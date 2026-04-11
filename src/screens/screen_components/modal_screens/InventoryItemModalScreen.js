@@ -56,9 +56,16 @@ function buildPathForButton(buttonID, allButtons) {
   return parts.join(" > ");
 }
 
+/** Check if a button's items array contains an inventory item ID (handles both legacy string entries and new object entries) */
+function buttonHasItem(btn, itemID) {
+  return (btn.items || []).some((entry) =>
+    typeof entry === "string" ? entry === itemID : entry.inventoryItemID === itemID
+  );
+}
+
 function getButtonsContainingItem(itemID, allButtons) {
   return allButtons
-    .filter((b) => b.items && b.items.includes(itemID))
+    .filter((b) => buttonHasItem(b, itemID))
     .map((b) => ({
       buttonID: b.id,
       path: buildPathForButton(b.id, allButtons),
@@ -76,7 +83,7 @@ const SubMenuRow = ({ parentID, itemID, quickButtons, onToggle, expandedIDs, tog
       {/* All chips on the same row */}
       <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
         {children.map((child) => {
-          let childIsIn = (child.items || []).includes(itemID);
+          let childIsIn = buttonHasItem(child, itemID);
           let hasGrandchildren = quickButtons.some((b) => b.parentID === child.id);
           let isExpanded = expandedIDs.includes(child.id);
           return (
@@ -203,7 +210,7 @@ const QuickButtonPickerModal = ({ itemID, quickButtons, onToggle, onClose }) => 
                 ) : (
                   rootButtons.map((btn) => {
                     let hasChildren = quickButtons.some((b) => b.parentID === btn.id);
-                    let isIn = (btn.items || []).includes(itemID);
+                    let isIn = buttonHasItem(btn, itemID);
                     let isExpanded = sExpandedIDs.includes(btn.id);
                     return (
                       <View
@@ -430,7 +437,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
       return;
     }
     let template = allTemplates[slug];
-    let printJob = labelPrintBuilder.label(slug, sItem, 1, template);
+    let printJob = labelPrintBuilder.zplLabel(slug, { ...sItem, storeDisplayName: zSettings?.storeInfo?.displayName || "" }, 1, template);
     dbSavePrintObj(printJob, printerID);
     _setPrintSuccess(true);
     setTimeout(() => _setPrintSuccess(false), 2000);
@@ -441,7 +448,9 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
   function handleRemoveFromButton(buttonID) {
     let updated = quickButtons.map((b) => {
       if (b.id !== buttonID) return b;
-      return { ...b, items: (b.items || []).filter((id) => id !== sItem.id) };
+      return { ...b, items: (b.items || []).filter((entry) =>
+        typeof entry === "string" ? entry !== sItem.id : entry.inventoryItemID !== sItem.id
+      ) };
     });
     _setDirty(true);
     useSettingsStore.getState().setField("quickItemButtons", updated, false);
@@ -451,11 +460,13 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
   function handleToggleInButton(buttonID) {
     let btn = quickButtons.find((b) => b.id === buttonID);
     if (!btn) return;
-    let isIn = (btn.items || []).includes(sItem.id);
+    let isIn = buttonHasItem(btn, sItem.id);
     let updated = quickButtons.map((b) => {
       if (b.id !== buttonID) return b;
       if (isIn) {
-        return { ...b, items: (b.items || []).filter((id) => id !== sItem.id) };
+        return { ...b, items: (b.items || []).filter((entry) =>
+          typeof entry === "string" ? entry !== sItem.id : entry.inventoryItemID !== sItem.id
+        ) };
       } else {
         return { ...b, items: [...(b.items || []), sItem.id] };
       }

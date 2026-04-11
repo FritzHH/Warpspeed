@@ -861,6 +861,35 @@ export const ActiveWorkorderComponent = ({}) => {
                     if (val.id === "33knktg") {
                       store.setField("finishedOnMillis", Date.now(), zOpenWorkorder.id);
                     }
+                    // Finished SMS confirmation modal
+                    if (val.id === "finished" && zOpenWorkorder.customerID) {
+                      const allWOs = store.getWorkorders();
+                      const otherWOs = allWOs.filter(
+                        (w) => w.customerID === zOpenWorkorder.customerID && w.id !== zOpenWorkorder.id
+                      );
+                      const hasOthers = otherWOs.length > 0;
+                      const allOthersFinished = hasOthers && otherWOs.every((w) => w.status === "finished");
+                      let modalMessage = "Would you like to send a text to let the customer know their bike is ready for pickup?";
+                      if (hasOthers && !allOthersFinished) {
+                        modalMessage = "This customer has other bikes that are still being worked on. Would you like to send a text to let them know this bike is ready?";
+                      } else if (allOthersFinished) {
+                        modalMessage = "All of this customer's bikes are now complete! Would you like to send a text to let them know everything is ready for pickup?";
+                      }
+                      useAlertScreenStore.getState().setValues({
+                        title: "Send Finished Text?",
+                        message: modalMessage,
+                        btn1Text: "Send",
+                        handleBtn1Press: () => {
+                          const finishedRule = { smsTemplateID: "finished_sms", emailTemplateID: "", delayMinutes: 0, delaySeconds: 0 };
+                          const wo = store.getWorkorders().find((w) => w.id === zOpenWorkorder.id) || zOpenWorkorder;
+                          scheduleAutoText(finishedRule, wo, zSettings);
+                          useAlertScreenStore.getState().setShowAlert(false);
+                        },
+                        btn2Text: "Don't Send",
+                        handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                        canExitOnOuterClick: true,
+                      });
+                    }
                     // When "Part Ordered" status is selected, clear the "to be ordered" checkbox
                     if (val.id === "part_ordered") {
                       store.setField("partToBeOrdered", false, zOpenWorkorder.id);

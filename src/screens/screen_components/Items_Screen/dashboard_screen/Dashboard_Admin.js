@@ -82,7 +82,7 @@ import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestore
 import { DB_NODES } from "../../../../constants";
 import { newCheckoutGetStripeReaders } from "../../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { StandButtonsCanvasEditor } from "./StandButtonsCanvas";
-import { LabelDesignerModal } from "../../modal_screens/LabelDesignerModal";
+import { LabelDesignerModalV2 as LabelDesignerModal } from "../../modal_screens/LabelDesignerModalV2";
 import { labelPrintBuilder } from "../../../../shared/labelPrintBuilder";
 
 
@@ -617,7 +617,57 @@ export function Dashboard_Admin({}) {
               }}
             >
               <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
-                Inject Settings
+                Inject Raw Settings
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={async () => {
+                const settings = useSettingsStore.getState().getSettings();
+                await dbSaveSettings(settings);
+                alert("Settings saved to Firestore.");
+              }}
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                borderRadius: 10,
+                borderWidth: 2,
+                borderColor: C.buttonLightGreenOutline,
+                backgroundColor: C.listItemWhite,
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: 10,
+              }}
+            >
+              <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
+                Save Settings
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={async () => {
+                const { dbGetSettings } = await import("../../../../db_calls_wrapper");
+                const { tenantID, storeID } = useSettingsStore.getState().getSettings();
+                const settings = await dbGetSettings(tenantID, storeID);
+                if (settings) {
+                  useSettingsStore.getState().setSettings(settings);
+                  alert("Settings rehydrated from Firestore.");
+                } else {
+                  alert("No settings found in Firestore.");
+                }
+              }}
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: 14,
+                borderRadius: 10,
+                borderWidth: 2,
+                borderColor: C.buttonLightGreenOutline,
+                backgroundColor: C.listItemWhite,
+                alignItems: "center",
+                justifyContent: "center",
+                marginTop: 10,
+              }}
+            >
+              <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
+                Rehydrate Settings
               </Text>
             </TouchableOpacity>
             <TouchableOpacity

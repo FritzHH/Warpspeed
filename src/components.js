@@ -3016,6 +3016,11 @@ export const TextInput_ = ({
   // Sync local state when value prop changes from external sources
   useEffect(() => {
     setLocalValue(value || "");
+    // Cancel any pending debounce so it doesn't overwrite the external value
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
   }, [value]);
 
   // Debounced function to call onChangeText

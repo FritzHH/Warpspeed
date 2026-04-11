@@ -1866,6 +1866,38 @@ export async function dbSearchCustomersByPhone(phoneNumber) {
 }
 
 /**
+ * Check if a cell phone number already exists on another customer.
+ * Unlike dbSearchCustomersByPhone, this function THROWS on network/query errors
+ * so the caller can distinguish "no match" from "network failure".
+ * @param {string} phone - 10-digit cell phone number
+ * @param {string} [excludeCustomerID] - Customer ID to exclude (for editing existing customers)
+ * @returns {Promise<{exists: boolean, customer: object|null}>}
+ * @throws {Error} On network or query failure
+ */
+export async function dbCheckCellPhoneExists(phone, excludeCustomerID) {
+  const { tenantID, storeID } = getTenantAndStore();
+  if (!tenantID || !storeID) throw new Error("Tenant/store not configured");
+
+  const cleanPhone = (phone || "").replace(/\D/g, "");
+  if (cleanPhone.length !== 10) return { exists: false, customer: null };
+
+  const collectionPath = buildCustomerCollectionPath(tenantID, storeID);
+
+  // Query both current and legacy field names
+  for (const field of ["customerCell", "cell"]) {
+    const results = await firestoreQuery(collectionPath, [
+      { field, operator: "==", value: cleanPhone },
+    ]);
+    const match = excludeCustomerID
+      ? results.find((c) => c.id !== excludeCustomerID)
+      : results[0];
+    if (match) return { exists: true, customer: match };
+  }
+
+  return { exists: false, customer: null };
+}
+
+/**
  * Search customers by email in Firestore (supports partial matching for real-time search)
  * @param {string} email - Email address (supports partial matches)
  * @returns {Promise<Object>} Object with success status and array of matching customers

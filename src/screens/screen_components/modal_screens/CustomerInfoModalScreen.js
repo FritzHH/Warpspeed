@@ -45,6 +45,7 @@ import {
   dbGetCompletedSale,
   dbGetCustomerMessages,
   dbListenToNewMessages,
+  dbCheckCellPhoneExists,
 } from "../../../db_calls_wrapper";
 import { smsService } from "../../../data_service_modules";
 import { readActiveSale, readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
@@ -85,7 +86,9 @@ export const CustomerInfoScreenModalComponent = ({
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
   const [sEditingCredit, _sSetEditingCredit] = useState(null);
   const [sRefundDeposit, _sSetRefundDeposit] = useState(null);
+  const [sCellDuplicateStatus, _sCellDuplicateStatus] = useState(null); // null | "checking" | "duplicate" | "unique" | "error"
   const mountedRef = useRef(true);
+  const initialCellRef = useRef(initialCustomer?.customerCell || "");
 
   // Fetch fresh customer on mount (background refresh even if we have cached data)
   useEffect(() => {
@@ -328,6 +331,21 @@ export const CustomerInfoScreenModalComponent = ({
     });
   }
 
+  async function checkCellPhoneUnique(phone) {
+    const clean = (phone || "").replace(/\D/g, "");
+    if (clean.length < 10) { _sCellDuplicateStatus(null); return; }
+    if (clean === initialCellRef.current) { _sCellDuplicateStatus(null); return; }
+    _sCellDuplicateStatus("checking");
+    try {
+      const { exists } = await dbCheckCellPhoneExists(clean, sCustomerInfo?.id);
+      if (!mountedRef.current) return;
+      _sCellDuplicateStatus(exists ? "duplicate" : "unique");
+    } catch (e) {
+      if (!mountedRef.current) return;
+      _sCellDuplicateStatus("error");
+    }
+  }
+
   const TEXT_INPUT_STYLE = {
     width: "100%",
     height: 40,
@@ -391,20 +409,35 @@ export const CustomerInfoScreenModalComponent = ({
           </View>
           <View>
             {!!sCustomerInfo?.customerCell && (
-              <Text style={{ color: gray(0.3), fontSize: 11, marginLeft: 2 }}>
-                Cell
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", marginLeft: 2 }}>
+                {sCellDuplicateStatus === "duplicate" ? (
+                  <Text style={{ color: C.red, fontSize: 11, fontWeight: "600" }}>Phone number duplicate</Text>
+                ) : sCellDuplicateStatus === "error" ? (
+                  <Text style={{ color: C.red, fontSize: 11, fontWeight: "600" }}>Network error - cannot verify</Text>
+                ) : sCellDuplicateStatus === "checking" ? (
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text style={{ color: gray(0.3), fontSize: 11 }}>Cell</Text>
+                    <SmallLoadingIndicator style={{ marginLeft: 5 }} />
+                  </View>
+                ) : (
+                  <Text style={{ color: gray(0.3), fontSize: 11 }}>Cell</Text>
+                )}
+              </View>
             )}
             <TextInput_
               onChangeText={(val) => {
                 val = removeDashesFromPhone(val);
                 if (val.length > 10) return;
                 saveField("customerCell", val);
+                checkCellPhoneUnique(val);
               }}
               placeholder="Cell phone"
               style={{
                 ...TEXT_INPUT_STYLE,
                 marginTop: sCustomerInfo.customerCell ? 1 : TEXT_INPUT_STYLE.marginTop,
+                ...(sCellDuplicateStatus === "duplicate" || sCellDuplicateStatus === "error"
+                  ? { borderColor: C.red, borderWidth: 2 }
+                  : {}),
               }}
               value={formatPhoneWithDashes(sCustomerInfo.customerCell)}
             />
@@ -502,6 +535,7 @@ export const CustomerInfoScreenModalComponent = ({
             {!!button1Text && (
               <Button_
                 onPress={() => handleButton1Press(sCustomerInfo)}
+                enabled={sCellDuplicateStatus !== "duplicate" && sCellDuplicateStatus !== "error" && sCellDuplicateStatus !== "checking"}
                 colorGradientArr={COLOR_GRADIENTS.blue}
                 buttonStyle={{
                   marginTop: 20,

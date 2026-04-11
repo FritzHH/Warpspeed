@@ -43,9 +43,13 @@ const LABEL_SIZES = [
 const AVAILABLE_FIELDS = [
   { name: "formalName", label: "Product Name", type: "text", placeholder: "Tire Kenda Kwick Trax 700x35 Continental Gatorskin Folding" },
   { name: "informalName", label: "Product Short Name", type: "text", placeholder: "Kwick Trax 700x35" },
+  { name: "brand", label: "Brand", type: "text", placeholder: "Continental" },
   { name: "id", label: "Barcode Number", type: "text", placeholder: "4827103956281" },
   { name: "price", label: "Price", type: "text", placeholder: "$49.99" },
   { name: "salePrice", label: "Sale Price", type: "text", placeholder: "$39.99" },
+  { name: "salePriceLabel", label: '"Sale Price" Text', type: "text", placeholder: "Sale Price" },
+  { name: "regPriceLabel", label: '"Reg. Price" Text', type: "text", placeholder: "Reg. Price" },
+  { name: "storeDisplayName", label: "Store Name", type: "text", placeholder: "Bonita Bikes" },
   { name: "barcode", label: "Barcode", type: "barcode" },
 ];
 
@@ -60,11 +64,13 @@ const DEFAULT_TEXT_FIELD = {
   align: "center",
 };
 
+const DEFAULT_BARCODE_DATA_LENGTH = 13; // EAN-13
+
 const DEFAULT_BARCODE_FIELD = {
   type: "barcode",
   x: 20,
   y: 20,
-  width: 422, // module 2 for 13-char barcode
+  width: 211, // module 1 for 13-char barcode
   height: 60,
 };
 
@@ -76,8 +82,6 @@ const MAX_CANVAS_HEIGHT = 380;
 function slugify(name) {
   return (name || "untitled").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "untitled";
 }
-
-const DEFAULT_BARCODE_DATA_LENGTH = 13; // EAN-13
 
 function getBarcodeValidWidths(dataLength) {
   let len = dataLength || DEFAULT_BARCODE_DATA_LENGTH;
@@ -101,7 +105,7 @@ function snapBarcodeWidth(rawWidth, dataLength) {
 function cleanField(field) {
   let f = { type: field.type, x: Number(field.x) || 0, y: Number(field.y) || 0 };
   if (field.type === "barcode") {
-    f.width = snapBarcodeWidth(Number(field.width) || 422);
+    f.width = snapBarcodeWidth(Number(field.width) || 211);
     f.height = Number(field.height) || 60;
   } else {
     f.width = Number(field.width) || 200;
@@ -112,50 +116,6 @@ function cleanField(field) {
   }
   f.name = field.name;
   return f;
-}
-
-// ─── Text Wrapping ──────────────────────────────────────────────────────────
-
-let _measureCanvas = null;
-function _getMeasureCtx() {
-  if (!_measureCanvas) _measureCanvas = document.createElement("canvas");
-  return _measureCanvas.getContext("2d");
-}
-
-function wrapTextForPrint(text, fieldWidth, fontSize, bold) {
-  if (!text || typeof text !== "string") return text;
-  let ctx = _getMeasureCtx();
-  // Use 0.75 factor to match the designer's CSS rendering ratio (fontSize * scale * 0.75 in a width * scale box)
-  let renderFontSize = fontSize * 0.75;
-  ctx.font = (bold ? "bold " : "") + renderFontSize + "px sans-serif";
-  let words = text.split(" ");
-  let lines = [];
-  let currentLine = "";
-  for (let i = 0; i < words.length; i++) {
-    let testLine = currentLine ? currentLine + " " + words[i] : words[i];
-    if (ctx.measureText(testLine).width > fieldWidth && currentLine) {
-      lines.push(currentLine);
-      currentLine = words[i];
-    } else {
-      currentLine = testLine;
-    }
-  }
-  if (currentLine) lines.push(currentLine);
-  return lines.join("\n");
-}
-
-export function wrapPrintData(data, fields) {
-  let wrapped = { ...data };
-  (fields || []).forEach(function (field) {
-    if (field.type === "text" && wrapped[field.name] && typeof wrapped[field.name] === "string") {
-      let maxLines = field.height && field.fontSize ? Math.floor(field.height / field.fontSize) : 999;
-      let wrappedText = wrapTextForPrint(wrapped[field.name], field.width || 200, field.fontSize || 30, field.bold === true);
-      let lines = wrappedText.split("\n");
-      if (lines.length > maxLines) lines = lines.slice(0, maxLines);
-      wrapped[field.name] = lines.join("\n");
-    }
-  });
-  return wrapped;
 }
 
 // ─── Sub-Components ─────────────────────────────────────────────────────────
@@ -236,8 +196,8 @@ function CanvasField({ field, scale, isSelected, onSelect, onDragStart, onResize
     );
   }
 
-  // Text field
-  let scaledFontSize = Math.max(8, (field.fontSize || 30) * scale * 0.75);
+  // Text field — Arial font at actual fontSize (no 0.75 factor)
+  let scaledFontSize = Math.max(8, (field.fontSize || 30) * scale);
   let scaledW = (field.width || 200) * scale;
   let scaledH = (field.height || 60) * scale;
   return (
@@ -251,6 +211,7 @@ function CanvasField({ field, scale, isSelected, onSelect, onDragStart, onResize
         width: scaledW,
         height: scaledH,
         fontSize: scaledFontSize,
+        fontFamily: "Arial",
         fontWeight: field.bold ? "bold" : "normal",
         color: isSelected ? C.blue : C.text,
         border: isSelected ? "2px dashed " + C.blue : "2px solid transparent",
@@ -322,7 +283,7 @@ function FieldPalette({ fields, onAddField, onRemoveField }) {
   );
 }
 
-function PropertiesPanel({ field, onUpdate, onRemove }) {
+function PropertiesPanel({ field, onUpdate, onRemove, labelWidth }) {
   if (!field) {
     return (
       <View style={{ width: "22%", minWidth: 160, paddingLeft: 15, justifyContent: "center", alignItems: "center" }}>
@@ -356,17 +317,21 @@ function PropertiesPanel({ field, onUpdate, onRemove }) {
 
       {isBarcode ? (
         <>
-          {/* Width — steps through valid barcode widths */}
+          {/* Width — steps through valid barcode widths, filtered by label width */}
           <PropRow label="Width" value={field.width}>
             <StepperButtons
               onMinus={() => {
-                let valid = getBarcodeValidWidths();
+                let valid = getBarcodeValidWidths().filter((w) => w <= (labelWidth || 9999));
+                if (valid.length === 0) return;
                 let idx = valid.indexOf(field.width);
+                if (idx === -1) { handleChange("width", valid[0]); return; }
                 if (idx > 0) handleChange("width", valid[idx - 1]);
               }}
               onPlus={() => {
-                let valid = getBarcodeValidWidths();
+                let valid = getBarcodeValidWidths().filter((w) => w <= (labelWidth || 9999));
+                if (valid.length === 0) return;
                 let idx = valid.indexOf(field.width);
+                if (idx === -1) { handleChange("width", valid[0]); return; }
                 if (idx < valid.length - 1) handleChange("width", valid[idx + 1]);
               }}
             />
@@ -588,7 +553,7 @@ function PrintSearchOverlay({ onSelect, onClose }) {
 
 // ─── Main Component ─────────────────────────────────────────────────────────
 
-export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) => {
+export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) => {
   const zSettingsObj = useSettingsStore((state) => state.settings);
 
   // Layout state
@@ -714,30 +679,15 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
         let updated = [...prev];
         let f = { ...r.startField };
         let pos = r.position;
-        if (f.type === "barcode") {
-          if (pos.includes("s")) f.height = Math.max(20, Math.round(r.startField.height + dy));
-          if (pos.includes("n")) {
-            let newH = Math.max(20, Math.round(r.startField.height - dy));
-            f.y = Math.max(0, Math.round(r.startField.y + (r.startField.height - newH)));
-            f.height = newH;
-          }
-          if (pos.includes("e")) {
-            let rawW = Math.round(r.startField.width + dx);
-            f.width = snapBarcodeWidth(rawW);
-          }
-          if (pos.includes("w")) {
-            let rawW = Math.round(r.startField.width - dx);
-            let snapped = snapBarcodeWidth(rawW);
-            f.x = Math.max(0, Math.round(r.startField.x + (r.startField.width - snapped)));
-            f.width = snapped;
-          }
-        } else {
-          if (pos.includes("s")) f.height = Math.max(20, Math.round(r.startField.height + dy));
-          if (pos.includes("n")) {
-            let newH = Math.max(20, Math.round(r.startField.height - dy));
-            f.y = Math.max(0, Math.round(r.startField.y + (r.startField.height - newH)));
-            f.height = newH;
-          }
+        // Height resize (all field types)
+        if (pos.includes("s")) f.height = Math.max(20, Math.round(r.startField.height + dy));
+        if (pos.includes("n")) {
+          let newH = Math.max(20, Math.round(r.startField.height - dy));
+          f.y = Math.max(0, Math.round(r.startField.y + (r.startField.height - newH)));
+          f.height = newH;
+        }
+        // Width resize (text only — barcode width must use stepper for valid sizes)
+        if (f.type !== "barcode") {
           if (pos.includes("e")) f.width = Math.max(40, Math.round(r.startField.width + dx));
           if (pos.includes("w")) {
             let newW = Math.max(40, Math.round(r.startField.width - dx));
@@ -839,7 +789,7 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
     // Migrate old barcode fields
     if (f.type === "barcode") {
       if (f.barcodeHeight && !f.height) f.height = Number(f.barcodeHeight);
-      if (!f.width) f.width = 300;
+      if (!f.width) f.width = 211;
       if (f.name === "primaryBarcode") f.name = "barcode";
       delete f.barcodeHeight;
       delete f.moduleWidth;
@@ -848,7 +798,7 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
     f.x = Number(f.x) || 0;
     f.y = Number(f.y) || 0;
     if (f.type === "barcode") {
-      f.width = snapBarcodeWidth(Number(f.width) || 422);
+      f.width = snapBarcodeWidth(Number(f.width) || 211);
       f.height = Number(f.height) || 60;
     } else {
       // Migrate old fontHeight/fontWidth to new fontSize/width/height
@@ -921,6 +871,21 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
     }
   }
 
+  function handleNewLayout() {
+    function clearToNew() {
+      _setFields([]);
+      _setLayoutName("");
+      _setCurrentLayout(null);
+      _setCurrentSlug(null);
+      _setSelectedFieldIdx(null);
+      _setIsDirty(false);
+    }
+    if (sIsDirty && sFields.length > 0) {
+      handleSaveLayout();
+    }
+    clearToNew();
+  }
+
   function handleTestPrint() {
     if (!sCurrentSlug) {
       useAlertScreenStore.getState().setValues({
@@ -939,19 +904,10 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
       });
       return;
     }
-    let testItem = {};
-    sFields.forEach((f) => {
-      let fieldDef = AVAILABLE_FIELDS.find((af) => af.name === f.name);
-      if (f.name === "price") testItem.price = 4999;
-      else if (f.name === "salePrice") testItem.salePrice = 3999;
-      else if (f.name === "barcode") testItem.barcode = "4827103956281";
-      else testItem[f.name] = fieldDef?.placeholder || fieldDef?.label || f.name;
-    });
     let cleanedFields = sFields.map(cleanField);
     let template = { labelWidth: sLabelSize.width, labelHeight: sLabelSize.height, fields: cleanedFields };
-    let printJob = labelPrintBuilder.label(sCurrentSlug, testItem, 1, template);
-    printJob.data = wrapPrintData(printJob.data, cleanedFields);
-    console.log("Test Print Job:", JSON.stringify(printJob, null, 2));
+    let printJob = labelPrintBuilder.zplTest(template);
+    console.log("Test Print Job (ZPL):", JSON.stringify(printJob, null, 2));
     dbSavePrintObj(printJob, printerID);
     _setPrintSuccess(true);
     setTimeout(() => _setPrintSuccess(false), 2000);
@@ -990,7 +946,7 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
           <TouchableWithoutFeedback onPress={() => {}}>
             <div
               tabIndex={0}
-              ref={(el) => { if (el) el.focus(); }}
+              ref={(el) => { if (el && !el._focused) { el.focus(); el._focused = true; } }}
               style={{
                 width: "92%",
                 maxWidth: 1000,
@@ -1008,6 +964,15 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
                 <Text style={{ fontSize: 16, fontWeight: Fonts.weight.textSuperheavy, color: C.text, marginRight: 15 }}>
                   Label Designer
                 </Text>
+
+                {/* New layout */}
+                <Button_
+                  text="New"
+                  onPress={handleNewLayout}
+                  colorGradientArr={COLOR_GRADIENTS.blue}
+                  style={{ marginRight: 8, paddingHorizontal: 12 }}
+                  textStyle={{ fontSize: 12 }}
+                />
 
                 {/* Layout name input */}
                 <TextInput_
@@ -1142,6 +1107,7 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
                   onRemove={() => {
                     if (selectedField) handleRemoveField(selectedField.name);
                   }}
+                  labelWidth={sLabelSize.width}
                 />
               </View>
 

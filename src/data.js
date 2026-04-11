@@ -1106,12 +1106,13 @@ export const SETTINGS_OBJ = {
   },
   smsTemplates: [
     {
-      id: "dfdas",
+      id: "finished_sms",
       label: "Finished",
       content: "Hi {firstName}, your {brand} {description} is ready for pickup! Your total is {totalAmount}. We're open {storeHours}. Call us at {storePhone} with any questions.",
       type: "",
       order: 0,
       showInChat: true,
+      removable: false,
     },
     {
       id: "fkdnfdfd",
@@ -1120,6 +1121,7 @@ export const SETTINGS_OBJ = {
       type: "",
       order: 0,
       showInChat: true,
+      removable: true,
     },
     {
       id: "default_sms_sale_receipt",
@@ -1128,6 +1130,7 @@ export const SETTINGS_OBJ = {
       type: "saleReceipt",
       order: 0,
       showInChat: false,
+      removable: false,
     },
     {
       id: "default_sms_intake_receipt",
@@ -1136,6 +1139,8 @@ export const SETTINGS_OBJ = {
       type: "intakeReceipt",
       order: 0,
       showInChat: false,
+      removable: false,
+
     },
   ],
   autoCustomerNoteTexts: [],

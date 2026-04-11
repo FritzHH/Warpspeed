@@ -785,7 +785,7 @@ export function WorkordersComponent({}) {
                               width: 8,
                               height: 8,
                               borderRadius: 4,
-                              backgroundColor: "gold",
+                              backgroundColor: C.green,
                               marginRight: 5,
                             }}
                           />
@@ -854,9 +854,6 @@ export function WorkordersComponent({}) {
                               {workorder.workorderLines.length}
                             </Text>
                           </View>
-                        )}
-                        {workorder.hasNewSMS && (
-                          <Image_ icon={ICONS.paperPlane} size={14} style={{ marginLeft: 6 }} />
                         )}
                       </View>
                     </View>

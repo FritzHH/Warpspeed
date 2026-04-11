@@ -102,7 +102,7 @@ const QuickItemCanvasCard = ({
     }
     let settings = useSettingsStore.getState().settings;
     let template = settings?.labelTemplates?.[slug];
-    let printJob = labelPrintBuilder.label(slug, invItem, 1, template);
+    let printJob = labelPrintBuilder.zplLabel(slug, { ...invItem, storeDisplayName: settings?.storeInfo?.displayName || "" }, 1, template);
     dbSavePrintObj(printJob, printerID);
     _setShowPrintPicker(false);
     _setPrintSuccess(true);
@@ -378,7 +378,7 @@ const QuickItemCanvasCard = ({
                 onClick={() => handlePrintClick()}
                 style={{ cursor: "pointer", padding: 2, display: "flex", alignItems: "center", justifyContent: "center" }}
               >
-                <Image_ icon={ICONS.print} size={11} />
+                <Image_ icon={ICONS.print} size={8} />
               </div>
             </div>
           )}
@@ -716,6 +716,8 @@ export function InventoryComponent({}) {
   const [sSelectedButtonID, _setSelectedButtonID] = useState(null);
   const [sCustomItemModal, _setCustomItemModal] = useState(null); // "labor" | "part" | null
   const [sForceEditMode, _setForceEditMode] = useState(false);
+  const [sListPrintPickerID, _setListPrintPickerID] = useState(null);
+  const [sListPrintSuccessID, _setListPrintSuccessID] = useState(null);
   const barcodeModalTimerRef = useRef(null);
 
   // Timeout to batch all store updates and reduce re-renders
@@ -981,6 +983,40 @@ export function InventoryComponent({}) {
   function handleInventoryInfoPress(item) {
     console.log("handleInventoryInfoPress:", item?.formalName, item?.id);
     _setModalItem({ ...item });
+  }
+
+  function handleListPrintClick(item) {
+    if (!item) return;
+    let settings = useSettingsStore.getState().settings;
+    let allTemplates = settings?.labelTemplates || {};
+    let templateEntries = Object.entries(allTemplates);
+    let quickPrintSlugs = settings?.quickPrintLayouts || [];
+    let qpEntries = templateEntries.filter(([slug]) => quickPrintSlugs.includes(slug));
+    if (qpEntries.length === 0) {
+      showAlert({ title: "No Quick Print Layouts", message: "Mark layouts as Quick Print in the Label Designer.", btn1Text: "OK" });
+      return;
+    }
+    if (qpEntries.length === 1) {
+      handleListPrintWithTemplate(qpEntries[0][0], item);
+    } else {
+      _setListPrintPickerID(item.id);
+    }
+  }
+
+  function handleListPrintWithTemplate(slug, item) {
+    if (!item) return;
+    let printerID = localStorageWrapper.getItem("selectedLabelPrinterID") || "";
+    if (!printerID) {
+      showAlert({ title: "No Label Printer", message: "Select a label printer for this device in Settings.", btn1Text: "OK" });
+      return;
+    }
+    let settings = useSettingsStore.getState().settings;
+    let template = settings?.labelTemplates?.[slug];
+    let printJob = labelPrintBuilder.zplLabel(slug, { ...item, storeDisplayName: settings?.storeInfo?.displayName || "" }, 1, template);
+    dbSavePrintObj(printJob, printerID);
+    _setListPrintPickerID(null);
+    _setListPrintSuccessID(item.id);
+    setTimeout(() => _setListPrintSuccessID(null), 1500);
   }
 
   function handleCustomItemSave(lineItem) {
@@ -1335,6 +1371,68 @@ export function InventoryComponent({}) {
                         marginBottom: 5,
                       }}
                     >
+                      <View style={{ width: "5%", position: "relative" }}>
+                        <Button_
+                          icon={ICONS.print}
+                          iconSize={15}
+                          buttonStyle={{ width: 30 }}
+                          onPress={() => handleListPrintClick(item)}
+                        />
+                        {sListPrintPickerID === item.id && (() => {
+                          let settings = useSettingsStore.getState().settings;
+                          let allTemplates = settings?.labelTemplates || {};
+                          let templateEntries = Object.entries(allTemplates);
+                          let quickPrintSlugs = settings?.quickPrintLayouts || [];
+                          let qpEntries = templateEntries.filter(([slug]) => quickPrintSlugs.includes(slug));
+                          return (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              onMouseDown={(e) => e.stopPropagation()}
+                              style={{
+                                position: "absolute",
+                                top: "100%",
+                                left: 0,
+                                zIndex: 10,
+                                backgroundColor: "white",
+                                borderRadius: 6,
+                                border: "1px solid " + gray(0.2),
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                minWidth: 120,
+                                overflow: "hidden",
+                              }}
+                            >
+                              {qpEntries.map(([slug, template]) => (
+                                <div
+                                  key={slug}
+                                  onClick={(e) => { e.stopPropagation(); handleListPrintWithTemplate(slug, item); }}
+                                  style={{
+                                    padding: "5px 8px",
+                                    cursor: "pointer",
+                                    fontSize: 10,
+                                    color: C.text,
+                                    borderBottom: "1px solid " + gray(0.1),
+                                  }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
+                                >
+                                  {template.name}
+                                </div>
+                              ))}
+                              <div
+                                onClick={(e) => { e.stopPropagation(); _setListPrintPickerID(null); }}
+                                style={{ padding: "4px 8px", cursor: "pointer", fontSize: 9, color: gray(0.5), textAlign: "center" }}
+                              >
+                                Cancel
+                              </div>
+                            </div>
+                          );
+                        })()}
+                        {sListPrintSuccessID === item.id && (
+                          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(88,145,65,0.15)", borderRadius: 8, zIndex: 5, pointerEvents: "none" }}>
+                            <Text style={{ fontSize: 9, color: C.green, fontWeight: "600" }}>Sent!</Text>
+                          </div>
+                        )}
+                      </View>
                       {!!zOpenWorkorderID && (
                         <View style={{ width: "5%" }}>
                           <Button_
@@ -1350,7 +1448,7 @@ export function InventoryComponent({}) {
                       <TouchableOpacity_
                         style={{
                           height: "100%",
-                          width: zOpenWorkorderID ? "95%" : "100%",
+                          width: zOpenWorkorderID ? "90%" : "95%",
                         }}
                         onPress={() => inventoryItemSelected(item)}
                       >

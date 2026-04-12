@@ -11,7 +11,7 @@ import {
   resolveStatus,
   deepEqual,
 } from "../../../utils";
-import { TabMenuDivider as Divider, CheckBox_, SmallLoadingIndicator, Image_, Button_, TextInput_ } from "../../../components";
+import { TabMenuDivider as Divider, CheckBox_, SmallLoadingIndicator, Image_, Button_, TextInput_, Tooltip } from "../../../components";
 import { C, Colors, Fonts, ICONS } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
 import React, { useEffect, useRef, useState } from "react";
@@ -24,12 +24,9 @@ import {
   useTabNamesStore,
   useWorkorderPreviewStore,
   useActiveSalesStore,
-  useCheckoutStore,
   useCustMessagesStore,
 } from "../../../stores";
-import { dbGetCustomer, dbGetCompletedWorkorder, dbGetCompletedSale, dbSearchCompletedWorkorders, dbGetCustomerMessages, dbListenToNewMessages } from "../../../db_calls_wrapper";
-import { readTransaction } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
-import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
+import { dbGetCustomer, dbGetCustomerMessages, dbListenToNewMessages } from "../../../db_calls_wrapper";
 
 
 const NUM_MILLIS_IN_DAY = 86400000; // millis in day
@@ -162,8 +159,6 @@ export function WorkordersComponent({}) {
   const zPendingWOIDs = (zUsers || []).find((u) => u.id === zCurrentUser?.id)?.pendingWorkorderIDs || EMPTY_PENDING;
 
   const [sSearchTerm, _setSearchTerm] = useState("");
-  const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
-  const [sSearching, _sSetSearching] = useState(false);
   const [sStatusBlink, _setStatusBlink] = useState(false);
 
   useEffect(() => {
@@ -196,179 +191,47 @@ export function WorkordersComponent({}) {
     }
   }
 
-  function getSearchMode(raw) {
-    if (!raw) return null;
-    let upper = raw.toUpperCase();
-    if (upper[0] === "W" && (upper.length === 1 || upper[1] === "O")) return "WO_MODE";
-    if (/^\d/.test(raw)) return "NUMBER_MODE";
-    if (/^[a-zA-Z]/.test(raw)) return "NAME_MODE";
-    return null;
-  }
-
-  function formatSearchDisplay(val) {
-    let raw = val.replace(/-/g, "");
-    let mode = getSearchMode(raw);
-
-    if (mode === "WO_MODE") {
-      // Single "W" typed -> autocomplete to "WO-"
-      if (raw.length === 1) return "WO-";
-      // Auto-capitalize WO prefix
-      let formatted = "WO" + raw.slice(2).toUpperCase();
-      // Insert dash after WO
-      if (formatted.length > 2) formatted = "WO-" + formatted.slice(2);
-      // Insert dash after 4 digits (position WO- + 4 digits = index 6 in raw = index 7 in display)
-      if (formatted.length > 7) formatted = formatted.slice(0, 7) + "-" + formatted.slice(7);
-      return formatted;
-    }
-
-    if (mode === "NAME_MODE") {
-      // Auto-capitalize first letter of each word
-      return raw.replace(/\b\w/g, (c) => c.toUpperCase());
-    }
-
-    // NUMBER_MODE or single char - return as-is
-    return raw;
-  }
-
   function handleSearchChange(val) {
-    // Strip special characters (allow letters, digits, spaces only)
-    val = val.replace(/[^a-zA-Z0-9\s-]/g, "");
+    _setSearchTerm(val);
+  }
 
-    // Backspace from "WO-" -> clear completely
-    let raw = val.replace(/-/g, "");
-    if (sSearchTerm === "WO-" && raw.length < 3) {
-      _setSearchTerm("");
-      _sSetSearching(false);
-      return;
+  function scoreWorkorder(wo, query) {
+    let q = query.toLowerCase().trim();
+    if (!q) return 0;
+    let parts = q.split(/\s+/).filter(Boolean);
+    let score = 0;
+
+    let fields = {
+      workorderNumber: (wo.workorderNumber || "").toLowerCase(),
+      id: (wo.id || "").toLowerCase(),
+      first: (wo.customerFirst || "").toLowerCase(),
+      last: (wo.customerLast || "").toLowerCase(),
+      phone: (wo.customerCell || "").replace(/\D/g, ""),
+      email: (wo.customerEmail || "").toLowerCase(),
+      brand: (wo.brand || "").toLowerCase(),
+      description: (wo.description || "").toLowerCase(),
+    };
+
+    for (let part of parts) {
+      let partScore = 0;
+      // Exact start matches score highest
+      if (fields.first === part || fields.last === part) partScore = Math.max(partScore, 100);
+      if (fields.first.startsWith(part)) partScore = Math.max(partScore, 80);
+      if (fields.last.startsWith(part)) partScore = Math.max(partScore, 80);
+      if (fields.workorderNumber.includes(part)) partScore = Math.max(partScore, 70);
+      if (fields.id.includes(part)) partScore = Math.max(partScore, 70);
+      if (fields.phone.includes(part)) partScore = Math.max(partScore, 60);
+      if (fields.email.includes(part)) partScore = Math.max(partScore, 50);
+      if (fields.brand.startsWith(part)) partScore = Math.max(partScore, 45);
+      if (fields.brand.includes(part)) partScore = Math.max(partScore, 35);
+      if (fields.description.includes(part)) partScore = Math.max(partScore, 30);
+      // Partial contains on names
+      if (!partScore && fields.first.includes(part)) partScore = 20;
+      if (!partScore && fields.last.includes(part)) partScore = 20;
+      score += partScore;
     }
 
-    let digits = raw.replace(/\D/g, "");
-
-    // 13-digit barcode scanner detection (instant scan)
-    if (digits.length === 13 && /^\d{13}$/.test(raw)) {
-      _setSearchTerm(raw);
-      let prefix = digits[0];
-      if (prefix === "1") {
-        let found = zOpenWorkorders.find((w) => w.id === digits);
-        if (found) {
-          useOpenWorkordersStore.getState().setOpenWorkorderID(found.id);
-          if (found.customerID) {
-            dbGetCustomer(found.customerID).then((c) => {
-              if (c) useCurrentCustomerStore.getState().setCustomer(c, false);
-            });
-            if (found.customerCell) fetchCustomerMessages(found.customerCell);
-          }
-          useTabNamesStore.getState().setItems({
-            infoTabName: TAB_NAMES.infoTab.workorder,
-            itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-            optionsTabName: TAB_NAMES.optionsTab.inventory,
-          });
-          _setSearchTerm("");
-        } else {
-          dbGetCompletedWorkorder(digits).then((wo) => {
-            if (wo) {
-              let store = useOpenWorkordersStore.getState();
-              store.setWorkorder(wo, false);
-              store.setLockedWorkorderID(wo.id);
-              store.setOpenWorkorderID(wo.id);
-              useTabNamesStore.getState().setItems({
-                infoTabName: TAB_NAMES.infoTab.workorder,
-                itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-                optionsTabName: TAB_NAMES.optionsTab.inventory,
-              });
-              if (wo.customerID) {
-                dbGetCustomer(wo.customerID).then((c) => {
-                  if (c) useCurrentCustomerStore.getState().setCustomer(c, false);
-                });
-                if (wo.customerCell) fetchCustomerMessages(wo.customerCell);
-              }
-            }
-            _setSearchTerm("");
-          });
-        }
-        return;
-      } else if (prefix === "3") {
-        readTransaction(digits).then((txn) => {
-          if (txn?.saleID) {
-            useCheckoutStore.getState().setStringOnly(txn.saleID);
-          }
-          _setSearchTerm("");
-        });
-        return;
-      } else if (prefix === "4") {
-        useCheckoutStore.getState().setStringOnly(digits);
-        _setSearchTerm("");
-        return;
-      }
-    }
-
-    // Format for display and store
-    let display = formatSearchDisplay(val);
-    _setSearchTerm(display);
-    _sSetSearching(false);
-
-    let mode = getSearchMode(raw);
-
-    // Remote search triggers
-    if (mode === "WO_MODE") {
-      let woRaw = "WO" + raw.slice(2).toUpperCase();
-      // Full WO number = 11 chars (WO + 4 digits + 3 month + 2 year)
-      if (woRaw.length >= 11) {
-        let localMatches = zOpenWorkorders.filter((wo) =>
-          (wo.workorderNumber || "").toUpperCase().includes(woRaw)
-        );
-        if (localMatches.length === 0) {
-          _sSetSearching(true);
-          dbSearchCompletedWorkorders("workorderNumber", woRaw).then((results) => {
-            _sSetSearching(false);
-            if (results && results.length > 0) {
-              _sSetClosedWorkorder(results[0]);
-            }
-          });
-        }
-      }
-    } else if (mode === "NUMBER_MODE") {
-      // 12+ digits with no local ID match -> remote pull by ID
-      if (digits.length >= 12) {
-        let localIDMatch = zOpenWorkorders.find((wo) => (wo.id || "").includes(digits));
-        if (!localIDMatch) {
-          _sSetSearching(true);
-          dbGetCompletedWorkorder(digits).then((wo) => {
-            if (wo) {
-              _sSetSearching(false);
-              _sSetClosedWorkorder(wo);
-            } else if (digits.length >= 10) {
-              // Also try phone search if no ID match
-              let phone = digits.slice(0, 10);
-              dbSearchCompletedWorkorders("customerCell", phone).then((results) => {
-                _sSetSearching(false);
-                if (results && results.length > 0) {
-                  _sSetClosedWorkorder(results[0]);
-                }
-              });
-            } else {
-              _sSetSearching(false);
-            }
-          });
-        }
-      } else if (digits.length >= 10) {
-        // 10+ digits with no local phone match -> remote phone search
-        let phone = digits.slice(0, 10);
-        let localPhoneMatch = zOpenWorkorders.find((wo) => {
-          let woPhone = (wo.customerCell || "").replace(/\D/g, "");
-          return woPhone.includes(phone);
-        });
-        if (!localPhoneMatch) {
-          _sSetSearching(true);
-          dbSearchCompletedWorkorders("customerCell", phone).then((results) => {
-            _sSetSearching(false);
-            if (results && results.length > 0) {
-              _sSetClosedWorkorder(results[0]);
-            }
-          });
-        }
-      }
-    }
+    return score;
   }
 
   ///////////////////////////////////////////////////////////////////
@@ -545,42 +408,13 @@ export function WorkordersComponent({}) {
     return finalArr;
   }
 
-  function filterWorkorders(workorders) {
-    let raw = sSearchTerm.replace(/-/g, "");
-    let mode = getSearchMode(raw);
-
-    if (mode === "WO_MODE") {
-      // Search starts at 4+ chars total (WO + 2 digits)
-      if (raw.length < 4) return workorders;
-      let woRaw = "WO" + raw.slice(2).toUpperCase();
-      return workorders.filter((wo) =>
-        (wo.workorderNumber || "").toUpperCase().includes(woRaw)
-      );
-    }
-
-    if (mode === "NUMBER_MODE") {
-      if (raw.length < 2) return workorders;
-      let digits = raw.replace(/\D/g, "");
-      return workorders.filter((wo) => {
-        let phone = (wo.customerCell || "").replace(/\D/g, "");
-        return (wo.id || "").includes(digits) || (digits.length >= 2 && phone.includes(digits));
-      });
-    }
-
-    if (mode === "NAME_MODE") {
-      if (raw.length < 2) return workorders;
-      let parts = raw.toLowerCase().split(/\s+/).filter(Boolean);
-      if (parts.length === 0) return workorders;
-      return workorders.filter((wo) => {
-        let first = (wo.customerFirst || "").toLowerCase();
-        let last = (wo.customerLast || "").toLowerCase();
-        let email = (wo.customerEmail || "").toLowerCase();
-        return parts.some((part) => first.includes(part) || last.includes(part) || email.includes(part));
-      });
-    }
-
-    // PENDING_WO (single "W") or unknown - show all
-    return workorders;
+  function filterAndRankWorkorders(workorders) {
+    let q = sSearchTerm.trim();
+    if (!q) return workorders;
+    let scored = workorders.map((wo) => ({ wo, score: scoreWorkorder(wo, q) }));
+    scored = scored.filter((s) => s.score > 0);
+    scored.sort((a, b) => b.score - a.score);
+    return scored.map((s) => s.wo);
   }
 
   function onMouseEnter(workorder) {
@@ -653,8 +487,6 @@ export function WorkordersComponent({}) {
             iconSize={20}
             onPress={() => {
               _setSearchTerm("");
-              _sSetClosedWorkorder(null);
-              _sSetSearching(false);
             }}
             useColorGradient={false}
             disabled={!sSearchTerm}
@@ -671,7 +503,7 @@ export function WorkordersComponent({}) {
               marginLeft: 8,
               marginRight: 12,
             }}
-            placeholder="Search workorders"
+            placeholder="Find open workorder"
             placeholderTextColor={gray(0.2)}
             value={sSearchTerm}
             onChangeText={handleSearchChange}
@@ -697,15 +529,13 @@ export function WorkordersComponent({}) {
           height: "96%",
           backgroundColor: null,
         }}
-        data={filterWorkorders(sortWorkorders(zOpenWorkorders.filter((wo) => !!wo.customerID)))}
+        data={sSearchTerm.trim() ? filterAndRankWorkorders(zOpenWorkorders.filter((wo) => !!wo.customerID)) : sortWorkorders(zOpenWorkorders.filter((wo) => !!wo.customerID))}
         keyExtractor={(item, index) => index}
         ListEmptyComponent={() => (
           <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 30 }}>
             {!zWorkordersLoaded ? (
               <SmallLoadingIndicator message="Loading workorders...." size={40} textStyle={{ fontSize: 16 }} />
-            ) : sSearching ? (
-              <SmallLoadingIndicator message="Searching..." size={30} textStyle={{ fontSize: 14 }} />
-            ) : sSearchTerm.replace(/-/g, "").length >= 2 ? (
+            ) : sSearchTerm.trim() ? (
               <View style={{ alignItems: "center" }}>
                 <Image_ source={ICONS.info} style={{ width: 24, height: 24, marginBottom: 6, opacity: 0.5 }} />
                 <Text style={{ color: gray(0.4), fontSize: 14 }}>No results found</Text>
@@ -911,7 +741,7 @@ export function WorkordersComponent({}) {
                   </View>
 
                   {/* Part ordered / source row */}
-                  {!!(workorder.partOrdered || workorder.partSource) && (
+                  {!!(workorder.partOrdered || workorder.partSource || workorder.trackingNumber) && (
                     <View
                       style={{
                         flexDirection: "row",
@@ -947,16 +777,32 @@ export function WorkordersComponent({}) {
                           {workorder.partSource}
                         </Text>
                       )}
-                      {!!workorder.partOrderedMillis && (
+                      {!!(workorder.partOrderedMillis && workorder.partOrderEstimateMillis && Math.round((workorder.partOrderEstimateMillis - workorder.partOrderedMillis) / NUM_MILLIS_IN_DAY) > 0) && (
                         <Text
                           numberOfLines={1}
                           style={{ fontSize: 11, color: "dimgray", marginLeft: 6 }}
                         >
                           {formatMillisForDisplay(workorder.partOrderedMillis)}
-                          {!!workorder.partOrderEstimateMillis &&
-                            " → " + formatMillisForDisplay(workorder.partOrderEstimateMillis)
-                          }
+                          {" → " + formatMillisForDisplay(workorder.partOrderEstimateMillis)}
                         </Text>
+                      )}
+                      {!!workorder.trackingNumber && (
+                        <Tooltip text="Press to copy tracking info to clipboard" position="top">
+                          <TouchableOpacity
+                            onPress={() => {
+                              navigator.clipboard.writeText(workorder.trackingNumber);
+                            }}
+                            style={{
+                              marginLeft: 6,
+                              paddingVertical: 2,
+                              paddingHorizontal: 8,
+                              borderRadius: 4,
+                              backgroundColor: lightenRGBByPercent(C.blue, 75),
+                            }}
+                          >
+                            <Text style={{ fontSize: 11, color: C.blue, fontWeight: "500" }}>Tracking</Text>
+                          </TouchableOpacity>
+                        </Tooltip>
                       )}
                     </View>
                   )}
@@ -965,10 +811,6 @@ export function WorkordersComponent({}) {
             </View>
           );
         }}
-      />
-      <ClosedWorkorderModal
-        workorder={sClosedWorkorder}
-        onClose={() => _sSetClosedWorkorder(null)}
       />
     </View>
   );

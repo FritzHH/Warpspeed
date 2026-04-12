@@ -413,7 +413,7 @@ export const ActiveWorkorderComponent = ({}) => {
         flex: 1,
         justifyContent: "space-between",
         alignItems: "center",
-        paddingBottom: 11,
+        paddingBottom: 0,
         paddingTop: 5,
         paddingHorizontal: 5,
         backgroundColor: (zIsPreview || zIsLocked)
@@ -552,12 +552,12 @@ export const ActiveWorkorderComponent = ({}) => {
           </View>
         </View>
 
-        {(!zWorkordersLoaded || !zCustomerRefreshed) && zOpenWorkorder && (
+        {/* {(!zWorkordersLoaded || !zCustomerRefreshed) && zOpenWorkorder && (
           <StaleBanner
             text="Waiting on customer refresh...."
             style={{ marginTop: 8, width: "100%" }}
           />
-        )}
+        )} */}
 
         <View pointerEvents={isDonePaid ? "none" : "auto"} style={{ width: "100%" }}>
           <View
@@ -566,7 +566,9 @@ export const ActiveWorkorderComponent = ({}) => {
               borderColor: gray(0.05),
               paddingHorizontal: 8,
               paddingVertical: 8,
-              backgroundColor: C.backgroundListWhite,
+              // backgroundColor: C.backgroundListWhite,
+              backgroundColor: gray(0.05),
+
               borderWidth: 1,
               borderRadius: 5,
             }}
@@ -1041,7 +1043,7 @@ export const ActiveWorkorderComponent = ({}) => {
 
           <View
             style={{
-              marginTop: 11,
+              marginTop: 0,
               width: "100%",
 
               // borderColor: gray(0.05),
@@ -1050,8 +1052,10 @@ export const ActiveWorkorderComponent = ({}) => {
               backgroundColor: gray(0.05),
               // borderWidth: 1,
               borderRadius: 5,
+
             }}
           >
+            <View style={{ width: '100%', height: 3, borderRadius: 5, backgroundColor: 'orange', marginBottom: 7, opacity: .5 }} />
             <View
               style={{
                 flexDirection: "row",
@@ -1205,7 +1209,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   <Text style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>+</Text>
                 </TouchableOpacity>
                 {!!zOpenWorkorder?.partOrderEstimateMillis && !zOpenWorkorder?.partToBeOrdered && (
-                  <Text style={{ fontSize: 14, color: gray(0.45), marginLeft: 8 }}>
+                  <Text style={{ fontSize: 14, color: sWaitDays > 0 ? gray(0.45) : "transparent", marginLeft: 8 }}>
                     {formatMillisForDisplay(zOpenWorkorder.partOrderEstimateMillis)}
                   </Text>
                 )}
@@ -1220,15 +1224,34 @@ export const ActiveWorkorderComponent = ({}) => {
                 textStyle={{ fontSize: 12, color: gray(0.55) }}
               />
             </View>
+            <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', marginTop: 8, paddingVertical: 2 }}>
+              <TextInput_
+                placeholder="Optional tracking here"
+                placeholderTextColor={gray(.3)}
+                value={zOpenWorkorder?.trackingNumber || ""}
+                onChangeText={(val) => {
+                  useOpenWorkordersStore.getState().setField("trackingNumber", val, zOpenWorkorder.id);
+                }}
+                multiline={false}
+                numberOfLines={1}
+                style={{ height: '100%', fontSize: 13, flex: 3, paddingHorizontal: 3, borderWidth: 1, borderColor: gray(.3), borderRadius: 6, resize: "none", overflow: "hidden", color: C.text }}
+              />
+              <Tooltip text="Copy tracking info" position="top">
+                <Button_
+                  text={"Copy"}
+                  textStyle={{ fontSize: 12 }}
+                  buttonStyle={{ height: '90%', marginLeft: 5, backgroundColor: zOpenWorkorder?.trackingNumber ? C.green : gray(0.45), flex: 1 }}
+                  disabled={!zOpenWorkorder?.trackingNumber}
+                  onPress={() => {
+                    navigator.clipboard.writeText(zOpenWorkorder?.trackingNumber || "");
+                  }}
+                />
+              </Tooltip>
+            </View>
           </View>
         </View>
       </View>
-      <style>{`
-        @keyframes uploadBarCycle {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(350%); }
-        }
-      `}</style>
+
       <View
         style={{
           flexDirection: "row",
@@ -1241,7 +1264,7 @@ export const ActiveWorkorderComponent = ({}) => {
           // backgroundColor: C.backgroundListWhite,
 
           borderWidth: 1,
-          paddingHorizontal: 10,
+          paddingHorizontal: 3,
         }}
       >
         <Tooltip text="New Workorder" position="top">
@@ -1265,11 +1288,13 @@ export const ActiveWorkorderComponent = ({}) => {
             // onPress={}
           />
         </Tooltip>
+        <Tooltip text="Print/Send Intake ticket" position="top">
+
         <Pressable_
           onPress={handleIntakePrintPress}
           onRightPress={handleIntakeRightClick}
           tooltip="Print/send intake receipt"
-        >
+          >
           <Button_
             icon={ICONS.receipt}
             iconSize={35}
@@ -1277,7 +1302,9 @@ export const ActiveWorkorderComponent = ({}) => {
             buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
             onPress={handleIntakePrintPress}
           />
-        </Pressable_>
+          </Pressable_>
+        </Tooltip>
+
         <Tooltip text={sUploadProgress && !sUploadProgress.done ? "Upload in progress, you may continue work safely" : "View & upload photos to workorder"} position="top">
           <View>
             <Button_
@@ -1294,8 +1321,8 @@ export const ActiveWorkorderComponent = ({}) => {
               pointerEvents="none"
               style={{
                 position: "absolute",
-                top: -1,
-                right: -5,
+                top: -3,
+                right: -10,
                 borderRadius: 8,
                 minWidth: 16,
                 height: 16,

@@ -63,7 +63,7 @@ import {
 } from "../../../stores";
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
-import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond, dbToggleSMSForwarding, dbGetCustomer } from "../../../db_calls_wrapper";
+import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond, dbToggleSMSForwarding, dbGetCustomer, dbSaveMessageTranslation } from "../../../db_calls_wrapper";
 import { translateText } from "../../../db_calls";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { TransformWrapper, TransformComponent, useTransformEffect } from "react-zoom-pan-pinch";
@@ -2392,7 +2392,8 @@ const MediaThumbnail = memo(({ url, thumbnailUrl, contentType }) => {
 });
 
 const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom, autoTranslateTo }) => {
-  const [sTranslation, _setTranslation] = useState({ text: "", loading: false, langCode: "" });
+  const cached = msgObj.translated;
+  const [sTranslation, _setTranslation] = useState(cached ? { text: cached.text, loading: false, langCode: cached.langCode, detectedFrom: cached.detectedFrom || "" } : { text: "", loading: false, langCode: "" });
   const [sContextMenu, _setContextMenu] = useState({ x: 0, y: 0, visible: false });
   const autoTranslatedRef = useRef(false);
 
@@ -2406,6 +2407,7 @@ const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom, autoTranslate
   useEffect(() => {
     if (autoTranslatedRef.current || !autoTranslateTo || !msgObj.message) return;
     autoTranslatedRef.current = true;
+    if (cached?.text && cached.langCode === autoTranslateTo) return;
     doTranslate("en", autoTranslateTo);
   }, [autoTranslateTo]);
 
@@ -2413,6 +2415,12 @@ const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom, autoTranslate
     if (!msgObj.message) return;
     e.preventDefault();
     _setContextMenu({ x: e.clientX, y: e.clientY, visible: true });
+  }
+
+  function saveTranslation(translated) {
+    if (!msgObj.id || !msgObj.phoneNumber) return;
+    msgObj.translated = translated;
+    dbSaveMessageTranslation(msgObj.phoneNumber, msgObj.id, translated);
   }
 
   function doTranslate(langCode, sourceLang) {
@@ -2428,6 +2436,7 @@ const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom, autoTranslate
             _setTranslation({ text: "", loading: false, langCode });
           } else {
             _setTranslation({ text: translated, loading: false, langCode, detectedFrom: detected });
+            saveTranslation({ text: translated, langCode, detectedFrom: detected });
           }
         } else {
           _setTranslation({ text: "", loading: false, langCode });

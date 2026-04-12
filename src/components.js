@@ -2324,10 +2324,12 @@ export const Button_ = ({
 
   // log(enabled.toString());
   return (
-    <View pointerEvents={!enabled ? "none" : "auto"}>
+    <View style={{ cursor: !enabled ? "default" : undefined }}>
       <TouchableOpacity
+        disabled={!enabled}
         style={{
           opacity: getOpacity(),
+          cursor: !enabled ? "default" : "pointer",
           ...viewStyle,
         }}
         activeOpacity={enabled ? null : 1}

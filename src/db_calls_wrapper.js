@@ -2904,6 +2904,19 @@ export async function dbUpdateMessageCanRespond(phone, messageId, canRespond) {
   }
 }
 
+export async function dbSaveMessageTranslation(phone, messageId, translated) {
+  try {
+    const cleanPhone = (phone || "").replace(/\D/g, "");
+    if (cleanPhone.length !== 10) return;
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return;
+    const path = `tenants/${tenantID}/stores/${storeID}/sms-messages/${cleanPhone}/messages/${messageId}`;
+    await firestoreUpdate(path, { translated });
+  } catch (error) {
+    log("Error saving message translation", { error: error.message, phone, messageId });
+  }
+}
+
 export async function dbSendEmail(to, subject, htmlBody) {
   const { tenantID, storeID } = getTenantAndStore();
 

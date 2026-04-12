@@ -615,7 +615,7 @@ export const Items_WorkorderItemsTab = ({}) => {
           }}
         >
           <Text style={{ color: "black", fontSize: 12, fontWeight: "600" }}>
-            {(activeSale?.workorderIDs?.length || 0) > 1 ? "Combined Sale in Progress" : "Sale in Progress"}
+            {((activeSale?.workorderIDs?.length || 0) > 1 ? "Combined Sale in Progress" : "Sale in Progress") + " - $" + formatCurrencyDisp((activeSale?.amountCaptured || 0) - (activeSale?.amountRefunded || 0)) + " Paid"}
           </Text>
         </Animated.View>
       )}

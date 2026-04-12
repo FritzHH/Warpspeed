@@ -166,10 +166,16 @@ export const NONREMOVABLE_STATUSES = [
   },
   {
     id: "part_ordered",
-
     textColor: "white",
     backgroundColor: "orange",
-    label: "Part Ordered",
+    label: "Item Ordered",
+    removable: false,
+  },
+  {
+    id: "is_order_part_for_customer",
+    textColor: "rgb(38,38,38)",
+    backgroundColor: "rgb(226,126,56)",
+    label: "Order Item for Customer",
     removable: false,
   },
 
@@ -315,6 +321,7 @@ export const SMS_PROTO = {
   originalMessage: "",
   translatedFrom: "",
   translatedTo: "",
+  translated: null, // { text, langCode, detectedFrom } — cached translation to avoid re-translating on every thread load
 };
 
 // payments stuff ///////////////////////////////////////////////////////////
@@ -450,7 +457,8 @@ export const WORKORDER_PROTO = {
   startedOnMillis: "",
   partOrdered: "",
   partSource: "",
-  partToBeOrdered: false,
+  partToBeOrdered: true,
+  trackingNumber: "",
   partOrderEstimateMillis: "",
   partOrderedMillis: "",
   workorderLines: [],

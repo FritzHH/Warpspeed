@@ -1102,6 +1102,7 @@ export function InventoryComponent({}) {
           iconSize={20}
           onPress={() => clearSearch()}
           useColorGradient={false}
+          disabled={!sSearchTerm}
         />
         <TextInput_
           autoFocus={true}

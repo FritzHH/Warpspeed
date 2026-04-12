@@ -55,8 +55,42 @@ export function buildForwardToPayload(forwardOverride, forwardReplies) {
  *  - onSelectCanRespond(canRespond: boolean): called when user picks yes/no
  *  - onToggleForward(): called when forward checkbox is toggled
  */
-export function ReplyOptionsBar({ visible, forwardReplies, hasActivePhone, onSelectCanRespond, onToggleForward }) {
+export function ReplyOptionsBar({ visible, forwardReplies, hasActivePhone, onSelectCanRespond, onToggleForward, audioMode, audioUploading, onSendAudio, onDeleteAudio }) {
   if (!visible) return null;
+
+  if (audioMode) {
+    return (
+      <View style={{ width: '100%', justifyContent: "space-between", flexDirection: 'row', alignItems: "center", marginBottom: 4, backgroundColor: 'orange', padding: 10, borderRadius: 6 }}>
+        <View style={{ alignItems: 'flex-start' }}>
+          <Text style={{ color: 'dimgray', fontWeight: "500" }}>Audio ready to send</Text>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+            <TouchableOpacity_
+              onPress={audioUploading ? undefined : onSendAudio}
+              style={{ paddingVertical: 8, paddingHorizontal: 16, marginRight: 8, backgroundColor: audioUploading ? gray(0.6) : C.green, borderRadius: 5 }}
+              hoverOpacity={0.7}
+            >
+              <Text style={{ color: "white", fontWeight: "600", fontSize: 15 }}>{audioUploading ? "Sending..." : "Send"}</Text>
+            </TouchableOpacity_>
+            <TouchableOpacity_
+              onPress={audioUploading ? undefined : onDeleteAudio}
+              style={{ paddingVertical: 8, paddingHorizontal: 16, backgroundColor: C.red, borderRadius: 5, opacity: audioUploading ? 0.4 : 1 }}
+              hoverOpacity={0.7}
+            >
+              <Text style={{ color: "white", fontWeight: "600", fontSize: 15 }}>Delete</Text>
+            </TouchableOpacity_>
+          </View>
+          <TouchableOpacity onPress={hasActivePhone ? onToggleForward : undefined} style={{ flexDirection: "row", alignItems: "center", opacity: hasActivePhone ? 1 : 0.4 }}>
+            <View style={{ width: 22, height: 22, borderRadius: 4, backgroundColor: forwardReplies ? C.red : "transparent", borderWidth: 2, borderColor: forwardReplies ? C.red : gray(0.15), alignItems: "center", justifyContent: "center" }}>
+              {forwardReplies && <Text style={{ color: "white", fontSize: 14, fontWeight: "bold" }}>✓</Text>}
+            </View>
+            <Text style={{ fontSize: 17, color: C.text, marginLeft: 8 }}>Forward replies to me</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={{ width: '100%', justifyContent: "space-between", flexDirection: 'row', marginBottom: 4, backgroundColor: 'orange', padding: 10, borderRadius: 6 }}>

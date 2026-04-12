@@ -309,6 +309,7 @@ export const SMS_PROTO = {
   type: "",
   deliverySuccess: false,
   senderUserObj: "",
+  sentByUser: "",
   status: "",
   errorMessage: "",
   originalMessage: "",

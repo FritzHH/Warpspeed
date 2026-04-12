@@ -657,6 +657,7 @@ export function WorkordersComponent({}) {
               _sSetSearching(false);
             }}
             useColorGradient={false}
+            disabled={!sSearchTerm}
           />
           <TextInput_
             style={{
@@ -874,6 +875,13 @@ export function WorkordersComponent({}) {
                           height: "100%",
                         }}
                       >
+                        <Text style={{ color: "dimgray", fontSize: 13 }}>
+                          {formatMillisForDisplay(
+                            workorder.startedOnMillis,
+                            new Date(workorder.startedOnMillis).getFullYear() !== new Date().getFullYear()
+                          )}
+                        </Text>
+                        <View style={{ width: 8 }} />
                         <View
                           style={{
                             backgroundColor: rs.backgroundColor,
@@ -897,13 +905,6 @@ export function WorkordersComponent({}) {
                             {rs.label}
                           </Text>
                         </View>
-                        <View style={{ width: 8 }} />
-                        <Text style={{ color: "dimgray", fontSize: 13 }}>
-                          {formatMillisForDisplay(
-                            workorder.startedOnMillis,
-                            new Date(workorder.startedOnMillis).getFullYear() !== new Date().getFullYear()
-                          )}
-                        </Text>
                       </View>
                       <WaitTimeIndicator workorder={workorder} />
                     </View>

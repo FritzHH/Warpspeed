@@ -10,11 +10,8 @@ import { NewWorkorderComponent } from "../screen_components/Info_Screen/Info_New
 import { StandaloneSaleComponent } from "../screen_components/Info_Screen/Info_StandaloneSale";
 import React from "react";
 import {
-  useOpenWorkordersStore,
   useTabNamesStore,
-  useCheckoutStore,
 } from "../../stores";
-import { clog } from "../../utils";
 
 export const Info_Section = React.memo(({}) => {
   // store getters

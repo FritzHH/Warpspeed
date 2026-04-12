@@ -1240,6 +1240,7 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     msg.id = crypto.randomUUID();
     msg.type = "outgoing";
     msg.senderUserObj = zCurrentUserObj;
+    msg.sentByUser = zCurrentUserObj.id;
     _sSetMessages((prev) => [...prev, { ...msg, status: "sending" }]);
     let result = await smsService.send(msg);
     _sSending(false);

@@ -2892,7 +2892,10 @@ export async function dbUpdateMessageCanRespond(phone, messageId, canRespond) {
     if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
     // Write canRespond to thread parent doc (canonical source of truth)
     const parentPath = `tenants/${tenantID}/stores/${storeID}/sms-messages/${cleanPhone}`;
-    await firestoreUpdate(parentPath, { canRespond: canRespond });
+    let updateData = { canRespond: canRespond };
+    // Reset the timeout window when unblocking so the thread doesn't auto-close immediately
+    if (canRespond) updateData.lastOutgoingMillis = Date.now();
+    await firestoreUpdate(parentPath, updateData);
     log("Updated thread canRespond", { phone: cleanPhone, canRespond });
     return { success: true };
   } catch (error) {

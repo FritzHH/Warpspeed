@@ -80,6 +80,7 @@ export function MobileMessagesScreen() {
       msg.id = crypto.randomUUID();
       msg.type = "outgoing";
       msg.senderUserObj = currentUser;
+      msg.sentByUser = currentUser.id;
       _setNewMessage("");
       let result = await smsService.send(msg);
       if (result.success) {

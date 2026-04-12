@@ -45,19 +45,32 @@ import {
   useActiveSalesStore,
 } from "../../../stores";
 import { CustomItemModal } from "../modal_screens/CustomItemModal";
+import { calculateSaleTotals } from "../modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { DeliveryReceiptInstance } from "twilio/lib/rest/conversations/v1/conversation/message/deliveryReceipt";
 
 export const Items_WorkorderItemsTab = ({}) => {
   // store getters ///////////////////////////////////////////////////////////////
 
-  // Fix 1+2: read directly from state snapshot (no getter methods); deepEqual prevents
-  // re-renders when Firestore syncs identical data with new object references
+  // Subscribe to the full workorder but only re-render when the fields this
+  // component uses actually change (not brand/description/colors/partOrdered/etc.)
   const zOpenWorkorder = useOpenWorkordersStore(
     (state) => {
       const id = state.workorderPreviewID || state.openWorkorderID;
       return state.workorders.find((o) => o.id === id) ?? null;
     },
-    deepEqual
+    (prev, next) => {
+      if (prev === next) return true;
+      if (!prev || !next) return false;
+      return (
+        prev.id === next.id &&
+        prev.status === next.status &&
+        prev.taxFree === next.taxFree &&
+        prev.customerID === next.customerID &&
+        prev.activeSaleID === next.activeSaleID &&
+        deepEqual(prev.workorderLines, next.workorderLines) &&
+        deepEqual(prev.customerNotes, next.customerNotes)
+      );
+    }
   );
   const zIsPreview = useOpenWorkordersStore((state) => !!state.workorderPreviewID && state.workorderPreviewID !== state.openWorkorderID);
   // Fix 3: deepEqual prevents re-renders from unrelated inventory changes
@@ -176,12 +189,73 @@ export const Items_WorkorderItemsTab = ({}) => {
   }, [zOpenWorkorder]);
 
   ////////////////////////////////////////////////////////////////////////
+
+  function buildLinesWithQtyOverrides(extraOverrides = {}) {
+    let storeWo = useOpenWorkordersStore.getState().workorders.find(
+      (o) => o.id === zOpenWorkorder.id
+    );
+    if (!storeWo) return null;
+    let mergedOverrides = { ...qtyMapRef.current, ...extraOverrides };
+    return storeWo.workorderLines.map((line) => {
+      let overrideQty = mergedOverrides[line.id];
+      if (overrideQty === undefined) return line;
+      let newLine = { ...line, qty: overrideQty };
+      if (newLine.discountObj?.name) {
+        let discounted = applyDiscountToWorkorderItem(newLine);
+        if (discounted.discountObj?.newPrice != null) return discounted;
+      }
+      return newLine;
+    });
+  }
+
+  function checkSaleFloor(proposedLines, overrides = {}) {
+    let freshSales = useActiveSalesStore.getState().activeSales;
+    let sale = zOpenWorkorder?.activeSaleID
+      ? freshSales.find(s => s.id === zOpenWorkorder.activeSaleID)
+      : null;
+    if (!sale || (sale.amountCaptured || 0) <= 0) return { allowed: true };
+    let netPaid = (sale.amountCaptured || 0) - (sale.amountRefunded || 0);
+    if (netPaid <= 0) return { allowed: true };
+    let settings = useSettingsStore.getState().settings;
+    let allStoreWorkorders = useOpenWorkordersStore.getState().workorders;
+    let saleWOIds = sale.workorderIDs || [zOpenWorkorder.id];
+    let combinedWOs = saleWOIds.map(woId => {
+      let wo = allStoreWorkorders.find(w => w.id === woId);
+      if (!wo) return null;
+      if (woId === zOpenWorkorder.id) {
+        wo = { ...wo };
+        if (proposedLines) wo.workorderLines = proposedLines;
+        if (overrides.taxFree !== undefined) wo.taxFree = overrides.taxFree;
+      }
+      return wo;
+    }).filter(Boolean);
+    let totals = calculateSaleTotals(combinedWOs, settings);
+    if (totals.total < netPaid) {
+      return { allowed: false, newTotal: totals.total, netPaid };
+    }
+    return { allowed: true };
+  }
+
+  function showFloorBlockedAlert(result) {
+    useAlertScreenStore.getState().setValues({
+      showAlert: true,
+      title: "Cannot Reduce Total",
+      message: "This change would reduce the sale total to $" + formatCurrencyDisp(result.newTotal) +
+               ", which is below the $" + formatCurrencyDisp(result.netPaid) + " already paid." +
+               "\n\nTo make this change, process a refund in the checkout screen first.",
+      btn1Text: "OK",
+      handleBtn1Press: () => useAlertScreenStore.getState().setValues({ showAlert: false }),
+    });
+  }
+
   function deleteWorkorderLineItem(index) {
     useLoginStore.getState().requireLogin(() => {
       let deletedLine = zOpenWorkorder.workorderLines[index];
       let workorderLines = zOpenWorkorder.workorderLines.filter(
         (o, idx) => idx != index
       );
+      let floorCheck = checkSaleFloor(workorderLines);
+      if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
       useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
 
       // remove auto customer note if no other line references the same item
@@ -202,21 +276,16 @@ export const Items_WorkorderItemsTab = ({}) => {
   }
 
   function saveQtyMapToDb() {
-    let storeWo = useOpenWorkordersStore.getState().workorders.find(
-      (o) => o.id === zOpenWorkorder.id
-    );
-    if (!storeWo) return;
+    let updatedLines = buildLinesWithQtyOverrides();
+    if (!updatedLines) return;
 
-    let updatedLines = storeWo.workorderLines.map((line) => {
-      let overrideQty = qtyMapRef.current[line.id];
-      if (overrideQty === undefined) return line;
-      let newLine = { ...line, qty: overrideQty };
-      if (newLine.discountObj?.name) {
-        let discounted = applyDiscountToWorkorderItem(newLine);
-        if (discounted.discountObj?.newPrice != null) return discounted;
-      }
-      return newLine;
-    });
+    let floorCheck = checkSaleFloor(updatedLines);
+    if (!floorCheck.allowed) {
+      qtyMapRef.current = {};
+      _setQtyMap({});
+      showFloorBlockedAlert(floorCheck);
+      return;
+    }
 
     useOpenWorkordersStore.getState().setField(
       "workorderLines",
@@ -241,6 +310,13 @@ export const Items_WorkorderItemsTab = ({}) => {
       } else {
         newQty = currentQty - 1;
         if (newQty <= 0) return;
+        if (hasActiveSale) {
+          let proposedLines = buildLinesWithQtyOverrides({ [workorderLine.id]: newQty });
+          if (proposedLines) {
+            let floorCheck = checkSaleFloor(proposedLines);
+            if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
+          }
+        }
       }
 
       // Update local state instantly
@@ -286,6 +362,13 @@ export const Items_WorkorderItemsTab = ({}) => {
   }
 
   function handleCustomItemEditSave(updatedLine) {
+    if (hasActiveSale) {
+      let proposedLines = zOpenWorkorder.workorderLines.map(l =>
+        l.id === updatedLine.id ? updatedLine : l
+      );
+      let floorCheck = checkSaleFloor(proposedLines);
+      if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
+    }
     editWorkorderLine(updatedLine);
   }
 
@@ -300,6 +383,9 @@ export const Items_WorkorderItemsTab = ({}) => {
         }
         return o;
       });
+
+      let floorCheck = checkSaleFloor(workorderLines);
+      if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
 
       useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
     });
@@ -382,6 +468,8 @@ export const Items_WorkorderItemsTab = ({}) => {
             btn1Text: "Confirm Tax-Free",
             handleBtn1Press: () => {
               useAlertScreenStore.getState().setValues({ showAlert: false });
+              let floorCheck = checkSaleFloor(null, { taxFree: true });
+              if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
               useOpenWorkordersStore.getState().setField("taxFree", true);
               useOpenWorkordersStore.getState().setField("taxFreeReceiptNote", TAX_FREE_RECEIPT_NOTE);
             },
@@ -527,7 +615,7 @@ export const Items_WorkorderItemsTab = ({}) => {
           }}
         >
           <Text style={{ color: "black", fontSize: 12, fontWeight: "600" }}>
-            Sale in progress - go to checkout to edit items
+            {(activeSale?.workorderIDs?.length || 0) > 1 ? "Combined Sale in Progress" : "Sale in Progress"}
           </Text>
         </Animated.View>
       )}
@@ -987,23 +1075,21 @@ export const LineItemComponent = ({
             </Tooltip>
             }
             <Button_
-              enabled={!isLocked && !hasActiveSale}
+              enabled={!isLocked}
               onPress={() => __modQtyPressed(workorderLine, "up", index)}
               buttonStyle={{
                 backgroundColor: "transparent",
                 paddingHorizontal: 3,
-                opacity: hasActiveSale ? 0.3 : 1,
               }}
               icon={ICONS.upArrowOrange}
               iconSize={23}
             />
             <Button_
-              enabled={!isLocked && !hasActiveSale && effectiveQty > 1}
+              enabled={!isLocked && effectiveQty > 1}
               onPress={() => __modQtyPressed(workorderLine, "down", index)}
               buttonStyle={{
                 paddingHorizontal: 4,
                 backgroundColor: "transparent",
-                opacity: hasActiveSale ? 0.3 : 1,
               }}
               icon={ICONS.downArrowOrange}
               iconSize={23}
@@ -1017,7 +1103,7 @@ export const LineItemComponent = ({
               }}
             >
               <TextInput_
-                editable={!isLocked && !hasActiveSale}
+                editable={!isLocked}
                 debounceMs={0}
                 maxLength={4}
                 style={{
@@ -1123,7 +1209,7 @@ export const LineItemComponent = ({
                   buttonIconSize={22}
                 modalCoordY={25}
                   modalCoordX={-100}
-                enabled={!isLocked && !hasActiveSale}
+                enabled={!isLocked}
                 isDiscountMenu={true}
                 discountMaxCents={workorderLine.inventoryItem.price * (workorderLine.qty || 1)}
                 buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
@@ -1149,7 +1235,7 @@ export const LineItemComponent = ({
 
             <Tooltip text="Remove" position="top">
               <Button_
-                enabled={!isLocked && !hasActiveSale}
+                enabled={!isLocked}
                 onPress={() => __deleteWorkorderLine(index)}
                 icon={ICONS.trash}
                 iconSize={21}

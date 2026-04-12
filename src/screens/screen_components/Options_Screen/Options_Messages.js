@@ -63,7 +63,7 @@ import {
 } from "../../../stores";
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
-import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond, dbGetCustomer } from "../../../db_calls_wrapper";
+import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond, dbToggleSMSForwarding, dbGetCustomer } from "../../../db_calls_wrapper";
 import { translateText } from "../../../db_calls";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { TransformWrapper, TransformComponent, useTransformEffect } from "react-zoom-pan-pinch";
@@ -120,10 +120,13 @@ export function MessagesComponent({}) {
   const zSmsThreads = useCustMessagesStore((state) => state.getSmsThreads());
   //////////////////////////////////////////////////////////////////////////
 
-  // Clear hasNewSMS flag when messages are viewed
+  // Clear hasNewSMS flag when messages are viewed - only if current user sent the last message
   useEffect(() => {
     if (zWorkorderObj?.hasNewSMS) {
-      useOpenWorkordersStore.getState().setField("hasNewSMS", false, zWorkorderObj.id);
+      let currentUser = useLoginStore.getState().getCurrentUser();
+      if (currentUser?.id && zWorkorderObj.lastSMSSenderUserID === currentUser.id) {
+        useOpenWorkordersStore.getState().setField("hasNewSMS", false, zWorkorderObj.id);
+      }
     }
   }, [zWorkorderObj?.hasNewSMS, zWorkorderObj?.id]);
 
@@ -138,6 +141,11 @@ export function MessagesComponent({}) {
   const [sCustomPhone, _setCustomPhone] = useState("");
   const [sCustomPhoneMessages, _setCustomPhoneMessages] = useState([]);
   const [sForwardReplies, _setForwardReplies] = useState(false);
+  const [sAudioRecording, _setAudioRecording] = useState(false);
+  const [sAudioBlob, _setAudioBlob] = useState(null);
+  const [sAudioUrl, _setAudioUrl] = useState("");
+  const [sHasMicrophone, _setHasMicrophone] = useState(false);
+  const [sAudioUploading, _setAudioUploading] = useState(false);
   const textInputRef = useRef("");
   const messageListRef = useRef(null);
   const debounceTimerRef = useRef(null);
@@ -149,6 +157,8 @@ export function MessagesComponent({}) {
   const isUnmodifiedTemplateRef = useRef(false);
   const hasInitialScrolledRef = useRef(false);
   const lastMsgIdRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
   // Hub mode (replaces custom phone dialer)
   // Hub cache is now loaded from IndexedDB on app start (BaseScreen)
@@ -241,11 +251,18 @@ export function MessagesComponent({}) {
     });
   }, []);
 
-  // Cleanup debounce timer on unmount
+  // Cleanup debounce timer on unmount + detect microphone
   useEffect(() => {
+    navigator.mediaDevices?.enumerateDevices().then(devices => {
+      _setHasMicrophone(devices.some(d => d.kind === "audioinput"));
+    }).catch(() => {});
     return () => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
+      }
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        mediaRecorderRef.current.stop();
+        mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
       }
     };
   }, []);
@@ -336,6 +353,9 @@ export function MessagesComponent({}) {
         pendingActionRef.current = null;
       } else if (pendingActionRef.current === "media") {
         sendMediaMessage(true, true);
+      } else if (pendingActionRef.current === "audio") {
+        handleSendAudio(true, true);
+        pendingActionRef.current = null;
       } else {
         sendMessage(sNewMessage, "", true, true);
       }
@@ -401,6 +421,7 @@ export function MessagesComponent({}) {
         msg.id = crypto.randomUUID();
         msg.type = "outgoing";
         msg.senderUserObj = zCurrentUserObj;
+        msg.sentByUser = zCurrentUserObj.id;
         if (isLastChunk && forwardTo) msg.forwardTo = forwardTo;
         if (sCustomPhoneMode) {
           _setCustomPhoneMessages(prev => [...prev, { ...msg, status: "sending" }]);
@@ -661,6 +682,7 @@ export function MessagesComponent({}) {
       msg.id = crypto.randomUUID();
       msg.type = "outgoing";
       msg.senderUserObj = zCurrentUserObj;
+      msg.sentByUser = zCurrentUserObj.id;
       if (forwardTo) msg.forwardTo = forwardTo;
       if (sCustomPhoneMode) {
         _setCustomPhoneMessages(prev => [...prev, { ...msg, status: "sending" }]);
@@ -842,6 +864,106 @@ export function MessagesComponent({}) {
     await dbUpdateMessageCanRespond(phone, null, newCanRespond);
   }
 
+  async function handleToggleForwardResponses() {
+    let phone = sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell;
+    if (!phone || phone.length !== 10) return;
+    let currentUser = useLoginStore.getState().getCurrentUser();
+    if (!currentUser?.id) return;
+    let thread = zSmsThreads.find(t => t.phone === phone);
+    let isCurrentlyForwarding = !!(thread?.forwardTo?.[currentUser.id]);
+    await dbToggleSMSForwarding(phone, currentUser.id, !isCurrentlyForwarding, currentUser.phone, currentUser.first);
+  }
+
+  async function handleStartRecording() {
+    if (!sHasMicrophone || sAudioRecording) return;
+    try {
+      let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      let recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm" });
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      recorder.onstop = () => {
+        let blob = new Blob(audioChunksRef.current, { type: recorder.mimeType });
+        let url = URL.createObjectURL(blob);
+        _setAudioBlob(blob);
+        _setAudioUrl(url);
+        _setShowReplyModal(true);
+        pendingActionRef.current = "audio";
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      _setAudioRecording(true);
+    } catch (err) {
+      log("Microphone access error:", err);
+      _setHasMicrophone(false);
+    }
+  }
+
+  function handleStopRecording() {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "recording") return;
+    mediaRecorderRef.current.stop();
+    mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
+    _setAudioRecording(false);
+  }
+
+  function handleDeleteAudio() {
+    if (sAudioUrl) URL.revokeObjectURL(sAudioUrl);
+    _setAudioBlob(null);
+    _setAudioUrl("");
+    _setAudioRecording(false);
+    _setShowReplyModal(false);
+    pendingActionRef.current = null;
+    clearAutoSend();
+  }
+
+  async function handleSendAudio(canRespondVal, forwardOverride) {
+    if (!sAudioBlob) return;
+    let sendPhone = sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell;
+    if (!sendPhone || sendPhone.length !== 10) return;
+    _setAudioUploading(true);
+    try {
+      let { uploadFileToStorage } = await import("../../../db_calls");
+      let zSettings = useSettingsStore.getState().settings;
+      let tenantID = zSettings?.tenantID;
+      let storeID = zSettings?.storeID;
+      let storeName = zSettings?.storeInfo?.displayName || "Our store";
+      let timestamp = Date.now();
+      let storagePath = `${tenantID}/${storeID}/sms-audio/${timestamp}_${crypto.randomUUID()}.webm`;
+      let result = await uploadFileToStorage(sAudioBlob, storagePath, { contentType: "audio/webm" });
+      if (!result.success) { log("Audio upload failed:", result.error); _setAudioUploading(false); return; }
+      useLoginStore.getState().requireLogin(async () => {
+        let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+        let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
+        let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+        let msg = { ...SMS_PROTO };
+        msg.message = storeName + " has sent you an audio message";
+        msg.mediaUrls = [{ url: result.downloadURL, contentType: "audio/webm" }];
+        msg.phoneNumber = sendPhone;
+        msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
+        if (!sCustomPhoneMode && zCustomer.first) msg.customerFirst = zCustomer.first;
+        if (!sCustomPhoneMode && zCustomer.last) msg.customerLast = zCustomer.last;
+        msg.canRespond = useCanRespond ? true : null;
+        msg.millis = Date.now();
+        msg.id = crypto.randomUUID();
+        msg.type = "outgoing";
+        msg.senderUserObj = zCurrentUserObj;
+        msg.sentByUser = zCurrentUserObj.id;
+        if (forwardTo) msg.forwardTo = forwardTo;
+        let sendResult = await smsService.send(msg);
+        if (sendResult.success && !sCustomPhoneMode) {
+          let allWOs = useOpenWorkordersStore.getState().workorders;
+          allWOs.filter((wo) => wo.customerID === zCustomer.id).forEach((wo) => {
+            useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", zCurrentUserObj.id, wo.id);
+          });
+        }
+        handleDeleteAudio();
+        _setAudioUploading(false);
+      });
+    } catch (err) {
+      log("Audio send error:", err);
+      _setAudioUploading(false);
+    }
+  }
+
   // Whether the compose area should show
   const hasActivePhone = sCustomPhoneMode ? sCustomPhone.length === 10 : !!zCustomer?.customerCell;
 
@@ -922,13 +1044,7 @@ export function MessagesComponent({}) {
                 onOpenWorkorderKeepHub={handleHubOpenWorkorderKeepHub}
                 hasMatchingWorkorder={!hasCustomer && !!zAllWorkorders.find(w => w.customerCell === (sHubHoverPhone || sHubSelectedPhone))}
                 hasWorkorderForPhone={!!zAllWorkorders.find(w => w.customerCell === (sHubHoverPhone || sHubSelectedPhone))}
-                exitHubButton={hasCustomer ? (
-                  <Tooltip text="Back to customer" position="top" offsetX={-20}>
-                    <TouchableOpacity onPress={handleExitHubMode} style={{ padding: 4 }}>
-                      <Image_ icon={ICONS.person} size={28} />
-                    </TouchableOpacity>
-                  </Tooltip>
-                ) : null}
+                exitHubButton={null}
               />
             ) : (
               <View style={{ flex: 1, flexDirection: "column" }}>
@@ -1041,9 +1157,9 @@ export function MessagesComponent({}) {
                 let idx = item.index;
                 item = item.item;
                 if (item.type === "incoming")
-                  return <IncomingMessageComponent msgObj={item} onScrollToBottom={() => { setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: true }); }, 50); }} />;
+                  return <IncomingMessageComponent msgObj={item} autoTranslateTo={sFromLang !== sToLang ? sToLang : ""} onScrollToBottom={() => { setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: true }); }, 50); }} />;
                 let isLast = (item.id || item.millis) === lastOutgoingID;
-                return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} thread={customerThread} onToggleBlock={handleToggleBlockResponses} />;
+                return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} thread={customerThread} onToggleBlock={handleToggleBlockResponses} onToggleForward={handleToggleForwardResponses} />;
               }}
               onScroll={(e) => {
                 if (sCustomPhoneMode) return;
@@ -1109,18 +1225,28 @@ export function MessagesComponent({}) {
           ) : null}
             <View style={{ width: "100%" }}>
 
+              {sAudioUrl ? (
+                <View style={{ padding: 8, marginBottom: 4, backgroundColor: "rgb(245,245,220)", borderRadius: 5, borderWidth: 1, borderColor: gray(0.15) }}>
+                  <audio controls src={sAudioUrl} style={{ width: "100%" }} />
+                </View>
+              ) : null}
               <ReplyOptionsBar
                 visible={sShowReplyModal}
                 forwardReplies={sForwardReplies}
                 hasActivePhone={hasActivePhone}
+                audioMode={pendingActionRef.current === "audio"}
+                audioUploading={sAudioUploading}
                 onSelectCanRespond={(canRespond) => {
                   clearAutoSend();
                   _setCanRespond(canRespond);
                   _setShowReplyModal(false);
                   if (pendingActionRef.current === "intake") { handleSendWorkorderTicket(canRespond); pendingActionRef.current = null; }
                   else if (pendingActionRef.current === "media") { sendMediaMessage(canRespond); }
+                  else if (pendingActionRef.current === "audio") { handleSendAudio(canRespond); }
                   else { sendMessage(sNewMessage, "", canRespond); }
                 }}
+                onSendAudio={() => handleSendAudio(sCanRespond)}
+                onDeleteAudio={handleDeleteAudio}
                 onToggleForward={handleToggleForwardReplies}
               />
               <View style={{ flexDirection: "row", alignItems: "flex-end", borderWidth: 2, borderRadius: 5, borderColor: gray(0.15), backgroundColor: "white" }}>
@@ -1162,13 +1288,21 @@ export function MessagesComponent({}) {
                   }}
                   value={sNewMessage}
                 />
-                <View style={{ position: "relative" }}>
+                <View style={{ flexDirection: "column", alignItems: "center", justifyContent: "flex-end" }}>
                   <TouchableOpacity
-                    onPress={() => { if (sNewMessage.trim()) { if (isUnmodifiedTemplateRef.current) { sendMessage(sNewMessage, "", false, false); isUnmodifiedTemplateRef.current = false; } else { _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); sendMessage(sNewMessage, "", sCanRespond); }); } } }}
-                    style={{ marginRight: 4, marginBottom: 4, padding: 6, opacity: sNewMessage.trim() ? 1 : 0.3 }}
+                    onPress={() => { if (sNewMessage.trim() && !(sFromLang !== sToLang && sTranslateLoading)) { if (isUnmodifiedTemplateRef.current) { sendMessage(sNewMessage, "", false, false); isUnmodifiedTemplateRef.current = false; } else { _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); sendMessage(sNewMessage, "", sCanRespond); }); } } }}
+                    style={{ marginRight: 4, marginBottom: 2, padding: 6, opacity: (!sNewMessage.trim() || (sFromLang !== sToLang && sTranslateLoading)) ? 0.3 : 1 }}
                   >
                     <Image_ icon={ICONS.airplane} size={41} />
                   </TouchableOpacity>
+                  <Tooltip text={!sHasMicrophone ? "No microphone detected" : sAudioRecording ? "Stop recording" : "Record audio clip"} position="top">
+                    <TouchableOpacity
+                      onPress={sHasMicrophone ? (sAudioRecording ? handleStopRecording : handleStartRecording) : undefined}
+                      style={{ marginRight: 4, marginBottom: 4, padding: 4, opacity: sHasMicrophone ? 1 : 0.3 }}
+                    >
+                      <Image_ icon={sAudioRecording ? ICONS.stopRecord : ICONS.microphone} size={30} />
+                    </TouchableOpacity>
+                  </Tooltip>
                 </View>
               </View>
           </View>
@@ -1387,18 +1521,29 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     _setCanRespond(thread?.canRespond !== undefined ? !!thread.canRespond : true);
   }
   const [sFromLang, _setFromLang] = useState("en");
-  const [sToLang, _setToLang] = useState("en");
+  const [sToLang, _setToLang] = useState(() => {
+    let wo = useOpenWorkordersStore.getState().workorders.find(w => w.customerCell === phone);
+    return (wo?.customerLanguage && LANG_NAME_TO_CODE[wo.customerLanguage]) || "en";
+  });
   const [sShowReplyModal, _setShowReplyModal] = useState(false);
   const [sForwardReplies, _setForwardReplies] = useState(false);
   const [sHubMediaUploading, _setHubMediaUploading] = useState(false);
   const [sHubInputHeight, _setHubInputHeight] = useState(36);
+  const [sAudioRecording, _setAudioRecording] = useState(false);
+  const [sAudioBlob, _setAudioBlob] = useState(null);
+  const [sAudioUrl, _setAudioUrl] = useState("");
+  const [sHasMicrophone, _setHasMicrophone] = useState(false);
+  const [sAudioUploading, _setAudioUploading] = useState(false);
   const messageListRef = useRef(null);
   const pendingSendTextRef = useRef("");
+  const pendingActionRef = useRef(null);
   const hubFileInputRef = useRef(null);
   const sMessagesRef = useRef([]);
   const noMoreRef = useRef(false);
   const hasInitialScrolledRef = useRef(false);
   const lastMsgIdRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
 
   const {
     translatedText, isLoading: sTranslateLoading,
@@ -1428,6 +1573,21 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     _setForwardReplies(false);
     _setLoadingMore(false);
     clearAutoSend();
+    // Reset audio state on phone change
+    if (sAudioUrl) URL.revokeObjectURL(sAudioUrl);
+    _setAudioBlob(null);
+    _setAudioUrl("");
+    _setAudioRecording(false);
+    _setAudioUploading(false);
+    pendingActionRef.current = null;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
+    }
+    // Detect microphone
+    navigator.mediaDevices?.enumerateDevices().then(devices => {
+      if (!cancelled) _setHasMicrophone(devices.some(d => d.kind === "audioinput"));
+    }).catch(() => {});
 
     // Check Zustand cache first (synchronous, instant)
     let cached = useCustMessagesStore.getState().getHubCachedThread(phone);
@@ -1501,7 +1661,14 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
         return merged;
       });
     });
-    return () => { cancelled = true; if (unsub) unsub(); };
+    return () => {
+      cancelled = true;
+      if (unsub) unsub();
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === "recording") {
+        mediaRecorderRef.current.stop();
+        mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
+      }
+    };
   }, [phone]);
 
   async function handleLoadMore() {
@@ -1570,6 +1737,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
       msg.id = crypto.randomUUID();
       msg.type = "outgoing";
       msg.senderUserObj = zCurrentUserObj;
+      msg.sentByUser = zCurrentUserObj.id;
       if (forwardTo) msg.forwardTo = forwardTo;
       let matchedWO = useOpenWorkordersStore.getState().workorders.find(wo => wo.customerCell === phone);
       if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
@@ -1612,7 +1780,12 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
       clearAutoSend();
       _setCanRespond(true);
       _setShowReplyModal(false);
-      doSend(pendingSendTextRef.current, true, true);
+      if (pendingActionRef.current === "audio") {
+        handleSendAudio(true, true);
+        pendingActionRef.current = null;
+      } else {
+        doSend(pendingSendTextRef.current, true, true);
+      }
     }
   }
 
@@ -1630,6 +1803,111 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     sMessagesRef.current = updated;
     _setMessages(updated);
     updateCache(updated, noMoreRef.current);
+  }
+
+  async function handleHubToggleForward() {
+    if (!phone || phone.length !== 10) return;
+    let currentUser = useLoginStore.getState().getCurrentUser();
+    if (!currentUser?.id) return;
+    let isCurrentlyForwarding = !!(thread?.forwardTo?.[currentUser.id]);
+    await dbToggleSMSForwarding(phone, currentUser.id, !isCurrentlyForwarding, currentUser.phone, currentUser.first);
+  }
+
+  async function handleStartRecording() {
+    if (!sHasMicrophone || sAudioRecording) return;
+    try {
+      let stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      audioChunksRef.current = [];
+      let recorder = new MediaRecorder(stream, { mimeType: MediaRecorder.isTypeSupported("audio/webm;codecs=opus") ? "audio/webm;codecs=opus" : "audio/webm" });
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+      recorder.onstop = () => {
+        let blob = new Blob(audioChunksRef.current, { type: recorder.mimeType });
+        let url = URL.createObjectURL(blob);
+        _setAudioBlob(blob);
+        _setAudioUrl(url);
+        _setShowReplyModal(true);
+        pendingActionRef.current = "audio";
+      };
+      mediaRecorderRef.current = recorder;
+      recorder.start();
+      _setAudioRecording(true);
+    } catch (err) {
+      log("Microphone access error:", err);
+      _setHasMicrophone(false);
+    }
+  }
+
+  function handleStopRecording() {
+    if (!mediaRecorderRef.current || mediaRecorderRef.current.state !== "recording") return;
+    mediaRecorderRef.current.stop();
+    mediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
+    _setAudioRecording(false);
+  }
+
+  function handleDeleteAudio() {
+    if (sAudioUrl) URL.revokeObjectURL(sAudioUrl);
+    _setAudioBlob(null);
+    _setAudioUrl("");
+    _setAudioRecording(false);
+    _setShowReplyModal(false);
+    pendingActionRef.current = null;
+    clearAutoSend();
+  }
+
+  async function handleSendAudio(canRespondVal, forwardOverride) {
+    if (!sAudioBlob || !phone || phone.length !== 10) return;
+    _setAudioUploading(true);
+    try {
+      let { uploadFileToStorage } = await import("../../../db_calls");
+      let zSettings = useSettingsStore.getState().settings;
+      let tenantID = zSettings?.tenantID;
+      let storeID = zSettings?.storeID;
+      let storeName = zSettings?.storeInfo?.displayName || "Our store";
+      let timestamp = Date.now();
+      let storagePath = `${tenantID}/${storeID}/sms-audio/${timestamp}_${crypto.randomUUID()}.webm`;
+      let result = await uploadFileToStorage(sAudioBlob, storagePath, { contentType: "audio/webm" });
+      if (!result.success) { log("Audio upload failed:", result.error); _setAudioUploading(false); return; }
+      useLoginStore.getState().requireLogin(async () => {
+        let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+        let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
+        let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+        let msg = { ...SMS_PROTO };
+        msg.message = storeName + " has sent you an audio message";
+        msg.mediaUrls = [{ url: result.downloadURL, contentType: "audio/webm" }];
+        msg.phoneNumber = phone;
+        msg.canRespond = useCanRespond ? true : null;
+        msg.millis = Date.now();
+        msg.id = crypto.randomUUID();
+        msg.type = "outgoing";
+        msg.senderUserObj = zCurrentUserObj;
+        msg.sentByUser = zCurrentUserObj.id;
+        if (forwardTo) msg.forwardTo = forwardTo;
+        let matchedWO = useOpenWorkordersStore.getState().workorders.find(wo => wo.customerCell === phone);
+        if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
+        let optimistic = { ...msg, status: "sending" };
+        let addedMessages = [...sMessagesRef.current, optimistic];
+        sMessagesRef.current = addedMessages;
+        _setMessages(addedMessages);
+        updateCache(addedMessages, noMoreRef.current);
+        let sendResult = await smsService.send(msg);
+        let updatedMessages = sMessagesRef.current.map(m => m.id === msg.id ? { ...m, status: sendResult.success ? "sent" : "failed" } : m);
+        sMessagesRef.current = updatedMessages;
+        _setMessages(updatedMessages);
+        updateCache(updatedMessages, noMoreRef.current);
+        if (!sendResult.success) {
+          useAlertScreenStore.getState().setValues({
+            title: "Message Failed", message: sendResult.error || "Failed to send message",
+            btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+            showAlert: true, canExitOnOuterClick: true,
+          });
+        }
+        handleDeleteAudio();
+        _setAudioUploading(false);
+      });
+    } catch (err) {
+      log("Audio send error:", err);
+      _setAudioUploading(false);
+    }
   }
 
   async function handleHubFilesSelected(e) {
@@ -1684,6 +1962,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
         msg.id = crypto.randomUUID();
         msg.type = "outgoing";
         msg.senderUserObj = zCurrentUserObj;
+        msg.sentByUser = zCurrentUserObj.id;
         let matchedWO = useOpenWorkordersStore.getState().workorders.find(wo => wo.customerCell === phone);
         if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
         let optimistic = { ...msg, status: "sending" };
@@ -1751,9 +2030,9 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
             data={sMessages}
             keyExtractor={(item) => item.id || String(item.millis)}
             renderItem={({ item }) => {
-              if (item.type === "incoming") return <IncomingMessageComponent msgObj={item} onScrollToBottom={() => { setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: true }); }, 50); }} />;
+              if (item.type === "incoming") return <IncomingMessageComponent msgObj={item} autoTranslateTo={sFromLang !== sToLang ? sToLang : ""} onScrollToBottom={() => { setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: true }); }, 50); }} />;
               let isLast = (item.id || item.millis) === lastOutgoingID;
-              return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} thread={thread} onToggleBlock={handleToggleBlock} />;
+              return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} thread={thread} onToggleBlock={handleToggleBlock} onToggleForward={handleHubToggleForward} />;
             }}
             onScrollToIndexFailed={(info) => {
               setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: false }); }, 50);
@@ -1780,16 +2059,26 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
             }
           </View>
         ) : null}
+        {sAudioUrl ? (
+          <View style={{ padding: 8, marginBottom: 4, backgroundColor: "rgb(245,245,220)", borderRadius: 5, borderWidth: 1, borderColor: gray(0.15) }}>
+            <audio controls src={sAudioUrl} style={{ width: "100%" }} />
+          </View>
+        ) : null}
         <ReplyOptionsBar
           visible={sShowReplyModal}
           forwardReplies={sForwardReplies}
           hasActivePhone={!!phone && phone.length === 10}
+          audioMode={pendingActionRef.current === "audio"}
+          audioUploading={sAudioUploading}
           onSelectCanRespond={(canRespond) => {
             clearAutoSend();
             _setCanRespond(canRespond);
             _setShowReplyModal(false);
-            doSend(pendingSendTextRef.current, canRespond);
+            if (pendingActionRef.current === "audio") { handleSendAudio(canRespond); }
+            else { doSend(pendingSendTextRef.current, canRespond); }
           }}
+          onSendAudio={() => handleSendAudio(sCanRespond)}
+          onDeleteAudio={handleDeleteAudio}
           onToggleForward={handleToggleForwardReplies}
         />
         <View style={{ flexDirection: "row", alignItems: "flex-end", borderWidth: 2, borderRadius: 5, borderColor: gray(0.15), backgroundColor: "white" }}>
@@ -1829,9 +2118,19 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
             }}
             value={sNewMessage}
           />
-          <TouchableOpacity onPress={() => !sHubMediaUploading && handleSend()} style={{ marginRight: 4, marginBottom: 4, padding: 6, opacity: sHubMediaUploading ? 0.3 : (sNewMessage.trim() ? 1 : 0.3) }}>
-            <Image_ icon={ICONS.airplane} size={41} />
-          </TouchableOpacity>
+          <View style={{ flexDirection: "column", alignItems: "center", justifyContent: "flex-end", marginRight: 4, marginBottom: 4 }}>
+            <TouchableOpacity onPress={() => !sHubMediaUploading && !(sFromLang !== sToLang && sTranslateLoading) && handleSend()} style={{ padding: 6, opacity: (sHubMediaUploading || (sFromLang !== sToLang && sTranslateLoading)) ? 0.3 : (sNewMessage.trim() ? 1 : 0.3) }}>
+              <Image_ icon={ICONS.airplane} size={41} />
+            </TouchableOpacity>
+            <Tooltip text={!sHasMicrophone ? "No microphone detected" : sAudioRecording ? "Stop recording" : "Record audio clip"} position="top">
+              <TouchableOpacity
+                onPress={sHasMicrophone ? (sAudioRecording ? handleStopRecording : handleStartRecording) : undefined}
+                style={{ padding: 4, opacity: sHasMicrophone ? 1 : 0.3 }}
+              >
+                <Image_ icon={sAudioRecording ? ICONS.stopRecord : ICONS.microphone} size={30} />
+              </TouchableOpacity>
+            </Tooltip>
+          </View>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, marginBottom: 8, paddingHorizontal: 4 }}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -2092,9 +2391,10 @@ const MediaThumbnail = memo(({ url, thumbnailUrl, contentType }) => {
   );
 });
 
-const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom }) => {
+const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom, autoTranslateTo }) => {
   const [sTranslation, _setTranslation] = useState({ text: "", loading: false, langCode: "" });
   const [sContextMenu, _setContextMenu] = useState({ x: 0, y: 0, visible: false });
+  const autoTranslatedRef = useRef(false);
 
   useEffect(() => {
     if (!sContextMenu.visible) return;
@@ -2103,22 +2403,32 @@ const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom }) => {
     return () => document.removeEventListener("mousedown", dismiss);
   }, [sContextMenu.visible]);
 
+  useEffect(() => {
+    if (autoTranslatedRef.current || !autoTranslateTo || !msgObj.message) return;
+    autoTranslatedRef.current = true;
+    doTranslate("en", autoTranslateTo);
+  }, [autoTranslateTo]);
+
   function handleContextMenu(e) {
     if (!msgObj.message) return;
     e.preventDefault();
     _setContextMenu({ x: e.clientX, y: e.clientY, visible: true });
   }
 
-  function handleSelectLanguage(langCode) {
+  function doTranslate(langCode, sourceLang) {
     _setContextMenu(prev => ({ ...prev, visible: false }));
     _setTranslation({ text: "", loading: true, langCode });
     if (onScrollToBottom) onScrollToBottom();
-    translateText({ text: msgObj.message, targetLanguage: langCode })
+    translateText({ text: msgObj.message, targetLanguage: langCode, ...(sourceLang ? { sourceLanguage: sourceLang } : {}) })
       .then((result) => {
         if (result.success) {
           let translated = result.data?.data?.translatedText || result.data?.translatedText || "";
-          let detected = result.data?.data?.detectedSourceLanguage || result.data?.detectedSourceLanguage || "";
-          _setTranslation({ text: translated, loading: false, langCode, detectedFrom: detected });
+          let detected = result.data?.data?.detectedSourceLanguage || result.data?.detectedSourceLanguage || sourceLang || "";
+          if (detected === langCode) {
+            _setTranslation({ text: "", loading: false, langCode });
+          } else {
+            _setTranslation({ text: translated, loading: false, langCode, detectedFrom: detected });
+          }
         } else {
           _setTranslation({ text: "", loading: false, langCode });
         }
@@ -2135,38 +2445,41 @@ const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom }) => {
     : "";
 
   return (
-    <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "75%" }}>
-      <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
-        {msgObj.mediaUrls?.length > 0 ? (
-          <View style={{ flexDirection: "column", marginBottom: msgObj.message ? 4 : 0 }}>
-            {msgObj.mediaUrls.map((media, i) => (
-              <MediaThumbnail key={i} url={media.url} thumbnailUrl={media.thumbnailUrl} contentType={media.contentType} />
-            ))}
-          </View>
-        ) : msgObj.imageUrl ? (
-          <MediaThumbnail url={msgObj.imageUrl} contentType="image/" />
-        ) : null}
-        {msgObj.message ? (
-          <Tooltip text="Right click for translation" position="top">
-            <View onContextMenu={handleContextMenu} style={{ cursor: "context-menu" }}>
-              {sTranslation.loading ? (
-                <>
-                  <Text style={{ ...MESSAGE_TEXT_STYLE, color: gray(0.5), fontStyle: "italic" }}>Translating...</Text>
-                  <Text style={{ fontSize: 12, color: gray(0.45), fontStyle: "italic", marginTop: 3 }}>{msgObj.message}</Text>
-                </>
-              ) : sTranslation.text ? (
-                <>
-                  <Text style={{ ...MESSAGE_TEXT_STYLE }}>{sTranslation.text}</Text>
-                  <Text style={{ fontSize: 12, color: gray(0.45), fontStyle: "italic", marginTop: 3 }}>
-                    {"Original" + (fromLangLabel ? " (" + fromLangLabel + ")" : "") + ": " + msgObj.message}
-                  </Text>
-                </>
-              ) : (
-                <Text style={{ ...MESSAGE_TEXT_STYLE }}>{msgObj.message}</Text>
-              )}
+    <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-start", marginLeft: 12, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "75%" }}>
+      <View style={{ position: "relative" }}>
+        <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, borderBottomLeftRadius: 2, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
+          {msgObj.mediaUrls?.length > 0 ? (
+            <View style={{ flexDirection: "column", marginBottom: msgObj.message ? 4 : 0 }}>
+              {msgObj.mediaUrls.map((media, i) => (
+                <MediaThumbnail key={i} url={media.url} thumbnailUrl={media.thumbnailUrl} contentType={media.contentType} />
+              ))}
             </View>
-          </Tooltip>
-        ) : null}
+          ) : msgObj.imageUrl ? (
+            <MediaThumbnail url={msgObj.imageUrl} contentType="image/" />
+          ) : null}
+          {msgObj.message ? (
+            <Tooltip text="Right click for translation" position="top">
+              <View onContextMenu={handleContextMenu} style={{ cursor: "context-menu" }}>
+                {sTranslation.loading ? (
+                  <>
+                    <Text style={{ ...MESSAGE_TEXT_STYLE, color: gray(0.5), fontStyle: "italic" }}>Translating...</Text>
+                    <Text style={{ fontSize: 12, color: gray(0.45), fontStyle: "italic", marginTop: 3 }}>{msgObj.message}</Text>
+                  </>
+                ) : sTranslation.text ? (
+                  <>
+                    <Text style={{ ...MESSAGE_TEXT_STYLE }}>{sTranslation.text}</Text>
+                    <Text style={{ fontSize: 12, color: gray(0.45), fontStyle: "italic", marginTop: 3 }}>
+                      {"Original" + (fromLangLabel ? " (" + fromLangLabel + ")" : "") + ": " + msgObj.message}
+                    </Text>
+                  </>
+                ) : (
+                  <Text style={{ ...MESSAGE_TEXT_STYLE }}>{msgObj.message}</Text>
+                )}
+              </View>
+            </Tooltip>
+          ) : null}
+        </View>
+        {!hasMedia && <View style={{ position: "absolute", bottom: 0, left: -8, width: 0, height: 0, borderTopWidth: 8, borderTopColor: backgroundColor, borderLeftWidth: 8, borderLeftColor: "transparent" }} />}
       </View>
       <View style={{ width: "100%", flexDirection: "row", justifyContent: "space-between" }}>
         <Text style={{ ...INFO_TEXT_STYLE }}>{dateObj.date}</Text>
@@ -2181,7 +2494,7 @@ const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom }) => {
           {TRANSLATION_LANGUAGES.map((lang) => (
             <div
               key={lang.code}
-              onClick={() => handleSelectLanguage(lang.code)}
+              onClick={() => doTranslate(lang.code)}
               style={{ padding: "9px 14px", cursor: "pointer", borderRadius: 5, fontSize: 15, fontWeight: "500", color: C.text }}
               onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = C.blue; e.currentTarget.style.color = "white"; }}
               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = C.text; }}
@@ -2196,7 +2509,7 @@ const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom }) => {
   );
 });
 
-const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing, thread, onToggleBlock }) => {
+const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing, thread, onToggleBlock, onToggleForward }) => {
   // Use live delivery status from thread parent doc for the last outgoing message
   let displayStatus = msgObj.status;
   if (isLastOutgoing && thread?.lastOutgoingMessageID === msgObj.id && thread?.lastOutgoingMessageStatus) {
@@ -2207,43 +2520,49 @@ const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing, thread, onToggl
   let hasMedia = msgObj.mediaUrls?.length > 0 || !!msgObj.imageUrl;
   let backgroundColor = hasMedia ? "transparent" : (isFailed ? "rgb(200,80,80)" : "rgb(0,122,255)");
   let showStatusIcons = isLastOutgoing;
-  // Read forwardTo from thread parent doc instead of individual message
-  let hasForward = showStatusIcons && thread?.forwardTo && Object.keys(thread.forwardTo).length > 0;
+  // Check if current user has forwarding enabled on the thread parent doc
+  let currentUserID = useLoginStore.getState().getCurrentUser()?.id;
+  let isForwarding = !!(currentUserID && thread?.forwardTo?.[currentUserID]);
   let isResponding = (thread?.canRespond !== undefined ? thread.canRespond : msgObj.canRespond);
   return (
-    <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-end", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "75%" }}>
-      <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, flexDirection: "row", alignItems: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
-        {showStatusIcons && (
-          <Tooltip text={isResponding ? "Block responses from user" : "Allow responses"} position="top">
-            <TouchableOpacity onPress={onToggleBlock} style={{ alignItems: "center", justifyContent: "center", marginRight: 5, marginTop: 2 }}>
-              <Image source={isResponding ? ICONS.unblock : ICONS.blocked} style={{ width: 35, height: 35 }} />
-            </TouchableOpacity>
-          </Tooltip>
-        )}
-        <View style={{ flex: 1 }}>
-          {msgObj.mediaUrls?.length > 0 ? (
-            <View style={{ flexDirection: "column", marginBottom: msgObj.message ? 4 : 0 }}>
-              {msgObj.mediaUrls.map((media, i) => (
-                <MediaThumbnail key={i} url={media.url} thumbnailUrl={media.thumbnailUrl} contentType={media.contentType} />
-              ))}
+    <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-end", marginRight: 12, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "75%" }}>
+      <View style={{ position: "relative" }}>
+        <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, borderBottomRightRadius: 2, flexDirection: "row", alignItems: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
+          {showStatusIcons && (
+            <View style={{ flexDirection: "column", alignItems: "center", marginRight: 5, marginTop: 2 }}>
+              <Tooltip text={isResponding ? "Block responses from user" : "Allow responses"} position="top">
+                <TouchableOpacity onPress={onToggleBlock} style={{ alignItems: "center", justifyContent: "center" }}>
+                  <Image source={isResponding ? ICONS.unblock : ICONS.blocked} style={{ width: 35, height: 35 }} />
+                </TouchableOpacity>
+              </Tooltip>
+              <Tooltip text={isForwarding ? "Stop forwarding replies to me" : "Forward replies to me"} position="top">
+                <TouchableOpacity onPress={onToggleForward} style={{ alignItems: "center", justifyContent: "center", marginTop: 4 }}>
+                  <Image source={isForwarding ? ICONS.allowNotif : ICONS.blockNotif} style={{ width: 28, height: 28 }} />
+                </TouchableOpacity>
+              </Tooltip>
             </View>
-          ) : msgObj.imageUrl ? (
-            <MediaThumbnail url={msgObj.imageUrl} contentType="image/" />
-          ) : null}
-          {msgObj.message ? (
-            <Text style={{ ...MESSAGE_TEXT_STYLE, color: "white" }}>{msgObj.message}</Text>
-          ) : null}
-          {msgObj.originalMessage ? (
-            <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", fontStyle: "italic", marginTop: 3 }}>
-              {"Original" + (msgObj.translatedFrom ? " (" + (TRANSLATION_LANGUAGES.find(l => l.code === msgObj.translatedFrom)?.label || msgObj.translatedFrom) + ")" : "") + ": " + msgObj.originalMessage}
-            </Text>
-          ) : null}
-        </View>
-        {hasForward && (
-          <View style={{ alignItems: "center", justifyContent: "center", marginLeft: 5, marginTop: 2 }}>
-            <Image source={ICONS.forward} style={{ width: 24, height: 24 }} />
+          )}
+          <View style={{ flex: 1 }}>
+            {msgObj.mediaUrls?.length > 0 ? (
+              <View style={{ flexDirection: "column", marginBottom: msgObj.message ? 4 : 0 }}>
+                {msgObj.mediaUrls.map((media, i) => (
+                  <MediaThumbnail key={i} url={media.url} thumbnailUrl={media.thumbnailUrl} contentType={media.contentType} />
+                ))}
+              </View>
+            ) : msgObj.imageUrl ? (
+              <MediaThumbnail url={msgObj.imageUrl} contentType="image/" />
+            ) : null}
+            {msgObj.message ? (
+              <Text style={{ ...MESSAGE_TEXT_STYLE, color: "white" }}>{msgObj.message}</Text>
+            ) : null}
+            {msgObj.originalMessage ? (
+              <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", fontStyle: "italic", marginTop: 3 }}>
+                {"Original" + (msgObj.translatedFrom ? " (" + (TRANSLATION_LANGUAGES.find(l => l.code === msgObj.translatedFrom)?.label || msgObj.translatedFrom) + ")" : "") + ": " + msgObj.originalMessage}
+              </Text>
+            ) : null}
           </View>
-        )}
+        </View>
+        {!hasMedia && <View style={{ position: "absolute", bottom: 0, right: -8, width: 0, height: 0, borderTopWidth: 8, borderTopColor: backgroundColor, borderRightWidth: 8, borderRightColor: "transparent" }} />}
       </View>
       <View
         style={{

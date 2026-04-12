@@ -498,7 +498,7 @@ export function NewWorkorderComponent({}) {
           marginBottom: 20,
         }}
       >
-        <Tooltip text="Standalone Sale" position="top">
+        <Tooltip text="New sale" position="top">
           <Button_
             onPress={handleStartStandaloneSalePress}
             icon={ICONS.cashRegister}

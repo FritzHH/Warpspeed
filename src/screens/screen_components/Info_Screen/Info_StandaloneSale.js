@@ -197,7 +197,7 @@ export const StandaloneSaleComponent = ({}) => {
           alignItems: "center",
         }}
       >
-        <Tooltip text="Back to Customer" position="top">
+        <Tooltip text="New workorder" position="top">
           <Button_
             onPress={() => {
               useTabNamesStore.getState().setItems({
@@ -211,6 +211,26 @@ export const StandaloneSaleComponent = ({}) => {
             buttonStyle={{ marginBottom: 0, paddingLeft: 15 }}
           />
         </Tooltip>
+        {!!zOpenWorkorder?.customerID && (
+          <Tooltip text="Back to workorder" position="top">
+            <Button_
+              onPress={() => {
+                useTabNamesStore.getState().setItems({
+                  infoTabName: TAB_NAMES.infoTab.workorder,
+                  itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+                  optionsTabName: TAB_NAMES.optionsTab.inventory,
+                });
+              }}
+              icon={ICONS.letterW}
+              iconSize={35}
+              buttonStyle={{
+                backgroundColor: "transparent",
+                paddingHorizontal: 0,
+                paddingVertical: 0,
+              }}
+            />
+          </Tooltip>
+        )}
         <Tooltip text="Pop cash register" position="top">
           <Button_
             icon={ICONS.openCashRegister}

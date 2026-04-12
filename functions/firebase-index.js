@@ -862,6 +862,7 @@ exports.sendSMSEnhanced = onCall(
             lastOutgoingMessageStatus: twilioResponse.status || "queued",
             lastOutgoingMillis: Date.now(),
             forwardTo: currentForwardTo,
+            ...(translatedTo ? { translatedTo } : {}),
             ...(customerFirst ? { customerFirst } : {}),
             ...(customerLast ? { customerLast } : {}),
           }, { merge: true });
@@ -1055,6 +1056,7 @@ exports.incomingSMSEnhanced = onRequest(
       twilioSecretKey,
       twilioSecretAccountNumber,
       firebaseServiceAccountKey,
+      googleTranslateApiKey,
     ],
   },
   async (request, response) => {
@@ -1238,7 +1240,7 @@ exports.incomingSMSEnhanced = onRequest(
 
         if (parentData && parentData.lastOutgoingMessageID) {
           canRespond = parentData.canRespond !== undefined ? !!parentData.canRespond : true;
-          conversationData = { forwardTo: parentData.forwardTo || {} };
+          conversationData = { forwardTo: parentData.forwardTo || {}, translatedTo: parentData.translatedTo || "" };
           const lastOutgoingMillis = parentData.lastOutgoingMillis || parentData.lastMillis || 0;
 
           // Apply timeout check
@@ -1273,6 +1275,13 @@ exports.incomingSMSEnhanced = onRequest(
 
       if (!canRespond) {
         log("Thread closed - sending auto-response", { customerID: customerData.id, threadStatus });
+
+        // Update parent doc so the app UI reflects the closed state
+        try {
+          await conversationRef.set({ canRespond: false, threadStatus: "closed" }, { merge: true });
+        } catch (updateErr) {
+          log("Error updating parent doc canRespond on auto-close", { error: updateErr.message });
+        }
 
         // Send auto-response using TwiML
         const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
@@ -1409,7 +1418,7 @@ exports.incomingSMSEnhanced = onRequest(
           if (!woQuery.empty) {
             const batch = db.batch();
             woQuery.docs.forEach((doc) => {
-              batch.update(doc.ref, { hasNewSMS: true, lastSMSSenderUserID: "" });
+              batch.update(doc.ref, { hasNewSMS: true });
             });
             await batch.commit();
             log("Flagged workorders with hasNewSMS", { count: woQuery.size, customerID: customerData.id });
@@ -1426,7 +1435,23 @@ exports.incomingSMSEnhanced = onRequest(
               twilioSecretKey.value()
             );
           }
-          let forwardBody = `Reply from ${customerData.first || ""} ${customerData.last || ""}: ${incomingMessage}`;
+
+          // Translate the incoming message to English if the conversation was using translation
+          let forwardMessageText = incomingMessage;
+          const conversationTranslatedTo = conversationData.translatedTo || "";
+          if (conversationTranslatedTo && conversationTranslatedTo !== "en" && incomingMessage) {
+            try {
+              const { Translate } = require("@google-cloud/translate").v2;
+              const translate = new Translate({ key: googleTranslateApiKey.value() });
+              const [translated] = await translate.translate(incomingMessage, { to: "en", from: conversationTranslatedTo });
+              forwardMessageText = translated;
+              log("Translated incoming message for forwarding", { from: conversationTranslatedTo, to: "en", original: incomingMessage, translated });
+            } catch (translateError) {
+              log("Error translating for forward - using original", { error: translateError.message });
+            }
+          }
+
+          let forwardBody = `Reply from ${customerData.first || ""} ${customerData.last || ""}: ${forwardMessageText}`;
           if (incomingMessageData.mediaUrls && incomingMessageData.mediaUrls.length > 0) {
             const mediaLinks = incomingMessageData.mediaUrls.map((m) => m.url).join("\n");
             forwardBody += `\n${mediaLinks}`;

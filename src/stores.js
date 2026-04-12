@@ -1414,7 +1414,7 @@ export const useOpenWorkordersStore = create(
         }
       },
       setWorkorder: (wo, saveToDB = true, batch = true) => {
-        set({ workorders: addOrRemoveFromArr(get().workorders, wo) });
+        set({ workorders: replaceOrAddToArr(get().workorders, wo) });
         // Standalone workorders are local-only — saved explicitly by checkout on first payment
         if (saveToDB && wo.customerID) dbSaveOpenWorkorder(wo);
         if (wo.id === get().openWorkorderID) broadcastWorkorderToDisplay(wo);

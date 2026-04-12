@@ -584,6 +584,7 @@ export const ActiveWorkorderComponent = ({}) => {
               <TextInput_
                 placeholder={"Brand"}
                 editable={!isDonePaid}
+                capitalize={true}
                 style={{
                   width: "45%",
                   borderWidth: 1,
@@ -677,6 +678,7 @@ export const ActiveWorkorderComponent = ({}) => {
               <TextInput_
                 placeholder={"Model/Description"}
                 editable={!isDonePaid}
+                capitalize={true}
                 style={{
                   width: "45%",
                   borderWidth: 1,
@@ -743,6 +745,7 @@ export const ActiveWorkorderComponent = ({}) => {
               <TextInput_
                 placeholder={"Color 1"}
                 editable={!isDonePaid}
+                capitalize={true}
                 value={zOpenWorkorder?.color1.label}
                 style={{
                   width: "48%",
@@ -765,6 +768,7 @@ export const ActiveWorkorderComponent = ({}) => {
               <TextInput_
                 placeholder={"Color 2"}
                 editable={!isDonePaid}
+                capitalize={true}
                 value={zOpenWorkorder?.color2.label}
                 style={{
                   width: "48%",
@@ -1060,6 +1064,7 @@ export const ActiveWorkorderComponent = ({}) => {
               <TextInput_
                 placeholder={"Part name/description"}
                 editable={!isDonePaid}
+                capitalize={true}
                 style={{
                   width: "100%",
                   borderWidth: 1,
@@ -1095,6 +1100,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 value={zOpenWorkorder?.partSource}
                 placeholder={"Part Source"}
                 editable={!isDonePaid}
+                capitalize={true}
                 style={{
                   width: "50%",
                   borderWidth: 1,
@@ -1217,95 +1223,12 @@ export const ActiveWorkorderComponent = ({}) => {
           </View>
         </View>
       </View>
-      {/* Media Button */}
       <style>{`
         @keyframes uploadBarCycle {
           0% { transform: translateX(-100%); }
           100% { transform: translateX(350%); }
         }
       `}</style>
-      <View
-        style={{
-          backgroundColor: 'transparent',
-          borderRadius: 10,
-          paddingHorizontal: 25,
-          marginBottom: 0,
-          alignItems: "center",
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-          <View>
-            <Tooltip text={sUploadProgress && !sUploadProgress.done ? "Upload in progress, you may continue work safely" : "View & upload photos"} position="top">
-              <Button_
-                icon={ICONS.uploadCamera}
-                iconSize={40}
-                onPress={() => _setShowMediaModal(true)}
-                buttonStyle={{
-                  backgroundColor: "transparent",
-                  paddingHorizontal: 0,
-                  paddingVertical: 0,
-                }}
-              />
-            </Tooltip>
-            <View
-              pointerEvents="none"
-              style={{
-                position: "absolute",
-                top: -1,
-                right: -5,
-                borderRadius: 8,
-                minWidth: 16,
-                height: 16,
-                justifyContent: "center",
-                alignItems: "center",
-                paddingHorizontal: 3,
-              }}
-            >
-              <Text
-                style={{
-                  color: zOpenWorkorder?.media?.length > 0 ? C.red : 'gray',
-                  fontSize: 15,
-                  fontWeight: "700",
-                }}
-              >
-                {zOpenWorkorder?.media?.length || 0}
-              </Text>
-            </View>
-          </View>
-        </View>
-        {/* Upload progress bar */}
-        {sUploadProgress && (
-          <Tooltip text={!sUploadProgress.done ? "Upload in progress, you may continue work safely" : ""} position="bottom" style={{ alignSelf: "stretch" }}>
-            <View style={{ flexDirection: "row", alignItems: "center", width: "100%", paddingBottom: 4 }}>
-              <Text style={{ fontSize: 11, color: sUploadProgress.done ? (sUploadProgress.failed > 0 ? C.red : C.green) : gray(0.45), fontWeight: "700", marginRight: 6 }}>
-                {sUploadProgress.completed}/{sUploadProgress.total}
-              </Text>
-              <View style={{ flex: 1, height: 4, backgroundColor: gray(0.88), borderRadius: 2, overflow: "hidden" }}>
-                {!sUploadProgress.done ? (
-                  <div
-                    style={{
-                      width: "40%",
-                      height: "100%",
-                      backgroundColor: C.blue,
-                      borderRadius: 2,
-                      animation: "uploadBarCycle 1.2s ease-in-out infinite",
-                    }}
-                  />
-                ) : (
-                  <View
-                    style={{
-                      width: "100%",
-                      height: "100%",
-                      backgroundColor: sUploadProgress.failed > 0 ? C.red : C.green,
-                      borderRadius: 2,
-                    }}
-                  />
-                )}
-              </View>
-            </View>
-          </Tooltip>
-        )}
-      </View>
       <View
         style={{
           flexDirection: "row",
@@ -1345,7 +1268,7 @@ export const ActiveWorkorderComponent = ({}) => {
         <Pressable_
           onPress={handleIntakePrintPress}
           onRightPress={handleIntakeRightClick}
-          tooltip="Send intake receipt. Right-click to print only"
+          tooltip="Print/send intake receipt"
         >
           <Button_
             icon={ICONS.receipt}
@@ -1355,6 +1278,68 @@ export const ActiveWorkorderComponent = ({}) => {
             onPress={handleIntakePrintPress}
           />
         </Pressable_>
+        <Tooltip text={sUploadProgress && !sUploadProgress.done ? "Upload in progress, you may continue work safely" : "View & upload photos to workorder"} position="top">
+          <View>
+            <Button_
+              icon={ICONS.uploadCamera}
+              iconSize={35}
+              onPress={() => _setShowMediaModal(true)}
+              buttonStyle={{
+                backgroundColor: "transparent",
+                paddingHorizontal: 0,
+                paddingVertical: 0,
+              }}
+            />
+            <View
+              pointerEvents="none"
+              style={{
+                position: "absolute",
+                top: -1,
+                right: -5,
+                borderRadius: 8,
+                minWidth: 16,
+                height: 16,
+                justifyContent: "center",
+                alignItems: "center",
+                paddingHorizontal: 3,
+              }}
+            >
+              <Text
+                style={{
+                  color: zOpenWorkorder?.media?.length > 0 ? C.red : 'gray',
+                  fontSize: 15,
+                  fontWeight: "700",
+                }}
+              >
+                {zOpenWorkorder?.media?.length || 0}
+              </Text>
+            </View>
+            {sUploadProgress && (
+              <View style={{ position: "absolute", bottom: -2, left: 0, right: 0, height: 4, backgroundColor: gray(0.88), borderRadius: 2, overflow: "hidden" }}>
+                {!sUploadProgress.done ? (
+                  <div
+                    style={{
+                      width: "40%",
+                      height: "100%",
+                      backgroundColor: C.blue,
+                      borderRadius: 2,
+                      animation: "uploadBarCycle 1.2s ease-in-out infinite",
+                    }}
+                  />
+                ) : (
+                  <View
+                    style={{
+                      width: "100%",
+                      height: "100%",
+                      backgroundColor: sUploadProgress.failed > 0 ? C.red : C.green,
+                      borderRadius: 2,
+                    }}
+                  />
+                )}
+              </View>
+            )}
+          </View>
+        </Tooltip>
         <Tooltip text="New sale" position="top">
           <Button_
             icon={ICONS.cashRegister}

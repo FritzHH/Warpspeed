@@ -10,7 +10,7 @@ import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { Button_, SmallLoadingIndicator, SHADOW_RADIUS_PROTO } from "../../../components";
-import { useSettingsStore } from "../../../stores";
+import { useSettingsStore, useCheckoutStore } from "../../../stores";
 import {
   formatCurrencyDisp,
   formatMillisForDisplay,
@@ -66,7 +66,7 @@ const DetailRow = ({ label, value }) => {
 
 // ─── Main Modal ─────────────────────────────────────────
 
-export const FullSaleModal = ({ item, onClose }) => {
+export const FullSaleModal = ({ item, onClose, onRefund }) => {
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
   const salesTaxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
 
@@ -138,8 +138,12 @@ export const FullSaleModal = ({ item, onClose }) => {
   const isVoided = !!sSale?.voidedByRefund;
 
   function handleRefund() {
-    // TODO: Link to NewRefundModalScreen
-    log("Refund button pressed — TODO: link to refund modal");
+    if (onRefund) {
+      onRefund(sSale.id);
+    } else {
+      onClose();
+      useCheckoutStore.getState().setStringOnly(sSale.id);
+    }
   }
 
   // ── Loading / Error state ──

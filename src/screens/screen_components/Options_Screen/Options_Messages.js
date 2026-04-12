@@ -184,6 +184,7 @@ export function MessagesComponent({}) {
   const [sHubSidebarCollapsed, _setHubSidebarCollapsed] = useState(false);
   const [sHubSidebarFullWidth, _setHubSidebarFullWidth] = useState(false);
   const [sHubHoverPhone, _setHubHoverPhone] = useState("");
+  const hoverTimerRef = useRef(null);
 
   const {
     translatedText, isLoading: sTranslateLoading,
@@ -1020,8 +1021,8 @@ export function MessagesComponent({}) {
                       isHovered={sHubHoverPhone === item.phone}
                       activeWO={activeWO}
                       onPress={() => handleHubThreadClick(item)}
-                      onHoverIn={() => _setHubHoverPhone(item.phone)}
-                      onHoverOut={() => _setHubHoverPhone((prev) => prev === item.phone ? "" : prev)}
+                      onHoverIn={() => { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = setTimeout(() => _setHubHoverPhone(item.phone), 150); }}
+                      onHoverOut={() => { clearTimeout(hoverTimerRef.current); _setHubHoverPhone((prev) => prev === item.phone ? "" : prev); }}
                     />
                   );
                 }}

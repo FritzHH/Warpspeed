@@ -887,6 +887,114 @@ export async function queryCompletedSalesReport(startMillis, endMillis) {
   }
 }
 
+// ─── Active Sales Report ─────────────────────────────────────────
+// Takes a pre-filtered array of active sale objects (already filtered
+// by date range by the caller) and returns flat report rows in the
+// same shape as queryCompletedSalesReport, tagged with source: "active".
+
+export async function queryActiveSalesForReport(sales) {
+  if (!sales || sales.length === 0) return [];
+  try {
+    let allTxnIDs = [];
+    let txnIDSet = new Set();
+    let uniqueCustomerIDs = [];
+    let custIDSet = new Set();
+
+    sales.forEach((sale) => {
+      (sale.transactionIDs || []).forEach((id) => {
+        if (!txnIDSet.has(id)) { txnIDSet.add(id); allTxnIDs.push(id); }
+      });
+      if (sale.customerID && !custIDSet.has(sale.customerID)) {
+        custIDSet.add(sale.customerID);
+        uniqueCustomerIDs.push(sale.customerID);
+      }
+    });
+
+    let txnMapPromise = (async () => {
+      let map = {};
+      for (let i = 0; i < allTxnIDs.length; i += 50) {
+        let chunk = allTxnIDs.slice(i, i + 50);
+        let results = await readTransactions(chunk);
+        results.forEach((txn) => { map[txn.id] = txn; });
+      }
+      return map;
+    })();
+
+    let [txnMap, customerMap] = await Promise.all([
+      txnMapPromise,
+      readCustomersBatch(uniqueCustomerIDs),
+    ]);
+
+    let flatRows = [];
+    for (let sale of sales) {
+      let customer = customerMap[sale.customerID] || {};
+      let custFirst = customer.first || "";
+      let custLast = customer.last || "";
+      let custCell = customer.customerCell || "";
+      let custEmail = customer.email || "";
+
+      if ((sale.transactionIDs || []).length === 0) {
+        flatRows.push({
+          saleID: sale.id,
+          customerFirst: custFirst,
+          customerLast: custLast,
+          customerCell: custCell,
+          customerEmail: custEmail,
+          type: "pending",
+          method: "",
+          amountCaptured: 0,
+          salesTax: 0,
+          millis: sale.millis,
+          id: sale.id + "-pending",
+          source: "active",
+        });
+        continue;
+      }
+
+      for (let txnID of (sale.transactionIDs || [])) {
+        let txn = txnMap[txnID];
+        if (!txn) continue;
+
+        flatRows.push({
+          saleID: sale.id,
+          customerFirst: custFirst,
+          customerLast: custLast,
+          customerCell: custCell,
+          customerEmail: custEmail,
+          type: "payment",
+          method: txn.method || "",
+          amountCaptured: txn.amountCaptured || 0,
+          salesTax: txn.salesTax || 0,
+          millis: txn.millis || sale.millis,
+          id: txn.id,
+          source: "active",
+        });
+
+        (txn.refunds || []).forEach((refund) => {
+          flatRows.push({
+            saleID: sale.id,
+            customerFirst: custFirst,
+            customerLast: custLast,
+            customerCell: custCell,
+            customerEmail: custEmail,
+            type: "refund",
+            method: refund.method || txn.method || "",
+            amountCaptured: refund.amount || 0,
+            salesTax: refund.salesTax || 0,
+            millis: refund.millis || txn.millis,
+            id: refund.id || (txn.id + "-refund"),
+            source: "active",
+          });
+        });
+      }
+    }
+    return flatRows;
+  } catch (error) {
+    log("queryActiveSalesForReport error:", error);
+    return [];
+  }
+}
+
 // ─── Pending Transaction Recovery (App Init) ─────────────────────
 // Runs once on first active-sales snapshot. Reconciles sales that have
 // pendingTransactionIDs left over from a page reload or network drop

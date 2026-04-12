@@ -3,12 +3,11 @@ import {
   TouchableWithoutFeedback,
   View,
   Text,
-  FlatList,
   ScrollView,
   TouchableOpacity,
   Modal,
 } from "react-native-web";
-import { Button_, DropdownMenu, Image_, TimePicker_ } from "../../../components";
+import { Button_, DropdownMenu, Image_, TimePicker_, SmallLoadingIndicator } from "../../../components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
@@ -26,7 +25,7 @@ import CalendarPicker, {
   useDefaultStyles,
 } from "react-native-ui-datepicker";
 import { cloneDeep, sortBy } from "lodash";
-import { useSettingsStore, useAlertScreenStore } from "../../../stores";
+import { useSettingsStore, useAlertScreenStore, useLoginStore } from "../../../stores";
 import {
   dbGetPunchesByTimeFrame,
   dbSavePunchObject,
@@ -34,7 +33,6 @@ import {
 } from "../../../db_calls_wrapper";
 import { TIME_PUNCH_PROTO } from "../../../data";
 import {
-  MILLIS_IN_DAY,
   MILLIS_IN_HOUR,
   MILLIS_IN_MINUTE,
 } from "../../../constants";
@@ -65,10 +63,13 @@ function resolveAnchor(anchor) {
 function getTimeFrameRange(tf) {
   let begin = tf?.begin || "lastFriday";
   let end = tf?.end || "thisThursday";
-  return {
-    start: resolveAnchor(begin),
-    end: resolveAnchor(end),
-  };
+  let start = resolveAnchor(begin);
+  let endDate = resolveAnchor(end);
+  let today = dayjs().endOf("day");
+  if (today.isAfter(start) && today.isBefore(endDate)) {
+    endDate = today;
+  }
+  return { start, end: endDate };
 }
 
 const STATIC_SHORTCUTS = [
@@ -191,18 +192,21 @@ function pairPunches(filteredArr) {
   return { displayArr: arr, runningTotalMinutes };
 }
 
-export const PayrollModal = ({ handleExit }) => {
+export const PayrollModal = ({ handleExit, employeeUser }) => {
   const defaultStyles = useDefaultStyles();
   const zDefaultPayrollTimeFrame = useSettingsStore((s) => s.settings?.defaultPayrollTimeFrame, deepEqual);
   const zStoreDisplayName = useSettingsStore((s) => s.settings?.storeInfo?.displayName);
   const zEmailTemplates = useSettingsStore((s) => s.settings?.emailTemplates, deepEqual);
   const zUsers = useSettingsStore((s) => s.settings?.users, deepEqual);
+  const zCurrentUserLevel = useLoginStore((s) => s.currentUser?.permissions?.level || 0);
+
+  let isAdmin = !employeeUser && zCurrentUserLevel >= 4;
 
   let tf = zDefaultPayrollTimeFrame || { begin: "lastFriday", end: "thisThursday" };
   let defaultRange = getTimeFrameRange(tf);
 
-  // selected user
-  const [sSelectedUser, _setSelectedUser] = useState(null);
+  // selected user — auto-set for employee mode
+  const [sSelectedUser, _setSelectedUser] = useState(employeeUser || null);
 
   // date state — default to settings range
   const [sStartDate, _setStartDate] = useState(defaultRange.start);
@@ -217,11 +221,11 @@ export const PayrollModal = ({ handleExit }) => {
   // punch data
   const [sFilteredArr, _setFilteredArr] = useState([]);
   const [sLoading, _setLoading] = useState(false);
-  const [sEditableRowIdx, _setEditableRowIdx] = useState(null);
   const [sHasUnsavedChanges, _setHasUnsavedChanges] = useState(false);
   const [sSaving, _setSaving] = useState(false);
   const [sEmailing, _setEmailing] = useState(false);
   const [sEmailStatus, _setEmailStatus] = useState(null); // "sent" | "error" | "no-email"
+  const [sShowRate, _setShowRate] = useState(false);
 
   // track which punch IDs have been modified
   const modifiedPunchIdsRef = useRef(new Set());
@@ -239,7 +243,6 @@ export const PayrollModal = ({ handleExit }) => {
     let thisQueryId = ++queryIdRef.current;
 
     _setLoading(true);
-    _setEditableRowIdx(null);
     _setHasUnsavedChanges(false);
     modifiedPunchIdsRef.current = new Set();
 
@@ -319,93 +322,8 @@ export const PayrollModal = ({ handleExit }) => {
   function handleUserSelect(userObj) {
     _setSelectedUser(userObj);
     _setFilteredArr([]);
-    _setEditableRowIdx(null);
     _setHasUnsavedChanges(false);
     modifiedPunchIdsRef.current = new Set();
-  }
-
-  function handleTimeEdit(rowObj, option) {
-    rowObj = cloneDeep(rowObj);
-    let millis;
-
-    switch (option) {
-      case "in-date-up":
-        millis = rowObj.in.millis + MILLIS_IN_DAY;
-        break;
-      case "in-date-down":
-        millis = rowObj.in.millis - MILLIS_IN_DAY;
-        break;
-      case "out-date-up":
-        millis = rowObj.out.millis + MILLIS_IN_DAY;
-        break;
-      case "out-date-down":
-        millis = rowObj.out.millis - MILLIS_IN_DAY;
-        break;
-      case "in-hour-up":
-        millis = rowObj.in.millis + MILLIS_IN_HOUR;
-        break;
-      case "in-hour-down":
-        millis = rowObj.in.millis - MILLIS_IN_HOUR;
-        break;
-      case "out-hour-up":
-        millis = rowObj.out.millis + MILLIS_IN_HOUR;
-        break;
-      case "out-hour-down":
-        millis = rowObj.out.millis - MILLIS_IN_HOUR;
-        break;
-      case "in-minutes-up":
-        millis = rowObj.in.millis + MILLIS_IN_MINUTE;
-        break;
-      case "in-minutes-down":
-        millis = rowObj.in.millis - MILLIS_IN_MINUTE;
-        break;
-      case "out-minutes-up":
-        millis = rowObj.out.millis + MILLIS_IN_MINUTE;
-        break;
-      case "out-minutes-down":
-        millis = rowObj.out.millis - MILLIS_IN_MINUTE;
-        break;
-      case "in-am-pm": {
-        let val = 12 * MILLIS_IN_HOUR;
-        if (rowObj.in.amPM === "PM") val = val * -1;
-        millis = rowObj.in.millis + val;
-        break;
-      }
-      case "out-am-pm": {
-        let val = 12 * MILLIS_IN_HOUR;
-        if (rowObj.out.amPM === "PM") val = val * -1;
-        millis = rowObj.out.millis + val;
-        break;
-      }
-      default:
-        return;
-    }
-
-    let punchObj;
-    let idx;
-    if (option.includes("in-")) {
-      idx = sFilteredArr.findIndex((o) => o.id === rowObj.in.id);
-      punchObj = sFilteredArr[idx];
-    } else {
-      idx = sFilteredArr.findIndex((o) => o.id === rowObj.out.id);
-      punchObj = sFilteredArr[idx];
-    }
-
-    // prevent in time >= out time
-    if (option.includes("in-") && rowObj.in && rowObj.out) {
-      if (millis >= rowObj.out.millis) return;
-    }
-    if (option.includes("out-") && rowObj.in && rowObj.out) {
-      if (millis <= rowObj.in.millis) return;
-    }
-
-    let filteredArr = cloneDeep(sFilteredArr);
-    punchObj = cloneDeep(punchObj);
-    punchObj.millis = millis;
-    filteredArr[idx] = punchObj;
-    _setFilteredArr(filteredArr);
-    _setHasUnsavedChanges(true);
-    modifiedPunchIdsRef.current.add(punchObj.id);
   }
 
   function handleFullTimeChange(item, prefix, hour, minute, period) {
@@ -595,6 +513,72 @@ export const PayrollModal = ({ handleExit }) => {
     setTimeout(() => _setEmailStatus(null), 3000);
   }
 
+  async function handleEmployeeEmailCSV() {
+    if (!sSelectedUser) return;
+    let userEmail = sSelectedUser.email;
+    if (!userEmail) {
+      useAlertScreenStore.getState().setValues({
+        title: "No Email",
+        message: "No email address on file for your account. Please contact your manager.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+
+    _setEmailing(true);
+
+    try {
+      // Build CSV
+      let csvLines = ["Date,Day,Clock In,Clock Out,Hours"];
+      displayArr.forEach((row) => {
+        let date = (row.in?.wordDayOfMonth || row.out?.wordDayOfMonth || "") + " " + (row.in?.dayOfMonth || row.out?.dayOfMonth || "");
+        let day = row.in?.wordDayOfWeek || row.out?.wordDayOfWeek || "";
+        let inTime = row.in ? row.in.hour + ":" + String(row.in.minutes).padStart(2, "0") + " " + row.in.amPM : "";
+        let outTime = row.out ? row.out.hour + ":" + String(row.out.minutes).padStart(2, "0") + " " + row.out.amPM : "";
+        let hours = row.hoursDiff != null || row.minutesDiff != null
+          ? (row.hoursDiff || 0) + ":" + (row.minutesDiff || "00")
+          : "";
+        csvLines.push('"' + date + '","' + day + '","' + inTime + '","' + outTime + '","' + hours + '"');
+      });
+
+      let totalHoursStr = totalHoursObj.hours + ":" + String(totalHoursObj.minutes).padStart(2, "0");
+      csvLines.push('"","","","Total",' + '"' + totalHoursStr + '"');
+      let csvString = csvLines.join("\n");
+
+      let employeeName = sSelectedUser.first + " " + sSelectedUser.last;
+      let payPeriod = dayjs(sStartDate).format("M/D/YYYY") + " - " + dayjs(sEndDate).format("M/D/YYYY");
+      let subject = "Punch History - " + employeeName + " - " + payPeriod;
+      let htmlBody = "Hi " + sSelectedUser.first + ",<br><br>Your punch history for " + payPeriod + " is attached.<br><br>Total Hours: " + totalHoursStr;
+
+      let result = await dbSendEmail(userEmail, subject, htmlBody, [
+        { filename: "punch_history.csv", content: csvString, contentType: "text/csv" },
+      ]);
+
+      useAlertScreenStore.getState().setValues({
+        title: result.success ? "Email Sent" : "Email Failed",
+        message: result.success
+          ? "Your punch history has been sent to " + userEmail
+          : "Failed to send email. Please try again.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+    } catch (e) {
+      log("Error sending employee CSV email:", e);
+      useAlertScreenStore.getState().setValues({
+        title: "Email Failed",
+        message: "An error occurred while sending the email. Please try again.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+    }
+
+    _setEmailing(false);
+  }
+
   function handleTimeFrameChange(field, value) {
     let updated = { ...tf, [field]: value };
     useSettingsStore.getState().setField("defaultPayrollTimeFrame", updated);
@@ -625,8 +609,6 @@ export const PayrollModal = ({ handleExit }) => {
     },
     range_label: { color: C.text },
   };
-
-  const iconSize = 26;
 
   let Component = useCallback(() => {
     return (
@@ -661,56 +643,60 @@ export const PayrollModal = ({ handleExit }) => {
                   textAlign: "center",
                 }}
               >
-                Payroll
+                {isAdmin ? "Payroll" : "My Punches"}
               </Text>
 
-              {/* User Buttons */}
-              <Text
-                style={{
-                  fontSize: 9,
-                  fontWeight: "600",
-                  color: gray(0.5),
-                  marginBottom: 3,
-                  textAlign: "center",
-                }}
-              >
-                SELECT USER
-              </Text>
-              {(zUsers || []).map((user) => {
-                let isSelected = sSelectedUser?.id === user.id;
-                return (
-                  <TouchableOpacity
-                    key={user.id}
-                    onPress={() => handleUserSelect(user)}
+              {isAdmin && (
+                <>
+                  {/* User Buttons */}
+                  <Text
                     style={{
-                      backgroundColor: isSelected ? C.orange : C.blue,
-                      borderRadius: 4,
-                      paddingVertical: 5,
+                      fontSize: 9,
+                      fontWeight: "600",
+                      color: gray(0.5),
                       marginBottom: 3,
-                      alignItems: "center",
+                      textAlign: "center",
                     }}
                   >
-                    <Text
-                      style={{
-                        color: "white",
-                        fontSize: 11,
-                        fontWeight: "600",
-                      }}
-                    >
-                      {user.first} {user.last}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+                    SELECT USER
+                  </Text>
+                  {(zUsers || []).map((user) => {
+                    let isSelected = sSelectedUser?.id === user.id;
+                    return (
+                      <TouchableOpacity
+                        key={user.id}
+                        onPress={() => handleUserSelect(user)}
+                        style={{
+                          backgroundColor: isSelected ? C.orange : C.blue,
+                          borderRadius: 4,
+                          paddingVertical: 5,
+                          marginBottom: 3,
+                          alignItems: "center",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: "white",
+                            fontSize: 11,
+                            fontWeight: "600",
+                          }}
+                        >
+                          {user.first} {user.last}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
 
-              {/* Divider */}
-              <View
-                style={{
-                  height: 1,
-                  backgroundColor: gray(0.8),
-                  marginVertical: 6,
-                }}
-              />
+                  {/* Divider */}
+                  <View
+                    style={{
+                      height: 1,
+                      backgroundColor: gray(0.8),
+                      marginVertical: 6,
+                    }}
+                  />
+                </>
+              )}
 
               {/* Quick Buttons */}
               {/* Pay Period button */}
@@ -732,7 +718,10 @@ export const PayrollModal = ({ handleExit }) => {
                     fontWeight: "600",
                   }}
                 >
-                  Pay Period
+                  Pay Period{" "}
+                  <Text style={{ fontSize: 10 }}>
+                    {(zDefaultPayrollTimeFrame?.begin || "lastFriday").slice(4, 7)} → {(zDefaultPayrollTimeFrame?.end || "thisThursday").slice(4, 7)}
+                  </Text>
                 </Text>
               </TouchableOpacity>
 
@@ -765,67 +754,71 @@ export const PayrollModal = ({ handleExit }) => {
                 );
               })}
 
-              {/* Divider */}
-              <View
-                style={{
-                  height: 1,
-                  backgroundColor: gray(0.8),
-                  marginVertical: 6,
-                }}
-              />
+              {isAdmin && (
+                <>
+                  {/* Divider */}
+                  <View
+                    style={{
+                      height: 1,
+                      backgroundColor: gray(0.8),
+                      marginVertical: 6,
+                    }}
+                  />
 
-              {/* Default Time Frame editor */}
-              <Text
-                style={{
-                  fontSize: 9,
-                  fontWeight: "600",
-                  color: gray(0.5),
-                  marginBottom: 2,
-                  textAlign: "center",
-                }}
-              >
-                PAY PERIOD
-              </Text>
-              <View style={{ marginBottom: 3 }}>
-                <Text style={{ fontSize: 9, color: gray(0.5), marginBottom: 1 }}>
-                  Start Day
-                </Text>
-                <DropdownMenu
-                  dataArr={BEGIN_OPTIONS}
-                  selectedIdx={BEGIN_OPTIONS.findIndex((o) => o.value === tf.begin)}
-                  useSelectedAsButtonTitle={true}
-                  onSelect={(item) => handleTimeFrameChange("begin", item.value)}
-                  buttonStyle={{
-                    borderWidth: 1,
-                    borderColor: C.buttonLightGreenOutline,
-                    borderRadius: 4,
-                    paddingVertical: 4,
-                    paddingHorizontal: 6,
-                    backgroundColor: C.listItemWhite,
-                  }}
-                  buttonTextStyle={{ fontSize: 11, color: C.text }}
-                />
-              </View>
-              <View>
-                <Text style={{ fontSize: 9, color: gray(0.5), marginBottom: 1 }}>
-                  End Day
-                </Text>
-                <DropdownMenu
-                  dataArr={END_OPTIONS}
-                  selectedIdx={END_OPTIONS.findIndex((o) => o.value === tf.end)}
-                  useSelectedAsButtonTitle={true}
-                  onSelect={(item) => handleTimeFrameChange("end", item.value)}
-                  buttonStyle={{
-                    borderWidth: 1,
-                    borderColor: C.buttonLightGreenOutline,
-                    borderRadius: 4,
-                    paddingVertical: 4,
-                    paddingHorizontal: 6,
-                    backgroundColor: C.listItemWhite,
-                  }}
-                  buttonTextStyle={{ fontSize: 11, color: C.text }}
-                />
-              </View>
+                  {/* Default Time Frame editor */}
+                  <Text
+                    style={{
+                      fontSize: 9,
+                      fontWeight: "600",
+                      color: gray(0.5),
+                      marginBottom: 2,
+                      textAlign: "center",
+                    }}
+                  >
+                    PAY PERIOD
+                  </Text>
+                  <View style={{ marginBottom: 3 }}>
+                    <Text style={{ fontSize: 9, color: gray(0.5), marginBottom: 1 }}>
+                      Start Day
+                    </Text>
+                    <DropdownMenu
+                      dataArr={BEGIN_OPTIONS}
+                      selectedIdx={BEGIN_OPTIONS.findIndex((o) => o.value === tf.begin)}
+                      useSelectedAsButtonTitle={true}
+                      onSelect={(item) => handleTimeFrameChange("begin", item.value)}
+                      buttonStyle={{
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        borderRadius: 4,
+                        paddingVertical: 4,
+                        paddingHorizontal: 6,
+                        backgroundColor: C.listItemWhite,
+                      }}
+                      buttonTextStyle={{ fontSize: 11, color: C.text }}
+                    />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 9, color: gray(0.5), marginBottom: 1 }}>
+                      End Day
+                    </Text>
+                    <DropdownMenu
+                      dataArr={END_OPTIONS}
+                      selectedIdx={END_OPTIONS.findIndex((o) => o.value === tf.end)}
+                      useSelectedAsButtonTitle={true}
+                      onSelect={(item) => handleTimeFrameChange("end", item.value)}
+                      buttonStyle={{
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        borderRadius: 4,
+                        paddingVertical: 4,
+                        paddingHorizontal: 6,
+                        backgroundColor: C.listItemWhite,
+                      }}
+                      buttonTextStyle={{ fontSize: 11, color: C.text }}
+                    />
+                  </View>
+                </>
+              )}
             </View>
 
             {/* Close Button */}
@@ -888,7 +881,7 @@ export const PayrollModal = ({ handleExit }) => {
                 <View
                   style={{
                     flexDirection: "row",
-                    backgroundColor: C.blue,
+                    backgroundColor: gray(0.2),
                     borderRadius: 6,
                     paddingVertical: 6,
                     paddingHorizontal: 10,
@@ -902,7 +895,7 @@ export const PayrollModal = ({ handleExit }) => {
                       style={{
                         fontSize: 13,
                         fontWeight: "700",
-                        color: "white",
+                        color: gray(0.7),
                       }}
                     >
                       {dayjs(displayStart).format("ddd M/D/YYYY")}
@@ -912,17 +905,17 @@ export const PayrollModal = ({ handleExit }) => {
                       style={{
                         fontSize: 13,
                         fontWeight: "700",
-                        color: "white",
+                        color: gray(0.7),
                       }}
                     >
                       {dateChips.length} days:{" "}
-                      <Text style={{ color: "white" }}>
+                      <Text style={{ color: C.blue }}>
                         {dayjs(displayStart).format("ddd M/D/YYYY")}
                       </Text>
                       {"  "}→{"  "}
                       <Text
                         style={{
-                          color: lightenRGBByPercent(C.green, 40),
+                          color: C.red,
                         }}
                       >
                         {dayjs(displayEnd).format("ddd M/D/YYYY")}
@@ -1008,16 +1001,16 @@ export const PayrollModal = ({ handleExit }) => {
                 })()}
 
                 {/* Go Button */}
-                <View style={{ alignItems: "center" }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
                   <Button_
                     text="GO"
                     colorGradientArr={
-                      canGo
+                      canGo && !sLoading
                         ? COLOR_GRADIENTS.green
                         : COLOR_GRADIENTS.grey
                     }
                     onPress={handleGoButton}
-                    disabled={!canGo}
+                    disabled={!canGo || sLoading}
                     buttonStyle={{
                       paddingLeft: 40,
                       paddingRight: 40,
@@ -1025,6 +1018,9 @@ export const PayrollModal = ({ handleExit }) => {
                     }}
                     textStyle={{ fontSize: 15, fontWeight: "700" }}
                   />
+                  {sLoading && (
+                    <SmallLoadingIndicator color={C.blue} containerStyle={{ marginLeft: 8 }} />
+                  )}
                 </View>
               </View>
           </ScrollView>
@@ -1055,22 +1051,11 @@ export const PayrollModal = ({ handleExit }) => {
                     ? sSelectedUser.first + " " + sSelectedUser.last
                     : "Select a user"}
                 </Text>
-                {!!sSelectedUser && (
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: gray(0.5),
-                      marginLeft: 10,
-                    }}
-                  >
-                    ${hourlyWage.toFixed(2)}/hr
-                  </Text>
-                )}
               </View>
               <View
                 style={{ flexDirection: "row", alignItems: "center" }}
               >
-                {!!sSelectedUser && (
+                {isAdmin && !!sSelectedUser && (
                   <Button_
                     text="Add Punch"
                     onPress={handleNewPunchPress}
@@ -1149,17 +1134,19 @@ export const PayrollModal = ({ handleExit }) => {
               >
                 Hours
               </Text>
-              <Text
-                style={{
-                  flex: 0.4,
-                  fontSize: 11,
-                  fontWeight: "700",
-                  color: "white",
-                  textAlign: "center",
-                }}
-              >
-                Edit
-              </Text>
+              {isAdmin && (
+                <Text
+                  style={{
+                    flex: 0.4,
+                    fontSize: 11,
+                    fontWeight: "700",
+                    color: "white",
+                    textAlign: "center",
+                  }}
+                >
+                  Edit
+                </Text>
+              )}
             </View>
 
             {/* FlatList of punch pairs */}
@@ -1182,301 +1169,12 @@ export const PayrollModal = ({ handleExit }) => {
                 </Text>
               </View>
             ) : (
-              <FlatList
-                style={{ flex: 1 }}
-                data={displayArr}
-                keyExtractor={(item, idx) =>
-                  (item.in?.id || "") + (item.out?.id || "") + idx
-                }
-                renderItem={({ item, index }) => {
-                  let editable = index === sEditableRowIdx;
-                  let bgColor =
-                    index % 2 === 0 ? C.listItemWhite : gray(0.075);
-
-                  return (
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        backgroundColor: bgColor,
-                        paddingVertical: editable ? 4 : 6,
-                        paddingHorizontal: 8,
-                        opacity: editable
-                          ? 1
-                          : sEditableRowIdx != null
-                          ? 0.3
-                          : 1,
-                      }}
-                    >
-                      {/* Date column */}
-                      <View style={{ flex: 0.8 }}>
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            color: C.text,
-                            fontWeight: "500",
-                          }}
-                        >
-                          {item.in?.wordDayOfWeek ||
-                            item.out?.wordDayOfWeek}
-                        </Text>
-                        <Text
-                          style={{ fontSize: 11, color: gray(0.5) }}
-                        >
-                          {item.in?.wordDayOfMonth ||
-                            item.out?.wordDayOfMonth}{" "}
-                          {item.in?.dayOfMonth || item.out?.dayOfMonth}
-                        </Text>
-                      </View>
-
-                      {/* Clock In column */}
-                      <View
-                        style={{
-                          flex: 1.5,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {item.in ? (
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                            }}
-                          >
-                            <Image_
-                              icon={ICONS.forwardGreen}
-                              size={12}
-                              style={{ marginRight: 4 }}
-                            />
-                            {editable ? (
-                              <EditableTimeCell
-                                timeObj={item.in}
-                                prefix="in"
-                                onEdit={(opt) =>
-                                  handleTimeEdit(item, opt)
-                                }
-                                onTimeChange={(prefix, hour, minute, period) =>
-                                  handleFullTimeChange(item, prefix, hour, minute, period)
-                                }
-                                iconSize={iconSize}
-                              />
-                            ) : (
-                              <Text
-                                style={{
-                                  fontSize: 12,
-                                  color: C.text,
-                                }}
-                              >
-                                {item.in.hour}:
-                                {String(item.in.minutes).padStart(
-                                  2,
-                                  "0"
-                                )}{" "}
-                                {item.in.amPM}
-                              </Text>
-                            )}
-                          </View>
-                        ) : editable ? (
-                          <TouchableOpacity
-                            onPress={() => handleCreateMissingPunch(item, "in")}
-                          >
-                            <View
-                              style={{
-                                backgroundColor: lightenRGBByPercent(C.green, 60),
-                                borderRadius: 4,
-                                paddingVertical: 3,
-                                paddingHorizontal: 8,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: 11,
-                                  color: C.green,
-                                  fontWeight: "600",
-                                }}
-                              >
-                                + Add
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
-                        ) : (
-                          <Text
-                            style={{
-                              fontSize: 12,
-                              color: gray(0.5),
-                              fontStyle: "italic",
-                            }}
-                          >
-                            --
-                          </Text>
-                        )}
-                      </View>
-
-                      {/* Clock Out column */}
-                      <View
-                        style={{
-                          flex: 1.5,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {item.out ? (
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                            }}
-                          >
-                            <Image_
-                              icon={ICONS.backRed}
-                              size={12}
-                              style={{ marginRight: 4 }}
-                            />
-                            {editable ? (
-                              <EditableTimeCell
-                                timeObj={item.out}
-                                prefix="out"
-                                onEdit={(opt) =>
-                                  handleTimeEdit(item, opt)
-                                }
-                                onTimeChange={(prefix, hour, minute, period) =>
-                                  handleFullTimeChange(item, prefix, hour, minute, period)
-                                }
-                                iconSize={iconSize}
-                              />
-                            ) : (
-                              <Text
-                                style={{
-                                  fontSize: 12,
-                                  color: C.text,
-                                }}
-                              >
-                                {item.out.hour}:
-                                {String(item.out.minutes).padStart(
-                                  2,
-                                  "0"
-                                )}{" "}
-                                {item.out.amPM}
-                              </Text>
-                            )}
-                          </View>
-                        ) : editable ? (
-                          <TouchableOpacity
-                            onPress={() => handleCreateMissingPunch(item, "out")}
-                          >
-                            <View
-                              style={{
-                                backgroundColor: lightenRGBByPercent(C.lightred, 60),
-                                borderRadius: 4,
-                                paddingVertical: 3,
-                                paddingHorizontal: 8,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: 11,
-                                  color: C.lightred,
-                                  fontWeight: "600",
-                                }}
-                              >
-                                + Add
-                              </Text>
-                            </View>
-                          </TouchableOpacity>
-                        ) : (
-                          <Text
-                            style={{
-                              fontSize: 12,
-                              color: gray(0.5),
-                              fontStyle: "italic",
-                            }}
-                          >
-                            --
-                          </Text>
-                        )}
-                      </View>
-
-                      {/* Hours column */}
-                      <View style={{ flex: 0.8, alignItems: "center" }}>
-                        {item.hoursDiff != null ||
-                        item.minutesDiff != null ? (
-                          <Text
-                            style={{
-                              fontSize: 12,
-                              fontWeight: "600",
-                              color: C.text,
-                            }}
-                          >
-                            {item.hoursDiff || 0}:
-                            {item.minutesDiff || "00"}
-                          </Text>
-                        ) : (
-                          <Text
-                            style={{
-                              fontSize: 12,
-                              color: gray(0.5),
-                              fontStyle: "italic",
-                            }}
-                          >
-                            --
-                          </Text>
-                        )}
-                      </View>
-
-                      {/* Edit / Delete column */}
-                      <View
-                        style={{
-                          flex: 0.4,
-                          flexDirection: "row",
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <TouchableOpacity
-                          onPress={() => {
-                            if (sEditableRowIdx === index) {
-                              _setEditableRowIdx(null);
-                            } else {
-                              _setEditableRowIdx(index);
-                            }
-                          }}
-                          style={{ padding: 2 }}
-                        >
-                          <Image_ icon={ICONS.editPencil} size={16} />
-                        </TouchableOpacity>
-                        {editable && (
-                          <TouchableOpacity
-                            onPress={() => {
-                              useAlertScreenStore.getState().setValues({
-                                title: "Delete Punch",
-                                message: "Are you sure you want to delete this entry?",
-                                btn1Text: "Delete",
-                                btn2Text: "Cancel",
-                                handleBtn1Press: () => {
-                                  handleDeletePunchPress(
-                                    item.in || item.out
-                                  );
-                                  _setEditableRowIdx(null);
-                                  useAlertScreenStore.getState().setShowAlert(false);
-                                },
-                                handleBtn2Press: () => {
-                                  useAlertScreenStore.getState().setShowAlert(false);
-                                },
-                                canExitOnOuterClick: true,
-                              });
-                            }}
-                            style={{ padding: 2, marginLeft: 4 }}
-                          >
-                            <Image_ icon={ICONS.close1} size={14} />
-                          </TouchableOpacity>
-                        )}
-                      </View>
-                    </View>
-                  );
-                }}
+              <PunchList
+                displayArr={displayArr}
+                handleFullTimeChange={handleFullTimeChange}
+                handleCreateMissingPunch={handleCreateMissingPunch}
+                handleDeletePunchPress={handleDeletePunchPress}
+                isAdmin={isAdmin}
               />
             )}
 
@@ -1502,15 +1200,36 @@ export const PayrollModal = ({ handleExit }) => {
                   String(totalHoursObj.minutes).padStart(2, "0")
                 }
               />
-              <PayrollSummaryItem
-                label="Hourly Rate"
-                value={"$" + hourlyWage.toFixed(2)}
-              />
-              <PayrollSummaryItem
-                label="Total Wages"
-                value={"$" + Number(totalWages).toLocaleString()}
-                highlight={true}
-              />
+              {isAdmin && (
+                <View style={{ alignItems: "center", marginHorizontal: 10, marginVertical: 2 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontWeight: "600" }}>
+                      Hourly Rate
+                    </Text>
+                    <TouchableOpacity onPress={() => _setShowRate((p) => !p)} style={{ marginLeft: 4 }}>
+                      <Image_ icon={ICONS.eyeballs} size={19} style={{ opacity: sShowRate ? 1 : 0.4 }} />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={{ fontSize: 16, fontWeight: "700", color: "white" }}>
+                    {sShowRate ? "$" + hourlyWage.toFixed(2) : "***"}
+                  </Text>
+                </View>
+              )}
+              {isAdmin && (
+                <View style={{ alignItems: "center", marginHorizontal: 10, marginVertical: 2 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontWeight: "600" }}>
+                      Total Wages
+                    </Text>
+                    <TouchableOpacity onPress={() => _setShowRate((p) => !p)} style={{ marginLeft: 4 }}>
+                      <Image_ icon={ICONS.eyeballs} size={19} style={{ opacity: sShowRate ? 1 : 0.4 }} />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={{ fontSize: 16, fontWeight: "700", color: lightenRGBByPercent(C.green, 30) }}>
+                    {sShowRate ? "$" + Number(totalWages).toLocaleString() : "***"}
+                  </Text>
+                </View>
+              )}
               <View
                 style={{
                   marginLeft: 15,
@@ -1518,22 +1237,24 @@ export const PayrollModal = ({ handleExit }) => {
                   alignItems: "center",
                 }}
               >
-                <Button_
-                  text={sSaving ? "Saving..." : "SAVE"}
-                  colorGradientArr={
-                    sHasUnsavedChanges
-                      ? COLOR_GRADIENTS.green
-                      : COLOR_GRADIENTS.grey
-                  }
-                  onPress={handleSave}
-                  disabled={!sHasUnsavedChanges || sSaving}
-                  buttonStyle={{
-                    paddingLeft: 25,
-                    paddingRight: 25,
-                    paddingVertical: 8,
-                  }}
-                  textStyle={{ fontSize: 14, fontWeight: "700" }}
-                />
+                {isAdmin && (
+                  <Button_
+                    text={sSaving ? "Saving..." : "SAVE"}
+                    colorGradientArr={
+                      sHasUnsavedChanges
+                        ? COLOR_GRADIENTS.green
+                        : COLOR_GRADIENTS.grey
+                    }
+                    onPress={handleSave}
+                    disabled={!sHasUnsavedChanges || sSaving}
+                    buttonStyle={{
+                      paddingLeft: 25,
+                      paddingRight: 25,
+                      paddingVertical: 8,
+                    }}
+                    textStyle={{ fontSize: 14, fontWeight: "700" }}
+                  />
+                )}
                 <Button_
                   text={sEmailing ? "Sending..." : "EMAIL"}
                   colorGradientArr={
@@ -1541,7 +1262,7 @@ export const PayrollModal = ({ handleExit }) => {
                       ? COLOR_GRADIENTS.purple
                       : COLOR_GRADIENTS.grey
                   }
-                  onPress={handleEmailPayroll}
+                  onPress={isAdmin ? handleEmailPayroll : handleEmployeeEmailCSV}
                   disabled={
                     !sSelectedUser ||
                     displayArr.length === 0 ||
@@ -1553,10 +1274,13 @@ export const PayrollModal = ({ handleExit }) => {
                     paddingLeft: 15,
                     paddingRight: 15,
                     paddingVertical: 8,
-                    marginLeft: 8,
+                    marginLeft: isAdmin ? 8 : 0,
                   }}
                   textStyle={{ fontSize: 14, fontWeight: "700" }}
                 />
+                {sEmailing && !isAdmin && (
+                  <SmallLoadingIndicator color="white" containerStyle={{ marginLeft: 8 }} />
+                )}
                 {sEmailStatus === "sent" && (
                   <Text
                     style={{
@@ -1611,11 +1335,12 @@ export const PayrollModal = ({ handleExit }) => {
     sCalKey,
     sFilteredArr,
     sLoading,
-    sEditableRowIdx,
     sHasUnsavedChanges,
     sSaving,
     sEmailing,
     sEmailStatus,
+    sShowRate,
+    isAdmin,
     zUsers,
     zEmailTemplates,
     zStoreDisplayName,
@@ -1651,43 +1376,22 @@ export const PayrollModal = ({ handleExit }) => {
   );
 };
 
-/** Reusable editable time cell — date adjuster + tappable time that opens TimePicker_ */
-const EditableTimeCell = ({ timeObj, prefix, onEdit, onTimeChange, iconSize }) => {
+/** Reusable editable time cell — tappable time that opens TimePicker_ */
+const EditableTimeCell = ({ timeObj, prefix, onTimeChange }) => {
   const [sShowPicker, _sSetShowPicker] = useState(false);
   return (
     <View style={{ flexDirection: "row", alignItems: "center" }}>
-      {/* Date adjust */}
-      <View style={{ alignItems: "center" }}>
-        <Button_
-          icon={ICONS.upChevron}
-          iconSize={iconSize}
-          onPress={() => onEdit(prefix + "-date-up")}
-          buttonStyle={{ paddingVertical: 0, paddingHorizontal: 0 }}
-        />
-        <Text style={{ fontSize: 12, textAlign: "center", width: 20 }}>
-          {timeObj.dayOfMonth}
-        </Text>
-        <Button_
-          icon={ICONS.downChevron}
-          iconSize={iconSize}
-          onPress={() => onEdit(prefix + "-date-down")}
-          buttonStyle={{ paddingVertical: 0, paddingHorizontal: 0 }}
-        />
-      </View>
       {/* Tappable time display */}
       <TouchableOpacity
         onPress={() => _sSetShowPicker(true)}
         style={{
-          marginLeft: 4,
           paddingHorizontal: 6,
           paddingVertical: 4,
           borderRadius: 4,
-          borderWidth: 1,
-          borderColor: gray(0.75),
-          backgroundColor: gray(0.95),
+          backgroundColor: C.blue,
         }}
       >
-        <Text style={{ fontSize: 12, color: C.text }}>
+        <Text style={{ fontSize: 12, color: "white", fontWeight: "600" }}>
           {timeObj.hour}:{String(timeObj.minutes).padStart(2, "0")} {timeObj.amPM}
         </Text>
       </TouchableOpacity>
@@ -1751,3 +1455,268 @@ const PayrollSummaryItem = ({ label, value, highlight }) => (
     </Text>
   </View>
 );
+
+const PAGE_SIZE = 50;
+
+const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch, handleDeletePunchPress, isAdmin }) => {
+  const [sEditableRowIdx, _setEditableRowIdx] = useState(null);
+  const [sPage, _setPage] = useState(0);
+  const scrollRef = useRef(null);
+
+  // Reverse so most recent is first
+  let reversed = [...displayArr].reverse();
+  let totalPages = Math.max(1, Math.ceil(reversed.length / PAGE_SIZE));
+  let page = Math.min(sPage, totalPages - 1);
+  let pageData = reversed.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+  // Reset page when data changes
+  let prevLenRef = useRef(displayArr.length);
+  if (displayArr.length !== prevLenRef.current) {
+    prevLenRef.current = displayArr.length;
+    if (sPage !== 0) _setPage(0);
+  }
+
+  function goPage(p) {
+    _setEditableRowIdx(null);
+    _setPage(p);
+    if (scrollRef.current) scrollRef.current.scrollTo({ y: 0, animated: false });
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      <ScrollView ref={scrollRef} style={{ flex: 1 }}>
+        {pageData.map((item, index) => {
+          let globalIdx = page * PAGE_SIZE + index;
+          let editable = globalIdx === sEditableRowIdx;
+          let bgColor = index % 2 === 0 ? C.listItemWhite : gray(0.075);
+
+          return (
+            <View
+              key={(item.in?.id || "") + (item.out?.id || "") + globalIdx}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: bgColor,
+                paddingVertical: editable ? 4 : 6,
+                paddingHorizontal: 8,
+                opacity: editable ? 1 : sEditableRowIdx != null ? 0.3 : 1,
+              }}
+            >
+              {/* Date column */}
+              <View style={{ flex: 0.8 }}>
+                <Text style={{ fontSize: 12, color: C.text, fontWeight: "500" }}>
+                  {item.in?.wordDayOfWeek || item.out?.wordDayOfWeek}
+                </Text>
+                <Text style={{ fontSize: 11, color: gray(0.5) }}>
+                  {item.in?.wordDayOfMonth || item.out?.wordDayOfMonth}{" "}
+                  {item.in?.dayOfMonth || item.out?.dayOfMonth}
+                </Text>
+              </View>
+
+              {/* Clock In column */}
+              <View
+                style={{
+                  flex: 1.5,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {item.in ? (
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Image_ icon={ICONS.forwardGreen} size={12} style={{ marginRight: 4 }} />
+                    {editable ? (
+                      <EditableTimeCell
+                        timeObj={item.in}
+                        prefix="in"
+                        onTimeChange={(prefix, hour, minute, period) =>
+                          handleFullTimeChange(item, prefix, hour, minute, period)
+                        }
+                      />
+                    ) : (
+                      <Text style={{ fontSize: 12, color: C.text }}>
+                        {item.in.hour}:{String(item.in.minutes).padStart(2, "0")} {item.in.amPM}
+                      </Text>
+                    )}
+                  </View>
+                ) : editable ? (
+                  <TouchableOpacity onPress={() => handleCreateMissingPunch(item, "in")}>
+                    <View
+                      style={{
+                        backgroundColor: lightenRGBByPercent(C.green, 60),
+                        borderRadius: 4,
+                        paddingVertical: 3,
+                        paddingHorizontal: 8,
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, color: C.green, fontWeight: "600" }}>+ Add</Text>
+                    </View>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={{ fontSize: 12, color: gray(0.5), fontStyle: "italic" }}>--</Text>
+                )}
+              </View>
+
+              {/* Clock Out column */}
+              <View
+                style={{
+                  flex: 1.5,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                {item.out ? (
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    {editable ? (
+                      <EditableTimeCell
+                        timeObj={item.out}
+                        prefix="out"
+                        onTimeChange={(prefix, hour, minute, period) =>
+                          handleFullTimeChange(item, prefix, hour, minute, period)
+                        }
+                      />
+                    ) : (
+                      <Text style={{ fontSize: 12, color: C.text }}>
+                        {item.out.hour}:{String(item.out.minutes).padStart(2, "0")} {item.out.amPM}
+                      </Text>
+                    )}
+                  </View>
+                ) : editable ? (
+                  <TouchableOpacity onPress={() => handleCreateMissingPunch(item, "out")}>
+                    <View
+                      style={{
+                        backgroundColor: lightenRGBByPercent(C.lightred, 60),
+                        borderRadius: 4,
+                        paddingVertical: 3,
+                        paddingHorizontal: 8,
+                      }}
+                    >
+                      <Text style={{ fontSize: 11, color: C.lightred, fontWeight: "600" }}>+ Add</Text>
+                    </View>
+                  </TouchableOpacity>
+                ) : (
+                  <Text style={{ fontSize: 12, color: gray(0.5), fontStyle: "italic" }}>--</Text>
+                )}
+              </View>
+
+              {/* Hours column */}
+              <View style={{ flex: 0.8, alignItems: "center" }}>
+                {item.hoursDiff != null || item.minutesDiff != null ? (
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: C.text }}>
+                    {item.hoursDiff || 0}:{item.minutesDiff || "00"}
+                  </Text>
+                ) : (
+                  <Text style={{ fontSize: 12, color: gray(0.5), fontStyle: "italic" }}>--</Text>
+                )}
+              </View>
+
+              {/* Edit / Delete column */}
+              {isAdmin && (
+                <View
+                  style={{
+                    flex: 0.4,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
+                  <TouchableOpacity
+                    onPress={() => {
+                      if (sEditableRowIdx === globalIdx) {
+                        // Exiting edit mode — validate times
+                        if (item.in && item.out && (item.out.millis - item.in.millis) < MILLIS_IN_MINUTE) {
+                          useAlertScreenStore.getState().setValues({
+                            title: "Invalid Time",
+                            message: "Clock in must be at least 1 minute before clock out.",
+                            btn1Text: "OK",
+                            handleBtn1Press: () => {
+                              useAlertScreenStore.getState().setShowAlert(false);
+                            },
+                            canExitOnOuterClick: true,
+                          });
+                          return;
+                        }
+                        _setEditableRowIdx(null);
+                      } else {
+                        _setEditableRowIdx(globalIdx);
+                      }
+                    }}
+                    style={{ padding: 2 }}
+                  >
+                    <Image_ icon={ICONS.editPencil} size={16} />
+                  </TouchableOpacity>
+                  {editable && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        useAlertScreenStore.getState().setValues({
+                          title: "Delete Punch",
+                          message: "Are you sure you want to delete this entry?",
+                          btn1Text: "Delete",
+                          btn2Text: "Cancel",
+                          handleBtn1Press: () => {
+                            handleDeletePunchPress(item.in || item.out);
+                            _setEditableRowIdx(null);
+                            useAlertScreenStore.getState().setShowAlert(false);
+                          },
+                          handleBtn2Press: () => {
+                            useAlertScreenStore.getState().setShowAlert(false);
+                          },
+                          canExitOnOuterClick: true,
+                        });
+                      }}
+                      style={{ padding: 2, marginLeft: 4 }}
+                    >
+                      <Image_ icon={ICONS.close1} size={14} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </ScrollView>
+
+      {/* Pagination bar */}
+      {totalPages > 1 && (
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "center",
+            alignItems: "center",
+            paddingVertical: 4,
+            backgroundColor: gray(0.95),
+            borderTopWidth: 1,
+            borderTopColor: gray(0.85),
+          }}
+        >
+          <TouchableOpacity
+            onPress={() => goPage(page - 1)}
+            disabled={page === 0}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 4,
+              opacity: page === 0 ? 0.3 : 1,
+            }}
+          >
+            <Image_ icon={ICONS.greenLeftArrow} size={16} />
+          </TouchableOpacity>
+          <Text style={{ fontSize: 12, color: C.text, fontWeight: "600", marginHorizontal: 10 }}>
+            Page {page + 1} of {totalPages}
+          </Text>
+          <TouchableOpacity
+            onPress={() => goPage(page + 1)}
+            disabled={page >= totalPages - 1}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 4,
+              opacity: page >= totalPages - 1 ? 0.3 : 1,
+            }}
+          >
+            <Image_ icon={ICONS.greenRightArrow} size={16} />
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+};

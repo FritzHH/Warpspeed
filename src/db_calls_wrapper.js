@@ -2917,7 +2917,7 @@ export async function dbSaveMessageTranslation(phone, messageId, translated) {
   }
 }
 
-export async function dbSendEmail(to, subject, htmlBody) {
+export async function dbSendEmail(to, subject, htmlBody, attachments) {
   const { tenantID, storeID } = getTenantAndStore();
 
   try {
@@ -2938,6 +2938,9 @@ export async function dbSendEmail(to, subject, htmlBody) {
       tenantID,
       storeID,
     };
+    if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+      emailData.attachments = attachments;
+    }
 
     let result = await sendEmail(emailData);
 

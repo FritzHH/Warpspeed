@@ -238,6 +238,7 @@ export function WorkordersComponent({}) {
 
   ///////////////////////////////////////////////////////////////////////////////////
   let sAllowPreview = zCurrentUser?.preview !== false; // default true
+  const enterTimerRef = useRef(null);
   const exitTimerRef = useRef(null);
   const preHoverTabsRef = useRef(null);
 
@@ -422,22 +423,33 @@ export function WorkordersComponent({}) {
       clearTimeout(exitTimerRef.current);
       exitTimerRef.current = null;
     }
-    // Save pre-hover tab state so we can restore on exit
-    if (!preHoverTabsRef.current) {
-      let tabStore = useTabNamesStore.getState();
-      preHoverTabsRef.current = {
-        infoTabName: tabStore.infoTabName,
-        itemsTabName: tabStore.itemsTabName,
-      };
+    if (enterTimerRef.current) {
+      clearTimeout(enterTimerRef.current);
+      enterTimerRef.current = null;
     }
-    useOpenWorkordersStore.getState().setWorkorderPreviewID(workorder.id);
-    useTabNamesStore.getState().setItems({
-      infoTabName: TAB_NAMES.infoTab.workorder,
-      itemsTabName: TAB_NAMES.itemsTab.workorderItems
-    });
+    enterTimerRef.current = setTimeout(() => {
+      enterTimerRef.current = null;
+      // Save pre-hover tab state so we can restore on exit
+      if (!preHoverTabsRef.current) {
+        let tabStore = useTabNamesStore.getState();
+        preHoverTabsRef.current = {
+          infoTabName: tabStore.infoTabName,
+          itemsTabName: tabStore.itemsTabName,
+        };
+      }
+      useOpenWorkordersStore.getState().setWorkorderPreviewID(workorder.id);
+      useTabNamesStore.getState().setItems({
+        infoTabName: TAB_NAMES.infoTab.workorder,
+        itemsTabName: TAB_NAMES.itemsTab.workorderItems
+      });
+    }, 150);
   }
 
   function onMouseExit(workorder) {
+    if (enterTimerRef.current) {
+      clearTimeout(enterTimerRef.current);
+      enterTimerRef.current = null;
+    }
     exitTimerRef.current = setTimeout(() => {
       // Restore tabs and clear preview in the same tick to avoid flicker
       if (preHoverTabsRef.current) {

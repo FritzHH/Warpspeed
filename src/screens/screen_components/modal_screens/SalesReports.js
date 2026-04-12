@@ -24,7 +24,8 @@ import dayjs from "dayjs";
 import CalendarPicker, {
   useDefaultStyles,
 } from "react-native-ui-datepicker";
-import { queryCompletedSalesReport } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { queryCompletedSalesReport, queryActiveSalesForReport } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { useActiveSalesStore, useCheckoutStore } from "../../../stores";
 import { FullSaleModal } from "./FullSaleModal";
 
 const PAGE_SIZE = 50;
@@ -112,6 +113,7 @@ export const SalesReportsModal = ({ handleExit }) => {
   const [sEndCalMonth, _setEndCalMonth] = useState(dayjs().month());
   const [sEndCalYear, _setEndCalYear] = useState(dayjs().year());
   const [sCalKey, _setCalKey] = useState(0);
+  const [sViewMode, _setViewMode] = useState("sale"); // "sale" or "transaction"
   const queryIdRef = useRef(0);
   const hasUserSelected = useRef(false);
 
@@ -124,10 +126,21 @@ export const SalesReportsModal = ({ handleExit }) => {
     let thisQueryId = ++queryIdRef.current;
     _setLoading(true);
     _setPage(0);
-    queryCompletedSalesReport(startMillis, endMillis)
-      .then((results) => {
+
+    let activeSales = useActiveSalesStore.getState().getActiveSales();
+    let filteredActive = activeSales.filter((s) => {
+      let m = s.millis || 0;
+      return m >= startMillis && m <= endMillis;
+    });
+
+    Promise.all([
+      queryCompletedSalesReport(startMillis, endMillis),
+      queryActiveSalesForReport(filteredActive),
+    ])
+      .then(([completedRows, activeRows]) => {
         if (thisQueryId !== queryIdRef.current) return;
-        _setResults(results || []);
+        let tagged = (completedRows || []).map((r) => ({ ...r, source: "completed" }));
+        _setResults([...tagged, ...(activeRows || [])]);
         _setLoading(false);
       })
       .catch(() => {
@@ -140,6 +153,25 @@ export const SalesReportsModal = ({ handleExit }) => {
   function handleCancelQuery() {
     queryIdRef.current++;
     _setLoading(false);
+  }
+
+  function handleRowPress(tx) {
+    if (tx.source === "active") {
+      let sale = useActiveSalesStore.getState().getActiveSale(tx.saleID);
+      if (sale) {
+        handleExit();
+        useCheckoutStore.getState().setViewOnlySale(sale);
+        useCheckoutStore.getState().setIsCheckingOut(true);
+      }
+    } else {
+      _setSaleModalItem(tx);
+    }
+  }
+
+  function handleRefundFromSaleModal(saleID) {
+    _setSaleModalItem(null);
+    handleExit();
+    useCheckoutStore.getState().setStringOnly(saleID);
   }
 
   function handleShortcut(shortcut) {
@@ -191,29 +223,42 @@ export const SalesReportsModal = ({ handleExit }) => {
     });
   }
 
-  // Group transactions by saleID
-  let grouped = {};
-  filteredResults.forEach((tx) => {
-    if (!grouped[tx.saleID]) {
-      grouped[tx.saleID] = {
-        saleID: tx.saleID,
-        customerFirst: tx.customerFirst || "",
-        customerLast: tx.customerLast || "",
-        transactions: [],
-      };
-    }
-    grouped[tx.saleID].transactions.push(tx);
-  });
-  let groups = Object.values(grouped);
-  groups.sort((a, b) => {
-    let aMin = Math.min(...a.transactions.map((t) => t.millis));
-    let bMin = Math.min(...b.transactions.map((t) => t.millis));
-    return bMin - aMin;
-  });
+  // Mode-aware data processing
+  let groups = [];
+  let flatSorted = [];
 
-  // Pagination on groups
-  let totalPages = Math.max(1, Math.ceil(groups.length / PAGE_SIZE));
-  let pageGroups = groups.slice(sPage * PAGE_SIZE, (sPage + 1) * PAGE_SIZE);
+  if (sViewMode === "sale") {
+    let grouped = {};
+    filteredResults.forEach((tx) => {
+      if (!grouped[tx.saleID]) {
+        grouped[tx.saleID] = {
+          saleID: tx.saleID,
+          customerFirst: tx.customerFirst || "",
+          customerLast: tx.customerLast || "",
+          transactions: [],
+          source: tx.source || "completed",
+        };
+      }
+      grouped[tx.saleID].transactions.push(tx);
+      if (tx.source === "active") grouped[tx.saleID].source = "active";
+    });
+    groups = Object.values(grouped);
+    groups.sort((a, b) => {
+      let aMin = Math.min(...a.transactions.map((t) => t.millis));
+      let bMin = Math.min(...b.transactions.map((t) => t.millis));
+      return bMin - aMin;
+    });
+  } else {
+    flatSorted = filteredResults
+      .filter((tx) => tx.type !== "pending")
+      .sort((a, b) => (b.millis || 0) - (a.millis || 0));
+  }
+
+  // Mode-aware pagination
+  let itemCount = sViewMode === "sale" ? groups.length : flatSorted.length;
+  let totalPages = Math.max(1, Math.ceil(itemCount / PAGE_SIZE));
+  let pageGroups = sViewMode === "sale" ? groups.slice(sPage * PAGE_SIZE, (sPage + 1) * PAGE_SIZE) : [];
+  let pageTransactions = sViewMode === "transaction" ? flatSorted.slice(sPage * PAGE_SIZE, (sPage + 1) * PAGE_SIZE) : [];
 
   // Summary calculations over all filtered transactions
   let totalPayments = 0;
@@ -258,9 +303,10 @@ export const SalesReportsModal = ({ handleExit }) => {
 
   function renderGroupHeader(group) {
     let label = "Sale";
+    let isActive = group.source === "active";
     let customerName = "";
     if (group.customerFirst || group.customerLast) {
-      customerName = " — " + (group.customerFirst + " " + group.customerLast).trim();
+      customerName = " - " + (group.customerFirst + " " + group.customerLast).trim();
     }
     return (
       <View
@@ -276,12 +322,24 @@ export const SalesReportsModal = ({ handleExit }) => {
         <Text style={{ fontSize: 13, fontWeight: "700", color: "white" }}>
           {label}{customerName}
         </Text>
+        {isActive && (
+          <View style={{
+            marginLeft: 8,
+            backgroundColor: C.orange,
+            borderRadius: 4,
+            paddingHorizontal: 6,
+            paddingVertical: 2,
+          }}>
+            <Text style={{ fontSize: 10, fontWeight: "700", color: "white" }}>Active</Text>
+          </View>
+        )}
       </View>
     );
   }
 
   function renderTransactionRow(tx, index) {
     let isRefund = tx.type === "refund";
+    let isActive = tx.source === "active";
     let bgColor = isRefund
       ? lightenRGBByPercent(C.red, 85)
       : index % 2 === 0
@@ -291,7 +349,7 @@ export const SalesReportsModal = ({ handleExit }) => {
     return (
       <TouchableOpacity
         key={tx.id || tx.saleID + "-" + index}
-        onPress={() => _setSaleModalItem(tx)}
+        onPress={() => handleRowPress(tx)}
         activeOpacity={0.6}
         style={{
           flexDirection: "row",
@@ -303,6 +361,9 @@ export const SalesReportsModal = ({ handleExit }) => {
           borderBottomColor: gray(0.9),
         }}
       >
+        {isActive && (
+          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.orange, marginRight: 4 }} />
+        )}
         <Text
           numberOfLines={1}
           style={{
@@ -310,7 +371,7 @@ export const SalesReportsModal = ({ handleExit }) => {
             fontSize: 14,
             fontWeight: "600",
             color: isRefund ? C.red : C.text,
-            paddingLeft: 10,
+            paddingLeft: isActive ? 0 : 10,
           }}
         >
           {capitalizeFirstLetterOfString(tx.type || "payment")}
@@ -594,9 +655,13 @@ export const SalesReportsModal = ({ handleExit }) => {
               <Text style={{ fontSize: 12, color: gray(0.4) }}>
                 {sLoading
                   ? "Loading..."
-                  : searchQuery
-                  ? groups.length + " groups (" + filteredResults.length + " transactions) of " + sResults.length
-                  : groups.length + " groups (" + sResults.length + " transactions)"}
+                  : sViewMode === "sale"
+                  ? (searchQuery
+                      ? groups.length + " sales (" + filteredResults.length + " transactions) of " + sResults.length
+                      : groups.length + " sales (" + sResults.length + " transactions)")
+                  : (searchQuery
+                      ? flatSorted.length + " transactions of " + sResults.length
+                      : flatSorted.length + " transactions")}
               </Text>
               <Text style={{ fontSize: 12, color: gray(0.4) }}>
                 Page {sPage + 1} of {totalPages}
@@ -613,6 +678,37 @@ export const SalesReportsModal = ({ handleExit }) => {
                 paddingBottom: 5,
               }}
             >
+              {/* View Mode Toggle */}
+              <View style={{ flexDirection: "row", marginRight: 10 }}>
+                <TouchableOpacity
+                  onPress={() => { _setViewMode("sale"); _setPage(0); }}
+                  style={{
+                    paddingVertical: 6,
+                    paddingHorizontal: 12,
+                    backgroundColor: sViewMode === "sale" ? C.blue : gray(0.85),
+                    borderTopLeftRadius: 6,
+                    borderBottomLeftRadius: 6,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "600", color: sViewMode === "sale" ? "white" : gray(0.4) }}>
+                    By Sale
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => { _setViewMode("transaction"); _setPage(0); }}
+                  style={{
+                    paddingVertical: 6,
+                    paddingHorizontal: 12,
+                    backgroundColor: sViewMode === "transaction" ? C.blue : gray(0.85),
+                    borderTopRightRadius: 6,
+                    borderBottomRightRadius: 6,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "600", color: sViewMode === "transaction" ? "white" : gray(0.4) }}>
+                    By Transaction
+                  </Text>
+                </TouchableOpacity>
+              </View>
               <TextInput
                 value={sSearchText}
                 onChangeText={(text) => {
@@ -663,23 +759,27 @@ export const SalesReportsModal = ({ handleExit }) => {
             {/* Table Header */}
             {renderHeader()}
 
-            {/* Grouped Transaction List */}
+            {/* Transaction List */}
             <ScrollView style={{ flex: 1 }}>
-              {pageGroups.map((group) => {
-                return (
+              {sViewMode === "sale" ? (
+                pageGroups.map((group) => (
                   <View key={group.saleID}>
                     {renderGroupHeader(group)}
                     {group.transactions.map((tx, idx) => renderTransactionRow(tx, idx))}
                   </View>
-                );
-              })}
-              {pageGroups.length === 0 && !sLoading && (
-                <View style={{ paddingVertical: 30, alignItems: "center" }}>
-                  <Text style={{ fontSize: 14, color: gray(0.5) }}>
-                    {sResults.length === 0 ? "Select a date range to view transactions" : "No matching transactions"}
-                  </Text>
-                </View>
+                ))
+              ) : (
+                pageTransactions.map((tx, idx) => renderTransactionRow(tx, idx))
               )}
+              {((sViewMode === "sale" && pageGroups.length === 0) ||
+                (sViewMode === "transaction" && pageTransactions.length === 0)) &&
+                !sLoading && (
+                  <View style={{ paddingVertical: 30, alignItems: "center" }}>
+                    <Text style={{ fontSize: 14, color: gray(0.5) }}>
+                      {sResults.length === 0 ? "Select a date range to view transactions" : "No matching transactions"}
+                    </Text>
+                  </View>
+                )}
             </ScrollView>
 
             {/* Pagination Controls */}
@@ -766,7 +866,7 @@ export const SalesReportsModal = ({ handleExit }) => {
         </View>
       </TouchableWithoutFeedback>
     );
-  }, [sStartDate, sEndDate, sResults, sPage, sLoading, sSaleModalItem, sActiveShortcut, sSearchText, sPendingStart, sPendingEnd, sEndCalMonth, sEndCalYear, sCalKey]);
+  }, [sStartDate, sEndDate, sResults, sPage, sLoading, sSaleModalItem, sActiveShortcut, sSearchText, sPendingStart, sPendingEnd, sEndCalMonth, sEndCalYear, sCalKey, sViewMode]);
 
   return ReactDOM.createPortal(
     <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}>
@@ -780,6 +880,7 @@ export const SalesReportsModal = ({ handleExit }) => {
         <FullSaleModal
           item={sSaleModalItem}
           onClose={() => _setSaleModalItem(null)}
+          onRefund={handleRefundFromSaleModal}
         />
       )}
       {/* Loading Overlay */}

@@ -3,6 +3,7 @@
 import { View, ActivityIndicator } from "react-native-web";
 import {
   checkInternetConnection,
+  convertMillisToHoursMins,
   dim,
   localStorageWrapper,
   log,
@@ -21,10 +22,15 @@ import {
   useAlertScreenStore,
 } from "../../stores";
 import { INTERNET_CHECK_DELAY, LOCAL_DB_KEYS } from "../../constants";
+import { PayrollModal } from "../screen_components/modal_screens/PayrollModal";
 
 export const Options_Section = React.memo(({}) => {
   // store getters ///////////////////////////////////////////////////////////////
   const zOptionsTabName = useTabNamesStore((state) => state.optionsTabName);
+  const zCurrentUser = useLoginStore((state) => state.currentUser);
+
+  // local state
+  const [sShowPayroll, _setShowPayroll] = useState(false);
 
   //////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////
@@ -55,12 +61,26 @@ export const Options_Section = React.memo(({}) => {
     };
 
     let viewHistoryFun = () => {
-      log("view history here");
+      useAlertScreenStore.getState().setShowAlert(false);
+      _setShowPayroll(true);
     };
+
+    let clockMessage = "";
+    if (option === "out") {
+      let punchObj = useLoginStore.getState().punchClock[user.id];
+      if (punchObj && punchObj.millis) {
+        let diff = millis - punchObj.millis;
+        let t = convertMillisToHoursMins(diff);
+        clockMessage = "Clocked in for " + t.hours + "h " + String(t.minutes).padStart(2, "0") + "m";
+      }
+    } else {
+      clockMessage = "Currently clocked out";
+    }
 
     useAlertScreenStore.getState().setShowAlert(true);
     useAlertScreenStore.getState().setValues({
       title: "PUNCH CLOCK",
+      message: clockMessage,
       btn1Text: option == "in" ? "CLOCK IN" : "CLOCK OUT",
       btn2Text: "VIEW HISTORY",
       btn3Text: "CANCEL",
@@ -95,6 +115,12 @@ export const Options_Section = React.memo(({}) => {
         handleUserPress={handleUserClockPress}
       />
       {ScreenComponent()}
+      {sShowPayroll && (
+        <PayrollModal
+          handleExit={() => _setShowPayroll(false)}
+          employeeUser={zCurrentUser}
+        />
+      )}
     </View>
   );
 });

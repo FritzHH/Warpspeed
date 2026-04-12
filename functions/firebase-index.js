@@ -5324,7 +5324,7 @@ exports.sendEmailCallable = onCall(
     log("Incoming email callable request", request.data);
 
     try {
-      const { to, subject, htmlBody, tenantID, storeID } = request.data;
+      const { to, subject, htmlBody, tenantID, storeID, attachments } = request.data;
 
       if (!to || typeof to !== "string" || !to.includes("@")) {
         throw new HttpsError("invalid-argument", "Valid email address is required");
@@ -5356,6 +5356,9 @@ exports.sendEmailCallable = onCall(
         subject: subject,
         html: htmlBody,
       };
+      if (attachments && Array.isArray(attachments) && attachments.length > 0) {
+        mailOptions.attachments = attachments;
+      }
 
       const info = await transporter.sendMail(mailOptions);
 

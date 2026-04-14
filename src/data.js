@@ -473,8 +473,6 @@ export const WORKORDER_PROTO = {
   salesTax: ""
 };
 
-export const TAX_FREE_RECEIPT_NOTE = "No items on this workorder were taxable under Florida law. All items are labor-only, and no shop parts or material left the shop with the customer."
-
 export const WORKORDER_ITEM_PROTO = {
   qty: 1,
   intakeNotes: "",

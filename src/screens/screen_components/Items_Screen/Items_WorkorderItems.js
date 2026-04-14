@@ -29,7 +29,6 @@ import {
   INVENTORY_ITEM_PROTO,
   SETTINGS_OBJ,
   TAB_NAMES,
-  TAX_FREE_RECEIPT_NOTE,
 } from "../../../data";
 import { useEffect, useRef, useState } from "react";
 import { cloneDeep, zipObject } from "lodash";
@@ -471,7 +470,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               let floorCheck = checkSaleFloor(null, { taxFree: true });
               if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
               useOpenWorkordersStore.getState().setField("taxFree", true);
-              useOpenWorkordersStore.getState().setField("taxFreeReceiptNote", TAX_FREE_RECEIPT_NOTE);
+              useOpenWorkordersStore.getState().setField("taxFreeReceiptNote", useSettingsStore.getState().settings?.taxFreeReceiptNote || "");
             },
             btn2Text: "Cancel",
             handleBtn2Press: () => {

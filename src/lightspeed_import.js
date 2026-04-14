@@ -1,5 +1,5 @@
 import { buildLightspeedEAN13, buildWorkorderNumberFromId, bestForegroundHex, hexToRgb, normalizeBarcode, generateEAN13Barcode } from "./utils";
-import { COLORS, NONREMOVABLE_STATUSES, CUSTOMER_LANGUAGES, TAX_FREE_RECEIPT_NOTE, APP_USER, TIME_PUNCH_PROTO } from "./data";
+import { COLORS, NONREMOVABLE_STATUSES, CUSTOMER_LANGUAGES, APP_USER, TIME_PUNCH_PROTO } from "./data";
 
 // ============================================================================
 // Status Aliases — map common Lightspeed labels to existing nonremovable labels
@@ -318,7 +318,8 @@ export function mapWorkorders(
   warpspeedStatuses,      // array of status objects from settings
   employeesCSVText,       // optional — employees.csv text for note author names
   salesCSVText,           // optional — sales.csv text for taxFree detection
-  customerRedirectMap = {} // { discardedLsID → survivingLsID } (from mapCustomers)
+  customerRedirectMap = {}, // { discardedLsID → survivingLsID } (from mapCustomers)
+  settings = {}           // settings object (for taxFreeReceiptNote)
 ) {
   const woRows = parseCSV(workorderCSVText);
   const wiRows = parseCSV(workorderItemsCSVText);
@@ -567,7 +568,7 @@ export function mapWorkorders(
         : false,
       taxFreeReceiptNote: (wo.saleID && saleMap[wo.saleID]
         && (parseFloat(saleMap[wo.saleID].calcTax1 || "0") + parseFloat(saleMap[wo.saleID].calcTax2 || "0")) === 0)
-        ? TAX_FREE_RECEIPT_NOTE : "",
+        ? (settings?.taxFreeReceiptNote || "") : "",
       archived: wo.archived === "true",
       startedBy: wo.employeeID || "",
       startedOnMillis,

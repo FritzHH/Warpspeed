@@ -798,9 +798,9 @@ export function MessagesComponent({}) {
     handleExitHubMode();
   }
 
-  function handleHubOpenWorkorderKeepHub(phone) {
-    let wo = zAllWorkorders.find(w => w.customerCell === phone);
+  function handleHubOpenWorkorderKeepHub(wo) {
     if (!wo) return;
+    _setHubMode(true);
     useOpenWorkordersStore.getState().setOpenWorkorderID(wo.id);
     if (wo.customerID) {
       dbGetCustomer(wo.customerID).then((c) => {
@@ -1044,7 +1044,7 @@ export function MessagesComponent({}) {
                 onOpenWorkorder={handleHubOpenWorkorder}
                 onOpenWorkorderKeepHub={handleHubOpenWorkorderKeepHub}
                 hasMatchingWorkorder={!hasCustomer && !!zAllWorkorders.find(w => w.customerCell === (sHubHoverPhone || sHubSelectedPhone))}
-                hasWorkorderForPhone={!!zAllWorkorders.find(w => w.customerCell === (sHubHoverPhone || sHubSelectedPhone))}
+                matchingWorkorders={zAllWorkorders.filter(w => w.customerCell === (sHubHoverPhone || sHubSelectedPhone))}
                 exitHubButton={null}
               />
             ) : (
@@ -1498,7 +1498,8 @@ function ThreadCard({ thread, isSelected, isHovered, activeWO, onPress, onHoverI
   );
 }
 
-function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, onOpenWorkorder, onOpenWorkorderKeepHub, hasMatchingWorkorder, hasWorkorderForPhone, exitHubButton }) {
+function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, onOpenWorkorder, onOpenWorkorderKeepHub, hasMatchingWorkorder, matchingWorkorders = [], exitHubButton }) {
+  const [sWoDropdown, _setWoDropdown] = useState(null);
   // Initialize from cache synchronously to avoid layout flash on hover
   const [sMessages, _setMessages] = useState(() => {
     let cached = useCustMessagesStore.getState().getHubCachedThread(phone);
@@ -2012,13 +2013,48 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
             </View>
           ) : sListenerConnecting ? <ActivityIndicator size={16} color="#007bff" /> : null}
         </View>
-        <TouchableOpacity onPress={() => hasWorkorderForPhone && onOpenWorkorderKeepHub(phone)} disabled={!hasWorkorderForPhone} style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, marginRight: 6, backgroundColor: C.orange, opacity: hasWorkorderForPhone ? 1 : 0 }}>
+        <TouchableOpacity
+          onPress={(e) => {
+            if (matchingWorkorders.length < 1) return;
+            if (matchingWorkorders.length === 1) {
+              onOpenWorkorderKeepHub(matchingWorkorders[0]);
+            } else {
+              let nativeEvent = e.nativeEvent || e;
+              _setWoDropdown({ x: nativeEvent.pageX || nativeEvent.clientX || 0, y: nativeEvent.pageY || nativeEvent.clientY || 0 });
+            }
+          }}
+          disabled={matchingWorkorders.length < 1}
+          style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, marginRight: 6, backgroundColor: C.orange, opacity: matchingWorkorders.length > 0 ? 1 : 0 }}
+        >
           <Text style={{ fontSize: 12, color: "white", fontWeight: Fonts.weight.textHeavy }}>Open Workorder</Text>
         </TouchableOpacity>
         <TouchableOpacity onPress={handleLoadMore} disabled={sLoadingMore || sNoMoreHistory} style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: (sLoadingMore || sNoMoreHistory) ? gray(0.15) : C.blue, opacity: sNoMoreHistory ? 0.4 : 1 }}>
           {sLoadingMore ? <SmallLoadingIndicator /> : <Text style={{ fontSize: 12, color: "white", fontWeight: Fonts.weight.textHeavy }}>Load more</Text>}
         </TouchableOpacity>
       </View>
+      {sWoDropdown && createPortal(
+        <TouchableWithoutFeedback onPress={() => _setWoDropdown(null)}>
+          <View style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999 }}>
+            <View style={{ position: "absolute", top: sWoDropdown.y, left: sWoDropdown.x, backgroundColor: C.listItemWhite, borderRadius: 8, borderWidth: 2, borderColor: C.buttonLightGreenOutline, minWidth: 240, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 10, overflow: "hidden" }}>
+              {matchingWorkorders.map((wo) => (
+                <TouchableOpacity
+                  key={wo.id}
+                  onPress={() => { _setWoDropdown(null); onOpenWorkorderKeepHub(wo); }}
+                  style={{ paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: gray(0.1), flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.text, flex: 1 }} numberOfLines={1}>
+                    {[wo.brand, wo.description].filter(Boolean).join(" ") || "Untitled"}
+                  </Text>
+                  <View style={{ backgroundColor: C.blue, paddingVertical: 2, paddingHorizontal: 8, borderRadius: 4, marginLeft: 10 }}>
+                    <Text style={{ fontSize: 11, color: "white", fontWeight: Fonts.weight.textHeavy }}>{wo.status || "No status"}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </TouchableWithoutFeedback>,
+        document.body
+      )}
       {/* Messages */}
       <View style={{ flex: 1, overflow: "hidden" }}>
         {sMessages.length < 1 && !sListenerConnecting ? (
@@ -2167,7 +2203,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
             onChange={handleHubFilesSelected}
             style={{ display: "none" }}
           />
-          {!hasWorkorderForPhone && (
+          {matchingWorkorders.length < 1 && (
             <Tooltip text={sHubMediaUploading ? "Uploading..." : "Send photo/video"} position="top">
               <TouchableOpacity
                 onPress={() => !sHubMediaUploading && hubFileInputRef.current?.click()}
@@ -2199,7 +2235,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
               </TouchableOpacity>
             </Tooltip>
           )}
-          {hasWorkorderForPhone && (
+          {matchingWorkorders.length > 0 && (
             <Tooltip text="Go to customer" position="top" offsetX={-15}>
               <TouchableOpacity onPress={() => onOpenWorkorder(phone)} style={{ padding: 6 }}>
                 <Image_ icon={ICONS.person} size={35} />

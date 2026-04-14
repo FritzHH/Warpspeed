@@ -34,7 +34,7 @@ import {
   createNewWorkorder,
   localStorageWrapper,
 } from "../../../../utils";
-import { WORKORDER_ITEM_PROTO, WORKORDER_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, TRANSACTION_PROTO, CREDIT_APPLIED_PROTO, CUSTOMER_DEPOST_TYPES, CUSTOMER_DEPOSIT_PROTO, TAB_NAMES, TAX_FREE_RECEIPT_NOTE, CUSTOMER_PROTO } from "../../../../data";
+import { WORKORDER_ITEM_PROTO, WORKORDER_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, TRANSACTION_PROTO, CREDIT_APPLIED_PROTO, CUSTOMER_DEPOST_TYPES, CUSTOMER_DEPOSIT_PROTO, TAB_NAMES, CUSTOMER_PROTO } from "../../../../data";
 import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer, dbDeleteWorkorder } from "../../../../db_calls_wrapper";
 import { takeId, getId } from "../../../../idPool";
 import {
@@ -1575,7 +1575,7 @@ export function NewCheckoutModalScreen() {
 
   function applyTaxFree(newVal) {
     dlog(DCAT.CHECKBOX, "applyTaxFree", "CheckoutModal", { taxFree: newVal, saleID: sSale?.id });
-    let note = newVal ? TAX_FREE_RECEIPT_NOTE : "";
+    let note = newVal ? (useSettingsStore.getState().settings?.taxFreeReceiptNote || "") : "";
     let newCombined = sCombinedWorkorders.map((wo) => ({
       ...wo,
       taxFree: newVal,

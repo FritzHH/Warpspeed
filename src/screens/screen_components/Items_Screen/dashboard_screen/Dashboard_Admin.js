@@ -5592,7 +5592,7 @@ const ImportComponent = () => {
     for (const c of customers) customerMap[c.id] = c;
     const settings = useSettingsStore.getState().settings;
     const statuses = settings?.statuses || [];
-    const workorders = mapWorkorders(woText, wiText, serText, itemsText, slText, customerMap, statuses, empText, salesText, customerRedirectMap);
+    const workorders = mapWorkorders(woText, wiText, serText, itemsText, slText, customerMap, statuses, empText, salesText, customerRedirectMap, settings);
     // Build workorderMap: lsSaleID → [mapped workorder objects]
     const workorderMap = {};
     for (const wo of workorders) {

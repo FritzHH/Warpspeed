@@ -68,7 +68,9 @@ import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoM
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS, startNewWorkorder } from "../../../db_calls_wrapper";
 
-const DROPDOWN_SELECTED_OPACITY = 0.3;
+// --- Dimming when field has text (easy to adjust) ---
+const FILLED_DROPDOWN_OPACITY = 0.3;                          // dropdown button opacity when text present
+const FILLED_BORDER_COLOR = "rgba(200, 228, 220, 0.25)";      // faded version of C.buttonLightGreenOutline rgb(200,228,220)
 const RECEIPT_DROPDOWN_SELECTIONS = [
   RECEIPT_TYPES.intake,
   RECEIPT_TYPES.workorder,
@@ -590,7 +592,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 style={{
                   width: "45%",
                   borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
+                  borderColor: zOpenWorkorder?.brand ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
                   color: C.text,
                   paddingVertical: 2,
                   paddingHorizontal: 4,
@@ -632,7 +634,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     buttonStyle={{
                       opacity: zOpenWorkorder?.brand
-                        ? DROPDOWN_SELECTED_OPACITY
+                        ? FILLED_DROPDOWN_OPACITY
                         : 1,
                     }}
                     modalCoordX={-6}
@@ -656,7 +658,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     buttonStyle={{
                       opacity: zOpenWorkorder?.brand
-                        ? DROPDOWN_SELECTED_OPACITY
+                        ? FILLED_DROPDOWN_OPACITY
                         : 1,
                     }}
                     modalCoordX={0}
@@ -684,7 +686,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 style={{
                   width: "45%",
                   borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
+                  borderColor: zOpenWorkorder?.description ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
                   color: C.text,
                   paddingVertical: 2,
                   paddingHorizontal: 4,
@@ -724,7 +726,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     // modalCoordinateVars={{ x: 30, y: 30 }}
                     buttonStyle={{
                       opacity: zOpenWorkorder?.description
-                        ? DROPDOWN_SELECTED_OPACITY
+                        ? FILLED_DROPDOWN_OPACITY
                         : 1,
                     }}
                     ref={descriptionRef}
@@ -752,7 +754,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 style={{
                   width: "48%",
                   borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
+                  borderColor: zOpenWorkorder?.color1?.label ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
                   paddingVertical: 2,
                   paddingHorizontal: 4,
                   fontSize: 15,
@@ -775,7 +777,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 style={{
                   width: "48%",
                   borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
+                  borderColor: zOpenWorkorder?.color2?.label ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
                   paddingVertical: 2,
                   paddingHorizontal: 4,
                   fontSize: 15,
@@ -817,7 +819,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     buttonStyle={{
                       opacity: zOpenWorkorder?.color1
-                        ? DROPDOWN_SELECTED_OPACITY
+                        ? FILLED_DROPDOWN_OPACITY
                         : 1,
                     }}
                     ref={color1Ref}
@@ -844,8 +846,8 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     modalCoordX={0}
                     buttonStyle={{
-                      opacity: zOpenWorkorder?.color1
-                        ? DROPDOWN_SELECTED_OPACITY
+                      opacity: zOpenWorkorder?.color2
+                        ? FILLED_DROPDOWN_OPACITY
                         : 1,
                     }}
                     ref={color2Ref}
@@ -963,7 +965,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 style={{
                   width: 50,
                   borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
+                  borderColor: zOpenWorkorder?.waitTime?.label ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
                   color: C.text,
                   paddingVertical: 2,
                   paddingHorizontal: 4,
@@ -1008,7 +1010,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     buttonStyle={{
                       opacity: zOpenWorkorder?.waitTime?.label
-                        ? DROPDOWN_SELECTED_OPACITY
+                        ? FILLED_DROPDOWN_OPACITY
                         : 1,
                     }}
                     ref={waitTimesRef}
@@ -1108,7 +1110,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 style={{
                   width: "50%",
                   borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
+                  borderColor: zOpenWorkorder?.partSource ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
                   color: C.text,
                   paddingVertical: 2,
                   paddingHorizontal: 4,
@@ -1144,8 +1146,8 @@ export const ActiveWorkorderComponent = ({}) => {
                   }}
                   modalCoordX={20}
                   buttonStyle={{
-                    opacity: zOpenWorkorder?.brand
-                      ? DROPDOWN_SELECTED_OPACITY
+                    opacity: zOpenWorkorder?.partSource
+                      ? FILLED_DROPDOWN_OPACITY
                       : 1,
                     paddingHorizontal: 40,
                   }}

@@ -2361,7 +2361,7 @@ export const Button_ = ({
             ...shadowStyle,
             ...buttonStyle,
             backgroundColor: icon && !text ? null : getBackgroundColor(),
-            opacity: enabled ? 1 : 0.2,
+            opacity: enabled ? (buttonStyle.opacity ?? 1) : 0.2,
           }}
           {...gradientViewProps}
         >

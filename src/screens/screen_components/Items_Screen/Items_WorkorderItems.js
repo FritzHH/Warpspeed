@@ -984,19 +984,24 @@ export const LineItemComponent = ({
                       disabled={!isCustom || isLocked}
                       onPress={() => isCustom && onEditCustomItem?.(workorderLine)}
                       activeOpacity={isCustom ? 0.6 : 1}
-                      style={{ flex: 1 }}
+                      style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
                     >
+                      {(inventoryItem.customPart || inventoryItem.customLabor) && (
+                        <View style={{ backgroundColor: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 55) : lightenRGBByPercent(C.green, 55), borderRadius: 15, paddingHorizontal: 7, paddingVertical: 3, marginRight: 5 }}>
+                          <Text style={{ fontSize: 10, fontWeight: "700", color: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 15) : lightenRGBByPercent(C.green, 15) }}>{inventoryItem.customPart ? "PART" : "LABOR"}</Text>
+                        </View>
+                      )}
                       <Text
                         style={{
                           fontSize: 15,
                           color: C.text,
                           fontWeight: "400",
                           textDecorationLine: "none",
-                          // backgroundColor: "blue",
+                          flex: 1,
                         }}
                         numberOfLines={2}
                       >
-                        {inventoryItem.formalName ? (<>{(inventoryItem.customPart || inventoryItem.customLabor) && <Text style={{ fontSize: 13, fontWeight: "600", textTransform: "lowercase" }}>{inventoryItem.customPart ? "custom part - " : "custom labor - "}</Text>}{inventoryItem.formalName}</>) : (isCustom ? "(tap to edit)" : "")}
+                        {inventoryItem.formalName ? inventoryItem.formalName : (isCustom ? "(tap to edit)" : "")}
                       </Text>
                     </TouchableOpacity>
                   </View>

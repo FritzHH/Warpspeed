@@ -1,9 +1,9 @@
 /* eslint-disable */
-import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
+import { View, Text, ScrollView, TouchableOpacity, TextInput } from "react-native-web";
 import { useState, memo, useMemo } from "react";
 import { cloneDeep } from "lodash";
-import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, DropdownMenu, Image_, Tooltip } from "../../../../components";
-import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
+import { ScreenModal, SHADOW_RADIUS_PROTO, Image_, Tooltip } from "../../../../components";
+import { C, Fonts, ICONS } from "../../../../styles";
 import {
   useSettingsStore,
   useLoginStore,
@@ -19,6 +19,9 @@ import {
   gray,
   printBuilder,
   localStorageWrapper,
+  capitalizeFirstLetterOfString,
+  formatPhoneWithDashes,
+  formatMillisForDisplay,
 } from "../../../../utils";
 import { dbSavePrintObj } from "../../../../db_calls_wrapper";
 import {
@@ -60,14 +63,12 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   const [sWorkordersInSale, _setWorkordersInSale] = useState([]);
   const [sSelectedItems, _setSelectedItems] = useState([]);
   const [sSelectedPayments, _setSelectedPayments] = useState([]);
-  const [sIsCustomAmount, _setIsCustomAmount] = useState(false);
-  const [sCustomRefundAmount, _setCustomRefundAmount] = useState(0);
+  const [sRefundNote, _setRefundNote] = useState("");
   const [sRefundComplete, _setRefundComplete] = useState(false);
   const [sLoading, _setLoading] = useState(false);
   const [sLoadMessage, _setLoadMessage] = useState("");
   const [sInitialized, _setInitialized] = useState(false);
   const [sIsActiveSale, _setIsActiveSale] = useState(false);
-  const [sCustomCardPayment, _setCustomCardPayment] = useState(null);
   const [sCardRefundProcessing, _setCardRefundProcessing] = useState(false);
   const [sLastRefundReceipt, _setLastRefundReceipt] = useState(null);
   const [sShowSendReceiptModal, _sSetShowSendReceiptModal] = useState(false);
@@ -123,21 +124,48 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   // Suggested refund total: items take priority, then payments
   let suggestedRefundTotal = hasItemSelection ? itemRefundTotal : selectedPaymentsTotal;
 
-  // Split item refund across card/cash (card first, then cash remainder)
+  let selectedIsCash = sSelectedPayments.length > 0 && (sSelectedPayments[0].method === "cash" || sSelectedPayments[0].method === "check");
+  let selectedIsCard = sSelectedPayments.length > 0 && !selectedIsCash;
+
+  // Selected payment's available balance
+  let selectedPaymentAvailable = 0;
+  if (sSelectedPayments.length > 0) {
+    let sp = sSelectedPayments[0];
+    let spRefunded = (sp.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+    selectedPaymentAvailable = sp.amountCaptured - spRefunded;
+  }
+
+  // Split item refund: if a payment is selected, route to that payment type
   let itemCardAmount = 0;
   let itemCashAmount = 0;
   if (hasItemSelection) {
-    itemCardAmount = Math.min(itemRefundTotal, cardPaymentsTotal);
-    itemCashAmount = Math.min(itemRefundTotal - itemCardAmount, cashPaymentsTotal);
+    if (selectedIsCash) {
+      itemCashAmount = Math.min(itemRefundTotal, selectedPaymentAvailable);
+    } else if (selectedIsCard) {
+      itemCardAmount = Math.min(itemRefundTotal, selectedPaymentAvailable);
+    } else {
+      // Fallback: card first, then cash
+      itemCardAmount = Math.min(itemRefundTotal, cardPaymentsTotal);
+      itemCashAmount = Math.min(itemRefundTotal - itemCardAmount, cashPaymentsTotal);
+    }
   }
 
   let hasCardPayments = cardPaymentsTotal > 0;
   let hasCashPayments = cashPaymentsTotal > 0;
 
-  // Compute which items would exceed the refund limit if added
+  // Payment-first: require payment selection when multiple payments exist
+  let needsPaymentSelection = sTransactions.length > 1 && sSelectedPayments.length === 0;
+
+  // Compute which items would exceed the refund limit or selected payment's available balance
   let disabledItemIDs = useMemo(() => {
     let set = new Set();
     let taxRate = zSalesTaxPercent || 0;
+    let maxCap = refundLimits.maxRefund;
+    if (sSelectedPayments.length > 0) {
+      let sp = sSelectedPayments[0];
+      let spRefunded = (sp.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+      maxCap = Math.min(maxCap, sp.amountCaptured - spRefunded);
+    }
     sWorkordersInSale.forEach((wo) => {
       (wo.workorderLines || []).forEach((line) => {
         if (sSelectedItems.find((s) => s.id === line.id)) return;
@@ -147,13 +175,13 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
           : line.inventoryItem?.price || 0;
         let newItemsTotal = selectedItemsTotal + itemPrice;
         let newTotalWithTax = newItemsTotal + Math.round(newItemsTotal * (taxRate / 100));
-        if (newTotalWithTax > refundLimits.maxRefund) {
+        if (newTotalWithTax > maxCap) {
           set.add(line.id);
         }
       });
     });
     return set;
-  }, [sSelectedItems, sWorkordersInSale, previouslyRefundedIDs, selectedItemsTotal, zSalesTaxPercent, refundLimits.maxRefund]);
+  }, [sSelectedItems, sSelectedPayments, sWorkordersInSale, previouslyRefundedIDs, selectedItemsTotal, zSalesTaxPercent, refundLimits.maxRefund]);
 
   // ─── Initialization ──────────────────────────────────────
   if (visible && !sInitialized && (saleID || saleProp)) {
@@ -195,7 +223,16 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       let splitWOs = splitWorkorderLinesToSingleQty(workorders);
 
       _setWorkordersInSale(splitWOs);
-      if (initialPayment) _setSelectedPayments([initialPayment]);
+      // Auto-select payment: use initialPayment if provided, otherwise auto-select if only 1 with balance
+      if (initialPayment) {
+        _setSelectedPayments([initialPayment]);
+      } else {
+        let available = txnsCopy.filter((t) => {
+          let refunded = (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+          return (t.amountCaptured - refunded) > 0;
+        });
+        if (available.length === 1) _setSelectedPayments([available[0]]);
+      }
       _setLoading(false);
       _setLoadMessage("");
     } catch (error) {
@@ -245,6 +282,13 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
       _setWorkordersInSale(splitWOs);
 
+      // Auto-select payment if only 1 with balance
+      let available = txns.filter((t) => {
+        let refunded = (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+        return (t.amountCaptured - refunded) > 0;
+      });
+      if (available.length === 1) _setSelectedPayments([available[0]]);
+
       _setLoading(false);
       _setLoadMessage("");
     } catch (error) {
@@ -256,8 +300,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
   // ─── Item Selection ───────────────────────────────────────
   function handleToggleItem(line) {
-    dlog(DCAT.CHECKBOX, "toggle_item", "RefundModal", { lineID: line?.id, alreadySelected: !!sSelectedItems.find((s) => s.id === line?.id), hasPaymentSelection });
-    if (hasPaymentSelection) return; // items disabled when payments are selected
+    dlog(DCAT.CHECKBOX, "toggle_item", "RefundModal", { lineID: line?.id, alreadySelected: !!sSelectedItems.find((s) => s.id === line?.id) });
     let exists = sSelectedItems.find((s) => s.id === line.id);
     if (exists) {
       _setSelectedItems(sSelectedItems.filter((s) => s.id !== line.id));
@@ -265,60 +308,25 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       if (disabledItemIDs.has(line.id)) return;
       _setSelectedItems([...sSelectedItems, cloneDeep(line)]);
     }
-    _setIsCustomAmount(false);
-    _setCustomCardPayment(null);
+  }
+
+  // ─── Manual Amount Input (clears item selections) ──────────
+  function handleManualAmountInput() {
+    if (sSelectedItems.length > 0) _setSelectedItems([]);
   }
 
   // ─── Payment Selection ────────────────────────────────────
-  let selectedIsCash = sSelectedPayments.length > 0 && (sSelectedPayments[0].method === "cash" || sSelectedPayments[0].method === "check");
-  let selectedIsCard = sSelectedPayments.length > 0 && !selectedIsCash;
-
   function handleSelectPayment(payment) {
     dlog(DCAT.BUTTON, "select_payment", "RefundModal", { paymentID: payment?.id, method: payment?.method, amountCaptured: payment?.amountCaptured, alreadySelected: !!sSelectedPayments.find((p) => p.id === payment?.id) });
     let alreadySelected = sSelectedPayments.find((p) => p.id === payment.id);
     if (alreadySelected) {
+      // Deselecting: clear items and amounts
       _setSelectedPayments([]);
+      _setSelectedItems([]);
       return;
     }
-    // Clear selected items - payment selection takes over
-    if (sSelectedItems.length > 0) _setSelectedItems([]);
     // Only one payment at a time
     _setSelectedPayments([payment]);
-  }
-
-  // ─── Custom Amount ────────────────────────────────────────
-  function handleCustomAmountChange(cents) {
-    dlog(DCAT.INPUT, "custom_amount_change", "RefundModal", { cents });
-    _setCustomRefundAmount(cents);
-  }
-
-  function toggleCustomAmount() {
-    dlog(DCAT.BUTTON, "toggle_custom_amount", "RefundModal", { entering: !sIsCustomAmount });
-    let entering = !sIsCustomAmount;
-    _setIsCustomAmount(entering);
-    if (entering) {
-      _setSelectedItems([]);
-      _setSelectedPayments([]);
-      // Auto-select if only one available card payment
-      let availableCards = sTransactions.filter((p) => {
-        if (p.method !== "card") return false;
-        let refunded = (p.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
-        return (p.amountCaptured - refunded) > 0;
-      });
-      _setCustomCardPayment(availableCards.length === 1 ? availableCards[0] : null);
-    } else {
-      _setCustomCardPayment(null);
-      _setCustomRefundAmount(0);
-    }
-  }
-
-  function handleSelectCustomCard(payment) {
-    dlog(DCAT.BUTTON, "select_custom_card", "RefundModal", { paymentID: payment?.id, amountCaptured: payment?.amountCaptured, last4: payment?.last4, deselecting: sCustomCardPayment?.id === payment?.id });
-    if (sCustomCardPayment?.id === payment.id) {
-      _setCustomCardPayment(null);
-    } else {
-      _setCustomCardPayment(payment);
-    }
   }
 
   // ─── Pending Refund Tracking (crash recovery) ────────────
@@ -358,23 +366,40 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       refundSalesTax = Math.round(sale.salesTax * (amount / sale.total));
     }
 
+    // Build refund notes object
+    let currentUser = useLoginStore.getState().getCurrentUser();
+    let refundNotes = sRefundNote.trim() ? {
+      millis: Date.now(),
+      reason: sRefundNote.trim(),
+      userID: currentUser?.id || "",
+      userInitials: ((currentUser?.first || "")[0] || "") + ((currentUser?.last || "")[0] || ""),
+    } : null;
+
     // Build refund objects and attach to the correct transaction(s)
     let refundObjects = []; // { transactionID, refundObj } pairs for persistence
 
     if (type === "card" && cardDetails?.paymentId) {
       // Card refund: use callable's returned refundObj (already written to Firestore by the callable)
-      let refund = cardDetails.refundObj || buildRefundObject(amount, cardDetails.paymentId, "card", sSelectedItems, cardDetails.refundId || "", refundSalesTax, "");
+      let refund = cardDetails.refundObj || buildRefundObject(amount, cardDetails.paymentId, "card", sSelectedItems, cardDetails.refundId || "", refundSalesTax, refundNotes);
+      if (refundNotes && !refund.notes) refund.notes = refundNotes;
       let txnIdx = updatedTxns.findIndex((t) => t.id === cardDetails.paymentId);
       if (txnIdx >= 0) {
         updatedTxns[txnIdx].refunds = [...(updatedTxns[txnIdx].refunds || []), refund];
         refundObjects.push({ transactionID: cardDetails.paymentId, refundObj: refund });
       }
     } else if (type === "cash") {
-      // Cash refund: write directly to the selected transaction
+      // Cash refund: write to the selected transaction, or fallback to first cash/check with balance
       let targetTxn = sSelectedPayments[0];
+      if (!targetTxn) {
+        targetTxn = updatedTxns.find((t) => {
+          if (t.method !== "cash" && t.method !== "check") return false;
+          let refunded = (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+          return (t.amountCaptured - refunded) > 0;
+        });
+      }
       let txnIdx = targetTxn ? updatedTxns.findIndex((t) => t.id === targetTxn.id) : -1;
       if (txnIdx >= 0) {
-        let refund = buildRefundObject(amount, updatedTxns[txnIdx].id, "cash", sSelectedItems, "", refundSalesTax, "");
+        let refund = buildRefundObject(amount, updatedTxns[txnIdx].id, "cash", sSelectedItems, "", refundSalesTax, refundNotes);
         updatedTxns[txnIdx].refunds = [...(updatedTxns[txnIdx].refunds || []), refund];
         refundObjects.push({ transactionID: updatedTxns[txnIdx].id, refundObj: refund });
       }
@@ -386,15 +411,12 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     // Clear pending refund marker (refund completed successfully on client)
     sale.pendingRefundIDs = [];
 
-
     _setOriginalSale(sale);
     _setTransactions(updatedTxns);
     _setRefundComplete(true);
     _setSelectedItems([]);
     _setSelectedPayments([]);
-    _setCustomRefundAmount(0);
-    _setIsCustomAmount(false);
-    _setCustomCardPayment(null);
+    _setRefundNote("");
 
     // Persist refunds to transaction documents (card refunds already written by callable)
     for (let { transactionID, refundObj } of refundObjects) {
@@ -590,9 +612,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     _setWorkordersInSale([]);
     _setSelectedItems([]);
     _setSelectedPayments([]);
-    _setIsCustomAmount(false);
-    _setCustomRefundAmount(0);
-    _setCustomCardPayment(null);
+    _setRefundNote("");
     _setRefundComplete(false);
     _setLastRefundReceipt(null);
     _sSetShowSendReceiptModal(false);
@@ -602,9 +622,6 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     _setInitialized(false);
     if (onClose) onClose();
   }
-
-  // Helper: check if first transaction is cash/check
-  let firstTxnIsCash = sTransactions.length > 0 && (sTransactions[0].method === "cash" || sTransactions[0].method === "check");
 
   // ─── Render ───────────────────────────────────────────────
   return (
@@ -657,9 +674,36 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                   Original: {formatCurrencyDisp(sOriginalSale.total)}
                 </Text>
               )}
+              {sOriginalSale?.millis ? (
+                <Text style={{ fontSize: 12, color: C.lightText }}>
+                  {formatMillisForDisplay(sOriginalSale.millis)}
+                </Text>
+              ) : null}
+              {(() => {
+                let wo = sWorkordersInSale[0];
+                let custFirst = wo?.customerFirst || "";
+                let custLast = wo?.customerLast || "";
+                let custPhone = wo?.customerCell || "";
+                if (!custFirst && !custLast && !custPhone) return null;
+                let custName = (capitalizeFirstLetterOfString(custFirst) + " " + capitalizeFirstLetterOfString(custLast)).trim();
+                return (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginLeft: 4 }}>
+                    {custName ? (
+                      <Text style={{ fontSize: 12, color: C.text, fontWeight: Fonts.weight.textHeavy }}>
+                        {custName}
+                      </Text>
+                    ) : null}
+                    {custPhone ? (
+                      <Text style={{ fontSize: 12, color: C.lightText }}>
+                        {formatPhoneWithDashes(custPhone)}
+                      </Text>
+                    ) : null}
+                  </View>
+                );
+              })()}
             </View>
 
-            {/* Center: Custom refund button or REFUND SCREEN label */}
+            {/* Center: REFUND SCREEN label */}
             <View
               style={{
                 position: "absolute",
@@ -667,41 +711,25 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                 transform: [{ translateX: "-50%" }],
               }}
             >
-              {sOriginalSale && !sRefundComplete && !sIsActiveSale ? (
-                <Button_
-                  text={sIsCustomAmount ? "EXIT CUSTOM REFUND" : "CUSTOM REFUND AMOUNT"}
-                  onPress={toggleCustomAmount}
-                  enabled={!sCardRefundProcessing}
-                  colorGradientArr={sIsCustomAmount ? COLOR_GRADIENTS.red : COLOR_GRADIENTS.green}
-                  textStyle={{ fontSize: 12, fontWeight: Fonts.weight.textHeavy, letterSpacing: 1 }}
-                  buttonStyle={{
-                    paddingVertical: 5,
-                    paddingHorizontal: 14,
-                    borderRadius: 6,
-                    opacity: sCardRefundProcessing ? 0.4 : 1,
-                  }}
-                />
-              ) : (
-                <View
+              <View
+                style={{
+                  backgroundColor: C.lightred,
+                  borderRadius: 6,
+                  paddingHorizontal: 14,
+                  paddingVertical: 4,
+                }}
+              >
+                <Text
                   style={{
-                    backgroundColor: C.lightred,
-                    borderRadius: 6,
-                    paddingHorizontal: 14,
-                    paddingVertical: 4,
+                    fontSize: 12,
+                    fontWeight: Fonts.weight.textHeavy,
+                    color: "white",
+                    letterSpacing: 1,
                   }}
                 >
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      fontWeight: Fonts.weight.textHeavy,
-                      color: "white",
-                      letterSpacing: 1,
-                    }}
-                  >
-                    REFUND SCREEN
-                  </Text>
-                </View>
-              )}
+                  REFUND SCREEN
+                </Text>
+              </View>
             </View>
 
             <View
@@ -749,8 +777,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                 }}
               >
                 <View
-                  style={{ flex: 1, opacity: sCardRefundProcessing || selectedIsCard || !hasCashPayments ? 0.3 : 1 }}
-                  pointerEvents={sCardRefundProcessing || selectedIsCard || !hasCashPayments ? "none" : "auto"}
+                  style={{ flex: 1, opacity: sCardRefundProcessing || selectedIsCard || !hasCashPayments || needsPaymentSelection ? 0.3 : 1 }}
+                  pointerEvents={sCardRefundProcessing || selectedIsCard || !hasCashPayments || needsPaymentSelection ? "none" : "auto"}
                 >
                   <CashRefund
                     maxCashRefund={maxCashRefund}
@@ -758,24 +786,18 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     refundComplete={sRefundComplete}
                     suggestedAmount={
                       hasItemSelection ? itemCashAmount
-                      : !sIsCustomAmount && !selectedIsCard ? suggestedRefundTotal
+                      : !selectedIsCard ? suggestedRefundTotal
                       : 0
                     }
-                    lockedAmount={!sIsCustomAmount}
-                    shouldFocus={sIsCustomAmount && firstTxnIsCash}
+                    onManualInput={handleManualAmountInput}
                   />
                 </View>
                 <View
-                  style={{ flex: 1, opacity: selectedIsCash || !hasCardPayments ? 0.3 : 1 }}
-                  pointerEvents={selectedIsCash || !hasCardPayments ? "none" : "auto"}
+                  style={{ flex: 1, opacity: selectedIsCash || !hasCardPayments || needsPaymentSelection ? 0.3 : 1 }}
+                  pointerEvents={selectedIsCash || !hasCardPayments || needsPaymentSelection ? "none" : "auto"}
                 >
                   <CardRefund
-                    selectedPayment={
-                      sIsCustomAmount ? sCustomCardPayment
-                      : hasItemSelection && hasCardPayments
-                        ? sTransactions.find((p) => p.method === "card")
-                        : selectedIsCard ? sSelectedPayments[0] : null
-                    }
+                    selectedPayment={selectedIsCard ? sSelectedPayments[0] : null}
                     maxCardRefund={maxCardRefund}
                     onProcessRefund={handleProcessRefund}
                     onRefundStarted={handleRefundStarted}
@@ -786,11 +808,10 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     refundComplete={sRefundComplete}
                     suggestedAmount={
                       hasItemSelection ? itemCardAmount
-                      : !sIsCustomAmount && !selectedIsCash ? suggestedRefundTotal
+                      : !selectedIsCash ? suggestedRefundTotal
                       : 0
                     }
-                    lockedAmount={!sIsCustomAmount}
-                    shouldFocus={sIsCustomAmount && !firstTxnIsCash}
+                    onManualInput={handleManualAmountInput}
                   />
                 </View>
               </View>
@@ -811,14 +832,11 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     selectedItemsTotal={selectedItemsTotal}
                     itemRefundTotal={itemRefundTotal}
                     selectedPaymentsTotal={selectedPaymentsTotal}
-                    customRefundAmount={sCustomRefundAmount}
                     previouslyRefunded={refundLimits.previouslyRefunded}
                     maxRefundAllowed={refundLimits.maxRefund}
                     cardFeeDeduction={refundLimits.cardFeeDeduction}
                     salesTaxPercent={zSalesTaxPercent}
-                    isCustomAmount={false}
                     hasItemSelection={hasItemSelection}
-                    onCustomAmountChange={handleCustomAmountChange}
                     refundComplete={sRefundComplete}
                   />
 
@@ -826,126 +844,93 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     payments={sTransactions}
                     selectedPayments={sSelectedPayments}
                     onSelectPayment={handleSelectPayment}
-                    disabled={sRefundComplete || sIsCustomAmount}
+                    disabled={sRefundComplete}
                   />
 
-                  {/* Card picker for custom refund mode */}
-                  {sIsCustomAmount && hasCardPayments && (
-                    <View style={{ padding: 10 }}>
-                      <Text
+                  {/* ── Refund Notes ──────────────────────────── */}
+                  <View style={{ padding: 10 }}>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: Fonts.weight.textHeavy,
+                        color: C.text,
+                        marginBottom: 6,
+                        borderBottomWidth: 1,
+                        borderBottomColor: gray(0.1),
+                        paddingBottom: 4,
+                      }}
+                    >
+                      REFUND NOTES
+                    </Text>
+
+                    {/* Previous refund notes */}
+                    {(() => {
+                      let allNotes = [];
+                      sTransactions.forEach((t) => {
+                        (t.refunds || []).forEach((r) => {
+                          if (r.notes && r.notes.reason) {
+                            allNotes.push(r.notes);
+                          }
+                        });
+                      });
+                      if (allNotes.length === 0) return null;
+                      return allNotes.map((note, idx) => (
+                        <View
+                          key={"rn" + idx}
+                          style={{
+                            backgroundColor: gray(0.03),
+                            borderRadius: 4,
+                            padding: 6,
+                            marginBottom: 4,
+                          }}
+                        >
+                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                            <Text style={{ fontSize: 10, color: C.lightText, fontStyle: "italic" }}>
+                              {note.millis ? formatMillisForDisplay(note.millis) : ""}
+                            </Text>
+                            {note.userInitials ? (
+                              <Text style={{ fontSize: 10, color: C.lightText, fontWeight: Fonts.weight.textHeavy }}>
+                                {note.userInitials}
+                              </Text>
+                            ) : null}
+                          </View>
+                          <Text style={{ fontSize: 11, color: C.text, marginTop: 2 }}>
+                            {note.reason}
+                          </Text>
+                        </View>
+                      ));
+                    })()}
+
+                    {/* New note input */}
+                    {!sRefundComplete && (
+                      <View
                         style={{
-                          fontSize: 13,
-                          fontWeight: Fonts.weight.textHeavy,
-                          color: C.text,
-                          marginBottom: 6,
-                          borderBottomWidth: 1,
-                          borderBottomColor: gray(0.1),
-                          paddingBottom: 4,
+                          borderWidth: 1,
+                          borderColor: gray(0.15),
+                          borderRadius: 6,
+                          paddingHorizontal: 8,
+                          paddingVertical: 6,
+                          backgroundColor: "white",
+                          marginTop: 4,
                         }}
                       >
-                        SELECT CARD FOR REFUND
-                      </Text>
-                      {sTransactions
-                        .filter((p) => p.method === "card")
-                        .map((payment, idx) => {
-                          let refunded = (payment.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
-                          let available = payment.amountCaptured - refunded;
-                          let fullyRefunded = available <= 0;
-                          let isSelected = sCustomCardPayment?.id === payment.id;
-                          return (
-                            <TouchableOpacity
-                              key={payment.id || idx}
-                              onPress={() => {
-                                if (!fullyRefunded) handleSelectCustomCard(payment);
-                              }}
-                              style={{
-                                flexDirection: "row",
-                                alignItems: "center",
-                                paddingVertical: 8,
-                                paddingHorizontal: 8,
-                                borderBottomWidth: 1,
-                                borderBottomColor: gray(0.05),
-                                backgroundColor: isSelected ? "rgb(230, 240, 252)" : fullyRefunded ? gray(0.04) : "transparent",
-                                borderRadius: 4,
-                                opacity: fullyRefunded ? 0.4 : 1,
-                              }}
-                            >
-                              {/* Selection indicator */}
-                              <View
-                                style={{
-                                  width: 16,
-                                  height: 16,
-                                  borderRadius: 8,
-                                  borderWidth: 2,
-                                  borderColor: isSelected ? C.blue : gray(0.2),
-                                  backgroundColor: isSelected ? C.blue : "transparent",
-                                  marginRight: 10,
-                                  alignItems: "center",
-                                  justifyContent: "center",
-                                }}
-                              >
-                                {isSelected && (
-                                  <View
-                                    style={{
-                                      width: 6,
-                                      height: 6,
-                                      borderRadius: 3,
-                                      backgroundColor: "white",
-                                    }}
-                                  />
-                                )}
-                              </View>
-                              <View style={{ flex: 1 }}>
-                                <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                                  <View
-                                    style={{
-                                      backgroundColor: C.blue,
-                                      borderRadius: 3,
-                                      paddingHorizontal: 5,
-                                      paddingVertical: 1,
-                                    }}
-                                  >
-                                    <Text
-                                      style={{
-                                        fontSize: 9,
-                                        fontWeight: Fonts.weight.textHeavy,
-                                        color: "white",
-                                      }}
-                                    >
-                                      CARD
-                                    </Text>
-                                  </View>
-                                  <Text
-                                    style={{
-                                      fontSize: 13,
-                                      fontWeight: Fonts.weight.textHeavy,
-                                      color: C.text,
-                                    }}
-                                  >
-                                    {formatCurrencyDisp(payment.amountCaptured)}
-                                  </Text>
-                                </View>
-                                {payment.last4 && (
-                                  <Text style={{ fontSize: 11, color: C.lightText, marginTop: 2 }}>
-                                    {payment.cardIssuer} ****{payment.last4}
-                                  </Text>
-                                )}
-                                {!fullyRefunded && (
-                                  <Text style={{ fontSize: 10, color: C.green, marginTop: 1 }}>
-                                    Available: {formatCurrencyDisp(available)}
-                                  </Text>
-                                )}
-                                {fullyRefunded && (
-                                  <Text style={{ fontSize: 10, color: C.lightred, fontStyle: "italic", marginTop: 2 }}>
-                                    Fully refunded
-                                  </Text>
-                                )}
-                              </View>
-                            </TouchableOpacity>
-                          );
-                        })}
-                    </View>
-                  )}
+                        <TextInput
+                          style={{
+                            fontSize: 12,
+                            color: C.text,
+                            minHeight: 40,
+                            outlineWidth: 0,
+                            outlineStyle: "none",
+                          }}
+                          value={sRefundNote}
+                          onChangeText={_setRefundNote}
+                          placeholder="Reason for refund..."
+                          placeholderTextColor={gray(0.3)}
+                          multiline
+                        />
+                      </View>
+                    )}
+                  </View>
 
                 </ScrollView>
 
@@ -992,11 +977,11 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                 style={{
                   width: "42%",
                   paddingLeft: 10,
-                  opacity: sCardRefundProcessing || sRefundComplete || sOriginalSale?.isDepositSale ? 0.3 : 1,
+                  opacity: sCardRefundProcessing || sRefundComplete || sOriginalSale?.isDepositSale || needsPaymentSelection ? 0.3 : 1,
                 }}
-                pointerEvents={sCardRefundProcessing || sRefundComplete || sOriginalSale?.isDepositSale ? "none" : "auto"}
+                pointerEvents={sCardRefundProcessing || sRefundComplete || sOriginalSale?.isDepositSale || needsPaymentSelection ? "none" : "auto"}
               >
-                {sIsCustomAmount ? (
+                {needsPaymentSelection ? (
                   <View
                     style={{
                       flex: 1,
@@ -1011,8 +996,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                         textAlign: "center",
                       }}
                     >
-                      Custom refund amount mode active.{"\n"}
-                      Enter the refund amount in the Cash or Card section.
+                      Select a payment to begin
                     </Text>
                   </View>
                 ) : (
@@ -1023,7 +1007,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     onClearItems={() => { dlog(DCAT.BUTTON, "clear_selected_items", "RefundModal"); _setSelectedItems([]); }}
                     previouslyRefundedIDs={previouslyRefundedIDs}
                     disabledItemIDs={disabledItemIDs}
-                    hasPaymentSelection={hasPaymentSelection}
+                    hasPaymentSelection={false}
                     isDepositSale={!!sOriginalSale?.isDepositSale}
                     isActiveSale={sIsActiveSale}
                   />

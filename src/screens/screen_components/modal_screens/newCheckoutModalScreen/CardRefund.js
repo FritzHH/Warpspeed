@@ -25,8 +25,7 @@ export const CardRefund = memo(function CardRefund({
   salesTaxPercent,
   refundComplete = false,
   suggestedAmount = 0,
-  lockedAmount = false,
-  shouldFocus = false,
+  onManualInput,
 }) {
   const [sRefundAmount, _setRefundAmount] = useState("");
   const [sRefundAmountDisp, _setRefundAmountDisp] = useState("");
@@ -36,12 +35,6 @@ export const CardRefund = memo(function CardRefund({
   const [sFocused, _setFocused] = useState(false);
   const prevSuggestedRef = useRef(0);
   const inputRef = useRef(null);
-  const prevShouldFocusRef = useRef(false);
-
-  if (shouldFocus && !prevShouldFocusRef.current) {
-    setTimeout(() => inputRef.current?.focus(), 100);
-  }
-  prevShouldFocusRef.current = shouldFocus;
 
   // Auto-populate when suggested amount changes from item selection
   if (suggestedAmount !== prevSuggestedRef.current) {
@@ -56,6 +49,7 @@ export const CardRefund = memo(function CardRefund({
   }
 
   function handleAmountChange(val) {
+    if (onManualInput) onManualInput();
     dlog(DCAT.INPUT, "handleAmountChange", "CardRefund", { cents: usdTypeMask(val, { withDollar: false }).cents });
     let result = usdTypeMask(val, { withDollar: false });
     // Cap to the lesser of max card refund and selected card's available amount
@@ -167,7 +161,7 @@ export const CardRefund = memo(function CardRefund({
     !sProcessing &&
     !!selectedPayment &&
     maxCardRefund > 0;
-  let inputEditable = isEnabled && !lockedAmount;
+  let inputEditable = isEnabled;
 
   let available = selectedPayment
     ? selectedPayment.amountCaptured - ((selectedPayment.refunds || []).reduce((s, r) => s + (r.amount || 0), 0))

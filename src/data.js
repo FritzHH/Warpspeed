@@ -369,7 +369,7 @@ export const REFUND_PROTO = {
   salesTax: 0,
   stripeRefundID: "",
   workorderLines: [],
-  notes: "",
+  notes: null,
 };
 
 export const THIN_DEPOSIT_PROTO = {

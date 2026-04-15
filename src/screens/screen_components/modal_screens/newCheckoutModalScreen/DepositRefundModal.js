@@ -267,8 +267,6 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                       onProcessRefund={handleProcessRefund}
                       refundComplete={sRefundComplete}
                       suggestedAmount={available}
-                      lockedAmount={false}
-                      shouldFocus={true}
                     />
                   )}
                   {isCard && (
@@ -281,8 +279,6 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                       salesTaxPercent={0}
                       refundComplete={sRefundComplete}
                       suggestedAmount={available}
-                      lockedAmount={false}
-                      shouldFocus={true}
                     />
                   )}
                 </View>

@@ -11,8 +11,7 @@ export const CashRefund = memo(function CashRefund({
   onProcessRefund,
   refundComplete = false,
   suggestedAmount = 0,
-  lockedAmount = false,
-  shouldFocus = false,
+  onManualInput,
 }) {
   const [sRefundAmount, _setRefundAmount] = useState("");
   const [sRefundAmountDisp, _setRefundAmountDisp] = useState("");
@@ -20,12 +19,6 @@ export const CashRefund = memo(function CashRefund({
   const [sFocused, _setFocused] = useState(false);
   const prevSuggestedRef = useRef(0);
   const inputRef = useRef(null);
-  const prevShouldFocusRef = useRef(false);
-
-  if (shouldFocus && !prevShouldFocusRef.current) {
-    setTimeout(() => inputRef.current?.focus(), 100);
-  }
-  prevShouldFocusRef.current = shouldFocus;
 
   // Auto-populate when suggested amount changes from item selection
   if (suggestedAmount !== prevSuggestedRef.current) {
@@ -40,6 +33,7 @@ export const CashRefund = memo(function CashRefund({
   }
 
   function handleAmountChange(val) {
+    if (onManualInput) onManualInput();
     dlog(DCAT.INPUT, "handleAmountChange", "CashRefund", { cents: usdTypeMask(val, { withDollar: false }).cents });
     let result = usdTypeMask(val, { withDollar: false });
     if (result.cents > maxCashRefund) {
@@ -72,7 +66,7 @@ export const CashRefund = memo(function CashRefund({
   }
 
   let isEnabled = !refundComplete && maxCashRefund > 0;
-  let inputEditable = isEnabled && !lockedAmount;
+  let inputEditable = isEnabled;
 
   return (
     <View

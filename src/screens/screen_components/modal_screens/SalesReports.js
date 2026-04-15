@@ -306,7 +306,7 @@ export const SalesReportsModal = ({ handleExit }) => {
     let isActive = group.source === "active";
     let customerName = "";
     if (group.customerFirst || group.customerLast) {
-      customerName = " - " + (group.customerFirst + " " + group.customerLast).trim();
+      customerName = " - " + (capitalizeFirstLetterOfString(group.customerFirst) + " " + capitalizeFirstLetterOfString(group.customerLast)).trim();
     }
     return (
       <View

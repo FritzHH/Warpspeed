@@ -1,13 +1,11 @@
 /* eslint-disable */
-import { View, Text, TextInput, Image } from "react-native-web";
-import { useState, memo } from "react";
+import { View, Text, Image } from "react-native-web";
+import { memo } from "react";
 import { C, Fonts, ICONS } from "../../../../styles";
 import {
   formatCurrencyDisp,
-  usdTypeMask,
   gray,
 } from "../../../../utils";
-import { dlog, DCAT } from "./checkoutDebugLog";
 
 function TotalRow({ label, value, color, bold, fontSize = 13 }) {
   return (
@@ -46,35 +44,17 @@ export const RefundTotals = memo(function RefundTotals({
   selectedItemsTotal = 0,
   itemRefundTotal = 0,
   selectedPaymentsTotal = 0,
-  customRefundAmount = 0,
   previouslyRefunded = 0,
   maxRefundAllowed = 0,
   cardFeeDeduction = 0,
   salesTaxPercent,
-  isCustomAmount = false,
   hasItemSelection = false,
-  onCustomAmountChange,
   refundComplete = false,
 }) {
-  const [sFocused, _setFocused] = useState(false);
-  const [sCustomDisp, _setCustomDisp] = useState("");
-
-  // Grand total: items take priority, then payments, then custom
-  let grandTotalRefund = isCustomAmount
-    ? customRefundAmount
-    : hasItemSelection
-    ? itemRefundTotal
-    : selectedPaymentsTotal;
+  let grandTotalRefund = hasItemSelection ? itemRefundTotal : selectedPaymentsTotal;
 
   // Exceeds limit check
   let exceedsLimit = grandTotalRefund > maxRefundAllowed;
-
-  function handleCustomAmountInput(val) {
-    dlog(DCAT.INPUT, "handleCustomAmountInput", "RefundTotals", { cents: usdTypeMask(val, { withDollar: false }).cents });
-    let result = usdTypeMask(val, { withDollar: false });
-    _setCustomDisp(result.display);
-    if (onCustomAmountChange) onCustomAmountChange(result.cents);
-  }
 
   return (
     <View style={{ padding: 10 }}>
@@ -131,7 +111,7 @@ export const RefundTotals = memo(function RefundTotals({
       />
 
       {/* Selected Items Total */}
-      {!isCustomAmount && hasItemSelection && (
+      {hasItemSelection && (
         <>
           <TotalRow
             label="SELECTED ITEMS"
@@ -149,51 +129,11 @@ export const RefundTotals = memo(function RefundTotals({
       )}
 
       {/* Selected Payments Total */}
-      {!isCustomAmount && !hasItemSelection && selectedPaymentsTotal > 0 && (
+      {!hasItemSelection && selectedPaymentsTotal > 0 && (
         <TotalRow
           label="SELECTED PAYMENTS"
           value={selectedPaymentsTotal}
         />
-      )}
-
-      {/* Custom Amount Input */}
-      {isCustomAmount && (
-        <View style={{ marginBottom: 8 }}>
-          <Text style={{ fontSize: 11, color: C.lightText, marginBottom: 3 }}>
-            Custom Refund Amount
-          </Text>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              borderWidth: 1,
-              borderColor: sFocused ? C.lightred : gray(0.15),
-              borderRadius: 6,
-              paddingHorizontal: 8,
-              paddingVertical: 6,
-              backgroundColor: "white",
-            }}
-          >
-            <Text style={{ fontSize: 14, color: C.lightred, marginRight: 2 }}>$</Text>
-            <TextInput
-              style={{
-                flex: 1,
-                outlineWidth: 0,
-                outlineStyle: "none",
-                fontSize: 14,
-                color: C.lightred,
-                textAlign: "right",
-              }}
-              value={sCustomDisp}
-              onChangeText={handleCustomAmountInput}
-              placeholder="0.00"
-              placeholderTextColor={gray(0.3)}
-              onFocus={() => _setFocused(true)}
-              onBlur={() => _setFocused(false)}
-              editable={!refundComplete}
-            />
-          </View>
-        </View>
       )}
 
       {/* Divider */}

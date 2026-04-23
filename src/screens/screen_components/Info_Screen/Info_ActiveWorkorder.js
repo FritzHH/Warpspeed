@@ -110,6 +110,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sWaitTimeBlink, _setWaitTimeBlink] = useState(false);
   const sUploadProgress = useUploadProgressStore((s) => s.progress);
   const [sPrinterAlert, _setPrinterAlert] = useState(null); // { x, y }
+  const [sTrackingModalVisible, _setTrackingModalVisible] = useState(false);
 
   // Estimated wait days — local state for instant UI, debounced DB write
   const [sWaitDays, _setWaitDays] = useState(0);
@@ -1236,19 +1237,23 @@ export const ActiveWorkorderComponent = ({}) => {
                 }}
                 multiline={false}
                 numberOfLines={1}
-                style={{ height: '100%', fontSize: 13, flex: 3, paddingHorizontal: 3, borderWidth: 1, borderColor: gray(.3), borderRadius: 6, resize: "none", overflow: "hidden", color: C.text }}
+                style={{ height: '100%', fontSize: 13, width: '75%', paddingHorizontal: 3, borderWidth: 1, borderColor: gray(.15), borderRadius: 6, resize: "none", overflow: "hidden", color: C.text, outlineStyle: "none" }}
               />
-              <Tooltip text="Copy tracking info" position="top">
-                <Button_
-                  text={"Copy"}
-                  textStyle={{ fontSize: 12 }}
-                  buttonStyle={{ height: '90%', marginLeft: 5, backgroundColor: zOpenWorkorder?.trackingNumber ? C.green : gray(0.45), flex: 1 }}
-                  disabled={!zOpenWorkorder?.trackingNumber}
-                  onPress={() => {
-                    navigator.clipboard.writeText(zOpenWorkorder?.trackingNumber || "");
-                  }}
-                />
-              </Tooltip>
+              {zOpenWorkorder?.trackingNumber ? (
+                <Tooltip text="Press to track, right-click to copy" position="top">
+                  <Pressable_
+                    onPress={() => _setTrackingModalVisible(true)}
+                    onRightPress={() => {
+                      navigator.clipboard.writeText(zOpenWorkorder?.trackingNumber || "");
+                    }}
+                    style={{ height: '90%', marginLeft: 5, flex: 1 }}
+                  >
+                    <View style={{ height: '100%', backgroundColor: C.green, borderRadius: 6, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 }}>
+                      <Text style={{ fontSize: 12, color: 'white', fontWeight: '600' }}>Track</Text>
+                    </View>
+                  </Pressable_>
+                </Tooltip>
+              ) : null}
             </View>
           </View>
         </View>
@@ -1389,6 +1394,36 @@ export const ActiveWorkorderComponent = ({}) => {
           workorderID={zOpenWorkorder?.id}
           mode="view"
           isDonePaid={isDonePaid}
+        />
+      )}
+      {sTrackingModalVisible && (
+        <ScreenModal
+          modalVisible={sTrackingModalVisible}
+          showOuterModal={true}
+          outerModalStyle={{ backgroundColor: "rgba(50,50,50,.65)" }}
+          buttonVisible={false}
+          handleOuterClick={() => _setTrackingModalVisible(false)}
+          Component={() => {
+            const trackNum = zOpenWorkorder?.trackingNumber || "";
+            return (
+              <View style={{ width: '80%', height: '85%', backgroundColor: C.backgroundWhite, borderRadius: 12, overflow: 'hidden', flexDirection: 'column' }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 10, backgroundColor: C.green }}>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: 'white' }}>Package Tracking</Text>
+                  <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>{trackNum}</Text>
+                  <Pressable_ onPress={() => _setTrackingModalVisible(false)}>
+                    <Text style={{ fontSize: 20, color: 'white', fontWeight: '700', paddingHorizontal: 5 }}>✕</Text>
+                  </Pressable_>
+                </View>
+                <View style={{ flex: 1, padding: 10 }}>
+                  <iframe
+                    src={"https://parcelsapp.com/tracking/" + trackNum}
+                    style={{ width: '100%', height: '100%', border: 'none', borderRadius: 6 }}
+                    title="Parcels App"
+                  />
+                </View>
+              </View>
+            );
+          }}
         />
       )}
       <PrinterAlert

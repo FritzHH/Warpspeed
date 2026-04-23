@@ -472,7 +472,6 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
     let settings = useSettingsStore.getState().getSettings();
     let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
-    let currentUser = useLoginStore.getState().getCurrentUser();
     let _ctx = { currentUser, settings };
     let refundReceipt = printBuilder.refund(
       primaryRefund,

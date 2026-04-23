@@ -770,6 +770,7 @@ export function InventoryComponent({}) {
   // Search function (now called by debounced TextInput_)
   const handleSearch = (searchTerm) => {
     _setSelectedButtonID(null);
+    _setSearchTerm(searchTerm || "");
     if (!searchTerm || searchTerm.length === 0) {
       _setSearchResults([]);
       return;
@@ -964,6 +965,9 @@ export function InventoryComponent({}) {
         lineItem.inventoryItem = cleanItem;
         lineItem.id = crypto.randomUUID();
         workorderLines = [...workorderLines, lineItem];
+        // Track newly added line so intake notes auto-open
+        if (!useOpenWorkordersStore._newLineIDs) useOpenWorkordersStore._newLineIDs = new Set();
+        useOpenWorkordersStore._newLineIDs.add(lineItem.id);
       }
       useOpenWorkordersStore
         .getState()
@@ -1041,6 +1045,9 @@ export function InventoryComponent({}) {
     useLoginStore.getState().requireLogin(() => {
       let workorderLines = openWorkorder.workorderLines || [];
       workorderLines = [...workorderLines, lineItem];
+      // Track newly added line so intake notes auto-open
+      if (!useOpenWorkordersStore._newLineIDs) useOpenWorkordersStore._newLineIDs = new Set();
+      useOpenWorkordersStore._newLineIDs.add(lineItem.id);
       useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
     });
   }
@@ -1165,7 +1172,7 @@ export function InventoryComponent({}) {
             iconSize={20}
             onPress={() => clearSearch()}
             useColorGradient={false}
-            disabled={!sSearchTerm}
+            enabled={!!sSearchTerm}
           />
           <TextInput_
             autoFocus={true}

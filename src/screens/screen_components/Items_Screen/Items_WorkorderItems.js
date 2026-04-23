@@ -870,7 +870,10 @@ export const LineItemComponent = ({
   const qtyDigits = qtyDisplayStr.length || 1;
   const qtyBoxWidth = qtyDigits <= 2 ? 31 : 31 + (qtyDigits - 2) * 10;
   const [sShowDiscountModal, _setShowDiscountModal] = useState(null);
-  const [sActiveNoteField, _sSetActiveNoteField] = useState(null);
+  const [sActiveNoteField, _sSetActiveNoteField] = useState(() => {
+    if (useOpenWorkordersStore._newLineIDs?.delete(workorderLine.id)) return "intake";
+    return null;
+  });
 
   /////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
@@ -1007,6 +1010,7 @@ export const LineItemComponent = ({
                   </View>
                   {showIntake && (
                     <TextInput_
+                      autoFocus={true}
                       multiline={true}
                       numberOfLines={5}
                       debounceMs={500}

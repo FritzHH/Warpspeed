@@ -230,6 +230,7 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
   // track which punch IDs have been modified
   const modifiedPunchIdsRef = useRef(new Set());
   const queryIdRef = useRef(0);
+  const hasAutoFetchedRef = useRef(false);
 
   // Manual fetch — called by Go button and shortcut buttons
   function fetchPunches(overrideStart, overrideEnd) {
@@ -263,6 +264,14 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
         _setLoading(false);
       });
   }
+
+  // Auto-fetch current pay period on mount (employee mode)
+  useEffect(() => {
+    if (hasAutoFetchedRef.current) return;
+    if (!sSelectedUser) return;
+    hasAutoFetchedRef.current = true;
+    fetchPunches(sStartDate, sEndDate);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Compute paired display data from raw punches
   let { displayArr, runningTotalMinutes } = pairPunches(sFilteredArr);
@@ -1000,26 +1009,27 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
                   );
                 })()}
 
-                {/* Go Button */}
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-                  <Button_
-                    text="GO"
-                    colorGradientArr={
-                      canGo && !sLoading
-                        ? COLOR_GRADIENTS.green
-                        : COLOR_GRADIENTS.grey
-                    }
-                    onPress={handleGoButton}
-                    disabled={!canGo || sLoading}
-                    buttonStyle={{
-                      paddingLeft: 40,
-                      paddingRight: 40,
-                      paddingVertical: 10,
-                    }}
-                    textStyle={{ fontSize: 15, fontWeight: "700" }}
-                  />
-                  {sLoading && (
-                    <SmallLoadingIndicator color={C.blue} containerStyle={{ marginLeft: 8 }} />
+                {/* Go Button / Loading */}
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", minHeight: 40 }}>
+                  {sLoading ? (
+                    <SmallLoadingIndicator color={C.blue} message="" />
+                  ) : (
+                    <Button_
+                      text="GO"
+                      colorGradientArr={
+                        canGo
+                          ? COLOR_GRADIENTS.green
+                          : COLOR_GRADIENTS.grey
+                      }
+                      onPress={handleGoButton}
+                      enabled={canGo}
+                      buttonStyle={{
+                        paddingLeft: 40,
+                        paddingRight: 40,
+                        paddingVertical: 10,
+                      }}
+                      textStyle={{ fontSize: 15, fontWeight: "700" }}
+                    />
                   )}
                 </View>
               </View>
@@ -1069,12 +1079,7 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
                     textStyle={{ fontSize: 12 }}
                   />
                 )}
-                {sLoading && (
-                  <Text style={{ fontSize: 12, color: gray(0.4) }}>
-                    Loading...
-                  </Text>
-                )}
-                {!sLoading && !!sSelectedUser && (
+                {!!sSelectedUser && !sLoading && (
                   <Text style={{ fontSize: 12, color: gray(0.4) }}>
                     {displayArr.length} entries
                   </Text>
@@ -1246,7 +1251,7 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
                         : COLOR_GRADIENTS.grey
                     }
                     onPress={handleSave}
-                    disabled={!sHasUnsavedChanges || sSaving}
+                    enabled={sHasUnsavedChanges && !sSaving}
                     buttonStyle={{
                       paddingLeft: 25,
                       paddingRight: 25,
@@ -1262,11 +1267,14 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
                       ? COLOR_GRADIENTS.purple
                       : COLOR_GRADIENTS.grey
                   }
-                  onPress={isAdmin ? handleEmailPayroll : handleEmployeeEmailCSV}
-                  disabled={
-                    !sSelectedUser ||
-                    displayArr.length === 0 ||
-                    sEmailing
+                  onPress={() => {
+                    if (!sSelectedUser || displayArr.length === 0 || sEmailing) return;
+                    isAdmin ? handleEmailPayroll() : handleEmployeeEmailCSV();
+                  }}
+                  enabled={
+                    !!sSelectedUser &&
+                    displayArr.length > 0 &&
+                    !sEmailing
                   }
                   icon={ICONS.notes}
                   iconSize={16}

@@ -3720,5 +3720,41 @@ export const DepositsList = ({ deposits, credits, onDepositPress, onCreditPress 
   );
 };
 
+// ─── WebPageModal ──────────────────────────────────────────────
+export const WebPageModal = ({
+  url,
+  title = "Web Page",
+  subtitle = "",
+  buttonLabel = "Open",
+  buttonStyle = {},
+  buttonTextStyle = {},
+}) => {
+  return (
+    <ScreenModal
+      showOuterModal={true}
+      handleModalActionInternally={true}
+      buttonLabel={buttonLabel}
+      buttonStyle={{ backgroundColor: C.green, borderRadius: 6, paddingHorizontal: 8, ...buttonStyle }}
+      buttonTextStyle={{ fontSize: 12, color: "white", fontWeight: "600", ...buttonTextStyle }}
+      Component={() => (
+        <View style={{ width: "80vw", height: "85vh", backgroundColor: C.backgroundWhite, borderRadius: 12, overflow: "hidden", flexDirection: "column" }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 15, paddingVertical: 10, backgroundColor: C.green }}>
+            <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>{title}</Text>
+            {subtitle ? <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", flex: 1, marginLeft: 10 }} numberOfLines={1}>{subtitle}</Text> : null}
+            <View style={{ width: 30 }} />
+          </View>
+          <View style={{ flex: 1, padding: 10 }}>
+            <iframe
+              src={url}
+              style={{ width: "100%", height: "100%", border: "none", borderRadius: 6 }}
+              title={title}
+            />
+          </View>
+        </View>
+      )}
+    />
+  );
+};
+
 // Export ProtectedRoute for routing
 export { ProtectedRoute } from "./components/ProtectedRoute";

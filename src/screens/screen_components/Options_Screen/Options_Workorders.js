@@ -11,7 +11,7 @@ import {
   resolveStatus,
   deepEqual,
 } from "../../../utils";
-import { TabMenuDivider as Divider, CheckBox_, SmallLoadingIndicator, Image_, Button_, TextInput_, Tooltip } from "../../../components";
+import { TabMenuDivider as Divider, CheckBox_, SmallLoadingIndicator, Image_, Button_, TextInput_, Tooltip, WebPageModal } from "../../../components";
 import { C, Colors, Fonts, ICONS } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
 import React, { useEffect, useRef, useState } from "react";
@@ -798,24 +798,39 @@ export function WorkordersComponent({}) {
                           {" → " + formatMillisForDisplay(workorder.partOrderEstimateMillis)}
                         </Text>
                       )}
-                      {!!workorder.trackingNumber && (
-                        <Tooltip text="Press to copy tracking info to clipboard" position="top">
-                          <TouchableOpacity
-                            onPress={() => {
-                              navigator.clipboard.writeText(workorder.trackingNumber);
-                            }}
-                            style={{
-                              marginLeft: 6,
-                              paddingVertical: 2,
-                              paddingHorizontal: 8,
-                              borderRadius: 4,
-                              backgroundColor: lightenRGBByPercent(C.blue, 75),
-                            }}
-                          >
-                            <Text style={{ fontSize: 11, color: C.blue, fontWeight: "500" }}>Tracking</Text>
-                          </TouchableOpacity>
-                        </Tooltip>
-                      )}
+                      {!!workorder.trackingNumber && (() => {
+                        const inputVal = workorder.trackingNumber.trim();
+                        const isURL = /^https?:\/\/|^www\./i.test(inputVal);
+                        if (isURL) {
+                          const openUrl = inputVal.startsWith("www.") ? "https://" + inputVal : inputVal;
+                          return (
+                            <View onContextMenu={(e) => { e.preventDefault(); navigator.clipboard.writeText(inputVal); }} style={{ marginLeft: 6 }}>
+                              <Tooltip text="Press to open, right-click to copy" position="top">
+                                <TouchableOpacity
+                                  onPress={() => window.open(openUrl, "_blank")}
+                                  style={{ paddingVertical: 2, paddingHorizontal: 8, borderRadius: 4, backgroundColor: lightenRGBByPercent(C.blue, 75) }}
+                                >
+                                  <Text style={{ fontSize: 11, color: C.blue, fontWeight: "500" }}>Open</Text>
+                                </TouchableOpacity>
+                              </Tooltip>
+                            </View>
+                          );
+                        }
+                        return (
+                          <View onContextMenu={(e) => { e.preventDefault(); navigator.clipboard.writeText(inputVal); }} style={{ marginLeft: 6 }}>
+                            <Tooltip text="Press to track, right-click to copy" position="top">
+                              <WebPageModal
+                                url={"https://parcelsapp.com/en/tracking/" + inputVal}
+                                title="Package Tracking"
+                                subtitle={inputVal}
+                                buttonLabel="Track"
+                                buttonStyle={{ paddingVertical: 2, paddingHorizontal: 8, borderRadius: 4, backgroundColor: lightenRGBByPercent(C.blue, 75) }}
+                                buttonTextStyle={{ fontSize: 11, color: C.blue, fontWeight: "500" }}
+                              />
+                            </Tooltip>
+                          </View>
+                        );
+                      })()}
                     </View>
                   )}
                 </View>

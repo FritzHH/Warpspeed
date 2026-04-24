@@ -36,6 +36,7 @@ import {
   Pressable_,
   StaleBanner,
   PrinterAlert,
+  WebPageModal,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
@@ -1229,7 +1230,7 @@ export const ActiveWorkorderComponent = ({}) => {
             </View>
             <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', marginTop: 8, paddingVertical: 2 }}>
               <TextInput_
-                placeholder="Optional tracking here"
+                placeholder="Tracking num or website here..."
                 placeholderTextColor={gray(.3)}
                 value={zOpenWorkorder?.trackingNumber || ""}
                 onChangeText={(val) => {
@@ -1239,21 +1240,37 @@ export const ActiveWorkorderComponent = ({}) => {
                 numberOfLines={1}
                 style={{ height: '100%', fontSize: 13, width: '75%', paddingHorizontal: 3, borderWidth: 1, borderColor: gray(.15), borderRadius: 6, resize: "none", overflow: "hidden", color: C.text, outlineStyle: "none" }}
               />
-              {zOpenWorkorder?.trackingNumber ? (
-                <Tooltip text="Press to track, right-click to copy" position="top">
-                  <Pressable_
-                    onPress={() => _setTrackingModalVisible(true)}
-                    onRightPress={() => {
-                      navigator.clipboard.writeText(zOpenWorkorder?.trackingNumber || "");
-                    }}
-                    style={{ height: '90%', marginLeft: 5, flex: 1 }}
-                  >
-                    <View style={{ height: '100%', backgroundColor: C.green, borderRadius: 6, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 }}>
-                      <Text style={{ fontSize: 12, color: 'white', fontWeight: '600' }}>Track</Text>
+              {zOpenWorkorder?.trackingNumber ? (() => {
+                const inputVal = zOpenWorkorder.trackingNumber.trim();
+                const isURL = /^https?:\/\/|^www\./i.test(inputVal);
+                if (isURL) {
+                  const openUrl = inputVal.startsWith("www.") ? "https://" + inputVal : inputVal;
+                  return (
+                    <View onContextMenu={(e) => { e.preventDefault(); navigator.clipboard.writeText(inputVal); }}>
+                      <Tooltip text="Press to open, right-click to copy" position="top">
+                        <Pressable_ onPress={() => window.open(openUrl, "_blank")} style={{ height: '90%', marginLeft: 5 }}>
+                          <View style={{ height: '100%', backgroundColor: C.green, borderRadius: 6, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 }}>
+                            <Text style={{ fontSize: 12, color: 'white', fontWeight: '600' }}>Open</Text>
+                          </View>
+                        </Pressable_>
+                      </Tooltip>
                     </View>
-                  </Pressable_>
-                </Tooltip>
-              ) : null}
+                  );
+                }
+                return (
+                  <View onContextMenu={(e) => { e.preventDefault(); navigator.clipboard.writeText(inputVal); }}>
+                    <Tooltip text="Press to track, right-click to copy" position="top">
+                      <WebPageModal
+                        url={"https://parcelsapp.com/en/tracking/" + inputVal}
+                        title="Package Tracking"
+                        subtitle={inputVal}
+                        buttonLabel="Track"
+                        buttonStyle={{ height: '90%', marginLeft: 5 }}
+                      />
+                    </Tooltip>
+                  </View>
+                );
+              })() : null}
             </View>
           </View>
         </View>
@@ -1394,36 +1411,6 @@ export const ActiveWorkorderComponent = ({}) => {
           workorderID={zOpenWorkorder?.id}
           mode="view"
           isDonePaid={isDonePaid}
-        />
-      )}
-      {sTrackingModalVisible && (
-        <ScreenModal
-          modalVisible={sTrackingModalVisible}
-          showOuterModal={true}
-          outerModalStyle={{ backgroundColor: "rgba(50,50,50,.65)" }}
-          buttonVisible={false}
-          handleOuterClick={() => _setTrackingModalVisible(false)}
-          Component={() => {
-            const trackNum = zOpenWorkorder?.trackingNumber || "";
-            return (
-              <View style={{ width: '80%', height: '85%', backgroundColor: C.backgroundWhite, borderRadius: 12, overflow: 'hidden', flexDirection: 'column' }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 15, paddingVertical: 10, backgroundColor: C.green }}>
-                  <Text style={{ fontSize: 16, fontWeight: '600', color: 'white' }}>Package Tracking</Text>
-                  <Text style={{ fontSize: 13, color: 'rgba(255,255,255,0.85)' }}>{trackNum}</Text>
-                  <Pressable_ onPress={() => _setTrackingModalVisible(false)}>
-                    <Text style={{ fontSize: 20, color: 'white', fontWeight: '700', paddingHorizontal: 5 }}>✕</Text>
-                  </Pressable_>
-                </View>
-                <View style={{ flex: 1, padding: 10 }}>
-                  <iframe
-                    src={"https://parcelsapp.com/tracking/" + trackNum}
-                    style={{ width: '100%', height: '100%', border: 'none', borderRadius: 6 }}
-                    title="Parcels App"
-                  />
-                </View>
-              </View>
-            );
-          }}
         />
       )}
       <PrinterAlert

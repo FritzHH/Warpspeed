@@ -5086,10 +5086,24 @@ const ParentButtonItemsList = ({
 
   let quickItemButtons = zSettingsObj?.quickItemButtons || [];
   let parentButton = quickItemButtons.find((b) => b.id === sCurrentParentID);
-  let parentItems = (parentButton?.items || []).map((entry) => {
-    let id = typeof entry === "string" ? entry : entry.inventoryItemID;
-    return zInventoryArr.find((o) => o.id === id);
+  let parentItemPairs = (parentButton?.items || []).map((entry) => {
+    let normalized = typeof entry === "string" ? { inventoryItemID: entry } : entry;
+    let inv = zInventoryArr.find((o) => o.id === normalized.inventoryItemID);
+    return inv ? { entry: normalized, inv } : null;
   }).filter(Boolean);
+
+  function handleItemLabelChange(inventoryItemID, val) {
+    let updated = quickItemButtons.map((b) => {
+      if (b.id !== sCurrentParentID) return b;
+      let items = (b.items || []).map((entry) => {
+        let norm = typeof entry === "string" ? { inventoryItemID: entry } : entry;
+        if (norm.inventoryItemID !== inventoryItemID) return entry;
+        return { ...norm, label: val };
+      });
+      return { ...b, items };
+    });
+    useSettingsStore.getState().setField("quickItemButtons", updated);
+  }
 
   function reorderItems(fromIdx, toIdx) {
     if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
@@ -5113,14 +5127,14 @@ const ParentButtonItemsList = ({
     useSettingsStore.getState().setField("quickItemButtons", updated);
   }
 
-  if (parentItems.length === 0) return null;
+  if (parentItemPairs.length === 0) return null;
 
   return (
     <View style={{ marginTop: 10, width: "100%" }}>
       <Text style={{ fontSize: 12, fontWeight: "bold", color: gray(0.5), marginBottom: 6 }}>
-        ITEMS ({parentItems.length})
+        ITEMS ({parentItemPairs.length})
       </Text>
-      {parentItems.map((inv, idx) => {
+      {parentItemPairs.map(({ entry, inv }, idx) => {
         let dividerObj = (parentButton?.dividers || []).find((d) => d.itemID === inv.id);
         let hasDivider = !!dividerObj;
         return (
@@ -5191,6 +5205,24 @@ const ParentButtonItemsList = ({
                     {inv.formalName}
                   </Text>
                 )}
+                <TextInput_
+                  placeholder="Custom card label"
+                  placeholderTextColor={gray(0.35)}
+                  value={entry.label || ""}
+                  onChangeText={(val) => handleItemLabelChange(inv.id, val)}
+                  debounceMs={400}
+                  style={{
+                    fontSize: 11,
+                    color: C.blue,
+                    paddingVertical: 2,
+                    paddingHorizontal: 0,
+                    marginTop: 2,
+                    outlineWidth: 0,
+                    backgroundColor: "transparent",
+                    borderBottomWidth: 1,
+                    borderBottomColor: gray(0.15),
+                  }}
+                />
               </View>
               <Text style={{ fontSize: 12, color: gray(0.5), marginRight: 10 }}>
                 {"$" + formatCurrencyDisp(inv.price)}

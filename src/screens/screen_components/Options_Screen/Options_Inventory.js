@@ -254,14 +254,18 @@ const QuickItemCanvasCard = ({
     <div
       onMouseDown={handleMouseDown}
       onClick={() => {
-        if (didDragRef.current) return;
-        if (sEditMode) onSelect(itemObj.inventoryItemID);
-        else if (onPress) onPress();
+        if (sEditMode) {
+          if (didDragRef.current) return;
+          onSelect(itemObj.inventoryItemID);
+        } else if (onPress) {
+          onPress();
+        }
       }}
       onContextMenu={(e) => {
         e.preventDefault();
         if (onRightClick) onRightClick(itemObj.inventoryItemID);
       }}
+      title={!sEditMode ? defaultName : undefined}
       style={{
         position: "absolute",
         left: (itemObj.x || 0) + "%",
@@ -769,7 +773,6 @@ export function InventoryComponent({}) {
 
   // Search function (now called by debounced TextInput_)
   const handleSearch = (searchTerm) => {
-    _setSelectedButtonID(null);
     _setSearchTerm(searchTerm || "");
     if (!searchTerm || searchTerm.length === 0) {
       _setSearchResults([]);
@@ -1055,9 +1058,6 @@ export function InventoryComponent({}) {
   function clearSearch() {
     _setSearchResults([]);
     _setSearchTerm("");
-    _setCurrentParentID(null);
-    _setMenuPath([]);
-    _setSelectedButtonID(null);
     _setCanvasEditMode(false);
     _setCanvasSelectedItemId(null);
   }
@@ -1411,7 +1411,7 @@ export function InventoryComponent({}) {
                 />
               );
             })()
-          ) : sSearchResults.length === 0 && sSelectedButtonID ? (
+          ) : sSearchResults.length === 0 && sSelectedButtonID && !sSearchTerm ? (
             <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 }}>
               <Image_ icon={ICONS.info} size={40} />
               <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 12 }}>No items in menu</Text>

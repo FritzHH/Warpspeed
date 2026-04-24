@@ -4599,7 +4599,7 @@ const QuickItemButtonsComponent = () => {
   }
 
   function handleDelete(btn) {
-    if (btn.id === "labor" || btn.id === "part") return;
+    if (btn.id === "labor" || btn.id === "item") return;
     let deletedParentID = btn.parentID || null;
     let updated = zSettingsObj.quickItemButtons
       .filter((o) => o.id !== btn.id)
@@ -4798,11 +4798,11 @@ const QuickItemButtonsComponent = () => {
           />
         ) : (
           <TouchableOpacity
-            onPress={() => drillIn(btn)}
+            onPress={(btn.id === "labor" || btn.id === "item") ? undefined : () => drillIn(btn)}
             style={{
               flex: isColumn ? 1 : undefined,
               width: isColumn ? undefined : "100%",
-              cursor: "pointer",
+              cursor: (btn.id === "labor" || btn.id === "item") ? "default" : "pointer",
             }}
           >
             <Text
@@ -5794,7 +5794,7 @@ const ImportComponent = () => {
           price,
           salePrice: 0,
           cost: dollarsToCents(stripDollar(item["Default Cost"])),
-          category: isLabor ? "Labor" : "Part",
+          category: isLabor ? "Labor" : "Item",
           primaryBarcode,
           barcodes,
           minutes: 0,
@@ -5856,7 +5856,7 @@ const ImportComponent = () => {
       //   console.log("[Inventory Import] Generating CSV for " + skipped.length + " skipped items...");
       //   const csvHeader = "Group,Description,Price,Cost,Primary Barcode,Other Barcodes";
       //   const csvRows = skipped.map(item => {
-      //     const group = item.formalName.toLowerCase().includes("labor") ? "Labor" : item.formalName.toLowerCase().includes("part") ? "Part" : "Other";
+      //     const group = item.formalName.toLowerCase().includes("labor") ? "Labor" : item.formalName.toLowerCase().includes("item") ? "Item" : "Other";
       //     const esc = (v) => '"' + String(v || "").replace(/"/g, '""') + '"';
       //     return [group, esc(item.formalName), item.price, item.cost, esc(item.primaryBarcode), esc((item.barcodes || []).join("; "))].join(",");
       //   });
@@ -5964,7 +5964,7 @@ const ImportComponent = () => {
           price: retailPrice ? dollarsToCents(retailPrice) : dollarsToCents(item.defaultCost),
           salePrice: 0,
           cost: dollarsToCents(item.avgCost || item.defaultCost),
-          category: isLabor ? "Labor" : "Part",
+          category: isLabor ? "Labor" : "Item",
           primaryBarcode: normalizeBarcode(item.upc) || normalizeBarcode(item.ean) || generateEAN13Barcode(),
           barcodes: [normalizeBarcode(item.upc), normalizeBarcode(item.ean)].filter(Boolean),
           minutes: 0,
@@ -6198,7 +6198,7 @@ const ImportComponent = () => {
           price: retailPrice ? dollarsToCents(retailPrice) : dollarsToCents(item.defaultCost),
           salePrice: 0,
           cost: dollarsToCents(item.avgCost || item.defaultCost),
-          category: isLabor ? "Labor" : "Part",
+          category: isLabor ? "Labor" : "Item",
           primaryBarcode: normalizeBarcode(item.upc) || normalizeBarcode(item.ean) || generateEAN13Barcode(),
           barcodes: [normalizeBarcode(item.upc), normalizeBarcode(item.ean)].filter(Boolean),
           minutes: 0,
@@ -6877,7 +6877,7 @@ const ImportComponent = () => {
           price: retailPrice ? dollarsToCents(retailPrice) : dollarsToCents(item.defaultCost),
           salePrice: 0,
           cost: dollarsToCents(item.avgCost || item.defaultCost),
-          category: isLabor ? "Labor" : "Part",
+          category: isLabor ? "Labor" : "Item",
           primaryBarcode: normalizeBarcode(item.upc) || normalizeBarcode(item.ean) || generateEAN13Barcode(),
           barcodes: [normalizeBarcode(item.upc), normalizeBarcode(item.ean)].filter(Boolean),
           minutes: 0,
@@ -8965,7 +8965,7 @@ const SPOOF_WORKORDER = {
         formalName: "HELMET AERIUS RAVEN L/XL M-BK",
         cost: 1995,
         brand: "",
-        category: "Part",
+        category: "Item",
         minutes: 0,
         salePrice: 0,
         upc: "",
@@ -8992,7 +8992,7 @@ const SPOOF_WORKORDER = {
         cost: 3249,
         brand: "",
         minutes: 0,
-        category: "Part",
+        category: "Item",
         formalName: "CAR RACK HOLYWD CROSSBAR ADAPTER BOOMERPRO",
         manufacturerSku: "BA-PRO",
       },
@@ -9026,7 +9026,7 @@ const SPOOF_WORKORDER = {
         salePrice: 0,
         cost: 1849,
         brand: "",
-        category: "Part",
+        category: "Item",
         minutes: 0,
         upc: "850051028009",
         id: "0AS4fNqu2f9I7Po11bgC",
@@ -9061,7 +9061,7 @@ const SPOOF_WORKORDER = {
         cost: 499,
         brand: "",
         minutes: 0,
-        category: "Part",
+        category: "Item",
         formalName: "TOOL VALVE CORE REMOVER PARK VC-1",
         manufacturerSku: "VC-1",
       },

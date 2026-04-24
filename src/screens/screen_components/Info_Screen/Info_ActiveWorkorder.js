@@ -1070,7 +1070,7 @@ export const ActiveWorkorderComponent = ({}) => {
               }}
             >
               <TextInput_
-                placeholder={"Part name/description"}
+                placeholder={"Item name/description"}
                 editable={!isDonePaid}
                 capitalize={true}
                 style={{
@@ -1106,7 +1106,7 @@ export const ActiveWorkorderComponent = ({}) => {
             >
               <TextInput_
                 value={zOpenWorkorder?.partSource}
-                placeholder={"Part Source"}
+                placeholder={"Item Source"}
                 editable={!isDonePaid}
                 capitalize={true}
                 style={{
@@ -1154,7 +1154,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     paddingHorizontal: 40,
                   }}
                   ref={partSourcesRef}
-                  buttonText={"Part Sources"}
+                  buttonText={"Item Sources"}
                 />
               </View>
             </View>

@@ -39,7 +39,7 @@ function ChangeLogRow({ entry, index }) {
         flexDirection: "row",
         paddingVertical: 6,
         paddingHorizontal: 10,
-        backgroundColor: index % 2 === 0 ? C.listItemWhite : gray(0.94),
+        backgroundColor: index % 2 === 0 ? C.listItemWhite : gray(0.06),
         alignItems: "flex-start",
       }}
     >

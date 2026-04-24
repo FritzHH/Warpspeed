@@ -732,7 +732,7 @@ export function InventoryComponent({}) {
   const [sCurrentParentID, _setCurrentParentID] = useState(null);
   const [sMenuPath, _setMenuPath] = useState([]);
   const [sSelectedButtonID, _setSelectedButtonID] = useState(null);
-  const [sCustomItemModal, _setCustomItemModal] = useState(null); // "labor" | "part" | null
+  const [sCustomItemModal, _setCustomItemModal] = useState(null); // "labor" | "item" | null
   const [sForceEditMode, _setForceEditMode] = useState(false);
   const [sCanvasEditMode, _setCanvasEditMode] = useState(false);
   const [sCanvasSelectedItemId, _setCanvasSelectedItemId] = useState(null);
@@ -803,8 +803,8 @@ export function InventoryComponent({}) {
   function handleQuickButtonPress(buttonObj) {
     _setCanvasEditMode(false);
     _setCanvasSelectedItemId(null);
-    // Intercept $LABOR and $PART buttons
-    if (buttonObj.id === "labor" || buttonObj.id === "part") {
+    // Intercept $LABOR and $ITEM buttons
+    if (buttonObj.id === "labor" || buttonObj.id === "item") {
       const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
       if (!openWorkorder) return;
       const statuses = useSettingsStore.getState().settings?.statuses;
@@ -1248,7 +1248,7 @@ export function InventoryComponent({}) {
                 >
                   <Button_
                     onPress={() => handleQuickButtonPress(item)}
-                    colorGradientArr={isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "part" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
+                    colorGradientArr={isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "item" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
                     buttonStyle={{
                       borderWidth: 1,
                       borderRadius: 5,

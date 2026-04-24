@@ -213,7 +213,7 @@ export const CUSTOMER_DEPOSIT_PROTO = {
 
 ////////// names of stuff ////////////////////////////
 export const INVENTORY_CATEGORY_NAMES = {
-  parts: "Parts",
+  parts: "Item",
   labor: "Labor",
 };
 
@@ -548,7 +548,7 @@ export const INVENTORY_ITEM_PROTO = {
   brand: "",
   price: 0,
   salePrice: 0,
-  category: "Part",
+  category: "Item",
   id: "",
   cost: "",
   primaryBarcode: "",
@@ -822,7 +822,7 @@ export const SETTINGS_OBJ = {
       textColor: "white",
       backgroundColor: "orange",
   
-      label: "Order Part for Customer",
+      label: "Order Item for Customer",
       removable: true,
     },
 
@@ -850,7 +850,7 @@ export const SETTINGS_OBJ = {
     { id: "bnfdeqw", name: "Pickup/Delivery", parentID: null, items: [], removable: true },
     { id: "34trhrg", name: "Diagnostics", parentID: null, items: [], removable: true },
     { id: "labor", name: "$Labor", parentID: null, items: [], removable: false },
-    { id: "part", name: "$Part", parentID: null, items: [], removable: false },
+    { id: "item", name: "$Item", parentID: null, items: [], removable: false },
     { id: "common", name: "Common", parentID: null, items: [], removable: false },
   ],
   // quickButtons: [],

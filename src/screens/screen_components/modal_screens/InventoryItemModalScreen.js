@@ -40,7 +40,7 @@ import {
 } from "../../../db_calls_wrapper";
 import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
 
-const CATEGORIES = ["Part", "Labor"];
+const CATEGORIES = ["Item", "Labor"];
 
 // ─── helpers ───────────────────────────────────────────────────────────────
 
@@ -290,6 +290,29 @@ const QuickButtonPickerModal = ({ itemID, quickButtons, onToggle, onClose }) => 
   );
 };
 
+const CurrencyField = ({ style, cents, onChangeText, placeholder }) => {
+  const [sFocused, _setFocused] = useState(false);
+  const [sLocalVal, _setLocalVal] = useState("");
+
+  return (
+    <TextInput
+      style={style}
+      value={sFocused ? sLocalVal : formatCurrencyDisp(cents)}
+      placeholder={placeholder}
+      placeholderTextColor={gray(0.35)}
+      onFocus={() => {
+        _setFocused(true);
+        _setLocalVal("");
+      }}
+      onBlur={() => _setFocused(false)}
+      onChangeText={(v) => {
+        _setLocalVal(v);
+        onChangeText(v);
+      }}
+    />
+  );
+};
+
 // ─── main component ────────────────────────────────────────────────────────
 
 export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }) => {
@@ -503,10 +526,11 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
         <Text style={labelStyle}>{label}{sEditing && opts.hint ? <Text style={{ fontWeight: "normal", color: gray(0.4) }}>{opts.hint}</Text> : null}</Text>
         {sEditing ? (
           opts.currency ? (
-            <TextInput
+            <CurrencyField
               style={inputStyle}
-              value={formatCurrencyDisp(sItem[fieldName])}
+              cents={sItem[fieldName]}
               onChangeText={(v) => handlePriceChange(fieldName, v)}
+              placeholder="$0.00"
             />
           ) : opts.numeric ? (
             <TextInput
@@ -614,12 +638,14 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
                   )}
                 </View>
               )}
-              <TouchableOpacity
-                onPress={() => _setEditing(!sEditing)}
-                style={{ padding: 6, marginRight: 10 }}
-              >
-                <Image_ icon={ICONS.editPencil} size={30} />
-              </TouchableOpacity>
+              {(!isNew || !!sItem.formalName?.trim()) && (
+                <TouchableOpacity
+                  onPress={() => _setEditing(!sEditing)}
+                  style={{ padding: 6, marginRight: 10 }}
+                >
+                  <Image_ icon={ICONS.editPencil} size={30} />
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -639,19 +665,30 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
               <View style={{ width: 120 }}>
                 <Text style={labelStyle}>Category</Text>
                 {sEditing ? (
-                  <DropdownMenu
-                    dataArr={CATEGORIES}
-                    buttonText={sItem.category || "Part"}
-                    buttonStyle={{
+                  <select
+                    value={sItem.category || "Item"}
+                    onChange={(e) => handleFieldChange("category", e.target.value)}
+                    style={{
                       width: 120,
                       marginTop: 4,
                       paddingVertical: 4,
+                      paddingHorizontal: 6,
                       borderRadius: 6,
+                      borderWidth: 1,
+                      borderColor: C.buttonLightGreenOutline,
+                      backgroundColor: C.listItemWhite,
+                      fontSize: 14,
+                      color: C.text,
+                      outlineStyle: "none",
+                      cursor: "pointer",
                     }}
-                    onSelect={(cat) => handleFieldChange("category", cat)}
-                  />
+                  >
+                    {CATEGORIES.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                  </select>
                 ) : (
-                  <Text style={valueStyle}>{sItem.category || "Part"}</Text>
+                  <Text style={valueStyle}>{sItem.category || "Item"}</Text>
                 )}
               </View>
               {sItem.category === "Labor" && (
@@ -830,22 +867,38 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
 
           </ScrollView>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
-            {isNew ? (
-              <View style={{ flex: 1 }} />
-            ) : (
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
               <TouchableOpacity
-                onPress={handleDeleteItem}
+                onPress={handleExit}
                 style={{ padding: 6, borderRadius: 6 }}
               >
-                <Image_ icon={ICONS.trash} size={40} />
+                <Image_ icon={ICONS.close1} size={36} />
+              </TouchableOpacity>
+              {!isNew && (
+                <TouchableOpacity
+                  onPress={handleDeleteItem}
+                  style={{ padding: 6, borderRadius: 6, marginLeft: 6 }}
+                >
+                  <Image_ icon={ICONS.trash} size={40} />
+                </TouchableOpacity>
+              )}
+            </View>
+            {isNew && !!sItem.formalName?.trim() && (
+              <TouchableOpacity
+                onPress={handleSaveNewItem}
+                style={{ padding: 6, borderRadius: 6 }}
+              >
+                <Image_ icon={ICONS.check1} size={36} />
               </TouchableOpacity>
             )}
-            <TouchableOpacity
-              onPress={handleExit}
-              style={{ padding: 6, borderRadius: 6 }}
-            >
-              <Image_ icon={sDirty ? ICONS.check1 : ICONS.close1} size={36} />
-            </TouchableOpacity>
+            {!isNew && sDirty && (
+              <TouchableOpacity
+                onPress={handleExit}
+                style={{ padding: 6, borderRadius: 6 }}
+              >
+                <Image_ icon={ICONS.check1} size={36} />
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </TouchableWithoutFeedback>

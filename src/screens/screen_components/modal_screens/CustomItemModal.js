@@ -19,7 +19,7 @@ export const CustomItemModal = ({
   visible,
   onClose,
   onSave,
-  type, // "labor" | "part"
+  type, // "labor" | "item"
   existingLine = null, // workorder line for editing
 }) => {
   const zDiscounts = useSettingsStore((s) => s.settings?.discounts);
@@ -119,7 +119,7 @@ export const CustomItemModal = ({
     let invItem = cloneDeep(INVENTORY_ITEM_PROTO);
     invItem.formalName = sName.trim();
     invItem.price = sPriceCents;
-    invItem.category = isLabor ? "Labor" : "Part";
+    invItem.category = isLabor ? "Labor" : "Item";
     invItem.customLabor = isLabor;
     invItem.customPart = !isLabor;
     invItem.minutes = isLabor ? Number(sMinutes) || 0 : 0;
@@ -205,7 +205,7 @@ export const CustomItemModal = ({
                 color: C.text,
               }}
             >
-              {isEditing ? "Edit" : "Add"} Custom {isLabor ? "Labor" : "Part"}
+              {isEditing ? "Edit" : "Add"} Custom {isLabor ? "Labor" : "Item"}
             </Text>
             <Button_
               icon={ICONS.redx}
@@ -224,7 +224,7 @@ export const CustomItemModal = ({
             Item Name *
           </Text>
           <TextInput_
-            placeholder={isLabor ? "Labor description" : "Part name"}
+            placeholder={isLabor ? "Labor description" : "Item name"}
             value={sName}
             onChangeText={(val) => _setName(val.length === 1 ? val.toUpperCase() : val.charAt(0).toUpperCase() + val.slice(1))}
             autoFocus={true}

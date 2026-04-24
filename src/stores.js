@@ -1174,7 +1174,10 @@ const CHANGELOG_TRACKED_FIELDS = [...CHANGELOG_TEXT_FIELDS, ...CHANGELOG_DISCRET
 const changeLogDebounceMap = {};
 
 export function getChangeLogUser() {
-  return useLoginStore.getState().currentUser?.first || "System";
+  let u = useLoginStore.getState().currentUser;
+  if (!u?.first) return "System";
+  let last = u.last ? " " + u.last.charAt(0) : "";
+  return u.first + last;
 }
 
 function getItemName(item) {
@@ -1198,22 +1201,6 @@ export function diffWorkorderLines(oldLines, newLines) {
   for (let id in oldMap) {
     if (!newMap[id]) {
       entries.push({ action: "removed", field: "workorderLines", from: getItemName(oldMap[id].inventoryItem || oldMap[id]) });
-    }
-  }
-  // changed qty or discount
-  for (let id in newMap) {
-    if (oldMap[id]) {
-      let oldL = oldMap[id];
-      let newL = newMap[id];
-      let name = getItemName(newL.inventoryItem || newL);
-      if (oldL.qty !== newL.qty) {
-        entries.push({ action: "changed", field: "workorderLines", detail: "qty", item: name, from: String(oldL.qty), to: String(newL.qty) });
-      }
-      if (oldL.discountObj?.name !== newL.discountObj?.name || oldL.discountObj?.value !== newL.discountObj?.value) {
-        let oldDisc = oldL.discountObj?.name || "none";
-        let newDisc = newL.discountObj?.name || "none";
-        entries.push({ action: "changed", field: "workorderLines", detail: "discount", item: name, from: oldDisc, to: newDisc });
-      }
     }
   }
   return entries;

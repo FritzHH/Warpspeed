@@ -4995,7 +4995,7 @@ exports.lightspeedImportData = onCall(
           brand: "",
           price: 0,
           salePrice: 0,
-          category: isLabor ? "Labor" : "Part",
+          category: isLabor ? "Labor" : "Item",
           id: db.collection("_").doc().id,
           cost: price,
           upc: item.upc || "",

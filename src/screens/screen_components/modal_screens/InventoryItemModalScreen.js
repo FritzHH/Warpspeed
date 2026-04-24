@@ -478,7 +478,8 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
 
   // ─── render helpers ────────────────────────────────────────────────────
 
-  const labelStyle = { fontStyle: "italic", color: gray(0.45), fontSize: 13, marginTop: 8 };
+  const sectionCardStyle = { borderWidth: 1, borderColor: gray(0.15), borderRadius: 10, backgroundColor: gray(0.03), padding: 12, marginTop: 10 };
+  const labelStyle = { fontStyle: "italic", color: gray(0.45), fontSize: 13, marginTop: 4 };
   const valueStyle = { fontSize: 15, color: C.text, marginTop: 2 };
   const inputStyle = {
     fontSize: 15,
@@ -498,8 +499,8 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
     if (!opts.currency && !sEditing && (val === "" || val === 0)) val = "-";
 
     return (
-      <View style={{ flex: opts.flex || 1, marginRight: opts.last ? 0 : 10 }}>
-        <Text style={labelStyle}>{label}</Text>
+      <View style={{ flex: opts.flex, marginRight: opts.last ? 0 : 10 }}>
+        <Text style={labelStyle}>{label}{sEditing && opts.hint ? <Text style={{ fontWeight: "normal", color: gray(0.4) }}>{opts.hint}</Text> : null}</Text>
         {sEditing ? (
           opts.currency ? (
             <TextInput
@@ -514,16 +515,45 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
               onChangeText={(v) => handleMinutesChange(v)}
               keyboardType="numeric"
             />
+          ) : opts.multiline ? (
+            <TextInput_
+              style={{
+                padding: 6,
+                paddingLeft: 8,
+                lineHeight: 18,
+                fontSize: 15,
+                color: C.text,
+                outlineWidth: 0,
+                outlineStyle: "none",
+                overflow: "hidden",
+                resize: "none",
+                borderWidth: 0,
+                borderRadius: 5,
+                backgroundColor: C.listItemWhite,
+                marginTop: 2,
+                boxShadow: "inset 0 0 0 1px " + C.buttonLightGreenOutline,
+              }}
+              value={String(sItem[fieldName] || "")}
+              onChangeText={(v) => handleFieldChange(fieldName, v)}
+              multiline={true}
+              numberOfLines={10}
+              debounceMs={0}
+            />
           ) : (
             <TextInput
               style={inputStyle}
               value={String(sItem[fieldName] || "")}
-              onChangeText={(v) => handleFieldChange(fieldName, v)}
+              onChangeText={(v) => {
+                if (opts.numbersOnly) v = v.replace(/[^0-9]/g, "");
+                handleFieldChange(fieldName, v);
+              }}
               autoFocus={opts.autoFocus}
+              keyboardType={opts.numbersOnly ? "numeric" : undefined}
+              inputMode={opts.numbersOnly ? "numeric" : undefined}
             />
           )
         ) : (
-          <Text style={valueStyle}>{String(val ?? "-")}</Text>
+          <Text style={{ ...valueStyle, ...(opts.multiline ? { whiteSpace: "pre-wrap" } : {}) }}>{String(val ?? "-")}</Text>
         )}
       </View>
     );
@@ -540,7 +570,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
       <View
         style={{
           width: "55%",
-          maxHeight: "calc(100vh - 40px)",
+          height: "90vh",
           backgroundColor: "white",
           borderRadius: 15,
           padding: 20,
@@ -593,13 +623,16 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
             </View>
           </View>
 
-          <View>
-            {/* SECTION 1: Item Details */}
+          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ justifyContent: "space-between", flexGrow: 1 }}>
             <View>
-            {renderField("Catalog Name", "formalName", { autoFocus: true })}
-            {renderField("Descriptive Name", "informalName")}
-            {/* Brand + Category + Minutes row */}
-            <View style={{ flexDirection: "row", marginTop: 4, gap: 10 }}>
+            {/* Names */}
+            <View style={sectionCardStyle}>
+              {renderField("Catalog Name", "formalName", { autoFocus: true })}
+              {renderField("Quick Button/Descriptive Name", "informalName", { multiline: true, hint: " -- use enter key to space name to fit quick button card if desired" })}
+            </View>
+
+            {/* Brand + Category + Minutes */}
+            <View style={{ ...sectionCardStyle, flexDirection: "row", gap: 10 }}>
               <View style={{ flex: 1 }}>
                 {renderField("Brand", "brand")}
               </View>
@@ -628,67 +661,72 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
               )}
             </View>
 
-            {/* Prices row */}
-            <View style={{ flexDirection: "row", marginTop: 4 }}>
+            {/* Prices */}
+            <View style={{ ...sectionCardStyle, flexDirection: "row" }}>
               {renderField("Price", "price", { currency: true, flex: 1 })}
               {renderField("Sale Price", "salePrice", { currency: true, flex: 1 })}
               {renderField("Cost", "cost", { currency: true, flex: 1, last: true })}
             </View>
 
-            {/* Barcode */}
-            {renderField("Primary Barcode", "primaryBarcode")}
-
-            {/* Additional Barcodes */}
-            <View style={{ marginTop: 8 }}>
-              <Text style={labelStyle}>Additional Barcodes</Text>
-              {(sItem.barcodes || []).map((code, i) => (
-                <View key={i} style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
-                  {sEditing ? (
-                    <TextInput
-                      style={{ ...inputStyle, flex: 1 }}
-                      value={code}
-                      onChangeText={(v) => {
-                        let updated = [...(sItem.barcodes || [])];
-                        updated[i] = v;
-                        handleFieldChange("barcodes", updated);
-                      }}
-                    />
-                  ) : (
-                    <Text style={{ ...valueStyle, flex: 1 }}>{code}</Text>
-                  )}
-                  {sEditing && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        let updated = (sItem.barcodes || []).filter((_, idx) => idx !== i);
-                        handleFieldChange("barcodes", updated);
-                      }}
-                      style={{ padding: 4, marginLeft: 6 }}
-                    >
-                      <Image_ icon={ICONS.trash} size={16} />
-                    </TouchableOpacity>
-                  )}
-                </View>
-              ))}
-              {sEditing && (
-                <TouchableOpacity
-                  onPress={() => {
-                    let updated = [...(sItem.barcodes || []), ""];
-                    handleFieldChange("barcodes", updated);
-                  }}
-                  style={{ marginTop: 6, flexDirection: "row", alignItems: "center" }}
-                >
-                  <Image_ icon={ICONS.add} size={20} style={{ tintColor: C.green }} />
-                  <Text style={{ fontSize: 13, color: C.green, marginLeft: 4 }}>Add Barcode</Text>
-                </TouchableOpacity>
-              )}
-              {!sEditing && (sItem.barcodes || []).length === 0 && (
-                <Text style={valueStyle}>-</Text>
-              )}
+            {/* Barcodes */}
+            <View style={{ ...sectionCardStyle, flexDirection: "row", gap: 10 }}>
+              <View style={{ flex: 1 }}>
+                {renderField("Primary Barcode", "primaryBarcode", { numbersOnly: true })}
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={labelStyle}>Additional Barcodes</Text>
+                {(sItem.barcodes || []).map((code, i) => (
+                  <View key={i} style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
+                    {sEditing ? (
+                      <TextInput
+                        style={{ ...inputStyle, flex: 1 }}
+                        value={code}
+                        keyboardType="numeric"
+                        inputMode="numeric"
+                        onChangeText={(v) => {
+                          v = v.replace(/[^0-9]/g, "");
+                          let updated = [...(sItem.barcodes || [])];
+                          updated[i] = v;
+                          handleFieldChange("barcodes", updated);
+                        }}
+                      />
+                    ) : (
+                      <Text style={{ ...valueStyle, flex: 1 }}>{code}</Text>
+                    )}
+                    {sEditing && (
+                      <TouchableOpacity
+                        onPress={() => {
+                          let updated = (sItem.barcodes || []).filter((_, idx) => idx !== i);
+                          handleFieldChange("barcodes", updated);
+                        }}
+                        style={{ padding: 4, marginLeft: 6 }}
+                      >
+                        <Image_ icon={ICONS.trash} size={16} />
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                ))}
+                {sEditing && (
+                  <TouchableOpacity
+                    onPress={() => {
+                      let updated = [...(sItem.barcodes || []), ""];
+                      handleFieldChange("barcodes", updated);
+                    }}
+                    style={{ marginTop: 6, flexDirection: "row", alignItems: "center" }}
+                  >
+                    <Image_ icon={ICONS.add} size={20} style={{ tintColor: C.green }} />
+                    <Text style={{ fontSize: 13, color: C.green, marginLeft: 4 }}>Add Barcode</Text>
+                  </TouchableOpacity>
+                )}
+                {!sEditing && (sItem.barcodes || []).length === 0 && (
+                  <Text style={valueStyle}>-</Text>
+                )}
+              </View>
             </View>
             </View>
 
             {/* SECTION 2: Quick Button Placement */}
-            <View style={{ marginTop: 20, borderWidth: 1, borderColor: gray(0.15), borderRadius: 10, backgroundColor: gray(0.03), padding: 12 }}>
+            <View style={sectionCardStyle}>
               <TouchableOpacity
                 onPress={() => _setShowQBSection(!sShowQBSection)}
                 style={{
@@ -747,7 +785,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
             </View>
 
             {/* SECTION 3: Auto Customer Note */}
-            <View style={{ marginTop: 14, borderWidth: 1, borderColor: gray(0.15), borderRadius: 10, backgroundColor: gray(0.03), padding: 12 }}>
+            <View style={sectionCardStyle}>
               <TouchableOpacity
                 onPress={() => _setShowAutoNote(!sShowAutoNote)}
                 style={{
@@ -790,7 +828,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
               )}
             </View>
 
-          </View>
+          </ScrollView>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
             {isNew ? (
               <View style={{ flex: 1 }} />

@@ -35,7 +35,7 @@ import {
   useInventoryStore,
   useLoginStore,
 } from "../../../stores";
-import { dbSaveSettingsField, dbSavePrintObj } from "../../../db_calls_wrapper";
+import { dbSaveSettingsField, dbSaveInventoryItem, dbSavePrintObj } from "../../../db_calls_wrapper";
 import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
 
 function getQuickButtonFontSize(text, baseFontSize) {
@@ -145,8 +145,8 @@ const QuickItemCanvasCard = ({
 
   let w = itemObj.w || DEFAULT_ITEM_W;
   let h = itemObj.h || DEFAULT_ITEM_H;
-  let defaultName = invItem ? (invItem.informalName || invItem.formalName || "Unknown") : "(not found)";
-  let name = itemObj.label || defaultName;
+  let defaultName = invItem ? (invItem.formalName || "Unknown") : "(not found)";
+  let name = invItem ? (invItem.informalName || invItem.formalName || "Unknown") : "(not found)";
   let nameLineCount = (name || "").split("\n").length;
   if (sLineCount !== nameLineCount && !sEditMode) _setLineCount(nameLineCount);
   let price = invItem ? formatCurrencyDisp(invItem.price) : "";
@@ -316,7 +316,7 @@ const QuickItemCanvasCard = ({
       {sEditMode ? (
         <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} style={{ width: "90%" }}>
           <TextInput_
-            value={itemObj.label || ""}
+            value={invItem?.informalName || ""}
             placeholder={defaultName}
             placeholderTextColor={gray(0.4)}
             onChangeText={(val) => {
@@ -575,13 +575,18 @@ const QuickItemCanvas = React.forwardRef(({
     saveItems(rawItems.map((it) => it.inventoryItemID === invItemID ? { ...it, x, y, w, h } : it));
   }
 
-  function handleLabelChange(invItemID, label) {
-    let updatedItems = rawItems.map((it) => it.inventoryItemID === invItemID ? { ...it, label } : it);
-    let updatedButtons = (zQuickItemButtons || []).map((b) =>
-      b.id === buttonObj.id ? { ...b, items: updatedItems } : b
-    );
-    useSettingsStore.getState().setField("quickItemButtons", updatedButtons, false);
-    dbSaveSettingsField("quickItemButtons", updatedButtons);
+  function handleLabelChange(invItemID, informalName) {
+    let invItem = findInvItem(invItemID);
+    if (!invItem) return;
+    let updated = { ...invItem, informalName };
+    // Update local inventory store immediately for speed
+    let updatedArr = (zInventoryArr || []).map((i) => i.id === invItemID ? updated : i);
+    useInventoryStore.getState().setItems(updatedArr);
+    // Debounce DB save
+    if (dbSaveTimerRef.current) clearTimeout(dbSaveTimerRef.current);
+    dbSaveTimerRef.current = setTimeout(() => {
+      dbSaveInventoryItem(updated);
+    }, 500);
   }
 
   function handleDeleteItem(invItemID) {

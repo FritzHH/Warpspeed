@@ -76,7 +76,7 @@ import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
 import { SalesReportsModal } from "../../modal_screens/SalesReports";
 import { PayrollModal } from "../../modal_screens/PayrollModal";
-import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection } from "../../../../db_calls_wrapper";
+import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection, dbSaveInventoryItem } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses, mapEmployees, mapPunchHistory, parseCSV } from "../../../../lightspeed_import";
 import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead, firestoreQuery, firestoreDelete, firestoreWrite, firestoreBatchWrite } from "../../../../db_calls";
 import { DB_NODES } from "../../../../constants";
@@ -5086,23 +5086,19 @@ const ParentButtonItemsList = ({
 
   let quickItemButtons = zSettingsObj?.quickItemButtons || [];
   let parentButton = quickItemButtons.find((b) => b.id === sCurrentParentID);
-  let parentItemPairs = (parentButton?.items || []).map((entry) => {
-    let normalized = typeof entry === "string" ? { inventoryItemID: entry } : entry;
-    let inv = zInventoryArr.find((o) => o.id === normalized.inventoryItemID);
-    return inv ? { entry: normalized, inv } : null;
+  let parentItems = (parentButton?.items || []).map((entry) => {
+    let id = typeof entry === "string" ? entry : entry.inventoryItemID;
+    return zInventoryArr.find((o) => o.id === id);
   }).filter(Boolean);
 
   function handleItemLabelChange(inventoryItemID, val) {
-    let updated = quickItemButtons.map((b) => {
-      if (b.id !== sCurrentParentID) return b;
-      let items = (b.items || []).map((entry) => {
-        let norm = typeof entry === "string" ? { inventoryItemID: entry } : entry;
-        if (norm.inventoryItemID !== inventoryItemID) return entry;
-        return { ...norm, label: val };
-      });
-      return { ...b, items };
-    });
-    useSettingsStore.getState().setField("quickItemButtons", updated);
+    let invItem = zInventoryArr.find((o) => o.id === inventoryItemID);
+    if (!invItem) return;
+    let updated = { ...invItem, informalName: val };
+    // Update local inventory store immediately for speed
+    let updatedArr = zInventoryArr.map((i) => i.id === inventoryItemID ? updated : i);
+    useInventoryStore.getState().setItems(updatedArr);
+    dbSaveInventoryItem(updated);
   }
 
   function reorderItems(fromIdx, toIdx) {
@@ -5127,14 +5123,14 @@ const ParentButtonItemsList = ({
     useSettingsStore.getState().setField("quickItemButtons", updated);
   }
 
-  if (parentItemPairs.length === 0) return null;
+  if (parentItems.length === 0) return null;
 
   return (
     <View style={{ marginTop: 10, width: "100%" }}>
       <Text style={{ fontSize: 12, fontWeight: "bold", color: gray(0.5), marginBottom: 6 }}>
-        ITEMS ({parentItemPairs.length})
+        ITEMS ({parentItems.length})
       </Text>
-      {parentItemPairs.map(({ entry, inv }, idx) => {
+      {parentItems.map((inv, idx) => {
         let dividerObj = (parentButton?.dividers || []).find((d) => d.itemID === inv.id);
         let hasDivider = !!dividerObj;
         return (
@@ -5198,17 +5194,12 @@ const ParentButtonItemsList = ({
             >
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 13, color: C.text }} numberOfLines={1}>
-                  {inv.informalName || inv.formalName}
+                  {inv.formalName}
                 </Text>
-                {!!inv.informalName && (
-                  <Text style={{ fontSize: 11, color: gray(0.4) }} numberOfLines={1}>
-                    {inv.formalName}
-                  </Text>
-                )}
                 <TextInput_
-                  placeholder="Custom card label"
+                  placeholder="Descriptive name"
                   placeholderTextColor={gray(0.35)}
-                  value={entry.label || ""}
+                  value={inv.informalName || ""}
                   onChangeText={(val) => handleItemLabelChange(inv.id, val)}
                   debounceMs={400}
                   style={{

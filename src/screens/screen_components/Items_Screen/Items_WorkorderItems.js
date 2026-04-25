@@ -996,7 +996,7 @@ export const LineItemComponent = ({
                       )}
                       <Text
                         style={{
-                          fontSize: 17,
+                          fontSize: 16,
                           color: C.text,
                           fontWeight: "400",
                           textDecorationLine: "none",
@@ -1162,7 +1162,7 @@ export const LineItemComponent = ({
             {(effectiveQty > 1 || workorderLine.discountObj?.newPrice != null) && (
               <Text
                 style={{
-                  fontSize: 16,
+                  fontSize: 13,
                   paddingHorizontal: 0,
                   color: C.text,
                   textDecorationLine: workorderLine.discountObj?.newPrice != null ? "line-through" : "none",
@@ -1178,7 +1178,7 @@ export const LineItemComponent = ({
             )}
             <Text
               style={{
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: "500",
                 minWidth: 30,
                 marginTop: 0,

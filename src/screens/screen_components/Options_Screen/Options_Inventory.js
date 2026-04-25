@@ -265,7 +265,6 @@ const QuickItemCanvasCard = ({
         e.preventDefault();
         if (onRightClick) onRightClick(itemObj.inventoryItemID);
       }}
-      title={!sEditMode ? defaultName : undefined}
       style={{
         position: "absolute",
         left: (itemObj.x || 0) + "%",
@@ -344,14 +343,9 @@ const QuickItemCanvasCard = ({
               outlineWidth: 0,
             }}
           />
-          {!!price && (
-            <Text style={{ fontSize: Math.min(13, Math.max(7, (itemObj.fontSize || 10) - 1)), color: gray(0.45), textAlign: "center", marginTop: 1 }}>
-              ${price}
-            </Text>
-          )}
         </div>
       ) : (
-        <>
+          <div title={defaultName} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
           <Text
             style={{
               fontSize: itemObj.fontSize || 10,
@@ -364,12 +358,7 @@ const QuickItemCanvasCard = ({
           >
             {name}
           </Text>
-          {!!price && (
-            <Text style={{ fontSize: Math.min(13, Math.max(7, (itemObj.fontSize || 10) - 1)), color: gray(0.45), textAlign: "center", marginTop: 1 }}>
-              ${price}
-            </Text>
-          )}
-        </>
+          </div>
       )}
       {!sEditMode && (
         <>
@@ -415,26 +404,27 @@ const QuickItemCanvasCard = ({
                 backgroundColor: C.buttonLightGreenOutline,
               }}
             >
-              <div
-                onClick={() => { if (invItem && onInfoPress) onInfoPress(); }}
-                style={{ cursor: "pointer", padding: 2, display: "flex", alignItems: "center", justifyContent: "center" }}
-              >
-                <Image_ icon={ICONS.info} size={11} />
-              </div>
-              {(useLoginStore.getState().currentUser?.permissions?.level || 0) >= 4 && (
+              {(useLoginStore.getState().currentUser?.permissions?.level || 0) >= 3 && (
                 <div
+                  title="Edit item"
                   onClick={() => { if (onRightClick) onRightClick(itemObj.inventoryItemID); _setShowActions(false); }}
                   style={{ cursor: "pointer", padding: 2, display: "flex", alignItems: "center", justifyContent: "center" }}
                 >
-                  <Image_ icon={ICONS.editPencil} size={11} />
+                  <Image_ icon={ICONS.editPencil} size={13} />
                 </div>
               )}
               <div
-                onClick={() => handlePrintClick()}
+                title="Item info"
+                onClick={() => { if (invItem && onInfoPress) onInfoPress(); }}
                 style={{ cursor: "pointer", padding: 2, display: "flex", alignItems: "center", justifyContent: "center" }}
               >
-                <Image_ icon={ICONS.print} size={8} />
+                <Image_ icon={ICONS.info} size={13} />
               </div>
+              {!!price && (
+                <Text style={{ fontSize: 12, color: gray(0.45) }}>
+                  ${price}
+                </Text>
+              )}
             </div>
           )}
           {/* Print layout picker */}
@@ -1138,11 +1128,11 @@ export function InventoryComponent({}) {
           }}
         >
           <Text style={{ fontSize: 13, color: gray(0.45), marginRight: 8 }}>
-            Drag edges to resize, right click to save & exit.
+              Drag edges to resize; use hand icon to move card; and right-click to save & exit.
           </Text>
           {sCanvasSelectedItemId && (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
-              <Text style={{ fontSize: 13, color: gray(0.45), marginRight: 4 }}>Font:</Text>
+                <Text style={{ fontSize: 13, color: gray(0.45), marginRight: 4 }}>Font size:</Text>
               <TouchableOpacity
                 onPress={() => quickCanvasRef.current?.fontSizeSelected(-1)}
                 style={{ width: 25, height: 25, borderRadius: 4, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}

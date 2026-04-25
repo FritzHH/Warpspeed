@@ -1245,7 +1245,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 }}
                 multiline={false}
                 numberOfLines={1}
-                style={{ height: '100%', fontSize: 13, width: '75%', paddingHorizontal: 3, borderWidth: 1, borderColor: gray(.15), borderRadius: 6, resize: "none", overflow: "hidden", color: C.text, outlineStyle: "none" }}
+                style={{ height: '100%', fontSize: 11, flex: 1, paddingHorizontal: 5, borderWidth: 1, borderColor: gray(.15), borderRadius: 6, resize: "none", overflow: "hidden", color: C.text, outlineStyle: "none" }}
               />
               {zOpenWorkorder?.trackingNumber ? (() => {
                 const inputVal = zOpenWorkorder.trackingNumber.trim();
@@ -1256,8 +1256,8 @@ export const ActiveWorkorderComponent = ({}) => {
                     <View onContextMenu={(e) => { e.preventDefault(); navigator.clipboard.writeText(inputVal); }}>
                       <Tooltip text="Press to open, right-click to copy" position="top">
                         <Pressable_ onPress={() => window.open(openUrl, "_blank")} style={{ height: '90%', marginLeft: 5 }}>
-                          <View style={{ height: '100%', backgroundColor: C.green, borderRadius: 6, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 }}>
-                            <Text style={{ fontSize: 12, color: 'white', fontWeight: '600' }}>Open</Text>
+                          <View style={{ height: '100%', backgroundColor: C.buttonLightGreen, borderColor: C.buttonLightGreenOutline, borderWidth: 1, borderRadius: 5, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 }}>
+                            <Text style={{ fontSize: 13, color: gray(0.55), fontWeight: '500' }}>Open</Text>
                           </View>
                         </Pressable_>
                       </Tooltip>

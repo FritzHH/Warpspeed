@@ -594,7 +594,7 @@ export function WorkordersComponent({}) {
                     borderColor: C.buttonLightGreenOutline,
                     opacity: workorder.id === zPreviewID ? 0.6 : 1,
                     backgroundColor: workorder.id === zOpenWorkorderID
-                      ? lightenRGBByPercent(C.lightred, 60)
+                      ? lightenRGBByPercent(C.lightred, 85)
                       : (zPendingWOIDs.includes(workorder.id) && sStatusBlink)
                         ? "rgba(255, 255, 0, 0.35)"
                         : C.listItemWhite,
@@ -636,7 +636,7 @@ export function WorkordersComponent({}) {
                         <Text
                           numberOfLines={1}
                           style={{
-                            fontSize: 13,
+                            fontSize: 15,
                             color: "dimgray",
                           }}
                         >
@@ -646,13 +646,13 @@ export function WorkordersComponent({}) {
                           let sale = workorder.activeSaleID ? zActiveSales.find((s) => s.id === workorder.activeSaleID) : null;
                           let paid = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
                           return paid > 0 ? (
-                            <Text style={{ fontSize: 12, color: C.green, marginLeft: 6, fontWeight: "500" }}>
+                            <Text style={{ fontSize: 14, color: C.green, marginLeft: 6, fontWeight: "500" }}>
                               {"Paid $" + formatCurrencyDisp(paid)}
                             </Text>
                           ) : null;
                         })()}
                         {!!workorder.activeSaleID && linkedSaleIDs.has(workorder.activeSaleID) && (
-                          <Text style={{ fontSize: 12, color: C.orange, marginLeft: 6, fontWeight: "500" }}>
+                          <Text style={{ fontSize: 14, color: C.orange, marginLeft: 6, fontWeight: "500" }}>
                             Combined Sale
                           </Text>
                         )}
@@ -660,6 +660,7 @@ export function WorkordersComponent({}) {
                       <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <Text
                           style={{
+                            fontSize: 14,
                             fontWeight: 500,
                             color: C.text,
                           }}
@@ -678,6 +679,7 @@ export function WorkordersComponent({}) {
                         )}
                         <Text
                           style={{
+                            fontSize: 14,
                             color: C.text,
                           }}
                         >
@@ -693,7 +695,7 @@ export function WorkordersComponent({}) {
                               marginLeft: 8,
                             }}
                           >
-                            <Text style={{ color: "white", fontSize: 11, fontWeight: "600" }}>
+                            <Text style={{ color: "white", fontSize: 13, fontWeight: "600" }}>
                               {workorder.workorderLines.length}
                             </Text>
                           </View>
@@ -717,7 +719,7 @@ export function WorkordersComponent({}) {
                           height: "100%",
                         }}
                       >
-                        <Text style={{ color: "dimgray", fontSize: 13 }}>
+                        <Text style={{ color: "dimgray", fontSize: 15 }}>
                           {formatMillisForDisplay(
                             workorder.startedOnMillis,
                             new Date(workorder.startedOnMillis).getFullYear() !== new Date().getFullYear()
@@ -740,7 +742,7 @@ export function WorkordersComponent({}) {
                           <Text
                             style={{
                               color: rs.textColor,
-                              fontSize: 12,
+                              fontSize: 14,
                               fontWeight: "600",
                             }}
                           >
@@ -766,7 +768,7 @@ export function WorkordersComponent({}) {
                       {!!workorder.partOrdered && (
                         <Text
                           numberOfLines={1}
-                          style={{ fontSize: 13, color: C.blue, fontWeight: "500" }}
+                          style={{ fontSize: 14, color: C.blue, fontWeight: "500" }}
                         >
                           {workorder.partOrdered}
                         </Text>
@@ -784,7 +786,7 @@ export function WorkordersComponent({}) {
                       {!!workorder.partSource && (
                         <Text
                           numberOfLines={1}
-                          style={{ fontSize: 13, color: C.orange }}
+                          style={{ fontSize: 14, color: C.orange }}
                         >
                           {workorder.partSource}
                         </Text>
@@ -792,7 +794,7 @@ export function WorkordersComponent({}) {
                       {!!(workorder.partOrderedMillis && workorder.partOrderEstimateMillis && Math.round((workorder.partOrderEstimateMillis - workorder.partOrderedMillis) / NUM_MILLIS_IN_DAY) > 0) && (
                         <Text
                           numberOfLines={1}
-                          style={{ fontSize: 11, color: "dimgray", marginLeft: 6 }}
+                          style={{ fontSize: 12, color: "dimgray", marginLeft: 6 }}
                         >
                           {formatMillisForDisplay(workorder.partOrderedMillis)}
                           {" → " + formatMillisForDisplay(workorder.partOrderEstimateMillis)}
@@ -805,12 +807,12 @@ export function WorkordersComponent({}) {
                           const openUrl = inputVal.startsWith("www.") ? "https://" + inputVal : inputVal;
                           return (
                             <View onContextMenu={(e) => { e.preventDefault(); navigator.clipboard.writeText(inputVal); }} style={{ marginLeft: 6 }}>
-                              <Tooltip text="Press to open, right-click to copy" position="top">
+                              <Tooltip text="Click to open website, right-click to copy link" position="top">
                                 <TouchableOpacity
                                   onPress={() => window.open(openUrl, "_blank")}
-                                  style={{ paddingVertical: 2, paddingHorizontal: 8, borderRadius: 4, backgroundColor: lightenRGBByPercent(C.blue, 75) }}
+                                  style={{ paddingVertical: 1, paddingHorizontal: 8, borderRadius: 4, backgroundColor: lightenRGBByPercent(C.blue, 75) }}
                                 >
-                                  <Text style={{ fontSize: 11, color: C.blue, fontWeight: "500" }}>Open</Text>
+                                  <Text style={{ fontSize: 11, color: C.blue, fontWeight: "500" }}>Open Tracking</Text>
                                 </TouchableOpacity>
                               </Tooltip>
                             </View>
@@ -818,13 +820,13 @@ export function WorkordersComponent({}) {
                         }
                         return (
                           <View onContextMenu={(e) => { e.preventDefault(); navigator.clipboard.writeText(inputVal); }} style={{ marginLeft: 6 }}>
-                            <Tooltip text="Press to track, right-click to copy" position="top">
+                            <Tooltip text="Click to open tracker, right-click to copy tracking number" position="top">
                               <WebPageModal
                                 url={"https://parcelsapp.com/en/tracking/" + inputVal}
                                 title="Package Tracking"
                                 subtitle={inputVal}
-                                buttonLabel="Track"
-                                buttonStyle={{ paddingVertical: 2, paddingHorizontal: 8, borderRadius: 4, backgroundColor: lightenRGBByPercent(C.blue, 75) }}
+                                buttonLabel="Open Tracking"
+                                buttonStyle={{ paddingVertical: 1, paddingHorizontal: 8, borderRadius: 4, backgroundColor: lightenRGBByPercent(C.blue, 75) }}
                                 buttonTextStyle={{ fontSize: 11, color: C.blue, fontWeight: "500" }}
                               />
                             </Tooltip>

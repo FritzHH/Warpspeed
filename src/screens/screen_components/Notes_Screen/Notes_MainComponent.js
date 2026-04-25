@@ -5,7 +5,7 @@ import {
   TextInput,
   FlatList,
 } from "react-native-web";
-import { gray, resolveStatus } from "../../../utils";
+import { gray, resolveStatus, lightenRGBByPercent } from "../../../utils";
 import { Image_, TouchableOpacity_, TextInput_, Tooltip } from "../../../components";
 import { C, Colors, ICONS } from "../../../styles";
 import { useState } from "react";
@@ -57,6 +57,7 @@ export function Notes_MainComponent() {
   });
   const zStatuses = useSettingsStore((state) => state.settings?.statuses);
   const isDonePaid = resolveStatus(zWorkorderStatus, zStatuses)?.label?.toLowerCase() === "done & paid";
+  const zIsPreview = useOpenWorkordersStore((state) => !!state.workorderPreviewID && state.workorderPreviewID !== state.openWorkorderID);
 
   /////////////////////////////////////////////////////////////////////////////////
   const [sEditingNoteId, _setEditingNoteId] = useState(null);
@@ -155,6 +156,7 @@ export function Notes_MainComponent() {
       style={{
         height: "100%",
         borderRadius: 15,
+        backgroundImage: zIsPreview ? `repeating-linear-gradient(135deg, ${lightenRGBByPercent(C.lightred, 92)}, ${lightenRGBByPercent(C.lightred, 92)} 10px, transparent 10px, transparent 20px)` : undefined,
       }}
     >
       <View
@@ -302,7 +304,7 @@ export function Notes_MainComponent() {
                           style={{
                             lineHeight: 18,
                             color: item.value ? C.text : gray(0.5),
-                            fontSize: 14,
+                            fontSize: 15,
                           }}
                         >
                           {item.value || "Empty note"}
@@ -454,7 +456,7 @@ export function Notes_MainComponent() {
                           style={{
                             lineHeight: 18,
                             color: item.value ? C.text : gray(0.5),
-                            fontSize: 14,
+                            fontSize: 15,
                           }}
                         >
                           {item.value || "Empty note"}

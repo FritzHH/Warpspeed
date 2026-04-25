@@ -420,9 +420,10 @@ export const ActiveWorkorderComponent = ({}) => {
         paddingBottom: 0,
         paddingTop: 5,
         paddingHorizontal: 5,
-        backgroundColor: (zIsPreview || zIsLocked)
-              ? lightenRGBByPercent(C.lightred, 80)
-              : C.backgroundWhite,
+        backgroundImage: (zIsPreview || zIsLocked)
+              ? `repeating-linear-gradient(135deg, ${lightenRGBByPercent(C.lightred, 92)}, ${lightenRGBByPercent(C.lightred, 92)} 10px, transparent 10px, transparent 20px)`
+              : undefined,
+        backgroundColor: C.backgroundWhite,
         borderRadius: 7,
       }}
     >
@@ -1059,7 +1060,11 @@ export const ActiveWorkorderComponent = ({}) => {
 
             }}
           >
-            <View style={{ width: '100%', height: 3, borderRadius: 5, backgroundColor: 'orange', marginBottom: 7, opacity: .5 }} />
+            <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', marginBottom: 7, opacity: .5 }}>
+              <View style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: gray(0.25) }} />
+              <Text style={{ fontSize: 12, fontWeight: '600', fontStyle: 'italic', color: gray(0.5), marginHorizontal: 8 }}>Customer Item Ordering</Text>
+              <View style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: gray(0.25) }} />
+            </View>
             <View
               style={{
                 flexDirection: "row",
@@ -1070,7 +1075,8 @@ export const ActiveWorkorderComponent = ({}) => {
               }}
             >
               <TextInput_
-                placeholder={"Item name/description"}
+                placeholder={"Item names/descriptions"}
+                placeholderTextColor={gray(0.2)}
                 editable={!isDonePaid}
                 capitalize={true}
                 style={{
@@ -1106,7 +1112,8 @@ export const ActiveWorkorderComponent = ({}) => {
             >
               <TextInput_
                 value={zOpenWorkorder?.partSource}
-                placeholder={"Item Source"}
+                placeholder={"Item sources"}
+                placeholderTextColor={gray(0.2)}
                 editable={!isDonePaid}
                 capitalize={true}
                 style={{
@@ -1154,7 +1161,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     paddingHorizontal: 40,
                   }}
                   ref={partSourcesRef}
-                  buttonText={"Item Sources"}
+                  buttonText={"Sources"}
                 />
               </View>
             </View>
@@ -1272,6 +1279,9 @@ export const ActiveWorkorderComponent = ({}) => {
                 );
               })() : null}
             </View>
+            {!!(zOpenWorkorder?.trackingNumber || "").trim() && (
+              <Text style={{ fontSize: 10, fontStyle: 'italic', color: gray(0.3), marginTop: 3 }}>Place additional tracking info in Internal Notes</Text>
+            )}
           </View>
         </View>
       </View>

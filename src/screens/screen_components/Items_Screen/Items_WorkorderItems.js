@@ -487,7 +487,7 @@ export const Items_WorkorderItemsTab = ({}) => {
   let hasItems = zOpenWorkorder?.workorderLines?.length > 0;
   if (!hasItems)
     return (
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, backgroundImage: zIsPreview ? `repeating-linear-gradient(135deg, ${lightenRGBByPercent(C.lightred, 92)}, ${lightenRGBByPercent(C.lightred, 92)} 10px, transparent 10px, transparent 20px)` : undefined }}>
         <View style={{ flex: 1, justifyContent: "center" }}>
           <Text style={{ fontSize: 100, color: gray(0.07), textAlign: "center" }}>
             {zOpenWorkorder.customerID ? "Empty\nWorkorder" : "Empty\nSale"}
@@ -570,8 +570,8 @@ export const Items_WorkorderItemsTab = ({}) => {
       style={{
         flex: 1,
         justifyContent: "center",
-        backgroundColor: zIsPreview
-          ? lightenRGBByPercent(C.lightred, 80)
+        backgroundImage: zIsPreview
+          ? `repeating-linear-gradient(135deg, ${lightenRGBByPercent(C.lightred, 92)}, ${lightenRGBByPercent(C.lightred, 92)} 10px, transparent 10px, transparent 20px)`
           : undefined,
       }}
     >
@@ -925,11 +925,11 @@ export const LineItemComponent = ({
           <View style={{ width: "100%" }}>
             {!!(workorderLine.discountObj?.name || workorderLine.discountObj?.discountName) && (
               <View style={{ alignSelf: "flex-end", flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Text style={{ color: C.lightred, fontSize: 12, marginRight: 5 }}>
+                <Text style={{ color: C.lightred, fontSize: 14, marginRight: 5 }}>
                   {workorderLine.discountObj.name || workorderLine.discountObj.discountName}
                 </Text>
                 {!!workorderLine.discountObj?.savings && (
-                  <Text style={{ color: C.lightred, fontSize: 12 }}>
+                  <Text style={{ color: C.lightred, fontSize: 14 }}>
                     {"-$" + formatCurrencyDisp(workorderLine.discountObj.savings)}
                   </Text>
                 )}
@@ -991,12 +991,12 @@ export const LineItemComponent = ({
                     >
                       {(inventoryItem.customPart || inventoryItem.customLabor) && (
                         <View style={{ backgroundColor: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 55) : lightenRGBByPercent(C.green, 55), borderRadius: 15, paddingHorizontal: 7, paddingVertical: 3, marginRight: 5 }}>
-                          <Text style={{ fontSize: 10, fontWeight: "700", color: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 15) : lightenRGBByPercent(C.green, 15) }}>{inventoryItem.customPart ? "ITEM" : "LABOR"}</Text>
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 15) : lightenRGBByPercent(C.green, 15) }}>{inventoryItem.customPart ? "ITEM" : "LABOR"}</Text>
                         </View>
                       )}
                       <Text
                         style={{
-                          fontSize: 15,
+                          fontSize: 17,
                           color: C.text,
                           fontWeight: "400",
                           textDecorationLine: "none",
@@ -1016,7 +1016,7 @@ export const LineItemComponent = ({
                       debounceMs={500}
                       capitalize={true}
                       editable={!isLocked}
-                      style={{ outlineWidth: 0, color: "orange", width: "100%", paddingHorizontal: 3 }}
+                      style={{ outlineWidth: 0, color: "orange", width: "100%", paddingHorizontal: 3, fontSize: 16 }}
                       onChangeText={(val) => {
                         useLoginStore.getState().requireLogin(() => {
                           __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
@@ -1035,7 +1035,7 @@ export const LineItemComponent = ({
                       numberOfLines={5}
                       debounceMs={500}
                       editable={!isLocked}
-                      style={{ outlineWidth: 0, color: "green", width: "100%", paddingHorizontal: 3 }}
+                      style={{ outlineWidth: 0, color: "green", width: "100%", paddingHorizontal: 3, fontSize: 14 }}
                       onChangeText={(val) => {
                         useLoginStore.getState().requireLogin(() => {
                           __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
@@ -1162,6 +1162,7 @@ export const LineItemComponent = ({
             {(effectiveQty > 1 || workorderLine.discountObj?.newPrice != null) && (
               <Text
                 style={{
+                  fontSize: 16,
                   paddingHorizontal: 0,
                   color: C.text,
                   textDecorationLine: workorderLine.discountObj?.newPrice != null ? "line-through" : "none",
@@ -1177,6 +1178,7 @@ export const LineItemComponent = ({
             )}
             <Text
               style={{
+                fontSize: 16,
                 fontWeight: "500",
                 minWidth: 30,
                 marginTop: 0,

@@ -19,7 +19,7 @@ import { Button_, SHADOW_RADIUS_PROTO } from "../../../components";
 import { dbGetCompletedSale, dbSavePrintObj } from "../../../db_calls_wrapper";
 import { printBuilder } from "../../../utils";
 import { readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
-import { SaleModal } from "./SaleModal";
+import { FullSaleModal } from "./FullSaleModal";
 
 // ─── Helper display components ──────────────────────────────────
 
@@ -872,7 +872,12 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
         </View>
       </View>
     </Modal>
-    <SaleModal sale={sSaleForModal} onClose={() => _sSetSaleForModal(null)} />
+    {!!sSaleForModal && (
+      <FullSaleModal
+        item={{ saleID: sSaleForModal.id }}
+        onClose={() => _sSetSaleForModal(null)}
+      />
+    )}
   </>
   );
 };

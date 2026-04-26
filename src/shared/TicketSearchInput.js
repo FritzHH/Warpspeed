@@ -7,7 +7,7 @@ import { C } from "../styles";
 import { executeTicketSearch, executeLiveSearch } from "./ticketSearch";
 import { ClosedWorkorderModal } from "../screens/screen_components/modal_screens/ClosedWorkorderModal";
 import { TransactionModal } from "../screens/screen_components/modal_screens/TransactionModal";
-import { SaleModal } from "../screens/screen_components/modal_screens/SaleModal";
+import { FullSaleModal } from "../screens/screen_components/modal_screens/FullSaleModal";
 import { NewRefundModalScreen } from "../screens/screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
 import { findSaleByTransactionID } from "../screens/screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { useAlertScreenStore } from "../stores";
@@ -152,10 +152,12 @@ export function TicketSearchInput({}) {
         onClose={() => _sSetTransaction(null)}
         onRefund={handleTransactionRefund}
       />
-      <SaleModal
-        sale={sSale}
-        onClose={() => _sSetSale(null)}
-      />
+      {!!sSale && (
+        <FullSaleModal
+          item={{ saleID: sSale.id }}
+          onClose={() => _sSetSale(null)}
+        />
+      )}
       {!!sRefundSaleID && (
         <NewRefundModalScreen
           visible={true}

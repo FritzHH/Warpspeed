@@ -36,7 +36,7 @@ import {
 import { FaceDetectionClientComponent } from "../faceDetection";
 import { NewCheckoutModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewCheckoutModalScreen";
 import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
-import { SaleModal } from "./screen_components/modal_screens/SaleModal";
+import { FullSaleModal } from "./screen_components/modal_screens/FullSaleModal";
 import { isSaleID, isLightspeedID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { decodeLightspeedBarcode, lightenRGBByPercent } from "../utils";
 import { newCheckoutGetStripeReaders, readActiveSale, recoverPendingActiveSales } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
@@ -145,6 +145,7 @@ export function BaseScreen() {
   const [sRefundSaleID, _setRefundSaleID] = useState("");
 
   const zReceiptScan = useCheckoutStore((state) => state.receiptScan);
+  const zSaleModalObj = useOpenWorkordersStore((s) => s.saleModalObj);
 
   // Detect sale-ID scans to open refund modal
   useEffect(() => {
@@ -442,7 +443,12 @@ export function BaseScreen() {
           50% { opacity: 0.3; }
         }
       `}</style>
-      <SaleModal />
+      {!!zSaleModalObj && (
+        <FullSaleModal
+          item={{ saleID: zSaleModalObj.id }}
+          onClose={() => useOpenWorkordersStore.getState().setSaleModalObj(null)}
+        />
+      )}
       <NewCheckoutModalScreen />
       <NewRefundModalScreen
         visible={sRefundModalVisible}

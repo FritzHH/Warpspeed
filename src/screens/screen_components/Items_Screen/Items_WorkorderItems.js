@@ -88,7 +88,8 @@ export const Items_WorkorderItemsTab = ({}) => {
   const activeSale = zOpenWorkorder?.activeSaleID
     ? zActiveSales.find((s) => s.id === zOpenWorkorder.activeSaleID)
     : null;
-  const hasActiveSale = !!activeSale && (activeSale.amountCaptured || 0) > 0;
+  const depositOnlyTotal = (activeSale?.depositsApplied || []).reduce((sum, d) => sum + (d.amount || 0), 0);
+  const hasActiveSale = !!activeSale && ((activeSale.amountCaptured || 0) - depositOnlyTotal) > 0;
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {

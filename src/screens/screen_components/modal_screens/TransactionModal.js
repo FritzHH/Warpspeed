@@ -264,6 +264,21 @@ export const TransactionModal = ({ transaction, onClose, onRefund }) => {
             </View>
           </View>
 
+          {/* ── Transaction Viewer Banner ── */}
+          <View
+            style={{
+              backgroundColor: lightenRGBByPercent(C.green, 55),
+              paddingVertical: 8,
+              paddingHorizontal: 20,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Text style={{ fontSize: 15, fontWeight: "700", color: C.green, letterSpacing: 0.5, textAlign: "center" }}>
+              Transaction Viewer
+            </Text>
+          </View>
+
           {/* ── Date Banner ── */}
           {!!txn.millis && (
             <View style={{ paddingHorizontal: 20, paddingVertical: 8, backgroundColor: gray(0.03) }}>

@@ -44,7 +44,7 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress }) {
           alignItems: "center",
         }}
       >
-        <Text style={{ color: C.green }}>
+        <Text style={{ color: C.green, fontWeight: "600" }}>
           {getPaymentLabel()}
         </Text>
         {fullyRefunded && (
@@ -179,7 +179,7 @@ const CreditRow = memo(function CreditRow({ credit, onPrintDepositReceipt, onRem
           alignItems: "center",
         }}
       >
-        <Text style={{ color: labelColor }}>
+        <Text style={{ color: labelColor, fontWeight: "600" }}>
           {getCreditLabel()}
         </Text>
       </View>

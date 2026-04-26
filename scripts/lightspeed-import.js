@@ -220,6 +220,7 @@ const NONREMOVABLE_STATUSES = [
   { id: "sale_in_progress", label: "Sale in Progress", textColor: "yellow", backgroundColor: "black", removable: false, requireWaitTime: false, systemOwned: true },
   { id: "finished_and_paid", label: "Finished & Paid", textColor: "white", backgroundColor: "green", removable: false, requireWaitTime: false, systemOwned: true },
   { id: "on_the_stand", label: "On the Stand", textColor: "white", backgroundColor: "pink", removable: false, requireWaitTime: false },
+  { id: "work_in_progress", textColor: "black", backgroundColor: "rgb(192,192,192)", label: "Work in Progress", removable: false },
   { id: "service", textColor: "black", backgroundColor: "rgb(192,192,192)", label: "Service", removable: false, requireWaitTime: false },
   { id: "finished", textColor: "white", backgroundColor: "green", label: "Finished", removable: false, requireWaitTime: false },
   { id: "part_ordered", textColor: "white", backgroundColor: "orange", label: "Item Ordered", removable: false },
@@ -467,12 +468,42 @@ function extractStatusesFromWorkorders(workorderCSVText, statusCSVText) {
         removable: true,
       };
     });
-  csvStatuses.sort(function (a, b) {
-    const aSort = lsSortMap[a.label.toLowerCase()] ?? Infinity;
-    const bSort = lsSortMap[b.label.toLowerCase()] ?? Infinity;
-    return aSort - bSort;
+  // Build reverse alias map: nonremovable label -> [LS names that alias to it]
+  var reverseAliases = {};
+  for (var alias in STATUS_ALIASES) {
+    var target = STATUS_ALIASES[alias];
+    if (!reverseAliases[target]) reverseAliases[target] = [];
+    reverseAliases[target].push(alias);
+  }
+
+  // Resolve sortOrder for any status (nonremovable or CSV)
+  function getSortOrder(label) {
+    var lower = label.toLowerCase();
+    // Direct match in LS sortOrder map
+    if (lsSortMap[lower] !== undefined) return lsSortMap[lower];
+    // Reverse alias: find LS names that alias to this label, take minimum sortOrder
+    var aliases = reverseAliases[lower] || [];
+    var minSort = Infinity;
+    for (var i = 0; i < aliases.length; i++) {
+      if (lsSortMap[aliases[i]] !== undefined && lsSortMap[aliases[i]] < minSort) {
+        minSort = lsSortMap[aliases[i]];
+      }
+    }
+    if (minSort < Infinity) return minSort;
+    // Hardcoded defaults for statuses with no LS equivalent
+    if (lower === "newly created") return -2;
+    if (lower === "sale in progress") return -1;
+    if (lower === "on the stand") return 15;
+    if (lower === "delivery") return 5;
+    return Infinity;
+  }
+
+  // Combine and sort ALL statuses by LS sortOrder
+  var combined = [].concat(NONREMOVABLE_STATUSES, csvStatuses);
+  combined.sort(function (a, b) {
+    return getSortOrder(a.label) - getSortOrder(b.label);
   });
-  return [...NONREMOVABLE_STATUSES, ...csvStatuses];
+  return combined;
 }
 
 function mapCustomers(customerCSVText) {
@@ -961,7 +992,10 @@ function mapSales(salesCSVText, salesPaymentsCSVText, stripePaymentsCSVText, wor
       _importSource: "lightspeed",
     };
 
-    sales.push(mappedSale);
+    // Deposit sales don't create a completed-sales doc — only transactions + customer.deposits[]
+    if (!isDepositSale) {
+      sales.push(mappedSale);
+    }
     allTransactions.push(...payments);
 
     // For deposit sales, add deposit to customer

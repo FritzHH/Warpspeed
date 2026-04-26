@@ -192,6 +192,13 @@ export const NONREMOVABLE_STATUSES = [
     label: "Delivery",
     removable: false,
   },
+  {
+    id: "work_in_progress",
+    textColor: "black",
+    backgroundColor: "rgb(192,192,192)",
+    label: "Work in Progress",
+    removable: false,
+  },
 
 ];
 

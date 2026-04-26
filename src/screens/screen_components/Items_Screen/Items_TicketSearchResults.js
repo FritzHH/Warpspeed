@@ -18,7 +18,7 @@ import { TAB_NAMES } from "../../../data";
 import { C } from "../../../styles";
 import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
 import { TransactionModal } from "../modal_screens/TransactionModal";
-import { SaleModal } from "../modal_screens/SaleModal";
+import { FullSaleModal } from "../modal_screens/FullSaleModal";
 import { NewRefundModalScreen } from "../modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
 import { readTransactions, findSaleByTransactionID } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 
@@ -292,10 +292,12 @@ export function Items_TicketSearchResults({}) {
         onClose={() => _sSetTransaction(null)}
         onRefund={handleTransactionRefund}
       />
-      <SaleModal
-        sale={sSale}
-        onClose={() => _sSetSale(null)}
-      />
+      {!!sSale && (
+        <FullSaleModal
+          item={{ saleID: sSale.id }}
+          onClose={() => _sSetSale(null)}
+        />
+      )}
       {!!sRefundSaleID && (
         <NewRefundModalScreen
           visible={true}

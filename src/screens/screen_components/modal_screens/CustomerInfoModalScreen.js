@@ -2,7 +2,6 @@
 import {
   View,
   Text,
-  TextInput,
   FlatList,
   ScrollView,
   TouchableOpacity,
@@ -14,6 +13,7 @@ import {
   checkInputForNumbersOnly,
   formatCurrencyDisp,
   formatMillisForDisplay,
+  formatPhoneForDisplay,
   formatPhoneWithDashes,
   generateEAN13Barcode,
   gray,
@@ -457,13 +457,15 @@ export const CustomerInfoScreenModalComponent = ({
             onChangeText={(val) => saveField("first", capitalizeFirstLetterOfString(val))}
             placeholder="First name"
             style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.first}
+            value={capitalizeFirstLetterOfString(sCustomerInfo.first)}
+            capitalize={true}
           />
           <TextInput_
             onChangeText={(val) => saveField("last", capitalizeFirstLetterOfString(val))}
             placeholder="Last name"
             style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.last}
+            value={capitalizeFirstLetterOfString(sCustomerInfo.last)}
+            capitalize={true}
           />
           <TextInput_
             onChangeText={(val) => saveField("email", val)}
@@ -472,10 +474,11 @@ export const CustomerInfoScreenModalComponent = ({
             value={sCustomerInfo.email}
           />
           <TextInput_
-            onChangeText={(val) => saveField("streetAddress", val)}
+            onChangeText={(val) => saveField("streetAddress", capitalizeFirstLetterOfString(val))}
             placeholder="Street address"
             style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.streetAddress}
+            value={capitalizeFirstLetterOfString(sCustomerInfo.streetAddress)}
+            capitalize={true}
           />
           <TextInput_
             onChangeText={(val) => saveField("unit", val)}
@@ -487,13 +490,14 @@ export const CustomerInfoScreenModalComponent = ({
             onChangeText={(val) => saveField("city", capitalizeFirstLetterOfString(val))}
             placeholder="City"
             style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.city}
+            value={capitalizeFirstLetterOfString(sCustomerInfo.city)}
+            capitalize={true}
           />
           <TextInput_
             onChangeText={(val) => saveField("state", val.toUpperCase())}
             placeholder="State"
             style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.state}
+            value={(sCustomerInfo.state || "").toUpperCase()}
           />
           <TextInput_
             onChangeText={(val) => {
@@ -510,7 +514,8 @@ export const CustomerInfoScreenModalComponent = ({
             multiline={true}
             numberOfLines={6}
             style={{ ...TEXT_INPUT_STYLE, height: undefined, minHeight: 40, paddingVertical: 8 }}
-            value={sCustomerInfo.notes}
+            value={capitalizeFirstLetterOfString(sCustomerInfo.notes)}
+            capitalize={true}
           />
           <CheckBox_
             isChecked={!!sCustomerInfo.gatedCommunity}
@@ -562,7 +567,7 @@ export const CustomerInfoScreenModalComponent = ({
                 }}
                 iconSize={16}
                 textStyle={{ color: C.textWhite, fontSize: 13 }}
-                text={"Deposits / Credits / Gift Cards"}
+                text={"Add Money"}
               />
             )}
           </View>
@@ -631,7 +636,18 @@ export const CustomerInfoScreenModalComponent = ({
               paddingVertical: 5,
             }}
           >
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+            {/* Deposits / Credits / Gift Cards — natural height */}
+            <DepositsList
+              deposits={sCustomerInfo.deposits || []}
+              credits={sCustomerInfo.credits || []}
+              onDepositPress={(deposit) => {
+                if (!deposit.id || !deposit.transactionId) return;
+                _sSetRefundDeposit(deposit);
+              }}
+              onCreditPress={(credit) => _sSetEditingCredit(credit)}
+            />
+            {/* Sales — fills remaining space below deposits */}
+            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 12, marginBottom: 8 }}>
               <Button_
                 icon={ICONS.dollarYellow}
                 iconSize={20}
@@ -644,7 +660,7 @@ export const CustomerInfoScreenModalComponent = ({
               {sSalesLoading && <View style={{ marginLeft: 8 }}><SmallLoadingIndicator /></View>}
             </View>
             {sSales.length > 0 ? (
-              <ScrollView style={{ flexShrink: 1 }}>
+              <ScrollView style={{ flex: 1 }}>
                 <SalesList
                   sales={sSales}
                   transactionsMap={sSaleTransactionsMap}
@@ -664,16 +680,6 @@ export const CustomerInfoScreenModalComponent = ({
                 No sales on file
               </Text>
             ) : null}
-            {/* Deposits section — directly below sales, pushes down until bottom */}
-            <DepositsList
-              deposits={sCustomerInfo.deposits || []}
-              credits={sCustomerInfo.credits || []}
-              onDepositPress={(deposit) => {
-                if (!deposit.id || !deposit.transactionId) return;
-                _sSetRefundDeposit(deposit);
-              }}
-              onCreditPress={(credit) => _sSetEditingCredit(credit)}
-            />
           </View>
         )}
         {!isNewCustomer && !!sCustomerInfo?.customerCell && (
@@ -1270,29 +1276,35 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
         style={{
           alignSelf: isOutgoing ? "flex-end" : "flex-start",
           maxWidth: "80%",
-          marginBottom: 6,
-          backgroundColor: isOutgoing ? C.blue : C.listItemWhite,
-          borderRadius: 10,
+          marginBottom: 8,
+          backgroundColor: isOutgoing ? C.blue : C.backgroundWhite,
+          borderRadius: isOutgoing ? 14 : 14,
+          borderBottomRightRadius: isOutgoing ? 4 : 14,
+          borderBottomLeftRadius: isOutgoing ? 14 : 4,
           paddingVertical: 8,
           paddingHorizontal: 12,
           borderWidth: isOutgoing ? 0 : 1,
-          borderColor: C.buttonLightGreenOutline,
+          borderColor: isOutgoing ? "transparent" : lightenRGBByPercent(C.buttonLightGreenOutline, 30),
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 1 },
+          shadowOpacity: 0.06,
+          shadowRadius: 3,
         }}
       >
-        <Text style={{ color: isOutgoing ? C.textWhite : C.text, fontSize: 13 }}>
+        <Text style={{ color: isOutgoing ? C.textWhite : C.text, fontSize: 13, lineHeight: 18 }}>
           {item.message}
         </Text>
-        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 3 }}>
-          <Text style={{ color: isOutgoing ? "rgba(255,255,255,0.6)" : gray(0.4), fontSize: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: isOutgoing ? "flex-end" : "flex-start", marginTop: 4 }}>
+          <Text style={{ color: isOutgoing ? "rgba(255,255,255,0.55)" : gray(0.55), fontSize: 10 }}>
             {formatMillisForDisplay(item.millis)}
           </Text>
           {item.status === "sending" && (
-            <Text style={{ color: isOutgoing ? "rgba(255,255,255,0.6)" : gray(0.4), fontSize: 10, marginLeft: 6 }}>
+            <Text style={{ color: isOutgoing ? "rgba(255,255,255,0.55)" : gray(0.55), fontSize: 10, marginLeft: 6, fontStyle: "italic" }}>
               Sending...
             </Text>
           )}
           {item.status === "failed" && (
-            <Text style={{ color: C.lightred, fontSize: 10, marginLeft: 6 }}>
+            <Text style={{ color: C.lightred, fontSize: 10, marginLeft: 6, fontWeight: "600" }}>
               Failed
             </Text>
           )}
@@ -1304,23 +1316,34 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
   return (
     <View
       style={{
-        width: "35%",
+        width: "100%",
         height: "100%",
-        paddingHorizontal: 10,
-        paddingVertical: 5,
         borderLeftWidth: 1,
         borderLeftColor: C.buttonLightGreenOutline,
+        backgroundColor: C.backgroundWhite,
       }}
     >
-      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-        <Image_ source={ICONS.cellPhone} style={{ width: 16, height: 16, marginRight: 6 }} />
-        <Text style={{ fontSize: 13, fontWeight: "600", color: C.text }}>
+      {/* Header */}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 14,
+          paddingVertical: 10,
+          borderBottomWidth: 1,
+          borderBottomColor: lightenRGBByPercent(C.buttonLightGreenOutline, 30),
+        }}
+      >
+        <Image_ source={ICONS.paperPlane} style={{ width: 18, height: 18, marginRight: 8, opacity: 0.7 }} />
+        <Text style={{ fontSize: 14, fontWeight: "700", color: C.text, marginRight: 8 }}>
           Messages
         </Text>
-        <Text style={{ fontSize: 11, color: gray(0.4), marginLeft: 8 }}>
-          {formatPhoneWithDashes(customerPhone)}
+        <Text style={{ fontSize: 12, color: gray(0.45) }}>
+          {formatPhoneForDisplay(customerPhone)}
         </Text>
       </View>
+
+      {/* Messages list */}
       {sLoading ? (
         <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
           <SmallLoadingIndicator />
@@ -1332,47 +1355,58 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
           style={{ flex: 1 }}
-          contentContainerStyle={{ paddingVertical: 5 }}
+          contentContainerStyle={sMessages.length === 0 ? { flex: 1, justifyContent: "center", alignItems: "center" } : { paddingVertical: 10, paddingHorizontal: 12 }}
           ListEmptyComponent={
-            <Text style={{ color: gray(0.4), fontSize: 12, textAlign: "center", marginTop: 20 }}>
-              No messages yet
-            </Text>
+            <View style={{ alignItems: "center" }}>
+              <Image_ source={ICONS.paperPlane} style={{ width: 40, height: 40, opacity: 0.12, marginBottom: 10 }} />
+              <Text style={{ color: gray(0.5), fontSize: 13 }}>
+                No messages yet
+              </Text>
+            </View>
           }
         />
       )}
+
+      {/* Input area */}
       <View
         style={{
           flexDirection: "row",
-          alignItems: "center",
-          marginTop: 8,
-          borderWidth: 1,
-          borderColor: C.buttonLightGreenOutline,
-          borderRadius: 8,
-          backgroundColor: C.listItemWhite,
-          paddingHorizontal: 8,
+          alignItems: "flex-end",
+          paddingHorizontal: 10,
+          paddingVertical: 8,
+          borderTopWidth: 1,
+          borderTopColor: lightenRGBByPercent(C.buttonLightGreenOutline, 30),
         }}
       >
-        <TextInput
+        <TextInput_
           value={sNewMessage}
           onChangeText={_sSetNewMessage}
+          debounceMs={0}
           placeholder="Type a message..."
-          placeholderTextColor={gray(0.4)}
+          placeholderTextColor={gray(0.5)}
+          multiline={true}
+          numberOfLines={4}
           onSubmitEditing={handleSend}
           style={{
             flex: 1,
-            height: 36,
+            minHeight: 34,
             fontSize: 13,
             color: C.text,
-            outlineWidth: 0,
-            outlineStyle: "none",
-            borderWidth: 0,
+            lineHeight: 18,
+            borderWidth: 1.5,
+            borderColor: C.buttonLightGreenOutline,
+            borderRadius: 10,
+            backgroundColor: C.listItemWhite,
+            paddingHorizontal: 10,
+            paddingVertical: 7,
+            marginRight: 8,
           }}
         />
         <Button_
           text="Send"
           colorGradientArr={COLOR_GRADIENTS.blue}
-          textStyle={{ color: C.textWhite, fontSize: 12 }}
-          buttonStyle={{ height: 28, paddingHorizontal: 12, borderRadius: 6 }}
+          textStyle={{ color: C.textWhite, fontSize: 12, fontWeight: "600" }}
+          buttonStyle={{ height: 34, paddingHorizontal: 14, borderRadius: 8, marginBottom: 1 }}
           onPress={handleSend}
           enabled={!sSending && !!sNewMessage.trim()}
         />
@@ -1460,28 +1494,20 @@ const SalesList = ({ sales, transactionsMap = {}, onSelect }) => {
                     </Text>
                   </View>
                 )}
-                <View
-                  style={{
-                    backgroundColor: sale._isActiveSale
-                      ? lightenRGBByPercent(C.orange, 65)
-                      : sale.paymentComplete
-                        ? lightenRGBByPercent(C.green, 70)
-                        : lightenRGBByPercent(C.lightred, 60),
-                    paddingHorizontal: 8,
-                    paddingVertical: 2,
-                    borderRadius: 10,
-                  }}
-                >
-                  <Text
+                {sale._isActiveSale && (
+                  <View
                     style={{
-                      fontSize: 10,
-                      fontWeight: "600",
-                      color: sale._isActiveSale ? C.orange : sale.paymentComplete ? C.green : C.lightred,
+                      backgroundColor: lightenRGBByPercent(C.orange, 65),
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 10,
                     }}
                   >
-                    {sale._isActiveSale ? "In Progress" : sale.paymentComplete ? "Paid" : "Partial"}
-                  </Text>
-                </View>
+                    <Text style={{ fontSize: 10, fontWeight: "600", color: C.orange }}>
+                      In Progress
+                    </Text>
+                  </View>
+                )}
               </View>
             </View>
 

@@ -249,6 +249,10 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sPrinterAlert, _setPrinterAlert] = useState(null); // { x, y }
   const [sTrackingModalVisible, _setTrackingModalVisible] = useState(false);
 
+  // Show/hide for Customer Item Ordering section
+  const [sShowItemOrdering, _sSetShowItemOrdering] = useState(false);
+  const hasItemOrderingData = !!(zOpenWorkorder?.partOrdered || zOpenWorkorder?.partSource || zOpenWorkorder?.trackingNumber || zOpenWorkorder?.partToBeOrdered === false || zOpenWorkorder?.partOrderEstimateMillis || zOpenWorkorder?.partOrderedMillis);
+
   // Estimated wait days — local state for instant UI, debounced DB write
   const [sWaitDays, _setWaitDays] = useState(0);
   const waitDaysTimerRef = useRef(null);
@@ -1264,11 +1268,26 @@ export const ActiveWorkorderComponent = ({}) => {
 
             }}
           >
-            <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', marginBottom: 7, opacity: .5 }}>
+            <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', marginBottom: (sShowItemOrdering || hasItemOrderingData) ? 7 : 0, opacity: .5 }}>
               <View style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: gray(0.25) }} />
-              <Text style={{ fontSize: 12, fontWeight: '600', fontStyle: 'italic', color: gray(0.5), marginHorizontal: 8 }}>Customer Item Ordering</Text>
+              <TouchableOpacity
+                disabled={hasItemOrderingData}
+                onPress={() => {
+                  const willShow = !sShowItemOrdering;
+                  _sSetShowItemOrdering(willShow);
+                  if (willShow && !zOpenWorkorder?.partOrdered && !zOpenWorkorder?.partSource && !zOpenWorkorder?.trackingNumber) {
+                    useOpenWorkordersStore.getState().setField("partToBeOrdered", true, zOpenWorkorder.id);
+                  }
+                }}
+                style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8 }}
+                activeOpacity={hasItemOrderingData ? 1 : 0.6}
+              >
+                <Text style={{ fontSize: 12, fontWeight: '600', fontStyle: 'italic', color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : gray(0.5), marginRight: 5 }}>Customer Item Ordering</Text>
+                <Text style={{ fontSize: 10, color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : gray(0.5), transform: [{ rotate: (sShowItemOrdering || hasItemOrderingData) ? '90deg' : '0deg' }] }}>▶</Text>
+              </TouchableOpacity>
               <View style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: gray(0.25) }} />
             </View>
+            {(sShowItemOrdering || hasItemOrderingData) && <>
             <View
               style={{
                 flexDirection: "row",
@@ -1380,18 +1399,18 @@ export const ActiveWorkorderComponent = ({}) => {
                 marginTop: 11,
               }}
             >
-              <View style={{ flexDirection: "row", alignItems: "center", opacity: zOpenWorkorder?.partToBeOrdered ? 0.35 : 1 }}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
                 <Text style={{ fontSize: 13, color: gray(0.45), marginRight: 8 }}>
                   Est. delivery
                 </Text>
                 <TouchableOpacity
-                  disabled={isDonePaid || !!zOpenWorkorder?.partToBeOrdered}
+                  disabled={isDonePaid}
                   onPress={() => updateWaitDays(Math.max(0, sWaitDays - 1))}
                   style={{
                     width: 20,
                     height: 20,
                     borderRadius: 4,
-                    backgroundColor: (isDonePaid || zOpenWorkorder?.partToBeOrdered) ? gray(0.85) : C.buttonLightGreen,
+                    backgroundColor: isDonePaid ? gray(0.85) : C.buttonLightGreen,
                     justifyContent: "center",
                     alignItems: "center",
                   }}
@@ -1410,34 +1429,38 @@ export const ActiveWorkorderComponent = ({}) => {
                   {sWaitDays + " days"}
                 </Text>
                 <TouchableOpacity
-                  disabled={isDonePaid || !!zOpenWorkorder?.partToBeOrdered}
+                  disabled={isDonePaid}
                   onPress={() => updateWaitDays(sWaitDays + 1)}
                   style={{
                     width: 20,
                     height: 20,
                     borderRadius: 4,
-                    backgroundColor: (isDonePaid || zOpenWorkorder?.partToBeOrdered) ? gray(0.85) : C.buttonLightGreen,
+                    backgroundColor: isDonePaid ? gray(0.85) : C.buttonLightGreen,
                     justifyContent: "center",
                     alignItems: "center",
                   }}
                 >
                   <Text style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>+</Text>
                 </TouchableOpacity>
-                {!!zOpenWorkorder?.partOrderEstimateMillis && !zOpenWorkorder?.partToBeOrdered && (
-                  <Text style={{ fontSize: 14, color: sWaitDays > 0 ? gray(0.45) : "transparent", marginLeft: 8 }}>
-                    {formatMillisForDisplay(zOpenWorkorder.partOrderEstimateMillis)}
-                  </Text>
-                )}
               </View>
-              <CheckBox_
-                text="To be ordered"
-                isChecked={!!zOpenWorkorder?.partToBeOrdered}
+              {!!zOpenWorkorder?.partOrderEstimateMillis && (
+                <Text style={{ fontSize: 14, color: sWaitDays > 0 ? gray(0.45) : "transparent" }}>
+                  {formatMillisForDisplay(zOpenWorkorder.partOrderEstimateMillis)}
+                </Text>
+              )}
+              <TouchableOpacity
                 disabled={isDonePaid}
-                onCheck={() => {
+                activeOpacity={0.7}
+                onPress={() => {
                   useOpenWorkordersStore.getState().setField("partToBeOrdered", !zOpenWorkorder?.partToBeOrdered, zOpenWorkorder.id);
                 }}
-                textStyle={{ fontSize: 12, color: gray(0.55) }}
-              />
+                style={{ flexDirection: 'row', alignItems: 'center' }}
+              >
+                <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: zOpenWorkorder?.partToBeOrdered ? C.red : C.green, justifyContent: 'center', alignItems: 'center', marginRight: 4 }}>
+                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: zOpenWorkorder?.partToBeOrdered ? C.red : C.green }} />
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: '600', color: zOpenWorkorder?.partToBeOrdered ? C.red : C.green }}>{zOpenWorkorder?.partToBeOrdered ? "Not ordered" : "Ordered"}</Text>
+              </TouchableOpacity>
             </View>
             <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', marginTop: 8, paddingVertical: 2 }}>
               <TextInput_
@@ -1486,6 +1509,7 @@ export const ActiveWorkorderComponent = ({}) => {
             {!!(zOpenWorkorder?.trackingNumber || "").trim() && (
               <Text style={{ fontSize: 10, fontStyle: 'italic', color: gray(0.3), marginTop: 3 }}>Place additional tracking info in Internal Notes</Text>
             )}
+            </>}
           </View>
         </View>
       </View>

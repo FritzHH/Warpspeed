@@ -1119,24 +1119,26 @@ export const ActiveWorkorderComponent = ({}) => {
 
               return (
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: isPickupDelivery ? "space-between" : undefined, marginTop: 11, width: "100%" }}>
-                  <StatusPickerModal
-                    statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned)}
-                    enabled={!isDonePaid}
-                    onSelect={handleStatusSelect}
-                    buttonStyle={{
-                      width: isPickupDelivery ? undefined : "100%",
-                      backgroundColor: rs.backgroundColor,
-                      paddingHorizontal: isPickupDelivery ? 12 : 8,
-                    }}
-                    buttonTextStyle={{
-                      color: rs.textColor,
-                      fontWeight: "normal",
-                      fontSize: 14,
-                    }}
-                    modalCoordX={100}
-                    modalCoordY={40}
-                    buttonText={rs.label}
-                  />
+                  <View style={{ width: isPickupDelivery ? "33%" : "100%" }}>
+                    <StatusPickerModal
+                      statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned)}
+                      enabled={!isDonePaid}
+                      onSelect={handleStatusSelect}
+                      buttonStyle={{
+                        width: "100%",
+                        backgroundColor: rs.backgroundColor,
+                        paddingHorizontal: isPickupDelivery ? 12 : 8,
+                      }}
+                      buttonTextStyle={{
+                        color: rs.textColor,
+                        fontWeight: "normal",
+                        fontSize: 14,
+                      }}
+                      modalCoordX={100}
+                      modalCoordY={40}
+                      buttonText={rs.label}
+                    />
+                  </View>
                   {isPickupDelivery && (
                     <PickupDeliveryInputs
                       pd={pd}

@@ -266,12 +266,11 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                   )}
                 </View>
                 <Button_
-                  text="Close"
-                  icon={ICONS.close1}
-                  iconSize={14}
-                  onPress={onClose}
-                  buttonStyle={{ paddingHorizontal: 16, height: 32 }}
-                  textStyle={{ color: gray(0.5), fontSize: 12 }}
+                  text="Refund"
+                  colorGradientArr={COLOR_GRADIENTS.red}
+                  onPress={handleRefund}
+                  buttonStyle={{ paddingHorizontal: 20, height: 32 }}
+                  textStyle={{ color: C.textWhite, fontSize: 12 }}
                 />
               </View>
 
@@ -529,11 +528,12 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                 }}
               >
                 <Button_
-                  text="Refund"
-                  colorGradientArr={COLOR_GRADIENTS.red}
-                  onPress={handleRefund}
-                  buttonStyle={{ paddingHorizontal: 20, height: 34 }}
-                  textStyle={{ color: C.textWhite, fontSize: 13 }}
+                  text="Close"
+                  icon={ICONS.close1}
+                  iconSize={14}
+                  onPress={onClose}
+                  buttonStyle={{ paddingHorizontal: 16, height: 34 }}
+                  textStyle={{ color: gray(0.5), fontSize: 13 }}
                 />
               </View>
             </View>

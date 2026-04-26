@@ -270,6 +270,7 @@ export function NewCheckoutModalScreen() {
   const [sShowSendReceiptModal, _sSetShowSendReceiptModal] = useState(false);
   const [sTransactions, _setTransactions] = useState([]);   // real payments (cash/card)
   const [sCredits, _setCredits] = useState([]);              // applied credits/deposits/gift cards
+  const [sAutoAppliedDeposits, _setAutoAppliedDeposits] = useState(false);
   const salePersistedRef = useRef(false);
   // ─── Derived Values ───────────────────────────────────────
   let isDepositMode = !!zDepositInfo;
@@ -313,7 +314,15 @@ export function NewCheckoutModalScreen() {
     }
   }
 
-
+  // Auto-apply customer deposits when checkout opens
+  if (sSale && !sAutoAppliedDeposits && !isDepositMode && !sSale.paymentComplete) {
+    _setAutoAppliedDeposits(true);
+    let appliedIds = new Set(sCredits.map((c) => c.id));
+    let available = (zCustomer?.deposits || [])
+      .filter((d) => (d.amountCents - (d.reservedCents || 0)) > 0 && !appliedIds.has(d.id))
+      .map((d) => ({ ...d, amountCents: d.amountCents - (d.reservedCents || 0), _type: d.type === "giftcard" ? "giftcard" : "deposit" }));
+    if (available.length > 0) autoApplyDeposits(available);
+  }
 
   async function initializeCheckout() {
     dlog(DCAT.INIT, "initializeCheckout", "CheckoutModal", { workorderID: zOpenWorkorder?.id, activeSaleID: zOpenWorkorder?.activeSaleID, customerID: zOpenWorkorder?.customerID });
@@ -691,6 +700,89 @@ export function NewCheckoutModalScreen() {
   }
 
   // ─── Deposit / Credit Application ───────────────────────
+  function autoApplyDeposits(deposits) {
+    if (!sSale || sSale.paymentComplete) return;
+
+    let sale = cloneDeep(sSale);
+    let newCredits = [...sCredits];
+    let updatedCustomer = cloneDeep(zCustomer);
+    let user = useLoginStore.getState().currentUser?.first || "System";
+    let timestamp = Date.now();
+    let changeLogEntries = [];
+
+    for (let deposit of deposits) {
+      let creditTotal = newCredits.reduce((sum, c) => sum + c.amount, 0);
+      let txnTotal = sTransactions.reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
+      let totalRefunded = sTransactions.reduce((sum, t) =>
+        sum + (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0), 0
+      );
+      let amountNeeded = (sale.total || 0) - (txnTotal + creditTotal - totalRefunded);
+      if (amountNeeded <= 0) break;
+
+      let isCredit = deposit._type === "credit";
+      let appliedAmount = Math.min(deposit.amountCents, amountNeeded);
+
+      let credit = {
+        id: deposit.id,
+        ...(isCredit ? {} : { transactionId: deposit.transactionId || deposit.id || "" }),
+        amount: appliedAmount,
+        type: isCredit ? "credit" : deposit._type === "giftcard" ? "giftcard" : "deposit",
+        _originalAmount: deposit.amountCents,
+        _note: isCredit ? (deposit.text || "") : (deposit.note || ""),
+        _last4: deposit.last4 || "",
+        _method: deposit.method || "cash",
+        _millis: deposit.millis || 0,
+        _depositSaleID: deposit.saleID || "",
+      };
+
+      newCredits.push(credit);
+
+      // Reserve on customer
+      let arrKey = isCredit ? "credits" : "deposits";
+      let customerArr = updatedCustomer[arrKey] || [];
+      let idx = customerArr.findIndex((d) => d.id === deposit.id);
+      if (idx >= 0) {
+        customerArr[idx] = { ...customerArr[idx], reservedCents: (customerArr[idx].reservedCents || 0) + appliedAmount };
+      }
+
+      changeLogEntries.push({
+        timestamp, user, field: "payment", action: "recorded",
+        from: "", to: "Deposit/credit applied " + formatCurrencyDisp(appliedAmount, true),
+      });
+    }
+
+    if (newCredits.length === sCredits.length) return;
+
+    // Save customer reservations
+    useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
+    dbSaveCustomer(updatedCustomer);
+
+    // Update credits and sale
+    _setCredits(newCredits);
+    recomputeSaleAmounts(sale, sTransactions, newCredits);
+
+    // Update workorders with changelog entries
+    if (changeLogEntries.length > 0) {
+      let updatedWorkorders = [];
+      for (let wo of sCombinedWorkorders) {
+        let updated = cloneDeep(wo);
+        updated.activeSaleID = sale.id;
+        updated.changeLog = [...(updated.changeLog || []), ...changeLogEntries];
+        if (!sDevSkip) useOpenWorkordersStore.getState().setWorkorder(updated, true);
+        updatedWorkorders.push(updated);
+      }
+      _setCombinedWorkorders(updatedWorkorders);
+    }
+
+    if (sale.paymentComplete) {
+      handleSaleComplete(sale, sTransactions, newCredits);
+    }
+
+    _setSale(sale);
+    broadcastSaleToDisplay(sale, sCombinedWorkorders, custFirst, custLast, custLanguage);
+    if (!sDevSkip && !sale.paymentComplete) persistSale(sale, sTransactions, newCredits);
+  }
+
   function handleApplyDeposit(deposit) {
     dlog(DCAT.BUTTON, "handleApplyDeposit", "CheckoutModal", { depositID: deposit?.id, amountCents: deposit?.amountCents, type: deposit?._type, saleID: sSale?.id });
     if (!sSale || sSale.paymentComplete) return;

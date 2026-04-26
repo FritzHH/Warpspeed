@@ -302,8 +302,11 @@ function splitCSVRows(text) {
   let inQuotes = false;
   for (let i = 0; i < text.length; i++) {
     let ch = text[i];
-    if (ch === '"') { inQuotes = !inQuotes; current += ch; }
-    else if (ch === '\n' && !inQuotes) {
+    if (ch === '"') {
+      if (inQuotes && text[i + 1] === '"') { current += '""'; i++; }
+      else { inQuotes = !inQuotes; }
+      current += ch;
+    } else if (ch === '\n' && !inQuotes) {
       if (current.trim()) rows.push(current);
       current = "";
     } else if (ch === '\r') { /* skip */ }
@@ -480,10 +483,11 @@ function mapCustomers(customerCSVText) {
 
   for (const row of rows) {
     if (row.archived === "true") continue;
+    if (!row.customerID || row.customerID === "0") continue;
 
     const cell = formatPhone(row.phone1);
     const customer = {
-      id: row.customerID ? buildLightspeedEAN13("20", row.customerID) : "",
+      id: buildLightspeedEAN13("20", row.customerID),
       first: (row.firstName || "").toLowerCase().trim(),
       last: (row.lastName || "").toLowerCase().trim(),
       customerCell: cell,
@@ -599,8 +603,15 @@ function mapWorkorders(
     if (!woID) continue;
     if (wo.archived === "true") continue;
 
+    // Skip empty shell workorders (no customer, no timeIn, no sale — junk Lightspeed entries)
+    if ((!wo.customerID || wo.customerID === "0") && !wo.timeIn && (!wo.saleID || wo.saleID === "0")) {
+      console.log("[Migration] Skipping empty shell WO " + woID + " (no customer, no timeIn, no sale)");
+      continue;
+    }
+
     // Customer lookup (apply redirect for deduplicated customers)
-    const woCustomerEAN = wo.customerID ? buildLightspeedEAN13("20", wo.customerID) : "";
+    const woCustomerEAN = wo.customerID && wo.customerID !== "0"
+      ? buildLightspeedEAN13("20", wo.customerID) : "";
     const resolvedCustomerID = customerRedirectMap[woCustomerEAN] || woCustomerEAN;
     const customer = customerMap[resolvedCustomerID] || null;
     const customerFirst = (wo.customerFirstName || "").toLowerCase().trim();
@@ -695,7 +706,7 @@ function mapWorkorders(
     } catch (e) {
       console.error("[LS Mapping] Failed to parse workorderLinesJSON for WO " + woID + ":", e.message);
     }
-    if (!Array.isArray(woLinesParsed)) woLinesParsed = [];
+    if (!Array.isArray(woLinesParsed)) woLinesParsed = woLinesParsed ? [woLinesParsed] : [];
 
     for (const wl of woLinesParsed) {
       const totalMinutes = (parseInt(wl.hours) || 0) * 60 + (parseInt(wl.minutes) || 0);
@@ -847,7 +858,17 @@ function mapSales(salesCSVText, salesPaymentsCSVText, stripePaymentsCSVText, wor
     const stripeForSale = stripeByOrderID[lsSaleID] || [];
     const stripeUsed = new Set();
 
-    const payments = paymentRows.map(function (sp) {
+    // Detect deposit pattern: a negative "credit account" payment paired with a positive payment
+    const creditAccountRows = paymentRows.filter(function (sp) { return sp.paymentTypeType === "credit account" && dollarsToCents(sp.amount) < 0; });
+    const isDepositSale = creditAccountRows.length > 0;
+    const depositAmountCents = creditAccountRows.reduce(function (sum, sp) { return sum + Math.abs(dollarsToCents(sp.amount)); }, 0);
+
+    // For deposit sales, exclude "credit account" rows — they aren't real transactions
+    const transactionRows = isDepositSale
+      ? paymentRows.filter(function (sp) { return sp.paymentTypeType !== "credit account"; })
+      : paymentRows;
+
+    const payments = transactionRows.map(function (sp) {
       const isCash = sp.paymentTypeType === "cash";
       const isCheck = sp.paymentTypeName === "Check";
       const isCard = sp.paymentTypeType === "credit card";
@@ -901,6 +922,12 @@ function mapSales(salesCSVText, salesPaymentsCSVText, stripePaymentsCSVText, wor
       };
     });
 
+    // Assign sale tax to the first payment transaction
+    if (tax > 0) {
+      const firstPayment = payments.find(function (p) { return p.type === "payment"; });
+      if (firstPayment) firstPayment.salesTax = tax;
+    }
+
     // Compute amounts from actual payments
     const computedAmountCaptured = payments.reduce(function (sum, p) { return p.type === "payment" ? sum + p.amountCaptured : sum; }, 0);
     const computedAmountRefunded = payments.reduce(function (sum, p) { return p.type === "refund" ? sum + Math.abs(p.amountCaptured) : sum; }, 0);
@@ -909,11 +936,11 @@ function mapSales(salesCSVText, salesPaymentsCSVText, stripePaymentsCSVText, wor
       id: saleID,
       lightspeed_id: lsSaleID,
       millis,
-      subtotal,
+      subtotal: isDepositSale ? depositAmountCents : subtotal,
       discount,
       salesTax: tax,
       salesTaxPercent,
-      total,
+      total: isDepositSale ? depositAmountCents : total,
       amountCaptured: computedAmountCaptured,
       amountRefunded: computedAmountRefunded,
       paymentComplete: completed,
@@ -927,13 +954,33 @@ function mapSales(salesCSVText, salesPaymentsCSVText, stripePaymentsCSVText, wor
       refunds: [],
       textToPay: false,
       checkoutSessionID: "",
-      depositType: "",
+      isDepositSale,
+      depositType: isDepositSale ? "deposit" : "",
+      depositNote: "",
       voidedByRefund: false,
       _importSource: "lightspeed",
     };
 
     sales.push(mappedSale);
     allTransactions.push(...payments);
+
+    // For deposit sales, add deposit to customer
+    if (isDepositSale && customer && completed) {
+      const primaryTxn = payments.find(function (p) { return p.type === "payment"; });
+      const deposit = {
+        id: saleID,
+        transactionId: primaryTxn ? primaryTxn.id : "",
+        amountCents: depositAmountCents,
+        reservedCents: 0,
+        millis: millis || Date.now(),
+        method: primaryTxn ? primaryTxn.method : "",
+        note: "",
+        last4: primaryTxn ? (primaryTxn.last4 || "") : "",
+        type: "deposit",
+      };
+      customer.deposits = customer.deposits || [];
+      customer.deposits.push(deposit);
+    }
 
     // Backfill workorder saleID
     for (const wo of linkedWorkorders) {
@@ -951,6 +998,141 @@ function mapSales(salesCSVText, salesPaymentsCSVText, stripePaymentsCSVText, wor
   }
 
   return { sales, transactions: allTransactions };
+}
+
+function buildStandaloneWorkorders(sales, salesLinesCSVText, itemsCSVText, customerMap, statuses) {
+  const slRows = parseCSV(salesLinesCSVText);
+  const itemRows = parseCSV(itemsCSVText);
+
+  // Group sale lines by Lightspeed saleID
+  const saleLinesBySaleID = {};
+  for (const row of slRows) {
+    if (!row.saleID) continue;
+    if (!saleLinesBySaleID[row.saleID]) saleLinesBySaleID[row.saleID] = [];
+    saleLinesBySaleID[row.saleID].push(row);
+  }
+
+  // Item lookup
+  const itemMap = {};
+  for (const row of itemRows) { if (row.itemID) itemMap[row.itemID] = row; }
+
+  // Find "Finished & Paid" status for completed standalone sales
+  const finishedPaidStatus = statuses.find(function (s) { return s.label.toLowerCase() === "finished & paid"; });
+
+  const standaloneWorkorders = [];
+
+  for (const sale of sales) {
+    if (sale.workorderIDs.length > 0) continue; // already linked to workorders
+
+    const lsSaleID = sale.lightspeed_id;
+    const saleLines = saleLinesBySaleID[lsSaleID] || [];
+    if (saleLines.length === 0) continue; // no items — nothing to build
+
+    // Build workorderLines from salesLines
+    var workorderLines = saleLines.map(function (sl) {
+      var item = sl.itemID ? itemMap[sl.itemID] : null;
+
+      var rawUpc = item ? (item.upc || "") : "";
+      var rawEan = item ? (item.ean || "") : "";
+      var normUpc = normalizeBarcode(rawUpc);
+      var normEan = normalizeBarcode(rawEan);
+      var isNativeEan = normEan && !normEan.startsWith("0");
+      var primaryBarcode = (isNativeEan ? normEan : null) || normUpc || generateEAN13Barcode();
+      var barcodes = [normEan, normUpc].filter(function (c) { return c && c !== primaryBarcode; });
+
+      var priceCents = dollarsToCents(sl.unitPrice);
+
+      var inventoryItem = {
+        id: item ? item.itemID : crypto.randomUUID(),
+        formalName: item ? (item.description || "Unknown Item") : "Unknown Item",
+        informalName: "",
+        brand: "",
+        price: priceCents,
+        salePrice: 0,
+        cost: item ? dollarsToCents(item.avgCost || item.defaultCost) : 0,
+        category: item && item.itemType === "non_inventory" ? "Labor" : "Item",
+        primaryBarcode,
+        barcodes,
+        customPart: false,
+        customLabor: false,
+        minutes: 0,
+      };
+
+      return {
+        id: crypto.randomUUID(),
+        qty: parseInt(sl.unitQuantity) || 1,
+        intakeNotes: sanitize((sl.note || "").trim()),
+        receiptNotes: "",
+        inventoryItem,
+        discountObj: buildDiscountObj(sl, priceCents),
+        useSalePrice: false,
+        warranty: false,
+      };
+    });
+
+    // Create standalone workorder
+    var woID = generateEAN13Barcode();
+    var customer = sale.customerID ? customerMap[sale.customerID] : null;
+
+    var wo = {
+      workorderNumber: buildWorkorderNumberFromId(woID),
+      id: woID,
+      lightspeed_id: "",
+      customerID: sale.customerID || "",
+      customerFirst: customer ? (customer.first || "") : "",
+      customerLast: customer ? (customer.last || "") : "",
+      customerCell: customer ? (customer.customerCell || "") : "",
+      customerLandline: customer ? (customer.customerLandline || "") : "",
+      customerEmail: customer ? (customer.email || "") : "",
+      customerContactRestriction: "",
+      customerLanguage: "",
+      customerPin: "",
+      brand: "",
+      description: "",
+      color1: { ...EMPTY_COLOR },
+      color2: { ...EMPTY_COLOR },
+      status: finishedPaidStatus ? finishedPaidStatus.id : "",
+      taxFree: false,
+      taxFreeReceiptNote: "",
+      archived: false,
+      startedBy: "Lightspeed Import",
+      startedOnMillis: sale.millis || "",
+      finishedOnMillis: sale.millis || "",
+      paidOnMillis: sale.millis || "",
+      workorderLines: workorderLines,
+      customerNotes: [],
+      internalNotes: [],
+      changeLog: [],
+      hasNewSMS: false,
+      waitTime: "",
+      waitTimeEstimateLabel: "",
+      partOrdered: "",
+      partSource: "",
+      partToBeOrdered: false,
+      partOrderEstimateMillis: "",
+      partOrderedMillis: "",
+      paymentComplete: sale.paymentComplete,
+      amountPaid: sale.amountCaptured,
+      activeSaleID: "",
+      endedOnMillis: "",
+      saleID: sale.id,
+      media: [],
+      _lsSaleID: lsSaleID,
+      _importSource: "lightspeed",
+    };
+
+    standaloneWorkorders.push(wo);
+
+    // Link the sale back to this workorder
+    sale.workorderIDs.push(woID);
+
+    // Backfill customer workorders array
+    if (customer) {
+      customer.workorders.push(woID);
+    }
+  }
+
+  return standaloneWorkorders;
 }
 
 function mapInventory(itemsCSVText) {
@@ -1284,6 +1466,15 @@ async function main() {
   );
   logSuccess(allSales.length.toLocaleString() + " sales mapped (" + allTransactions.length.toLocaleString() + " transactions)");
 
+  // Build standalone workorders for sales that have no linked workorder
+  const standaloneWOs = buildStandaloneWorkorders(
+    allSales, csv["salesLines.csv"], csv["items.csv"], customerMap, statuses
+  );
+  if (standaloneWOs.length > 0) {
+    allWorkorders.push(...standaloneWOs);
+    logSuccess(standaloneWOs.length.toLocaleString() + " standalone sale workorders created (from salesLines)");
+  }
+
   // -- STAGE 8: Map employees + punch history --
   logStage(8, TOTAL_STAGES, "Mapping employees + punch history");
   let newUsers = [];
@@ -1408,6 +1599,7 @@ async function main() {
   console.log("[" + timestamp() + "]   Customers:             " + customers.length.toLocaleString());
   console.log("[" + timestamp() + "]   Open workorders:       " + openWorkorders.length.toLocaleString());
   console.log("[" + timestamp() + "]   Completed workorders:  " + completedWorkorders.length.toLocaleString());
+  console.log("[" + timestamp() + "]   Standalone sale WOs:   " + standaloneWOs.length.toLocaleString());
   console.log("[" + timestamp() + "]   Completed sales:       " + completedSales.length.toLocaleString());
   console.log("[" + timestamp() + "]   Active sales:          " + activeSales.length.toLocaleString());
   console.log("[" + timestamp() + "]   Transactions:          " + transactions.length.toLocaleString());

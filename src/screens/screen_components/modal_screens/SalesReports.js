@@ -114,6 +114,8 @@ export const SalesReportsModal = ({ handleExit }) => {
   const [sEndCalYear, _setEndCalYear] = useState(dayjs().year());
   const [sCalKey, _setCalKey] = useState(0);
   const [sViewMode, _setViewMode] = useState("sale"); // "sale" or "transaction"
+  const [sSortField, _setSortField] = useState("date");
+  const [sSortDir, _setSortDir] = useState("desc");
   const queryIdRef = useRef(0);
   const hasUserSelected = useRef(false);
 
@@ -140,8 +142,10 @@ export const SalesReportsModal = ({ handleExit }) => {
       .then(([completedRows, activeRows]) => {
         if (thisQueryId !== queryIdRef.current) return;
         let tagged = (completedRows || []).map((r) => ({ ...r, source: "completed" }));
-        _setResults([...tagged, ...(activeRows || [])]);
+        let combined = [...tagged, ...(activeRows || [])];
+        _setResults(combined);
         _setLoading(false);
+        console.log("[SalesReport]", JSON.stringify(combined, null, 2));
       })
       .catch(() => {
         if (thisQueryId !== queryIdRef.current) return;
@@ -172,6 +176,15 @@ export const SalesReportsModal = ({ handleExit }) => {
     _setSaleModalItem(null);
     handleExit();
     useCheckoutStore.getState().setStringOnly(saleID);
+  }
+
+  function handleHeaderSort(field) {
+    if (sSortField === field) {
+      _setSortDir(sSortDir === "asc" ? "desc" : "asc");
+    } else {
+      _setSortField(field);
+      _setSortDir(field === "amount" || field === "date" ? "desc" : "asc");
+    }
   }
 
   function handleShortcut(shortcut) {
@@ -210,17 +223,26 @@ export const SalesReportsModal = ({ handleExit }) => {
   let searchQuery = sSearchText.trim().toLowerCase();
   let filteredResults = sResults;
   if (searchQuery) {
-    filteredResults = sResults.filter((tx) => {
-      let first = (tx.customerFirst || "").toLowerCase();
-      let last = (tx.customerLast || "").toLowerCase();
-      let phone = (tx.customerCell || "").toLowerCase();
-      return (
-        first.includes(searchQuery) ||
-        last.includes(searchQuery) ||
-        phone.includes(searchQuery) ||
-        (first + " " + last).includes(searchQuery)
-      );
-    });
+    let isAmountSearch = searchQuery.includes(".");
+    if (isAmountSearch) {
+      let searchAmount = searchQuery.replace(/[^0-9.]/g, "");
+      filteredResults = sResults.filter((tx) => {
+        let txAmount = formatCurrencyDisp(tx.amountCaptured || 0);
+        return txAmount.includes(searchAmount);
+      });
+    } else {
+      filteredResults = sResults.filter((tx) => {
+        let first = (tx.customerFirst || "").toLowerCase();
+        let last = (tx.customerLast || "").toLowerCase();
+        let phone = (tx.customerCell || "").toLowerCase();
+        return (
+          first.includes(searchQuery) ||
+          last.includes(searchQuery) ||
+          phone.includes(searchQuery) ||
+          (first + " " + last).includes(searchQuery)
+        );
+      });
+    }
   }
 
   // Mode-aware data processing
@@ -244,14 +266,36 @@ export const SalesReportsModal = ({ handleExit }) => {
     });
     groups = Object.values(grouped);
     groups.sort((a, b) => {
-      let aMin = Math.min(...a.transactions.map((t) => t.millis));
-      let bMin = Math.min(...b.transactions.map((t) => t.millis));
-      return bMin - aMin;
+      let dir = sSortDir === "asc" ? 1 : -1;
+      if (sSortField === "amount") {
+        let aVal = a.transactions.reduce((s, t) => s + (t.amountCaptured || 0), 0);
+        let bVal = b.transactions.reduce((s, t) => s + (t.amountCaptured || 0), 0);
+        return (aVal - bVal) * dir;
+      }
+      if (sSortField === "method") {
+        let aVal = (a.transactions[0]?.method || "").toLowerCase();
+        let bVal = (b.transactions[0]?.method || "").toLowerCase();
+        return aVal.localeCompare(bVal) * dir;
+      }
+      if (sSortField === "type") {
+        let aVal = (a.transactions[0]?.type || "").toLowerCase();
+        let bVal = (b.transactions[0]?.type || "").toLowerCase();
+        return aVal.localeCompare(bVal) * dir;
+      }
+      let aMin = Math.min(...a.transactions.map((t) => t.millis || 0));
+      let bMin = Math.min(...b.transactions.map((t) => t.millis || 0));
+      return (aMin - bMin) * dir;
     });
   } else {
     flatSorted = filteredResults
       .filter((tx) => tx.type !== "pending")
-      .sort((a, b) => (b.millis || 0) - (a.millis || 0));
+      .sort((a, b) => {
+        let dir = sSortDir === "asc" ? 1 : -1;
+        if (sSortField === "amount") return ((a.amountCaptured || 0) - (b.amountCaptured || 0)) * dir;
+        if (sSortField === "method") return (a.method || "").toLowerCase().localeCompare((b.method || "").toLowerCase()) * dir;
+        if (sSortField === "type") return (a.type || "").toLowerCase().localeCompare((b.type || "").toLowerCase()) * dir;
+        return ((a.millis || 0) - (b.millis || 0)) * dir;
+      });
   }
 
   // Mode-aware pagination
@@ -302,12 +346,14 @@ export const SalesReportsModal = ({ handleExit }) => {
   };
 
   function renderGroupHeader(group) {
-    let label = "Sale";
+    let isDeposit = group.transactions.some((tx) => tx.isDepositSale);
+    let label = isDeposit ? "Deposit" : "Sale";
+    let labelColor = isDeposit ? C.green : C.orange;
     let isActive = group.source === "active";
-    let customerName = "";
-    if (group.customerFirst || group.customerLast) {
-      customerName = " - " + (capitalizeFirstLetterOfString(group.customerFirst) + " " + capitalizeFirstLetterOfString(group.customerLast)).trim();
-    }
+    let hasCustomer = !!(group.customerFirst || group.customerLast);
+    let customerName = hasCustomer
+      ? (capitalizeFirstLetterOfString(group.customerFirst) + " " + capitalizeFirstLetterOfString(group.customerLast)).trim()
+      : "";
     return (
       <View
         key={"gh-" + group.saleID}
@@ -316,11 +362,12 @@ export const SalesReportsModal = ({ handleExit }) => {
           alignItems: "center",
           paddingVertical: 6,
           paddingHorizontal: 10,
-          backgroundColor: "rgba(0,0,0,0.75)",
+          backgroundColor: gray(0.06),
         }}
       >
-        <Text style={{ fontSize: 13, fontWeight: "700", color: "white" }}>
-          {label}{customerName}
+        <Text style={{ fontSize: 13, fontWeight: "700", color: C.darkBlue }}>
+          {!hasCustomer && <Text style={{ color: labelColor }}>{label}</Text>}
+          {hasCustomer && customerName}
         </Text>
         {isActive && (
           <View style={{
@@ -339,12 +386,11 @@ export const SalesReportsModal = ({ handleExit }) => {
 
   function renderTransactionRow(tx, index) {
     let isRefund = tx.type === "refund";
+    let isDeposit = tx.type === "deposit";
     let isActive = tx.source === "active";
     let bgColor = isRefund
       ? lightenRGBByPercent(C.red, 85)
-      : index % 2 === 0
-      ? C.listItemWhite
-      : gray(0.075);
+      : C.listItemWhite;
 
     return (
       <TouchableOpacity
@@ -358,7 +404,7 @@ export const SalesReportsModal = ({ handleExit }) => {
           paddingHorizontal: 10,
           backgroundColor: bgColor,
           borderBottomWidth: 1,
-          borderBottomColor: gray(0.9),
+          borderBottomColor: gray(0.05),
         }}
       >
         {isActive && (
@@ -370,7 +416,7 @@ export const SalesReportsModal = ({ handleExit }) => {
             flex: 1,
             fontSize: 14,
             fontWeight: "600",
-            color: isRefund ? C.red : C.text,
+            color: isRefund ? C.red : isDeposit ? C.green : C.text,
             paddingLeft: isActive ? 0 : 10,
           }}
         >
@@ -381,7 +427,7 @@ export const SalesReportsModal = ({ handleExit }) => {
           style={{
             flex: 0.8,
             fontSize: 14,
-            color: gray(0.35),
+            color: gray(0.5),
             fontWeight: "600",
             textAlign: "center",
           }}
@@ -405,18 +451,28 @@ export const SalesReportsModal = ({ handleExit }) => {
           style={{
             flex: 1.5,
             fontSize: 13,
-            color: gray(0.35),
+            color: gray(0.45),
             textAlign: "right",
             paddingRight: 5,
           }}
         >
-          {formatMillisForDisplay(tx.millis) || ""}
+          {tx.millis ? (() => {
+            let d = formatMillisForDisplay(tx.millis, true, true, true);
+            let min = String(d.minutes).padStart(2, "0");
+            return d.wordDayOfWeek + ", " + d.wordDayOfMonth + " " + d.dayOfMonth + " '" + d.year + "  " + d.hour + ":" + min + " " + d.amPM;
+          })() : ""}
         </Text>
       </TouchableOpacity>
     );
   }
 
   function renderHeader() {
+    let headers = [
+      { field: "type", label: "Type", flex: 1, align: "flex-start", padLeft: 10 },
+      { field: "method", label: "Method", flex: 0.8, align: "center" },
+      { field: "amount", label: "Amount", flex: 1, align: "flex-end" },
+      { field: "date", label: "Date", flex: 1.5, align: "flex-end", padRight: 5 },
+    ];
     return (
       <View
         style={{
@@ -429,18 +485,35 @@ export const SalesReportsModal = ({ handleExit }) => {
           borderBottomColor: C.buttonLightGreenOutline,
         }}
       >
-        <Text style={{ flex: 1, fontSize: 11, fontWeight: "700", color: "white", paddingLeft: 10 }}>
-          Type
-        </Text>
-        <Text style={{ flex: 0.8, fontSize: 11, fontWeight: "700", color: "white", textAlign: "center" }}>
-          Method
-        </Text>
-        <Text style={{ flex: 1, fontSize: 11, fontWeight: "700", color: "white", textAlign: "right" }}>
-          Amount
-        </Text>
-        <Text style={{ flex: 1.5, fontSize: 11, fontWeight: "700", color: "white", textAlign: "right", paddingRight: 5 }}>
-          Date
-        </Text>
+        {headers.map((h) => {
+          let isActive = sSortField === h.field;
+          let arrow = isActive ? (sSortDir === "asc" ? " \u25B2" : " \u25BC") : "";
+          let caretColor = isActive ? C.orange : "white";
+          let tooltip = isActive
+            ? "Sorted by " + h.label.toLowerCase() + " (" + (sSortDir === "asc" ? "ascending" : "descending") + "). Click to reverse."
+            : "Click to sort by " + h.label.toLowerCase();
+          return (
+            <TouchableOpacity
+              key={h.field}
+              onPress={() => handleHeaderSort(h.field)}
+              title={tooltip}
+              activeOpacity={0.6}
+              style={{
+                flex: h.flex,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: h.align,
+                paddingLeft: h.padLeft || 0,
+                paddingRight: h.padRight || 0,
+              }}
+            >
+              <Text style={{ fontSize: 11, fontWeight: "700", color: isActive ? C.orange : "white" }}>
+                {h.label}{arrow}
+              </Text>
+              <Text style={{ fontSize: 9, fontWeight: "700", color: caretColor, marginLeft: 4 }}>{"\u25B8"}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
     );
   }
@@ -866,7 +939,7 @@ export const SalesReportsModal = ({ handleExit }) => {
         </View>
       </TouchableWithoutFeedback>
     );
-  }, [sStartDate, sEndDate, sResults, sPage, sLoading, sSaleModalItem, sActiveShortcut, sSearchText, sPendingStart, sPendingEnd, sEndCalMonth, sEndCalYear, sCalKey, sViewMode]);
+  }, [sStartDate, sEndDate, sResults, sPage, sLoading, sSaleModalItem, sActiveShortcut, sSearchText, sPendingStart, sPendingEnd, sEndCalMonth, sEndCalYear, sCalKey, sViewMode, sSortField, sSortDir]);
 
   return ReactDOM.createPortal(
     <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}>

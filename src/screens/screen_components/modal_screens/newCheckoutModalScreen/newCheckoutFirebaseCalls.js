@@ -851,12 +851,13 @@ export async function queryCompletedSalesReport(startMillis, endMillis) {
           customerLast: custLast,
           customerCell: custCell,
           customerEmail: custEmail,
-          type: "payment",
+          type: sale.isDepositSale ? "deposit" : "payment",
           method: txn.method || "",
           amountCaptured: txn.amountCaptured || 0,
           salesTax: txn.salesTax || 0,
           millis: txn.millis || sale.millis,
           id: txn.id,
+          isDepositSale: !!sale.isDepositSale,
         });
 
         // Refund rows from this transaction
@@ -873,6 +874,7 @@ export async function queryCompletedSalesReport(startMillis, endMillis) {
             salesTax: refund.salesTax || 0,
             millis: refund.millis || txn.millis,
             id: refund.id || (txn.id + "-refund"),
+            isDepositSale: !!sale.isDepositSale,
           });
         });
       }
@@ -947,6 +949,7 @@ export async function queryActiveSalesForReport(sales) {
           millis: sale.millis,
           id: sale.id + "-pending",
           source: "active",
+          isDepositSale: !!sale.isDepositSale,
         });
         continue;
       }
@@ -961,13 +964,14 @@ export async function queryActiveSalesForReport(sales) {
           customerLast: custLast,
           customerCell: custCell,
           customerEmail: custEmail,
-          type: "payment",
+          type: sale.isDepositSale ? "deposit" : "payment",
           method: txn.method || "",
           amountCaptured: txn.amountCaptured || 0,
           salesTax: txn.salesTax || 0,
           millis: txn.millis || sale.millis,
           id: txn.id,
           source: "active",
+          isDepositSale: !!sale.isDepositSale,
         });
 
         (txn.refunds || []).forEach((refund) => {
@@ -984,6 +988,7 @@ export async function queryActiveSalesForReport(sales) {
             millis: refund.millis || txn.millis,
             id: refund.id || (txn.id + "-refund"),
             source: "active",
+            isDepositSale: !!sale.isDepositSale,
           });
         });
       }

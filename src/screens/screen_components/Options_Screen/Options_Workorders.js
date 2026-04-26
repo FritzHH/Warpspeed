@@ -564,6 +564,7 @@ export function WorkordersComponent({}) {
           height: "96%",
           backgroundColor: null,
         }}
+        onLayout={() => console.log("[Options_Workorders]", JSON.stringify(zOpenWorkorders, null, 2))}
         data={sSearchTerm.trim() ? filterAndRankWorkorders(zOpenWorkorders.filter((wo) => !!wo.customerID)) : sortWorkorders(zOpenWorkorders.filter((wo) => !!wo.customerID))}
         keyExtractor={(item, index) => index}
         ListEmptyComponent={() => (

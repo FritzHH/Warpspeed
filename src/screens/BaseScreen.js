@@ -622,7 +622,9 @@ export function BaseScreen() {
           // width: "100%",
           width: "34%",
           height: "99%",
-          backgroundColor: 'rgb(250, 248, 242)',
+          backgroundColor: C.backgroundWhite,
+          borderColor: C.buttonLightGreen,
+          borderWidth: 1,
           borderRadius: 15,
           shadowColor: C.green,
           shadowOffset: {

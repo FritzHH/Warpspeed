@@ -570,7 +570,7 @@ export function mapWorkorders(
         && (parseFloat(saleMap[wo.saleID].calcTax1 || "0") + parseFloat(saleMap[wo.saleID].calcTax2 || "0")) === 0)
         ? (settings?.taxFreeReceiptNote || "") : "",
       archived: wo.archived === "true",
-      startedBy: wo.employeeID || "",
+      startedBy: employeeMap[wo.employeeID] || wo.employeeID || "",
       startedOnMillis,
       finishedOnMillis,
       paidOnMillis,

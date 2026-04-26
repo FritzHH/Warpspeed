@@ -3070,6 +3070,93 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             flexDirection: "row",
             alignItems: "center",
             marginTop: 10,
+          }}
+        >
+          <Text
+            style={{
+              textAlign: "right",
+              fontColor: C.text,
+              width: "30%",
+            }}
+          >
+            Support Email:
+          </Text>
+          <TextInput
+            style={{
+              width: "50%",
+              marginLeft: 10,
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              padding: 3,
+              paddingRight: 7,
+              textAlign: "right",
+              outlineWidth: 0,
+            }}
+            value={zSettingsObj?.storeInfo.supportEmail || ""}
+            onChangeText={(supportEmail) => {
+              handleSettingsFieldChange("storeInfo", {
+                ...zSettingsObj.storeInfo,
+                supportEmail,
+              });
+            }}
+          />
+          <CheckBox_
+            buttonStyle={{ marginLeft: 7 }}
+            text={"Receipt"}
+            textStyle={{ fontSize: 12 }}
+            isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
+              (o) => o === "supportEmail"
+            )}
+          />
+        </View>
+
+        <View
+          style={{
+            width: "100%",
+            justifyContent: "flex-end",
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 10,
+          }}
+        >
+          <Text
+            style={{
+              textAlign: "right",
+              fontColor: C.text,
+              width: "30%",
+            }}
+          >
+            Office Email:
+          </Text>
+          <TextInput
+            style={{
+              width: "50%",
+              marginLeft: 10,
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              padding: 3,
+              paddingRight: 7,
+              textAlign: "right",
+              outlineWidth: 0,
+            }}
+            value={zSettingsObj?.storeInfo.officeEmail || ""}
+            onChangeText={(officeEmail) => {
+              handleSettingsFieldChange("storeInfo", {
+                ...zSettingsObj.storeInfo,
+                officeEmail,
+              });
+            }}
+          />
+          <View style={{ marginLeft: 7, width: 70 }} />
+        </View>
+
+        <View
+          style={{
+            width: "100%",
+            justifyContent: "flex-end",
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 10,
 
             // backgroundColor: "green",
           }}
@@ -6139,13 +6226,26 @@ const ImportComponent = () => {
       const allPunches = empHoursCsvText ? mapPunchHistory(empHoursCsvText, employeeIDMap) : [];
       console.log("[Dev Migration] Full mapping complete: " + freshData.workorders.length + " WOs, " + freshData.customers.length + " customers, " + freshData.sales.length + " sales, " + freshData.transactions.length + " transactions, " + allEmployees.length + " employees, " + allPunches.length + " punches.");
 
-      // 2. Pick 50 most recent workorders
+      // 2. Pick 20 most recent workorders + pinned WO 12497
       _setMigrationStep("Filtering to 20 most recent WOs...");
+      const DEV_PINNED_WO_IDS = ["12497"];
       const sorted = [...freshData.workorders]
         .filter(wo => wo.startedOnMillis)
         .sort((a, b) => b.startedOnMillis - a.startedOnMillis);
       const selectedWOs = sorted.slice(0, 20);
-      console.log("[Dev Migration] Selected " + selectedWOs.length + " most recent workorders.");
+      for (const pinnedID of DEV_PINNED_WO_IDS) {
+        const alreadyIncluded = selectedWOs.some(wo => wo.lightspeed_id === pinnedID);
+        if (!alreadyIncluded) {
+          const pinned = freshData.workorders.find(wo => wo.lightspeed_id === pinnedID);
+          if (pinned) {
+            selectedWOs.push(pinned);
+            console.log("[Dev Migration] Pinned WO " + pinnedID + " added.");
+          } else {
+            console.warn("[Dev Migration] Pinned WO " + pinnedID + " not found in mapped data — skipping.");
+          }
+        }
+      }
+      console.log("[Dev Migration] Selected " + selectedWOs.length + " workorders.");
 
       // 3. Collect referenced IDs from those 50 workorders
       const customerIDSet = new Set();

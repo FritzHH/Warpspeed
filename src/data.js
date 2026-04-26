@@ -178,6 +178,20 @@ export const NONREMOVABLE_STATUSES = [
     label: "Order Item for Customer",
     removable: false,
   },
+  {
+    id: "pickup",
+    textColor: "white",
+    backgroundColor: "purple",
+    label: "Pickup",
+    removable: false,
+  },
+  {
+    id: "delivery",
+    textColor: "white",
+    backgroundColor: "purple",
+    label: "Delivery",
+    removable: false,
+  },
 
 ];
 
@@ -470,7 +484,13 @@ export const WORKORDER_PROTO = {
   media: [],
   customerPin: "",
   taxFreeReceiptNote: "",
-  salesTax: ""
+  salesTax: "",
+  pickupDelivery: {
+    month: "",
+    day: "",
+    startTime: "",
+    endTime: "",
+  },
 };
 
 export const WORKORDER_ITEM_PROTO = {
@@ -1037,6 +1057,8 @@ export const SETTINGS_OBJ = {
     state: "Florida",
     zip: "34135",
     phone: "2393369177",
+    supportEmail: "",
+    officeEmail: "",
   },
   receiptSetup: {
     includeFieldsInReceipt: ["displayName", "street", "city", "state", "phone"],

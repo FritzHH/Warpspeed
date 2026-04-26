@@ -504,7 +504,7 @@ export const ScreenModal = ({
   centerMenuVertically = false,
   menuHeight,
 }) => {
-  const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
+  const [sModalCoordinates, _setModalCoordinates] = useState(null);
   const [sInternalModalShow, _setInternalModalShow] = useState(false);
   const [sAnimation, _setAnimation] = useState("fade");
 
@@ -527,14 +527,6 @@ export const ScreenModal = ({
     // };
   });
   // if (!openUpward && !centerMenuVertically && modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
-  // log("ref in ScreenModal", ref);
-  useEffect(() => {
-    const el = ref ? ref.current : null;
-    if (el) {
-      let rect = el.getBoundingClientRect();
-      _setModalCoordinates({ x: rect.x, y: rect.y, height: rect.height });
-    }
-  }, [ref]);
 
   if (!showShadow) shadowStyle = SHADOW_RADIUS_NOTHING;
   if (!showOuterModal)
@@ -564,6 +556,10 @@ export const ScreenModal = ({
             iconSize={buttonIconSize}
             text={buttonLabel}
             onPress={() => {
+              if (ref?.current) {
+                const rect = ref.current.getBoundingClientRect();
+                _setModalCoordinates({ x: rect.x, y: rect.y, height: rect.height });
+              }
               handleButtonPress();
               setModalVisibility(false);
               _setInternalModalShow(!sInternalModalShow);
@@ -597,8 +593,8 @@ export const ScreenModal = ({
               alignSelf: "center",
               justifySelf: "center",
               ...outerModalStyle,
-              position: ref ? "absolute" : null,
-              top: ref && !openUpward
+              position: sModalCoordinates ? "absolute" : null,
+              top: sModalCoordinates && !openUpward
                 ? centerMenuVertically && menuHeight
                   ? Math.max(
                       10,
@@ -611,8 +607,8 @@ export const ScreenModal = ({
                     )
                   : sModalCoordinates.y + modalCoordinateVars.y
                 : null,
-              bottom: ref && openUpward ? window.innerHeight - sModalCoordinates.y : null,
-              left: ref ? sModalCoordinates.x + modalCoordinateVars.x : null,
+              bottom: sModalCoordinates && openUpward ? window.innerHeight - sModalCoordinates.y : null,
+              left: sModalCoordinates ? sModalCoordinates.x + modalCoordinateVars.x : null,
             }}
           >
             {Component()}
@@ -2851,6 +2847,165 @@ export const TimePicker_ = ({
         }}
       >
         <TouchableOpacity onPress={confirmResult} style={{ padding: 8 }}>
+          <Image_ style={{ width: 27, height: 27 }} icon={ICONS.check} />
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onCancel} style={{ padding: 8 }}>
+          <Image_ style={{ width: 23, height: 23 }} icon={ICONS.close1} />
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
+
+const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAYS_IN_MONTH = [31,29,31,30,31,30,31,31,30,31,30,31];
+
+export const DatePicker_ = ({
+  initialMonth = new Date().getMonth() + 1,
+  initialDay = new Date().getDate(),
+  onConfirm = () => {},
+  onCancel = () => {},
+  style = {},
+}) => {
+  const [sMonth, _sSetMonth] = useState(initialMonth);
+  const [sDay, _sSetDay] = useState(initialDay);
+
+  const monthRef = useRef(null);
+  const dayRef = useRef(null);
+  const monthReady = useRef(false);
+  const dayReady = useRef(false);
+  const monthTimer = useRef(null);
+  const dayTimer = useRef(null);
+
+  const ITEM_H = 36;
+  const VISIBLE = 7;
+  const PAD = Math.floor(VISIBLE / 2);
+  const COL_W = 64;
+  const BLUE = "#2979FF";
+
+  const months = [];
+  for (let i = 1; i <= 12; i++) months.push(i);
+
+  const maxDay = DAYS_IN_MONTH[sMonth - 1] || 31;
+  const days = [];
+  for (let i = 1; i <= maxDay; i++) days.push(i);
+
+  // clamp day if month changed to a shorter month
+  useEffect(() => {
+    if (sDay > maxDay) _sSetDay(maxDay);
+  }, [sMonth]);
+
+  const nudge = (ref, items, current, setter, dir) => {
+    const idx = items.indexOf(current) + dir;
+    if (idx >= 0 && idx < items.length) {
+      ref.current?.scrollTo({ y: idx * ITEM_H, animated: true });
+      setter(items[idx]);
+    }
+  };
+
+  const renderScrollColumn = (items, selected, ref, setter, formatFn, readyRef, initVal, timerRef) => {
+    const selIdx = items.indexOf(selected);
+    return (
+      <View style={{ width: COL_W, alignItems: "center" }}>
+        <TouchableOpacity
+          onPress={() => nudge(ref, items, selected, setter, -1)}
+          style={{ height: 22, justifyContent: "center", alignItems: "center", width: COL_W }}
+        >
+          <Text style={{ fontSize: 9, color: gray(0.5) }}>▲</Text>
+        </TouchableOpacity>
+
+        <View style={{ height: ITEM_H * VISIBLE, overflow: "hidden" }}>
+          <ScrollView
+            ref={ref}
+            showsVerticalScrollIndicator={false}
+            snapToInterval={ITEM_H}
+            decelerationRate="fast"
+            scrollEventThrottle={16}
+            onScroll={(e) => {
+              clearTimeout(timerRef.current);
+              const y = e.nativeEvent.contentOffset.y;
+              timerRef.current = setTimeout(() => {
+                const idx = Math.max(0, Math.min(items.length - 1, Math.round(y / ITEM_H)));
+                ref.current?.scrollTo({ y: idx * ITEM_H, animated: true });
+                setter(items[idx]);
+              }, 75);
+            }}
+            onLayout={() => {
+              if (!readyRef.current) {
+                readyRef.current = true;
+                const idx = items.indexOf(initVal);
+                ref.current?.scrollTo({ y: Math.max(0, idx) * ITEM_H, animated: false });
+              }
+            }}
+            contentContainerStyle={{ paddingVertical: ITEM_H * PAD }}
+          >
+            {items.map((item, i) => (
+              <TouchableOpacity
+                key={i}
+                onPress={() => {
+                  ref.current?.scrollTo({ y: i * ITEM_H, animated: true });
+                  setter(item);
+                }}
+                style={{ height: ITEM_H, justifyContent: "center", alignItems: "center" }}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={{
+                    fontSize: i === selIdx ? 19 : 17,
+                    fontWeight: i === selIdx ? "600" : "400",
+                    color: i === selIdx ? "#fff" : gray(0.55),
+                  }}
+                >
+                  {formatFn(item)}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        <TouchableOpacity
+          onPress={() => nudge(ref, items, selected, setter, 1)}
+          style={{ height: 22, justifyContent: "center", alignItems: "center", width: COL_W }}
+        >
+          <Text style={{ fontSize: 9, color: gray(0.5) }}>▼</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  return (
+    <View style={[{ backgroundColor: "#fff", borderRadius: 10, paddingVertical: 4, width: COL_W * 2 + 16 }, style]}>
+      <View style={{ position: "relative", paddingHorizontal: 8 }}>
+        <View
+          pointerEvents="none"
+          style={{
+            position: "absolute",
+            left: 4,
+            right: 4,
+            top: 22 + PAD * ITEM_H,
+            height: ITEM_H,
+            backgroundColor: BLUE,
+            borderRadius: 8,
+            zIndex: 0,
+          }}
+        />
+        <View style={{ flexDirection: "row", zIndex: 1 }}>
+          {renderScrollColumn(months, sMonth, monthRef, _sSetMonth, (m) => MONTH_NAMES[m - 1], monthReady, initialMonth, monthTimer)}
+          {renderScrollColumn(days, sDay, dayRef, _sSetDay, (d) => String(d), dayReady, initialDay, dayTimer)}
+        </View>
+      </View>
+      <View
+        style={{
+          flexDirection: "row",
+          justifyContent: "space-evenly",
+          paddingTop: 10,
+          paddingBottom: 6,
+          borderTopWidth: 1,
+          borderColor: "#eee",
+          marginTop: 4,
+        }}
+      >
+        <TouchableOpacity onPress={() => onConfirm({ month: sMonth, day: sDay })} style={{ padding: 8 }}>
           <Image_ style={{ width: 27, height: 27 }} icon={ICONS.check} />
         </TouchableOpacity>
         <TouchableOpacity onPress={onCancel} style={{ padding: 8 }}>

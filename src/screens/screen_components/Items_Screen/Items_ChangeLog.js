@@ -5,15 +5,41 @@ import { gray, deepEqual } from "../../../utils";
 import { C, Fonts } from "../../../styles";
 import { useOpenWorkordersStore } from "../../../stores";
 
+const DAY_NAMES = ["Sun", "Mon", "Tues", "Wed", "Thurs", "Fri", "Sat"];
+const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function ordinalSuffix(n) {
+  if (n >= 11 && n <= 13) return "th";
+  let last = n % 10;
+  if (last === 1) return "st";
+  if (last === 2) return "nd";
+  if (last === 3) return "rd";
+  return "th";
+}
+
 function formatTimestamp(millis) {
   let d = new Date(millis);
-  let month = d.getMonth() + 1;
-  let day = d.getDate();
+  let day = DAY_NAMES[d.getDay()];
+  let month = MONTH_NAMES[d.getMonth()];
+  let date = d.getDate();
   let hour = d.getHours();
   let amPM = hour >= 12 ? "PM" : "AM";
   hour = hour % 12 || 12;
   let min = d.getMinutes().toString().padStart(2, "0");
-  return month + "/" + day + " " + hour + ":" + min + " " + amPM;
+  return day + ", " + month + " " + date + ordinalSuffix(date) + " " + hour + ":" + min + " " + amPM;
+}
+
+function formatTimestampFull(millis) {
+  let d = new Date(millis);
+  let day = DAY_NAMES[d.getDay()];
+  let month = MONTH_NAMES[d.getMonth()];
+  let date = d.getDate();
+  let year = d.getFullYear();
+  let hour = d.getHours();
+  let amPM = hour >= 12 ? "PM" : "AM";
+  hour = hour % 12 || 12;
+  let min = d.getMinutes().toString().padStart(2, "0");
+  return day + ", " + month + " " + date + ordinalSuffix(date) + " " + year + " " + hour + ":" + min + " " + amPM;
 }
 
 function describeEntry(entry) {
@@ -47,7 +73,7 @@ function ChangeLogRow({ entry, index }) {
         style={{
           fontSize: 12,
           color: gray(0.45),
-          width: 100,
+          width: 170,
           flexShrink: 0,
         }}
       >
@@ -69,10 +95,11 @@ function ChangeLogRow({ entry, index }) {
 }
 
 export function Items_ChangeLog() {
-  const zChangeLog = useOpenWorkordersStore((state) => {
+  const zWorkorder = useOpenWorkordersStore((state) => {
     let id = state.openWorkorderID;
-    return state.workorders.find((o) => o.id === id)?.changeLog || [];
+    return state.workorders.find((o) => o.id === id);
   }, deepEqual);
+  const zChangeLog = zWorkorder?.changeLog || [];
 
   let changeLog = zChangeLog;
   let sorted = [...changeLog].sort((a, b) => b.timestamp - a.timestamp);
@@ -87,6 +114,30 @@ export function Items_ChangeLog() {
 
   return (
     <View style={{ flex: 1 }}>
+      {/* Started info */}
+      <View
+        style={{
+          flexDirection: "row",
+          paddingVertical: 8,
+          paddingHorizontal: 10,
+          backgroundColor: C.backgroundListWhite,
+          borderBottomWidth: 1,
+          borderBottomColor: C.buttonLightGreenOutline,
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ fontSize: 13, color: gray(0.5) }}>
+          {"Started: "}
+          <Text style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}>
+            {zWorkorder?.startedOnMillis ? formatTimestampFull(zWorkorder.startedOnMillis) : "N/A"}
+          </Text>
+          {"   by "}
+          <Text style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}>
+            {zWorkorder?.startedBy || "Unknown"}
+          </Text>
+        </Text>
+      </View>
+      {/* Column headers */}
       <View
         style={{
           flexDirection: "row",
@@ -97,7 +148,7 @@ export function Items_ChangeLog() {
           backgroundColor: C.listItemWhite,
         }}
       >
-        <Text style={{ fontSize: 12, color: gray(0.45), width: 100, fontWeight: Fonts.weight.textHeavy }}>Time</Text>
+        <Text style={{ fontSize: 12, color: gray(0.45), width: 170, fontWeight: Fonts.weight.textHeavy }}>Time</Text>
         <Text style={{ fontSize: 12, color: gray(0.45), flex: 1, fontWeight: Fonts.weight.textHeavy }}>Change</Text>
       </View>
       <FlatList

@@ -250,11 +250,11 @@ export function BaseScreen() {
   // Pre-load Stripe card readers on mount + refresh every 5 minutes
   useEffect(() => {
     async function fetchReaders() {
-      console.log("[CARD_READER] BaseScreen fetchReaders called");
+      // console.log("[CARD_READER] BaseScreen fetchReaders called");
       try {
         let result = await newCheckoutGetStripeReaders();
         let readersArr = result?.data?.data || [];
-        console.log("[CARD_READER] BaseScreen fetchReaders:", readersArr.length, "readers found", readersArr.map(r => ({ id: r.id, label: r.label, status: r.status })));
+        // console.log("[CARD_READER] BaseScreen fetchReaders:", readersArr.length, "readers found", readersArr.map(r => ({ id: r.id, label: r.label, status: r.status })));
         useStripePaymentStore.getState().setReadersArr(readersArr);
       } catch (e) {
         console.log("[CARD_READER] BaseScreen fetchReaders ERROR:", e?.message, e);

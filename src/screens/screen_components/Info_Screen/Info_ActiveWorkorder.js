@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { View, Text, TextInput, TouchableOpacity } from "react-native-web";
+import { View, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, Modal } from "react-native-web";
 import {
   capitalizeFirstLetterOfString,
   checkInputForNumbersOnly,
@@ -37,6 +37,8 @@ import {
   StaleBanner,
   PrinterAlert,
   WebPageModal,
+  TimePicker_,
+  DatePicker_,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
@@ -76,6 +78,140 @@ const RECEIPT_DROPDOWN_SELECTIONS = [
   RECEIPT_TYPES.intake,
   RECEIPT_TYPES.workorder,
 ];
+
+const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12To24Parts, to24, updatePickupFields }) => {
+  const [sShowDatePicker, _sSetShowDatePicker] = useState(false);
+  const [sShowStartPicker, _sSetShowStartPicker] = useState(false);
+  const [sShowEndPicker, _sSetShowEndPicker] = useState(false);
+  const [sPickerCoords, _sSetPickerCoords] = useState({ x: 0, y: 0 });
+
+  const dateRef = useRef(null);
+  const startRef = useRef(null);
+  const endRef = useRef(null);
+
+  const openPicker = (ref, setter) => {
+    const el = ref.current;
+    if (el) {
+      const rect = el.getBoundingClientRect();
+      _sSetPickerCoords({ x: rect.left, y: rect.bottom + 4 });
+    }
+    setter(true);
+  };
+
+  const pillStyle = {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 5,
+    backgroundColor: C.blue,
+  };
+  const pillText = { fontSize: 12, color: "white", fontWeight: "600" };
+  const labelText = { fontSize: 11, color: gray(0.5), fontStyle: "italic", marginRight: 4 };
+
+  const startParts = parse12To24Parts(pd.startTime);
+  const endParts = parse12To24Parts(pd.endTime);
+
+  const pickerOverlay = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 };
+
+  return (
+    <>
+      <View ref={dateRef}>
+        <TouchableOpacity
+          disabled={isDonePaid}
+          onPress={() => openPicker(dateRef, _sSetShowDatePicker)}
+          style={[pillStyle, { backgroundColor: C.green }]}
+        >
+          <Text style={pillText}>{dateLabel}</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <View ref={startRef}>
+          <TouchableOpacity
+            disabled={isDonePaid}
+            onPress={() => openPicker(startRef, _sSetShowStartPicker)}
+            style={pillStyle}
+          >
+            <Text style={pillText}>{formatTime12(pd.startTime)}</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={[labelText, { marginLeft: 7 }]}>to</Text>
+        <View ref={endRef}>
+          <TouchableOpacity
+            disabled={isDonePaid}
+            onPress={() => openPicker(endRef, _sSetShowEndPicker)}
+            style={pillStyle}
+          >
+            <Text style={pillText}>{formatTime12(pd.endTime)}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Date picker modal */}
+      <Modal visible={sShowDatePicker} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={() => _sSetShowDatePicker(false)}>
+          <View style={pickerOverlay}>
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+              <View style={{ position: "absolute", left: sPickerCoords.x, top: sPickerCoords.y }}>
+                <DatePicker_
+                  initialMonth={Number(pd.month) || new Date().getMonth() + 1}
+                  initialDay={Number(pd.day) || new Date().getDate()}
+                  onConfirm={({ month, day }) => {
+                    updatePickupFields({ month: String(month), day: String(day) });
+                    _sSetShowDatePicker(false);
+                  }}
+                  onCancel={() => _sSetShowDatePicker(false)}
+                />
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* Start time picker modal */}
+      <Modal visible={sShowStartPicker} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={() => _sSetShowStartPicker(false)}>
+          <View style={pickerOverlay}>
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+              <View style={{ position: "absolute", left: sPickerCoords.x, top: sPickerCoords.y }}>
+                <TimePicker_
+                  initialHour={startParts.hour}
+                  initialMinute={startParts.minute}
+                  initialPeriod={startParts.period}
+                  onConfirm={({ hour, minute, period }) => {
+                    updatePickupFields({ startTime: to24(hour, minute, period) });
+                    _sSetShowStartPicker(false);
+                  }}
+                  onCancel={() => _sSetShowStartPicker(false)}
+                />
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+
+      {/* End time picker modal */}
+      <Modal visible={sShowEndPicker} transparent animationType="fade">
+        <TouchableWithoutFeedback onPress={() => _sSetShowEndPicker(false)}>
+          <View style={pickerOverlay}>
+            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+              <View style={{ position: "absolute", left: sPickerCoords.x, top: sPickerCoords.y }}>
+                <TimePicker_
+                  initialHour={endParts.hour}
+                  initialMinute={endParts.minute}
+                  initialPeriod={endParts.period}
+                  onConfirm={({ hour, minute, period }) => {
+                    updatePickupFields({ endTime: to24(hour, minute, period) });
+                    _sSetShowEndPicker(false);
+                  }}
+                  onCancel={() => _sSetShowEndPicker(false)}
+                />
+              </View>
+            </TouchableWithoutFeedback>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+    </>
+  );
+};
 
 export const ActiveWorkorderComponent = ({}) => {
   // store getters ///////////////////////////////////////////////////////////////////
@@ -600,7 +736,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   paddingVertical: 2,
                   paddingHorizontal: 4,
                   fontSize: 15,
-                  outlineWidth: 0,
+                  outlineStyle: "none",
                   borderRadius: 5,
                   fontWeight: zOpenWorkorder?.brand ? "500" : null,
                 }}
@@ -694,7 +830,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   paddingVertical: 2,
                   paddingHorizontal: 4,
                   fontSize: 15,
-                  outlineWidth: 0,
+                  outlineStyle: "none",
                   borderRadius: 5,
                   fontWeight: zOpenWorkorder?.description ? "500" : null,
                 }}
@@ -761,7 +897,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   paddingVertical: 2,
                   paddingHorizontal: 4,
                   fontSize: 15,
-                  outlineWidth: 0,
+                  outlineStyle: "none",
                   borderRadius: 5,
                   fontWeight: zOpenWorkorder?.color1.label ? "500" : null,
                   backgroundColor: zOpenWorkorder?.color1.backgroundColor,
@@ -784,7 +920,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   paddingVertical: 2,
                   paddingHorizontal: 4,
                   fontSize: 15,
-                  outlineWidth: 0,
+                  outlineStyle: "none",
                   borderRadius: 5,
                   fontWeight: zOpenWorkorder?.color2.label ? "500" : null,
                   backgroundColor: zOpenWorkorder?.color2.backgroundColor,
@@ -861,92 +997,158 @@ export const ActiveWorkorderComponent = ({}) => {
             </View>
             {(() => {
               const rs = resolveStatus(zOpenWorkorder?.status, zSettings?.statuses);
-              return (
-                <StatusPickerModal
-                  statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned)}
-                  enabled={!isDonePaid}
-                  onSelect={(val) => {
-                    const store = useOpenWorkordersStore.getState();
-                    store.setField("status", val.id, zOpenWorkorder.id);
-                    // Stamp finishedOnMillis when status is set to "Finished"
-                    if (val.id === "33knktg") {
-                      store.setField("finishedOnMillis", Date.now(), zOpenWorkorder.id);
-                    }
-                    // Finished SMS confirmation modal
-                    if (val.id === "finished" && zOpenWorkorder.customerID) {
-                      const allWOs = store.getWorkorders();
-                      const otherWOs = allWOs.filter(
-                        (w) => w.customerID === zOpenWorkorder.customerID && w.id !== zOpenWorkorder.id
-                      );
-                      const hasOthers = otherWOs.length > 0;
-                      const allOthersFinished = hasOthers && otherWOs.every((w) => w.status === "finished");
-                      let modalMessage = "Would you like to send a text to let the customer know their bike is ready for pickup?";
-                      if (hasOthers && !allOthersFinished) {
-                        modalMessage = "This customer has other bikes that are still being worked on. Would you like to send a text to let them know this bike is ready?";
-                      } else if (allOthersFinished) {
-                        modalMessage = "All of this customer's bikes are now complete! Would you like to send a text to let them know everything is ready for pickup?";
-                      }
-                      useAlertScreenStore.getState().setValues({
-                        title: "Send Finished Text?",
-                        message: modalMessage,
-                        btn1Text: "Send",
-                        handleBtn1Press: () => {
-                          const finishedRule = { smsTemplateID: "finished_sms", emailTemplateID: "", delayMinutes: 0, delaySeconds: 0 };
-                          const wo = store.getWorkorders().find((w) => w.id === zOpenWorkorder.id) || zOpenWorkorder;
-                          scheduleAutoText(finishedRule, wo, zSettings);
-                          useAlertScreenStore.getState().setShowAlert(false);
-                        },
-                        btn2Text: "Don't Send",
-                        handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
-                        canExitOnOuterClick: true,
-                      });
-                    }
-                    // When "Part Ordered" status is selected, clear the "to be ordered" checkbox
-                    if (val.id === "part_ordered") {
-                      store.setField("partToBeOrdered", false, zOpenWorkorder.id);
-                    }
-                    // Auto-populate linked wait time if one is configured for this status
-                    const linked = zSettings?.waitTimeLinkedStatus?.[val.id];
-                    if (linked) {
-                      store.setField("waitTime", linked, zOpenWorkorder.id);
-                    }
-                    // Auto-text: check if this status has an auto-text rule
-                    const autoTextRules = zSettings?.statusAutoText || [];
-                    const rule = autoTextRules.find((r) => r.statusID === val.id);
-                    if (rule) {
+              const isPickupDelivery = zOpenWorkorder?.status === "pickup" || zOpenWorkorder?.status === "delivery";
+              const pd = zOpenWorkorder?.pickupDelivery || {};
+
+              const handleStatusSelect = (val) => {
+                const store = useOpenWorkordersStore.getState();
+                store.setField("status", val.id, zOpenWorkorder.id);
+                // Auto-populate pickup/delivery defaults when first selected
+                if (val.id === "pickup" || val.id === "delivery") {
+                  const existing = zOpenWorkorder?.pickupDelivery;
+                  if (!existing?.month && !existing?.day) {
+                    const now = new Date();
+                    const tomorrow = new Date(now);
+                    tomorrow.setDate(tomorrow.getDate() + 1);
+                    store.setField("pickupDelivery", {
+                      month: String(tomorrow.getMonth() + 1),
+                      day: String(tomorrow.getDate()),
+                      startTime: "11:00",
+                      endTime: "15:00",
+                    }, zOpenWorkorder.id);
+                  }
+                }
+                // Stamp finishedOnMillis when status is set to "Finished"
+                if (val.id === "33knktg") {
+                  store.setField("finishedOnMillis", Date.now(), zOpenWorkorder.id);
+                }
+                // Finished SMS confirmation modal
+                if (val.id === "finished" && zOpenWorkorder.customerID) {
+                  const allWOs = store.getWorkorders();
+                  const otherWOs = allWOs.filter(
+                    (w) => w.customerID === zOpenWorkorder.customerID && w.id !== zOpenWorkorder.id
+                  );
+                  const hasOthers = otherWOs.length > 0;
+                  const allOthersFinished = hasOthers && otherWOs.every((w) => w.status === "finished");
+                  let modalMessage = "Would you like to send a text to let the customer know their bike is ready for pickup?";
+                  if (hasOthers && !allOthersFinished) {
+                    modalMessage = "This customer has other bikes that are still being worked on. Would you like to send a text to let them know this bike is ready?";
+                  } else if (allOthersFinished) {
+                    modalMessage = "All of this customer's bikes are now complete! Would you like to send a text to let them know everything is ready for pickup?";
+                  }
+                  useAlertScreenStore.getState().setValues({
+                    title: "Send Finished Text?",
+                    message: modalMessage,
+                    btn1Text: "Send",
+                    handleBtn1Press: () => {
+                      const finishedRule = { smsTemplateID: "finished_sms", emailTemplateID: "", delayMinutes: 0, delaySeconds: 0 };
                       const wo = store.getWorkorders().find((w) => w.id === zOpenWorkorder.id) || zOpenWorkorder;
-                      scheduleAutoText(rule, wo, zSettings);
-                    }
-                    // Notify linked users: add this workorder to their pendingWorkorderIDs
-                    const woID = zOpenWorkorder.id;
-                    const users = zSettings?.users || [];
-                    const currentUserID = useLoginStore.getState().getCurrentUser()?.id;
-                    let usersChanged = false;
-                    const updatedUsers = users.map((u) => {
-                      if (!(u.statuses || []).includes(val.id)) return u;
-                      if ((u.pendingWorkorderIDs || []).includes(woID)) return u;
-                      if (u.id === currentUserID) return u;
-                      usersChanged = true;
-                      return { ...u, pendingWorkorderIDs: [...(u.pendingWorkorderIDs || []), woID] };
-                    });
-                    if (usersChanged) {
-                      useSettingsStore.getState().setField("users", updatedUsers);
-                    }
-                  }}
-                  buttonStyle={{
-                    width: "100%",
-                    backgroundColor: rs.backgroundColor,
-                    marginTop: 11,
-                  }}
-                  buttonTextStyle={{
-                    color: rs.textColor,
-                    fontWeight: "normal",
-                    fontSize: 14,
-                  }}
-                  modalCoordX={100}
-                  modalCoordY={40}
-                  buttonText={rs.label}
-                />
+                      scheduleAutoText(finishedRule, wo, zSettings);
+                      useAlertScreenStore.getState().setShowAlert(false);
+                    },
+                    btn2Text: "Don't Send",
+                    handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                    canExitOnOuterClick: true,
+                  });
+                }
+                // When "Part Ordered" status is selected, clear the "to be ordered" checkbox
+                if (val.id === "part_ordered") {
+                  store.setField("partToBeOrdered", false, zOpenWorkorder.id);
+                }
+                // Auto-populate linked wait time if one is configured for this status
+                const linked = zSettings?.waitTimeLinkedStatus?.[val.id];
+                if (linked) {
+                  store.setField("waitTime", linked, zOpenWorkorder.id);
+                }
+                // Auto-text: check if this status has an auto-text rule
+                const autoTextRules = zSettings?.statusAutoText || [];
+                const rule = autoTextRules.find((r) => r.statusID === val.id);
+                if (rule) {
+                  const wo = store.getWorkorders().find((w) => w.id === zOpenWorkorder.id) || zOpenWorkorder;
+                  scheduleAutoText(rule, wo, zSettings);
+                }
+                // Notify linked users: add this workorder to their pendingWorkorderIDs
+                const woID = zOpenWorkorder.id;
+                const users = zSettings?.users || [];
+                const currentUserID = useLoginStore.getState().getCurrentUser()?.id;
+                let usersChanged = false;
+                const updatedUsers = users.map((u) => {
+                  if (!(u.statuses || []).includes(val.id)) return u;
+                  if ((u.pendingWorkorderIDs || []).includes(woID)) return u;
+                  if (u.id === currentUserID) return u;
+                  usersChanged = true;
+                  return { ...u, pendingWorkorderIDs: [...(u.pendingWorkorderIDs || []), woID] };
+                });
+                if (usersChanged) {
+                  useSettingsStore.getState().setField("users", updatedUsers);
+                }
+              };
+
+              const updatePickupFields = (fields) => {
+                const store = useOpenWorkordersStore.getState();
+                const current = zOpenWorkorder?.pickupDelivery || {};
+                store.setField("pickupDelivery", { ...current, ...fields }, zOpenWorkorder.id);
+              };
+
+              const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+              const dateLabel = pd.month && pd.day
+                ? (MONTH_LABELS[Number(pd.month) - 1] || pd.month) + " " + pd.day
+                : "Date";
+              const formatTime12 = (t24) => {
+                if (!t24) return "--:--";
+                const [hStr, mStr] = t24.split(":");
+                let h = Number(hStr);
+                const period = h >= 12 ? "PM" : "AM";
+                if (h === 0) h = 12;
+                else if (h > 12) h -= 12;
+                return h + ":" + mStr + " " + period;
+              };
+              const parse12To24Parts = (t24) => {
+                if (!t24) return { hour: 11, minute: 0, period: "AM" };
+                const [hStr, mStr] = t24.split(":");
+                let h = Number(hStr);
+                const period = h >= 12 ? "PM" : "AM";
+                if (h === 0) h = 12;
+                else if (h > 12) h -= 12;
+                return { hour: h, minute: Number(mStr), period };
+              };
+              const to24 = (hour, minute, period) => {
+                let h24 = period === "PM" ? (hour === 12 ? 12 : hour + 12) : (hour === 12 ? 0 : hour);
+                return String(h24).padStart(2, "0") + ":" + String(minute).padStart(2, "0");
+              };
+
+              return (
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: isPickupDelivery ? "space-between" : undefined, marginTop: 11, width: "100%" }}>
+                  <StatusPickerModal
+                    statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned)}
+                    enabled={!isDonePaid}
+                    onSelect={handleStatusSelect}
+                    buttonStyle={{
+                      width: isPickupDelivery ? undefined : "100%",
+                      backgroundColor: rs.backgroundColor,
+                      paddingHorizontal: isPickupDelivery ? 12 : 8,
+                    }}
+                    buttonTextStyle={{
+                      color: rs.textColor,
+                      fontWeight: "normal",
+                      fontSize: 14,
+                    }}
+                    modalCoordX={100}
+                    modalCoordY={40}
+                    buttonText={rs.label}
+                  />
+                  {isPickupDelivery && (
+                    <PickupDeliveryInputs
+                      pd={pd}
+                      isDonePaid={isDonePaid}
+                      dateLabel={dateLabel}
+                      formatTime12={formatTime12}
+                      parse12To24Parts={parse12To24Parts}
+                      to24={to24}
+                      updatePickupFields={updatePickupFields}
+                    />
+                  )}
+                </View>
               );
             })()}
             <View
@@ -973,7 +1175,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   paddingVertical: 2,
                   paddingHorizontal: 4,
                   fontSize: 15,
-                  outlineWidth: 0,
+                  outlineStyle: "none",
                   borderRadius: 5,
                   textAlign: "center",
                   fontWeight: (zOpenWorkorder?.waitTime?.maxWaitTimeDays != null && zOpenWorkorder?.waitTime?.maxWaitTimeDays !== "") ? "500" : null,
@@ -1087,7 +1289,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   paddingVertical: 2,
                   paddingHorizontal: 4,
                   fontSize: 15,
-                  outlineWidth: 0,
+                  outlineStyle: "none",
                   borderRadius: 5,
                   fontWeight: zOpenWorkorder?.partOrdered ? "500" : null,
                   backgroundColor: C.backgroundWhite,
@@ -1124,7 +1326,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   paddingVertical: 2,
                   paddingHorizontal: 4,
                   fontSize: 15,
-                  outlineWidth: 0,
+                  outlineStyle: "none",
                   borderRadius: 5,
                   fontWeight: zOpenWorkorder?.partSource ? "500" : null,
                   backgroundColor: C.backgroundWhite,

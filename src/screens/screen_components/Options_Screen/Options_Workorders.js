@@ -397,12 +397,35 @@ export function WorkordersComponent({}) {
       });
     }
 
-    // Priority 1 (highest): Current user sent the last message on this workorder
+    // Priority 1: Current user sent the last message on this workorder
     finalArr.sort((a, b) => {
       let aIsSender = a.lastSMSSenderUserID && a.lastSMSSenderUserID === currentUser?.id;
       let bIsSender = b.lastSMSSenderUserID && b.lastSMSSenderUserID === currentUser?.id;
       if (aIsSender && !bIsSender) return -1;
       if (!aIsSender && bIsSender) return 1;
+      return 0;
+    });
+
+    // Priority 0 (highest): Today's pickup/delivery at the very top, sorted by startTime
+    const now = new Date();
+    const todayMonth = now.getMonth() + 1;
+    const todayDay = now.getDate();
+    finalArr.sort((a, b) => {
+      const aIsToday = (a.status === "pickup" || a.status === "delivery") &&
+        Number(a.pickupDelivery?.month) === todayMonth &&
+        Number(a.pickupDelivery?.day) === todayDay;
+      const bIsToday = (b.status === "pickup" || b.status === "delivery") &&
+        Number(b.pickupDelivery?.month) === todayMonth &&
+        Number(b.pickupDelivery?.day) === todayDay;
+      if (aIsToday && !bIsToday) return -1;
+      if (!aIsToday && bIsToday) return 1;
+      if (aIsToday && bIsToday) {
+        // pickups first, then deliveries
+        if (a.status === "pickup" && b.status === "delivery") return -1;
+        if (a.status === "delivery" && b.status === "pickup") return 1;
+        // within same type, sort by startTime
+        return (a.pickupDelivery?.startTime || "").localeCompare(b.pickupDelivery?.startTime || "");
+      }
       return 0;
     });
 

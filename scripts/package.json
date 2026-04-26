@@ -1,7 +1,13 @@
 {
-  "name": "lightspeed-import",
+  "name": "lightspeed-migration",
   "private": true,
+  "scripts": {
+    "download": "node lightspeed-download.js",
+    "download:statuses": "node lightspeed-download-statuses.js",
+    "migrate": "node lightspeed-import.js"
+  },
   "dependencies": {
+    "dotenv": "^16.4.7",
     "firebase-admin": "^12.6.0",
     "lodash": "^4.17.21"
   }

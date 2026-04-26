@@ -6857,6 +6857,70 @@ async function completeSaleServerSide({
     }
   }
 
+  // ── Link-to-pay: send confirmation email to store office ──
+  if (logPrefix === "LinkToPay") {
+    const officeEmail = settings?.storeInfo?.officeEmail || "";
+    if (officeEmail && officeEmail.includes("@")) {
+      try {
+        const transporter = nodemailer.createTransport({
+          service: "gmail",
+          auth: {
+            user: "support@bonitabikes.com",
+            pass: gmailAppPassword.value(),
+          },
+        });
+        const custName = [customer?.first || primaryWO?.customerFirst || "", customer?.last || primaryWO?.customerLast || ""].filter(Boolean).join(" ") || "Unknown";
+        const woID = primaryWO?.id || workorderIDs?.[0] || "";
+        await transporter.sendMail({
+          from: `"${storeName}" <support@bonitabikes.com>`,
+          to: officeEmail,
+          subject: `Payment Received - $${amountDisplay} - ${custName} - ${woID}`,
+          html: `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto"><p>A link-to-pay payment of <strong>$${amountDisplay}</strong> was received.</p><p><strong>Customer:</strong> ${custName}</p><p><strong>Workorder:</strong> ${woID}</p><p style="margin:24px 0"><a href="${receiptUrl}" style="display:inline-block;padding:12px 24px;background-color:#4CAF50;color:white;text-decoration:none;border-radius:6px;font-size:14px">View Payment</a></p></div>`,
+        });
+        log(`completeSaleServerSide[${logPrefix}]: store confirmation email sent`, { officeEmail });
+      } catch (officeErr) {
+        log(`completeSaleServerSide[${logPrefix}]: store confirmation email error`, officeErr.message);
+      }
+    }
+
+    // ── Link-to-pay: add confirmation to customer SMS queue ──
+    if (cleanPhone.length === 10) {
+      try {
+        const confirmMsg = `Link-to-pay: Payment of $${amountDisplay} received. View receipt: ${receiptUrl}`;
+        const confirmMsgID = crypto.randomUUID();
+        const confirmConvRef = db.collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("sms-messages").doc(cleanPhone);
+        await confirmConvRef.collection("messages").doc(confirmMsgID)
+          .set({
+            id: confirmMsgID,
+            customerID: customerID || "",
+            message: confirmMsg,
+            phoneNumber: cleanPhone,
+            fromNumber: "+12393171234",
+            tenantID,
+            storeID,
+            type: "outgoing",
+            millis: Date.now(),
+            textToPay: true,
+            paymentConfirmation: true,
+          });
+        await confirmConvRef.set({
+          lastMessage: confirmMsg,
+          lastMillis: Date.now(),
+          lastType: "outgoing",
+          lastOutgoingMessageID: confirmMsgID,
+          lastOutgoingMessageStatus: "delivered",
+          lastOutgoingMillis: Date.now(),
+          threadStatus: "open",
+        }, { merge: true });
+        log(`completeSaleServerSide[${logPrefix}]: confirmation added to SMS queue`, { phone: cleanPhone });
+      } catch (queueErr) {
+        log(`completeSaleServerSide[${logPrefix}]: SMS queue error`, queueErr.message);
+      }
+    }
+  }
+
   log(`completeSaleServerSide[${logPrefix}]: sale completed`, { saleID });
   return { completed: true, partial: false };
 }

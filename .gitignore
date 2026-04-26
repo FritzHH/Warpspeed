@@ -23,5 +23,6 @@ yarn-debug.log*
 yarn-error.log*
 functions/creds.json
 functions/creds.json.json
-
-
+scripts/.env
+scripts/serviceAccountKey.json
+scripts/csv/

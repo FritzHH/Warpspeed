@@ -696,7 +696,7 @@ export function WorkordersComponent({}) {
                             color: C.text,
                           }}
                         >
-                          {workorder.brand || "Brand"}
+                          {capitalizeFirstLetterOfString(workorder.brand) || "Brand"}
                         </Text>
                         {!!workorder.description && (
                           <View
@@ -714,7 +714,7 @@ export function WorkordersComponent({}) {
                             color: C.text,
                           }}
                         >
-                          {workorder.description}
+                          {capitalizeFirstLetterOfString(workorder.description)}
                         </Text>
                         {workorder.workorderLines?.length > 0 && (
                           <View
@@ -804,7 +804,7 @@ export function WorkordersComponent({}) {
                           numberOfLines={1}
                           style={{ fontSize: 14, color: C.blue, fontWeight: "500" }}
                         >
-                          {workorder.partOrdered}
+                          {capitalizeFirstLetterOfString(workorder.partOrdered)}
                         </Text>
                       )}
                       {!!(workorder.partOrdered && workorder.partSource) && (
@@ -822,7 +822,7 @@ export function WorkordersComponent({}) {
                           numberOfLines={1}
                           style={{ fontSize: 14, color: C.orange }}
                         >
-                          {workorder.partSource}
+                          {capitalizeFirstLetterOfString(workorder.partSource)}
                         </Text>
                       )}
                       {!!(workorder.partOrderedMillis && workorder.partOrderEstimateMillis && Math.round((workorder.partOrderEstimateMillis - workorder.partOrderedMillis) / NUM_MILLIS_IN_DAY) > 0) && (

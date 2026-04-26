@@ -568,13 +568,13 @@ export async function newCheckoutCancelStripePayment(readerID) {
   }
 }
 
-export async function newCheckoutProcessStripeRefund(amount, chargeID, transactionFields) {
-  dlog(DCAT.STRIPE_REQ, "processStripeRefund", "FirebaseCalls", { amount, chargeID, transactionID: transactionFields?.transactionID });
+export async function newCheckoutProcessStripeRefund(amount, paymentIntentID, transactionFields) {
+  dlog(DCAT.STRIPE_REQ, "processStripeRefund", "FirebaseCalls", { amount, paymentIntentID, transactionID: transactionFields?.transactionID });
   try {
     const callables = await getCallables();
     const result = await callables.processRefund({
       amount: Number(amount),
-      chargeID,
+      paymentIntentID,
       ...(transactionFields || {}),
     });
     log("newCheckout refund processed:", result.data);

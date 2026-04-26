@@ -115,6 +115,8 @@ export function Dashboard_Admin({}) {
   // store getters ///////////////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.settings);
   const zLiveReaders = useStripePaymentStore((state) => state.readersArr) || [];
+  const zCurrentUserLevel = useLoginStore((state) => state.currentUser?.permissions?.level || 0);
+  const sMenuLocked = zCurrentUserLevel < 4;
   // local state ///////////////////////////////////////////////////////////
   const [sFacialRecognitionModalUserObj, _setFacialRecognitionModalUserObj] =
     useState(false);
@@ -334,51 +336,17 @@ export function Dashboard_Admin({}) {
             }}
           >
             {/************************* settings list names ****************** */}
+            {/****************** sales report modal *****************************/}
             <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.quickItems}
-              handleExpandPress={() =>
-                _setExpand(
-                  sExpand === TAB_NAMES.quickItems ? null : TAB_NAMES.quickItems
-                )
-              }
-              text={TAB_NAMES.quickItems}
-              icon={ICONS.quickItemButton}
+              selected={sExpand === TAB_NAMES.sales}
+              handleExpandPress={() => _setShowSalesReportModal(true)}
               style={{
-                fontWeight: sExpand === TAB_NAMES.quickItems ? 500 : null,
-                color: sExpand === TAB_NAMES.quickItems ? C.green : gray(0.6),
+                fontWeight: sExpand === TAB_NAMES.sales ? 500 : null,
+                color: sExpand === TAB_NAMES.sales ? C.green : gray(0.6),
               }}
-            />
-            <VerticalSpacer />
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.standButtons}
-              handleExpandPress={() => {
-                if (sExpand === TAB_NAMES.standButtons) {
-                  _setExpand(null);
-                } else {
-                  _setExpand(TAB_NAMES.standButtons);
-                  _setShowStandButtonsModal(true);
-                }
-              }}
-              text={TAB_NAMES.standButtons}
-              icon={ICONS.tools1}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.standButtons ? 500 : null,
-                color:
-                  sExpand === TAB_NAMES.standButtons ? C.green : gray(0.6),
-              }}
-            />
-            <VerticalSpacer />
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.users}
-              handleExpandPress={() =>
-                _setExpand(sExpand === TAB_NAMES.users ? null : TAB_NAMES.users)
-              }
-              text={TAB_NAMES.users}
-              icon={ICONS.userControl}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.users ? 500 : null,
-                color: sExpand === TAB_NAMES.users ? C.green : gray(0.6),
-              }}
+              text={TAB_NAMES.sales}
+              icon={ICONS.dollarYellow}
+              iconSize={25}
             />
             <VerticalSpacer />
             <MenuListLabelComponent
@@ -402,6 +370,92 @@ export function Dashboard_Admin({}) {
               }}
             />
             <VerticalSpacer />
+            {/****************** ordering tab***********************************/}
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.ordering}
+              handleExpandPress={() =>
+                _setExpand(
+                  sExpand === TAB_NAMES.ordering ? null : TAB_NAMES.ordering
+                )
+              }
+              style={{
+                fontWeight: sExpand === TAB_NAMES.ordering ? 500 : null,
+                color: sExpand === TAB_NAMES.ordering ? C.green : gray(0.6),
+              }}
+              text={TAB_NAMES.ordering}
+              icon={ICONS.ordering}
+            />
+            <VerticalSpacer />
+            {/****************** label designer *****************************/}
+            <MenuListLabelComponent
+              handleExpandPress={() => _setShowLabelDesigner(true)}
+              text={TAB_NAMES.labelDesigner}
+              icon={ICONS.print}
+            />
+            <VerticalSpacer />
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.users}
+              handleExpandPress={() =>
+                _setExpand(sExpand === TAB_NAMES.users ? null : TAB_NAMES.users)
+              }
+              text={TAB_NAMES.users}
+              icon={ICONS.userControl}
+              style={{
+                fontWeight: sExpand === TAB_NAMES.users ? 500 : null,
+                color: sExpand === TAB_NAMES.users ? C.green : gray(0.6),
+              }}
+            />
+            <VerticalSpacer />
+            {/****************** payroll modal *****************************/}
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.payroll}
+              handleExpandPress={() => _setShowPayrollModal(true)}
+              style={{
+                fontWeight: sExpand === TAB_NAMES.payroll ? 500 : null,
+                color: sExpand === TAB_NAMES.payroll ? C.green : gray(0.6),
+              }}
+              text={TAB_NAMES.payroll}
+              icon={ICONS.greenDollar}
+              iconSize={25}
+              disabled={sMenuLocked}
+            />
+            <VerticalSpacer />
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.quickItems}
+              handleExpandPress={() =>
+                _setExpand(
+                  sExpand === TAB_NAMES.quickItems ? null : TAB_NAMES.quickItems
+                )
+              }
+              text={TAB_NAMES.quickItems}
+              icon={ICONS.quickItemButton}
+              style={{
+                fontWeight: sExpand === TAB_NAMES.quickItems ? 500 : null,
+                color: sExpand === TAB_NAMES.quickItems ? C.green : gray(0.6),
+              }}
+              disabled={sMenuLocked}
+            />
+            <VerticalSpacer />
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.standButtons}
+              handleExpandPress={() => {
+                if (sExpand === TAB_NAMES.standButtons) {
+                  _setExpand(null);
+                } else {
+                  _setExpand(TAB_NAMES.standButtons);
+                  _setShowStandButtonsModal(true);
+                }
+              }}
+              text={TAB_NAMES.standButtons}
+              icon={ICONS.tools1}
+              style={{
+                fontWeight: sExpand === TAB_NAMES.standButtons ? 500 : null,
+                color:
+                  sExpand === TAB_NAMES.standButtons ? C.green : gray(0.6),
+              }}
+              disabled={sMenuLocked}
+            />
+            <VerticalSpacer />
             <MenuListLabelComponent
               selected={sExpand === TAB_NAMES.statuses}
               handleExpandPress={() =>
@@ -416,6 +470,7 @@ export function Dashboard_Admin({}) {
 
                 color: sExpand === TAB_NAMES.statuses ? C.green : gray(0.6),
               }}
+              disabled={sMenuLocked}
             />
             <VerticalSpacer />
             <MenuListLabelComponent
@@ -430,6 +485,7 @@ export function Dashboard_Admin({}) {
                 color: sExpand === TAB_NAMES.lists ? C.green : gray(0.6),
               }}
               text={TAB_NAMES.lists}
+              disabled={sMenuLocked}
             />
             <VerticalSpacer />
             <MenuListLabelComponent
@@ -445,48 +501,7 @@ export function Dashboard_Admin({}) {
                 color: sExpand === TAB_NAMES.storeInfo ? C.green : gray(0.6),
               }}
               text={TAB_NAMES.storeInfo}
-            />
-            <VerticalSpacer />
-            {/****************** sales report modal *****************************/}
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.sales}
-              handleExpandPress={() => _setShowSalesReportModal(true)}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.sales ? 500 : null,
-                color: sExpand === TAB_NAMES.sales ? C.green : gray(0.6),
-              }}
-              text={TAB_NAMES.sales}
-              icon={ICONS.dollarYellow}
-              iconSize={25}
-            />
-            <VerticalSpacer />
-            {/****************** payroll modal *****************************/}
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.payroll}
-              handleExpandPress={() => _setShowPayrollModal(true)}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.payroll ? 500 : null,
-                color: sExpand === TAB_NAMES.payroll ? C.green : gray(0.6),
-              }}
-              text={TAB_NAMES.payroll}
-              icon={ICONS.greenDollar}
-              iconSize={25}
-            />
-            <VerticalSpacer />
-            {/****************** ordering tab***********************************/}
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.ordering}
-              handleExpandPress={() =>
-                _setExpand(
-                  sExpand === TAB_NAMES.ordering ? null : TAB_NAMES.ordering
-                )
-              }
-              style={{
-                fontWeight: sExpand === TAB_NAMES.ordering ? 500 : null,
-                color: sExpand === TAB_NAMES.ordering ? C.green : gray(0.6),
-              }}
-              text={TAB_NAMES.ordering}
-              icon={ICONS.ordering}
+              disabled={sMenuLocked}
             />
             <VerticalSpacer />
             {/****************** text templates tab *****************************/}
@@ -506,6 +521,7 @@ export function Dashboard_Admin({}) {
               }}
               text={TAB_NAMES.textTemplates}
               icon={ICONS.notes}
+              disabled={sMenuLocked}
             />
             <VerticalSpacer />
             {/****************** email templates tab *****************************/}
@@ -525,6 +541,7 @@ export function Dashboard_Admin({}) {
               }}
               text={TAB_NAMES.emailTemplates}
               icon={ICONS.notes}
+              disabled={sMenuLocked}
             />
             <VerticalSpacer />
             {/****************** blocked numbers tab *****************************/}
@@ -544,6 +561,7 @@ export function Dashboard_Admin({}) {
               }}
               text={TAB_NAMES.blockedNumbers}
               icon={ICONS.notes}
+              disabled={sMenuLocked}
             />
             <VerticalSpacer />
             {/****************** import tab *****************************/}
@@ -560,6 +578,7 @@ export function Dashboard_Admin({}) {
               }}
               text={TAB_NAMES.import}
               icon={ICONS.importIcon}
+              disabled={sMenuLocked}
             />
             <VerticalSpacer />
             {/****************** backup & recovery tab *****************************/}
@@ -576,13 +595,7 @@ export function Dashboard_Admin({}) {
               }}
               text={TAB_NAMES.backup}
               icon={ICONS.tools}
-            />
-            <VerticalSpacer />
-            {/****************** label designer *****************************/}
-            <MenuListLabelComponent
-              handleExpandPress={() => _setShowLabelDesigner(true)}
-              text={TAB_NAMES.labelDesigner}
-              icon={ICONS.print}
+              disabled={sMenuLocked}
             />
           </View>
         </ScrollView>
@@ -595,398 +608,14 @@ export function Dashboard_Admin({}) {
           }}
           contentContainerStyle={{ alignItems: "center" }}
         >
-          {!sExpand && (<>
-            <TouchableOpacity
-              onPress={async () => {
-                const statusesText = await fetch("/import_data/statuses.csv").then(r => r.text());
-                const statuses = mapStatuses(statusesText);
-                const settings = { ...cloneDeep(SETTINGS_OBJ), statuses };
-                await dbSaveSettings(settings);
-                useSettingsStore.getState().setSettings(settings);
-              }}
-              style={{
-                paddingVertical: 10,
-                paddingHorizontal: 14,
-                borderRadius: 10,
-                borderWidth: 2,
-                borderColor: C.buttonLightGreenOutline,
-                backgroundColor: C.listItemWhite,
-                alignItems: "center",
-                justifyContent: "center",
-                marginTop: 20,
-              }}
-            >
-              <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
-                Inject Raw Settings
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={async () => {
-                const settings = useSettingsStore.getState().getSettings();
-                await dbSaveSettings(settings);
-                alert("Settings saved to Firestore.");
-              }}
-              style={{
-                paddingVertical: 10,
-                paddingHorizontal: 14,
-                borderRadius: 10,
-                borderWidth: 2,
-                borderColor: C.buttonLightGreenOutline,
-                backgroundColor: C.listItemWhite,
-                alignItems: "center",
-                justifyContent: "center",
-                marginTop: 10,
-              }}
-            >
-              <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
-                Save Settings
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={async () => {
-                const { dbGetSettings } = await import("../../../../db_calls_wrapper");
-                const { tenantID, storeID } = useSettingsStore.getState().getSettings();
-                const settings = await dbGetSettings(tenantID, storeID);
-                if (settings) {
-                  useSettingsStore.getState().setSettings(settings);
-                  alert("Settings rehydrated from Firestore.");
-                } else {
-                  alert("No settings found in Firestore.");
-                }
-              }}
-              style={{
-                paddingVertical: 10,
-                paddingHorizontal: 14,
-                borderRadius: 10,
-                borderWidth: 2,
-                borderColor: C.buttonLightGreenOutline,
-                backgroundColor: C.listItemWhite,
-                alignItems: "center",
-                justifyContent: "center",
-                marginTop: 10,
-              }}
-            >
-              <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
-                Rehydrate Settings
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => {
-                let printObj = {
-                  id: crypto.randomUUID(),
-                  receiptType: "Workorder",
-                  barcode: "100000000001",
-                  workorderNumber: "WO-10001",
-                  customerFirstName: "John",
-                  customerLastName: "Smith",
-                  customerCell: "239-555-1234",
-                  customerEmail: "john.smith@email.com",
-                  customerAddress: "123 Main St, Bonita Springs, FL 34135",
-                  brand: "Trek",
-                  description: "Domane SL 5",
-                  color1: "Matte Black",
-                  color2: "Red",
-                  status: "In Progress",
-                  startedBy: "Mike",
-                  startedOnDate: "03/20/2026",
-                  finishedOnDate: "",
-                  subtotal: "$185.00",
-                  discount: "$10.00",
-                  tax: "$12.25",
-                  total: "$187.25",
-                  salesTaxPercent: "7%",
-                  labor: "$75.00",
-                  parts: "$110.00",
-                  shopName: "Bonita Bikes LLC",
-                  shopContactBlurb: "239-555-0000 | bonitabikes@email.com",
-                  thankYouBlurb: "Thank you for choosing Bonita Bikes!",
-                  workorderLines: [
-                    { qty: 1, inventoryItem: { formalName: "Brake Pad Set - Shimano 105", price: 3500 }, id: "line1" },
-                    { qty: 2, inventoryItem: { formalName: "Inner Tube 700x25c", price: 800 }, id: "line2" },
-                    { qty: 1, inventoryItem: { formalName: "Chain - KMC X11 Silver", price: 3500 }, id: "line3" },
-                    { qty: 1, inventoryItem: { formalName: "Labor - Full Tune Up", price: 7500 }, id: "line4" },
-                  ],
-                  customerNotes: ["Customer requested rush service", "Pickup after 5pm"],
-                  internalNotes: ["Rear derailleur cable frayed — replaced"],
-                };
-                dbSavePrintObj(printObj, localStorageWrapper.getItem("selectedPrinterID") || "");
-              }}
-              style={{
-                paddingVertical: 10,
-                paddingHorizontal: 14,
-                borderRadius: 10,
-                borderWidth: 2,
-                borderColor: C.buttonLightGreenOutline,
-                backgroundColor: C.listItemWhite,
-                alignItems: "center",
-                justifyContent: "center",
-                marginTop: 20,
-              }}
-            >
-              <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
-                Test Print
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={async () => {
-                let dayjs = (await import("dayjs")).default;
-                let userID = "1234";
-                let now = dayjs();
-                let startDate = now.subtract(3, "month").startOf("day");
-                let endDate = now.startOf("day");
-                let current = startDate;
-                let allPunches = [];
-
-                while (current.isBefore(endDate) || current.isSame(endDate, "day")) {
-                  // 3-7 punch pairs per day
-                  let pairCount = 3 + Math.floor(Math.random() * 5);
-                  // Spread pairs across 10am-7pm (600 min window)
-                  let windowStart = 600; // 10:00 AM in minutes from midnight
-                  let windowEnd = 1140;  // 7:00 PM in minutes from midnight
-                  let slotSize = Math.floor((windowEnd - windowStart) / pairCount);
-
-                  for (let i = 0; i < pairCount; i++) {
-                    let slotStart = windowStart + (i * slotSize);
-                    let slotEnd = slotStart + slotSize;
-                    // Random in time within first 60% of slot
-                    let inMinutes = slotStart + Math.floor(Math.random() * (slotSize * 0.5));
-                    // Random out time in last 40% of slot, at least 10 min after in
-                    let outMinutes = Math.min(
-                      inMinutes + 10 + Math.floor(Math.random() * (slotSize * 0.4)),
-                      slotEnd - 1
-                    );
-                    if (outMinutes > windowEnd) outMinutes = windowEnd;
-                    if (outMinutes <= inMinutes) outMinutes = inMinutes + 10;
-
-                    let inMillis = current.add(inMinutes, "minute").valueOf();
-                    let outMillis = current.add(outMinutes, "minute").valueOf();
-
-                    allPunches.push({
-                      ...TIME_PUNCH_PROTO,
-                      userID,
-                      id: crypto.randomUUID(),
-                      millis: inMillis,
-                      option: "in",
-                    });
-                    allPunches.push({
-                      ...TIME_PUNCH_PROTO,
-                      userID,
-                      id: crypto.randomUUID(),
-                      millis: outMillis,
-                      option: "out",
-                    });
-                  }
-                  current = current.add(1, "day");
-                }
-
-                log("Injecting " + allPunches.length + " punches for user 1234...");
-                let batchSize = 20;
-                for (let i = 0; i < allPunches.length; i += batchSize) {
-                  let batch = allPunches.slice(i, i + batchSize);
-                  await Promise.all(batch.map((p) => dbSavePunchObject(p)));
-                }
-                log("Done! Injected " + allPunches.length + " punches.");
-                alert("Injected " + allPunches.length + " punches for user 1234 (3 months).");
-              }}
-              style={{
-                paddingVertical: 10,
-                paddingHorizontal: 14,
-                borderRadius: 10,
-                borderWidth: 2,
-                borderColor: C.orange,
-                backgroundColor: C.listItemWhite,
-                alignItems: "center",
-                justifyContent: "center",
-                marginTop: 10,
-              }}
-            >
-              <Text style={{ fontSize: 13, color: C.orange, fontWeight: "700" }}>
-                Inject Test Punches (1234)
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={async () => {
-                try {
-                  const settings = useSettingsStore.getState().getSettings();
-                  const { tenantID, storeID } = settings;
-                  const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-
-                  const workorder = SPOOF_WORKORDER;
-                  const customer = {
-                    first: workorder.customerFirst,
-                    last: workorder.customerLast,
-                    customerCell: workorder.customerCell,
-                    customerLandline: workorder.customerLandline,
-                    email: workorder.customerEmail,
-                    contactRestriction: workorder.customerContactRestriction,
-                  };
-
-                  const totals = calculateRunningTotals(workorder, settings?.salesTaxPercent, [], false, !!workorder.taxFree);
-                  const fakeSale = {
-                    id: generateEAN13Barcode(),
-                    millis: Date.now(),
-                    subtotal: totals.runningSubtotal,
-                    discount: totals.runningDiscount,
-                    tax: totals.runningTax,
-                    total: totals.finalTotal,
-                    amountCaptured: totals.finalTotal,
-                    transactions: [],
-                    refunds: [],
-                    workorderID: workorder.id,
-                  };
-                  const cardAmount = Math.round(totals.finalTotal * 0.6);
-                  const cashAmount = totals.finalTotal - cardAmount;
-                  const fakeCardPayment = {
-                    amountCaptured: cardAmount,
-                    amountTendered: cardAmount,
-                    type: "payment",
-                    method: "card",
-                    last4: "4242",
-                    cardType: "Visa",
-                    brand: "visa",
-                    paymentMethod: "card_present",
-                    authorizationCode: "A83F72",
-                  };
-                  const fakeCashPayment = {
-                    amountCaptured: cashAmount,
-                    amountTendered: cashAmount + 500,
-                    type: "payment",
-                    method: "cash",
-                  };
-
-                  const receiptData = printBuilder.sale(fakeSale, [fakeCardPayment, fakeCashPayment], customer, workorder, settings?.salesTaxPercent, _ctx);
-                  log("SPOOF SALE RECEIPT", JSON.stringify(receiptData, null, 2));
-
-                  // Send to thermal printer
-                  dbSavePrintObj(receiptData, localStorageWrapper.getItem("selectedPrinterID") || "");
-
-                  // Generate and upload PDF
-                  const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
-                  const base64 = generateSaleReceiptPDF(receiptData);
-                  const storagePath = build_db_path.cloudStorage.saleReceiptPDF(fakeSale.id, tenantID, storeID);
-                  const { uploadStringToStorage } = await import("../../../../db_calls");
-                  const uploadResult = await uploadStringToStorage(base64, storagePath, "base64");
-                  if (uploadResult?.downloadURL) {
-                    log("Spoof sale PDF uploaded:", uploadResult.downloadURL);
-                    window.open(uploadResult.downloadURL, "_blank");
-                  } else {
-                    useAlertScreenStore.getState().setValues({
-                      title: "Spoof Sale Receipt",
-                      message: "Sent to printer. PDF upload may have failed.",
-                      btn1Text: "OK",
-                      handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
-                      canExitOnOuterClick: true,
-                    });
-                  }
-                } catch (e) {
-                  log("Spoof sale receipt error:", e);
-                  useAlertScreenStore.getState().setValues({
-                    title: "Error",
-                    message: e.message,
-                    btn1Text: "OK",
-                    handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
-                    canExitOnOuterClick: true,
-                  });
-                }
-              }}
-              style={{
-                paddingVertical: 10,
-                paddingHorizontal: 14,
-                borderRadius: 10,
-                borderWidth: 2,
-                borderColor: C.purple,
-                backgroundColor: C.listItemWhite,
-                alignItems: "center",
-                justifyContent: "center",
-                marginTop: 10,
-              }}
-            >
-              <Text style={{ fontSize: 13, color: C.purple, fontWeight: "700" }}>
-                Spoof Sale Receipt
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={async () => {
-                const WO_IDS = ["1000000000245", "1000000000252"];
-                try {
-                  const settings = useSettingsStore.getState().getSettings();
-                  const { tenantID, storeID } = settings;
-                  if (!tenantID || !storeID) { log("Revert: missing tenantID/storeID"); return; }
-
-                  const basePath = `tenants/${tenantID}/stores/${storeID}`;
-                  let results = [];
-
-                  for (let WO_ID of WO_IDS) {
-                    // 1. Find the workorder — check open-workorders first, then completed-workorders
-                    let wo = null;
-                    let wasCompleted = false;
-                    const openPath = `${basePath}/open-workorders/${WO_ID}`;
-                    wo = await firestoreRead(openPath);
-                    if (!wo) {
-                      const completedPath = `${basePath}/completed-workorders/${WO_ID}`;
-                      wo = await firestoreRead(completedPath);
-                      if (wo) wasCompleted = true;
-                    }
-                    if (!wo) {
-                      results.push(WO_ID + ": not found");
-                      continue;
-                    }
-
-                    // 2. Collect all sale IDs from the workorder
-                    let saleIDs = [wo.activeSaleID, wo.saleID].filter(Boolean);
-                    let uniqueSaleIDs = [...new Set(saleIDs)];
-
-                    // 3. For each sale, delete the sale from active + completed
-                    for (let sid of uniqueSaleIDs) {
-                      await firestoreDelete(`${basePath}/active-sales/${sid}`).catch(() => {});
-                      await firestoreDelete(`${basePath}/completed-sales/${sid}`).catch(() => {});
-                    }
-
-                    // 4. Strip all payment/sale fields from workorder
-                    wo.paymentComplete = false;
-                    wo.activeSaleID = "";
-                    wo.saleID = "";
-                    wo.endedOnMillis = "";
-                    wo.status = "finished";
-                    wo.changeLog = (wo.changeLog || []).filter((e) => e.field !== "payment");
-
-                    // 5. Write clean workorder to open-workorders
-                    await firestoreWrite(openPath, wo);
-
-                    // 6. Delete from completed-workorders if it was there
-                    if (wasCompleted) {
-                      await firestoreDelete(`${basePath}/completed-workorders/${WO_ID}`);
-                    }
-
-                    // 7. Update local Zustand store
-                    useOpenWorkordersStore.getState().setWorkorder(wo, false);
-                    results.push(WO_ID + ": reverted");
-                  }
-
-                  log("Revert complete:", results);
-                  useAlertScreenStore.getState().setValues({ title: "Reverted", message: results.join("\n"), btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false), canExitOnOuterClick: true });
-                } catch (e) {
-                  log("Revert error:", e);
-                  useAlertScreenStore.getState().setValues({ title: "Revert Error", message: e.message, btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false), canExitOnOuterClick: true });
-                }
-              }}
-              style={{
-                paddingVertical: 10,
-                paddingHorizontal: 14,
-                borderRadius: 10,
-                borderWidth: 2,
-                borderColor: C.red,
-                backgroundColor: C.listItemWhite,
-                alignItems: "center",
-                justifyContent: "center",
-                marginTop: 10,
-              }}
-            >
-              <Text style={{ fontSize: 13, color: C.red, fontWeight: "700" }}>
-                Revert Sales (245 + 252)
-              </Text>
-            </TouchableOpacity>
-          </>)}
+          {!sExpand && (
+            <View style={{ flex: 1, width: "100%", justifyContent: "center", alignItems: "center" }}>
+              <Image_
+                icon={require("../../../../resources/default_app_logo_large.png")}
+                style={{ opacity: 0.08, width: "60%", height: "60%" }}
+              />
+            </View>
+          )}
           {!!sExpand && (
             <Text
               style={{
@@ -1141,25 +770,28 @@ function MenuListLabelComponent({
   selected,
   dropdownDataArr,
   onDropdownSelect,
+  disabled,
 }) {
   let ICON_SIZE = 18;
   const [sOpacity, _setOpacity] = useState(1);
   return (
     <TouchableOpacity
-      onMouseEnter={() => _setOpacity(0.6)}
+      onMouseEnter={() => !disabled && _setOpacity(0.6)}
       onMouseLeave={() => _setOpacity(1)}
-      onPress={handleExpandPress}
+      onPress={disabled ? undefined : handleExpandPress}
+      activeOpacity={disabled ? 1 : 0.2}
       style={{
         flexDirection: "row",
         width: "100%",
         justifyContent: "space-between",
         alignItems: "center",
         marginBottom: 4,
-        opacity: sOpacity,
+        opacity: disabled ? 0.4 : sOpacity,
         backgroundColor: selected ? C.orange : "transparent",
         borderRadius: 5,
         paddingVertical: 4,
         paddingHorizontal: 6,
+        cursor: disabled ? "default" : "pointer",
       }}
     >
       {!dropdownDataArr && (
@@ -2959,6 +2591,31 @@ const PartSourcesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
 const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
   const [sPickerDay, _sSetPickerDay] = useState(null);
   const [sPickerType, _sSetPickerType] = useState(null);
+  const [sLogoUploading, _sSetLogoUploading] = useState(false);
+  const logoInputRef = useRef(null);
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    _sSetLogoUploading(true);
+    try {
+      const { storageUpload } = await import("../../../../db_calls");
+      const settings = useSettingsStore.getState().getSettings();
+      const url = await storageUpload(
+        `${settings.tenantID}/${settings.storeID}/store-logo`,
+        file,
+        { contentType: file.type }
+      );
+      handleSettingsFieldChange("storeInfo", {
+        ...zSettingsObj.storeInfo,
+        storeLogo: url,
+      });
+    } catch (err) {
+      log("Logo upload error:", err);
+    }
+    _sSetLogoUploading(false);
+    e.target.value = "";
+  };
 
   if (!zSettingsObj) return null;
   return (
@@ -2966,6 +2623,87 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
       <BoxContainerInnerComponent
         style={{ width: "100%", alignItems: "center", paddingVertical: 20 }}
       >
+        {/***************** store logo upload **************************/}
+        <View
+          style={{
+            width: "100%",
+            alignItems: "center",
+            marginBottom: 20,
+            paddingBottom: 20,
+            borderBottomWidth: 1,
+            borderBottomColor: C.buttonLightGreenOutline,
+          }}
+        >
+          <Text
+            style={{
+              fontWeight: Fonts.weight.textHeavy,
+              color: C.text,
+              marginBottom: 10,
+            }}
+          >
+            Store Logo
+          </Text>
+          {zSettingsObj?.storeInfo?.storeLogo ? (
+            <Image_
+              icon={{ uri: zSettingsObj.storeInfo.storeLogo }}
+              style={{
+                width: 150,
+                height: 150,
+                marginBottom: 10,
+                borderRadius: 10,
+              }}
+            />
+          ) : (
+            <View
+              style={{
+                width: 150,
+                height: 150,
+                borderWidth: 2,
+                borderColor: C.buttonLightGreenOutline,
+                borderRadius: 10,
+                borderStyle: "dashed",
+                justifyContent: "center",
+                alignItems: "center",
+                marginBottom: 10,
+              }}
+            >
+              <Text style={{ color: gray(0.6) }}>No logo</Text>
+            </View>
+          )}
+          <View style={{ flexDirection: "row" }}>
+            <Button_
+              text={sLogoUploading ? "Uploading..." : "Upload Logo"}
+              enabled={!sLogoUploading}
+              colorGradientArr={COLOR_GRADIENTS.green}
+              buttonStyle={{ paddingHorizontal: 15, paddingVertical: 8 }}
+              onPress={() => logoInputRef.current?.click()}
+            />
+            {!!zSettingsObj?.storeInfo?.storeLogo && (
+              <Button_
+                text="Remove"
+                colorGradientArr={COLOR_GRADIENTS.red}
+                buttonStyle={{
+                  marginLeft: 10,
+                  paddingHorizontal: 15,
+                  paddingVertical: 8,
+                }}
+                onPress={() =>
+                  handleSettingsFieldChange("storeInfo", {
+                    ...zSettingsObj.storeInfo,
+                    storeLogo: "",
+                  })
+                }
+              />
+            )}
+          </View>
+          <input
+            ref={logoInputRef}
+            type="file"
+            accept="image/*"
+            style={{ display: "none" }}
+            onChange={handleLogoUpload}
+          />
+        </View>
         <View
           style={{
             width: "100%",
@@ -3034,7 +2772,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           >
             Phone Number:
           </Text>
-          <TextInput
+          <TextInput_
             style={{
               width: "50%",
               marginLeft: 10,
@@ -3081,7 +2819,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           >
             Support Email:
           </Text>
-          <TextInput
+          <TextInput_
             style={{
               width: "50%",
               marginLeft: 10,
@@ -3128,7 +2866,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           >
             Office Email:
           </Text>
-          <TextInput
+          <TextInput_
             style={{
               width: "50%",
               marginLeft: 10,
@@ -4803,6 +4541,13 @@ const QuickItemButtonsComponent = () => {
   function renderButtonCard(btn, idx, isDraggable, isColumn) {
     let isEditing = sEditingID === btn.id;
     let childCount = getChildCount(btn.id);
+    let formalNames = "";
+    if (isEditing) {
+      formalNames = (btn.items || []).map((entry) => {
+        let id = typeof entry === "string" ? entry : entry.inventoryItemID;
+        return zInventoryArr.find((o) => o.id === id)?.formalName;
+      }).filter(Boolean).join(", ");
+    }
     return (
       <div
         key={btn.id}
@@ -4843,7 +4588,10 @@ const QuickItemButtonsComponent = () => {
         style={{
           width: isColumn ? "100%" : 170,
           minHeight: isColumn ? 44 : 60,
-          margin: 4,
+          marginRight: 4,
+          marginBottom: 4,
+          marginLeft: 4,
+          marginTop: isEditing && formalNames ? 22 : 4,
           padding: 8,
           display: "flex",
           flexDirection: isColumn ? "row" : "column",
@@ -4863,6 +4611,25 @@ const QuickItemButtonsComponent = () => {
           boxSizing: "border-box",
         }}
       >
+        {/* Formal name helper above card when editing */}
+        {isEditing && formalNames ? (
+          <Text
+            style={{
+              position: "absolute",
+              top: -18,
+              left: 0,
+              right: 0,
+              fontSize: 10,
+              color: gray(0.5),
+              textAlign: isColumn ? "left" : "center",
+              paddingHorizontal: 4,
+              pointerEvents: "none",
+            }}
+            numberOfLines={1}
+          >
+            {formalNames}
+          </Text>
+        ) : null}
         {/* Name area */}
         {isEditing ? (
           <TextInput_
@@ -5685,7 +5452,7 @@ const ImportComponent = () => {
 
   async function loadAndCacheLightspeedData() {
     if (_lsCsvData) return _lsCsvData;
-    const [custText, woText, wiText, serText, itemsText, slText, salesText, spText, stripeText, empText] = await Promise.all([
+    const [custText, woText, wiText, serText, itemsText, slText, salesText, spText, paymentsText, empText] = await Promise.all([
       fetch("/lightspeed/customers.csv").then(r => r.text()),
       fetch("/lightspeed/workorders.csv").then(r => r.text()),
       fetch("/lightspeed/workorderItems.csv").then(r => r.text()),
@@ -5694,7 +5461,7 @@ const ImportComponent = () => {
       fetch("/lightspeed/salesLines.csv").then(r => r.text()),
       fetch("/lightspeed/sales.csv").then(r => r.text()),
       fetch("/lightspeed/salesPayments.csv").then(r => r.text()),
-      fetch("/lightspeed/stripePayments.csv").then(r => r.text()),
+      fetch("/lightspeed/payments.csv").then(r => r.ok ? r.text() : "").catch(() => ""),
       fetch("/lightspeed/employees.csv").then(r => r.ok ? r.text() : "").catch(() => ""),
     ]);
     const { customers, customerRedirectMap } = mapCustomers(custText);
@@ -5712,7 +5479,7 @@ const ImportComponent = () => {
         workorderMap[lsSaleID].push(wo);
       }
     }
-    const { sales, transactions } = mapSales(salesText, spText, stripeText, workorderMap, customerMap, customerRedirectMap);
+    const { sales, transactions } = mapSales(salesText, spText, paymentsText, workorderMap, customerMap, customerRedirectMap);
     _lsCsvData = { customers, customerMap, customerRedirectMap, workorders, sales, transactions, itemsText };
     return _lsCsvData;
   }
@@ -7591,6 +7358,399 @@ const ImportComponent = () => {
             {sLsResult}
           </Text>
         ) : null}
+
+        {/***************** dev tools **************************/}
+        <View
+          style={{
+            width: "100%",
+            marginTop: 30,
+            paddingTop: 20,
+            borderTopWidth: 1,
+            borderTopColor: C.buttonLightGreenOutline,
+            alignItems: "center",
+          }}
+        >
+          <Text style={{ fontSize: 14, fontWeight: "700", color: gray(0.5), marginBottom: 10 }}>
+            Dev Tools
+          </Text>
+          <TouchableOpacity
+            onPress={async () => {
+              const statusesText = await fetch("/import_data/statuses.csv").then(r => r.text());
+              const statuses = mapStatuses(statusesText);
+              const settings = { ...cloneDeep(SETTINGS_OBJ), statuses };
+              await dbSaveSettings(settings);
+              useSettingsStore.getState().setSettings(settings);
+            }}
+            style={{
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderRadius: 10,
+              borderWidth: 2,
+              borderColor: C.buttonLightGreenOutline,
+              backgroundColor: C.listItemWhite,
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 10,
+            }}
+          >
+            <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
+              Inject Raw Settings
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={async () => {
+              const settings = useSettingsStore.getState().getSettings();
+              await dbSaveSettings(settings);
+              alert("Settings saved to Firestore.");
+            }}
+            style={{
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderRadius: 10,
+              borderWidth: 2,
+              borderColor: C.buttonLightGreenOutline,
+              backgroundColor: C.listItemWhite,
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 10,
+            }}
+          >
+            <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
+              Save Settings
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={async () => {
+              const { dbGetSettings } = await import("../../../../db_calls_wrapper");
+              const { tenantID, storeID } = useSettingsStore.getState().getSettings();
+              const settings = await dbGetSettings(tenantID, storeID);
+              if (settings) {
+                useSettingsStore.getState().setSettings(settings);
+                alert("Settings rehydrated from Firestore.");
+              } else {
+                alert("No settings found in Firestore.");
+              }
+            }}
+            style={{
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderRadius: 10,
+              borderWidth: 2,
+              borderColor: C.buttonLightGreenOutline,
+              backgroundColor: C.listItemWhite,
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 10,
+            }}
+          >
+            <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
+              Rehydrate Settings
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => {
+              let printObj = {
+                id: crypto.randomUUID(),
+                receiptType: "Workorder",
+                barcode: "100000000001",
+                workorderNumber: "WO-10001",
+                customerFirstName: "John",
+                customerLastName: "Smith",
+                customerCell: "239-555-1234",
+                customerEmail: "john.smith@email.com",
+                customerAddress: "123 Main St, Bonita Springs, FL 34135",
+                brand: "Trek",
+                description: "Domane SL 5",
+                color1: "Matte Black",
+                color2: "Red",
+                status: "In Progress",
+                startedBy: "Mike",
+                startedOnDate: "03/20/2026",
+                finishedOnDate: "",
+                subtotal: "$185.00",
+                discount: "$10.00",
+                tax: "$12.25",
+                total: "$187.25",
+                salesTaxPercent: "7%",
+                labor: "$75.00",
+                parts: "$110.00",
+                shopName: "Bonita Bikes LLC",
+                shopContactBlurb: "239-555-0000 | bonitabikes@email.com",
+                thankYouBlurb: "Thank you for choosing Bonita Bikes!",
+                workorderLines: [
+                  { qty: 1, inventoryItem: { formalName: "Brake Pad Set - Shimano 105", price: 3500 }, id: "line1" },
+                  { qty: 2, inventoryItem: { formalName: "Inner Tube 700x25c", price: 800 }, id: "line2" },
+                  { qty: 1, inventoryItem: { formalName: "Chain - KMC X11 Silver", price: 3500 }, id: "line3" },
+                  { qty: 1, inventoryItem: { formalName: "Labor - Full Tune Up", price: 7500 }, id: "line4" },
+                ],
+                customerNotes: ["Customer requested rush service", "Pickup after 5pm"],
+                internalNotes: ["Rear derailleur cable frayed — replaced"],
+              };
+              dbSavePrintObj(printObj, localStorageWrapper.getItem("selectedPrinterID") || "");
+            }}
+            style={{
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderRadius: 10,
+              borderWidth: 2,
+              borderColor: C.buttonLightGreenOutline,
+              backgroundColor: C.listItemWhite,
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 20,
+            }}
+          >
+            <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
+              Test Print
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={async () => {
+              let dayjs = (await import("dayjs")).default;
+              let userID = "1234";
+              let now = dayjs();
+              let startDate = now.subtract(3, "month").startOf("day");
+              let endDate = now.startOf("day");
+              let current = startDate;
+              let allPunches = [];
+
+              while (current.isBefore(endDate) || current.isSame(endDate, "day")) {
+                let pairCount = 3 + Math.floor(Math.random() * 5);
+                let windowStart = 600;
+                let windowEnd = 1140;
+                let slotSize = Math.floor((windowEnd - windowStart) / pairCount);
+
+                for (let i = 0; i < pairCount; i++) {
+                  let slotStart = windowStart + (i * slotSize);
+                  let slotEnd = slotStart + slotSize;
+                  let inMinutes = slotStart + Math.floor(Math.random() * (slotSize * 0.5));
+                  let outMinutes = Math.min(
+                    inMinutes + 10 + Math.floor(Math.random() * (slotSize * 0.4)),
+                    slotEnd - 1
+                  );
+                  if (outMinutes > windowEnd) outMinutes = windowEnd;
+                  if (outMinutes <= inMinutes) outMinutes = inMinutes + 10;
+
+                  let inMillis = current.add(inMinutes, "minute").valueOf();
+                  let outMillis = current.add(outMinutes, "minute").valueOf();
+
+                  allPunches.push({
+                    ...TIME_PUNCH_PROTO,
+                    userID,
+                    id: crypto.randomUUID(),
+                    millis: inMillis,
+                    option: "in",
+                  });
+                  allPunches.push({
+                    ...TIME_PUNCH_PROTO,
+                    userID,
+                    id: crypto.randomUUID(),
+                    millis: outMillis,
+                    option: "out",
+                  });
+                }
+                current = current.add(1, "day");
+              }
+
+              log("Injecting " + allPunches.length + " punches for user 1234...");
+              let batchSize = 20;
+              for (let i = 0; i < allPunches.length; i += batchSize) {
+                let batch = allPunches.slice(i, i + batchSize);
+                await Promise.all(batch.map((p) => dbSavePunchObject(p)));
+              }
+              log("Done! Injected " + allPunches.length + " punches.");
+              alert("Injected " + allPunches.length + " punches for user 1234 (3 months).");
+            }}
+            style={{
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderRadius: 10,
+              borderWidth: 2,
+              borderColor: C.orange,
+              backgroundColor: C.listItemWhite,
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 10,
+            }}
+          >
+            <Text style={{ fontSize: 13, color: C.orange, fontWeight: "700" }}>
+              Inject Test Punches (1234)
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={async () => {
+              try {
+                const settings = useSettingsStore.getState().getSettings();
+                const { tenantID, storeID } = settings;
+                const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+
+                const workorder = SPOOF_WORKORDER;
+                const customer = {
+                  first: workorder.customerFirst,
+                  last: workorder.customerLast,
+                  customerCell: workorder.customerCell,
+                  customerLandline: workorder.customerLandline,
+                  email: workorder.customerEmail,
+                  contactRestriction: workorder.customerContactRestriction,
+                };
+
+                const totals = calculateRunningTotals(workorder, settings?.salesTaxPercent, [], false, !!workorder.taxFree);
+                const fakeSale = {
+                  id: generateEAN13Barcode(),
+                  millis: Date.now(),
+                  subtotal: totals.runningSubtotal,
+                  discount: totals.runningDiscount,
+                  tax: totals.runningTax,
+                  total: totals.finalTotal,
+                  amountCaptured: totals.finalTotal,
+                  transactions: [],
+                  refunds: [],
+                  workorderID: workorder.id,
+                };
+                const cardAmount = Math.round(totals.finalTotal * 0.6);
+                const cashAmount = totals.finalTotal - cardAmount;
+                const fakeCardPayment = {
+                  amountCaptured: cardAmount,
+                  amountTendered: cardAmount,
+                  type: "payment",
+                  method: "card",
+                  last4: "4242",
+                  cardType: "Visa",
+                  brand: "visa",
+                  paymentMethod: "card_present",
+                  authorizationCode: "A83F72",
+                };
+                const fakeCashPayment = {
+                  amountCaptured: cashAmount,
+                  amountTendered: cashAmount + 500,
+                  type: "payment",
+                  method: "cash",
+                };
+
+                const receiptData = printBuilder.sale(fakeSale, [fakeCardPayment, fakeCashPayment], customer, workorder, settings?.salesTaxPercent, _ctx);
+                log("SPOOF SALE RECEIPT", JSON.stringify(receiptData, null, 2));
+
+                dbSavePrintObj(receiptData, localStorageWrapper.getItem("selectedPrinterID") || "");
+
+                const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
+                const base64 = generateSaleReceiptPDF(receiptData);
+                const storagePath = build_db_path.cloudStorage.saleReceiptPDF(fakeSale.id, tenantID, storeID);
+                const { uploadStringToStorage } = await import("../../../../db_calls");
+                const uploadResult = await uploadStringToStorage(base64, storagePath, "base64");
+                if (uploadResult?.downloadURL) {
+                  log("Spoof sale PDF uploaded:", uploadResult.downloadURL);
+                  window.open(uploadResult.downloadURL, "_blank");
+                } else {
+                  useAlertScreenStore.getState().setValues({
+                    title: "Spoof Sale Receipt",
+                    message: "Sent to printer. PDF upload may have failed.",
+                    btn1Text: "OK",
+                    handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                    canExitOnOuterClick: true,
+                  });
+                }
+              } catch (e) {
+                log("Spoof sale receipt error:", e);
+                useAlertScreenStore.getState().setValues({
+                  title: "Error",
+                  message: e.message,
+                  btn1Text: "OK",
+                  handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                  canExitOnOuterClick: true,
+                });
+              }
+            }}
+            style={{
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderRadius: 10,
+              borderWidth: 2,
+              borderColor: C.purple,
+              backgroundColor: C.listItemWhite,
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 10,
+            }}
+          >
+            <Text style={{ fontSize: 13, color: C.purple, fontWeight: "700" }}>
+              Spoof Sale Receipt
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={async () => {
+              const WO_IDS = ["1000000000245", "1000000000252"];
+              try {
+                const settings = useSettingsStore.getState().getSettings();
+                const { tenantID, storeID } = settings;
+                if (!tenantID || !storeID) { log("Revert: missing tenantID/storeID"); return; }
+
+                const basePath = `tenants/${tenantID}/stores/${storeID}`;
+                let results = [];
+
+                for (let WO_ID of WO_IDS) {
+                  let wo = null;
+                  let wasCompleted = false;
+                  const openPath = `${basePath}/open-workorders/${WO_ID}`;
+                  wo = await firestoreRead(openPath);
+                  if (!wo) {
+                    const completedPath = `${basePath}/completed-workorders/${WO_ID}`;
+                    wo = await firestoreRead(completedPath);
+                    if (wo) wasCompleted = true;
+                  }
+                  if (!wo) {
+                    results.push(WO_ID + ": not found");
+                    continue;
+                  }
+
+                  let saleIDs = [wo.activeSaleID, wo.saleID].filter(Boolean);
+                  let uniqueSaleIDs = [...new Set(saleIDs)];
+
+                  for (let sid of uniqueSaleIDs) {
+                    await firestoreDelete(`${basePath}/active-sales/${sid}`).catch(() => {});
+                    await firestoreDelete(`${basePath}/completed-sales/${sid}`).catch(() => {});
+                  }
+
+                  wo.paymentComplete = false;
+                  wo.activeSaleID = "";
+                  wo.saleID = "";
+                  wo.endedOnMillis = "";
+                  wo.status = "finished";
+                  wo.changeLog = (wo.changeLog || []).filter((e) => e.field !== "payment");
+
+                  await firestoreWrite(openPath, wo);
+
+                  if (wasCompleted) {
+                    await firestoreDelete(`${basePath}/completed-workorders/${WO_ID}`);
+                  }
+
+                  useOpenWorkordersStore.getState().setWorkorder(wo, false);
+                  results.push(WO_ID + ": reverted");
+                }
+
+                log("Revert complete:", results);
+                useAlertScreenStore.getState().setValues({ title: "Reverted", message: results.join("\n"), btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false), canExitOnOuterClick: true });
+              } catch (e) {
+                log("Revert error:", e);
+                useAlertScreenStore.getState().setValues({ title: "Revert Error", message: e.message, btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false), canExitOnOuterClick: true });
+              }
+            }}
+            style={{
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderRadius: 10,
+              borderWidth: 2,
+              borderColor: C.red,
+              backgroundColor: C.listItemWhite,
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 10,
+            }}
+          >
+            <Text style={{ fontSize: 13, color: C.red, fontWeight: "700" }}>
+              Revert Sales (245 + 252)
+            </Text>
+          </TouchableOpacity>
+        </View>
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );

@@ -1,30 +1,29 @@
 /* eslint-disable */
 import { View, Text } from "react-native-web";
-import { useState, useRef, memo } from "react";
+import { useState, memo } from "react";
 import { cloneDeep } from "lodash";
-import { ScreenModal, Button_, SHADOW_RADIUS_PROTO } from "../../../../components";
-import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
-import { useCurrentCustomerStore, useSettingsStore, useLoginStore } from "../../../../stores";
-import { formatCurrencyDisp, formatMillisForDisplay, gray, lightenRGBByPercent, log, localStorageWrapper } from "../../../../utils";
-import { readTransaction, writeCashRefund } from "./newCheckoutFirebaseCalls";
+import { ScreenModal, Button_, SmallLoadingIndicator, SHADOW_RADIUS_PROTO } from "../../../../components";
+import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
+import { useCurrentCustomerStore, useSettingsStore } from "../../../../stores";
+import { formatCurrencyDisp, formatMillisForDisplay, gray, lightenRGBByPercent, log, generateEAN13Barcode } from "../../../../utils";
+import { readTransaction, writeCashRefund, newCheckoutProcessStripeRefund } from "./newCheckoutFirebaseCalls";
 import { buildRefundObject } from "./newCheckoutUtils";
-import { dbSaveCustomer, dbSavePrintObj } from "../../../../db_calls_wrapper";
-import { CashRefund } from "./CashRefund";
-import { CardRefund } from "./CardRefund";
-import { printBuilder } from "../../../../utils";
+import { dbSaveCustomer } from "../../../../db_calls_wrapper";
 
 export const DepositRefundModal = memo(function DepositRefundModal({ visible, deposit, customer, onClose, onCustomerUpdated }) {
   const [sTransaction, _setTransaction] = useState(null);
   const [sLoading, _setLoading] = useState(false);
   const [sLoadMessage, _setLoadMessage] = useState("");
   const [sRefundComplete, _setRefundComplete] = useState(false);
-  const [sCardRefundProcessing, _setCardRefundProcessing] = useState(false);
+  const [sProcessing, _setProcessing] = useState(false);
+  const [sErrorMessage, _setErrorMessage] = useState("");
   const [sInitialized, _setInitialized] = useState(false);
 
   let isGiftCard = deposit?.type === "giftcard";
   let label = isGiftCard ? "Gift Card" : "Deposit";
+  let refundAmount = deposit?.amountCents || 0;
 
-  // Calculate available refund from transaction
+  // Calculate transaction info
   let totalRefunded = (sTransaction?.refunds || []).reduce((sum, r) => sum + (r.amount || 0), 0);
   let available = sTransaction ? sTransaction.amountCaptured - totalRefunded : 0;
   let isCard = sTransaction?.method === "card";
@@ -57,46 +56,64 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
     }
   }
 
-  // ─── Process Refund ──────────────────────────────────────
-  async function handleProcessRefund(amount, type, cardDetails) {
-    let txn = cloneDeep(sTransaction);
+  // ─── Process Full Refund ───────────────────────────────────
+  async function handleFullRefund() {
+    _setProcessing(true);
+    _setErrorMessage("");
 
-    // Cash refund: write to transaction
-    if (type === "cash") {
-      let refundObj = buildRefundObject(amount, txn.id, "cash", [], "", 0, "");
-      await writeCashRefund(txn.id, refundObj);
-      txn.refunds = [...(txn.refunds || []), refundObj];
+    try {
+      if (isCash) {
+        let txn = cloneDeep(sTransaction);
+        let refundObj = buildRefundObject(refundAmount, txn.id, "cash", [], "", 0, "");
+        await writeCashRefund(txn.id, refundObj);
+        txn.refunds = [...(txn.refunds || []), refundObj];
+        _setTransaction(txn);
+      } else {
+        // Card refund via Stripe
+        let { tenantID, storeID } = useSettingsStore.getState().getSettings();
+        let refundId = generateEAN13Barcode();
+
+        let result = await newCheckoutProcessStripeRefund(
+          refundAmount,
+          sTransaction.paymentIntentID,
+          {
+            transactionID: sTransaction.id,
+            tenantID,
+            storeID,
+            refundId,
+            method: "card",
+            salesTax: 0,
+            workorderLines: [],
+          }
+        );
+
+        if (!result?.success) {
+          _setErrorMessage(result?.message || "Refund failed");
+          _setProcessing(false);
+          return;
+        }
+
+        let updatedTxn = cloneDeep(sTransaction);
+        if (result.data?.refundObj) {
+          updatedTxn.refunds = [...(updatedTxn.refunds || []), result.data.refundObj];
+        }
+        _setTransaction(updatedTxn);
+      }
+
+      _setRefundComplete(true);
+      removeDepositFromCustomer();
+    } catch (error) {
+      log("Deposit refund error:", error);
+      _setErrorMessage(error?.message || "Refund processing failed");
     }
 
-    // Card refund: CardRefund component already called the Cloud Function and wrote to transaction
-    if (type === "card" && cardDetails?.refundObj) {
-      txn.refunds = [...(txn.refunds || []), cardDetails.refundObj];
-    }
-
-    _setTransaction(txn);
-    _setRefundComplete(true);
-
-    // Update customer deposit
-    updateCustomerDeposit(amount);
+    _setProcessing(false);
   }
 
-  function updateCustomerDeposit(refundAmount) {
+  function removeDepositFromCustomer() {
     if (!customer?.id || !deposit?.id) return;
     let updatedCustomer = cloneDeep(customer);
-    let deposits = updatedCustomer.deposits || [];
-    let idx = deposits.findIndex((d) => d.id === deposit.id);
-    if (idx < 0) return;
-
-    let newAmount = deposits[idx].amountCents - refundAmount;
-    if (newAmount <= 0) {
-      // Fully refunded - remove deposit
-      deposits.splice(idx, 1);
-    } else {
-      // Partial refund - reduce amount
-      deposits[idx] = { ...deposits[idx], amountCents: newAmount };
-    }
-
-    updatedCustomer.deposits = deposits;
+    updatedCustomer.deposits = (updatedCustomer.deposits || []).filter((d) => d.id !== deposit.id);
     useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
     dbSaveCustomer(updatedCustomer);
     if (onCustomerUpdated) onCustomerUpdated(updatedCustomer);
@@ -108,7 +125,8 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
     _setLoading(false);
     _setLoadMessage("");
     _setRefundComplete(false);
-    _setCardRefundProcessing(false);
+    _setProcessing(false);
+    _setErrorMessage("");
     _setInitialized(false);
     if (onClose) onClose();
   }
@@ -233,16 +251,6 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                   <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>
                     {"$" + formatCurrencyDisp(sTransaction.amountCaptured)}
                   </Text>
-                  {totalRefunded > 0 && (
-                    <Text style={{ fontSize: 10, color: C.lightred, fontWeight: "600", marginTop: 1 }}>
-                      Refunded: {"$" + formatCurrencyDisp(totalRefunded)}
-                    </Text>
-                  )}
-                  {available > 0 && totalRefunded > 0 && (
-                    <Text style={{ fontSize: 10, color: C.green, fontWeight: "600", marginTop: 1 }}>
-                      Available: {"$" + formatCurrencyDisp(available)}
-                    </Text>
-                  )}
                 </View>
               </View>
 
@@ -253,34 +261,67 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                     Fully Refunded
                   </Text>
                   <Text style={{ fontSize: 12, color: gray(0.5), textAlign: "center" }}>
-                    This transaction has already been fully refunded.
+                    This {label.toLowerCase()} has already been fully refunded.
                   </Text>
                 </View>
               )}
 
-              {/* Refund Section */}
-              {!fullyRefunded && (
+              {/* Refund Section - Full amount only */}
+              {!fullyRefunded && !sRefundComplete && (
                 <View>
-                  {isCash && (
-                    <CashRefund
-                      maxCashRefund={available}
-                      onProcessRefund={handleProcessRefund}
-                      refundComplete={sRefundComplete}
-                      suggestedAmount={available}
-                    />
+                  {/* Full Refund Amount Display */}
+                  <View
+                    style={{
+                      backgroundColor: lightenRGBByPercent(C.lightred, 80),
+                      borderRadius: 8,
+                      padding: 12,
+                      marginBottom: 12,
+                      alignItems: "center",
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, color: gray(0.5), marginBottom: 4 }}>
+                      Refund Amount
+                    </Text>
+                    <Text style={{ fontSize: 22, fontWeight: "700", color: C.lightred }}>
+                      {"$" + formatCurrencyDisp(refundAmount)}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: gray(0.4), marginTop: 4 }}>
+                      {isCard ? "Card" : "Cash"} refund - full {label.toLowerCase()} amount
+                    </Text>
+                  </View>
+
+                  {/* Error Message */}
+                  {sErrorMessage ? (
+                    <Text style={{ fontSize: 11, color: C.lightred, fontWeight: "600", textAlign: "center", marginBottom: 8 }}>
+                      {sErrorMessage}
+                    </Text>
+                  ) : null}
+
+                  {/* Processing indicator */}
+                  {sProcessing && (
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 8 }}>
+                      <SmallLoadingIndicator color={C.orange} text="" message="" containerStyle={{ padding: 2, marginRight: 8 }} />
+                      <Text style={{ fontSize: 12, color: gray(0.5), fontWeight: "600" }}>
+                        Processing {isCard ? "card" : "cash"} refund...
+                      </Text>
+                    </View>
                   )}
-                  {isCard && (
-                    <CardRefund
-                      selectedPayment={sTransaction}
-                      maxCardRefund={available}
-                      onProcessRefund={handleProcessRefund}
-                      onProcessingChange={(val) => _setCardRefundProcessing(val)}
-                      workorderLines={[]}
-                      salesTaxPercent={0}
-                      refundComplete={sRefundComplete}
-                      suggestedAmount={available}
-                    />
-                  )}
+
+                  {/* Refund Button */}
+                  <Button_
+                    text={sProcessing ? "PROCESSING..." : `REFUND FULL ${isGiftCard ? "GIFT CARD" : "DEPOSIT"}`}
+                    onPress={handleFullRefund}
+                    enabled={!sProcessing}
+                    colorGradientArr={COLOR_GRADIENTS.yellow}
+                    textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
+                    buttonStyle={{
+                      paddingVertical: 8,
+                      borderRadius: 6,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      opacity: sProcessing ? 0.4 : 1,
+                    }}
+                  />
                 </View>
               )}
 
@@ -288,7 +329,10 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
               {sRefundComplete && (
                 <View style={{ padding: 15, alignItems: "center", backgroundColor: lightenRGBByPercent(C.green, 80), borderRadius: 8, marginTop: 8 }}>
                   <Text style={{ fontSize: 14, fontWeight: "600", color: C.green }}>
-                    Refund processed successfully
+                    {label} refund processed successfully
+                  </Text>
+                  <Text style={{ fontSize: 11, color: gray(0.5), marginTop: 4 }}>
+                    {"$" + formatCurrencyDisp(refundAmount)} refunded - {label.toLowerCase()} removed
                   </Text>
                 </View>
               )}
@@ -301,7 +345,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                   colorGradientArr={sRefundComplete ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.red}
                   textStyle={{ fontSize: 13, color: C.textWhite }}
                   buttonStyle={{ width: 120, height: 36, borderRadius: 6 }}
-                  enabled={!sCardRefundProcessing}
+                  enabled={!sProcessing}
                 />
               </View>
             </View>

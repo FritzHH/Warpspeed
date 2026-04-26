@@ -275,7 +275,7 @@ export const TransactionModal = ({ transaction, onClose, onRefund }) => {
             }}
           >
             <Text style={{ fontSize: 15, fontWeight: "700", color: C.green, letterSpacing: 0.5, textAlign: "center" }}>
-              Transaction Viewer
+              Transaction View
             </Text>
           </View>
 

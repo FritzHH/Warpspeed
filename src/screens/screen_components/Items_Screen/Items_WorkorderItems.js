@@ -45,6 +45,7 @@ import {
 } from "../../../stores";
 import { CustomItemModal } from "../modal_screens/CustomItemModal";
 import { calculateSaleTotals } from "../modal_screens/newCheckoutModalScreen/newCheckoutUtils";
+import { deleteActiveSale, writeActiveSale } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { DeliveryReceiptInstance } from "twilio/lib/rest/conversations/v1/conversation/message/deliveryReceipt";
 
 export const Items_WorkorderItemsTab = ({}) => {
@@ -90,6 +91,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     : null;
   const depositOnlyTotal = (activeSale?.depositsApplied || []).reduce((sum, d) => sum + (d.amount || 0), 0);
   const hasActiveSale = !!activeSale && ((activeSale.amountCaptured || 0) - depositOnlyTotal) > 0;
+  const hasAppliedCredits = (activeSale?.creditsApplied || []).some(c => (c.amount || 0) > 0);
 
   const fadeAnim = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -414,6 +416,27 @@ export const Items_WorkorderItemsTab = ({}) => {
   function handleDeleteWorkorder() {
     useLoginStore.getState().requireLogin(() => {
     const deleteFun = () => {
+      // Clean up associated active sale to prevent orphans
+      let saleID = zOpenWorkorder.activeSaleID;
+      if (saleID) {
+        let sale = useActiveSalesStore.getState().getActiveSale(saleID);
+        let saleWOIds = sale?.workorderIDs || [];
+        if (saleWOIds.length > 1) {
+          // Combined sale - remove this workorder from the sale, keep the sale alive
+          let updated = { ...sale, workorderIDs: saleWOIds.filter(id => id !== zOpenWorkorder.id) };
+          writeActiveSale(updated);
+          useActiveSalesStore.getState().setActiveSales(
+            useActiveSalesStore.getState().activeSales.map(s => s.id === saleID ? updated : s)
+          );
+        } else {
+          // Solo sale - delete it entirely
+          deleteActiveSale(saleID);
+          useActiveSalesStore.getState().setActiveSales(
+            useActiveSalesStore.getState().activeSales.filter(s => s.id !== saleID)
+          );
+        }
+      }
+
       useOpenWorkordersStore.getState().removeWorkorder(zOpenWorkorder.id);
 
       useOpenWorkordersStore.getState().setOpenWorkorderID(null);
@@ -510,13 +533,13 @@ export const Items_WorkorderItemsTab = ({}) => {
             alignSelf: "center",
           }}
         >
-          <Tooltip text={hasActiveSale ? "Sale in progress, cannot delete workorder" : "Delete workorder"} position="top" alert={hasActiveSale}>
+          <Tooltip text={(hasActiveSale || hasAppliedCredits) ? "Sale in progress, cannot delete workorder" : "Delete workorder"} position="top" alert={hasActiveSale || hasAppliedCredits}>
             <Button_
               icon={ICONS.trash}
               iconSize={22}
-              enabled={!hasActiveSale}
+              enabled={!(hasActiveSale || hasAppliedCredits)}
               onPress={handleDeleteWorkorder}
-              buttonStyle={{ opacity: hasActiveSale ? 0.3 : 1 }}
+              buttonStyle={{ opacity: (hasActiveSale || hasAppliedCredits) ? 0.3 : 1 }}
             />
           </Tooltip>
           <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
@@ -667,13 +690,13 @@ export const Items_WorkorderItemsTab = ({}) => {
           alignSelf: "center",
         }}
       >
-        <Tooltip text={hasActiveSale ? "Sale in progress, cannot delete workorder" : "Delete workorder"} position="top" alert={hasActiveSale}>
+        <Tooltip text={(hasActiveSale || hasAppliedCredits) ? "Sale in progress, cannot delete workorder" : "Delete workorder"} position="top" alert={hasActiveSale || hasAppliedCredits}>
           <Button_
             icon={ICONS.trash}
             iconSize={22}
-            enabled={!isLocked && !hasActiveSale}
+            enabled={!isLocked && !(hasActiveSale || hasAppliedCredits)}
             onPress={handleDeleteWorkorder}
-            buttonStyle={{ opacity: (isLocked || hasActiveSale) ? 0.3 : 1 }}
+            buttonStyle={{ opacity: (isLocked || hasActiveSale || hasAppliedCredits) ? 0.3 : 1 }}
           />
         </Tooltip>
         <View

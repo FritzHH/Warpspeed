@@ -117,7 +117,7 @@ export function CustomerSearchListComponent({}) {
       }}
     >
       <Animated.Image
-        source={require('../../../resources/bblogo_trans_high.png')}
+        source={require('../../../resources/default_app_logo_large.png')}
         style={{
           opacity: 0.1,
           width: "90%",

@@ -141,8 +141,8 @@ export const NONREMOVABLE_STATUSES = [
     systemOwned: true
   },
   {
-    id: "intake",
-    label: "Intake",
+    id: "on_the_stand",
+    label: "On the Stand",
     textColor: "white",
     backgroundColor: "pink",
     removable: false,
@@ -1069,6 +1069,7 @@ export const SETTINGS_OBJ = {
     phone: "2393369177",
     supportEmail: "",
     officeEmail: "",
+    storeLogo: "",
   },
   receiptSetup: {
     includeFieldsInReceipt: ["displayName", "street", "city", "state", "phone"],

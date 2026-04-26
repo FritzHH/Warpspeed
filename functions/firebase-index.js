@@ -2661,12 +2661,12 @@ exports.initiateRefundCallable = onCall(
   async (request) => {
     log("Incoming refund callable request", request.data);
 
-    const { chargeID, amount } = request.data;
+    const { paymentIntentID, amount } = request.data;
 
-    if (!chargeID || typeof chargeID !== "string") {
+    if (!paymentIntentID || typeof paymentIntentID !== "string") {
       throw new HttpsError(
         "invalid-argument",
-        "Charge ID must be provided and must be a string."
+        "Payment Intent ID must be provided and must be a string."
       );
     }
 
@@ -2678,9 +2678,9 @@ exports.initiateRefundCallable = onCall(
     }
 
     try {
-      // Create the refund directly with the charge ID
+      // Create the refund using payment intent ID (Stripe recommended)
       const refund = await stripe.refunds.create({
-        charge: chargeID,
+        payment_intent: paymentIntentID,
         ...(amount ? { amount } : {}), // Optional partial refund
       });
 
@@ -3771,8 +3771,8 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
 
 /**
  * newCheckoutProcessRefundCallable
- * Processes a refund for a given charge.
- * Input: { chargeID, amount (cents, optional for partial) }
+ * Processes a refund for a given payment intent.
+ * Input: { paymentIntentID, amount (cents, optional for partial) }
  * Optional (new architecture): { transactionID, tenantID, storeID, refundId, method, salesTax, workorderLines, notes }
  * If transactionID is provided, writes the refund object to the payment transaction in Firestore.
  */
@@ -3781,12 +3781,12 @@ exports.newCheckoutProcessRefundCallable = onCall(
   async (request) => {
     log("newCheckout: process refund request", request.data);
 
-    const { chargeID, amount, transactionID, tenantID, storeID, refundId, method, salesTax, workorderLines, notes } = request.data;
+    const { paymentIntentID, amount, transactionID, tenantID, storeID, refundId, method, salesTax, workorderLines, notes } = request.data;
 
-    if (!chargeID || typeof chargeID !== "string") {
+    if (!paymentIntentID || typeof paymentIntentID !== "string") {
       throw new HttpsError(
         "invalid-argument",
-        "Charge ID must be provided."
+        "Payment Intent ID must be provided."
       );
     }
 
@@ -3800,9 +3800,9 @@ exports.newCheckoutProcessRefundCallable = onCall(
     try {
       const stripeClient = Stripe(stripeSecretKey.value());
 
-      // Create the refund directly with the charge ID
+      // Create the refund using payment intent ID (Stripe recommended)
       const refund = await stripeClient.refunds.create({
-        charge: chargeID,
+        payment_intent: paymentIntentID,
         ...(amount ? { amount } : {}),
       });
 

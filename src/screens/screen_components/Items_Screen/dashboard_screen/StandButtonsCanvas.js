@@ -53,6 +53,8 @@ const CanvasButtonCard = ({
   containerRef,
 }) => {
   const [sIsEditing, _setIsEditing] = useState(false);
+  const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
+  let invItem = btn.inventoryItemID ? zInventoryArr.find((o) => o.id === btn.inventoryItemID) : null;
   const [sDragging, _setDragging] = useState(false);
   const dragStartRef = useRef(null);
   const didDragRef = useRef(false);

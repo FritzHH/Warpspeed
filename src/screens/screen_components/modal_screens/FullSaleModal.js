@@ -10,7 +10,7 @@ import React, { useState, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { Button_, SmallLoadingIndicator, SHADOW_RADIUS_PROTO } from "../../../components";
-import { useSettingsStore, useCheckoutStore } from "../../../stores";
+import { useSettingsStore, useCheckoutStore, useLoginStore } from "../../../stores";
 import {
   formatCurrencyDisp,
   formatMillisForDisplay,
@@ -21,7 +21,10 @@ import {
   calculateRunningTotals,
   resolveStatus,
   log,
+  printBuilder,
+  localStorageWrapper,
 } from "../../../utils";
+import { dbSavePrintObj } from "../../../db_calls_wrapper";
 import {
   readActiveSale,
   readCompletedSale,
@@ -137,6 +140,22 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
   const hasRefunds = totalRefunded > 0;
   const isVoided = !!sSale?.voidedByRefund;
 
+  function handlePrintSale() {
+    const _settings = useSettingsStore.getState().getSettings();
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    const customer = {
+      first: item.customerFirst || "",
+      last: item.customerLast || "",
+      cell: item.customerCell || "",
+      email: item.customerEmail || "",
+    };
+    const wo = sWorkorders[0] || {};
+    const creds = [...(sSale.creditsApplied || []), ...(sSale.depositsApplied || [])];
+    let toPrint = printBuilder.sale(sSale, sTransactions, customer, wo, _settings?.salesTaxPercent, _ctx, creds);
+    log("DEV — sale receipt:", toPrint);
+    dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
+  }
+
   function handleRefund() {
     if (onRefund) {
       onRefund(sSale.id);
@@ -244,13 +263,38 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                     </View>
                   )}
                 </View>
-                <Button_
-                  text="Refund"
-                  colorGradientArr={COLOR_GRADIENTS.red}
-                  onPress={handleRefund}
-                  buttonStyle={{ paddingHorizontal: 20, height: 32 }}
-                  textStyle={{ color: C.textWhite, fontSize: 12 }}
-                />
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Button_
+                    text="Refund"
+                    colorGradientArr={COLOR_GRADIENTS.red}
+                    onPress={handleRefund}
+                    buttonStyle={{ paddingHorizontal: 20, height: 32, marginRight: 8 }}
+                    textStyle={{ color: C.textWhite, fontSize: 12 }}
+                  />
+                  <Button_
+                    text="Print Sale"
+                    icon={ICONS.receipt}
+                    iconSize={16}
+                    onPress={handlePrintSale}
+                    buttonStyle={{ paddingHorizontal: 14, height: 32, borderWidth: 1, borderColor: C.buttonLightGreenOutline }}
+                    textStyle={{ fontSize: 12, color: C.text }}
+                  />
+                </View>
+              </View>
+
+              {/* ── Sale View Banner ── */}
+              <View
+                style={{
+                  backgroundColor: lightenRGBByPercent(C.blue, 55),
+                  paddingVertical: 8,
+                  paddingHorizontal: 20,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "700", color: C.blue, letterSpacing: 0.5, textAlign: "center" }}>
+                  Sale View
+                </Text>
               </View>
 
               {/* ── Date Banner ── */}

@@ -13,7 +13,7 @@ import {
 import { formatCurrencyDisp, formatPhoneForDisplay, gray } from "../utils";
 import { C, Fonts, ICONS } from "../styles";
 
-const logo = require("../resources/bblogo_trans_high.png");
+const logo = require("../resources/default_app_logo_large.png");
 
 const DEV_SHOW_OVERLAY = false;
 

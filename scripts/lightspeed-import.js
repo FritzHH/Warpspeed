@@ -765,12 +765,12 @@ function mapWorkorders(
     const internalNotes = [];
     if (ser) {
       const parts = [];
-      if (ser.description) parts.push("Description: " + ser.description.trim());
-      if (ser.colorName) parts.push("Color: " + ser.colorName.trim());
-      if (ser.sizeName) parts.push("Size: " + ser.sizeName.trim());
-      if (ser.serial) parts.push("Serial: " + ser.serial.trim());
+      if (ser.description) parts.push(ser.description.trim());
+      if (ser.colorName) parts.push(ser.colorName.trim());
+      if (ser.sizeName) parts.push(ser.sizeName.trim());
+      if (ser.serial) parts.push(ser.serial.trim());
       if (parts.length > 0) {
-        internalNotes.push({ id: crypto.randomUUID(), name: "Lightspeed", userID: "", value: parts.join(" | ") });
+        internalNotes.push({ id: crypto.randomUUID(), name: "Lightspeed", userID: "", value: parts.join("\n") });
       }
     }
     if (wo.internalNote && wo.internalNote.trim()) {
@@ -897,7 +897,7 @@ function mapWorkorders(
       waitTimeEstimateLabel: "",
       partOrdered: "",
       partSource: "",
-      partToBeOrdered: false,
+      partToBeOrdered: statusLabel === "item ordered" ? false : true,
       partOrderEstimateMillis: "",
       partOrderedMillis: "",
       paymentComplete: false,
@@ -921,11 +921,11 @@ function mapWorkorders(
   return workorders;
 }
 
-function mapSales(salesCSVText, salesPaymentsCSVText, stripePaymentsCSVText, workorderMap, customerMap, customerRedirectMap) {
+function mapSales(salesCSVText, salesPaymentsCSVText, paymentsCSVText, workorderMap, customerMap, customerRedirectMap) {
   if (!customerRedirectMap) customerRedirectMap = {};
   const saleRows = parseCSV(salesCSVText);
   const spRows = parseCSV(salesPaymentsCSVText);
-  const stripeRows = stripePaymentsCSVText ? parseCSV(stripePaymentsCSVText) : [];
+  const paymentReportRows = paymentsCSVText ? parseCSV(paymentsCSVText) : [];
 
   const paymentsMap = {};
   for (const sp of spRows) {
@@ -934,13 +934,39 @@ function mapSales(salesCSVText, salesPaymentsCSVText, stripePaymentsCSVText, wor
     paymentsMap[sp.saleID].push(sp);
   }
 
-  const stripeByOrderID = {};
-  for (const sr of stripeRows) {
-    const orderID = sr["Order ID"];
+  // paymentsByOrderID: LS saleID → [Lightspeed Payments report rows]
+  const paymentsByOrderID = {};
+  for (const pr of paymentReportRows) {
+    const orderID = pr["Order ID"];
     if (!orderID) continue;
-    if (!stripeByOrderID[orderID]) stripeByOrderID[orderID] = [];
-    stripeByOrderID[orderID].push(sr);
+    if (pr.Status !== "CAPTURED" && pr.Status !== "REFUNDED" && pr.Status !== "PARTIALLY_REFUNDED") continue;
+    if (!paymentsByOrderID[orderID]) paymentsByOrderID[orderID] = [];
+    paymentsByOrderID[orderID].push(pr);
   }
+
+  // Build refund charge lookup: for return sales, link to the original sale's chargeID
+  // Key: customerID_absAmountCents → [{ chargeID, last4, cardType, paymentID }]
+  const refundChargesByCustomer = {};
+  for (const pr of paymentReportRows) {
+    if (pr.Status !== "REFUNDED" && pr.Status !== "PARTIALLY_REFUNDED") continue;
+    const orderID = pr["Order ID"];
+    if (!orderID) continue;
+    const origSaleRow = saleRows.find(function (r) { return r.saleID === orderID; });
+    if (!origSaleRow || !origSaleRow.customerID || origSaleRow.customerID === "0") continue;
+    const custID = origSaleRow.customerID;
+    const refundedCents = dollarsToCents(pr["Refunded amount"]);
+    if (refundedCents <= 0) continue;
+    var key = custID + "_" + refundedCents;
+    if (!refundChargesByCustomer[key]) refundChargesByCustomer[key] = [];
+    refundChargesByCustomer[key].push({
+      chargeID: (pr.ID || "").replace(/^st-/, ""),
+      last4: pr["Card last 4"] || "",
+      cardType: pr["Card type"] || "",
+      _entryMode: pr["Entry mode"] || "",
+      _cardFundingSource: pr["Card funding source"] || "",
+    });
+  }
+  const refundChargesUsed = new Set();
 
   const sales = [];
   const allTransactions = [];
@@ -975,8 +1001,8 @@ function mapSales(salesCSVText, salesPaymentsCSVText, stripePaymentsCSVText, wor
     const paymentRows = paymentsMap[lsSaleID] || [];
     const saleID = buildLightspeedEAN13("22", lsSaleID);
 
-    const stripeForSale = stripeByOrderID[lsSaleID] || [];
-    const stripeUsed = new Set();
+    const prForSale = paymentsByOrderID[lsSaleID] || [];
+    const prUsed = new Set();
 
     // Detect deposit pattern: a negative "credit account" payment paired with a positive payment
     const creditAccountRows = paymentRows.filter(function (sp) { return sp.paymentTypeType === "credit account" && dollarsToCents(sp.amount) < 0; });
@@ -992,50 +1018,71 @@ function mapSales(salesCSVText, salesPaymentsCSVText, stripePaymentsCSVText, wor
       const isCash = sp.paymentTypeType === "cash";
       const isCheck = sp.paymentTypeName === "Check";
       const isCard = sp.paymentTypeType === "credit card";
+      const isCredit = sp.paymentTypeType === "credit account";
+      const isEcom = sp.paymentTypeType === "ecom";
       const amount = dollarsToCents(sp.amount);
 
-      let stripeMatch = null;
-      if (isCard && stripeForSale.length > 0) {
-        for (let i = 0; i < stripeForSale.length; i++) {
-          if (stripeUsed.has(i)) continue;
-          if (dollarsToCents(stripeForSale[i]["Amount"]) === amount) {
-            stripeMatch = stripeForSale[i]; stripeUsed.add(i); break;
+      // Match card payment to Lightspeed Payments report by amount
+      let prMatch = null;
+      if (isCard && prForSale.length > 0) {
+        for (let i = 0; i < prForSale.length; i++) {
+          if (prUsed.has(i)) continue;
+          if (dollarsToCents(prForSale[i].Amount) === amount) {
+            prMatch = prForSale[i]; prUsed.add(i); break;
           }
         }
-        if (!stripeMatch) {
-          for (let i = 0; i < stripeForSale.length; i++) {
-            if (stripeUsed.has(i)) continue;
-            stripeMatch = stripeForSale[i]; stripeUsed.add(i);
-            console.warn("[Migration] Stripe fallback match for sale " + lsSaleID + ": payment $" + (amount / 100).toFixed(2) + " matched to Stripe $" + stripeForSale[i]["Amount"] + " (inexact)");
+        if (!prMatch) {
+          for (let i = 0; i < prForSale.length; i++) {
+            if (prUsed.has(i)) continue;
+            prMatch = prForSale[i]; prUsed.add(i); break;
+          }
+        }
+      }
+
+      // For return/refund card transactions, link to the original sale's chargeID
+      let refundMatch = null;
+      if (isCard && !prMatch && amount < 0 && row.customerID && row.customerID !== "0") {
+        var refKey = row.customerID + "_" + Math.abs(amount);
+        var candidates = refundChargesByCustomer[refKey] || [];
+        for (var ri = 0; ri < candidates.length; ri++) {
+          var cid = candidates[ri].chargeID;
+          if (!refundChargesUsed.has(cid)) {
+            refundMatch = candidates[ri];
+            refundChargesUsed.add(cid);
             break;
           }
         }
       }
 
+      // Fallback to salesPayments.csv card fields (e.g., May 2025 gap)
+      var spLast4 = isCard && sp.cardLast4 ? sp.cardLast4 : "";
+      var spCardType = isCard && sp.cardType ? sp.cardType : "";
+      var spAuthCode = isCard && sp.authCode ? sp.authCode : "";
+
       return {
         id: sp.salePaymentID || crypto.randomUUID(),
         saleID,
         type: amount < 0 ? "refund" : "payment",
-        method: isCash ? "cash" : isCheck ? "check" : "card",
+        method: isCash ? "cash" : isCheck ? "check" : isCard ? "card" : isCredit ? "credit" : isEcom ? "ecom" : "other",
         amountCaptured: amount,
         amountTendered: (isCash && amount >= 0) ? amount : 0,
         salesTax: 0,
-        cardType: stripeMatch ? stripeMatch["Card type"] : (sp.cardType || ""),
+        cardType: prMatch ? (prMatch["Card type"] || "") : refundMatch ? refundMatch.cardType : spCardType,
         cardIssuer: isCard ? sp.paymentTypeName : "",
-        last4: stripeMatch ? stripeMatch["Card last 4"] : (sp.cardLast4 || ""),
-        authorizationCode: sp.authCode || "",
+        last4: prMatch ? (prMatch["Card last 4"] || "") : refundMatch ? refundMatch.last4 : spLast4,
+        authorizationCode: spAuthCode,
         millis: sp.createTime ? new Date(sp.createTime).getTime() : 0,
         paymentProcessor: isCard ? "Stripe" : "",
-        chargeID: stripeMatch ? stripeMatch["ID"] : (sp.ccChargeID && sp.ccChargeID !== "0" ? sp.ccChargeID : ""),
-        paymentIntentID: stripeMatch ? (stripeMatch["Payment ID"] || "") : "",
+        chargeID: prMatch ? (prMatch.ID || "").replace(/^st-/, "") : refundMatch ? refundMatch.chargeID : "",
+        paymentIntentID: "",
         receiptURL: "",
         expMonth: "",
         expYear: "",
         networkTransactionID: "",
-        amountRefunded: stripeMatch ? dollarsToCents(stripeMatch["Refunded amount"]) : 0,
+        amountRefunded: prMatch ? dollarsToCents(prMatch["Refunded amount"]) : 0,
         depositType: isDepositSale ? "deposit" : "",
-        _cardFundingSource: stripeMatch ? (stripeMatch["Card funding source"] || "") : "",
-        _entryMode: stripeMatch ? (stripeMatch["Entry mode"] || "") : "",
+        _entryMode: prMatch ? (prMatch["Entry mode"] || "") : refundMatch ? refundMatch._entryMode : "",
+        _cardFundingSource: prMatch ? (prMatch["Card funding source"] || "") : refundMatch ? refundMatch._cardFundingSource : "",
         refunds: [],
       };
     });
@@ -1432,13 +1479,13 @@ const CSV_FILES = [
   "salesLines.csv",
   "sales.csv",
   "salesPayments.csv",
-  "stripePayments.csv",
+  "payments.csv",
   "employees.csv",
   "employeeHours.csv",
   "workorderStatuses.csv",
 ];
 
-const OPTIONAL_CSV_FILES = new Set(["stripePayments.csv", "employeeHours.csv", "workorderStatuses.csv"]);
+const OPTIONAL_CSV_FILES = new Set(["payments.csv", "employeeHours.csv", "workorderStatuses.csv"]);
 
 function readCSVFiles() {
   const csvData = {};
@@ -1485,6 +1532,129 @@ function askQuestion(prompt) {
 }
 
 // ============================================================================
+// CSV Export — write mapped objects to scripts/output/ for verification
+// ============================================================================
+
+function escapeCSV(val) {
+  if (val === null || val === undefined) return "";
+  const str = String(val);
+  if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+    return '"' + str.replace(/"/g, '""') + '"';
+  }
+  return str;
+}
+
+function writeCSVFile(filename, headers, rows) {
+  const outputDir = path.resolve(__dirname, "output");
+  if (!fs.existsSync(outputDir)) fs.mkdirSync(outputDir, { recursive: true });
+  const lines = [headers.join(",")];
+  for (const row of rows) {
+    lines.push(row.map(escapeCSV).join(","));
+  }
+  const filePath = path.join(outputDir, filename);
+  fs.writeFileSync(filePath, lines.join("\n"), "utf8");
+  logSuccess("Wrote " + rows.length + " rows to output/" + filename);
+}
+
+function exportWorkordersCSV(openWorkorders, completedWorkorders) {
+  const headers = [
+    "id", "lightspeed_id", "workorderNumber", "collection",
+    "customerID", "customerFirst", "customerLast",
+    "brand", "description", "color1_label", "color2_label",
+    "status", "saleID", "activeSaleID", "_lsSaleID",
+    "paymentComplete", "amountPaid",
+    "partToBeOrdered", "partOrdered",
+    "startedOnMillis", "finishedOnMillis", "paidOnMillis",
+    "workorderLines_count", "changeLog_count",
+    "_importSource"
+  ];
+  const rows = [];
+  for (const wo of openWorkorders) {
+    rows.push([
+      wo.id, wo.lightspeed_id, wo.workorderNumber, "open-workorders",
+      wo.customerID, wo.customerFirst, wo.customerLast,
+      wo.brand, wo.description, wo.color1?.label || "", wo.color2?.label || "",
+      wo.status, wo.saleID, wo.activeSaleID, wo._lsSaleID,
+      wo.paymentComplete, wo.amountPaid,
+      wo.partToBeOrdered, wo.partOrdered,
+      wo.startedOnMillis, wo.finishedOnMillis, wo.paidOnMillis,
+      (wo.workorderLines || []).length, (wo.changeLog || []).length,
+      wo._importSource
+    ]);
+  }
+  for (const wo of completedWorkorders) {
+    rows.push([
+      wo.id, wo.lightspeed_id, wo.workorderNumber, "completed-workorders",
+      wo.customerID, wo.customerFirst, wo.customerLast,
+      wo.brand, wo.description, wo.color1?.label || "", wo.color2?.label || "",
+      wo.status, wo.saleID, wo.activeSaleID, wo._lsSaleID,
+      wo.paymentComplete, wo.amountPaid,
+      wo.partToBeOrdered, wo.partOrdered,
+      wo.startedOnMillis, wo.finishedOnMillis, wo.paidOnMillis,
+      (wo.workorderLines || []).length, (wo.changeLog || []).length,
+      wo._importSource
+    ]);
+  }
+  writeCSVFile("workorders.csv", headers, rows);
+}
+
+function exportSalesCSV(completedSales, activeSales) {
+  const headers = [
+    "id", "lightspeed_id", "collection",
+    "customerID", "subtotal", "discount", "salesTax", "salesTaxPercent",
+    "total", "amountCaptured", "amountRefunded",
+    "paymentComplete", "depositType",
+    "workorderIDs", "transactionIDs",
+    "millis", "_importSource"
+  ];
+  const rows = [];
+  for (const s of completedSales) {
+    rows.push([
+      s.id, s.lightspeed_id, "completed-sales",
+      s.customerID, s.subtotal, s.discount, s.salesTax, s.salesTaxPercent,
+      s.total, s.amountCaptured, s.amountRefunded,
+      s.paymentComplete, s.depositType,
+      (s.workorderIDs || []).join(";"), (s.transactionIDs || []).join(";"),
+      s.millis, s._importSource
+    ]);
+  }
+  for (const s of activeSales) {
+    rows.push([
+      s.id, s.lightspeed_id, "active-sales",
+      s.customerID, s.subtotal, s.discount, s.salesTax, s.salesTaxPercent,
+      s.total, s.amountCaptured, s.amountRefunded,
+      s.paymentComplete, s.depositType,
+      (s.workorderIDs || []).join(";"), (s.transactionIDs || []).join(";"),
+      s.millis, s._importSource
+    ]);
+  }
+  writeCSVFile("sales.csv", headers, rows);
+}
+
+function exportTransactionsCSV(transactions) {
+  const headers = [
+    "id", "saleID", "type", "method",
+    "amountCaptured", "amountTendered", "amountRefunded",
+    "chargeID", "paymentIntentID", "last4", "cardType", "cardIssuer",
+    "depositType", "paymentProcessor",
+    "authorizationCode", "millis",
+    "_cardFundingSource", "_entryMode"
+  ];
+  const rows = [];
+  for (const t of transactions) {
+    rows.push([
+      t.id, t.saleID, t.type, t.method,
+      t.amountCaptured, t.amountTendered, t.amountRefunded,
+      t.chargeID, t.paymentIntentID, t.last4, t.cardType, t.cardIssuer,
+      t.depositType, t.paymentProcessor,
+      t.authorizationCode, t.millis,
+      t._cardFundingSource, t._entryMode
+    ]);
+  }
+  writeCSVFile("transactions.csv", headers, rows);
+}
+
+// ============================================================================
 // Main Orchestrator
 // ============================================================================
 
@@ -1507,16 +1677,16 @@ async function main() {
 
   // Mode selection
   console.log("");
-  console.log("  full - All workorders, customers, sales, inventory, employees");
-  console.log("  dev  - 20 most recent WOs + associated data only");
+  console.log("  full  - All workorders, customers, sales, inventory, employees");
+  console.log("  sales - Sales + transactions only (clears and rewrites sales/transactions)");
   console.log("");
   let choice = "";
-  while (choice !== "full" && choice !== "dev") {
-    choice = (await askQuestion("  Type 'full' or 'dev': ")).toLowerCase();
+  while (choice !== "full" && choice !== "sales") {
+    choice = (await askQuestion("  Type 'full' or 'sales': ")).toLowerCase();
   }
-  const devMode = choice === "dev";
+  const salesOnly = choice === "sales";
 
-  console.log("\n  -> " + (devMode ? "Dev" : "Full") + " Migration selected\n");
+  console.log("\n  -> " + (salesOnly ? "Sales-only" : "Full") + " Migration selected\n");
 
   const TOTAL_STAGES = 10;
 
@@ -1530,14 +1700,18 @@ async function main() {
 
   // -- STAGE 2: Clear existing collections --
   logStage(2, TOTAL_STAGES, "Clearing existing collections");
-  await clearCollection(basePath + "/open-workorders", "open workorders");
-  await clearCollection(basePath + "/completed-workorders", "completed workorders");
-  await clearCollection(basePath + "/customers", "customers");
+  if (!salesOnly) {
+    await clearCollection(basePath + "/open-workorders", "open workorders");
+    await clearCollection(basePath + "/completed-workorders", "completed workorders");
+    await clearCollection(basePath + "/customers", "customers");
+    await clearCollection(basePath + "/inventory", "inventory");
+    await clearCollection(basePath + "/punches", "punches");
+  } else {
+    logInfo("Sales-only mode: skipping workorders, customers, inventory, punches");
+  }
   await clearCollection(basePath + "/completed-sales", "completed sales");
   await clearCollection(basePath + "/active-sales", "active sales");
-  await clearCollection(basePath + "/inventory", "inventory");
   await clearCollection(basePath + "/transactions", "transactions");
-  await clearCollection(basePath + "/punches", "punches");
 
   // -- STAGE 3: Map statuses --
   logStage(3, TOTAL_STAGES, "Mapping statuses");
@@ -1582,7 +1756,7 @@ async function main() {
   // -- STAGE 7: Map sales --
   logStage(7, TOTAL_STAGES, "Mapping sales");
   const { sales: allSales, transactions: allTransactions } = mapSales(
-    csv["sales.csv"], csv["salesPayments.csv"], csv["stripePayments.csv"],
+    csv["sales.csv"], csv["salesPayments.csv"], csv["payments.csv"],
     workorderMap, customerMap, customerRedirectMap
   );
   logSuccess(allSales.length.toLocaleString() + " sales mapped (" + allTransactions.length.toLocaleString() + " transactions)");
@@ -1615,45 +1789,11 @@ async function main() {
     logInfo("No employees.csv - skipping employee + punch mapping");
   }
 
-  // -----------------------------------------------------------------------
-  // Dev mode: filter down to 20 most recent WOs + their dependencies
-  // -----------------------------------------------------------------------
-  let workorders, customers, sales, transactions, punches;
-
-  if (devMode) {
-    logInfo("");
-    logInfo("DEV MODE: Filtering to 20 most recent workorders + dependencies...");
-
-    // Pick 20 most recent workorders by startedOnMillis
-    const sorted = [...allWorkorders]
-      .filter(function (wo) { return wo.startedOnMillis; })
-      .sort(function (a, b) { return b.startedOnMillis - a.startedOnMillis; });
-    workorders = sorted.slice(0, 20);
-    logInfo("Selected " + workorders.length + " most recent workorders");
-
-    // Collect referenced customer and sale IDs from those workorders
-    const customerIDSet = new Set();
-    const saleIDSet = new Set();
-    for (const wo of workorders) {
-      if (wo.customerID) customerIDSet.add(wo.customerID);
-      if (wo.saleID) saleIDSet.add(wo.saleID);
-    }
-
-    // Filter associated data
-    customers = allCustomers.filter(function (c) { return customerIDSet.has(c.id); });
-    sales = allSales.filter(function (s) { return saleIDSet.has(s.id); });
-    const filteredSaleIDSet = new Set(sales.map(function (s) { return s.id; }));
-    transactions = allTransactions.filter(function (t) { return filteredSaleIDSet.has(t.saleID); });
-    punches = allPunches; // keep all punches like the browser dev migration
-
-    logInfo("Filtered: " + customers.length + " customers, " + sales.length + " sales, " + transactions.length + " transactions");
-  } else {
-    workorders = allWorkorders;
-    customers = allCustomers;
-    sales = allSales;
-    transactions = allTransactions;
-    punches = allPunches;
-  }
+  const workorders = allWorkorders;
+  const customers = allCustomers;
+  const sales = allSales;
+  const transactions = allTransactions;
+  const punches = allPunches;
 
   // Split workorders into open vs completed
   const finishedAndPaidID = statuses.find(function (s) { return s.label.toLowerCase() === "finished & paid"; });
@@ -1667,49 +1807,55 @@ async function main() {
   const activeSales = sales.filter(function (s) { return !s.paymentComplete && s.workorderIDs && s.workorderIDs.length > 0; });
   logInfo("  -> " + completedSales.length.toLocaleString() + " completed sales | " + activeSales.length.toLocaleString() + " active sales");
 
+  // Export CSVs to scripts/output/ for verification
+  logInfo("Exporting CSV verification files...");
+  exportWorkordersCSV(openWorkorders, completedWorkorders);
+  exportSalesCSV(completedSales, activeSales);
+  exportTransactionsCSV(transactions);
+
   // -- STAGE 9: Write to Firestore --
   logStage(9, TOTAL_STAGES, "Writing to Firestore");
 
-  // 9a: Merge statuses + employees into settings
-  logInfo("Merging statuses and employees into settings...");
-  const settingsRef = db.doc(basePath + "/settings/settings");
-  const settingsDoc = await settingsRef.get();
-  const existingSettings = settingsDoc.exists ? settingsDoc.data() : {};
-  const existingUsers = existingSettings.users || [];
-  const existingIDs = new Set(existingUsers.map(function (u) { return u.id; }));
-  for (const u of newUsers) {
-    if (!existingIDs.has(u.id)) existingUsers.push(u);
+  if (!salesOnly) {
+    // 9a: Merge statuses + employees into settings
+    logInfo("Merging statuses and employees into settings...");
+    const settingsRef = db.doc(basePath + "/settings/settings");
+    const settingsDoc = await settingsRef.get();
+    const existingSettings = settingsDoc.exists ? settingsDoc.data() : {};
+    const existingUsers = existingSettings.users || [];
+    const existingIDs = new Set(existingUsers.map(function (u) { return u.id; }));
+    for (const u of newUsers) {
+      if (!existingIDs.has(u.id)) existingUsers.push(u);
+    }
+    await settingsRef.set({ statuses, users: existingUsers }, { merge: true });
+    logSuccess("Settings updated (statuses + " + existingUsers.length + " users)");
+
+    // 9b: Inventory
+    await batchWrite(basePath + "/inventory", inventoryItems, "inventory");
+
+    // 9c: Customers
+    await batchWrite(basePath + "/customers", customers, "customers");
+
+    // 9d: Open workorders
+    await batchWrite(basePath + "/open-workorders", openWorkorders, "open workorders");
+
+    // 9e: Completed workorders
+    await batchWrite(basePath + "/completed-workorders", completedWorkorders, "completed workorders");
+
+    // 9i: Punch history
+    await batchWrite(basePath + "/punches", punches, "punch history");
+  } else {
+    logInfo("Sales-only mode: skipping settings, inventory, customers, workorders, punches");
   }
-  await settingsRef.set({ statuses, users: existingUsers }, { merge: true });
-  logSuccess("Settings updated (statuses + " + existingUsers.length + " users)");
 
-  // 9b: Inventory (always full set, even in dev mode)
-  await batchWrite(basePath + "/inventory", inventoryItems, "inventory");
-
-  // 9c: Customers
-  await batchWrite(basePath + "/customers", customers, "customers");
-
-  // 9d: Open workorders
-  await batchWrite(basePath + "/open-workorders", openWorkorders, "open workorders");
-
-  // 9e: Completed workorders
-  await batchWrite(basePath + "/completed-workorders", completedWorkorders, "completed workorders");
-
-  // 9f: Completed sales
+  // Sales + transactions always written
   await batchWrite(basePath + "/completed-sales", completedSales, "completed sales");
-
-  // 9g: Active sales
   await batchWrite(basePath + "/active-sales", activeSales, "active sales");
-
-  // 9h: Transactions
   await batchWrite(basePath + "/transactions", transactions, "transactions");
-
-  // 9i: Punch history
-  await batchWrite(basePath + "/punches", punches, "punch history");
 
   // -- STAGE 10: Summary --
   logStage(10, TOTAL_STAGES, "Summary");
-  const modeLabel = devMode ? "DEV MIGRATION" : "FULL MIGRATION";
+  const modeLabel = salesOnly ? "SALES-ONLY MIGRATION" : "FULL MIGRATION";
   const totalTime = ((Date.now() - globalStart) / 1000).toFixed(1);
   const minutes = Math.floor(totalTime / 60);
   const seconds = (totalTime % 60).toFixed(0);

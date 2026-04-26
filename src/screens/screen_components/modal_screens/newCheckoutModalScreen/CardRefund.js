@@ -68,7 +68,7 @@ export const CardRefund = memo(function CardRefund({
   }
 
   async function handleProcessRefund() {
-    dlog(DCAT.BUTTON, "handleProcessRefund", "CardRefund", { amount: sRefundAmount, chargeID: selectedPayment?.chargeID });
+    dlog(DCAT.BUTTON, "handleProcessRefund", "CardRefund", { amount: sRefundAmount, paymentIntentID: selectedPayment?.paymentIntentID });
     if (!selectedPayment) {
       _setErrorMessage("Select a card payment to refund against");
       return;
@@ -107,7 +107,7 @@ export const CardRefund = memo(function CardRefund({
 
       let result = await newCheckoutProcessStripeRefund(
         sRefundAmount,
-        selectedPayment.chargeID,
+        selectedPayment.paymentIntentID,
         {
           transactionID: selectedPayment.id,
           tenantID,

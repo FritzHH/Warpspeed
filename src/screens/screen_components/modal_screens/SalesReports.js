@@ -248,6 +248,32 @@ export const SalesReportsModal = ({ handleExit }) => {
     }
   }
 
+  // Search filtering for transaction mode (uses sTransactionResults)
+  let filteredTransactions = sTransactionResults;
+  if (searchQuery) {
+    let isAmountSearch = searchQuery.includes(".");
+    if (isAmountSearch) {
+      let searchAmount = searchQuery.replace(/[^0-9.]/g, "");
+      filteredTransactions = sTransactionResults.filter((tx) => {
+        let txAmount = formatCurrencyDisp(tx.amountCaptured || 0);
+        return txAmount.includes(searchAmount);
+      });
+    } else {
+      filteredTransactions = sTransactionResults.filter((tx) => {
+        let method = (tx.method || "").toLowerCase();
+        let type = (tx.type || "").toLowerCase();
+        let cardType = (tx.cardType || "").toLowerCase();
+        let cardIssuer = (tx.cardIssuer || "").toLowerCase();
+        return (
+          method.includes(searchQuery) ||
+          type.includes(searchQuery) ||
+          cardType.includes(searchQuery) ||
+          cardIssuer.includes(searchQuery)
+        );
+      });
+    }
+  }
+
   // Mode-aware data processing
   let groups = [];
   let flatSorted = [];
@@ -290,7 +316,7 @@ export const SalesReportsModal = ({ handleExit }) => {
       return (aMin - bMin) * dir;
     });
   } else {
-    flatSorted = filteredResults
+    flatSorted = filteredTransactions
       .filter((tx) => tx.type !== "pending")
       .sort((a, b) => {
         let dir = sSortDir === "asc" ? 1 : -1;
@@ -389,7 +415,8 @@ export const SalesReportsModal = ({ handleExit }) => {
 
   function renderTransactionRow(tx, index) {
     let isRefund = tx.type === "refund";
-    let isDeposit = tx.type === "deposit";
+    let isDeposit = tx.depositType === "deposit";
+    let isGiftCard = tx.method === "credit";
     let isActive = tx.source === "active";
     let bgColor = isRefund
       ? lightenRGBByPercent(C.red, 85)
@@ -419,11 +446,11 @@ export const SalesReportsModal = ({ handleExit }) => {
             flex: 1,
             fontSize: 14,
             fontWeight: "600",
-            color: isRefund ? C.red : isDeposit ? C.green : C.text,
+            color: isRefund ? C.red : (isDeposit || isGiftCard) ? C.green : C.text,
             paddingLeft: isActive ? 0 : 10,
           }}
         >
-          {capitalizeFirstLetterOfString(tx.type || "payment")}
+          {isDeposit ? "Deposit" : isGiftCard ? "Gift Card" : capitalizeFirstLetterOfString(tx.type || "payment")}
         </Text>
         <Text
           numberOfLines={1}
@@ -739,8 +766,10 @@ export const SalesReportsModal = ({ handleExit }) => {
                   ? (searchQuery
                       ? groups.length + " sales (" + filteredResults.length + " transactions) of " + sResults.length
                       : groups.length + " sales (" + sResults.length + " transactions)")
+                  : sTransactionLoading
+                  ? "Loading transactions..."
                   : (searchQuery
-                      ? flatSorted.length + " transactions of " + sResults.length
+                      ? flatSorted.length + " transactions of " + sTransactionResults.length
                       : flatSorted.length + " transactions")}
               </Text>
               <Text style={{ fontSize: 12, color: gray(0.4) }}>
@@ -968,7 +997,7 @@ export const SalesReportsModal = ({ handleExit }) => {
         </View>
       </TouchableWithoutFeedback>
     );
-  }, [sStartDate, sEndDate, sResults, sPage, sLoading, sSaleModalItem, sActiveShortcut, sSearchText, sPendingStart, sPendingEnd, sEndCalMonth, sEndCalYear, sCalKey, sViewMode, sSortField, sSortDir]);
+  }, [sStartDate, sEndDate, sResults, sPage, sLoading, sSaleModalItem, sActiveShortcut, sSearchText, sPendingStart, sPendingEnd, sEndCalMonth, sEndCalYear, sCalKey, sViewMode, sSortField, sSortDir, sTransactionResults, sTransactionLoading]);
 
   return ReactDOM.createPortal(
     <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}>

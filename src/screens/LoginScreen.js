@@ -5,7 +5,7 @@ import { C, Colors, Fonts } from "../styles";
 import { sendPasswordReset, dbLoginUser } from "../db_calls_wrapper";
 import { gray } from "../utils";
 
-const logo = require("../resources/bblogo_trans_high.png");
+const logo = require("../resources/default_app_logo_large.png");
 
 // ── Brand colors pulled from the logo ──
 const BRAND_BLUE = "#2B7CB5";

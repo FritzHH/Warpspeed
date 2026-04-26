@@ -5,7 +5,7 @@ import { onTranslateMessage, TRANSLATE_MSG_TYPES } from "../broadcastChannel";
 import { C, Fonts } from "../styles";
 import { gray } from "../utils";
 
-const logo = require("../resources/bblogo_trans_high.png");
+const logo = require("../resources/default_app_logo_large.png");
 
 function IdleScreen() {
   return (

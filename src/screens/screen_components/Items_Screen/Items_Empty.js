@@ -18,7 +18,7 @@ export function EmptyItemsComponent() {
       }}
     >
       <Image_
-        icon={require('../../../resources/bblogo_trans_high.png')}
+        icon={require('../../../resources/default_app_logo_large.png')}
         style={{ opacity: 0.1, width: "90%", height: "90%" }}
       />
     </View>

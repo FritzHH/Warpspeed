@@ -744,7 +744,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   borderRadius: 5,
                   fontWeight: zOpenWorkorder?.brand ? "500" : null,
                 }}
-                value={zOpenWorkorder?.brand}
+                value={capitalizeFirstLetterOfString(zOpenWorkorder?.brand)}
                 onChangeText={(val) =>
                   useOpenWorkordersStore.getState().setField("brand", val, zOpenWorkorder.id)
                 }
@@ -838,7 +838,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   borderRadius: 5,
                   fontWeight: zOpenWorkorder?.description ? "500" : null,
                 }}
-                value={zOpenWorkorder?.description}
+                value={capitalizeFirstLetterOfString(zOpenWorkorder?.description)}
                 onChangeText={(val) => {
                   useOpenWorkordersStore.getState().setField("description", val, zOpenWorkorder.id);
                 }}
@@ -893,7 +893,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 placeholder={"Color 1"}
                 editable={!isDonePaid}
                 capitalize={true}
-                value={zOpenWorkorder?.color1.label}
+                value={capitalizeFirstLetterOfString(zOpenWorkorder?.color1.label)}
                 style={{
                   width: "48%",
                   borderWidth: 1,
@@ -916,7 +916,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 placeholder={"Color 2"}
                 editable={!isDonePaid}
                 capitalize={true}
-                value={zOpenWorkorder?.color2.label}
+                value={capitalizeFirstLetterOfString(zOpenWorkorder?.color2.label)}
                 style={{
                   width: "48%",
                   borderWidth: 1,
@@ -1315,7 +1315,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   fontWeight: zOpenWorkorder?.partOrdered ? "500" : null,
                   backgroundColor: C.backgroundWhite,
                 }}
-                value={zOpenWorkorder?.partOrdered}
+                value={capitalizeFirstLetterOfString(zOpenWorkorder?.partOrdered)}
                 onChangeText={(val) => {
                   useOpenWorkordersStore.getState().setField("partOrdered", val, zOpenWorkorder.id);
                   useOpenWorkordersStore.getState().setField("partOrderedMillis", Date.now(), zOpenWorkorder.id);
@@ -1334,7 +1334,7 @@ export const ActiveWorkorderComponent = ({}) => {
               }}
             >
               <TextInput_
-                value={zOpenWorkorder?.partSource}
+                value={capitalizeFirstLetterOfString(zOpenWorkorder?.partSource)}
                 placeholder={"Item sources"}
                 placeholderTextColor={gray(0.2)}
                 editable={!isDonePaid}

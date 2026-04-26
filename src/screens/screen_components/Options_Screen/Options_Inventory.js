@@ -287,9 +287,34 @@ const QuickItemCanvasCard = ({
         paddingTop: 2,
         paddingBottom: sEditMode ? 2 : (sShowActions ? 20 : 2),
         userSelect: "none",
-        overflow: "hidden",
+        overflow: sEditMode ? "visible" : "hidden",
       }}
     >
+      {/* Formal name helper - above card in edit mode */}
+      {sEditMode && isSelected && invItem?.formalName && (
+        <div
+          style={{
+            position: "absolute",
+            top: -16,
+            left: "50%",
+            transform: "translateX(-50%)",
+            fontSize: 12,
+            color: gray(0.5),
+            backgroundColor: "rgba(255,255,255,0.95)",
+            borderRadius: 4,
+            paddingTop: 1,
+            paddingBottom: 1,
+            paddingLeft: 4,
+            paddingRight: 4,
+            pointerEvents: "none",
+            zIndex: 10,
+            whiteSpace: "nowrap",
+          }}
+        >
+          {invItem.formalName}
+        </div>
+      )}
+
       {/* Resize handles - edges and corners */}
       {sEditMode && isSelected && !sDragging && RESIZE_HANDLES.map((handle) => (
         <div
@@ -614,7 +639,7 @@ const QuickItemCanvas = React.forwardRef(({
         style={{
           flex: 1,
           position: "relative",
-          overflow: "hidden",
+          overflow: sEditMode ? "visible" : "hidden",
           borderRadius: 6,
           minHeight: 200,
           ...(sEditMode ? {

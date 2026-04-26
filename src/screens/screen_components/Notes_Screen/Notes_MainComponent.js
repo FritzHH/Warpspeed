@@ -5,7 +5,7 @@ import {
   TextInput,
   FlatList,
 } from "react-native-web";
-import { gray, resolveStatus, lightenRGBByPercent } from "../../../utils";
+import { gray, resolveStatus, lightenRGBByPercent, capitalizeFirstLetterOfString } from "../../../utils";
 import { Image_, TouchableOpacity_, TextInput_, Tooltip } from "../../../components";
 import { C, Colors, ICONS } from "../../../styles";
 import { useState } from "react";
@@ -293,7 +293,7 @@ export function Notes_MainComponent() {
                           color: C.text,
                         }}
                         autoFocus={true}
-                        value={item.value}
+                        value={capitalizeFirstLetterOfString(item.value)}
                       />
                     ) : (
                       <TouchableOpacity_
@@ -307,7 +307,7 @@ export function Notes_MainComponent() {
                             fontSize: 15,
                           }}
                         >
-                          {item.value || "Empty note"}
+                          {capitalizeFirstLetterOfString(item.value) || "Empty note"}
                         </Text>
                       </TouchableOpacity_>
                     )}
@@ -445,7 +445,7 @@ export function Notes_MainComponent() {
                           color: C.text,
                         }}
                         autoFocus={true}
-                        value={item.value}
+                        value={capitalizeFirstLetterOfString(item.value)}
                       />
                     ) : (
                       <TouchableOpacity_
@@ -459,7 +459,7 @@ export function Notes_MainComponent() {
                             fontSize: 15,
                           }}
                         >
-                          {item.value || "Empty note"}
+                          {capitalizeFirstLetterOfString(item.value) || "Empty note"}
                         </Text>
                       </TouchableOpacity_>
                     )}

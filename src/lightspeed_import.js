@@ -614,14 +614,14 @@ export function mapWorkorders(
 export function mapSales(
   salesCSVText,
   salesPaymentsCSVText,
-  stripePaymentsCSVText,
+  paymentsCSVText,
   workorderMap,            // { lsSaleID → mapped workorder object(s) }
   customerMap,             // { lsCustomerID → customer object }
   customerRedirectMap = {} // { discardedLsID → survivingLsID } (from mapCustomers)
 ) {
   const saleRows = parseCSV(salesCSVText);
   const spRows = parseCSV(salesPaymentsCSVText);
-  const stripeRows = stripePaymentsCSVText ? parseCSV(stripePaymentsCSVText) : [];
+  const paymentReportRows = paymentsCSVText ? parseCSV(paymentsCSVText) : [];
 
   // --- Build lookup maps ---
 
@@ -633,14 +633,38 @@ export function mapSales(
     paymentsMap[sp.saleID].push(sp);
   }
 
-  // stripeByOrderID: Order ID (= LS saleID) → [stripe rows]
-  const stripeByOrderID = {};
-  for (const sr of stripeRows) {
-    const orderID = sr["Order ID"];
+  // paymentsByOrderID: LS saleID → [Lightspeed Payments report rows]
+  const paymentsByOrderID = {};
+  for (const pr of paymentReportRows) {
+    const orderID = pr["Order ID"];
     if (!orderID) continue;
-    if (!stripeByOrderID[orderID]) stripeByOrderID[orderID] = [];
-    stripeByOrderID[orderID].push(sr);
+    if (pr.Status !== "CAPTURED" && pr.Status !== "REFUNDED" && pr.Status !== "PARTIALLY_REFUNDED") continue;
+    if (!paymentsByOrderID[orderID]) paymentsByOrderID[orderID] = [];
+    paymentsByOrderID[orderID].push(pr);
   }
+
+  // Build refund charge lookup: for return sales, link to the original sale's chargeID
+  const refundChargesByCustomer = {};
+  for (const pr of paymentReportRows) {
+    if (pr.Status !== "REFUNDED" && pr.Status !== "PARTIALLY_REFUNDED") continue;
+    const orderID = pr["Order ID"];
+    if (!orderID) continue;
+    const origSaleRow = saleRows.find(r => r.saleID === orderID);
+    if (!origSaleRow || !origSaleRow.customerID || origSaleRow.customerID === "0") continue;
+    const custID = origSaleRow.customerID;
+    const refundedCents = dollarsToCents(pr["Refunded amount"]);
+    if (refundedCents <= 0) continue;
+    const key = custID + "_" + refundedCents;
+    if (!refundChargesByCustomer[key]) refundChargesByCustomer[key] = [];
+    refundChargesByCustomer[key].push({
+      chargeID: (pr.ID || "").replace(/^st-/, ""),
+      last4: pr["Card last 4"] || "",
+      cardType: pr["Card type"] || "",
+      _entryMode: pr["Entry mode"] || "",
+      _cardFundingSource: pr["Card funding source"] || "",
+    });
+  }
+  const refundChargesUsed = new Set();
 
   // --- Map sales ---
   const sales = [];
@@ -687,68 +711,82 @@ export function mapSales(
     const paymentRows = paymentsMap[lsSaleID] || [];
     const saleID = buildLightspeedEAN13("22", lsSaleID);
 
-    // Stripe records for this sale (matched by Order ID = saleID)
-    const stripeForSale = stripeByOrderID[lsSaleID] || [];
-    // Track which Stripe rows are consumed (for multi-payment matching)
-    const stripeUsed = new Set();
+    // Detect deposit sale: any payment with "Credit Account" type and negative amount (money into account)
+    const isDepositSale = paymentRows.some(sp => sp.paymentTypeName === "Credit Account" && parseFloat(sp.amount) < 0);
+
+    // Lightspeed Payments report records for this sale (matched by Order ID)
+    const prForSale = paymentsByOrderID[lsSaleID] || [];
+    const prUsed = new Set();
 
     const payments = paymentRows.map(sp => {
       const isCash = sp.paymentTypeType === "cash";
       const isCheck = sp.paymentTypeName === "Check";
       const isCard = sp.paymentTypeType === "credit card";
+      const isCredit = sp.paymentTypeType === "credit account";
+      const isEcom = sp.paymentTypeType === "ecom";
       const amount = dollarsToCents(sp.amount);
 
-      // For card payments, try to match a Stripe record for card details
-      let stripeMatch = null;
-      if (isCard && stripeForSale.length > 0) {
-        // Try exact amount match first (Stripe Amount is in dollars)
-        for (let i = 0; i < stripeForSale.length; i++) {
-          if (stripeUsed.has(i)) continue;
-          const stripeAmountCents = dollarsToCents(stripeForSale[i]["Amount"]);
-          if (stripeAmountCents === amount) {
-            stripeMatch = stripeForSale[i];
-            stripeUsed.add(i);
-            break;
+      // Match card payment to Lightspeed Payments report by amount
+      let prMatch = null;
+      if (isCard && prForSale.length > 0) {
+        for (let i = 0; i < prForSale.length; i++) {
+          if (prUsed.has(i)) continue;
+          if (dollarsToCents(prForSale[i].Amount) === amount) {
+            prMatch = prForSale[i]; prUsed.add(i); break;
           }
         }
-        // Fallback: take first unused Stripe record for this sale (inexact match)
-        if (!stripeMatch) {
-          for (let i = 0; i < stripeForSale.length; i++) {
-            if (stripeUsed.has(i)) continue;
-            stripeMatch = stripeForSale[i];
-            stripeUsed.add(i);
-            console.warn("[Migration] Stripe fallback match for sale " + lsSaleID + ": payment $" + (amount / 100).toFixed(2) + " matched to Stripe $" + stripeForSale[i]["Amount"] + " (inexact)");
+        if (!prMatch) {
+          for (let i = 0; i < prForSale.length; i++) {
+            if (prUsed.has(i)) continue;
+            prMatch = prForSale[i]; prUsed.add(i); break;
+          }
+        }
+      }
+
+      // For return/refund card transactions, link to the original sale's chargeID
+      let refundMatch = null;
+      if (isCard && !prMatch && amount < 0 && row.customerID && row.customerID !== "0") {
+        const refKey = row.customerID + "_" + Math.abs(amount);
+        const candidates = refundChargesByCustomer[refKey] || [];
+        for (let ri = 0; ri < candidates.length; ri++) {
+          const cid = candidates[ri].chargeID;
+          if (!refundChargesUsed.has(cid)) {
+            refundMatch = candidates[ri];
+            refundChargesUsed.add(cid);
             break;
           }
         }
       }
 
+      // Fallback to salesPayments.csv card fields (e.g., May 2025 gap)
+      const spLast4 = isCard && sp.cardLast4 ? sp.cardLast4 : "";
+      const spCardType = isCard && sp.cardType ? sp.cardType : "";
+      const spAuthCode = isCard && sp.authCode ? sp.authCode : "";
+
       return {
         id: sp.salePaymentID || crypto.randomUUID(),
         saleID,
         type: amount < 0 ? "refund" : "payment",
-        method: isCash ? "cash" : isCheck ? "check" : "card",
+        method: isCash ? "cash" : isCheck ? "check" : isCard ? "card" : isCredit ? "credit" : isEcom ? "ecom" : "other",
         amountCaptured: amount,
         amountTendered: (isCash && amount >= 0) ? amount : 0,
         salesTax: 0,
-        cardType: stripeMatch ? stripeMatch["Card type"] : (sp.cardType || ""),
+        cardType: prMatch ? (prMatch["Card type"] || "") : refundMatch ? refundMatch.cardType : spCardType,
         cardIssuer: isCard ? sp.paymentTypeName : "",
-        last4: stripeMatch ? stripeMatch["Card last 4"] : (sp.cardLast4 || ""),
-        authorizationCode: sp.authCode || "",
+        last4: prMatch ? (prMatch["Card last 4"] || "") : refundMatch ? refundMatch.last4 : spLast4,
+        authorizationCode: spAuthCode,
         millis: sp.createTime ? new Date(sp.createTime).getTime() : 0,
         paymentProcessor: isCard ? "Stripe" : "",
-        chargeID: stripeMatch ? stripeMatch["ID"] : (sp.ccChargeID && sp.ccChargeID !== "0" ? sp.ccChargeID : ""),
-        paymentIntentID: stripeMatch ? (stripeMatch["Payment ID"] || "") : "",
+        chargeID: prMatch ? (prMatch.ID || "").replace(/^st-/, "") : refundMatch ? refundMatch.chargeID : "",
+        paymentIntentID: "",
         receiptURL: "",
         expMonth: "",
         expYear: "",
         networkTransactionID: "",
-        amountRefunded: stripeMatch ? dollarsToCents(stripeMatch["Refunded amount"]) : 0,
-        depositType: "",
-        depositId: "",
-        depositOriginalAmount: 0,
-        _cardFundingSource: stripeMatch ? (stripeMatch["Card funding source"] || "") : "",
-        _entryMode: stripeMatch ? (stripeMatch["Entry mode"] || "") : "",
+        amountRefunded: prMatch ? dollarsToCents(prMatch["Refunded amount"]) : 0,
+        depositType: isDepositSale ? "deposit" : "",
+        _entryMode: prMatch ? (prMatch["Entry mode"] || "") : refundMatch ? refundMatch._entryMode : "",
+        _cardFundingSource: prMatch ? (prMatch["Card funding source"] || "") : refundMatch ? refundMatch._cardFundingSource : "",
         refunds: [],
       };
     });
@@ -784,22 +822,26 @@ export function mapSales(
       _importSource: "lightspeed",
     };
 
-    sales.push(mappedSale);
-    allTransactions.push(...payments);
+    // Deposit sales do not create sale objects — only transaction docs
+    if (!isDepositSale) {
+      sales.push(mappedSale);
 
-    // Backfill workorder saleID
-    for (const wo of linkedWorkorders) {
-      wo.saleID = saleID;
-      if (completed) {
-        wo.paymentComplete = true;
-        wo.amountPaid = computedAmountCaptured;
+      // Backfill workorder saleID
+      for (const wo of linkedWorkorders) {
+        wo.saleID = saleID;
+        if (completed) {
+          wo.paymentComplete = true;
+          wo.amountPaid = computedAmountCaptured;
+        }
+      }
+
+      // Backfill customer sales array
+      if (customer) {
+        customer.sales.push(saleID);
       }
     }
 
-    // Backfill customer sales array
-    if (customer) {
-      customer.sales.push(saleID);
-    }
+    allTransactions.push(...payments);
   }
 
   return { sales, transactions: allTransactions };

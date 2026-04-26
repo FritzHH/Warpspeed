@@ -470,27 +470,6 @@ var EXPORTS = [
     },
   },
   {
-    name: "ccCharges",
-    filename: "stripePayments.csv", // named for import script compatibility
-    endpoint: "CCCharge",
-    params: {},
-    build: function (data) {
-      var headers = [
-        "ccChargeID", "saleID", "gatewayTransID", "xnum", "cardType",
-        "amount", "refunded", "authCode", "exp", "entryMethod",
-        "isDebit", "cardholderName", "voided", "declined", "authOnly", "timeStamp",
-      ];
-      var rows = data.map(function (cc) {
-        return [
-          cc.ccChargeID, cc.saleID, cc.gatewayTransID || "", cc.xnum || "", cc.cardType || "",
-          cc.amount || "", cc.refunded || "", cc.authCode || "", cc.exp || "", cc.entryMethod || "",
-          cc.isDebit || "", cc.cardholderName || "", cc.voided, cc.declined, cc.authOnly, cc.timeStamp || "",
-        ];
-      });
-      return { headers: headers, rows: rows };
-    },
-  },
-  {
     name: "workorderStatuses",
     filename: "workorderStatuses.csv",
     endpoint: "WorkorderStatus",
@@ -579,7 +558,7 @@ function askQuestion(prompt) {
   });
 }
 
-var MINI_RECORDS = 5; // records per endpoint in mini mode
+var SALES_EXPORT_NAMES = ["sales", "salesLines", "salesPayments"];
 
 async function main() {
   var globalStart = Date.now();
@@ -607,12 +586,14 @@ async function main() {
   }
 
   // Ask mode
-  var answer = await askQuestion("  Download mode — (F)ull or (M)ini test? [f/m]: ");
-  var isMini = answer === "m" || answer === "mini";
-  var maxRecords = isMini ? MINI_RECORDS : 0;
+  console.log("  full  - All 11 CSV exports (workorders, customers, sales, inventory, employees)");
+  console.log("  sales - Sales-related only (sales, salesLines, salesPayments, stripePayments)");
+  console.log("");
+  var answer = await askQuestion("  Type 'full' or 'sales': ");
+  var salesOnly = answer === "s" || answer === "sales";
 
-  if (isMini) {
-    console.log("\n  >> MINI MODE: " + MINI_RECORDS + " records per endpoint\n");
+  if (salesOnly) {
+    console.log("\n  >> SALES-ONLY MODE: downloading 4 sale-related exports\n");
   } else {
     console.log("\n  >> FULL MODE: downloading all records\n");
   }
@@ -620,19 +601,24 @@ async function main() {
   // Init Firebase
   initFirebase();
   await initLogNode();
-  await log("Script started (" + (isMini ? "MINI — " + MINI_RECORDS + " records each" : "FULL") + ")");
+  await log("Script started (" + (salesOnly ? "SALES-ONLY" : "FULL") + ")");
 
   // Authenticate
   logHeader("AUTHENTICATION");
   var auth = await getAccessToken();
   await log("Authenticated with Lightspeed (account: " + auth.accountID + ")", "success");
 
-  // Run exports in parallel
-  var modeLabel = isMini ? " [MINI]" : "";
-  logHeader("DOWNLOADING " + EXPORTS.length + " CSV FILES" + modeLabel + " (parallel: " + CONFIG.PARALLEL_LIMIT + ")");
+  // Filter exports if sales-only mode
+  var activeExports = salesOnly
+    ? EXPORTS.filter(function (e) { return SALES_EXPORT_NAMES.indexOf(e.name) !== -1; })
+    : EXPORTS;
 
-  var tasks = EXPORTS.map(function (exportDef) {
-    return function () { return runExport(exportDef, auth.accessToken, auth.accountID, maxRecords); };
+  // Run exports in parallel
+  var modeLabel = salesOnly ? " [SALES-ONLY]" : "";
+  logHeader("DOWNLOADING " + activeExports.length + " CSV FILES" + modeLabel + " (parallel: " + CONFIG.PARALLEL_LIMIT + ")");
+
+  var tasks = activeExports.map(function (exportDef) {
+    return function () { return runExport(exportDef, auth.accessToken, auth.accountID, 0); };
   });
   var results = await runParallel(tasks, CONFIG.PARALLEL_LIMIT);
 
@@ -653,9 +639,9 @@ async function main() {
   console.log("  Total rows:  " + totalRows.toLocaleString());
   console.log("  Total time:  " + (mins > 0 ? mins + "m " : "") + secs + "s");
   console.log("  Output dir:  " + CONFIG.csvDir);
-  if (isMini) console.log("  Mode:        MINI (" + MINI_RECORDS + " records per endpoint)");
+  if (salesOnly) console.log("  Mode:        SALES-ONLY (4 exports)");
 
-  await log("Download complete! " + results.length + " files, " + totalRows.toLocaleString() + " total rows." + (isMini ? " [MINI MODE]" : ""), "success");
+  await log("Download complete! " + results.length + " files, " + totalRows.toLocaleString() + " total rows." + (salesOnly ? " [SALES-ONLY]" : ""), "success");
   if (logDocRef) await logDocRef.update({ status: "complete" });
 
   console.log("\n  + ALL DONE\n");

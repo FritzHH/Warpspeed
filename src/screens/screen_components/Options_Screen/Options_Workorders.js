@@ -584,6 +584,13 @@ export function WorkordersComponent({}) {
         renderItem={(item) => {
           let workorder = item.item;
           const rs = resolveStatus(workorder.status, useSettingsStore.getState().settings?.statuses);
+          let wipUser = "";
+          if (workorder.status === "work_in_progress" && workorder.changeLog?.length) {
+            for (let i = workorder.changeLog.length - 1; i >= 0; i--) {
+              let entry = workorder.changeLog[i];
+              if (entry.field === "status" && entry.to === rs.label) { wipUser = entry.user || ""; break; }
+            }
+          }
           return (
             <View>
               <TouchableOpacity
@@ -763,6 +770,9 @@ export function WorkordersComponent({}) {
                             borderLeftColor: rs.textColor,
                           }}
                         >
+                          {!!wipUser && (
+                            <Text style={{ color: C.red, fontSize: 11, fontStyle: "italic", marginRight: 5 }}>{wipUser}</Text>
+                          )}
                           <Text
                             style={{
                               color: rs.textColor,

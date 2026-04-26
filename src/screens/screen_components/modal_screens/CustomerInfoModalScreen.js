@@ -51,6 +51,7 @@ import { smsService } from "../../../data_service_modules";
 import { readActiveSale, readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { ClosedWorkorderModal } from "./ClosedWorkorderModal";
 import { DepositRefundModal } from "./newCheckoutModalScreen/DepositRefundModal";
+import { FullSaleModal } from "./FullSaleModal";
 
 export const CustomerInfoScreenModalComponent = ({
   incomingCustomer = null,
@@ -86,6 +87,7 @@ export const CustomerInfoScreenModalComponent = ({
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
   const [sEditingCredit, _sSetEditingCredit] = useState(null);
   const [sRefundDeposit, _sSetRefundDeposit] = useState(null);
+  const [sSaleModalItem, _sSetSaleModalItem] = useState(null);
   const [sCellDuplicateStatus, _sCellDuplicateStatus] = useState(null); // null | "checking" | "duplicate" | "unique" | "error"
   const mountedRef = useRef(true);
   const initialCellRef = useRef(initialCustomer?.customerCell || "");
@@ -670,7 +672,7 @@ export const CustomerInfoScreenModalComponent = ({
                       useCheckoutStore.getState().setViewOnlySale(sale);
                       useCheckoutStore.getState().setIsCheckingOut(true);
                     } else {
-                      useOpenWorkordersStore.getState().setSaleModalObj(sale);
+                      _sSetSaleModalItem({ saleID: sale.id });
                     }
                   }}
                 />
@@ -780,6 +782,12 @@ export const CustomerInfoScreenModalComponent = ({
             _sSetEditingCredit(null);
           }}
         />
+        {!!sSaleModalItem && (
+          <FullSaleModal
+            item={sSaleModalItem}
+            onClose={() => _sSetSaleModalItem(null)}
+          />
+        )}
       </View>
     </TouchableWithoutFeedback>
   );

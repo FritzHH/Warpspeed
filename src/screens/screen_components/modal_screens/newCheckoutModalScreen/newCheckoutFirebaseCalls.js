@@ -889,6 +889,29 @@ export async function queryCompletedSalesReport(startMillis, endMillis) {
   }
 }
 
+// ─── Transaction History Query ────────────────────────────────────
+// Queries the transactions collection directly by millis range.
+// Returns raw transaction docs (not flattened report rows).
+
+export async function queryTransactionsByDateRange(startMillis, endMillis) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return [];
+    const path = `tenants/${tenantID}/stores/${storeID}/transactions`;
+    const txns = await firestoreQuery(path, [
+      { field: "millis", operator: ">=", value: startMillis },
+      { field: "millis", operator: "<=", value: endMillis },
+    ], {
+      orderBy: { field: "millis", direction: "desc" },
+      limit: 2000,
+    });
+    return txns || [];
+  } catch (error) {
+    log("queryTransactionsByDateRange error:", error);
+    return [];
+  }
+}
+
 // ─── Active Sales Report ─────────────────────────────────────────
 // Takes a pre-filtered array of active sale objects (already filtered
 // by date range by the caller) and returns flat report rows in the

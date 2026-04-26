@@ -24,7 +24,7 @@ import dayjs from "dayjs";
 import CalendarPicker, {
   useDefaultStyles,
 } from "react-native-ui-datepicker";
-import { queryCompletedSalesReport, queryActiveSalesForReport } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { queryCompletedSalesReport, queryActiveSalesForReport, queryTransactionsByDateRange } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { useActiveSalesStore, useCheckoutStore } from "../../../stores";
 import { FullSaleModal } from "./FullSaleModal";
 
@@ -116,7 +116,10 @@ export const SalesReportsModal = ({ handleExit }) => {
   const [sViewMode, _setViewMode] = useState("sale"); // "sale" or "transaction"
   const [sSortField, _setSortField] = useState("date");
   const [sSortDir, _setSortDir] = useState("desc");
+  const [sTransactionResults, _setTransactionResults] = useState([]);
+  const [sTransactionLoading, _setTransactionLoading] = useState(false);
   const queryIdRef = useRef(0);
+  const txnQueryIdRef = useRef(0);
   const hasUserSelected = useRef(false);
 
   // Fetch data when dates change
@@ -604,7 +607,11 @@ export const SalesReportsModal = ({ handleExit }) => {
                 mode="range"
                 startDate={displayStart}
                 endDate={displayEnd}
-                onChange={({ startDate }) => { _setActiveShortcut(null); _setPendingStart(dayjs(startDate)); }}
+                onChange={({ startDate, endDate }) => {
+                  _setActiveShortcut(null);
+                  _setPendingStart(dayjs(startDate));
+                  if (endDate) _setPendingEnd(dayjs(endDate));
+                }}
               />
             </View>
 
@@ -768,7 +775,27 @@ export const SalesReportsModal = ({ handleExit }) => {
                   </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  onPress={() => { _setViewMode("transaction"); _setPage(0); }}
+                  onPress={() => {
+                    _setViewMode("transaction");
+                    _setPage(0);
+                    if (!sStartDate || !sEndDate) return;
+                    let startMillis = dayjs(sStartDate).startOf("day").valueOf();
+                    let endMillis = dayjs(sEndDate).endOf("day").valueOf();
+                    let thisQueryId = ++txnQueryIdRef.current;
+                    _setTransactionLoading(true);
+                    queryTransactionsByDateRange(startMillis, endMillis)
+                      .then((txns) => {
+                        if (thisQueryId !== txnQueryIdRef.current) return;
+                        console.log("[SalesReport] [By Transaction]", JSON.stringify(txns, null, 2));
+                        _setTransactionResults(txns);
+                        _setTransactionLoading(false);
+                      })
+                      .catch(() => {
+                        if (thisQueryId !== txnQueryIdRef.current) return;
+                        _setTransactionResults([]);
+                        _setTransactionLoading(false);
+                      });
+                  }}
                   style={{
                     paddingVertical: 6,
                     paddingHorizontal: 12,
@@ -788,7 +815,7 @@ export const SalesReportsModal = ({ handleExit }) => {
                   _setSearchText(text);
                   _setPage(0);
                 }}
-                placeholder="Search customer name or phone"
+                placeholder={sViewMode === "transaction" ? "Search by amount or payment type" : "Search customer name or phone"}
                 placeholderTextColor={gray(0.65)}
                 style={{
                   flex: 1,
@@ -925,15 +952,17 @@ export const SalesReportsModal = ({ handleExit }) => {
                 borderTopColor: C.buttonLightGreenOutline,
               }}
             >
-              <SummaryItem label="Total Payments" value={totalPayments} />
-              <SummaryItem label="Tax-Exempt" value={taxExemptTotal} />
-              <SummaryItem label="Taxable" value={taxableTotal} />
-              <SummaryItem label="Sales Tax" value={salesTax} />
-              <SummaryItem
-                label="Refunds"
-                value={refundsTotal}
-                isNegative={true}
-              />
+              {sViewMode === "sale" ? (
+                <>
+                  <SummaryItem label="Total Payments" value={totalPayments} />
+                  <SummaryItem label="Tax-Exempt" value={taxExemptTotal} />
+                  <SummaryItem label="Taxable" value={taxableTotal} />
+                  <SummaryItem label="Sales Tax" value={salesTax} />
+                  <SummaryItem label="Refunds" value={refundsTotal} isNegative={true} />
+                </>
+              ) : (
+                <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", fontWeight: "500", fontStyle: "italic", paddingVertical: 4, textAlign: "center" }}>Transactions include deposits and no customer information attached. Return to Sale Mode to see information</Text>
+              )}
             </View>
           </View>
         </View>

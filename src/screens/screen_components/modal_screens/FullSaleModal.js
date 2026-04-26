@@ -225,28 +225,7 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                 }}
               >
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  {/* Payment status badge */}
-                  <View
-                    style={{
-                      backgroundColor: sSale.paymentComplete
-                        ? lightenRGBByPercent(C.green, 60)
-                        : lightenRGBByPercent(C.lightred, 50),
-                      paddingHorizontal: 14,
-                      paddingVertical: 4,
-                      borderRadius: 10,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        fontWeight: "600",
-                        color: sSale.paymentComplete ? C.green : C.lightred,
-                      }}
-                    >
-                      {isVoided ? "Voided" : sSale.paymentComplete ? "Paid" : "Partial"}
-                    </Text>
-                  </View>
-                  <Text style={{ fontSize: 10, color: gray(0.35), marginLeft: 12 }}>
+                  <Text style={{ fontSize: 10, color: gray(0.35) }}>
                     {"Sale ID: " + sSale.id}
                   </Text>
                   {!!sSale._importSource && (

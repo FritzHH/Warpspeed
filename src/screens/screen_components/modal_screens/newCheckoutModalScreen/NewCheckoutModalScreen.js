@@ -1094,6 +1094,11 @@ export function NewCheckoutModalScreen() {
       dbSaveCustomer(updatedCustomer);
     }
 
+    // Mark transactions with deposit type before persisting
+    localTxns.forEach((txn) => {
+      txn.depositType = sale.depositType === "giftcard" ? "giftcard" : "deposit";
+    });
+
     // Persist all transactions (no completed-sale for deposits/gift cards)
     await writeAllTransactions(localTxns);
     await deleteActiveSale(sale.id);

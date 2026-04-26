@@ -141,8 +141,8 @@ export const NONREMOVABLE_STATUSES = [
     systemOwned: true
   },
   {
-    id: "on_the_stand",
-    label: "On the Stand",
+    id: "intake",
+    label: "Intake",
     textColor: "white",
     backgroundColor: "pink",
     removable: false,
@@ -376,6 +376,9 @@ export const TRANSACTION_PROTO = {
   authorizationCode: "",
   networkTransactionID: "",
   receiptURL: "",
+
+  // Deposit/gift card
+  depositType: "",              // "deposit" | "giftcard" | "" (empty = regular payment)
 
   refunds: [],
   items: [],

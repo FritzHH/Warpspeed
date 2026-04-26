@@ -356,7 +356,7 @@ function cleanItemDescription(item) {
 const COLOR_MAP = {};
 for (const c of COLORS) {
   const key = c.label.toLowerCase();
-  COLOR_MAP[key] = { textColor: c.textColor || "", backgroundColor: c.backgroundColor || "", label: c.label || "" };
+  COLOR_MAP[key] = { textColor: c.textColor || "", backgroundColor: c.backgroundColor || "", label: (c.label || "").toLowerCase() };
 }
 COLOR_MAP["grey"] = COLOR_MAP["gray"] || { textColor: "white", backgroundColor: "darkgray", label: "Gray" };
 COLOR_MAP["light blue"] = COLOR_MAP["light-blue"];
@@ -364,27 +364,109 @@ COLOR_MAP["lightblue"] = COLOR_MAP["light-blue"];
 COLOR_MAP["light gray"] = COLOR_MAP["light-gray"];
 COLOR_MAP["lightgray"] = COLOR_MAP["light-gray"];
 
+// Color search keywords sorted longest-first so "light-blue" matches before "blue"
+const COLOR_KEYWORDS = Object.keys(COLOR_MAP).sort(function (a, b) { return b.length - a.length; });
+
 const EMPTY_COLOR = { textColor: "", backgroundColor: "", label: "" };
 
-function mapColor(colorName) {
-  if (!colorName) return { ...EMPTY_COLOR };
-  let primary = colorName.split("/")[0].trim().toLowerCase();
-  return COLOR_MAP[primary] ? { ...COLOR_MAP[primary] } : { ...EMPTY_COLOR };
+// Search a string for color words. Each word is checked for substring matches
+// so "reddish" matches "red", "greenish" matches "green", etc.
+// Splits on "/" to handle "blue/green" or "blue / green".
+function findColorsInText(text) {
+  if (!text) return [];
+  var found = [];
+  var foundLabels = {};
+  // Split on "/" first, then split each segment into words
+  var segments = text.toLowerCase().split("/");
+  for (var s = 0; s < segments.length; s++) {
+    var words = segments[s].trim().split(/\s+/);
+    for (var w = 0; w < words.length; w++) {
+      var word = words[w];
+      if (!word) continue;
+      // Check multi-word keywords first (e.g. "light blue") by joining with next word
+      if (w + 1 < words.length) {
+        var pair = word + " " + words[w + 1];
+        for (var k = 0; k < COLOR_KEYWORDS.length; k++) {
+          if (COLOR_KEYWORDS[k].indexOf(" ") === -1) continue;
+          if (pair.indexOf(COLOR_KEYWORDS[k]) !== -1 && !foundLabels[COLOR_MAP[COLOR_KEYWORDS[k]].label]) {
+            foundLabels[COLOR_MAP[COLOR_KEYWORDS[k]].label] = true;
+            found.push({ ...COLOR_MAP[COLOR_KEYWORDS[k]] });
+            w++; // skip next word, it was part of the pair
+            break;
+          }
+        }
+        if (found.length >= 2) return found;
+      }
+      // Check single-word keywords
+      for (var k = 0; k < COLOR_KEYWORDS.length; k++) {
+        if (COLOR_KEYWORDS[k].indexOf(" ") !== -1) continue;
+        if (word.indexOf(COLOR_KEYWORDS[k]) !== -1 && !foundLabels[COLOR_MAP[COLOR_KEYWORDS[k]].label]) {
+          foundLabels[COLOR_MAP[COLOR_KEYWORDS[k]].label] = true;
+          found.push({ ...COLOR_MAP[COLOR_KEYWORDS[k]] });
+          break;
+        }
+      }
+      if (found.length >= 2) return found;
+    }
+  }
+  return found;
 }
 
-function extractBrandModel(description) {
-  if (!description) return { brand: "", model: "" };
-  let working = cleanItemDescription(description);
-  const colorKeywords = Object.keys(COLOR_MAP);
-  for (const keyword of colorKeywords) {
-    const regex = new RegExp("\\b" + keyword + "\\b", "i");
-    working = working.replace(regex, "").replace(/\s{2,}/g, " ").trim();
+// Extract up to 2 colors from colorName + description combined
+function extractColors(colorName, description) {
+  // Search colorName first (more reliable), then description for additional colors
+  var colors = findColorsInText(colorName);
+  if (colors.length < 2 && description) {
+    var fromDesc = findColorsInText(description);
+    for (var i = 0; i < fromDesc.length && colors.length < 2; i++) {
+      // Don't duplicate a color already found
+      var isDupe = false;
+      for (var j = 0; j < colors.length; j++) {
+        if (colors[j].label === fromDesc[i].label) { isDupe = true; break; }
+      }
+      if (!isDupe) colors.push(fromDesc[i]);
+    }
   }
-  let segment = working.split(/[,.]/)[0].trim();
-  let words = segment.split(/\s+/).filter(function (w) { return w; });
-  if (words.length > 1) return { brand: words.slice(0, -1).join(" "), model: words[words.length - 1] };
-  if (words.length === 1) return { brand: words[0], model: "" };
-  return { brand: "", model: "" };
+  return {
+    color1: colors.length > 0 ? colors[0] : { ...EMPTY_COLOR },
+    color2: colors.length > 1 ? colors[1] : { ...EMPTY_COLOR },
+  };
+}
+
+// First non-color word = brand. Remaining non-color words before the first comma = description.
+// Everything lowercased for searchability.
+function extractBrandDescription(rawDescription) {
+  if (!rawDescription) return { brand: "", description: "" };
+  var cleaned = cleanItemDescription(rawDescription);
+  // Take only the first segment (before comma/period) - the rest is usually service notes
+  var segment = cleaned.split(/[,.]/)[0].trim();
+  var words = segment.split(/\s+/).filter(function (w) { return w; });
+  if (words.length === 0) return { brand: "", description: "" };
+
+  function isColorWord(word) {
+    var lower = word.toLowerCase();
+    for (var k = 0; k < COLOR_KEYWORDS.length; k++) {
+      if (lower.indexOf(COLOR_KEYWORDS[k]) !== -1) return true;
+    }
+    return false;
+  }
+
+  // Skip leading color words to find the brand
+  var brandIndex = -1;
+  for (var i = 0; i < words.length; i++) {
+    if (!isColorWord(words[i])) { brandIndex = i; break; }
+  }
+  if (brandIndex === -1) return { brand: "", description: "" };
+
+  var brand = words[brandIndex].toLowerCase();
+
+  // Remaining words after brand: keep only non-color words
+  var descWords = [];
+  for (var i = brandIndex + 1; i < words.length; i++) {
+    if (!isColorWord(words[i])) descWords.push(words[i].toLowerCase());
+  }
+
+  return { brand: brand, description: descWords.join(" ") };
 }
 
 function formatPhone(raw) {
@@ -661,11 +743,8 @@ function mapWorkorders(
     // Bike details from serialized
     const ser = wo.serializedID ? serializedMap[wo.serializedID] : null;
     const serDescription = ser ? (ser.description || "") : "";
-    const { brand } = extractBrandModel(serDescription);
-    const cleaned = cleanItemDescription(serDescription);
-    const description = brand && cleaned.toLowerCase().startsWith(brand.toLowerCase())
-      ? cleaned.slice(brand.length).trim() : cleaned;
-    const color1 = ser ? mapColor(ser.colorName) : { ...EMPTY_COLOR };
+    const { brand, description } = extractBrandDescription(serDescription);
+    const { color1, color2 } = ser ? extractColors(ser.colorName, serDescription) : { color1: { ...EMPTY_COLOR }, color2: { ...EMPTY_COLOR } };
 
     // Timestamps
     const startedOnMillis = wo.timeIn ? new Date(wo.timeIn).getTime() : "";
@@ -684,6 +763,16 @@ function mapWorkorders(
       customerNotes.push({ id: crypto.randomUUID(), name: noteName, userID: "", value: sanitize(wo.note.trim()) });
     }
     const internalNotes = [];
+    if (ser) {
+      const parts = [];
+      if (ser.description) parts.push("Description: " + ser.description.trim());
+      if (ser.colorName) parts.push("Color: " + ser.colorName.trim());
+      if (ser.sizeName) parts.push("Size: " + ser.sizeName.trim());
+      if (ser.serial) parts.push("Serial: " + ser.serial.trim());
+      if (parts.length > 0) {
+        internalNotes.push({ id: crypto.randomUUID(), name: "Lightspeed", userID: "", value: parts.join(" | ") });
+      }
+    }
     if (wo.internalNote && wo.internalNote.trim()) {
       internalNotes.push({ id: crypto.randomUUID(), name: noteName, userID: "", value: sanitize(wo.internalNote.trim()) });
     }
@@ -790,7 +879,7 @@ function mapWorkorders(
       brand,
       description,
       color1,
-      color2: { ...EMPTY_COLOR },
+      color2,
       status: status.id,
       taxFree: isTaxFree,
       taxFreeReceiptNote: isTaxFree ? (settings.taxFreeReceiptNote || "") : "",

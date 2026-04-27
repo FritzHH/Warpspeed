@@ -184,7 +184,7 @@ function bestForegroundHex(bgHex) {
   const bgLum = luminance(r, g, b);
   const contrastWithWhite = contrastRatio(bgLum, 1.0);
   const contrastWithBlack = contrastRatio(bgLum, 0.0);
-  return contrastWithWhite >= contrastWithBlack ? "white" : gray(0.85);
+  return contrastWithWhite >= contrastWithBlack ? "white" : "rgb(71,71,71)";
 }
 
 function dollarsToCents(val) {
@@ -216,17 +216,17 @@ const COLORS = [
 ];
 
 const NONREMOVABLE_STATUSES = [
-  { id: "newly_created", label: "Newly Created", textColor: "white", backgroundColor: "red", removable: false, requireWaitTime: false },
-  { id: "sale_in_progress", label: "Sale in Progress", textColor: "yellow", backgroundColor: "black", removable: false, requireWaitTime: false, systemOwned: true },
-  { id: "finished_and_paid", label: "Finished & Paid", textColor: "white", backgroundColor: "green", removable: false, requireWaitTime: false, systemOwned: true },
-  { id: "intake", label: "Intake", textColor: "white", backgroundColor: "pink", removable: false, requireWaitTime: false },
-  { id: "work_in_progress", textColor: "black", backgroundColor: "rgb(192,192,192)", label: "Work in Progress", removable: false },
-  { id: "service", textColor: "black", backgroundColor: "rgb(192,192,192)", label: "Service", removable: false, requireWaitTime: false },
-  { id: "finished", textColor: "white", backgroundColor: "green", label: "Finished", removable: false, requireWaitTime: false },
-  { id: "part_ordered", textColor: "white", backgroundColor: "orange", label: "Item Ordered", removable: false },
-  { id: "is_order_part_for_customer", textColor: "rgb(38,38,38)", backgroundColor: "rgb(226,126,56)", label: "Order Item for Customer", removable: false },
-  { id: "pickup", textColor: "white", backgroundColor: "purple", label: "Pickup", removable: false },
-  { id: "delivery", textColor: "orange", backgroundColor: "purple", label: "Delivery", removable: false },
+  { id: "newly_created", label: "Newly Created", textColor: "white", backgroundColor: "red", removable: false, requireWaitTime: false, hidden: false },
+  { id: "sale_in_progress", label: "Sale in Progress", textColor: "yellow", backgroundColor: "black", removable: false, requireWaitTime: false, systemOwned: true, hidden: false },
+  { id: "finished_and_paid", label: "Finished & Paid", textColor: "white", backgroundColor: "green", removable: false, requireWaitTime: false, systemOwned: true, hidden: false },
+  { id: "intake", label: "Intake", textColor: "white", backgroundColor: "pink", removable: false, requireWaitTime: false, hidden: false },
+  { id: "service", textColor: "black", backgroundColor: "rgb(192,192,192)", label: "Service", removable: false, requireWaitTime: false, hidden: false },
+  { id: "finished", textColor: "white", backgroundColor: "green", label: "Finished", removable: false, requireWaitTime: false, hidden: false },
+  { id: "part_ordered", textColor: "white", backgroundColor: "orange", label: "Item Ordered", removable: false, hidden: true },
+  { id: "is_order_part_for_customer", textColor: "rgb(38,38,38)", backgroundColor: "rgb(226,126,56)", label: "Order Item for Customer", removable: false, hidden: false },
+  { id: "pickup", textColor: "white", backgroundColor: "purple", label: "Pickup", removable: false, hidden: false },
+  { id: "delivery", textColor: "white", backgroundColor: "purple", label: "Delivery", removable: false, hidden: false },
+  { id: "work_in_progress", textColor: "black", backgroundColor: "rgb(192,192,192)", label: "Work in Progress", removable: false, hidden: false },
 ];
 
 const CUSTOMER_LANGUAGES = {
@@ -506,86 +506,36 @@ function buildDiscountObj(saleLine, priceCents) {
 // ============================================================================
 
 function extractStatusesFromWorkorders(workorderCSVText, statusCSVText) {
-  // Build color + sortOrder lookups from Lightspeed WorkorderStatus CSV
-  const lsColorMap = {};
-  const lsSortMap = {};
-  if (statusCSVText) {
-    const statusRows = parseCSV(statusCSVText);
-    for (const row of statusRows) {
-      const name = (row.name || "").trim().toLowerCase();
-      const color = (row.htmlColor || "").trim();
-      const sort = (row.sortOrder || "").trim();
-      if (name && color) lsColorMap[name] = color;
-      if (name && sort) lsSortMap[name] = parseInt(sort, 10) || 0;
-    }
-  }
-
-  const rows = parseCSV(workorderCSVText);
-  const seen = new Set();
-  const extracted = [];
-  for (const row of rows) {
-    const name = (row.statusName || "").trim();
-    if (!name || seen.has(name.toLowerCase())) continue;
-    seen.add(name.toLowerCase());
-    extracted.push(name);
-  }
   const nonremovableLabels = new Set(NONREMOVABLE_STATUSES.map(function (s) { return s.label.toLowerCase(); }));
-  const csvStatuses = extracted
-    .filter(function (name) {
-      const lower = name.toLowerCase();
-      if (nonremovableLabels.has(lower)) return false;
-      if (STATUS_ALIASES[lower]) return false;
-      return true;
-    })
-    .map(function (name) {
-      const lsHex = lsColorMap[name.toLowerCase()];
-      const bgHex = lsHex || "#B8B8B8";
-      const textColor = bestForegroundHex(bgHex);
-      const { r, g, b } = hexToRgb(bgHex);
-      return {
-        id: "ls_" + name.toLowerCase().replace(/[^a-z0-9]+/g, "_"),
+  const aliasedLabels = new Set(Object.keys(STATUS_ALIASES));
+
+  // Build CSV statuses from workorderStatuses.csv in exact CSV row order
+  var csvStatuses = [];
+  if (statusCSVText) {
+    var statusRows = parseCSV(statusCSVText);
+    for (var i = 0; i < statusRows.length; i++) {
+      var name = (statusRows[i].name || "").trim();
+      var lower = name.toLowerCase();
+      if (!name) continue;
+      // Skip if it maps to a nonremovable status or is aliased to one
+      if (nonremovableLabels.has(lower)) continue;
+      if (aliasedLabels.has(lower)) continue;
+      var bgHex = (statusRows[i].htmlColor || "").trim() || "#B8B8B8";
+      var textColor = bestForegroundHex(bgHex);
+      var rgb = hexToRgb(bgHex);
+      csvStatuses.push({
+        id: "ls_" + lower.replace(/[^a-z0-9]+/g, "_"),
         label: name,
-        textColor,
-        backgroundColor: "rgb(" + r + "," + g + "," + b + ")",
+        textColor: textColor,
+        backgroundColor: "rgb(" + rgb.r + "," + rgb.g + "," + rgb.b + ")",
         removable: true,
-      };
-    });
-  // Build reverse alias map: nonremovable label -> [LS names that alias to it]
-  var reverseAliases = {};
-  for (var alias in STATUS_ALIASES) {
-    var target = STATUS_ALIASES[alias];
-    if (!reverseAliases[target]) reverseAliases[target] = [];
-    reverseAliases[target].push(alias);
-  }
-
-  // Resolve sortOrder for any status (nonremovable or CSV)
-  function getSortOrder(label) {
-    var lower = label.toLowerCase();
-    // Direct match in LS sortOrder map
-    if (lsSortMap[lower] !== undefined) return lsSortMap[lower];
-    // Reverse alias: find LS names that alias to this label, take minimum sortOrder
-    var aliases = reverseAliases[lower] || [];
-    var minSort = Infinity;
-    for (var i = 0; i < aliases.length; i++) {
-      if (lsSortMap[aliases[i]] !== undefined && lsSortMap[aliases[i]] < minSort) {
-        minSort = lsSortMap[aliases[i]];
-      }
+        hidden: false,
+      });
     }
-    if (minSort < Infinity) return minSort;
-    // Hardcoded defaults for statuses with no LS equivalent
-    if (lower === "newly created") return -2;
-    if (lower === "sale in progress") return -1;
-    if (lower === "on the stand") return 15;
-    if (lower === "delivery") return 5;
-    return Infinity;
   }
 
-  // Combine and sort ALL statuses by LS sortOrder
-  var combined = [].concat(NONREMOVABLE_STATUSES, csvStatuses);
-  combined.sort(function (a, b) {
-    return getSortOrder(a.label) - getSortOrder(b.label);
-  });
-  return combined;
+  // Nonremovable statuses first, then CSV statuses in their original CSV order
+  return [].concat(NONREMOVABLE_STATUSES, csvStatuses);
 }
 
 function mapCustomers(customerCSVText) {
@@ -962,8 +912,6 @@ function mapSales(salesCSVText, salesPaymentsCSVText, paymentsCSVText, workorder
       chargeID: (pr.ID || "").replace(/^st-/, ""),
       last4: pr["Card last 4"] || "",
       cardType: pr["Card type"] || "",
-      _entryMode: pr["Entry mode"] || "",
-      _cardFundingSource: pr["Card funding source"] || "",
     });
   }
   const refundChargesUsed = new Set();
@@ -1009,17 +957,22 @@ function mapSales(salesCSVText, salesPaymentsCSVText, paymentsCSVText, workorder
     const isDepositSale = creditAccountRows.length > 0;
     const depositAmountCents = creditAccountRows.reduce(function (sum, sp) { return sum + Math.abs(dollarsToCents(sp.amount)); }, 0);
 
-    // For deposit sales, exclude "credit account" rows — they aren't real transactions
-    const transactionRows = isDepositSale
-      ? paymentRows.filter(function (sp) { return sp.paymentTypeType !== "credit account"; })
-      : paymentRows;
+    // Separate payment rows into real transactions (cash/card/check) vs deposit redemptions (credit account positive)
+    const transactionRows = paymentRows.filter(function (sp) {
+      if (sp.paymentTypeType === "credit account") return false; // handled as depositsApplied
+      if (sp.paymentTypeType === "ecom") return false; // no matching system method
+      return true;
+    });
+
+    // Collect deposit redemptions (positive credit account on non-deposit sales)
+    const depositRedemptionRows = isDepositSale ? [] : paymentRows.filter(function (sp) {
+      return sp.paymentTypeType === "credit account" && dollarsToCents(sp.amount) > 0;
+    });
 
     const payments = transactionRows.map(function (sp) {
       const isCash = sp.paymentTypeType === "cash";
       const isCheck = sp.paymentTypeName === "Check";
       const isCard = sp.paymentTypeType === "credit card";
-      const isCredit = sp.paymentTypeType === "credit account";
-      const isEcom = sp.paymentTypeType === "ecom";
       const amount = dollarsToCents(sp.amount);
 
       // Match card payment to Lightspeed Payments report by amount
@@ -1061,41 +1014,46 @@ function mapSales(salesCSVText, salesPaymentsCSVText, paymentsCSVText, workorder
 
       return {
         id: sp.salePaymentID || crypto.randomUUID(),
-        saleID,
-        type: amount < 0 ? "refund" : "payment",
-        method: isCash ? "cash" : isCheck ? "check" : isCard ? "card" : isCredit ? "credit" : isEcom ? "ecom" : "other",
+        method: isCash ? "cash" : isCheck ? "check" : "card",
         amountCaptured: amount,
         amountTendered: (isCash && amount >= 0) ? amount : 0,
         salesTax: 0,
-        cardType: prMatch ? (prMatch["Card type"] || "") : refundMatch ? refundMatch.cardType : spCardType,
-        cardIssuer: isCard ? sp.paymentTypeName : "",
-        last4: prMatch ? (prMatch["Card last 4"] || "") : refundMatch ? refundMatch.last4 : spLast4,
-        authorizationCode: spAuthCode,
         millis: sp.createTime ? new Date(sp.createTime).getTime() : 0,
-        paymentProcessor: isCard ? "Stripe" : "",
-        chargeID: prMatch ? (prMatch.ID || "").replace(/^st-/, "") : refundMatch ? refundMatch.chargeID : "",
-        paymentIntentID: "",
-        receiptURL: "",
+        last4: prMatch ? (prMatch["Card last 4"] || "") : refundMatch ? refundMatch.last4 : spLast4,
         expMonth: "",
         expYear: "",
+        cardType: prMatch ? (prMatch["Card type"] || "") : refundMatch ? refundMatch.cardType : spCardType,
+        cardIssuer: isCard ? sp.paymentTypeName : "",
+        paymentProcessor: isCard ? "stripe" : isCash ? "cash" : "check",
+        paymentIntentID: "",
+        chargeID: prMatch ? (prMatch.ID || "").replace(/^st-/, "") : refundMatch ? refundMatch.chargeID : "",
+        authorizationCode: spAuthCode,
         networkTransactionID: "",
-        amountRefunded: prMatch ? dollarsToCents(prMatch["Refunded amount"]) : 0,
+        receiptURL: "",
         depositType: isDepositSale ? "deposit" : "",
-        _entryMode: prMatch ? (prMatch["Entry mode"] || "") : refundMatch ? refundMatch._entryMode : "",
-        _cardFundingSource: prMatch ? (prMatch["Card funding source"] || "") : refundMatch ? refundMatch._cardFundingSource : "",
         refunds: [],
+        items: [],
+      };
+    });
+
+    // Build depositsApplied entries for credit account redemptions
+    const depositsApplied = depositRedemptionRows.map(function (sp) {
+      return {
+        id: sp.salePaymentID || crypto.randomUUID(),
+        transactionId: "",
+        amount: dollarsToCents(sp.amount),
+        type: "deposit",
       };
     });
 
     // Assign sale tax to the first payment transaction
-    if (tax > 0) {
-      const firstPayment = payments.find(function (p) { return p.type === "payment"; });
-      if (firstPayment) firstPayment.salesTax = tax;
+    if (tax > 0 && payments.length > 0) {
+      payments[0].salesTax = tax;
     }
 
-    // Compute amounts from actual payments
-    const computedAmountCaptured = payments.reduce(function (sum, p) { return p.type === "payment" ? sum + p.amountCaptured : sum; }, 0);
-    const computedAmountRefunded = payments.reduce(function (sum, p) { return p.type === "refund" ? sum + Math.abs(p.amountCaptured) : sum; }, 0);
+    // Compute amounts: transactions + deposit redemptions
+    const txnTotal = payments.reduce(function (sum, p) { return sum + p.amountCaptured; }, 0);
+    const depositRedemptionTotal = depositsApplied.reduce(function (sum, d) { return sum + d.amount; }, 0);
 
     const mappedSale = {
       id: saleID,
@@ -1106,23 +1064,18 @@ function mapSales(salesCSVText, salesPaymentsCSVText, paymentsCSVText, workorder
       salesTax: tax,
       salesTaxPercent,
       total: isDepositSale ? depositAmountCents : total,
-      amountCaptured: computedAmountCaptured,
-      amountRefunded: computedAmountRefunded,
+      amountCaptured: txnTotal + depositRedemptionTotal,
       paymentComplete: completed,
       workorderIDs,
       transactionIDs: payments.map(function (p) { return p.id; }),
       pendingTransactionIDs: [],
       pendingRefundIDs: [],
       creditsApplied: [],
-      depositsApplied: [],
+      depositsApplied,
       customerID: resolvedCustID,
-      refunds: [],
-      textToPay: false,
-      checkoutSessionID: "",
       isDepositSale,
       depositType: isDepositSale ? "deposit" : "",
       depositNote: "",
-      voidedByRefund: false,
       _importSource: "lightspeed",
     };
 
@@ -1134,7 +1087,7 @@ function mapSales(salesCSVText, salesPaymentsCSVText, paymentsCSVText, workorder
 
     // For deposit sales, add deposit to customer
     if (isDepositSale && customer && completed) {
-      const primaryTxn = payments.find(function (p) { return p.type === "payment"; });
+      const primaryTxn = payments[0] || null;
       const deposit = {
         id: saleID,
         transactionId: primaryTxn ? primaryTxn.id : "",
@@ -1155,7 +1108,7 @@ function mapSales(salesCSVText, salesPaymentsCSVText, paymentsCSVText, workorder
       wo.saleID = saleID;
       if (completed) {
         wo.paymentComplete = true;
-        wo.amountPaid = computedAmountCaptured;
+        wo.amountPaid = txnTotal + depositRedemptionTotal;
       }
     }
 
@@ -1354,7 +1307,7 @@ function mapEmployees(employeesCSVText) {
     const fullName = (first + " " + last).trim().toLowerCase();
     if (SKIP_EMPLOYEE_NAMES.includes(fullName)) continue;
 
-    const appUserID = crypto.randomUUID();
+    const appUserID = "ls_emp_" + lsID;
     employeeIDMap[lsID] = appUserID;
 
     users.push({
@@ -1384,22 +1337,24 @@ function mapPunchHistory(employeeHoursCSVText, employeeIDMap) {
     const checkOut = (row.checkOut || "").trim();
 
     if (checkIn) {
+      var inMillis = new Date(checkIn).getTime();
       punches.push({
         ...TIME_PUNCH_PROTO,
-        id: crypto.randomUUID(),
+        id: "ls_punch_" + lsEmployeeID + "_in_" + inMillis,
         userID: appUserID,
-        millis: new Date(checkIn).getTime(),
+        millis: inMillis,
         option: "in",
         _importSource: "lightspeed",
       });
     }
 
     if (checkOut) {
+      var outMillis = new Date(checkOut).getTime();
       punches.push({
         ...TIME_PUNCH_PROTO,
-        id: crypto.randomUUID(),
+        id: "ls_punch_" + lsEmployeeID + "_out_" + outMillis,
         userID: appUserID,
-        millis: new Date(checkOut).getTime(),
+        millis: outMillis,
         option: "out",
         _importSource: "lightspeed",
       });
@@ -1602,9 +1557,9 @@ function exportSalesCSV(completedSales, activeSales) {
   const headers = [
     "id", "lightspeed_id", "collection",
     "customerID", "subtotal", "discount", "salesTax", "salesTaxPercent",
-    "total", "amountCaptured", "amountRefunded",
+    "total", "amountCaptured",
     "paymentComplete", "depositType",
-    "workorderIDs", "transactionIDs",
+    "workorderIDs", "transactionIDs", "depositsApplied",
     "millis", "_importSource"
   ];
   const rows = [];
@@ -1612,9 +1567,10 @@ function exportSalesCSV(completedSales, activeSales) {
     rows.push([
       s.id, s.lightspeed_id, "completed-sales",
       s.customerID, s.subtotal, s.discount, s.salesTax, s.salesTaxPercent,
-      s.total, s.amountCaptured, s.amountRefunded,
+      s.total, s.amountCaptured,
       s.paymentComplete, s.depositType,
       (s.workorderIDs || []).join(";"), (s.transactionIDs || []).join(";"),
+      (s.depositsApplied || []).map(function (d) { return d.id + ":" + d.amount; }).join(";"),
       s.millis, s._importSource
     ]);
   }
@@ -1622,9 +1578,10 @@ function exportSalesCSV(completedSales, activeSales) {
     rows.push([
       s.id, s.lightspeed_id, "active-sales",
       s.customerID, s.subtotal, s.discount, s.salesTax, s.salesTaxPercent,
-      s.total, s.amountCaptured, s.amountRefunded,
+      s.total, s.amountCaptured,
       s.paymentComplete, s.depositType,
       (s.workorderIDs || []).join(";"), (s.transactionIDs || []).join(";"),
+      (s.depositsApplied || []).map(function (d) { return d.id + ":" + d.amount; }).join(";"),
       s.millis, s._importSource
     ]);
   }
@@ -1633,22 +1590,20 @@ function exportSalesCSV(completedSales, activeSales) {
 
 function exportTransactionsCSV(transactions) {
   const headers = [
-    "id", "saleID", "type", "method",
-    "amountCaptured", "amountTendered", "amountRefunded",
+    "id", "method",
+    "amountCaptured", "amountTendered",
     "chargeID", "paymentIntentID", "last4", "cardType", "cardIssuer",
     "depositType", "paymentProcessor",
-    "authorizationCode", "millis",
-    "_cardFundingSource", "_entryMode"
+    "authorizationCode", "millis"
   ];
   const rows = [];
   for (const t of transactions) {
     rows.push([
-      t.id, t.saleID, t.type, t.method,
-      t.amountCaptured, t.amountTendered, t.amountRefunded,
+      t.id, t.method,
+      t.amountCaptured, t.amountTendered,
       t.chargeID, t.paymentIntentID, t.last4, t.cardType, t.cardIssuer,
       t.depositType, t.paymentProcessor,
-      t.authorizationCode, t.millis,
-      t._cardFundingSource, t._entryMode
+      t.authorizationCode, t.millis
     ]);
   }
   writeCSVFile("transactions.csv", headers, rows);
@@ -1823,9 +1778,15 @@ async function main() {
     const settingsDoc = await settingsRef.get();
     const existingSettings = settingsDoc.exists ? settingsDoc.data() : {};
     const existingUsers = existingSettings.users || [];
-    const existingIDs = new Set(existingUsers.map(function (u) { return u.id; }));
+    // Deduplicate by lightspeed_id to prevent repeats across migration runs
+    const existingByLsID = {};
+    existingUsers.forEach(function (u) {
+      if (u.lightspeed_id) existingByLsID[u.lightspeed_id] = u;
+    });
     for (const u of newUsers) {
-      if (!existingIDs.has(u.id)) existingUsers.push(u);
+      if (!existingByLsID[u.lightspeed_id]) {
+        existingUsers.push(u);
+      }
     }
     await settingsRef.set({ statuses, users: existingUsers }, { merge: true });
     logSuccess("Settings updated (statuses + " + existingUsers.length + " users)");

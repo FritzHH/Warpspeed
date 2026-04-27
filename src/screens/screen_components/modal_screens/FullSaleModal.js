@@ -168,7 +168,7 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
   // ── Loading / Error state ──
   if (sLoadingSale || sError) {
     return ReactDOM.createPortal(
-      <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1002 }}>
+      <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000 }}>
         <TouchableWithoutFeedback onPress={onClose}>
           <View style={{ width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
             <TouchableWithoutFeedback>
@@ -213,7 +213,7 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
 
   // ── Full modal ──
   return ReactDOM.createPortal(
-    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1002 }}>
+    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000 }}>
       <TouchableWithoutFeedback onPress={onClose}>
         <View style={{ width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
           <TouchableWithoutFeedback>

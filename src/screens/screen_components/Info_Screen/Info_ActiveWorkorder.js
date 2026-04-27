@@ -1125,7 +1125,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: isPickupDelivery ? "space-between" : undefined, marginTop: 11, width: "100%" }}>
                   <View style={{ width: isPickupDelivery ? "33%" : "100%" }}>
                     <StatusPickerModal
-                      statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned)}
+                      statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned && !s.hidden)}
                       enabled={!isDonePaid}
                       onSelect={handleStatusSelect}
                       buttonStyle={{
@@ -1452,7 +1452,10 @@ export const ActiveWorkorderComponent = ({}) => {
                 disabled={isDonePaid}
                 activeOpacity={0.7}
                 onPress={() => {
-                  useOpenWorkordersStore.getState().setField("partToBeOrdered", !zOpenWorkorder?.partToBeOrdered, zOpenWorkorder.id);
+                  const newVal = !zOpenWorkorder?.partToBeOrdered;
+                  const store = useOpenWorkordersStore.getState();
+                  store.setField("partToBeOrdered", newVal, zOpenWorkorder.id);
+                  store.setField("status", newVal ? "open" : "part_ordered", zOpenWorkorder.id);
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center' }}
               >

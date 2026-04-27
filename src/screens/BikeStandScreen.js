@@ -18,9 +18,9 @@ import {
   lightenRGBByPercent,
   capitalizeFirstLetterOfString,
   applyDiscountToWorkorderItem,
+  calculateRunningTotals,
   deepEqual,
   formatWorkorderNumber,
-  intakeButtonsToRows,
   removeDashesFromPhone,
   formatPhoneWithDashes,
   checkInputForNumbersOnly,
@@ -37,6 +37,9 @@ import {
   NONREMOVABLE_WAIT_TIMES,
   SETTINGS_OBJ,
   CONTACT_RESTRICTIONS,
+  QUICK_BUTTON_ITEM_PROTO,
+  QB_DEFAULT_W,
+  QB_DEFAULT_H,
 } from "../data";
 import {
   Button_,
@@ -60,6 +63,19 @@ import { WorkorderMediaModal } from "./screen_components/modal_screens/Workorder
 import { MILLIS_IN_DAY } from "../constants";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
+
+function getQuickButtonFontSize(text, baseFontSize) {
+  let len = (text || "").length;
+  if (len <= 15) return baseFontSize;
+  return Math.max(7, Math.round(baseFontSize - (len - 15) * 0.5));
+}
+
+function normalizeItemEntry(entry, idx) {
+  if (typeof entry === "string") {
+    return { ...QUICK_BUTTON_ITEM_PROTO, inventoryItemID: entry, x: (idx % 6) * (QB_DEFAULT_W + 1), y: Math.floor(idx / 6) * (QB_DEFAULT_H + 1) };
+  }
+  return entry;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Sort Logic (from Options_Workorders)
@@ -118,7 +134,7 @@ function sortWorkorders(inputArr, statuses, currentUser) {
 
 export function BikeStandScreen() {
   const zStatuses = useSettingsStore((s) => s.settings?.statuses, deepEqual);
-  const zIntakeQuickButtons = useSettingsStore((s) => s.settings?.intakeQuickButtons, deepEqual);
+  const zQuickItemButtons = useSettingsStore((s) => s.settings?.quickItemButtons, deepEqual);
   const zSettings = useSettingsStore((s) => s.settings) || SETTINGS_OBJ;
   const zWorkorders = useOpenWorkordersStore((state) => state.workorders);
   const zInventory = useInventoryStore((state) => state.inventoryArr);
@@ -134,6 +150,8 @@ export function BikeStandScreen() {
   const [sSelectedCustomer, _setSelectedCustomer] = useState(null);
   const [sShowPhoneSearch, _setShowPhoneSearch] = useState(false);
   const [sShowCustomerModal, _setShowCustomerModal] = useState(false);
+  const [sDiscountCardID, _setDiscountCardID] = useState(null);
+  const longPressTimerRef = useRef(null);
 
   // Firebase listeners (same pattern as IntakeScreen)
   useEffect(() => {
@@ -151,7 +169,9 @@ export function BikeStandScreen() {
   let statuses = zStatuses || [];
   let sortedWorkorders = sortWorkorders(zWorkorders || [], statuses, zCurrentUser);
   let selectedWorkorder = (zWorkorders || []).find((o) => o.id === sSelectedWorkorderID);
-  let intakeQuickButtons = intakeButtonsToRows(zIntakeQuickButtons || []);
+  let commonButton = (zQuickItemButtons || []).find((b) => b.id === "common");
+  let canvasItems = (commonButton?.items || []).map(normalizeItemEntry);
+  let canvasMaxBottom = canvasItems.reduce((max, it) => Math.max(max, (it.y || 0) + (it.h || QB_DEFAULT_H)), 0);
 
   //////////////////////////////////////////////////////////////////////////////
   // Quick button press
@@ -218,6 +238,38 @@ export function BikeStandScreen() {
   }
 
   //////////////////////////////////////////////////////////////////////////////
+  // Long-press discount
+  //////////////////////////////////////////////////////////////////////////////
+
+  function handleLongPressStart(inventoryItemID) {
+    longPressTimerRef.current = setTimeout(() => {
+      if (!selectedWorkorder) return;
+      let hasLine = (selectedWorkorder.workorderLines || []).some(
+        (ln) => ln.inventoryItem?.id === inventoryItemID
+      );
+      if (hasLine) _setDiscountCardID(inventoryItemID);
+    }, 500);
+  }
+
+  function handleLongPressEnd() {
+    clearTimeout(longPressTimerRef.current);
+  }
+
+  function handleDiscountSelect(inventoryItemID, discountObj) {
+    if (!selectedWorkorder) return;
+    let updatedLines = (selectedWorkorder.workorderLines || []).map((ln) => {
+      if (ln.inventoryItem?.id !== inventoryItemID) return ln;
+      if (!discountObj) return { ...ln, discountObj: null };
+      let updated = { ...ln, discountObj };
+      return applyDiscountToWorkorderItem(updated);
+    });
+    useOpenWorkordersStore.getState().setField(
+      "workorderLines", updatedLines, sSelectedWorkorderID, true
+    );
+    _setDiscountCardID(null);
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
   // Customer search + workorder creation
   //////////////////////////////////////////////////////////////////////////////
 
@@ -246,6 +298,10 @@ export function BikeStandScreen() {
     : "";
 
   let lines = selectedWorkorder?.workorderLines || [];
+  let selectedItemIDs = new Set(lines.map((ln) => ln.inventoryItem?.id).filter(Boolean));
+  let totals = selectedWorkorder
+    ? calculateRunningTotals(selectedWorkorder, zSettings?.salesTaxPercent || 0, [], false, !!selectedWorkorder?.taxFree)
+    : { runningSubtotal: 0, runningDiscount: 0, runningTax: 0, finalTotal: 0 };
 
   return (
     <View style={{ flex: 1, backgroundColor: C.backgroundWhite }}>
@@ -267,7 +323,7 @@ export function BikeStandScreen() {
 
       {sViewMode === "buttons" ? (
         <>
-          {/* ── Header: workorder dropdown + search button ── */}
+          {/* ── Header: workorder dropdown + new workorder button ── */}
           <View style={{ padding: 12, zIndex: 10 }}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
               <View style={{ flex: 1 }}>
@@ -279,9 +335,8 @@ export function BikeStandScreen() {
                 />
               </View>
               <TouchableOpacity
-                onPress={() => _setShowPhoneSearch(true)}
+                onPress={() => {/* TODO: hook up new workorder logic */}}
                 style={{
-                  width: 42,
                   height: 42,
                   borderRadius: 6,
                   borderWidth: 1,
@@ -289,138 +344,165 @@ export function BikeStandScreen() {
                   backgroundColor: "white",
                   alignItems: "center",
                   justifyContent: "center",
+                  paddingHorizontal: 12,
                 }}
               >
-                <Image_ icon={ICONS.search} size={20} />
+                <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>+ New</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          {/* ── Customer name ── */}
-          {selectedWorkorder && (
-            <View style={{ paddingHorizontal: 16, paddingBottom: 8 }}>
-              <Text style={{ fontSize: 22, fontWeight: "600", color: C.text }}>
-                {customerName || selectedWorkorder.brand || selectedWorkorder.description || "No Name"}
-              </Text>
-            </View>
-          )}
-
-          {/* ── Line items list (grows) ── */}
-          <ScrollView style={{ flex: 1, paddingHorizontal: 12 }}>
-            {lines.map((line, idx) => {
-              let inv = line.inventoryItem || {};
-              let name = inv.informalName || inv.formalName || "(unnamed)";
-              let price = line.useSalePrice ? (inv.salePrice || inv.price || 0) : (inv.price || 0);
-              let effectiveQty = sQtyMap[line.id] !== undefined ? sQtyMap[line.id] : (line.qty || 1);
-
-              return (
-                <View
-                  key={line.id || idx}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingVertical: 8,
-                    paddingHorizontal: 10,
-                    marginBottom: 4,
-                    backgroundColor: C.listItemWhite,
-                    borderRadius: 6,
-                    borderWidth: 1,
-                    borderColor: gray(0.08),
-                  }}
-                >
-                  {/* Name */}
-                  <Text style={{ flex: 1, fontSize: 15, color: C.text }} numberOfLines={1}>
-                    {name}
-                  </Text>
-
-                  {/* Qty buttons */}
-                  <Button_
-                    onPress={() => modifyQty(line, "down")}
-                    buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 4 }}
-                    icon={ICONS.downArrowOrange}
-                    iconSize={23}
-                  />
-                  <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, minWidth: 28, textAlign: "center" }}>
-                    {effectiveQty}
-                  </Text>
-                  <Button_
-                    onPress={() => modifyQty(line, "up")}
-                    buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 4 }}
-                    icon={ICONS.upArrowOrange}
-                    iconSize={23}
-                  />
-
-                  {/* Price */}
-                  <Text style={{ fontSize: 14, color: C.text, fontWeight: "500", minWidth: 70, textAlign: "right" }}>
-                    {"$" + formatCurrencyDisp(price * effectiveQty)}
-                  </Text>
-                </View>
-              );
-            })}
-            {selectedWorkorder && lines.length === 0 && (
-              <Text style={{ fontSize: 14, color: gray(0.4), textAlign: "center", marginTop: 20 }}>
-                No items yet. Press a button below to add.
+          {/* ── Totals row ── */}
+          <View style={{ flexDirection: "row", paddingHorizontal: 12, paddingBottom: 6, gap: 12, alignItems: "center" }}>
+            <Text style={{ fontSize: 11, color: gray(0.45) }}>
+              Subtotal: <Text style={{ fontWeight: "600", color: C.text }}>${formatCurrencyDisp(totals.runningSubtotal)}</Text>
+            </Text>
+            {totals.runningDiscount > 0 && (
+              <Text style={{ fontSize: 11, color: gray(0.45) }}>
+                Disc: <Text style={{ fontWeight: "600", color: C.red }}>-${formatCurrencyDisp(totals.runningDiscount)}</Text>
               </Text>
             )}
-            {!selectedWorkorder && (
-              <Text style={{ fontSize: 14, color: gray(0.4), textAlign: "center", marginTop: 40 }}>
-                Select a workorder above to get started.
-              </Text>
-            )}
-          </ScrollView>
+            <Text style={{ fontSize: 11, color: gray(0.45) }}>
+              Tax: <Text style={{ fontWeight: "600", color: C.text }}>${formatCurrencyDisp(totals.runningTax)}</Text>
+            </Text>
+            <Text style={{ fontSize: 11, color: gray(0.45) }}>
+              Total: <Text style={{ fontWeight: "600", color: C.text }}>${formatCurrencyDisp(totals.finalTotal)}</Text>
+            </Text>
+          </View>
 
-          {/* ── Quick buttons container (fixed at bottom) ── */}
-          <View
+          {/* ── Quick item canvas (common button items) ── */}
+          <ScrollView
             style={{
-              borderTopWidth: 1,
-              borderTopColor: gray(0.1),
+              flex: 1,
               backgroundColor: lightenRGBByPercent(C.backgroundWhite, 20),
-              paddingVertical: 8,
-              paddingHorizontal: 8,
             }}
           >
-            {intakeQuickButtons.map((row, rowIdx) => (
-              <View
-                key={rowIdx}
-                style={{
-                  flexDirection: "row",
-                  marginBottom: 6,
-                }}
-              >
-                {row.map((btn) => (
-                  <TouchableOpacity
-                    key={btn.id}
-                    onPress={() => handleQuickButtonPress(btn)}
+            <div
+              style={{
+                position: "relative",
+                width: "100%",
+                minHeight: Math.max(500, canvasMaxBottom * 8),
+                overflow: "hidden",
+                borderRadius: 6,
+              }}
+            >
+              {canvasItems.map((itemObj) => {
+                let invItem = (zInventory || []).find((i) => i.id === itemObj.inventoryItemID);
+                let name = invItem ? (invItem.informalName || invItem.formalName || "Unknown") : "(not found)";
+                let w = itemObj.w || QB_DEFAULT_W;
+                let h = itemObj.h || QB_DEFAULT_H;
+                let fontSize = getQuickButtonFontSize(name, itemObj.fontSize || 10);
+                let isOnWorkorder = selectedItemIDs.has(itemObj.inventoryItemID);
+
+                let workorderLine = isOnWorkorder
+                  ? (selectedWorkorder.workorderLines || []).find((ln) => ln.inventoryItem?.id === itemObj.inventoryItemID)
+                  : null;
+                let hasDiscount = !!workorderLine?.discountObj?.value;
+
+                return (
+                  <div
+                    key={itemObj.inventoryItemID}
+                    onClick={() => {
+                      if (sDiscountCardID) { _setDiscountCardID(null); return; }
+                      handleQuickButtonPress(itemObj);
+                    }}
+                    onMouseDown={() => handleLongPressStart(itemObj.inventoryItemID)}
+                    onMouseUp={handleLongPressEnd}
+                    onMouseLeave={handleLongPressEnd}
+                    onTouchStart={() => handleLongPressStart(itemObj.inventoryItemID)}
+                    onTouchEnd={handleLongPressEnd}
                     style={{
-                      flex: 1,
-                      margin: 3,
-                      minHeight: 48,
-                      borderWidth: 1,
-                      borderColor: C.buttonLightGreenOutline,
-                      borderRadius: 8,
-                      backgroundColor: C.listItemWhite,
+                      position: "absolute",
+                      left: (itemObj.x || 0) + "%",
+                      top: (itemObj.y || 0) + "%",
+                      width: w + "%",
+                      height: h + "%",
+                      display: "flex",
+                      flexDirection: "column",
                       alignItems: "center",
                       justifyContent: "center",
-                      paddingVertical: 6,
-                      paddingHorizontal: 4,
+                      borderWidth: isOnWorkorder ? 2 : 1,
+                      borderStyle: "solid",
+                      borderColor: isOnWorkorder ? C.green : C.buttonLightGreenOutline,
+                      borderRadius: 8,
+                      backgroundColor: isOnWorkorder ? lightenRGBByPercent(C.green, 70) : C.buttonLightGreenOutline,
+                      cursor: "pointer",
+                      boxSizing: "border-box",
+                      paddingLeft: 4,
+                      paddingRight: 4,
+                      paddingTop: 2,
+                      paddingBottom: 2,
+                      userSelect: "none",
+                      overflow: "visible",
                     }}
                   >
                     <Text
-                      style={{ fontSize: 14, textAlign: "center", color: C.text, fontWeight: "500" }}
-                      numberOfLines={2}
+                      style={{
+                        fontSize: fontSize,
+                        color: invItem ? C.text : gray(0.35),
+                        textAlign: "center",
+                        fontWeight: "500",
+                        lineHeight: (itemObj.fontSize || 10) + 6,
+                      }}
+                      numberOfLines={(name || "").split("\n").length}
                     >
-                      {btn.label || "(unnamed)"}
+                      {name}
                     </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ))}
-            {intakeQuickButtons.length === 0 && (
-              <Text style={{ fontSize: 13, color: gray(0.35), textAlign: "center", paddingVertical: 12 }}>
-                No quick buttons configured. Set them up in Dashboard Admin.
-              </Text>
-            )}
-          </View>
+                    {hasDiscount && (
+                      <Text style={{ fontSize: 8, color: C.green, fontWeight: "600" }}>
+                        {workorderLine.discountObj.name || "Discount"}
+                      </Text>
+                    )}
+                    {/* Discount dropdown on long-press */}
+                    {sDiscountCardID === itemObj.inventoryItemID && (
+                      <div
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          position: "absolute",
+                          top: "100%",
+                          left: 0,
+                          zIndex: 100,
+                          backgroundColor: "white",
+                          borderRadius: 6,
+                          border: "1px solid " + gray(0.2),
+                          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                          minWidth: 140,
+                          overflow: "hidden",
+                        }}
+                      >
+                        <div
+                          onClick={() => handleDiscountSelect(itemObj.inventoryItemID, null)}
+                          style={{ padding: "6px 10px", cursor: "pointer", fontSize: 12, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
+                        >
+                          No Discount
+                        </div>
+                        {(zSettings.discounts || [])
+                          .filter((d) => d.type !== "$" || Number(d.value) <= (invItem?.price || 0) * (workorderLine?.qty || 1))
+                          .map((d) => (
+                          <div
+                            key={d.name}
+                            onClick={() => handleDiscountSelect(itemObj.inventoryItemID, d)}
+                            style={{ padding: "6px 10px", cursor: "pointer", fontSize: 12, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
+                          >
+                            {d.name}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+              {canvasItems.length === 0 && (
+                <Text style={{ fontSize: 13, color: gray(0.35), textAlign: "center", paddingVertical: 12, width: "100%" }}>
+                  No common quick buttons configured.
+                </Text>
+              )}
+            </div>
+          </ScrollView>
         </>
       ) : (
         <StandWorkorderDetail
@@ -980,7 +1062,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
 
           {/* Status */}
           <StatusPickerModal
-            statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned)}
+            statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned && !s.hidden)}
             onSelect={(val) => {
               setField("status", val.id);
               if (val.id === "33knktg") setField("finishedOnMillis", Date.now());

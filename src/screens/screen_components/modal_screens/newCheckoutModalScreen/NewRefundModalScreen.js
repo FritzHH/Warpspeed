@@ -922,7 +922,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                             outlineStyle: "none",
                           }}
                           value={sRefundNote}
-                          onChangeText={_setRefundNote}
+                          onChangeText={(val) => _setRefundNote(val.length === 1 ? val.toUpperCase() : val)}
                           placeholder="Reason for refund..."
                           placeholderTextColor={gray(0.3)}
                           multiline

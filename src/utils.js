@@ -1847,7 +1847,7 @@ export function bestForegroundHex(bgHex) {
   const contrastWithWhite = contrastRatio(bgLum, whiteLum);
   const contrastWithBlack = contrastRatio(bgLum, blackLum);
 
-  return contrastWithWhite >= contrastWithBlack ? C.textWhite : gray(0.85);
+  return contrastWithWhite >= contrastWithBlack ? C.textWhite : C.text;
 }
 // utils
 export const localStorageWrapper = {

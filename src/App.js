@@ -22,7 +22,8 @@ import {
   loadTenantAndSettings,
   dbLogout,
 } from "./db_calls_wrapper";
-import { log } from "./utils";
+import { log, gray } from "./utils";
+import { View } from "react-native-web";
 import { useLayoutStore } from "./stores";
 import { ROUTES } from "./routes";
 import { topUpPool } from "./idPool";
@@ -60,6 +61,38 @@ function DeviceAwareHome({ user }) {
     return <Navigate to={ROUTES.dashboard} replace />;
   }
   return <HomeScreen />;
+}
+
+// Desktop: wrap BikeStandScreen in a centered tablet portrait frame that fits the viewport
+function BikeStandScreenWrapper() {
+  const deviceType = useLayoutStore((state) => state.deviceType);
+
+  if (deviceType === "desktop") {
+    return (
+      <div style={{
+        width: "100vw",
+        height: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: gray(0.12),
+      }}>
+        <div style={{
+          height: "90vh",
+          aspectRatio: "3 / 4",
+          borderRadius: 16,
+          overflow: "hidden",
+          border: "2px solid " + gray(0.25),
+          backgroundColor: "white",
+          display: "flex",
+        }}>
+          <BikeStandScreen />
+        </div>
+      </div>
+    );
+  }
+
+  return <BikeStandScreen />;
 }
 
 /////////////////////////////////////
@@ -223,7 +256,7 @@ function App() {
           path={ROUTES.stand}
           element={
             <ProtectedRoute user={user}>
-              <BikeStandScreen />
+              <BikeStandScreenWrapper />
             </ProtectedRoute>
           }
         />

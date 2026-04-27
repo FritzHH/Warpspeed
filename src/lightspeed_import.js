@@ -6,6 +6,15 @@ import { COLORS, NONREMOVABLE_STATUSES, CUSTOMER_LANGUAGES, APP_USER, TIME_PUNCH
 // ============================================================================
 const STATUS_ALIASES = {
   "done & paid": "finished & paid",
+  "bicycle ordered": "item ordered",
+  "part ordered": "item ordered",
+  "battery ordered": "item ordered",
+  "accessory ordered": "item ordered",
+  "order this item": "order item for customer",
+  "order part for customer": "order item for customer",
+  "order bicycle for customer": "order item for customer",
+  "pickup/delivery today": "pickup",
+  "pickup/delivery upcoming": "pickup",
 };
 
 // ============================================================================
@@ -84,21 +93,27 @@ export function mapStatuses(statusesCSVText) {
   const nonremovableLabels = new Set(
     NONREMOVABLE_STATUSES.map(s => s.label.toLowerCase())
   );
+  const aliasedLabels = new Set(Object.keys(STATUS_ALIASES));
 
-  const csvStatuses = rows
-    .filter(row => row.Status && !nonremovableLabels.has(row.Status.toLowerCase()))
-    .map(row => {
-      const bgHex = row.Color || "#B8B8B8";
-      const textColor = bestForegroundHex(bgHex);
-      const { r, g, b } = hexToRgb(bgHex);
-      return {
-        id: "ls_" + row.Status.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_"),
-        label: row.Status.trim(),
-        textColor,
-        backgroundColor: "rgb(" + r + "," + g + "," + b + ")",
-        removable: true,
-      };
+  const csvStatuses = [];
+  for (var i = 0; i < rows.length; i++) {
+    var name = (rows[i].Status || rows[i].name || "").trim();
+    var lower = name.toLowerCase();
+    if (!name) continue;
+    if (nonremovableLabels.has(lower)) continue;
+    if (aliasedLabels.has(lower)) continue;
+    var bgHex = (rows[i].Color || rows[i].htmlColor || "").trim() || "#B8B8B8";
+    var textColor = bestForegroundHex(bgHex);
+    var rgb = hexToRgb(bgHex);
+    csvStatuses.push({
+      id: "ls_" + lower.replace(/[^a-z0-9]+/g, "_"),
+      label: name,
+      textColor: textColor,
+      backgroundColor: "rgb(" + rgb.r + "," + rgb.g + "," + rgb.b + ")",
+      removable: true,
+      hidden: false,
     });
+  }
 
   return [...NONREMOVABLE_STATUSES, ...csvStatuses];
 }
@@ -660,8 +675,6 @@ export function mapSales(
       chargeID: (pr.ID || "").replace(/^st-/, ""),
       last4: pr["Card last 4"] || "",
       cardType: pr["Card type"] || "",
-      _entryMode: pr["Entry mode"] || "",
-      _cardFundingSource: pr["Card funding source"] || "",
     });
   }
   const refundChargesUsed = new Set();
@@ -714,16 +727,26 @@ export function mapSales(
     // Detect deposit sale: any payment with "Credit Account" type and negative amount (money into account)
     const isDepositSale = paymentRows.some(sp => sp.paymentTypeName === "Credit Account" && parseFloat(sp.amount) < 0);
 
+    // Separate payment rows into real transactions (cash/card/check) vs deposit redemptions (credit account positive)
+    const transactionRows = paymentRows.filter(sp => {
+      if (sp.paymentTypeType === "credit account") return false;
+      if (sp.paymentTypeType === "ecom") return false;
+      return true;
+    });
+
+    // Collect deposit redemptions (positive credit account on non-deposit sales)
+    const depositRedemptionRows = isDepositSale ? [] : paymentRows.filter(sp =>
+      sp.paymentTypeType === "credit account" && dollarsToCents(sp.amount) > 0
+    );
+
     // Lightspeed Payments report records for this sale (matched by Order ID)
     const prForSale = paymentsByOrderID[lsSaleID] || [];
     const prUsed = new Set();
 
-    const payments = paymentRows.map(sp => {
+    const payments = transactionRows.map(sp => {
       const isCash = sp.paymentTypeType === "cash";
       const isCheck = sp.paymentTypeName === "Check";
       const isCard = sp.paymentTypeType === "credit card";
-      const isCredit = sp.paymentTypeType === "credit account";
-      const isEcom = sp.paymentTypeType === "ecom";
       const amount = dollarsToCents(sp.amount);
 
       // Match card payment to Lightspeed Payments report by amount
@@ -765,35 +788,44 @@ export function mapSales(
 
       return {
         id: sp.salePaymentID || crypto.randomUUID(),
-        saleID,
-        type: amount < 0 ? "refund" : "payment",
-        method: isCash ? "cash" : isCheck ? "check" : isCard ? "card" : isCredit ? "credit" : isEcom ? "ecom" : "other",
+        method: isCash ? "cash" : isCheck ? "check" : "card",
         amountCaptured: amount,
         amountTendered: (isCash && amount >= 0) ? amount : 0,
         salesTax: 0,
-        cardType: prMatch ? (prMatch["Card type"] || "") : refundMatch ? refundMatch.cardType : spCardType,
-        cardIssuer: isCard ? sp.paymentTypeName : "",
-        last4: prMatch ? (prMatch["Card last 4"] || "") : refundMatch ? refundMatch.last4 : spLast4,
-        authorizationCode: spAuthCode,
         millis: sp.createTime ? new Date(sp.createTime).getTime() : 0,
-        paymentProcessor: isCard ? "Stripe" : "",
-        chargeID: prMatch ? (prMatch.ID || "").replace(/^st-/, "") : refundMatch ? refundMatch.chargeID : "",
-        paymentIntentID: "",
-        receiptURL: "",
+        last4: prMatch ? (prMatch["Card last 4"] || "") : refundMatch ? refundMatch.last4 : spLast4,
         expMonth: "",
         expYear: "",
+        cardType: prMatch ? (prMatch["Card type"] || "") : refundMatch ? refundMatch.cardType : spCardType,
+        cardIssuer: isCard ? sp.paymentTypeName : "",
+        paymentProcessor: isCard ? "stripe" : isCash ? "cash" : "check",
+        paymentIntentID: "",
+        chargeID: prMatch ? (prMatch.ID || "").replace(/^st-/, "") : refundMatch ? refundMatch.chargeID : "",
+        authorizationCode: spAuthCode,
         networkTransactionID: "",
-        amountRefunded: prMatch ? dollarsToCents(prMatch["Refunded amount"]) : 0,
+        receiptURL: "",
         depositType: isDepositSale ? "deposit" : "",
-        _entryMode: prMatch ? (prMatch["Entry mode"] || "") : refundMatch ? refundMatch._entryMode : "",
-        _cardFundingSource: prMatch ? (prMatch["Card funding source"] || "") : refundMatch ? refundMatch._cardFundingSource : "",
         refunds: [],
+        items: [],
       };
     });
 
-    // Compute amountCaptured/amountRefunded from transactions (consistent with recomputeSaleAmounts)
-    const computedAmountCaptured = payments.reduce((sum, p) => p.type === "payment" ? sum + p.amountCaptured : sum, 0);
-    const computedAmountRefunded = payments.reduce((sum, p) => p.type === "refund" ? sum + Math.abs(p.amountCaptured) : sum, 0);
+    // Build depositsApplied entries for credit account redemptions
+    const depositsApplied = depositRedemptionRows.map(sp => ({
+      id: sp.salePaymentID || crypto.randomUUID(),
+      transactionId: "",
+      amount: dollarsToCents(sp.amount),
+      type: "deposit",
+    }));
+
+    // Assign sale tax to the first payment transaction
+    if (tax > 0 && payments.length > 0) {
+      payments[0].salesTax = tax;
+    }
+
+    // Compute amounts: transactions + deposit redemptions
+    const txnTotal = payments.reduce((sum, p) => sum + p.amountCaptured, 0);
+    const depositRedemptionTotal = depositsApplied.reduce((sum, d) => sum + d.amount, 0);
 
     const mappedSale = {
       id: saleID,
@@ -804,21 +836,18 @@ export function mapSales(
       salesTax: tax,
       salesTaxPercent,
       total,
-      amountCaptured: computedAmountCaptured,
-      amountRefunded: computedAmountRefunded,
+      amountCaptured: txnTotal + depositRedemptionTotal,
       paymentComplete: completed,
       workorderIDs,
       transactionIDs: payments.map(p => p.id),
       pendingTransactionIDs: [],
       pendingRefundIDs: [],
       creditsApplied: [],
-      depositsApplied: [],
+      depositsApplied,
       customerID: resolvedCustID,
-      refunds: [],
-      textToPay: false,
-      checkoutSessionID: "",
-      depositType: "",
-      voidedByRefund: false,
+      isDepositSale,
+      depositType: isDepositSale ? "deposit" : "",
+      depositNote: "",
       _importSource: "lightspeed",
     };
 
@@ -831,7 +860,7 @@ export function mapSales(
         wo.saleID = saleID;
         if (completed) {
           wo.paymentComplete = true;
-          wo.amountPaid = computedAmountCaptured;
+          wo.amountPaid = txnTotal + depositRedemptionTotal;
         }
       }
 
@@ -873,7 +902,7 @@ export function mapEmployees(employeesCSVText) {
     const fullName = (first + " " + last).trim().toLowerCase();
     if (SKIP_EMPLOYEE_NAMES.includes(fullName)) continue;
 
-    const appUserID = crypto.randomUUID();
+    const appUserID = "ls_emp_" + lsID;
     employeeIDMap[lsID] = appUserID;
 
     users.push({
@@ -912,22 +941,24 @@ export function mapPunchHistory(employeeHoursCSVText, employeeIDMap) {
     const checkOut = (row.checkOut || "").trim();
 
     if (checkIn) {
+      const inMillis = new Date(checkIn).getTime();
       punches.push({
         ...TIME_PUNCH_PROTO,
-        id: crypto.randomUUID(),
+        id: "ls_punch_" + lsEmployeeID + "_in_" + inMillis,
         userID: appUserID,
-        millis: new Date(checkIn).getTime(),
+        millis: inMillis,
         option: "in",
         _importSource: "lightspeed",
       });
     }
 
     if (checkOut) {
+      const outMillis = new Date(checkOut).getTime();
       punches.push({
         ...TIME_PUNCH_PROTO,
-        id: crypto.randomUUID(),
+        id: "ls_punch_" + lsEmployeeID + "_out_" + outMillis,
         userID: appUserID,
-        millis: new Date(checkOut).getTime(),
+        millis: outMillis,
         option: "out",
         _importSource: "lightspeed",
       });

@@ -3,6 +3,7 @@
 import { identity } from "lodash";
 import { DISCOUNT_TYPES, MILLIS_IN_HOUR, PERMISSION_LEVELS } from "./constants";
 import { getRgbFromNamedColor, lightenRGBByPercent } from "./utils";
+import { C } from "./styles";
 
 ////////// hardcoded settings and options ///////
 export const SHADOW_RADIUS_NOTHING = {
@@ -121,6 +122,7 @@ export const NONREMOVABLE_STATUSES = [
     backgroundColor: "red",
     removable: false,
     requireWaitTime: false,
+    hidden: false,
   },
   {
     id: "sale_in_progress",
@@ -129,7 +131,8 @@ export const NONREMOVABLE_STATUSES = [
     backgroundColor: "black",
     removable: false,
     requireWaitTime: false,
-    systemOwned: true
+    systemOwned: true,
+    hidden: false,
   },
   {
     id: "finished_and_paid",
@@ -138,23 +141,35 @@ export const NONREMOVABLE_STATUSES = [
     backgroundColor: "green",
     removable: false,
     requireWaitTime: false,
-    systemOwned: true
+    systemOwned: true,
+    hidden: false,
   },
   {
-    id: "on_the_stand",
-    label: "On the Stand",
+    id: "intake",
+    label: "Intake",
     textColor: "white",
     backgroundColor: "pink",
     removable: false,
     requireWaitTime: false,
+    hidden: false,
   },
   {
     id: "service",
-    textColor: "black",
+    textColor: lightenRGBByPercent("rgb(0,0,0)", 28),
     backgroundColor: "rgb(192,192,192)",
     label: "Service",
     removable: false,
     requireWaitTime: false,
+    hidden: false,
+  },
+  {
+    id: "open",
+    textColor: lightenRGBByPercent("rgb(0,0,0)", 28),
+    backgroundColor: "rgb(192,192,192)",
+    label: "Open",
+    removable: false,
+    requireWaitTime: false,
+    hidden: true,
   },
   {
     id: "finished",
@@ -163,6 +178,7 @@ export const NONREMOVABLE_STATUSES = [
     label: "Finished",
     removable: false,
     requireWaitTime: false,
+    hidden: false,
   },
   {
     id: "part_ordered",
@@ -170,6 +186,7 @@ export const NONREMOVABLE_STATUSES = [
     backgroundColor: "orange",
     label: "Item Ordered",
     removable: false,
+    hidden: true,
   },
   {
     id: "is_order_part_for_customer",
@@ -177,6 +194,7 @@ export const NONREMOVABLE_STATUSES = [
     backgroundColor: "rgb(226,126,56)",
     label: "Order Item for Customer",
     removable: false,
+    hidden: false,
   },
   {
     id: "pickup",
@@ -184,6 +202,7 @@ export const NONREMOVABLE_STATUSES = [
     backgroundColor: "purple",
     label: "Pickup",
     removable: false,
+    hidden: false,
   },
   {
     id: "delivery",
@@ -191,6 +210,7 @@ export const NONREMOVABLE_STATUSES = [
     backgroundColor: "purple",
     label: "Delivery",
     removable: false,
+    hidden: false,
   },
   {
     id: "work_in_progress",
@@ -198,6 +218,7 @@ export const NONREMOVABLE_STATUSES = [
     backgroundColor: "rgb(192,192,192)",
     label: "Work in Progress",
     removable: false,
+    hidden: false,
   },
 
 ];

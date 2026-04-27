@@ -118,6 +118,7 @@ export const SalesReportsModal = ({ handleExit }) => {
   const [sSortDir, _setSortDir] = useState("desc");
   const [sTransactionResults, _setTransactionResults] = useState([]);
   const [sTransactionLoading, _setTransactionLoading] = useState(false);
+  const [sTransactionModalItem, _setTransactionModalItem] = useState(null);
   const queryIdRef = useRef(0);
   const txnQueryIdRef = useRef(0);
   const hasUserSelected = useRef(false);
@@ -163,6 +164,10 @@ export const SalesReportsModal = ({ handleExit }) => {
   }
 
   function handleRowPress(tx) {
+    if (!tx.saleID) {
+      _setTransactionModalItem(tx);
+      return;
+    }
     if (tx.source === "active") {
       let sale = useActiveSalesStore.getState().getActiveSale(tx.saleID);
       if (sale) {
@@ -572,7 +577,7 @@ export const SalesReportsModal = ({ handleExit }) => {
           >
             <View>
               <Text style={{ fontSize: 14, fontWeight: "700", color: C.text, marginBottom: 8, textAlign: "center" }}>
-                Sales Reports
+                Sales History
               </Text>
               {DATE_SHORTCUTS.map((sc) => {
                 let isActive = sActiveShortcut === sc.label;
@@ -997,7 +1002,7 @@ export const SalesReportsModal = ({ handleExit }) => {
         </View>
       </TouchableWithoutFeedback>
     );
-  }, [sStartDate, sEndDate, sResults, sPage, sLoading, sSaleModalItem, sActiveShortcut, sSearchText, sPendingStart, sPendingEnd, sEndCalMonth, sEndCalYear, sCalKey, sViewMode, sSortField, sSortDir, sTransactionResults, sTransactionLoading]);
+  }, [sStartDate, sEndDate, sResults, sPage, sLoading, sSaleModalItem, sActiveShortcut, sSearchText, sPendingStart, sPendingEnd, sEndCalMonth, sEndCalYear, sCalKey, sViewMode, sSortField, sSortDir, sTransactionResults, sTransactionLoading, sTransactionModalItem]);
 
   return ReactDOM.createPortal(
     <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}>
@@ -1012,6 +1017,13 @@ export const SalesReportsModal = ({ handleExit }) => {
           item={sSaleModalItem}
           onClose={() => _setSaleModalItem(null)}
           onRefund={handleRefundFromSaleModal}
+        />
+      )}
+      {/* Transaction Viewer Modal (no saleID) */}
+      {!!sTransactionModalItem && (
+        <TransactionViewerModal
+          tx={sTransactionModalItem}
+          onClose={() => _setTransactionModalItem(null)}
         />
       )}
       {/* Loading Overlay */}
@@ -1061,6 +1073,111 @@ export const SalesReportsModal = ({ handleExit }) => {
           </View>
         </View>
       )}
+    </View>,
+    document.body
+  );
+};
+
+const TransactionViewerModal = ({ tx, onClose }) => {
+  let isRefund = tx.type === "refund";
+  let dateStr = "";
+  if (tx.millis) {
+    let d = formatMillisForDisplay(tx.millis, true, true, true);
+    let min = String(d.minutes).padStart(2, "0");
+    dateStr = d.wordDayOfWeek + ", " + d.wordDayOfMonth + " " + d.dayOfMonth + " " + d.year + "  " + d.hour + ":" + min + " " + d.amPM;
+  }
+
+  let rows = [
+    { label: "Type", value: capitalizeFirstLetterOfString(tx.type || "payment") },
+    { label: "Method", value: capitalizeFirstLetterOfString(tx.method || "") },
+    { label: "Amount", value: (isRefund ? "-" : "") + "$" + formatCurrencyDisp(tx.amountCaptured || 0), color: isRefund ? C.lightred : C.text },
+    { label: "Date", value: dateStr },
+  ];
+  if (tx.method === "card") {
+    if (tx.cardType || tx.last4) rows.push({ label: "Card", value: (tx.cardType || "Card") + (tx.last4 ? "  ..." + tx.last4 : "") });
+    if (tx.cardIssuer) rows.push({ label: "Issuer", value: tx.cardIssuer });
+    if (tx.expMonth && tx.expYear) rows.push({ label: "Exp", value: tx.expMonth + "/" + tx.expYear });
+    if (tx.authorizationCode) rows.push({ label: "Auth Code", value: tx.authorizationCode });
+    if (tx.chargeID) rows.push({ label: "Charge ID", value: tx.chargeID });
+  }
+  if (tx.method === "cash" && tx.amountTendered) rows.push({ label: "Tendered", value: "$" + formatCurrencyDisp(tx.amountTendered) });
+  if (tx.id) rows.push({ label: "Transaction ID", value: tx.id });
+
+  return ReactDOM.createPortal(
+    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1002 }}>
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={{ width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
+          <TouchableWithoutFeedback>
+            <View
+              style={{
+                width: 400,
+                backgroundColor: C.backgroundWhite,
+                borderRadius: 12,
+                overflow: "hidden",
+              }}
+            >
+              {/* Header */}
+              <View
+                style={{
+                  backgroundColor: "rgba(0,0,0,0.75)",
+                  paddingVertical: 12,
+                  paddingHorizontal: 16,
+                  alignItems: "center",
+                }}
+              >
+                <Text style={{ fontSize: 15, fontWeight: "700", color: "white" }}>
+                  Transaction Details
+                </Text>
+              </View>
+
+              {/* Body */}
+              <View style={{ padding: 16 }}>
+                {rows.map((row, idx) => (
+                  <View
+                    key={idx}
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      paddingVertical: 8,
+                      borderBottomWidth: idx < rows.length - 1 ? 1 : 0,
+                      borderBottomColor: gray(0.08),
+                    }}
+                  >
+                    <Text style={{ fontSize: 12, color: gray(0.45), fontWeight: "600" }}>
+                      {row.label}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "600",
+                        color: row.color || C.text,
+                        flex: 1,
+                        textAlign: "right",
+                        marginLeft: 12,
+                      }}
+                      numberOfLines={1}
+                    >
+                      {row.value}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Footer */}
+              <View style={{ alignItems: "center", paddingBottom: 14, paddingTop: 4 }}>
+                <Button_
+                  text="Close"
+                  colorGradientArr={COLOR_GRADIENTS.grey}
+                  onPress={onClose}
+                  buttonStyle={{ paddingHorizontal: 30, paddingVertical: 8 }}
+                  textStyle={{ fontSize: 13 }}
+                />
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
     </View>,
     document.body
   );

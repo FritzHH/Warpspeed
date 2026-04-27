@@ -88,14 +88,13 @@ import { labelPrintBuilder } from "../../../../shared/labelPrintBuilder";
 
 const TAB_NAMES = {
   users: "User Control",
-  payments: "Payments/Printers",
-  statuses: "Workorder Statuses",
+  payments: "Readers/Printers",
+  statuses: "Statuses",
   lists: "Lists & Options",
   waitTimes: "Wait Times",
   storeInfo: "Store Info",
-  quickItems: "Quick Item Buttons",
-  standButtons: "Stand Buttons",
-  sales: "Sales Reports",
+  quickItems: "Quick Buttons",
+  sales: "Sales History",
   payroll: "Payroll",
   ordering: "Ordering",
   textTemplates: "Text Templates",
@@ -437,26 +436,6 @@ export function Dashboard_Admin({}) {
             />
             <VerticalSpacer />
             <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.standButtons}
-              handleExpandPress={() => {
-                if (sExpand === TAB_NAMES.standButtons) {
-                  _setExpand(null);
-                } else {
-                  _setExpand(TAB_NAMES.standButtons);
-                  _setShowStandButtonsModal(true);
-                }
-              }}
-              text={TAB_NAMES.standButtons}
-              icon={ICONS.tools1}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.standButtons ? 500 : null,
-                color:
-                  sExpand === TAB_NAMES.standButtons ? C.green : gray(0.6),
-              }}
-              disabled={sMenuLocked}
-            />
-            <VerticalSpacer />
-            <MenuListLabelComponent
               selected={sExpand === TAB_NAMES.statuses}
               handleExpandPress={() =>
                 _setExpand(
@@ -602,22 +581,21 @@ export function Dashboard_Admin({}) {
 
         {/*********************right-side column container****************** */}
 
-        <ScrollView
+        {!sExpand && (
+          <View style={{ width: "70%", height: "100%", justifyContent: "center", alignItems: "center" }}>
+            <Image_
+              icon={require("../../../../resources/default_app_logo_large.png")}
+              style={{ opacity: 0.08, width: "60%", height: "60%" }}
+            />
+          </View>
+        )}
+        {!!sExpand && <ScrollView
           style={{
             width: "70%",
           }}
           contentContainerStyle={{ alignItems: "center" }}
         >
-          {!sExpand && (
-            <View style={{ flex: 1, width: "100%", justifyContent: "center", alignItems: "center" }}>
-              <Image_
-                icon={require("../../../../resources/default_app_logo_large.png")}
-                style={{ opacity: 0.08, width: "60%", height: "60%" }}
-              />
-            </View>
-          )}
-          {!!sExpand && (
-            <Text
+          <Text
               style={{
                 borderColor: C.buttonLightGreenOutline,
                 color: gray(0.6),
@@ -628,7 +606,6 @@ export function Dashboard_Admin({}) {
             >
               {sExpand?.toUpperCase()}
             </Text>
-          )}
           {sExpand === TAB_NAMES.payments && (
             <>
               <PaymentProcessingComponent
@@ -675,28 +652,6 @@ export function Dashboard_Admin({}) {
           {sExpand === TAB_NAMES.quickItems && (
             <QuickItemButtonsComponent />
           )}
-          {sExpand === TAB_NAMES.standButtons && (
-            <BoxContainerOuterComponent>
-              <BoxContainerInnerComponent style={{ width: "100%", alignItems: "center", borderWidth: 0 }}>
-                <Button_
-                  text="Open Stand Buttons Editor"
-                  icon={ICONS.display}
-                  iconSize={18}
-                  onPress={() => _setShowStandButtonsModal(true)}
-                  colorGradientArr={COLOR_GRADIENTS.green}
-                  style={{ paddingHorizontal: 24, paddingVertical: 10 }}
-                />
-                <Button_
-                  text="Open Stand Page"
-                  icon={ICONS.bicycle}
-                  iconSize={18}
-                  onPress={() => window.open("/stand", "_blank")}
-                  colorGradientArr={COLOR_GRADIENTS.blue}
-                  style={{ paddingHorizontal: 24, paddingVertical: 10, marginTop: 10 }}
-                />
-              </BoxContainerInnerComponent>
-            </BoxContainerOuterComponent>
-          )}
           {sExpand === TAB_NAMES.ordering && (
             <OrderingComponent
               sOrderingMenuSelectionName={sOrderingMenuSelectionName}
@@ -723,7 +678,7 @@ export function Dashboard_Admin({}) {
           )}
           {sExpand === TAB_NAMES.import && <ImportComponent />}
           {sExpand === TAB_NAMES.backup && <BackupRecoveryComponent />}
-        </ScrollView>
+        </ScrollView>}
       </View>
     </View>
   );
@@ -3666,6 +3621,7 @@ const WorkorderStatusesComponent = ({
                 proto.textColor = C.text;
                 proto.removable = true;
                 proto.requireWaitTime = false;
+                proto.hidden = false;
                 let newStatuses = [proto, ...zSettingsObj.statuses];
                 handleSettingsFieldChange("statuses", newStatuses);
               }}
@@ -3801,19 +3757,25 @@ const WorkorderStatusesComponent = ({
                         }
                       />
                     </Tooltip>
-                    <Tooltip text="Delete status" position="top">
-                      <BoxButton1
-                        style={{ paddingHorizontal: 5 }}
-                        iconSize={15}
-                        icon={ICONS.close1}
-                        onPress={() => {
-                          let newStatuses = zSettingsObj.statuses.filter(
-                            (o) => o.id != item.id
-                          );
-                          handleSettingsFieldChange("statuses", newStatuses);
-                        }}
-                      />
-                    </Tooltip>
+                    {item.removable ? (
+                      <Tooltip text="Delete status" position="top">
+                        <BoxButton1
+                          style={{ paddingHorizontal: 5 }}
+                          iconSize={15}
+                          icon={ICONS.close1}
+                          onPress={() => {
+                            let newStatuses = zSettingsObj.statuses.filter(
+                              (o) => o.id != item.id
+                            );
+                            handleSettingsFieldChange("statuses", newStatuses);
+                          }}
+                        />
+                      </Tooltip>
+                    ) : (
+                      <View style={{ paddingHorizontal: 5, opacity: 0.3, cursor: "not-allowed" }}>
+                        <Image_ icon={ICONS.close1} size={15} />
+                      </View>
+                    )}
                     <Tooltip text="Edit colors" position="top">
                       <BoxButton1
                         style={{ paddingHorizontal: 5 }}
@@ -3826,7 +3788,21 @@ const WorkorderStatusesComponent = ({
                         }}
                       />
                     </Tooltip>
-                    <Tooltip text="Link wait time" position="top">
+                    <Tooltip text="Require wait time before status change" position="top">
+                      <CheckBox_
+                        text=""
+                        isChecked={!!item.requireWaitTime}
+                        onCheck={() => {
+                          let newStatuses = zSettingsObj.statuses.map((o) => {
+                            if (o.id === item.id) return { ...o, requireWaitTime: !o.requireWaitTime };
+                            return o;
+                          });
+                          handleSettingsFieldChange("statuses", newStatuses);
+                        }}
+                        buttonStyle={{ marginLeft: 5 }}
+                      />
+                    </Tooltip>
+                    <Tooltip text="Auto-add this wait time" position="top">
                       <DropdownMenu
                         dataArr={[
                           { id: "__none__", label: "No linked wait time" },
@@ -3855,13 +3831,13 @@ const WorkorderStatusesComponent = ({
                         menuMaxHeight={300}
                       />
                     </Tooltip>
-                    <Tooltip text="Require wait time" position="top">
+                    <Tooltip text="Hidden from status picker" position="top">
                       <CheckBox_
                         text=""
-                        isChecked={!!item.requireWaitTime}
+                        isChecked={!!item.hidden}
                         onCheck={() => {
                           let newStatuses = zSettingsObj.statuses.map((o) => {
-                            if (o.id === item.id) return { ...o, requireWaitTime: !o.requireWaitTime };
+                            if (o.id === item.id) return { ...o, hidden: !o.hidden };
                             return o;
                           });
                           handleSettingsFieldChange("statuses", newStatuses);
@@ -5897,9 +5873,10 @@ const ImportComponent = () => {
         // Add new users to settings alongside existing users (Fritz)
         const updatedSettings = cloneDeep(useSettingsStore.getState().settings || {});
         if (!updatedSettings.users) updatedSettings.users = [];
-        const existingIDs = new Set(updatedSettings.users.map(u => u.id));
+        const existingByLsID = {};
+        updatedSettings.users.forEach(function (u) { if (u.lightspeed_id) existingByLsID[u.lightspeed_id] = u; });
         for (const u of newUsers) {
-          if (!existingIDs.has(u.id)) updatedSettings.users.push(u);
+          if (!existingByLsID[u.lightspeed_id]) updatedSettings.users.push(u);
         }
         await dbSaveSettings(updatedSettings);
         useSettingsStore.getState().setSettings(updatedSettings);
@@ -6163,9 +6140,10 @@ const ImportComponent = () => {
         _setMigrationStep("Saving employees...");
         const updatedSettings = cloneDeep(useSettingsStore.getState().settings || {});
         if (!updatedSettings.users) updatedSettings.users = [];
-        const existingIDs = new Set(updatedSettings.users.map(u => u.id));
+        const existingByLsID = {};
+        updatedSettings.users.forEach(function (u) { if (u.lightspeed_id) existingByLsID[u.lightspeed_id] = u; });
         for (const u of filteredEmployees) {
-          if (!existingIDs.has(u.id)) updatedSettings.users.push(u);
+          if (!existingByLsID[u.lightspeed_id]) updatedSettings.users.push(u);
         }
         await dbSaveSettings(updatedSettings);
         useSettingsStore.getState().setSettings(updatedSettings);
@@ -6837,9 +6815,10 @@ const ImportComponent = () => {
 
         const updatedSettings = cloneDeep(useSettingsStore.getState().settings || {});
         if (!updatedSettings.users) updatedSettings.users = [];
-        const existingIDs = new Set(updatedSettings.users.map(u => u.id));
+        const existingByLsID = {};
+        updatedSettings.users.forEach(function (u) { if (u.lightspeed_id) existingByLsID[u.lightspeed_id] = u; });
         for (const u of newUsers) {
-          if (!existingIDs.has(u.id)) updatedSettings.users.push(u);
+          if (!existingByLsID[u.lightspeed_id]) updatedSettings.users.push(u);
         }
         await dbSaveSettings(updatedSettings);
         useSettingsStore.getState().setSettings(updatedSettings);

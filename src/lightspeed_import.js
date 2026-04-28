@@ -841,7 +841,7 @@ export function mapSales(
       salesTaxPercent,
       total,
       amountCaptured: txnTotal + depositRedemptionTotal,
-      paymentComplete: completed,
+      paymentComplete: completed || (txnTotal + depositRedemptionTotal >= total && total > 0),
       workorderIDs,
       transactionIDs: payments.map(p => p.id),
       pendingTransactionIDs: [],

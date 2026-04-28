@@ -1100,8 +1100,10 @@ export const SETTINGS_OBJ = {
   autoEmailSalesReceipt: true,
   autoPrintSalesReceipt: true,
   shopContactBlurb: "9102 Bonita Beach Rd SE\nBonita Springs, FL\n(239) 291-9396\nsupport@bonitabikes.com\nwww.bonitabikes.com",
-  intakeBlurb: "This ticket is an estimate only. We will contact you with any major additions or changes. Minor additions or changes will be made at our discretion.",
+  intakeBlurb: "This ticket is an estimate, and MAY NOT INCLUDE ALL ITEMS FOR THE SERVICE. We will add items as discussed, and call for unforseen major additions.",
   thankYouBlurb: "Thanks you for visiting Bonita Bikes! \nWe value your business and satisfaction with our services. \n\nPlease call or email anytime, we look forward to seeing you again.",
+  waitTimeBlurbWithEstimate: "Wait times are a BEST ESTIMATE only; We will call/text/email when service is complete!",
+  waitTimeBlurbWithoutEstimate: "We do not currently have an estimate. We will call/text/email when service is complete!",
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   smsConversationLockTimeout: 2, //days

@@ -409,53 +409,6 @@ export const ActiveWorkorderComponent = ({}) => {
     if (px && py) _setPrinterAlert({ x: px, y: py });
     const settings = useSettingsStore.getState().getSettings();
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-
-    // Print
-    if (settings?.autoPrintIntakeReceipt !== false) {
-      let toPrint = printBuilder.intake(
-        zOpenWorkorder,
-        zCustomer,
-        settings?.salesTaxPercent,
-        _ctx
-      );
-      log("INTAKE PRINT OBJ", JSON.stringify(toPrint, null, 2));
-      dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
-    }
-
-    // Look up templates
-    const smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "intakeReceipt");
-    const emailTemplate = findTemplateByType(settings?.emailTemplates, "intakeReceipt");
-
-    const shouldSMS = settings?.autoSMSIntakeReceipt && zCustomer.customerCell;
-    const shouldEmail = settings?.autoEmailIntakeReceipt && zCustomer.email;
-
-    // Check for empty template content
-    const smsContent = smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "";
-    const emailContent = emailTemplate?.content || emailTemplate?.body || "";
-    let emptyParts = [];
-    if (shouldSMS && !smsContent.trim()) emptyParts.push("SMS");
-    if (shouldEmail && !emailContent.trim()) emptyParts.push("email");
-    if (emptyParts.length > 0) {
-      useAlertScreenStore.getState().setValues({
-        title: "Empty Template",
-        message: "The intake receipt " + emptyParts.join(" and ") + " template is empty. Fill in the template content in Dashboard > " + (emptyParts.includes("SMS") ? "Text Templates" : "Email Templates") + ", or uncheck the auto " + emptyParts.join("/") + " option in Dashboard > Printing.",
-        btn1Text: "OK",
-        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
-        canExitOnOuterClick: true,
-      });
-    }
-
-    // Send only if template has content
-    const canSMS = shouldSMS && smsContent.trim();
-    const canEmail = shouldEmail && emailContent.trim();
-    if (canSMS || canEmail) {
-      sendIntakeReceipt(settings, zCustomer, zOpenWorkorder, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null);
-    }
-  }
-
-  function handleIntakePrintOnly() {
-    const settings = useSettingsStore.getState().getSettings();
-    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
     let toPrint = printBuilder.intake(
       zOpenWorkorder,
       zCustomer,
@@ -465,25 +418,45 @@ export const ActiveWorkorderComponent = ({}) => {
     dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
   }
 
-  function handleIntakeRightClick() {
-    useAlertScreenStore.getState().setValues({
-      title: "Print Only",
-      message: "Print the intake receipt without sending SMS or email?",
-      btn1Text: "Print",
-      btn1Icon: ICONS.receipt,
-      handleBtn1Press: () => {
-        handleIntakePrintOnly();
-        useAlertScreenStore.getState().setShowAlert(false);
-      },
-      btn2Text: "Cancel",
-      handleBtn2Press: () => {
-        useAlertScreenStore.getState().setShowAlert(false);
-      },
-      canExitOnOuterClick: true,
-    });
+  function handleIntakeSendElectronic() {
+    const settings = useSettingsStore.getState().getSettings();
+
+    const smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "intakeReceipt");
+    const emailTemplate = findTemplateByType(settings?.emailTemplates, "intakeReceipt");
+
+    const shouldSMS = zCustomer.customerCell;
+    const shouldEmail = zCustomer.email;
+
+    const smsContent = smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "";
+    const emailContent = emailTemplate?.content || emailTemplate?.body || "";
+    let emptyParts = [];
+    if (shouldSMS && !smsContent.trim()) emptyParts.push("SMS");
+    if (shouldEmail && !emailContent.trim()) emptyParts.push("email");
+    if (emptyParts.length > 0) {
+      useAlertScreenStore.getState().setValues({
+        title: "Empty Template",
+        message: "The intake receipt " + emptyParts.join(" and ") + " template is empty. Fill in the template content in Dashboard > " + (emptyParts.includes("SMS") ? "Text Templates" : "Email Templates") + ".",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+    }
+
+    const canSMS = shouldSMS && smsContent.trim();
+    const canEmail = shouldEmail && emailContent.trim();
+    if (!canSMS && !canEmail) return;
+    sendIntakeReceipt(settings, zCustomer, zOpenWorkorder, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null);
   }
 
   async function sendIntakeReceipt(settings, customer, workorder, smsTemplate, emailTemplate) {
+    useAlertScreenStore.getState().setValues({
+      title: "Sending ticket...",
+      message: "",
+      btn1Icon: ICONS.wheelGIF,
+      icon1Size: 40,
+      canExitOnOuterClick: false,
+    });
+
     const { tenantID, storeID } = useSettingsStore.getState().getSettings();
     const firstName = customer?.first || "Customer";
     const storeName = settings?.storeInfo?.displayName || "our store";
@@ -499,7 +472,9 @@ export const ActiveWorkorderComponent = ({}) => {
       return result;
     }
 
-    // Generate PDF
+    let results = [];
+    let errors = [];
+
     let receiptURL = "";
     try {
       const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
@@ -508,32 +483,37 @@ export const ActiveWorkorderComponent = ({}) => {
       const base64 = generateWorkorderTicketPDF(receiptData);
       const storagePath = build_db_path.cloudStorage.intakeReceiptPDF(workorder.id, tenantID, storeID);
 
-      // SMS — upload PDF and send link in one call
-      if (smsTemplate && settings.autoSMSIntakeReceipt && customer.customerCell) {
+      if (smsTemplate && customer.customerCell) {
         const vars = { firstName, storeName, brand, description, link: "{link}", workorderLink };
         const msg = applyVars(smsTemplate.content || smsTemplate.message || smsTemplate.text || "", vars);
-        const result = await dbUploadPDFAndSendSMS({
-          base64,
-          storagePath,
-          message: msg,
-          phoneNumber: customer.customerCell,
-          customerID: workorder?.customerID || "",
-          messageID: crypto.randomUUID(),
-        });
-        if (result?.data?.url) receiptURL = result.data.url;
-        log("Sent intake receipt SMS to", customer.customerCell);
+        try {
+          const result = await dbUploadPDFAndSendSMS({
+            base64,
+            storagePath,
+            message: msg,
+            phoneNumber: customer.customerCell,
+            customerID: workorder?.customerID || "",
+            messageID: crypto.randomUUID(),
+          });
+          if (result?.data?.url) receiptURL = result.data.url;
+          results.push("SMS sent to " + customer.customerCell);
+        } catch (smsErr) {
+          errors.push("SMS failed: " + (smsErr?.message || String(smsErr)));
+        }
       } else {
-        // No SMS but still upload PDF for email link
         const { uploadStringToStorage } = await import("../../../db_calls");
-        const uploadResult = await uploadStringToStorage(base64, storagePath, "base64");
-        if (uploadResult?.downloadURL) receiptURL = uploadResult.downloadURL;
+        try {
+          const uploadResult = await uploadStringToStorage(base64, storagePath, "base64");
+          if (uploadResult?.downloadURL) receiptURL = uploadResult.downloadURL;
+        } catch (uploadErr) {
+          errors.push("PDF upload failed: " + (uploadErr?.message || String(uploadErr)));
+        }
       }
     } catch (e) {
-      log("Error generating/uploading intake receipt PDF:", e);
+      errors.push("PDF generation failed: " + (e?.message || String(e)));
     }
 
-    // Email
-    if (emailTemplate && settings.autoEmailIntakeReceipt && customer.email) {
+    if (emailTemplate && customer.email) {
       const linkHtml = receiptURL
         ? "<a href='" + receiptURL + "' style='display:inline-block;padding:12px 24px;background-color:#4CAF50;color:white;text-decoration:none;border-radius:6px;font-size:14px'>View Receipt</a>"
         : "";
@@ -546,8 +526,29 @@ export const ActiveWorkorderComponent = ({}) => {
       const vars = { firstName, storeName, brand, description, link: linkHtml || receiptURL, receiptLink, workorderLink: workorderLinkHtml || workorderLink };
       const subject = applyVars(emailTemplate.subject || "", vars);
       const html = applyVars(emailTemplate.content || emailTemplate.body || "", vars);
-      dbSendEmail(customer.email, subject, html);
-      log("Sent intake receipt email to", customer.email);
+      try {
+        await dbSendEmail(customer.email, subject, html);
+        results.push("Email sent to " + customer.email);
+      } catch (emailErr) {
+        errors.push("Email failed: " + (emailErr?.message || String(emailErr)));
+      }
+    }
+
+    if (errors.length > 0) {
+      useAlertScreenStore.getState().setValues({
+        title: "Intake Receipt Errors",
+        message: (results.length > 0 ? results.join("\n") + "\n\n" : "") + errors.join("\n"),
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+    } else {
+      useAlertScreenStore.getState().setValues({
+        title: "Sent",
+        message: results.join("\n"),
+        canExitOnOuterClick: true,
+      });
+      setTimeout(() => useAlertScreenStore.getState().setShowAlert(false), 2000);
     }
   }
 
@@ -1553,12 +1554,10 @@ export const ActiveWorkorderComponent = ({}) => {
             // onPress={}
           />
         </Tooltip>
-        <Tooltip text="Print/Send Intake ticket" position="top">
-
+        <Tooltip text="Click to print, right-click to send text/email" position="top">
         <Pressable_
           onPress={handleIntakePrintPress}
-          onRightPress={handleIntakeRightClick}
-          tooltip="Print/send intake receipt"
+          onRightPress={handleIntakeSendElectronic}
           >
           <Button_
             icon={ICONS.receipt}

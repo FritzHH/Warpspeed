@@ -203,6 +203,8 @@ var SHOP_CONTACT_BLURB = "9102 Bonita Beach Rd SE\n Bonita Springs, FL\n" +
   "www.bonitabikes.com";
 var INTAKE_BLURB = "This ticket is an estimate only. We will contact you with any major additions or changes. Minor additions or changes will be made at our discretion.";
 var THANK_YOU_BLURB = "Thanks you for visiting Bonita Bikes! \nWe value your business.";
+var WAIT_TIME_BLURB_WITH_ESTIMATE = "Wait times are a BEST ESTIMATE only; We will call/text/email when service is complete!";
+var WAIT_TIME_BLURB_WITHOUT_ESTIMATE = "We will call/text/email when service is complete!";
 var SHOP_NAME = "Bonita Bikes LLC";
 
 
@@ -336,6 +338,12 @@ function createPrintBase(workorder, customer, salesTaxPercent, context) {
   var _settings = _ctx.settings || {};
 
   var r = Object.assign({}, workorder, customer, calculateRunningTotals(workorder, salesTaxPercent, [], false, !!workorder.taxFree));
+  r.customerFirstName = capitalizeFirstLetterOfString((customer?.first || customer?.customerFirstName || "").trim());
+  r.customerLastName = capitalizeFirstLetterOfString((customer?.last || customer?.customerLastName || "").trim());
+  r.first = r.customerFirstName;
+  r.last = r.customerLastName;
+  r.customerFirst = r.customerFirstName;
+  r.customerLast = r.customerLastName;
   r.workorderLines = parseWorkorderLines(workorder);
   r.status = resolveStatus(workorder.status, _settings.statuses || []).label;
   r.salesTaxPercent = salesTaxPercent;
@@ -387,6 +395,11 @@ var printBuilder = {
   intake: function (workorder, customer, salesTaxPercent, context) {
     var receipt = createPrintBase(workorder, customer, salesTaxPercent, context);
     receipt.receiptType = RECEIPT_TYPES.intake;
+    var _settings = (context || {}).settings || {};
+    var hasWaitInfo = !!(receipt.waitTime || receipt.waitTimeEstimateLabel);
+    receipt.waitTimeBlurb = hasWaitInfo
+      ? (_settings.waitTimeBlurbWithEstimate || WAIT_TIME_BLURB_WITH_ESTIMATE)
+      : (_settings.waitTimeBlurbWithoutEstimate || WAIT_TIME_BLURB_WITHOUT_ESTIMATE);
     return receipt;
   },
   refund: function (refund, sale, customer, workorder, salesTaxPercent, context) {
@@ -405,8 +418,8 @@ var printBuilder = {
     receipt.taxFree = !!workorder?.taxFree;
 
     // Customer info
-    receipt.customerFirstName = customer?.first || customer?.customerFirstName || "";
-    receipt.customerLastName = customer?.last || customer?.customerLastName || "";
+    receipt.customerFirstName = capitalizeFirstLetterOfString((customer?.first || customer?.customerFirstName || "").trim());
+    receipt.customerLastName = capitalizeFirstLetterOfString((customer?.last || customer?.customerLastName || "").trim());
     receipt.customerCell = customer?.phone || customer?.customerCell || "";
     receipt.customerEmail = customer?.email || customer?.customerEmail || "";
     receipt.customerContact = formatPhoneForDisplay(receipt.customerCell) || receipt.customerEmail;

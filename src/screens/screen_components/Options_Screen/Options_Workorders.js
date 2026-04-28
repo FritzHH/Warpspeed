@@ -193,6 +193,25 @@ export function WorkordersComponent({}) {
 
   function handleSearchChange(val) {
     _setSearchTerm(val);
+    let q = val.trim();
+    if (q.length < 5) return;
+    let workorders = zOpenWorkorders.filter((wo) => !!wo.customerID);
+    let scored = workorders.map((wo) => ({ wo, score: scoreWorkorder(wo, q) }));
+    let matches = scored.filter((s) => s.score > 0);
+    if (matches.length === 1) {
+      let wo = matches[0].wo;
+      _setSearchTerm("");
+      workorderSelected(wo);
+      if (zPendingWOIDs.includes(wo.id)) {
+        const uid = useLoginStore.getState().getCurrentUser()?.id;
+        const users = useSettingsStore.getState().getSettings()?.users || [];
+        const updatedUsers = users.map((u) => {
+          if (u.id !== uid) return u;
+          return { ...u, pendingWorkorderIDs: (u.pendingWorkorderIDs || []).filter((id) => id !== wo.id) };
+        });
+        useSettingsStore.getState().setField("users", updatedUsers);
+      }
+    }
   }
 
   function scoreWorkorder(wo, query) {

@@ -41,6 +41,11 @@ function doneSearching() {
 function openWorkorder(wo, isCompleted) {
   const store = useOpenWorkordersStore.getState();
   store.setWorkorderPreviewID(null);
+  const prevLockedID = store.lockedWorkorderID;
+  if (prevLockedID && prevLockedID !== wo.id) {
+    store.setLockedWorkorderID(null);
+    store.removeWorkorder(prevLockedID, false);
+  }
   if (isCompleted) {
     store.setWorkorder(wo, false);
     store.setLockedWorkorderID(wo.id);
@@ -96,10 +101,9 @@ export async function executeLiveSearch(trimmed, mode, options) {
   try {
     let results = [];
     if (mode === "woNumber") {
-      const woPrefix = "WO" + trimmed;
       const openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
       const localMatches = openWOs
-        .filter((w) => w.workorderNumber && w.workorderNumber.startsWith(woPrefix))
+        .filter((w) => w.workorderNumber && w.workorderNumber.startsWith(trimmed))
         .map((w) => ({ type: "workorder", data: w, isCompleted: false }));
       const completedMatches = (await dbSearchCompletedWorkordersByNumber(trimmed))
         .map((w) => ({ type: "workorder", data: w, isCompleted: true }));

@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import { View, Text, FlatList, Image, TouchableOpacity, Animated } from "react-native-web";
+import { View, Text, FlatList, Image, TouchableOpacity, Animated, Modal, TouchableWithoutFeedback, TextInput } from "react-native-web";
 import {
   applyDiscountToWorkorderItem,
   calculateRunningTotals,
@@ -11,12 +11,13 @@ import {
   replaceOrAddToArr,
   resolveStatus,
   showAlert,
+  usdTypeMask,
 } from "../../../utils";
+import { DISCOUNT_TYPES } from "../../../constants";
 import {
   GradientView,
   Button_,
   CheckBox_,
-  DropdownMenu,
   NoteHelperDropdown,
   TextInput_,
   Tooltip,
@@ -921,7 +922,13 @@ export const LineItemComponent = ({
   const qtyDisplayStr = sQtyFocused ? sQtyInputVal : String(effectiveQty);
   const qtyDigits = qtyDisplayStr.length || 1;
   const qtyBoxWidth = qtyDigits <= 2 ? 31 : 31 + (qtyDigits - 2) * 10;
-  const [sShowDiscountModal, _setShowDiscountModal] = useState(null);
+  const [sLineActionModal, _setLineActionModal] = useState(null);
+  const [sModalTop, _setModalTop] = useState(null);
+  const lineActionRef = useRef(null);
+  const modalContentRef = useRef(null);
+  const [sCustomPercent, _setCustomPercent] = useState("");
+  const [sCustomDollar, _setCustomDollar] = useState("");
+  const [sCustomDollarCents, _setCustomDollarCents] = useState(0);
 
   /////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
@@ -1095,20 +1102,6 @@ export const LineItemComponent = ({
               // marginRight: 5,
             }}
           >
-            {effectiveQty > 1 && <Tooltip text="Split items" position="top">
-              <Button_
-                icon={ICONS.axe}
-                iconSize={20}
-                enabled={!isLocked}
-                onPress={effectiveQty > 1 ? () => __splitItems(workorderLine, index) : () => { }}
-                buttonStyle={{
-                  backgroundColor: "transparent",
-                  paddingRight: 2,
-                  opacity: effectiveQty > 1 ? 1 : 0,
-                }}
-              />
-            </Tooltip>
-            }
             <Button_
               enabled={!isLocked}
               onPress={() => __modQtyPressed(workorderLine, "up", index)}
@@ -1230,58 +1223,202 @@ export const LineItemComponent = ({
               alignItems: "center",
             }}
           >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                // justifyContent: "space-between",
-                // backgroundColor: "green",
-              }
-              }
-            >
-
-            <Tooltip text="Discounts" position="top">
-              <DropdownMenu
-                buttonIcon={ICONS.dollarYellow}
-                  buttonIconSize={22}
-                modalCoordY={25}
-                  modalCoordX={-100}
+            <Tooltip text="Actions" position="top">
+              <Button_
+                ref={lineActionRef}
                 enabled={!isLocked}
-                isDiscountMenu={true}
-                discountMaxCents={workorderLine.inventoryItem.price * (workorderLine.qty || 1)}
-                buttonStyle={{ borderWidth: 0, backgroundColor: "transparent" }}
-                dataArr={[
-                  { label: "No Discount" },
-                  ...(zSettingsObj.discounts || []).filter((o) => o.type !== "$" || Number(o.value) <= workorderLine.inventoryItem.price * (workorderLine.qty || 1)).map((o) => ({ label: o.name })),
-                ]}
-                onSelect={(item) => {
-                  if (item._customDiscount) {
-                    applyDiscount(workorderLine, item._customDiscount);
-                  } else if (item.label === "No Discount") {
-                    __setWorkorderLineItem({ ...workorderLine, discountObj: null });
-                  } else {
-                    applyDiscount(
-                      workorderLine,
-                      zSettingsObj.discounts.find((o) => o.name === item.label)
-                    );
+                icon={ICONS.menu2}
+                iconSize={22}
+                onPress={() => {
+                  if (lineActionRef.current) {
+                    const rect = lineActionRef.current.getBoundingClientRect();
+                    _setModalTop(null);
+                    _setLineActionModal({ x: rect.x + rect.width + 5, y: rect.y });
+                    _setCustomPercent("");
+                    _setCustomDollar("");
+                    _setCustomDollarCents(0);
                   }
                 }}
-              />
-              </Tooltip>
-            </View>
-
-            <Tooltip text="Remove" position="top">
-              <Button_
-                enabled={!isLocked}
-                onPress={() => __deleteWorkorderLine(index)}
-                icon={ICONS.trash}
-                iconSize={21}
-                buttonStyle={{
-                  paddingRight: 2,
-                  marginLeft: -8,
-                }}
+                buttonStyle={{ backgroundColor: "transparent", borderWidth: 0, paddingHorizontal: 4, marginRight: 3 }}
               />
             </Tooltip>
+            <Modal visible={!!sLineActionModal} transparent animationType="fade">
+              <TouchableWithoutFeedback onPress={() => { _setLineActionModal(null); _setModalTop(null); }}>
+                <View style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}>
+                  <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+                    <View
+                      ref={modalContentRef}
+                      onLayout={() => {
+                        if (modalContentRef.current && sLineActionModal && sModalTop === null) {
+                          const el = modalContentRef.current;
+                          const rect = typeof el.getBoundingClientRect === "function" ? el.getBoundingClientRect() : null;
+                          if (rect) {
+                            const bottom = sLineActionModal.y + rect.height;
+                            const viewportH = window.innerHeight;
+                            const margin = 10;
+                            if (bottom > viewportH - margin) {
+                              _setModalTop(Math.max(margin, viewportH - rect.height - margin));
+                            } else {
+                              _setModalTop(sLineActionModal.y);
+                            }
+                          }
+                        }
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: sModalTop !== null ? sModalTop : (sLineActionModal?.y || 0),
+                        left: sLineActionModal?.x || 0,
+                        backgroundColor: "white",
+                        borderRadius: 10,
+                        borderWidth: 2,
+                        borderColor: gray(0.08),
+                        minWidth: 180,
+                        overflow: "hidden",
+                      }}
+                    >
+                      <View style={{ flexDirection: "row", borderBottomWidth: 1, borderBottomColor: gray(0.1) }}>
+                        <View style={{ width: "50%", alignItems: "center", justifyContent: "center", backgroundColor: lightenRGBByPercent(C.blue, 85) }}>
+                          {effectiveQty > 1 ? (
+                            <Tooltip text="Split into individual lines" position="top">
+                              <Button_
+                                icon={ICONS.axe}
+                                iconSize={28}
+                                onPress={() => {
+                                  _setLineActionModal(null);
+                                  __splitItems(workorderLine, index);
+                                }}
+                                buttonStyle={{ backgroundColor: "transparent", borderRadius: 0, borderWidth: 0, paddingVertical: 10 }}
+                              />
+                            </Tooltip>
+                          ) : (
+                            <Button_
+                              icon={ICONS.axe}
+                              iconSize={28}
+                              enabled={false}
+                              buttonStyle={{ backgroundColor: "transparent", borderRadius: 0, borderWidth: 0, paddingVertical: 10, opacity: 0.25 }}
+                            />
+                          )}
+                        </View>
+                        <View style={{ width: "50%", alignItems: "center", justifyContent: "center", backgroundColor: lightenRGBByPercent(C.lightred, 85), borderLeftWidth: 1, borderLeftColor: gray(0.1) }}>
+                          <Tooltip text="Remove item" position="top">
+                            <Button_
+                              icon={ICONS.trash}
+                              iconSize={28}
+                              onPress={() => {
+                                _setLineActionModal(null);
+                                __deleteWorkorderLine(index);
+                              }}
+                              buttonStyle={{ backgroundColor: "transparent", borderRadius: 0, borderWidth: 0, paddingVertical: 10 }}
+                            />
+                          </Tooltip>
+                        </View>
+                      </View>
+                      <View>
+                        <Button_
+                          text="No Discount"
+                          onPress={() => {
+                            _setLineActionModal(null);
+                            __setWorkorderLineItem({ ...workorderLine, discountObj: null });
+                          }}
+                          buttonStyle={{ backgroundColor: gray(0.036), borderRadius: 0, borderWidth: 0, paddingVertical: 8, paddingHorizontal: 10 }}
+                          textStyle={{ fontSize: 18, color: C.text }}
+                        />
+                        {(zSettingsObj.discounts || [])
+                          .filter((o) => o.type !== "$" || Number(o.value) <= workorderLine.inventoryItem.price * (workorderLine.qty || 1))
+                          .map((discount, dIdx) => (
+                            <Button_
+                              key={discount.name + dIdx}
+                              text={discount.name}
+                              onPress={() => {
+                                _setLineActionModal(null);
+                                applyDiscount(workorderLine, discount);
+                              }}
+                              buttonStyle={{ backgroundColor: dIdx % 2 === 0 ? "white" : gray(0.036), borderRadius: 0, borderWidth: 0, paddingVertical: 8, paddingHorizontal: 10 }}
+                              textStyle={{ fontSize: 18, color: C.text }}
+                            />
+                          ))}
+                        <View style={{ height: 1, backgroundColor: gray(0.15), width: "100%" }} />
+                        <View
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", height: 40, paddingLeft: 2, backgroundColor: lightenRGBByPercent(C.blue, 60) }}
+                        >
+                          <Text style={{ fontSize: 16, color: gray(0.5), marginRight: 6 }}>Custom %</Text>
+                          <TextInput
+                            value={sCustomPercent}
+                            placeholder="0"
+                            placeholderTextColor={gray(0.3)}
+                            maxLength={3}
+                            onChangeText={(v) => {
+                              let cleaned = v.replace(/[^0-9]/g, "");
+                              if (Number(cleaned) > 100) cleaned = "100";
+                              _setCustomPercent(cleaned);
+                            }}
+                            onSubmitEditing={() => {
+                              const num = Number(sCustomPercent);
+                              if (!num) return;
+                              _setLineActionModal(null);
+                              applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
+                            }}
+                            style={{ width: 50, height: 28, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 4, paddingHorizontal: 6, fontSize: 16, color: C.text, textAlign: "center", outlineWidth: 0, backgroundColor: "white" }}
+                          />
+                          <Button_
+                            icon={ICONS.check1}
+                            iconSize={19}
+                            enabled={Number(sCustomPercent) > 0}
+                            onPress={() => {
+                              const num = Number(sCustomPercent);
+                              if (!num) return;
+                              _setLineActionModal(null);
+                              applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
+                            }}
+                            buttonStyle={{ marginLeft: 6, backgroundColor: "transparent", borderWidth: 0, padding: 4 }}
+                          />
+                        </View>
+                        <View
+                          onClick={(e) => e.stopPropagation()}
+                          onMouseDown={(e) => e.stopPropagation()}
+                          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", height: 40, paddingLeft: 2, backgroundColor: lightenRGBByPercent(C.blue, 60) }}
+                        >
+                          <Text style={{ fontSize: 16, color: gray(0.5), marginRight: 6 }}>Custom $</Text>
+                          <TextInput
+                            value={sCustomDollar}
+                            placeholder="0.00"
+                            placeholderTextColor={gray(0.3)}
+                            onChangeText={(v) => {
+                              const maxCents = workorderLine.inventoryItem.price * (workorderLine.qty || 1);
+                              let result = usdTypeMask(v);
+                              if (maxCents && result.cents > maxCents) result = usdTypeMask(String(maxCents));
+                              _setCustomDollar(result.display);
+                              _setCustomDollarCents(result.cents);
+                            }}
+                            onSubmitEditing={() => {
+                              if (!sCustomDollarCents) return;
+                              _setLineActionModal(null);
+                              const dollars = (sCustomDollarCents / 100).toFixed(2);
+                              applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(sCustomDollarCents), type: DISCOUNT_TYPES.dollar, custom: true });
+                            }}
+                            style={{ width: 70, height: 28, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 4, paddingHorizontal: 6, fontSize: 16, color: C.text, textAlign: "center", outlineWidth: 0, backgroundColor: "white" }}
+                          />
+                          <Button_
+                            icon={ICONS.check1}
+                            iconSize={19}
+                            enabled={sCustomDollarCents > 0}
+                            onPress={() => {
+                              if (!sCustomDollarCents) return;
+                              _setLineActionModal(null);
+                              const dollars = (sCustomDollarCents / 100).toFixed(2);
+                              applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(sCustomDollarCents), type: DISCOUNT_TYPES.dollar, custom: true });
+                            }}
+                            buttonStyle={{ marginLeft: 6, backgroundColor: "transparent", borderWidth: 0, padding: 4 }}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  </TouchableWithoutFeedback>
+                </View>
+              </TouchableWithoutFeedback>
+            </Modal>
           </View>
         </View>
       </View>

@@ -1784,9 +1784,15 @@ async function main() {
   const completedWorkorders = workorders.filter(function (wo) { return wo.status === doneID; });
   logInfo("  -> " + openWorkorders.length.toLocaleString() + " open | " + completedWorkorders.length.toLocaleString() + " completed");
 
-  // Split sales
+  // Treat fully-paid sales as completed even if Lightspeed didn't mark them
+  for (var si = 0; si < sales.length; si++) {
+    if (!sales[si].paymentComplete && sales[si].amountCaptured > 0 && sales[si].amountCaptured >= sales[si].total) {
+      sales[si].paymentComplete = true;
+    }
+  }
+  // Drop zero-payment incomplete sales
   const completedSales = sales.filter(function (s) { return s.paymentComplete; });
-  const activeSales = sales.filter(function (s) { return !s.paymentComplete && s.workorderIDs && s.workorderIDs.length > 0; });
+  const activeSales = sales.filter(function (s) { return !s.paymentComplete && s.workorderIDs && s.workorderIDs.length > 0 && s.amountCaptured > 0; });
   logInfo("  -> " + completedSales.length.toLocaleString() + " completed sales | " + activeSales.length.toLocaleString() + " active sales");
 
   // Export CSVs to scripts/output/ for verification

@@ -17,6 +17,8 @@ import {
   Button_,
   CheckBox_,
   DropdownMenu,
+  Image_,
+  NoteHelperDropdown,
   TextInput_,
   Tooltip,
   StaleBanner,
@@ -898,6 +900,10 @@ export const LineItemComponent = ({
     if (useOpenWorkordersStore._newLineIDs?.delete(workorderLine.id)) return "intake";
     return null;
   });
+  const [sNoteHelperDropdown, _setNoteHelperDropdown] = useState(null); // { targetField, anchorPosition }
+  const zNoteHelpers = useSettingsStore((state) => state.settings?.noteHelpers);
+  const intakePlusBtnRef = useRef(null);
+  const receiptPlusBtnRef = useRef(null);
 
   /////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
@@ -1033,42 +1039,74 @@ export const LineItemComponent = ({
                     </TouchableOpacity>
                   </View>
                   {showIntake && (
-                    <TextInput_
-                      autoFocus={true}
-                      multiline={true}
-                      numberOfLines={5}
-                      debounceMs={500}
-                      capitalize={true}
-                      editable={!isLocked}
-                      style={{ outlineWidth: 0, color: "orange", width: "100%", paddingHorizontal: 3, fontSize: 16 }}
-                      onChangeText={(val) => {
-                        useLoginStore.getState().requireLogin(() => {
-                          __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
-                        });
-                      }}
-                      placeholder="      Intake notes..."
-                      placeholderTextColor={gray(0.2)}
-                      value={workorderLine.intakeNotes || ""}
-                    />
+                    <View style={{ flexDirection: "row", alignItems: "flex-start", width: "100%" }}>
+                      <Tooltip text="Note helpers">
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            const el = e?.currentTarget || e?.target;
+                            if (el) {
+                              const rect = el.getBoundingClientRect();
+                              _setNoteHelperDropdown({ targetField: "intakeNotes", anchorPosition: { x: rect.right + 2, y: rect.top } });
+                            }
+                          }}
+                          style={{ paddingTop: 3, paddingRight: 3 }}
+                        >
+                          <Image_ icon={ICONS.add} size={16} />
+                        </TouchableOpacity>
+                      </Tooltip>
+                      <TextInput_
+                        autoFocus={true}
+                        multiline={true}
+                        numberOfLines={5}
+                        debounceMs={500}
+                        capitalize={true}
+                        editable={!isLocked}
+                        style={{ outlineWidth: 0, color: "orange", flex: 1, paddingHorizontal: 3, fontSize: 16 }}
+                        onChangeText={(val) => {
+                          useLoginStore.getState().requireLogin(() => {
+                            __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
+                          });
+                        }}
+                        placeholder="Intake notes..."
+                        placeholderTextColor={gray(0.2)}
+                        value={workorderLine.intakeNotes || ""}
+                      />
+                    </View>
                   )}
                   {showReceipt && (
-                    <TextInput_
-                      autoFocus={true}
-                      capitalize
-                      multiline={true}
-                      numberOfLines={5}
-                      debounceMs={500}
-                      editable={!isLocked}
-                      style={{ outlineWidth: 0, color: "green", width: "100%", paddingHorizontal: 3, fontSize: 14 }}
-                      onChangeText={(val) => {
-                        useLoginStore.getState().requireLogin(() => {
-                          __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
-                        });
-                      }}
-                      placeholder="      Receipt notes..."
-                      placeholderTextColor={gray(0.2)}
-                      value={workorderLine.receiptNotes || ""}
-                    />
+                    <View style={{ flexDirection: "row", alignItems: "flex-start", width: "100%" }}>
+                      <Tooltip text="Note helpers">
+                        <TouchableOpacity
+                          onPress={(e) => {
+                            const el = e?.currentTarget || e?.target;
+                            if (el) {
+                              const rect = el.getBoundingClientRect();
+                              _setNoteHelperDropdown({ targetField: "receiptNotes", anchorPosition: { x: rect.right + 2, y: rect.top } });
+                            }
+                          }}
+                          style={{ paddingTop: 3, paddingRight: 3 }}
+                        >
+                          <Image_ icon={ICONS.add} size={16} />
+                        </TouchableOpacity>
+                      </Tooltip>
+                      <TextInput_
+                        autoFocus={true}
+                        capitalize
+                        multiline={true}
+                        numberOfLines={5}
+                        debounceMs={500}
+                        editable={!isLocked}
+                        style={{ outlineWidth: 0, color: "green", flex: 1, paddingHorizontal: 3, fontSize: 14 }}
+                        onChangeText={(val) => {
+                          useLoginStore.getState().requireLogin(() => {
+                            __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
+                          });
+                        }}
+                        placeholder="Receipt notes..."
+                        placeholderTextColor={gray(0.2)}
+                        value={workorderLine.receiptNotes || ""}
+                      />
+                    </View>
                   )}
                 </>
               );
@@ -1283,6 +1321,18 @@ export const LineItemComponent = ({
           </View>
         </View>
       </View>
+      <NoteHelperDropdown
+        visible={!!sNoteHelperDropdown}
+        onClose={() => _setNoteHelperDropdown(null)}
+        workorderLine={workorderLine}
+        onUpdateLine={(updatedLine) => {
+          __setWorkorderLineItem(updatedLine);
+          _setNoteHelperDropdown((prev) => prev ? { ...prev } : null);
+        }}
+        anchorPosition={sNoteHelperDropdown?.anchorPosition || { x: 0, y: 0 }}
+        noteHelpers={zNoteHelpers || []}
+        noteHelpersTarget={sNoteHelperDropdown?.targetField || "intakeNotes"}
+      />
     </View>
   );
   // try {

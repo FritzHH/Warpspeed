@@ -70,7 +70,7 @@ import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
-import { APP_USER, INTAKE_QUICK_BUTTON_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../../data";
+import { APP_USER, INTAKE_QUICK_BUTTON_PROTO, NOTE_HELPER_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
@@ -1852,6 +1852,10 @@ const ListOptionsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           zSettingsObj={zSettingsObj}
           handleSettingsFieldChange={handleSettingsFieldChange}
         />
+        <NoteHelpersAdminComponent
+          zSettingsObj={zSettingsObj}
+          handleSettingsFieldChange={handleSettingsFieldChange}
+        />
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );
@@ -2535,6 +2539,317 @@ const PartSourcesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               );
             }}
           />
+        </View>
+      </View>
+    </BoxContainerInnerComponent>
+  );
+};
+
+const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
+  const [sCatDragIdx, _setCatDragIdx] = useState(null);
+  const [sCatDragOverIdx, _setCatDragOverIdx] = useState(null);
+  const [sItemDragCatId, _setItemDragCatId] = useState(null);
+  const [sItemDragIdx, _setItemDragIdx] = useState(null);
+  const [sItemDragOverIdx, _setItemDragOverIdx] = useState(null);
+  const [sEditingItem, _setEditingItem] = useState(null); // { catId, itemIdx }
+
+  const noteHelpers = zSettingsObj?.noteHelpers || [];
+  const noteHelpersTarget = zSettingsObj?.noteHelpersTarget || "intakeNotes";
+
+  function reorderCategories(fromIdx, toIdx) {
+    if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
+    let arr = [...noteHelpers];
+    let [dragged] = arr.splice(fromIdx, 1);
+    arr.splice(toIdx, 0, dragged);
+    handleSettingsFieldChange("noteHelpers", arr);
+  }
+
+  function reorderItems(catId, fromIdx, toIdx) {
+    if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
+    let arr = noteHelpers.map((cat) => {
+      if (cat.id !== catId) return cat;
+      let items = [...(cat.items || [])];
+      let [dragged] = items.splice(fromIdx, 1);
+      items.splice(toIdx, 0, dragged);
+      return { ...cat, items };
+    });
+    handleSettingsFieldChange("noteHelpers", arr);
+  }
+
+  return (
+    <BoxContainerInnerComponent
+      style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
+    >
+      <View style={{ width: "100%", alignItems: "center" }}>
+        {/* Header */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: C.buttonLightGreen,
+            borderRadius: 5,
+            paddingVertical: 5,
+            width: "95%",
+          }}
+        >
+          <Text style={{ color: C.text, marginRight: 20 }}>Workorder Item Note Helpers</Text>
+          <Tooltip text="Add category">
+            <BoxButton1
+              onPress={() => {
+                let newCat = { ...cloneDeep(NOTE_HELPER_PROTO), id: crypto.randomUUID(), label: "New Category" };
+                handleSettingsFieldChange("noteHelpers", [...noteHelpers, newCat]);
+              }}
+            />
+          </Tooltip>
+        </View>
+
+        {/* Target radio */}
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            marginTop: 10,
+            gap: 20,
+          }}
+        >
+          <Text style={{ fontSize: 13, color: gray(0.5) }}>Notes appear in:</Text>
+          <TouchableOpacity
+            onPress={() => handleSettingsFieldChange("noteHelpersTarget", "intakeNotes")}
+            style={{ flexDirection: "row", alignItems: "center" }}
+          >
+            <View
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: 8,
+                borderWidth: 2,
+                borderColor: noteHelpersTarget === "intakeNotes" ? C.blue : gray(0.3),
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: 5,
+              }}
+            >
+              {noteHelpersTarget === "intakeNotes" && (
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.blue }} />
+              )}
+            </View>
+            <Text style={{ fontSize: 13, color: C.text }}>Intake Notes</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => handleSettingsFieldChange("noteHelpersTarget", "receiptNotes")}
+            style={{ flexDirection: "row", alignItems: "center" }}
+          >
+            <View
+              style={{
+                width: 16,
+                height: 16,
+                borderRadius: 8,
+                borderWidth: 2,
+                borderColor: noteHelpersTarget === "receiptNotes" ? C.blue : gray(0.3),
+                alignItems: "center",
+                justifyContent: "center",
+                marginRight: 5,
+              }}
+            >
+              {noteHelpersTarget === "receiptNotes" && (
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.blue }} />
+              )}
+            </View>
+            <Text style={{ fontSize: 13, color: C.text }}>Receipt Notes</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Category list */}
+        <View style={{ marginTop: 10, width: "95%" }}>
+          {noteHelpers.map((cat, catIdx) => (
+            <div
+              key={cat.id}
+              draggable
+              onDragStart={(e) => {
+                if (sItemDragIdx !== null) { e.preventDefault(); return; }
+                _setCatDragIdx(catIdx);
+              }}
+              onDragOver={(e) => {
+                e.preventDefault();
+                if (sItemDragIdx === null) _setCatDragOverIdx(catIdx);
+              }}
+              onDragEnd={() => { _setCatDragIdx(null); _setCatDragOverIdx(null); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                if (sItemDragIdx === null) {
+                  reorderCategories(sCatDragIdx, catIdx);
+                  _setCatDragIdx(null);
+                  _setCatDragOverIdx(null);
+                }
+              }}
+              style={{
+                borderWidth: sCatDragOverIdx === catIdx && sItemDragIdx === null ? 2 : 1,
+                borderStyle: "solid",
+                borderColor: sCatDragOverIdx === catIdx && sItemDragIdx === null ? C.blue : C.buttonLightGreenOutline,
+                borderRadius: 8,
+                backgroundColor: C.listItemWhite,
+                padding: 8,
+                marginBottom: 6,
+                cursor: "grab",
+                opacity: sCatDragIdx === catIdx ? 0.5 : 1,
+              }}
+            >
+              {/* Category header row */}
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                <TextInput_
+                  value={cat.label}
+                  onChangeText={(val) => {
+                    let arr = noteHelpers.map((c) => c.id === cat.id ? { ...c, label: val } : c);
+                    handleSettingsFieldChange("noteHelpers", arr);
+                  }}
+                  style={{
+                    flex: 1,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderWidth: 1,
+                    borderRadius: 5,
+                    padding: 5,
+                    color: C.text,
+                    fontWeight: "600",
+                    outlineWidth: 0,
+                  }}
+                />
+                <Tooltip text="Add item">
+                  <BoxButton1
+                    onPress={() => {
+                      let arr = noteHelpers.map((c) => {
+                        if (c.id !== cat.id) return c;
+                        return { ...c, items: [...(c.items || []), "New Item"] };
+                      });
+                      handleSettingsFieldChange("noteHelpers", arr);
+                    }}
+                    style={{ marginLeft: 8, backgroundColor: "transparent" }}
+                    iconSize={17}
+                  />
+                </Tooltip>
+                <Tooltip text="Delete category">
+                  <BoxButton1
+                    onPress={() => {
+                      let arr = noteHelpers.filter((c) => c.id !== cat.id);
+                      handleSettingsFieldChange("noteHelpers", arr);
+                    }}
+                    style={{ marginLeft: 4, backgroundColor: "transparent" }}
+                    iconSize={15}
+                    icon={ICONS.close1}
+                  />
+                </Tooltip>
+              </View>
+
+              {/* Items within category */}
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                {(cat.items || []).map((itemText, itemIdx) => {
+                  const isEditing = sEditingItem?.catId === cat.id && sEditingItem?.itemIdx === itemIdx;
+                  return (
+                    <div
+                      key={itemText + itemIdx}
+                      draggable={!isEditing}
+                      onDragStart={(e) => {
+                        if (isEditing) { e.preventDefault(); return; }
+                        e.stopPropagation();
+                        _setItemDragCatId(cat.id);
+                        _setItemDragIdx(itemIdx);
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (sItemDragCatId === cat.id) _setItemDragOverIdx(itemIdx);
+                      }}
+                      onDragEnd={() => {
+                        _setItemDragCatId(null);
+                        _setItemDragIdx(null);
+                        _setItemDragOverIdx(null);
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        if (sItemDragCatId === cat.id) {
+                          reorderItems(cat.id, sItemDragIdx, itemIdx);
+                          _setItemDragCatId(null);
+                          _setItemDragIdx(null);
+                          _setItemDragOverIdx(null);
+                        }
+                      }}
+                      style={{
+                        display: "flex",
+                        flexDirection: "row",
+                        alignItems: "center",
+                        borderWidth: sItemDragCatId === cat.id && sItemDragOverIdx === itemIdx ? 2 : 1,
+                        borderStyle: "solid",
+                        borderColor: isEditing ? C.blue : (sItemDragCatId === cat.id && sItemDragOverIdx === itemIdx ? C.blue : C.buttonLightGreenOutline),
+                        borderRadius: 6,
+                        backgroundColor: "white",
+                        paddingHorizontal: 4,
+                        paddingVertical: 2,
+                        cursor: isEditing ? "text" : "grab",
+                        opacity: sItemDragCatId === cat.id && sItemDragIdx === itemIdx ? 0.5 : 1,
+                      }}
+                    >
+                      {isEditing ? (
+                        <TextInput_
+                          value={itemText}
+                          autoFocus
+                          onChangeText={(val) => {
+                            let arr = noteHelpers.map((c) => {
+                              if (c.id !== cat.id) return c;
+                              let items = [...(c.items || [])];
+                              items[itemIdx] = val;
+                              return { ...c, items };
+                            });
+                            handleSettingsFieldChange("noteHelpers", arr);
+                          }}
+                          onBlur={() => _setEditingItem(null)}
+                          onSubmitEditing={() => _setEditingItem(null)}
+                          style={{
+                            borderWidth: 0,
+                            paddingVertical: 3,
+                            paddingHorizontal: 4,
+                            fontSize: 13,
+                            color: C.text,
+                            outlineWidth: 0,
+                            width: Math.max(40, (itemText || "").length * 8 + 16),
+                          }}
+                        />
+                      ) : (
+                        <Text style={{ fontSize: 13, color: C.text, paddingVertical: 3, paddingHorizontal: 4 }}>
+                          {itemText}
+                        </Text>
+                      )}
+                      <Tooltip text="Edit item">
+                        <TouchableOpacity
+                          onPress={() => _setEditingItem(isEditing ? null : { catId: cat.id, itemIdx })}
+                          style={{ padding: 2 }}
+                        >
+                          <Image_ icon={ICONS.editPencil} size={12} />
+                        </TouchableOpacity>
+                      </Tooltip>
+                      <Tooltip text="Remove item">
+                        <TouchableOpacity
+                          onPress={() => {
+                            let arr = noteHelpers.map((c) => {
+                              if (c.id !== cat.id) return c;
+                              let items = (c.items || []).filter((_, i) => i !== itemIdx);
+                              return { ...c, items };
+                            });
+                            handleSettingsFieldChange("noteHelpers", arr);
+                            if (isEditing) _setEditingItem(null);
+                          }}
+                          style={{ padding: 2 }}
+                        >
+                          <Image_ icon={ICONS.close1} size={12} />
+                        </TouchableOpacity>
+                      </Tooltip>
+                    </div>
+                  );
+                })}
+              </View>
+            </div>
+          ))}
         </View>
       </View>
     </BoxContainerInnerComponent>
@@ -7396,6 +7711,31 @@ const ImportComponent = () => {
           >
             <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
               Save Settings
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={async () => {
+              const liveSettings = useSettingsStore.getState().getSettings();
+              const defaults = cloneDeep(SETTINGS_OBJ);
+              const merged = { ...defaults, ...liveSettings };
+              await dbSaveSettings(merged);
+              useSettingsStore.getState().setSettings(merged);
+              alert("Settings merged and saved. New fields from defaults injected, existing values preserved.");
+            }}
+            style={{
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderRadius: 10,
+              borderWidth: 2,
+              borderColor: C.buttonLightGreenOutline,
+              backgroundColor: C.listItemWhite,
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 10,
+            }}
+          >
+            <Text style={{ fontSize: 13, color: C.text, fontWeight: "700" }}>
+              Merge Settings
             </Text>
           </TouchableOpacity>
           <TouchableOpacity

@@ -236,52 +236,27 @@ export function WorkordersComponent({}) {
 
   const enterTimerRef = useRef(null);
   const exitTimerRef = useRef(null);
-  const preHoverTabsRef = useRef(null);
+  const preHoverItemsTabRef = useRef(null);
 
   function onMouseEnter(workorder) {
-    if (exitTimerRef.current) {
-      clearTimeout(exitTimerRef.current);
-      exitTimerRef.current = null;
-    }
-    if (enterTimerRef.current) {
-      clearTimeout(enterTimerRef.current);
-      enterTimerRef.current = null;
-    }
+    if (exitTimerRef.current) { clearTimeout(exitTimerRef.current); exitTimerRef.current = null; }
+    if (enterTimerRef.current) { clearTimeout(enterTimerRef.current); enterTimerRef.current = null; }
     enterTimerRef.current = setTimeout(() => {
       enterTimerRef.current = null;
-      if (!preHoverTabsRef.current) {
-        let tabStore = useTabNamesStore.getState();
-        preHoverTabsRef.current = {
-          infoTabName: tabStore.infoTabName,
-          itemsTabName: tabStore.itemsTabName,
-        };
+      if (!preHoverItemsTabRef.current) {
+        preHoverItemsTabRef.current = useTabNamesStore.getState().itemsTabName;
       }
       useOpenWorkordersStore.getState().setWorkorderPreviewID(workorder.id);
-      useTabNamesStore.getState().setItems({
-        infoTabName: TAB_NAMES.infoTab.workorder,
-        itemsTabName: TAB_NAMES.itemsTab.workorderItems
-      });
+      useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.workorderItems);
     }, 50);
   }
 
   function onMouseExit() {
-    if (enterTimerRef.current) {
-      clearTimeout(enterTimerRef.current);
-      enterTimerRef.current = null;
-    }
+    if (enterTimerRef.current) { clearTimeout(enterTimerRef.current); enterTimerRef.current = null; }
     exitTimerRef.current = setTimeout(() => {
-      if (preHoverTabsRef.current) {
-        useTabNamesStore.getState().setItems(preHoverTabsRef.current);
-        preHoverTabsRef.current = null;
-      } else {
-        let store = useOpenWorkordersStore.getState();
-        let activeID = store.openWorkorderID;
-        if (!activeID) {
-          useTabNamesStore.getState().setItems({
-            infoTabName: TAB_NAMES.infoTab.customer,
-            itemsTabName: TAB_NAMES.itemsTab.empty
-          });
-        }
+      if (preHoverItemsTabRef.current) {
+        useTabNamesStore.getState().setItemsTabName(preHoverItemsTabRef.current);
+        preHoverItemsTabRef.current = null;
       }
       useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
       exitTimerRef.current = null;
@@ -362,6 +337,12 @@ export function WorkordersComponent({}) {
   }
 
   function workorderSelected(obj) {
+    // Clear hover state so exit handler doesn't restore stale tabs
+    preHoverItemsTabRef.current = null;
+    if (enterTimerRef.current) { clearTimeout(enterTimerRef.current); enterTimerRef.current = null; }
+    if (exitTimerRef.current) { clearTimeout(exitTimerRef.current); exitTimerRef.current = null; }
+    useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
+
     const store = useOpenWorkordersStore.getState();
     // Clear locked (completed) workorder if switching away
     const lockedID = store.lockedWorkorderID;

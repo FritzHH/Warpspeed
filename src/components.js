@@ -1987,9 +1987,9 @@ export const TouchableOpacity_ = ({
     setIsHovered(false);
   };
 
-  const handlePress = () => {
+  const handlePress = (e) => {
     if (!disabled && onPress) {
-      onPress();
+      onPress(e);
     }
   };
 
@@ -3908,6 +3908,320 @@ export const WebPageModal = ({
         </View>
       )}
     />
+  );
+};
+
+// Note Helper Dropdown ////////////////////////////////////////////////////
+
+export const NoteHelperDropdown = ({
+  visible,
+  onClose,
+  workorderLine,
+  onUpdateLine,
+  anchorPosition = { x: 0, y: 0 },
+  noteHelpers = [],
+  noteHelpersTarget = "intakeNotes",
+}) => {
+  const [sCustomChips, _sSetCustomChips] = useState([]);
+  const [sActiveChipKeys, _sSetActiveChipKeys] = useState(new Set());
+  const [sCustomIntake, _sSetCustomIntake] = useState("");
+  const [sCustomReceipt, _sSetCustomReceipt] = useState("");
+  const [sDropdownHeight, _sSetDropdownHeight] = useState(0);
+  const customIntakeRef = useRef(null);
+  const customReceiptRef = useRef(null);
+  const openTimeRef = useRef(0);
+
+  // Seed active keys from existing notes when dropdown opens
+  const wasVisibleRef = useRef(false);
+  if (visible && !wasVisibleRef.current && workorderLine) {
+    wasVisibleRef.current = true;
+    openTimeRef.current = Date.now();
+    _sSetCustomChips([]);
+    _sSetDropdownHeight(0);
+    // Build initial active set from existing notes
+    const existingNotes = workorderLine[noteHelpersTarget] || "";
+    const existingParts = existingNotes.split(", ").map((s) => s.trim()).filter(Boolean);
+    if (existingParts.length > 0) {
+      const initialKeys = new Set();
+      for (const part of existingParts) {
+        for (const cat of noteHelpers) {
+          if ((cat.items || []).includes(part)) {
+            initialKeys.add(cat.id + "::" + part);
+          }
+        }
+      }
+      _sSetActiveChipKeys(initialKeys);
+    } else {
+      _sSetActiveChipKeys(new Set());
+    }
+  }
+  if (!visible && wasVisibleRef.current) {
+    wasVisibleRef.current = false;
+  }
+
+  if (!visible || !workorderLine) return null;
+
+  function chipKey(catId, chipText) {
+    return catId + "::" + chipText;
+  }
+
+  function isChipActive(catId, chipText) {
+    return sActiveChipKeys.has(chipKey(catId, chipText));
+  }
+
+  function toggleChip(chipText, targetOverride, catId) {
+    const target = targetOverride || noteHelpersTarget;
+    const notes = workorderLine[target] || "";
+    const parts = notes.split(", ").map((s) => s.trim()).filter(Boolean);
+    const key = chipKey(catId, chipText);
+    const wasActive = sActiveChipKeys.has(key);
+    let updated;
+    if (wasActive) {
+      const idx = parts.indexOf(chipText.trim());
+      if (idx !== -1) parts.splice(idx, 1);
+      updated = parts.join(", ");
+      const next = new Set(sActiveChipKeys);
+      next.delete(key);
+      _sSetActiveChipKeys(next);
+    } else {
+      parts.push(chipText.trim());
+      updated = parts.join(", ");
+      const next = new Set(sActiveChipKeys);
+      next.add(key);
+      _sSetActiveChipKeys(next);
+    }
+    onUpdateLine({ ...workorderLine, [target]: updated });
+  }
+
+  function isChipActiveForTarget(chipText, target) {
+    const notes = workorderLine[target] || "";
+    const parts = notes.split(", ").map((s) => s.trim()).filter(Boolean);
+    return parts.includes(chipText.trim());
+  }
+
+  function submitCustomNote(target) {
+    const val = target === "intakeNotes" ? sCustomIntake : sCustomReceipt;
+    if (!val.trim()) return;
+    const trimmed = val.trim();
+    _sSetCustomChips((prev) => {
+      if (prev.find((c) => c.text === trimmed && c.target === target)) return prev;
+      return [...prev, { text: trimmed, target }];
+    });
+    toggleChip(trimmed, target, "_custom_" + target);
+    if (target === "intakeNotes") _sSetCustomIntake("");
+    else _sSetCustomReceipt("");
+  }
+
+  // Center dropdown on click point, clamp to viewport
+  const dropdownWidth = 340;
+  const dropdownMeasured = sDropdownHeight > 0;
+  let left = anchorPosition.x - dropdownWidth / 2;
+  let top = anchorPosition.y - sDropdownHeight / 2;
+  if (typeof window !== "undefined") {
+    const vh = window.innerHeight;
+    const vw = window.innerWidth;
+    if (dropdownMeasured && top + sDropdownHeight > vh - 10) top = vh - sDropdownHeight - 10;
+    if (left + dropdownWidth > vw - 10) left = vw - dropdownWidth - 10;
+    if (left < 10) left = 10;
+    if (top < 10) top = 10;
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <TouchableWithoutFeedback onPress={() => { if (Date.now() - openTimeRef.current > 150) onClose(); }}>
+        <View style={{ width: "100%", height: "100%", position: "absolute" }} />
+      </TouchableWithoutFeedback>
+      <View
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          if (h > 0 && h !== sDropdownHeight) _sSetDropdownHeight(h);
+        }}
+        style={{
+          position: "absolute",
+          left: left,
+          top: top,
+          width: dropdownWidth,
+          backgroundColor: "white",
+          borderRadius: 10,
+          borderWidth: 2,
+          borderColor: C.buttonLightGreenOutline,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.25,
+          shadowRadius: 4,
+          elevation: 5,
+          padding: 10,
+          opacity: dropdownMeasured ? 1 : 0,
+        }}
+      >
+          {/* Item header */}
+          <View style={{
+            marginBottom: 8,
+            paddingBottom: 8,
+            borderBottomWidth: 1,
+            borderBottomColor: C.buttonLightGreenOutline,
+          }}>
+            <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.text }} numberOfLines={1}>
+              {workorderLine.inventoryItem?.informalName || workorderLine.inventoryItem?.formalName || "Item"}
+            </Text>
+          </View>
+
+          {noteHelpers.map((category) => (
+            <View key={category.id} style={{ marginBottom: 6, borderWidth: 1, borderColor: gray(0.15), borderRadius: 8, padding: 6 }}>
+              <Text
+                style={{
+                  fontSize: 11,
+                  fontWeight: Fonts.weight.textHeavy,
+                  color: gray(0.4),
+                  marginBottom: 4,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                }}
+              >
+                {category.label}
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
+                {(category.items || []).map((chipText, chipIdx) => {
+                  const active = isChipActive(category.id, chipText);
+                  return (
+                    <TouchableOpacity_
+                      key={chipText + chipIdx}
+                      onPress={() => toggleChip(chipText, null, category.id)}
+                      hoverOpacity={0.6}
+                      style={{
+                        backgroundColor: active
+                          ? lightenRGBByPercent(C.blue, 70)
+                          : C.buttonLightGreenOutline,
+                        borderRadius: 6,
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderWidth: 1,
+                        borderColor: active ? C.blue : C.buttonLightGreenOutline,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          color: active ? C.blue : gray(0.5),
+                          fontWeight: active ? Fonts.weight.textHeavy : Fonts.weight.textRegular,
+                        }}
+                      >
+                        {chipText}
+                      </Text>
+                    </TouchableOpacity_>
+                  );
+                })}
+              </View>
+            </View>
+          ))}
+
+          {sCustomChips.length > 0 && (
+            <View style={{ marginBottom: 8 }}>
+              <Text
+                style={{
+                  fontSize: 12,
+                  fontWeight: Fonts.weight.textHeavy,
+                  color: gray(0.4),
+                  marginBottom: 4,
+                  textTransform: "uppercase",
+                  letterSpacing: 0.5,
+                }}
+              >
+                Custom
+              </Text>
+              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
+                {sCustomChips.map((chip, idx) => {
+                  const customKey = "_custom_" + chip.target;
+                  const active = isChipActive(customKey, chip.text);
+                  return (
+                    <TouchableOpacity_
+                      key={chip.text + chip.target + idx}
+                      onPress={() => toggleChip(chip.text, chip.target, customKey)}
+                      hoverOpacity={0.6}
+                      style={{
+                        backgroundColor: active
+                          ? lightenRGBByPercent(C.blue, 70)
+                          : C.buttonLightGreenOutline,
+                        borderRadius: 6,
+                        paddingHorizontal: 10,
+                        paddingVertical: 5,
+                        borderWidth: 1,
+                        borderColor: active ? C.blue : C.buttonLightGreenOutline,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          color: active ? C.blue : gray(0.5),
+                          fontWeight: active ? Fonts.weight.textHeavy : Fonts.weight.textRegular,
+                        }}
+                      >
+                        {chip.text}
+                      </Text>
+                    </TouchableOpacity_>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          <View
+            style={{
+              borderTopWidth: 1,
+              borderTopColor: C.buttonLightGreenOutline,
+              marginTop: 4,
+              paddingTop: 8,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+              <TextInput
+                ref={customIntakeRef}
+                value={sCustomIntake}
+                onChangeText={_sSetCustomIntake}
+                onSubmitEditing={() => submitCustomNote("intakeNotes")}
+                placeholder="Custom intake note"
+                placeholderTextColor={gray(0.35)}
+                style={{
+                  flex: 1,
+                  height: 32,
+                  borderWidth: 1,
+                  borderColor: C.buttonLightGreenOutline,
+                  borderRadius: 6,
+                  paddingHorizontal: 8,
+                  fontSize: 13,
+                  color: C.text,
+                  outlineWidth: 0,
+                  outline: "none",
+                  backgroundColor: "white",
+                }}
+              />
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <TextInput
+                ref={customReceiptRef}
+                value={sCustomReceipt}
+                onChangeText={_sSetCustomReceipt}
+                onSubmitEditing={() => submitCustomNote("receiptNotes")}
+                placeholder="Custom receipt note"
+                placeholderTextColor={gray(0.35)}
+                style={{
+                  flex: 1,
+                  height: 32,
+                  borderWidth: 1,
+                  borderColor: C.buttonLightGreenOutline,
+                  borderRadius: 6,
+                  paddingHorizontal: 8,
+                  fontSize: 13,
+                  color: C.text,
+                  outlineWidth: 0,
+                  outline: "none",
+                  backgroundColor: "white",
+                }}
+              />
+            </View>
+          </View>
+      </View>
+    </Modal>
   );
 };
 

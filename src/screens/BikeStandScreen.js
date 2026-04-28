@@ -36,6 +36,7 @@ import {
   printBuilder,
   localStorageWrapper,
   findTemplateByType,
+  replaceOrAddToArr,
 } from "../utils";
 import {
   WORKORDER_ITEM_PROTO,
@@ -60,6 +61,7 @@ import {
   PhoneNumberInput,
   Tooltip,
   SmallLoadingIndicator,
+  NoteHelperDropdown,
 } from "../components";
 import {
   dbListenToSettings,
@@ -86,6 +88,11 @@ function getQuickButtonFontSize(text, baseFontSize) {
   let len = (text || "").length;
   if (len <= 15) return baseFontSize;
   return Math.max(7, Math.round(baseFontSize - (len - 15) * 0.5));
+}
+
+function splitButtonLabel(text) {
+  if (!text) return "";
+  return text.split(/\s*[\/\\&]\s*/).join("\n");
 }
 
 function normalizeItemEntry(entry, idx) {
@@ -131,6 +138,7 @@ export function BikeStandScreen() {
   const [sDetailField, _setDetailField] = useState(null); // null | "brand" | "description" | "color1" | "color2" | "waitDays"
   const [sDetailForm, _setDetailForm] = useState({ brand: "", description: "", color1: "", color2: "", waitDays: "" });
   const detailDebounceRef = useRef(null);
+  const waitDaysDebounceRef = useRef(null);
   const [sShowPrintMenu, _setShowPrintMenu] = useState(false);
   const [sShowPrinterSelectModal, _setShowPrinterSelectModal] = useState(false);
   const [sShowIntakeActionModal, _setShowIntakeActionModal] = useState(false);
@@ -141,6 +149,22 @@ export function BikeStandScreen() {
   const itemSwipeRef = useRef(null); // { x, y } touch start
   const [sIntakeNotesLineID, _setIntakeNotesLineID] = useState(null); // line.id being edited
   const [sIntakeNotesText, _setIntakeNotesText] = useState("");
+  const [sReceiptNotesText, _setReceiptNotesText] = useState("");
+  const [sNotesTarget, _setNotesTarget] = useState("intakeNotes"); // "intakeNotes" | "receiptNotes"
+  const [sActiveNoteChips, _setActiveNoteChips] = useState(new Set());
+  const [sNoteHelperDropdown, _setNoteHelperDropdown] = useState(null); // { anchorPosition, workorderLine }
+  const lastCanvasClickTimeRef = useRef(0);
+  const lastCanvasClickItemRef = useRef(null);
+
+  // Local font size adjustments (persisted per device, not to DB)
+  const [sCanvasCardFontAdj, _setCanvasCardFontAdj] = useState(() => {
+    let v = localStorageWrapper.getItem("standCanvasCardFontAdj");
+    return v != null ? Number(v) : 2;
+  });
+  const [sQuickButtonFontAdj, _setQuickButtonFontAdj] = useState(() => {
+    let v = localStorageWrapper.getItem("standQuickButtonFontAdj");
+    return v != null ? Number(v) : 10;
+  });
 
   // Refs for bike detail dropdowns
   const bikeBrandsRef = useRef(null);
@@ -425,6 +449,28 @@ export function BikeStandScreen() {
 
   function handleLongPressEnd() {
     clearTimeout(longPressTimerRef.current);
+  }
+
+  function openNoteHelperForCanvasItem(invItem, e) {
+    if (!invItem) return;
+    const nativeEvent = e?.nativeEvent || e;
+    const x = nativeEvent?.pageX || nativeEvent?.clientX || 0;
+    const y = nativeEvent?.pageY || nativeEvent?.clientY || 0;
+    // Get the workorder line for this item
+    const wo = useOpenWorkordersStore.getState().workorders.find((o) => o.id === sSelectedWorkorderID);
+    if (!wo) return;
+    const line = (wo.workorderLines || []).find((ln) => ln.inventoryItem?.id === invItem.id);
+    if (!line) return;
+    _setNoteHelperDropdown({ anchorPosition: { x, y }, workorderLine: line });
+  }
+
+  function handleNoteHelperUpdate(updatedLine) {
+    if (!sSelectedWorkorderID) return;
+    const wo = useOpenWorkordersStore.getState().workorders.find((o) => o.id === sSelectedWorkorderID);
+    if (!wo) return;
+    const updatedLines = replaceOrAddToArr(wo.workorderLines || [], updatedLine);
+    useOpenWorkordersStore.getState().setField("workorderLines", updatedLines, sSelectedWorkorderID, true);
+    _setNoteHelperDropdown((prev) => prev ? { ...prev, workorderLine: updatedLine } : null);
   }
 
   function handleDiscountSelect(inventoryItemID, discountObj) {
@@ -831,7 +877,7 @@ export function BikeStandScreen() {
     : { runningSubtotal: 0, runningDiscount: 0, runningTax: 0, finalTotal: 0 };
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.backgroundWhite, position: "relative", overflow: "hidden" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", maxHeight: "100vh", overflow: "hidden", backgroundColor: C.backgroundWhite, position: "relative" }}>
       {/* Phone search modal (portal) */}
       {sShowPhoneSearch && (
         <PhoneSearchModal
@@ -917,10 +963,10 @@ export function BikeStandScreen() {
             }}
           >
             <SmallLoadingIndicator />
-            <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, marginTop: 12 }}>
+            <Text style={{ fontSize: 22, fontWeight: "600", color: C.text, marginTop: 12 }}>
               Scanning face...
             </Text>
-            <Text style={{ fontSize: 48, fontWeight: "700", color: C.green, marginTop: 16 }}>
+            <Text style={{ fontSize: 52, fontWeight: "700", color: C.green, marginTop: 16 }}>
               {sFaceCountdown}
             </Text>
           </View>
@@ -961,7 +1007,7 @@ export function BikeStandScreen() {
               minWidth: 280,
             }}
           >
-            <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, marginBottom: 20 }}>
+            <Text style={{ fontSize: 35, fontWeight: "600", color: C.text, marginBottom: 20 }}>
               Enter PIN
             </Text>
             <View style={{ flexDirection: "row", marginBottom: 20, height: 24, alignItems: "center" }}>
@@ -978,7 +1024,7 @@ export function BikeStandScreen() {
                 />
               ))}
               {sPin.length === 0 && (
-                <Text style={{ fontSize: 14, color: gray(0.5) }}>-</Text>
+                <Text style={{ fontSize: 31, color: gray(0.5) }}>-</Text>
               )}
             </View>
             <StandKeypad mode="phone" onKeyPress={handleStandPinKeyPress} />
@@ -986,7 +1032,7 @@ export function BikeStandScreen() {
               onPress={() => { _setShowPinModal(false); _setPin(""); pendingActionRef.current = null; }}
               style={{ marginTop: 16 }}
             >
-              <Text style={{ fontSize: 14, color: gray(0.5) }}>Cancel</Text>
+              <Text style={{ fontSize: 31, color: gray(0.5) }}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -1010,8 +1056,8 @@ export function BikeStandScreen() {
                   gap: 10,
                 }}
               >
-                <Image_ icon={ICONS.gears1} size={22} />
-                <Text style={{ fontSize: 18, fontWeight: "700", color: C.textWhite }}>New Workorder</Text>
+                <Image_ icon={ICONS.gears1} size={24} />
+                <Text style={{ fontSize: 20, fontWeight: "700", color: C.textWhite }}>New Workorder</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
@@ -1024,7 +1070,7 @@ export function BikeStandScreen() {
                   paddingHorizontal: 8,
                 }}
               >
-                <Image_ icon={ICONS.search} size={36} />
+                <Image_ icon={ICONS.search} size={38} />
               </TouchableOpacity>
             </View>
           ) : (
@@ -1032,11 +1078,11 @@ export function BikeStandScreen() {
               {/* Header row: customer info + status + show/hide toggle */}
               <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6 }}>
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
+                  <Text style={{ fontSize: 18, fontWeight: "600", color: C.text }}>
                     {customerName || "Standalone Sale"}
                   </Text>
                   {customerCell ? (
-                    <Text style={{ fontSize: 12, color: gray(0.5) }}>
+                    <Text style={{ fontSize: 16, color: gray(0.5) }}>
                       {formatPhoneWithDashes(customerCell)}
                     </Text>
                   ) : null}
@@ -1053,7 +1099,7 @@ export function BikeStandScreen() {
                     buttonTextStyle={{
                       color: rs.textColor,
                       fontWeight: "normal",
-                      fontSize: 14,
+                      fontSize: 18,
                     }}
                     modalCoordY={30}
                     buttonText={rs.label}
@@ -1061,19 +1107,20 @@ export function BikeStandScreen() {
                 )}
                 <TouchableOpacity
                   onPress={() => { _setShowBikeDetails((p) => { if (p) _setDetailField(null); return !p; }); }}
-                  style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 6, marginRight: 10 }}
                 >
                   {selectedWorkorder?.brand ? (
-                    <Text style={{ fontSize: 13, color: gray(0.5) }}>
+                    <Text style={{ fontSize: 17, color: gray(0.5) }}>
                       {capitalizeFirstLetterOfString(selectedWorkorder.brand)}
                     </Text>
                   ) : null}
                   {selectedWorkorder?.description ? (
-                    <Text style={{ fontSize: 13, color: gray(0.5) }}>
+                    <Text style={{ fontSize: 17, color: gray(0.5) }}>
                       {capitalizeFirstLetterOfString(selectedWorkorder.description)}
                     </Text>
                   ) : null}
-                  <Image_ icon={ICONS.info} size={20} />
+                  <Image_ icon={ICONS.info} size={26} />
+                  <Text style={{ fontSize: 18, fontStyle: "italic", color: gray(0.35) }}>Tap for info</Text>
                 </TouchableOpacity>
               </View>
 
@@ -1083,7 +1130,7 @@ export function BikeStandScreen() {
 
                   {/* Brand row */}
                   <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                    <TouchableOpacity onPress={() => activateDetailField("brand")} style={{ width: "45%" }}>
+                    <TouchableOpacity onPress={() => activateDetailField("brand")} style={{ width: "50%" }}>
                       <View pointerEvents="none">
                         <TextInput_
                           placeholder={"Brand"}
@@ -1095,7 +1142,7 @@ export function BikeStandScreen() {
                             color: C.text,
                             paddingVertical: 2,
                             paddingHorizontal: 4,
-                            fontSize: 15,
+                            fontSize: 23,
                             outlineStyle: "none",
                             borderRadius: 5,
                             fontWeight: (sDetailField === "brand" ? sDetailForm.brand : selectedWorkorder?.brand) ? "500" : null,
@@ -1105,7 +1152,7 @@ export function BikeStandScreen() {
                         />
                       </View>
                     </TouchableOpacity>
-                    <View style={{ width: "55%", flexDirection: "row", paddingLeft: 5, justifyContent: "space-between", alignItems: "center" }}>
+                    <View style={{ width: "50%", flexDirection: "row", paddingLeft: 5, justifyContent: "space-between", alignItems: "center" }}>
                       <View style={{ width: "48%", height: "100%" }}>
                         <DropdownMenu
                           dataArr={zSettings.bikeBrands}
@@ -1114,6 +1161,8 @@ export function BikeStandScreen() {
                             useOpenWorkordersStore.getState().setField("brand", item, selectedWorkorder.id);
                           }}
                           buttonStyle={{ opacity: selectedWorkorder?.brand ? DROPDOWN_SELECTED_OPACITY : 1 }}
+                          buttonTextStyle={{ fontSize: 21 }}
+                          itemTextStyle={{ fontSize: 29 }}
                           modalCoordX={-6}
                           ref={bikeBrandsRef}
                           buttonText={zSettings.bikeBrandsName}
@@ -1128,6 +1177,8 @@ export function BikeStandScreen() {
                             useOpenWorkordersStore.getState().setField("brand", item, selectedWorkorder.id);
                           }}
                           buttonStyle={{ opacity: selectedWorkorder?.brand ? DROPDOWN_SELECTED_OPACITY : 1 }}
+                          buttonTextStyle={{ fontSize: 21 }}
+                          itemTextStyle={{ fontSize: 29 }}
                           modalCoordX={0}
                           ref={bikeOptBrandsRef}
                           buttonText={zSettings.bikeOptionalBrandsName}
@@ -1138,7 +1189,7 @@ export function BikeStandScreen() {
 
                   {/* Description row */}
                   <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                    <TouchableOpacity onPress={() => activateDetailField("description")} style={{ width: "45%" }}>
+                    <TouchableOpacity onPress={() => activateDetailField("description")} style={{ width: "50%" }}>
                       <View pointerEvents="none">
                         <TextInput_
                           placeholder={"Model/Description"}
@@ -1150,7 +1201,7 @@ export function BikeStandScreen() {
                             color: C.text,
                             paddingVertical: 2,
                             paddingHorizontal: 4,
-                            fontSize: 15,
+                            fontSize: 23,
                             outlineStyle: "none",
                             borderRadius: 5,
                             fontWeight: (sDetailField === "description" ? sDetailForm.description : selectedWorkorder?.description) ? "500" : null,
@@ -1160,7 +1211,7 @@ export function BikeStandScreen() {
                         />
                       </View>
                     </TouchableOpacity>
-                    <View style={{ width: "55%", flexDirection: "row", paddingLeft: 5, justifyContent: "center", alignItems: "center" }}>
+                    <View style={{ width: "50%", flexDirection: "row", paddingLeft: 5, justifyContent: "center", alignItems: "center" }}>
                       <View style={{ width: "100%" }}>
                         <DropdownMenu
                           modalCoordX={55}
@@ -1170,6 +1221,8 @@ export function BikeStandScreen() {
                             useOpenWorkordersStore.getState().setField("description", item, selectedWorkorder.id);
                           }}
                           buttonStyle={{ opacity: selectedWorkorder?.description ? DROPDOWN_SELECTED_OPACITY : 1 }}
+                          buttonTextStyle={{ fontSize: 21 }}
+                          itemTextStyle={{ fontSize: 29 }}
                           ref={descriptionRef}
                           buttonText={"Descriptions"}
                         />
@@ -1179,52 +1232,54 @@ export function BikeStandScreen() {
 
                   {/* Color row */}
                   <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                    <TouchableOpacity onPress={() => activateDetailField("color1")} style={{ width: "24%" }}>
-                      <View pointerEvents="none">
-                        <TextInput_
-                          placeholder={"Color 1"}
-                          editable={false}
-                          style={{
-                            width: "100%",
-                            borderWidth: sDetailField === "color1" ? 2 : 1,
-                            borderColor: sDetailField === "color1" ? C.blue : selectedWorkorder?.color1?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
-                            paddingVertical: 2,
-                            paddingHorizontal: 4,
-                            fontSize: 15,
-                            outlineStyle: "none",
-                            borderRadius: 5,
-                            fontWeight: (sDetailField === "color1" ? sDetailForm.color1 : selectedWorkorder?.color1?.label) ? "500" : null,
-                            backgroundColor: sDetailField === "color1" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color1?.backgroundColor,
-                            color: selectedWorkorder?.color1?.textColor || C.text,
-                          }}
-                          value={sDetailField === "color1" ? capitalizeFirstLetterOfString(sDetailForm.color1) : capitalizeFirstLetterOfString(selectedWorkorder?.color1?.label)}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                    <View style={{ width: 5 }} />
-                    <TouchableOpacity onPress={() => activateDetailField("color2")} style={{ width: "24%" }}>
-                      <View pointerEvents="none">
-                        <TextInput_
-                          placeholder={"Color 2"}
-                          editable={false}
-                          style={{
-                            width: "100%",
-                            borderWidth: sDetailField === "color2" ? 2 : 1,
-                            borderColor: sDetailField === "color2" ? C.blue : selectedWorkorder?.color2?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
-                            paddingVertical: 2,
-                            paddingHorizontal: 4,
-                            fontSize: 15,
-                            outlineStyle: "none",
-                            borderRadius: 5,
-                            fontWeight: (sDetailField === "color2" ? sDetailForm.color2 : selectedWorkorder?.color2?.label) ? "500" : null,
-                            backgroundColor: sDetailField === "color2" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color2?.backgroundColor,
-                            color: selectedWorkorder?.color2?.textColor || C.text,
-                          }}
-                          value={sDetailField === "color2" ? capitalizeFirstLetterOfString(sDetailForm.color2) : capitalizeFirstLetterOfString(selectedWorkorder?.color2?.label)}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                    <View style={{ width: "48%", flexDirection: "row", paddingLeft: 5, alignItems: "center", justifyContent: "space-between" }}>
+                    <View style={{ width: "50%", flexDirection: "row", alignItems: "center" }}>
+                      <TouchableOpacity onPress={() => activateDetailField("color1")} style={{ width: "48%" }}>
+                        <View pointerEvents="none">
+                          <TextInput_
+                            placeholder={"Color 1"}
+                            editable={false}
+                            style={{
+                              width: "100%",
+                              borderWidth: sDetailField === "color1" ? 2 : 1,
+                              borderColor: sDetailField === "color1" ? C.blue : selectedWorkorder?.color1?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                              paddingVertical: 2,
+                              paddingHorizontal: 4,
+                              fontSize: 23,
+                              outlineStyle: "none",
+                              borderRadius: 5,
+                              fontWeight: (sDetailField === "color1" ? sDetailForm.color1 : selectedWorkorder?.color1?.label) ? "500" : null,
+                              backgroundColor: sDetailField === "color1" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color1?.backgroundColor,
+                              color: selectedWorkorder?.color1?.textColor || C.text,
+                            }}
+                            value={sDetailField === "color1" ? capitalizeFirstLetterOfString(sDetailForm.color1) : capitalizeFirstLetterOfString(selectedWorkorder?.color1?.label)}
+                          />
+                        </View>
+                      </TouchableOpacity>
+                      <View style={{ width: "4%" }} />
+                      <TouchableOpacity onPress={() => activateDetailField("color2")} style={{ width: "48%" }}>
+                        <View pointerEvents="none">
+                          <TextInput_
+                            placeholder={"Color 2"}
+                            editable={false}
+                            style={{
+                              width: "100%",
+                              borderWidth: sDetailField === "color2" ? 2 : 1,
+                              borderColor: sDetailField === "color2" ? C.blue : selectedWorkorder?.color2?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                              paddingVertical: 2,
+                              paddingHorizontal: 4,
+                              fontSize: 23,
+                              outlineStyle: "none",
+                              borderRadius: 5,
+                              fontWeight: (sDetailField === "color2" ? sDetailForm.color2 : selectedWorkorder?.color2?.label) ? "500" : null,
+                              backgroundColor: sDetailField === "color2" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color2?.backgroundColor,
+                              color: selectedWorkorder?.color2?.textColor || C.text,
+                            }}
+                            value={sDetailField === "color2" ? capitalizeFirstLetterOfString(sDetailForm.color2) : capitalizeFirstLetterOfString(selectedWorkorder?.color2?.label)}
+                          />
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={{ width: "50%", flexDirection: "row", paddingLeft: 5, alignItems: "center", justifyContent: "space-between" }}>
                       <View style={{ width: "48%", height: "100%", justifyContent: "center" }}>
                         <DropdownMenu
                           itemSeparatorStyle={{ height: 0 }}
@@ -1235,6 +1290,8 @@ export function BikeStandScreen() {
                             useOpenWorkordersStore.getState().setField("color1", item, selectedWorkorder.id);
                           }}
                           buttonStyle={{ opacity: selectedWorkorder?.color1?.label ? DROPDOWN_SELECTED_OPACITY : 1 }}
+                          buttonTextStyle={{ fontSize: 21 }}
+                          itemTextStyle={{ fontSize: 29 }}
                           ref={color1Ref}
                           buttonText={"Color 1"}
                           modalCoordX={0}
@@ -1251,6 +1308,8 @@ export function BikeStandScreen() {
                           }}
                           modalCoordX={0}
                           buttonStyle={{ opacity: selectedWorkorder?.color2?.label ? DROPDOWN_SELECTED_OPACITY : 1 }}
+                          buttonTextStyle={{ fontSize: 21 }}
+                          itemTextStyle={{ fontSize: 29 }}
                           ref={color2Ref}
                           buttonText={"Color 2"}
                         />
@@ -1259,34 +1318,36 @@ export function BikeStandScreen() {
                   </View>
 
                   {/* Wait time row */}
-                  <View style={{ flexDirection: "row", justifyContent: "flex-start", width: "100%", alignItems: "center" }}>
-                    <Text style={{ color: gray(0.5), fontSize: 13, marginRight: 4 }}>
-                      Max wait days:
-                    </Text>
-                    <TouchableOpacity onPress={() => activateDetailField("waitDays")}>
-                      <View pointerEvents="none">
-                        <TextInput_
-                          placeholder={"0"}
-                          editable={false}
-                          style={{
-                            width: 50,
-                            borderWidth: sDetailField === "waitDays" ? 2 : 1,
-                            borderColor: sDetailField === "waitDays" ? C.blue : selectedWorkorder?.waitTime?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
-                            color: C.text,
-                            paddingVertical: 2,
-                            paddingHorizontal: 4,
-                            fontSize: 15,
-                            outlineStyle: "none",
-                            borderRadius: 5,
-                            textAlign: "center",
-                            fontWeight: (sDetailField === "waitDays" ? sDetailForm.waitDays : (selectedWorkorder?.waitTime?.maxWaitTimeDays != null && selectedWorkorder?.waitTime?.maxWaitTimeDays !== "")) ? "500" : null,
-                            backgroundColor: sDetailField === "waitDays" ? lightenRGBByPercent(C.blue, 85) : undefined,
-                          }}
-                          value={sDetailField === "waitDays" ? sDetailForm.waitDays : String(selectedWorkorder?.waitTime?.maxWaitTimeDays ?? "")}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                    <View style={{ flex: 1, flexDirection: "row", paddingLeft: 5, justifyContent: "flex-start", alignItems: "center" }}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <View style={{ width: "50%", flexDirection: "row", alignItems: "center" }}>
+                      <Text style={{ color: gray(0.5), fontSize: 18, marginRight: 4 }}>
+                        Max wait days:
+                      </Text>
+                      <TouchableOpacity onPress={() => activateDetailField("waitDays")}>
+                        <View pointerEvents="none">
+                          <TextInput_
+                            placeholder={"0"}
+                            editable={false}
+                            style={{
+                              width: 50,
+                              borderWidth: sDetailField === "waitDays" ? 2 : 1,
+                              borderColor: sDetailField === "waitDays" ? C.blue : selectedWorkorder?.waitTime?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                              color: C.text,
+                              paddingVertical: 2,
+                              paddingHorizontal: 4,
+                              fontSize: 23,
+                              outlineStyle: "none",
+                              borderRadius: 5,
+                              textAlign: "center",
+                              fontWeight: (sDetailField === "waitDays" ? sDetailForm.waitDays : (selectedWorkorder?.waitTime?.maxWaitTimeDays != null && selectedWorkorder?.waitTime?.maxWaitTimeDays !== "")) ? "500" : null,
+                              backgroundColor: sDetailField === "waitDays" ? lightenRGBByPercent(C.blue, 85) : undefined,
+                            }}
+                            value={sDetailField === "waitDays" ? sDetailForm.waitDays : String(selectedWorkorder?.waitTime?.maxWaitTimeDays ?? "")}
+                          />
+                        </View>
+                      </TouchableOpacity>
+                    </View>
+                    <View style={{ width: "50%", flexDirection: "row", paddingLeft: 5, alignItems: "center" }}>
                       <View style={{ width: "100%" }}>
                         <DropdownMenu
                           modalCoordX={50}
@@ -1298,6 +1359,8 @@ export function BikeStandScreen() {
                             useOpenWorkordersStore.getState().setField("waitTime", waitObj, selectedWorkorder.id);
                           }}
                           buttonStyle={{ opacity: selectedWorkorder?.waitTime?.label ? DROPDOWN_SELECTED_OPACITY : 1 }}
+                          buttonTextStyle={{ fontSize: 21 }}
+                          itemTextStyle={{ fontSize: 29 }}
                           ref={waitTimesRef}
                           buttonText={"Wait Times"}
                         />
@@ -1313,7 +1376,7 @@ export function BikeStandScreen() {
                       <Text
                         style={{
                           color: isMissing ? C.red : gray(0.5),
-                          fontSize: 13,
+                          fontSize: 18,
                           fontStyle: "italic",
                           marginTop: 4,
                           paddingHorizontal: 4,
@@ -1331,22 +1394,18 @@ export function BikeStandScreen() {
                       <StandKeypad mode={detailKeypadMode} onKeyPress={handleDetailKeyPress} />
                       <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 6, paddingHorizontal: 4 }}>
                         <TouchableOpacity
-                          onPress={handleDetailNext}
-                          style={{
-                            backgroundColor: C.blue,
-                            borderRadius: 8,
-                            paddingVertical: 8,
-                            paddingHorizontal: 24,
-                          }}
+                          onPress={() => _setDetailField(null)}
+                          style={{ padding: 4 }}
                         >
-                          <Text style={{ color: C.textWhite, fontSize: 14, fontWeight: "600" }}>Next</Text>
+                          <Image_ icon={ICONS.close1} size={32} />
                         </TouchableOpacity>
                       </View>
                     </View>
                   )}
 
-                  {/* Swipe-up divider to hide */}
+                  {/* Tap/swipe-up divider to hide */}
                   <View
+                    onClick={() => { _setShowBikeDetails(false); _setDetailField(null); }}
                     onTouchStart={(e) => { swipeDividerRef.current = e.touches[0].clientY; }}
                     onTouchEnd={(e) => {
                       if (swipeDividerRef.current !== null) {
@@ -1356,14 +1415,14 @@ export function BikeStandScreen() {
                       }
                     }}
                     style={{
-                      height: 24,
+                      height: 15,
                       alignItems: "center",
                       justifyContent: "center",
                       marginTop: 4,
                       cursor: "pointer",
                     }}
                   >
-                    <Text style={{ fontSize: 10, fontStyle: "italic", color: gray(0.35) }}>Swipe up to minimize</Text>
+                    <Text style={{ fontSize: 16, fontStyle: "italic", color: gray(0.35) }}>Tap/swipe up to hide</Text>
                   </View>
 
                 </View>
@@ -1385,11 +1444,11 @@ export function BikeStandScreen() {
                       _setSelectedButtonID(null);
                     }}
                   >
-                    <Text style={{ fontSize: 11, color: C.blue, fontWeight: "600" }}>{"\u2190"} All</Text>
+                    <Text style={{ fontSize: 13, color: C.blue, fontWeight: "600" }}>{"\u2190"} All</Text>
                   </TouchableOpacity>
                   {sMenuPath.map((crumb, i) => (
                     <View key={crumb.id} style={{ flexDirection: "row", alignItems: "center" }}>
-                      <Text style={{ color: gray(0.3), marginHorizontal: 3, fontSize: 11 }}>{">"}</Text>
+                      <Text style={{ color: gray(0.3), marginHorizontal: 3, fontSize: 13 }}>{">"}</Text>
                       <TouchableOpacity
                         onPress={() => {
                           let newPath = sMenuPath.slice(0, i + 1);
@@ -1405,7 +1464,7 @@ export function BikeStandScreen() {
                       >
                         <Text style={{
                           color: i === sMenuPath.length - 1 ? gray(0.4) : gray(0.55),
-                          fontSize: 11,
+                          fontSize: 13,
                           fontWeight: i === sMenuPath.length - 1 ? "bold" : "normal",
                         }}>
                           {(crumb.name || "").toUpperCase()}
@@ -1432,7 +1491,7 @@ export function BikeStandScreen() {
                       backgroundColor: undefined,
                     }}
                     textStyle={{
-                      fontSize: 12,
+                      fontSize: 19,
                       fontWeight: 400,
                       textAlign: "center",
                       color: C.textWhite,
@@ -1457,17 +1516,17 @@ export function BikeStandScreen() {
                           borderRadius: 5,
                           borderColor: C.buttonLightGreenOutline,
                           paddingHorizontal: 4,
-                          paddingVertical: item.id === "common" ? 12 : 7,
+                          paddingVertical: item.id === "common" ? 22 : (splitButtonLabel(item.name).split("\n").length > 1 || item.name.length > 17) ? 10 : 20,
                           backgroundColor: undefined,
                         }}
-                        numLines={item.name.length > 17 ? 2 : 1}
+                        numLines={splitButtonLabel(item.name).split("\n").length > 1 ? splitButtonLabel(item.name).split("\n").length : (item.name.length > 17 ? 2 : 1)}
                         textStyle={{
-                          fontSize: getQuickButtonFontSize(item.name, 12),
+                          fontSize: getQuickButtonFontSize(item.name, 12 + sQuickButtonFontAdj),
                           fontWeight: 400,
                           textAlign: "center",
                           color: isActive ? "white" : C.textWhite,
                         }}
-                        text={item.name.toUpperCase()}
+                        text={splitButtonLabel(item.name).toUpperCase()}
                       />
                     </View>
                   );
@@ -1489,7 +1548,7 @@ export function BikeStandScreen() {
                             paddingHorizontal: 4,
                           }}
                         >
-                          <Image_ icon={ICONS.print} size={24} />
+                          <Image_ icon={ICONS.print} size={28} />
                         </TouchableOpacity>
 
                         {/* Upward dropdown menu + backdrop */}
@@ -1519,13 +1578,13 @@ export function BikeStandScreen() {
                               }}
                               style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}
                             >
-                              <Text style={{ fontSize: 14, color: C.text }}>Intake</Text>
+                              <Text style={{ fontSize: 18, color: C.text }}>Intake</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                               onPress={handleWorkorderPrint}
                               style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}
                             >
-                              <Text style={{ fontSize: 14, color: C.text }}>Workorder</Text>
+                              <Text style={{ fontSize: 18, color: C.text }}>Workorder</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                               onPress={() => {
@@ -1534,7 +1593,7 @@ export function BikeStandScreen() {
                               }}
                               style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: gray(0.05) }}
                             >
-                              <Text style={{ fontSize: 13, color: selectedPrinterLabel ? gray(0.5) : C.orange, fontWeight: selectedPrinterLabel ? "normal" : "600" }}>
+                              <Text style={{ fontSize: 17, color: selectedPrinterLabel ? gray(0.5) : C.orange, fontWeight: selectedPrinterLabel ? "normal" : "600" }}>
                                 {selectedPrinterLabel ? "Printer: " + selectedPrinterLabel : "Select Printer"}
                               </Text>
                             </TouchableOpacity>
@@ -1556,7 +1615,7 @@ export function BikeStandScreen() {
                         alignItems: "center",
                       }}
                     >
-                      <Text style={{ fontSize: 16, fontWeight: "700", color: C.textWhite }}>New</Text>
+                      <Text style={{ fontSize: 20, fontWeight: "700", color: C.textWhite }}>New</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -1571,7 +1630,7 @@ export function BikeStandScreen() {
                   {sMenuPath.map((crumb, i) => (
                     <View key={crumb.id} style={{ flexDirection: "row", alignItems: "center" }}>
                       {i > 0 && (
-                        <Text style={{ color: gray(0.3), marginHorizontal: 4, fontSize: 13 }}>{">"}</Text>
+                        <Text style={{ color: gray(0.3), marginHorizontal: 4, fontSize: 15 }}>{">"}</Text>
                       )}
                       <TouchableOpacity
                         onPress={() => {
@@ -1588,7 +1647,7 @@ export function BikeStandScreen() {
                       >
                         <Text style={{
                           color: i === sMenuPath.length - 1 ? gray(0.4) : gray(0.55),
-                          fontSize: 13,
+                          fontSize: 15,
                           fontWeight: i === sMenuPath.length - 1 ? "bold" : "normal",
                         }}>
                           {(crumb.name || "(unnamed)").toUpperCase()}
@@ -1615,10 +1674,10 @@ export function BikeStandScreen() {
                           marginRight: 6,
                           marginBottom: 6,
                           paddingHorizontal: 12,
-                          paddingVertical: 8,
+                          paddingVertical: 18,
                         }}
                         textStyle={{
-                          fontSize: getQuickButtonFontSize(btn.name, 12),
+                          fontSize: getQuickButtonFontSize(btn.name, 15),
                           fontWeight: 400,
                           color: C.textWhite,
                         }}
@@ -1648,7 +1707,7 @@ export function BikeStandScreen() {
                       let name = invItem ? (invItem.informalName || invItem.formalName || "Unknown") : "(not found)";
                       let w = itemObj.w || QB_DEFAULT_W;
                       let h = itemObj.h || QB_DEFAULT_H;
-                      let fontSize = getQuickButtonFontSize(name, itemObj.fontSize || 10);
+                      let fontSize = getQuickButtonFontSize(name, (itemObj.fontSize || 10) + sCanvasCardFontAdj);
                       let isOnWorkorder = selectedItemIDs.has(itemObj.inventoryItemID);
 
                       let workorderLine = isOnWorkorder
@@ -1660,9 +1719,18 @@ export function BikeStandScreen() {
                         <TouchableOpacity
                           key={itemObj.inventoryItemID}
                           activeOpacity={0.6}
-                          onPress={() => {
+                          onPress={(e) => {
                             if (sDiscountCardID) { _setDiscountCardID(null); return; }
-                            inventoryItemSelected(invItem);
+                            const now = Date.now();
+                            if (lastCanvasClickItemRef.current === itemObj.inventoryItemID && now - lastCanvasClickTimeRef.current < 500) {
+                              lastCanvasClickTimeRef.current = 0;
+                              lastCanvasClickItemRef.current = null;
+                              openNoteHelperForCanvasItem(invItem, e);
+                            } else {
+                              lastCanvasClickTimeRef.current = now;
+                              lastCanvasClickItemRef.current = itemObj.inventoryItemID;
+                              inventoryItemSelected(invItem);
+                            }
                           }}
                           onMouseDown={() => handleLongPressStart(itemObj.inventoryItemID)}
                           onMouseUp={handleLongPressEnd}
@@ -1693,14 +1761,14 @@ export function BikeStandScreen() {
                               color: invItem ? C.text : gray(0.35),
                               textAlign: "center",
                               fontWeight: "500",
-                              lineHeight: (itemObj.fontSize || 10) + 6,
+                              lineHeight: (itemObj.fontSize || 10) + sCanvasCardFontAdj + 6,
                             }}
                             numberOfLines={(name || "").split("\n").length}
                           >
                             {name}
                           </Text>
                           {hasDiscount && (
-                            <Text style={{ fontSize: 8, color: C.green, fontWeight: "600" }}>
+                            <Text style={{ fontSize: 10, color: C.green, fontWeight: "600" }}>
                               {workorderLine.discountObj.name || "Discount"}
                             </Text>
                           )}
@@ -1723,7 +1791,7 @@ export function BikeStandScreen() {
                             >
                               <div
                                 onClick={() => handleDiscountSelect(itemObj.inventoryItemID, null)}
-                                style={{ padding: "6px 10px", cursor: "pointer", fontSize: 12, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
+                                style={{ padding: "9px 10px", cursor: "pointer", fontSize: 19, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
                                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
                                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
                               >
@@ -1735,7 +1803,7 @@ export function BikeStandScreen() {
                                 <div
                                   key={d.name + "-" + dIdx}
                                   onClick={() => handleDiscountSelect(itemObj.inventoryItemID, d)}
-                                  style={{ padding: "6px 10px", cursor: "pointer", fontSize: 12, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
+                                  style={{ padding: "9px 10px", cursor: "pointer", fontSize: 19, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
                                   onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
                                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
                                 >
@@ -1749,14 +1817,14 @@ export function BikeStandScreen() {
                     })}
                     {canvasItems.length === 0 && (
                       <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 }}>
-                        <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 12 }}>No items in this menu</Text>
+                        <Text style={{ fontSize: 16, color: gray(0.5), marginTop: 12 }}>No items in this menu</Text>
                       </View>
                     )}
                   </div>
                 </ScrollView>
               ) : (
                 <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-                  <Text style={{ fontSize: 14, color: gray(0.4) }}>Select a button to view items</Text>
+                  <Text style={{ fontSize: 16, color: gray(0.4) }}>Select a button to view items</Text>
                 </View>
               )}
 
@@ -1772,7 +1840,7 @@ export function BikeStandScreen() {
                     bottom: 0,
                     justifyContent: "flex-end",
                     paddingHorizontal: 8,
-                    paddingBottom: 6,
+                    paddingBottom: 58,
                   }}
                 >
                   {selectedWorkorder.workorderLines.map((line) => {
@@ -1811,7 +1879,7 @@ export function BikeStandScreen() {
                               justifyContent: "center",
                             }}
                           >
-                            <Image_ icon={ICONS.dollarYellow} size={20} />
+                            <Image_ icon={ICONS.dollarYellow} size={22} />
                           </TouchableOpacity>
                         )}
 
@@ -1835,16 +1903,26 @@ export function BikeStandScreen() {
                               onPress={() => {
                                 _setIntakeNotesLineID(line.id);
                                 _setIntakeNotesText(line.intakeNotes || "");
+                                _setReceiptNotesText(line.receiptNotes || "");
+                                _setNotesTarget("intakeNotes");
+                                // Seed active chips from existing notes
+                                let helpers = zSettings.noteHelpers || [];
+                                let existing = (line.intakeNotes || "").split(", ").map((s) => s.trim()).filter(Boolean);
+                                let keys = new Set();
+                                existing.forEach((part) => {
+                                  helpers.forEach((cat) => { if ((cat.items || []).includes(part)) keys.add(cat.id + "::" + part); });
+                                });
+                                _setActiveNoteChips(keys);
                               }}
                               style={{ marginRight: 5 }}
                             >
-                              <Image_ icon={ICONS.editPencil} size={14} style={{ opacity: 0.5 }} />
+                              <Image_ icon={ICONS.editPencil} size={16} style={{ opacity: 0.5 }} />
                             </TouchableOpacity>
                           )}
                           {(inv.customPart || inv.customLabor) && (
-                            <Image_ icon={inv.customLabor ? ICONS.tools1 : ICONS.gears1} size={14} style={{ marginRight: 5 }} />
+                            <Image_ icon={inv.customLabor ? ICONS.tools1 : ICONS.gears1} size={16} style={{ marginRight: 5 }} />
                           )}
-                          <Text style={{ fontSize: 13, color: C.text, flex: 1 }} numberOfLines={1}>
+                          <Text style={{ fontSize: 17, color: C.text, flex: 1 }} numberOfLines={1}>
                             {informal ? informal + " \u2192 " + formal : formal}{qtyLabel} - {formatCurrencyDisp((inv.price || 0) * (line.qty || 1), true)}
                           </Text>
                         </View>
@@ -1863,84 +1941,62 @@ export function BikeStandScreen() {
                               justifyContent: "center",
                             }}
                           >
-                            <Image_ icon={ICONS.trash} size={20} />
+                            <Image_ icon={ICONS.trash} size={22} />
                           </TouchableOpacity>
                         )}
                       </View>
                     );
                   })}
 
-                  {/* Totals row */}
-                  <View
-                    pointerEvents="none"
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      alignSelf: "flex-start",
-                      marginTop: 6,
-                      backgroundColor: "rgba(255,255,255,0.65)",
-                      borderRadius: 6,
-                      paddingVertical: 4,
-                      paddingHorizontal: 10,
-                      gap: 14,
-                    }}
-                  >
-                    <View style={{ alignItems: "center" }}>
-                      <Text style={{ fontSize: 9, color: gray(0.5) }}>Subtotal</Text>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: C.text }}>{formatCurrencyDisp(totals.runningSubtotal, true)}</Text>
-                    </View>
-                    <View style={{ alignItems: "center" }}>
-                      <Text style={{ fontSize: 9, color: gray(0.5) }}>Discount</Text>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: C.red }}>-{formatCurrencyDisp(totals.runningDiscount, true)}</Text>
-                    </View>
-                    <View style={{ alignItems: "center" }}>
-                      <Text style={{ fontSize: 9, color: gray(0.5) }}>Tax</Text>
-                      <Text style={{ fontSize: 13, fontWeight: "600", color: C.text }}>{formatCurrencyDisp(totals.runningTax, true)}</Text>
-                    </View>
-                    <View style={{ alignItems: "center" }}>
-                      <Text style={{ fontSize: 9, color: gray(0.5) }}>Total</Text>
-                      <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>{formatCurrencyDisp(totals.finalTotal, true)}</Text>
-                    </View>
-                  </View>
                 </View>
               )}
 
-              {/* Slim swipe-up bar at bottom of right panel */}
+              {/* Footer — always-visible totals + tap for items */}
               <View
-                onTouchStart={(e) => { itemSwipeRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }; }}
                 onClick={() => _setShowItemOverlay((p) => !p)}
-                onTouchEnd={(e) => {
-                  if (itemSwipeRef.current) {
-                    let dx = e.changedTouches[0].clientX - itemSwipeRef.current.x;
-                    let dy = e.changedTouches[0].clientY - itemSwipeRef.current.y;
-                    if (dy < -20) { _setShowItemOverlay(true); }
-                    else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) { _setShowItemOverlay((p) => !p); }
-                    itemSwipeRef.current = null;
-                  }
-                }}
                 style={{
-                  height: 22,
+                  flexDirection: "row",
                   alignItems: "center",
-                  justifyContent: "center",
+                  justifyContent: "space-between",
+                  paddingVertical: 6,
+                  paddingHorizontal: 10,
                   borderTopWidth: 1,
-                  borderTopColor: sShowItemOverlay ? "transparent" : gray(0.1),
-                  backgroundColor: "rgba(255,255,255,0.4)",
+                  borderTopColor: gray(0.1),
+                  backgroundColor: "rgba(255,255,255,0.65)",
                   cursor: "pointer",
                 }}
               >
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                  <View style={{ alignItems: "center" }}>
+                    <Text style={{ fontSize: 12, color: gray(0.5) }}>Subtotal</Text>
+                    <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>{formatCurrencyDisp(totals.runningSubtotal, true)}</Text>
+                  </View>
+                  <View style={{ alignItems: "center" }}>
+                    <Text style={{ fontSize: 12, color: gray(0.5) }}>Discount</Text>
+                    <Text style={{ fontSize: 16, fontWeight: "600", color: C.red }}>-{formatCurrencyDisp(totals.runningDiscount, true)}</Text>
+                  </View>
+                  <View style={{ alignItems: "center" }}>
+                    <Text style={{ fontSize: 12, color: gray(0.5) }}>Tax</Text>
+                    <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>{formatCurrencyDisp(totals.runningTax, true)}</Text>
+                  </View>
+                  <View style={{ alignItems: "center" }}>
+                    <Text style={{ fontSize: 15, color: gray(0.5) }}>Total</Text>
+                    <Text style={{ fontSize: 20, fontWeight: "700", color: C.text }}>{formatCurrencyDisp(totals.finalTotal, true)}</Text>
+                  </View>
+                </View>
                 {selectedWorkorder?.workorderLines?.length > 0 && (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={{ fontSize: 10, fontStyle: "italic", color: sShowItemOverlay ? "transparent" : gray(0.35) }}>Tap/swipe up to see items</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginRight: 10 }}>
+                    <Text style={{ fontSize: 22, fontStyle: "italic", color: gray(0.35) }}>Tap for items</Text>
                     <View style={{
                       backgroundColor: C.blue,
                       borderRadius: 8,
-                      minWidth: 16,
-                      height: 16,
+                      minWidth: 24,
+                      height: 24,
                       alignItems: "center",
                       justifyContent: "center",
                       paddingHorizontal: 4,
                     }}>
-                      <Text style={{ fontSize: 9, fontWeight: "700", color: C.textWhite }}>
+                      <Text style={{ fontSize: 17, fontWeight: "700", color: C.textWhite }}>
                         {selectedWorkorder.workorderLines.reduce((sum, ln) => sum + (ln.qty || 1), 0)}
                       </Text>
                     </View>
@@ -1967,14 +2023,14 @@ export function BikeStandScreen() {
                 overflow: "hidden",
               }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: gray(0.15) }}>
-                  <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>Select Printer</Text>
+                  <Text style={{ fontSize: 18, fontWeight: "700", color: C.text }}>Select Printer</Text>
                   <TouchableOpacity onPress={() => _setShowPrinterSelectModal(false)}>
-                    <Text style={{ fontSize: 18, fontWeight: "700", color: gray(0.4) }}>X</Text>
+                    <Text style={{ fontSize: 20, fontWeight: "700", color: gray(0.4) }}>X</Text>
                   </TouchableOpacity>
                 </View>
                 <ScrollView style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
                   {receiptPrinters.length === 0 ? (
-                    <Text style={{ fontSize: 14, color: gray(0.5), paddingVertical: 20, textAlign: "center" }}>No receipt printers configured</Text>
+                    <Text style={{ fontSize: 16, color: gray(0.5), paddingVertical: 20, textAlign: "center" }}>No receipt printers configured</Text>
                   ) : (
                     receiptPrinters.map((printer) => {
                       let isSelected = printer.id === sSelectedPrinterID;
@@ -2003,15 +2059,15 @@ export function BikeStandScreen() {
                             marginRight: 10,
                           }} />
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 15, fontWeight: isSelected ? "600" : "normal", color: C.text }}>
+                            <Text style={{ fontSize: 17, fontWeight: isSelected ? "600" : "normal", color: C.text }}>
                               {printer.label || printer.printerName || printer.id}
                             </Text>
                             {printer.printerName && printer.label ? (
-                              <Text style={{ fontSize: 12, color: gray(0.5) }}>{printer.printerName}</Text>
+                              <Text style={{ fontSize: 14, color: gray(0.5) }}>{printer.printerName}</Text>
                             ) : null}
                           </View>
                           {isSelected && (
-                            <Text style={{ fontSize: 16, color: C.green, fontWeight: "700" }}>{"\u2713"}</Text>
+                            <Text style={{ fontSize: 18, color: C.green, fontWeight: "700" }}>{"\u2713"}</Text>
                           )}
                         </TouchableOpacity>
                       );
@@ -2037,9 +2093,9 @@ export function BikeStandScreen() {
                 width: 360,
               }}>
                 <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: gray(0.15) }}>
-                  <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>Intake Receipt</Text>
+                  <Text style={{ fontSize: 18, fontWeight: "700", color: C.text }}>Intake Receipt</Text>
                   <TouchableOpacity onPress={() => _setShowIntakeActionModal(false)}>
-                    <Text style={{ fontSize: 18, fontWeight: "700", color: gray(0.4) }}>X</Text>
+                    <Text style={{ fontSize: 20, fontWeight: "700", color: gray(0.4) }}>X</Text>
                   </TouchableOpacity>
                 </View>
                 <View style={{ padding: 16 }}>
@@ -2054,7 +2110,7 @@ export function BikeStandScreen() {
                     }}
                     disabled={!sSelectedPrinterID}
                   >
-                    <Text style={{ fontSize: 16, fontWeight: "600", color: C.textWhite }}>
+                    <Text style={{ fontSize: 18, fontWeight: "600", color: C.textWhite }}>
                       {sSelectedPrinterID ? "Print" : "Print (no printer selected)"}
                     </Text>
                   </TouchableOpacity>
@@ -2069,7 +2125,7 @@ export function BikeStandScreen() {
                         marginBottom: 10,
                       }}
                     >
-                      <Text style={{ fontSize: 16, fontWeight: "600", color: C.textWhite }}>
+                      <Text style={{ fontSize: 18, fontWeight: "600", color: C.textWhite }}>
                         {customerCell && customerEmail ? "Text/Email" : customerCell ? "Text" : "Email"}
                       </Text>
                     </TouchableOpacity>
@@ -2084,7 +2140,7 @@ export function BikeStandScreen() {
                     }}
                     disabled={!sSelectedPrinterID && !customerCell && !customerEmail}
                   >
-                    <Text style={{ fontSize: 16, fontWeight: "600", color: C.textWhite }}>All</Text>
+                    <Text style={{ fontSize: 18, fontWeight: "600", color: C.textWhite }}>All</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -2093,7 +2149,45 @@ export function BikeStandScreen() {
           )}
 
           {/* Intake notes modal for editing a line's intake notes */}
-          {sIntakeNotesLineID && (
+          {sIntakeNotesLineID && (() => {
+            let notesLine = (selectedWorkorder?.workorderLines || []).find((ln) => ln.id === sIntakeNotesLineID);
+            let itemLabel = notesLine?.inventoryItem?.informalName || notesLine?.inventoryItem?.formalName || "Item";
+            let noteHelpers = zSettings.noteHelpers || [];
+            let activeText = sNotesTarget === "intakeNotes" ? sIntakeNotesText : sReceiptNotesText;
+            let activeSetText = sNotesTarget === "intakeNotes" ? _setIntakeNotesText : _setReceiptNotesText;
+
+            function toggleNoteChip(catId, chipText) {
+              let key = catId + "::" + chipText;
+              let parts = activeText.split(", ").map((s) => s.trim()).filter(Boolean);
+              let wasActive = sActiveNoteChips.has(key);
+              if (wasActive) {
+                let idx = parts.indexOf(chipText.trim());
+                if (idx !== -1) parts.splice(idx, 1);
+                let next = new Set(sActiveNoteChips);
+                next.delete(key);
+                _setActiveNoteChips(next);
+              } else {
+                parts.push(chipText.trim());
+                let next = new Set(sActiveNoteChips);
+                next.add(key);
+                _setActiveNoteChips(next);
+              }
+              activeSetText(parts.join(", "));
+            }
+
+            function switchNotesTarget(target) {
+              // Re-seed active chips for the new target
+              let text = target === "intakeNotes" ? sIntakeNotesText : sReceiptNotesText;
+              let existing = text.split(", ").map((s) => s.trim()).filter(Boolean);
+              let keys = new Set();
+              existing.forEach((part) => {
+                noteHelpers.forEach((cat) => { if ((cat.items || []).includes(part)) keys.add(cat.id + "::" + part); });
+              });
+              _setActiveNoteChips(keys);
+              _setNotesTarget(target);
+            }
+
+            return (
             <div
               onClick={() => _setIntakeNotesLineID(null)}
               style={{
@@ -2111,78 +2205,141 @@ export function BikeStandScreen() {
                 style={{
                   width: "95%",
                   height: "95%",
-                  backgroundColor: "rgba(255,255,255,0.95)",
+                  backgroundColor: "rgba(255,255,255,0.97)",
                   borderRadius: 12,
                   display: "flex",
                   flexDirection: "column",
                   overflow: "hidden",
                 }}
               >
-                {/* Header */}
+                {/* Header: item name + target toggle + close */}
                 <div style={{
                   display: "flex",
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  padding: 12,
+                  padding: 10,
                   borderBottom: "1px solid " + gray(0.1),
                 }}>
-                  <Text style={{ fontSize: 18, fontWeight: "600", color: C.text }}>Intake Notes</Text>
+                  <Text style={{ fontSize: 22, fontWeight: "600", color: C.text }} numberOfLines={1}>{itemLabel}</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <TouchableOpacity
+                      onPress={() => switchNotesTarget("intakeNotes")}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 5,
+                        borderRadius: 6,
+                        backgroundColor: sNotesTarget === "intakeNotes" ? C.blue : gray(0.08),
+                      }}
+                    >
+                      <Text style={{ fontSize: 19, fontWeight: "600", color: sNotesTarget === "intakeNotes" ? C.textWhite : gray(0.5) }}>Intake</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => switchNotesTarget("receiptNotes")}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 5,
+                        borderRadius: 6,
+                        backgroundColor: sNotesTarget === "receiptNotes" ? C.blue : gray(0.08),
+                      }}
+                    >
+                      <Text style={{ fontSize: 19, fontWeight: "600", color: sNotesTarget === "receiptNotes" ? C.textWhite : gray(0.5) }}>Receipt</Text>
+                    </TouchableOpacity>
+                  </View>
                   <TouchableOpacity onPress={() => _setIntakeNotesLineID(null)}>
-                    <Text style={{ fontSize: 20, color: gray(0.5), fontWeight: "600", paddingHorizontal: 8 }}>{"\u2715"}</Text>
+                    <Text style={{ fontSize: 27, color: gray(0.5), fontWeight: "600", paddingHorizontal: 8 }}>{"\u2715"}</Text>
                   </TouchableOpacity>
                 </div>
 
-                {/* Text display area */}
-                <View style={{ flex: 1, padding: 12 }}>
+                {/* Note helper categories - horizontal sections */}
+                <ScrollView style={{ flex: 1, paddingHorizontal: 10, paddingTop: 8 }}>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+                    {noteHelpers.map((category) => (
+                      <View key={category.id} style={{ marginRight: 16, marginBottom: 10 }}>
+                        <Text style={{ fontSize: 19, fontWeight: "700", color: gray(0.4), marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                          {category.label}
+                        </Text>
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                          {(category.items || []).map((chipText, chipIdx) => {
+                            let active = sActiveNoteChips.has(category.id + "::" + chipText);
+                            return (
+                              <TouchableOpacity
+                                key={chipText + chipIdx}
+                                onPress={() => toggleNoteChip(category.id, chipText)}
+                                style={{
+                                  backgroundColor: active ? lightenRGBByPercent(C.blue, 70) : C.buttonLightGreenOutline,
+                                  borderRadius: 5,
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                  borderWidth: 1,
+                                  borderColor: active ? C.blue : C.buttonLightGreenOutline,
+                                }}
+                              >
+                                <Text style={{ fontSize: 22, color: active ? C.blue : gray(0.5), fontWeight: active ? "600" : "400" }}>
+                                  {chipText}
+                                </Text>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+
+                {/* Notes text display - 2 lines */}
+                <View style={{ paddingHorizontal: 10, paddingVertical: 6 }}>
                   <View style={{
-                    flex: 1,
                     borderWidth: 2,
                     borderColor: C.buttonLightGreenOutline,
-                    borderRadius: 10,
+                    borderRadius: 8,
                     backgroundColor: C.listItemWhite,
-                    padding: 10,
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    minHeight: 44,
+                    maxHeight: 44,
                   }}>
-                    <Text style={{ fontSize: 16, color: "orange", minHeight: 40 }}>
-                      {sIntakeNotesText}<Text style={{ color: C.blue }}>|</Text>
+                    <Text style={{ fontSize: 19, color: C.text }} numberOfLines={2}>
+                      {activeText}<Text style={{ color: C.blue }}>|</Text>
                     </Text>
                   </View>
                 </View>
 
-                {/* Keypad with number row */}
-                <div style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 8 }}>
+                {/* Keypad */}
+                <View style={{ paddingHorizontal: 10, paddingBottom: 6 }}>
                   <StandKeypad mode="alpha" showNumberRow={true} onKeyPress={(key) => {
-                    if (key === "CLR") { _setIntakeNotesText(""); return; }
-                    if (key === "\u232B") { _setIntakeNotesText(sIntakeNotesText.slice(0, -1)); return; }
+                    if (key === "CLR") { activeSetText(""); return; }
+                    if (key === "\u232B") { activeSetText(activeText.slice(0, -1)); return; }
                     let char = key === " " ? " " : key.toLowerCase();
-                    if (sIntakeNotesText.length === 0) char = key.toUpperCase();
-                    _setIntakeNotesText(sIntakeNotesText + char);
+                    if (activeText.length === 0) char = key.toUpperCase();
+                    activeSetText(activeText + char);
                   }} />
-                </div>
+                </View>
 
                 {/* Save button */}
-                <div style={{ padding: 12, borderTop: "1px solid " + gray(0.1) }}>
+                <View style={{ paddingHorizontal: 10, paddingBottom: 10 }}>
                   <TouchableOpacity
                     onPress={() => {
                       let updatedLines = (selectedWorkorder?.workorderLines || []).map((ln) =>
-                        ln.id === sIntakeNotesLineID ? { ...ln, intakeNotes: sIntakeNotesText } : ln
+                        ln.id === sIntakeNotesLineID ? { ...ln, intakeNotes: sIntakeNotesText, receiptNotes: sReceiptNotesText } : ln
                       );
                       useOpenWorkordersStore.getState().setField("workorderLines", updatedLines, sSelectedWorkorderID, true);
                       _setIntakeNotesLineID(null);
                     }}
                     style={{
-                      paddingVertical: 14,
+                      paddingVertical: 12,
                       borderRadius: 8,
                       backgroundColor: C.green,
                       alignItems: "center",
                     }}
                   >
-                    <Text style={{ fontSize: 16, fontWeight: "600", color: C.textWhite }}>Save</Text>
+                    <Text style={{ fontSize: 18, fontWeight: "600", color: C.textWhite }}>Save</Text>
                   </TouchableOpacity>
-                </div>
+                </View>
               </div>
             </div>
-          )}
+            );
+          })()}
         </View>
       ) : (
         <StandWorkorderDetail
@@ -2192,7 +2349,17 @@ export function BikeStandScreen() {
           onShowCustomerModal={() => _setShowCustomerModal(true)}
         />
       )}
-    </View>
+
+      <NoteHelperDropdown
+        visible={!!sNoteHelperDropdown}
+        onClose={() => _setNoteHelperDropdown(null)}
+        workorderLine={sNoteHelperDropdown?.workorderLine}
+        onUpdateLine={handleNoteHelperUpdate}
+        anchorPosition={sNoteHelperDropdown?.anchorPosition || { x: 0, y: 0 }}
+        noteHelpers={zSettings.noteHelpers || []}
+        noteHelpersTarget={zSettings.noteHelpersTarget || "intakeNotes"}
+      />
+    </div>
   );
 }
 
@@ -2246,7 +2413,7 @@ const StandWaitTimeIndicator = ({ workorder }) => {
         alignItems: "center",
         justifyContent: "flex-end",
         height: "100%",
-        width: 90,
+        width: 135,
         paddingRight: 2,
         backgroundColor: C.buttonLightGreen,
         borderWidth: 1,
@@ -2258,15 +2425,15 @@ const StandWaitTimeIndicator = ({ workorder }) => {
       <View style={{ flexDirection: "column", alignItems: "flex-end", justifyContent: "center" }}>
         {info.isMissing ? null : !!info.waitEndDay && info.waitEndDay.includes("\n") ? (
           <>
-            <Text style={{ color: info.textColor, fontSize: 10, textAlign: "right", fontStyle: "italic" }}>
+            <Text style={{ color: info.textColor, fontSize: 12, textAlign: "right", fontStyle: "italic" }}>
               {capitalizeFirstLetterOfString(info.waitEndDay.split("\n")[0])}
             </Text>
-            <Text style={{ color: info.textColor, fontSize: 12, textAlign: "right" }}>
+            <Text style={{ color: info.textColor, fontSize: 14, textAlign: "right" }}>
               {info.waitEndDay.split("\n")[1]}
             </Text>
           </>
         ) : !!info.waitEndDay ? (
-          <Text style={{ color: info.textColor, fontSize: 12, textAlign: "right" }}>
+          <Text style={{ color: info.textColor, fontSize: 14, textAlign: "right" }}>
             {capitalizeFirstLetterOfString(info.waitEndDay)}
           </Text>
         ) : null}
@@ -2379,16 +2546,16 @@ const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
           borderBottomWidth: 1,
           borderBottomColor: gray(0.1),
         }}>
-          <Text style={{ fontSize: 18, fontWeight: "600", color: C.text }}>Open Workorders</Text>
+          <Text style={{ fontSize: 20, fontWeight: "600", color: C.text }}>Open Workorders</Text>
           <TouchableOpacity onPress={onClose}>
-            <Text style={{ fontSize: 20, color: gray(0.5), fontWeight: "600", paddingHorizontal: 8 }}>{"\u2715"}</Text>
+            <Text style={{ fontSize: 22, color: gray(0.5), fontWeight: "600", paddingHorizontal: 8 }}>{"\u2715"}</Text>
           </TouchableOpacity>
         </View>
 
         {/* Workorder list */}
         <ScrollView style={{ flex: 1, paddingHorizontal: 12, paddingTop: 8 }}>
           {sortedWorkorders.length === 0 ? (
-            <Text style={{ fontSize: 14, color: gray(0.4), textAlign: "center", paddingVertical: 20 }}>No open workorders.</Text>
+            <Text style={{ fontSize: 16, color: gray(0.4), textAlign: "center", paddingVertical: 20 }}>No open workorders.</Text>
           ) : (
             sortedWorkorders.map((workorder) => {
               const rs = resolveStatus(workorder.status, zStatuses);
@@ -2453,7 +2620,7 @@ const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
                           )}
                           <Text
                             numberOfLines={1}
-                            style={{ fontSize: 15, color: "dimgray" }}
+                            style={{ fontSize: 17, color: "dimgray" }}
                           >
                             {capitalizeFirstLetterOfString(workorder.customerFirst) + " " + capitalizeFirstLetterOfString(workorder.customerLast)}
                           </Text>
@@ -2461,13 +2628,13 @@ const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
 
                         {/* Brand + description + line count */}
                         <View style={{ flexDirection: "row", alignItems: "center" }}>
-                          <Text style={{ fontSize: 14, fontWeight: "500", color: C.text }}>
+                          <Text style={{ fontSize: 16, fontWeight: "500", color: C.text }}>
                             {capitalizeFirstLetterOfString(workorder.brand) || ""}
                           </Text>
                           {!!workorder.description && (
                             <View style={{ width: 7, height: 2, marginHorizontal: 5, backgroundColor: "lightgray" }} />
                           )}
-                          <Text style={{ fontSize: 14, color: C.text }}>
+                          <Text style={{ fontSize: 16, color: C.text }}>
                             {capitalizeFirstLetterOfString(workorder.description)}
                           </Text>
                           {workorder.workorderLines?.length > 0 && (
@@ -2480,7 +2647,7 @@ const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
                                 marginLeft: 8,
                               }}
                             >
-                              <Text style={{ color: "white", fontSize: 13, fontWeight: "600" }}>
+                              <Text style={{ color: "white", fontSize: 15, fontWeight: "600" }}>
                                 {workorder.workorderLines.length}
                               </Text>
                             </View>
@@ -2506,7 +2673,7 @@ const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
                             height: "100%",
                           }}
                         >
-                          <Text style={{ color: "dimgray", fontSize: 13 }}>
+                          <Text style={{ color: "dimgray", fontSize: 15 }}>
                             {(() => {
                               let d = new Date(workorder.startedOnMillis);
                               let h = d.getHours();
@@ -2533,9 +2700,9 @@ const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
                             }}
                           >
                             {!!wipUser && (
-                              <Text style={{ color: C.red, fontSize: 11, fontStyle: "italic", marginRight: 5 }}>{wipUser}</Text>
+                              <Text style={{ color: C.red, fontSize: 13, fontStyle: "italic", marginRight: 5 }}>{wipUser}</Text>
                             )}
-                            <Text style={{ color: rs.textColor, fontSize: 13, fontWeight: "normal" }}>
+                            <Text style={{ color: rs.textColor, fontSize: 15, fontWeight: "normal" }}>
                               {rs.label}
                             </Text>
                           </View>
@@ -2556,7 +2723,7 @@ const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
                         }}
                       >
                         {!!workorder.partOrdered && (
-                          <Text numberOfLines={1} style={{ fontSize: 14, color: C.blue, fontWeight: "500" }}>
+                          <Text numberOfLines={1} style={{ fontSize: 16, color: C.blue, fontWeight: "500" }}>
                             {capitalizeFirstLetterOfString(workorder.partOrdered)}
                           </Text>
                         )}
@@ -2564,18 +2731,18 @@ const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
                           <View style={{ width: 5, height: 2, marginHorizontal: 5, backgroundColor: "lightgray" }} />
                         )}
                         {!!workorder.partSource && (
-                          <Text numberOfLines={1} style={{ fontSize: 14, color: C.orange }}>
+                          <Text numberOfLines={1} style={{ fontSize: 16, color: C.orange }}>
                             {capitalizeFirstLetterOfString(workorder.partSource)}
                           </Text>
                         )}
                         {!!(workorder.partOrderedMillis && workorder.partOrderEstimateMillis) && (
-                          <Text numberOfLines={1} style={{ fontSize: 12, color: "dimgray", marginLeft: 6 }}>
+                          <Text numberOfLines={1} style={{ fontSize: 14, color: "dimgray", marginLeft: 6 }}>
                             {formatMillisForDisplay(workorder.partOrderedMillis)}
                             {" \u2192 " + formatMillisForDisplay(workorder.partOrderEstimateMillis)}
                           </Text>
                         )}
                         {!!workorder.trackingNumber && (
-                          <Text numberOfLines={1} style={{ fontSize: 12, color: C.blue, marginLeft: 6 }}>
+                          <Text numberOfLines={1} style={{ fontSize: 14, color: C.blue, marginLeft: 6 }}>
                             {workorder.trackingNumber}
                           </Text>
                         )}
@@ -2763,11 +2930,11 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
               onPress={() => _setMode("search")}
               style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
             >
-              <Text style={{ fontSize: 16, color: C.blue, fontWeight: "600" }}>{"\u2190"} Back to Search</Text>
+              <Text style={{ fontSize: 21, color: C.blue, fontWeight: "600" }}>{"\u2190"} Back to Search</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity onPress={onClose}>
-              <Text style={{ fontSize: 20, color: gray(0.5), fontWeight: "600", paddingHorizontal: 8 }}>{"\u2715"}</Text>
+              <Text style={{ fontSize: 25, color: gray(0.5), fontWeight: "600", paddingHorizontal: 8 }}>{"\u2715"}</Text>
             </TouchableOpacity>
           )}
         </div>
@@ -2788,7 +2955,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                 alignItems: "center",
                 paddingLeft: 12,
                 paddingRight: 12,
-                fontSize: 20,
+                fontSize: 23,
                 fontWeight: "500",
                 color: C.text,
               }}>
@@ -2810,7 +2977,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                   justifyContent: "center",
                 }}
               >
-                <Text style={{ fontSize: 13, fontWeight: "600", color: "white" }}>
+                <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>
                   {sKeypadMode === "phone" ? "ABC" : "123"}
                 </Text>
               </TouchableOpacity>
@@ -2824,7 +2991,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
             {/* Search results */}
             <ScrollView style={{ flex: 1, paddingHorizontal: 12 }}>
               {sSearching && (
-                <Text style={{ fontSize: 13, color: gray(0.4), textAlign: "center", paddingVertical: 10 }}>Searching...</Text>
+                <Text style={{ fontSize: 16, color: gray(0.4), textAlign: "center", paddingVertical: 10 }}>Searching...</Text>
               )}
               {sSearchResults.map((cust) => (
                 <TouchableOpacity
@@ -2843,19 +3010,19 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                     gap: 16,
                   }}
                 >
-                  <Text style={{ flex: 1, fontSize: 16, fontWeight: "600", color: C.text }}>
+                  <Text style={{ flex: 1, fontSize: 19, fontWeight: "600", color: C.text }}>
                     {capitalizeFirstLetterOfString(cust.first || "")} {capitalizeFirstLetterOfString(cust.last || "")}
                   </Text>
-                  <Text style={{ fontSize: 14, color: gray(0.5) }}>
+                  <Text style={{ fontSize: 17, color: gray(0.5) }}>
                     {formatPhoneWithDashes(cust.customerCell || cust.cell || "")}
                   </Text>
-                  <Text style={{ fontSize: 13, color: gray(0.4) }} numberOfLines={1}>
+                  <Text style={{ fontSize: 16, color: gray(0.4) }} numberOfLines={1}>
                     {cust.email || ""}
                   </Text>
                 </TouchableOpacity>
               ))}
               {!sSearching && sSearchText.length >= 2 && sSearchResults.length === 0 && (
-                <Text style={{ fontSize: 13, color: gray(0.4), textAlign: "center", paddingVertical: 10 }}>No results found.</Text>
+                <Text style={{ fontSize: 16, color: gray(0.4), textAlign: "center", paddingVertical: 10 }}>No results found.</Text>
               )}
             </ScrollView>
 
@@ -2872,7 +3039,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                     alignItems: "center",
                   }}
                 >
-                  <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>+ Create New Customer</Text>
+                  <Text style={{ fontSize: 21, fontWeight: "600", color: "white" }}>+ Create New Customer</Text>
                 </TouchableOpacity>
               </div>
             )}
@@ -2905,8 +3072,8 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                     cursor: "pointer",
                   }}
                 >
-                  <Text style={{ fontSize: 13, color: gray(0.5), width: 80 }}>{field.label}</Text>
-                  <Text style={{ fontSize: 16, fontWeight: "500", color: C.text, flex: 1 }}>
+                  <Text style={{ fontSize: 16, color: gray(0.5), width: 80 }}>{field.label}</Text>
+                  <Text style={{ fontSize: 19, fontWeight: "500", color: C.text, flex: 1 }}>
                     {field.key === "phone"
                       ? formatPhoneWithDashes((sCreateForm[field.key] || "").replace(/\D/g, ""))
                       : sCreateForm[field.key] || ""
@@ -2936,7 +3103,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                 }}
                 disabled={!(sCreateForm.first || sCreateForm.phone)}
               >
-                <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>Create & Start Workorder</Text>
+                <Text style={{ fontSize: 21, fontWeight: "600", color: "white" }}>Create & Start Workorder</Text>
               </TouchableOpacity>
             </div>
           </>

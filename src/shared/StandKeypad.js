@@ -29,7 +29,7 @@ const KEY_STYLE = {
   cursor: "pointer",
   userSelect: "none",
   fontWeight: "600",
-  fontSize: 18,
+  fontSize: 28,
   color: C.text,
 };
 
@@ -54,7 +54,7 @@ export function StandKeypad({ mode, onKeyPress, showNumberRow }) {
         {PHONE_KEYS.map((row, ri) => (
           <div key={ri} style={{ display: "flex", flexDirection: "row", gap: 6, justifyContent: "center" }}>
             {row.map((key) => (
-              <KeyButton key={key} keyLabel={key} onClick={onKeyPress} style={{ width: 64, height: 48 }} />
+              <KeyButton key={key} keyLabel={key} onClick={onKeyPress} style={{ width: 102, height: 84 }} />
             ))}
           </div>
         ))}
@@ -67,20 +67,20 @@ export function StandKeypad({ mode, onKeyPress, showNumberRow }) {
       {showNumberRow && (
         <div style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
           {NUMBER_ROW.map((key) => (
-            <KeyButton key={key} keyLabel={key} onClick={onKeyPress} style={{ flex: 1, height: 42, maxWidth: 48 }} />
+            <KeyButton key={key} keyLabel={key} onClick={onKeyPress} style={{ flex: 1, height: 84, maxWidth: 90 }} />
           ))}
         </div>
       )}
       {QWERTY_ROWS.map((row, ri) => (
         <div key={ri} style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
           {row.map((key) => (
-            <KeyButton key={key} keyLabel={key} onClick={onKeyPress} style={{ flex: 1, height: 42, maxWidth: 48 }} />
+            <KeyButton key={key} keyLabel={key} onClick={onKeyPress} style={{ flex: 1, height: 84, maxWidth: 90 }} />
           ))}
         </div>
       ))}
       <div style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
-        <KeyButton keyLabel=" " displayLabel="SPACE" onClick={onKeyPress} style={{ flex: 3, height: 42 }} />
-        <KeyButton keyLabel="CLR" onClick={onKeyPress} style={{ flex: 1, height: 42, fontSize: 13 }} />
+        <KeyButton keyLabel=" " displayLabel="SPACE" onClick={onKeyPress} style={{ flex: 3, height: 78 }} />
+        <KeyButton keyLabel="CLR" onClick={onKeyPress} style={{ flex: 1, height: 78, fontSize: 18 }} />
       </div>
     </div>
   );

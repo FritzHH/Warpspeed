@@ -14,12 +14,14 @@ import {
   normalizeBarcode,
   showAlert,
   localStorageWrapper,
+  replaceOrAddToArr,
 } from "../../../utils";
 import { workerSearchInventory } from "../../../inventorySearchManager";
 import {
   Button,
   Button_,
   Image_,
+  NoteHelperDropdown,
   ScreenModal,
   StaleBanner,
   TouchableOpacity_,
@@ -94,6 +96,7 @@ const QuickItemCanvasCard = ({
   onPositionChange,
   onResize,
   onPress,
+  onDoubleClickPress,
   onRightClick,
   onInfoPress,
   onLabelChange,
@@ -110,6 +113,8 @@ const QuickItemCanvasCard = ({
   const dragStartRef = useRef(null);
   const resizeStartRef = useRef(null);
   const didDragRef = useRef(false);
+  const lastClickTimeRef = useRef(0);
+  const longPressTimerRef = useRef(null);
 
   function handlePrintWithTemplate(slug) {
     if (!invItem) return;
@@ -255,18 +260,38 @@ const QuickItemCanvasCard = ({
   return (
     <div
       onMouseDown={(e) => {
-        if (!sEditMode) _setPressed(true);
+        if (!sEditMode) {
+          _setPressed(true);
+          if (onDoubleClickPress) {
+            longPressTimerRef.current = setTimeout(() => {
+              longPressTimerRef.current = null;
+              onDoubleClickPress(e);
+            }, 500);
+          }
+        }
         handleMouseDown(e);
       }}
-      onMouseUp={() => { if (!sEditMode) _setPressed(false); }}
-      onMouseLeave={() => { if (!sEditMode) _setPressed(false); }}
+      onMouseUp={() => {
+        if (!sEditMode) _setPressed(false);
+        if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+      }}
+      onMouseLeave={() => {
+        if (!sEditMode) _setPressed(false);
+        if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; }
+      }}
       onClick={() => {
         if (sEditMode) {
           if (didDragRef.current) return;
           onSelect(itemObj.inventoryItemID);
         } else if (onPress) {
+          const now = Date.now();
+          if (now - lastClickTimeRef.current < 500) return;
+          lastClickTimeRef.current = now;
           onPress();
         }
+      }}
+      onDoubleClick={(e) => {
+        if (!sEditMode && onDoubleClickPress) onDoubleClickPress(e);
       }}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -412,7 +437,7 @@ const QuickItemCanvasCard = ({
               zIndex: 4,
             }}
           >
-            <Text style={{ fontSize: 8, color: gray(0.4), lineHeight: 14 }}>{sShowActions ? "\u25BC" : "\u25B6"}</Text>
+            <Text style={{ fontSize: 8, color: gray(0.2), lineHeight: 14 }}>{sShowActions ? "\u25BC" : "\u25B6"}</Text>
           </div>
           {/* Action row */}
           {sShowActions && (
@@ -530,6 +555,7 @@ const QuickItemCanvas = React.forwardRef(({
   zQuickItemButtons,
   zWorkorderLines,
   onItemPress,
+  onItemDoubleClick,
   onInfoPress,
   forceEditMode,
   onForceEditConsumed,
@@ -671,6 +697,7 @@ const QuickItemCanvas = React.forwardRef(({
               onPositionChange={handlePositionChange}
               onResize={handleResize}
               onPress={() => invItem && onItemPress(invItem)}
+              onDoubleClickPress={(e) => invItem && onItemDoubleClick && onItemDoubleClick(invItem, e)}
               onInfoPress={() => invItem && onInfoPress(invItem)}
               onRightClick={(id) => {
                 if (sEditMode) {
@@ -764,6 +791,13 @@ export function InventoryComponent({}) {
   const [sListPrintPickerID, _setListPrintPickerID] = useState(null);
   const [sListPrintSuccessID, _setListPrintSuccessID] = useState(null);
   const barcodeModalTimerRef = useRef(null);
+
+  // Note Helper dropdown state
+  const zNoteHelpers = useSettingsStore((state) => state.settings?.noteHelpers);
+  const zNoteHelpersTarget = useSettingsStore((state) => state.settings?.noteHelpersTarget || "intakeNotes");
+  const [sNoteHelperDropdown, _setNoteHelperDropdown] = useState(null); // { workorderLine, anchorPosition }
+  const lastClickTimeRef = useRef(0);
+  const lastClickItemRef = useRef(null);
 
   // Timeout to batch all store updates and reduce re-renders
   useEffect(() => {
@@ -1030,6 +1064,31 @@ export function InventoryComponent({}) {
         }
       }
     });
+  }
+
+  function openNoteHelperDropdown(item, event) {
+    if (!zNoteHelpers || zNoteHelpers.length === 0) return;
+    const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
+    if (!openWorkorder) return;
+    const lines = openWorkorder.workorderLines || [];
+    const line = lines.find((l) => l.inventoryItem?.id === item.id);
+    if (!line) return;
+    let x = 0, y = 0;
+    if (event?.pageX != null) { x = event.pageX; y = event.pageY; }
+    else if (event?.nativeEvent) { x = event.nativeEvent.pageX || 0; y = event.nativeEvent.pageY || 0; }
+    _setNoteHelperDropdown({ workorderLine: line, anchorPosition: { x, y } });
+  }
+
+  function handleNoteHelperUpdate(updatedLine) {
+    const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
+    if (!openWorkorder) return;
+    const updatedLines = replaceOrAddToArr(openWorkorder.workorderLines || [], updatedLine);
+    useOpenWorkordersStore.getState().setField("workorderLines", updatedLines);
+    _setNoteHelperDropdown((prev) => prev ? { ...prev, workorderLine: updatedLine } : null);
+  }
+
+  function handleItemDoubleClickOrLongPress(item, event) {
+    openNoteHelperDropdown(item, event);
   }
 
   function handleInventoryInfoPress(item) {
@@ -1431,6 +1490,7 @@ export function InventoryComponent({}) {
                   zQuickItemButtons={zQuickItemButtons}
                   zWorkorderLines={zOpenWorkorder?.workorderLines}
                   onItemPress={inventoryItemSelected}
+                  onItemDoubleClick={handleItemDoubleClickOrLongPress}
                   onInfoPress={handleInventoryInfoPress}
                   forceEditMode={sForceEditMode}
                   onForceEditConsumed={() => _setForceEditMode(false)}
@@ -1559,7 +1619,19 @@ export function InventoryComponent({}) {
                           height: "100%",
                           width: zOpenWorkorderID ? "90%" : "95%",
                         }}
-                        onPress={() => inventoryItemSelected(item)}
+                        onPress={(e) => {
+                          const now = Date.now();
+                          if (lastClickItemRef.current === item.id && now - lastClickTimeRef.current < 500) {
+                            lastClickTimeRef.current = 0;
+                            lastClickItemRef.current = null;
+                            openNoteHelperDropdown(item, e);
+                          } else {
+                            lastClickTimeRef.current = now;
+                            lastClickItemRef.current = item.id;
+                            inventoryItemSelected(item);
+                          }
+                        }}
+                        onLongPress={(e) => openNoteHelperDropdown(item, e)}
                       >
                         <View
                           style={{
@@ -1659,6 +1731,15 @@ export function InventoryComponent({}) {
           onClose={() => _setCustomItemModal(null)}
           onSave={handleCustomItemSave}
           type={sCustomItemModal}
+        />
+        <NoteHelperDropdown
+          visible={!!sNoteHelperDropdown}
+          onClose={() => _setNoteHelperDropdown(null)}
+          workorderLine={sNoteHelperDropdown?.workorderLine}
+          onUpdateLine={handleNoteHelperUpdate}
+          anchorPosition={sNoteHelperDropdown?.anchorPosition || { x: 0, y: 0 }}
+          noteHelpers={zNoteHelpers || []}
+          noteHelpersTarget={zNoteHelpersTarget}
         />
       </View>
       </View>

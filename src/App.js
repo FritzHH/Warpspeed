@@ -34,7 +34,7 @@ import { BUILD_VERSION } from "./buildVersion";
 export { ROUTES };
 
 // Auto-update: force reload when a newer version is deployed.
-// Runs on page load, tab refocus, and every 5 minutes.
+// Checks on page load, tab refocus, and every day at 8 AM.
 const checkForAppUpdate = async () => {
   try {
     const res = await fetch("/version.json?t=" + Date.now());
@@ -46,11 +46,21 @@ const checkForAppUpdate = async () => {
     // Network error — skip silently
   }
 };
+const scheduleNextUpdateCheck = () => {
+  const now = new Date();
+  const next8AM = new Date(now);
+  next8AM.setHours(8, 0, 0, 0);
+  if (now >= next8AM) next8AM.setDate(next8AM.getDate() + 1);
+  setTimeout(() => {
+    checkForAppUpdate();
+    scheduleNextUpdateCheck();
+  }, next8AM - now);
+};
 checkForAppUpdate();
+scheduleNextUpdateCheck();
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") checkForAppUpdate();
 });
-setInterval(checkForAppUpdate, 5 * 60 * 1000);
 
 // Redirects tablet → /stand, mobile → / (workorders), desktop → shows HomeScreen
 function DeviceAwareHome({ user }) {

@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
+import { View, Text, ScrollView, TouchableOpacity, TextInput } from "react-native-web";
 import { useState, useEffect, useRef } from "react";
 import * as faceapi from "face-api.js";
 import { C, ICONS } from "../styles";
@@ -45,6 +45,7 @@ export function PhoneScreen() {
   const [sSelectedWorkorderID, _setSelectedWorkorderID] = useState(null);
   const [sPin, _setPin] = useState("");
   const [sPinError, _setPinError] = useState("");
+  const [sSearch, _setSearch] = useState("");
   const [sFaceCountdown, _setFaceCountdown] = useState(5);
 
   // "face" = scanning, "pin" = keypad, null = logged in
@@ -295,17 +296,73 @@ export function PhoneScreen() {
         <Text style={{ fontSize: 20, fontWeight: "600", color: C.text }}>
           WARPSPEED
         </Text>
+        <TouchableOpacity
+          onPress={() => {
+            if ("caches" in window) {
+              caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
+            }
+            window.location.reload(true);
+          }}
+          style={{
+            marginLeft: "auto",
+            backgroundColor: C.red,
+            borderRadius: 6,
+            paddingHorizontal: 8,
+            paddingVertical: 4,
+          }}
+        >
+          <Text style={{ color: "white", fontSize: 11, fontWeight: "700" }}>
+            CLEAR CACHE
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Alert overlay */}
       <AlertBox_ showAlert={zShowAlert} />
 
+      {/* Search Bar */}
+      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingTop: 8, paddingBottom: 4 }}>
+        <View
+          style={{
+            flex: 1,
+            flexDirection: "row",
+            alignItems: "center",
+            borderWidth: 1,
+            borderColor: C.buttonLightGreenOutline,
+            borderRadius: 8,
+            backgroundColor: C.listItemWhite,
+            paddingHorizontal: 8,
+            height: 36,
+          }}
+        >
+          <Image_ icon={ICONS.search} size={16} style={{ marginRight: 6, opacity: 0.4 }} />
+          <TextInput
+            value={sSearch}
+            onChangeText={_setSearch}
+            placeholder="Search name, brand, description..."
+            placeholderTextColor={gray(0.6)}
+            style={{ flex: 1, fontSize: 14, color: C.text, outlineStyle: "none" }}
+          />
+          {!!sSearch && (
+            <TouchableOpacity onPress={() => _setSearch("")} style={{ padding: 4 }}>
+              <Image_ icon={ICONS.close1} size={14} />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
       {/* Workorder List */}
       <ScrollView
         style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 8, paddingVertical: 8 }}
+        contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 8 }}
       >
-        {sortWorkorders(zWorkorders.filter((wo) => !!wo.customerID)).map((workorder) => (
+        {sortWorkorders(zWorkorders.filter((wo) => {
+          if (!wo.customerID) return false;
+          if (!sSearch.trim()) return true;
+          let q = sSearch.trim().toLowerCase();
+          let fields = [wo.customerFirst, wo.customerLast, wo.brand, wo.description];
+          return fields.some((f) => f && f.toLowerCase().includes(q));
+        })).map((workorder) => (
           <WorkorderCard
             key={workorder.id}
             workorder={workorder}
@@ -376,7 +433,7 @@ function WorkorderCard({ workorder, zStatuses, zSettings, onPress }) {
               {workorder.hasNewSMS && (
                 <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.green, marginRight: 5 }} />
               )}
-              <Text numberOfLines={1} style={{ fontSize: 14, color: "dimgray" }}>
+              <Text numberOfLines={1} style={{ fontSize: 17, color: "dimgray" }}>
                 {capitalizeFirstLetterOfString(workorder.customerFirst) + " " + capitalizeFirstLetterOfString(workorder.customerLast)}
               </Text>
             </View>
@@ -588,7 +645,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
           }}
         >
           <Image_ icon={ICONS.backRed} size={20} />
-          <Text style={{ color: C.text, fontSize: 16, marginLeft: 8, fontWeight: "500" }}>
+          <Text style={{ color: C.text, fontSize: 17, marginLeft: 8, fontWeight: "500" }}>
             Back
           </Text>
         </TouchableOpacity>
@@ -601,9 +658,9 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
         {/* Customer + Status */}
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 20, fontWeight: "700", color: C.text }}>{customerName}</Text>
+            <Text style={{ fontSize: 21, fontWeight: "700", color: C.text }}>{customerName}</Text>
             {workorder.cell ? (
-              <Text style={{ fontSize: 14, color: gray(0.45), marginTop: 2 }}>
+              <Text style={{ fontSize: 15, color: gray(0.45), marginTop: 2 }}>
                 {formatPhoneWithDashes(workorder.cell)}
               </Text>
             ) : null}
@@ -641,10 +698,10 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
           {/* Header: MEDIA label + count + Add button */}
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.45) }}>MEDIA</Text>
+              <Text style={{ fontSize: 15, fontWeight: "600", color: gray(0.45) }}>MEDIA</Text>
               {(workorder.media?.length > 0) && (
                 <View style={{ backgroundColor: C.blue, borderRadius: 10, paddingHorizontal: 6, paddingVertical: 1, marginLeft: 6 }}>
-                  <Text style={{ color: "white", fontSize: 11, fontWeight: "600" }}>{workorder.media.length}</Text>
+                  <Text style={{ color: "white", fontSize: 13, fontWeight: "600" }}>{workorder.media.length}</Text>
                 </View>
               )}
             </View>
@@ -661,7 +718,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
                 opacity: sUploading ? 0.5 : 1,
               }}
             >
-              <Text style={{ color: "white", fontSize: 13, fontWeight: "600" }}>+ Add</Text>
+              <Text style={{ color: "white", fontSize: 15, fontWeight: "600" }}>+ Add</Text>
             </TouchableOpacity>
           </View>
 
@@ -670,7 +727,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
             <View style={{ marginBottom: 8 }}>
               <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
                 <SmallLoadingIndicator text="" color={C.blue} />
-                <Text style={{ fontSize: 12, color: gray(0.45), marginLeft: 6 }}>
+                <Text style={{ fontSize: 14, color: gray(0.45), marginLeft: 6 }}>
                   Uploading {zUploadProgress.completed}/{zUploadProgress.total}...
                 </Text>
               </View>
@@ -690,7 +747,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
           {/* Upload complete message */}
           {zUploadProgress && zUploadProgress.done && (
             <View style={{ marginBottom: 8 }}>
-              <Text style={{ fontSize: 12, color: zUploadProgress.failed > 0 ? C.red : C.green, fontWeight: "500" }}>
+              <Text style={{ fontSize: 14, color: zUploadProgress.failed > 0 ? C.red : C.green, fontWeight: "500" }}>
                 {zUploadProgress.failed > 0
                   ? `Uploaded ${zUploadProgress.completed}/${zUploadProgress.total} (${zUploadProgress.failed} failed)`
                   : `${zUploadProgress.completed} file${zUploadProgress.completed > 1 ? "s" : ""} uploaded`}
@@ -733,7 +790,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
                           backgroundColor: "rgba(0,0,0,0.25)",
                         }}
                       >
-                        <Text style={{ color: "white", fontSize: 24 }}>{"\u25B6"}</Text>
+                        <Text style={{ color: "white", fontSize: 26 }}>{"\u25B6"}</Text>
                       </View>
                     )}
                   </TouchableOpacity>
@@ -741,7 +798,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
               })}
             </View>
           ) : (
-            <Text style={{ fontSize: 13, color: gray(0.5) }}>No photos or videos yet</Text>
+            <Text style={{ fontSize: 15, color: gray(0.5) }}>No photos or videos yet</Text>
           )}
         </View>
 
@@ -757,8 +814,8 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
               marginBottom: 12,
             }}
           >
-            <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.45), marginBottom: 4 }}>BIKE</Text>
-            <Text style={{ fontSize: 15, color: C.text }}>
+            <Text style={{ fontSize: 14, fontWeight: "600", color: gray(0.45), marginBottom: 4 }}>BIKE</Text>
+            <Text style={{ fontSize: 16, color: C.text }}>
               {[workorder.brand, workorder.model].filter(Boolean).join(" ")}
             </Text>
           </View>
@@ -775,7 +832,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
             marginBottom: 12,
           }}
         >
-          <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.45), marginBottom: 8 }}>
+          <Text style={{ fontSize: 14, fontWeight: "600", color: gray(0.45), marginBottom: 8 }}>
             ITEMS ({runningQty})
           </Text>
           {(workorder.workorderLines || []).map((line, idx) => {
@@ -793,19 +850,19 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
                 }}
               >
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 14, color: C.text }}>{name}</Text>
+                  <Text style={{ fontSize: 15, color: C.text }}>{name}</Text>
                   {line.qty > 1 && (
-                    <Text style={{ fontSize: 12, color: gray(0.5) }}>Qty: {line.qty}</Text>
+                    <Text style={{ fontSize: 13, color: gray(0.5) }}>Qty: {line.qty}</Text>
                   )}
                 </View>
-                <Text style={{ fontSize: 14, color: C.text, fontWeight: "500" }}>
+                <Text style={{ fontSize: 15, color: C.text, fontWeight: "500" }}>
                   {formatCurrencyDisp(lineTotal, true)}
                 </Text>
               </View>
             );
           })}
           {(!workorder.workorderLines || workorder.workorderLines.length === 0) && (
-            <Text style={{ fontSize: 14, color: gray(0.5) }}>No items</Text>
+            <Text style={{ fontSize: 15, color: gray(0.5) }}>No items</Text>
           )}
         </View>
 
@@ -821,8 +878,8 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
               marginBottom: 12,
             }}
           >
-            <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.45), marginBottom: 4 }}>NOTES</Text>
-            <Text style={{ fontSize: 14, color: C.text }}>{workorder.notes}</Text>
+            <Text style={{ fontSize: 14, fontWeight: "600", color: gray(0.45), marginBottom: 4 }}>NOTES</Text>
+            <Text style={{ fontSize: 15, color: C.text }}>{workorder.notes}</Text>
           </View>
         ) : null}
 
@@ -835,8 +892,8 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
             paddingHorizontal: 4,
           }}
         >
-          <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>Total</Text>
-          <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>
+          <Text style={{ fontSize: 17, fontWeight: "600", color: C.text }}>Total</Text>
+          <Text style={{ fontSize: 17, fontWeight: "700", color: C.text }}>
             {formatCurrencyDisp(runningTotal, true)}
           </Text>
         </View>

@@ -1234,7 +1234,110 @@ export const SETTINGS_OBJ = {
       type: "intakeReceipt",
     },
   ],
+  staticNotes: [
+    {
+      id: 'position',
+      label: 'Position',
+      items: [
+        'Front',
+        'Rear',
+      ]
+    },
+    {
+      id: 'brakes',
+      label: 'Brakes',
+      itesm: [
+        'Squealing',
+        'Broken',
+      ]
+    }
+  ],
   statusAutoText: [],
+  noteHelpers: [{
+    id: 'position',
+    label: 'Position',
+    items: [
+      'Front',
+      'Rear',
+    ]
+  },
+  {
+    id: 'brakes',
+    label: 'Brakes',
+    items: [
+      'Squealing',
+      'Broken',
+      'Very contaminated'
+    ]
+  },
+  {
+    id: 'tires',
+    label: 'Tires',
+    items: [
+      'worn',
+      'broken'
+    ]
+  },
+  {
+    id: 'tube',
+    label: 'Tube',
+    items: [
+      'Slow leak'
+    ]
+  },
+  {
+    id: 'cable',
+    label: 'Cables',
+    items: [
+      'Brake',
+      'Shifter',
+      'Corroded',
+      'Kinked'
+    ]
+  },
+  {
+    id: 'chain',
+    label: 'Chain',
+    items: [
+      'Stretched',
+      'Corroded',
+      'Twisted'
+    ]
+  },
+  {
+    id: 'gears',
+    label: 'Gears',
+    items: [
+      'Worn',
+      'Corroded'
+    ]
+  },
+  {
+    id: 'wheels',
+    label: 'Wheels',
+    items: [
+      'Spokes',
+      'Damaged'
+    ]
+  },
+  {
+    id: 'shifter',
+    label: 'Shifter',
+    items: [
+      'Gummed',
+      'Broken',
+      'Try to recover'
+    ]
+  },
+  {
+    id: 'customer',
+    label: 'Customer Request',
+    items: [
+      'Customer Request'
+    ]
+  },
+  ],
+  noteHelpersTarget: "intakeNotes",
   nextWorkorderCounter: 1,
   nextSaleCounter: 1,
 };
@@ -1276,6 +1379,13 @@ export const STATUS_AUTO_TEXT_PROTO = {
   delayMinutes: 0,
   delaySeconds: 0,
 };
+
+export const NOTE_HELPER_PROTO = {
+  id: "",
+  label: "",
+  items: [],
+};
+
 // RECEIPT STUFF ////////////////////////////////////////////////////
 
 // DB CONNECETED DO NOT CHANGE

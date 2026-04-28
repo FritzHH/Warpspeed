@@ -24,7 +24,7 @@ import {
   log,
 } from "../utils";
 import { dbUploadWorkorderMedia } from "../db_calls_wrapper";
-import { Image_, AlertBox_, SmallLoadingIndicator } from "../components";
+import { Image_, AlertBox_, SmallLoadingIndicator, StatusPickerModal } from "../components";
 import { StandKeypad } from "../shared/StandKeypad";
 import { FACE_DESCRIPTOR_CONFIDENCE_DISTANCE } from "../constants";
 import { openCacheDB, clearStaleCache, loadModelCached } from "../faceDetection";
@@ -498,6 +498,10 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
   const uploadInputRef = useRef(null);
   const zUploadProgress = useUploadProgressStore((s) => s.progress);
 
+  function handleStatusSelect(val) {
+    useOpenWorkordersStore.getState().setField("status", val.id, workorder.id);
+  }
+
   function handleUploadPress() {
     if (uploadInputRef.current) uploadInputRef.current.click();
   }
@@ -604,9 +608,15 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
               </Text>
             ) : null}
           </View>
-          <View style={{ backgroundColor: statusColor, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5 }}>
-            <Text style={{ fontSize: 13, fontWeight: "600", color: "white" }}>{statusObj?.label || workorder.status}</Text>
-          </View>
+          <StatusPickerModal
+            statuses={(zSettings?.statuses || []).filter((s) => !s.systemOwned && !s.hidden)}
+            enabled={true}
+            onSelect={handleStatusSelect}
+            buttonStyle={{
+              backgroundColor: statusColor,
+              paddingHorizontal: 10,
+            }}
+          />
         </View>
 
         {/* Media upload */}

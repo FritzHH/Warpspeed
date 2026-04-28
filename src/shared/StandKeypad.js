@@ -9,6 +9,8 @@ export const PHONE_KEYS = [
   ["CLR", "0", "\u232B"],
 ];
 
+export const NUMBER_ROW = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+
 export const QWERTY_ROWS = [
   ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
   ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
@@ -45,7 +47,7 @@ function KeyButton({ keyLabel, displayLabel, onClick, style }) {
   );
 }
 
-export function StandKeypad({ mode, onKeyPress }) {
+export function StandKeypad({ mode, onKeyPress, showNumberRow }) {
   if (mode === "phone") {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -62,6 +64,13 @@ export function StandKeypad({ mode, onKeyPress }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {showNumberRow && (
+        <div style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
+          {NUMBER_ROW.map((key) => (
+            <KeyButton key={key} keyLabel={key} onClick={onKeyPress} style={{ flex: 1, height: 42, maxWidth: 48 }} />
+          ))}
+        </div>
+      )}
       {QWERTY_ROWS.map((row, ri) => (
         <div key={ri} style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
           {row.map((key) => (

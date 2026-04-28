@@ -98,9 +98,11 @@ const QuickItemCanvasCard = ({
   onInfoPress,
   onLabelChange,
   containerRef,
+  isInWorkorder,
 }) => {
   const [sDragging, _setDragging] = useState(false);
   const [sResizing, _setResizing] = useState(false);
+  const [sPressed, _setPressed] = useState(false);
   const [sLineCount, _setLineCount] = useState(1);
   const [sShowActions, _setShowActions] = useState(false);
   const [sShowPrintPicker, _setShowPrintPicker] = useState(false);
@@ -252,7 +254,12 @@ const QuickItemCanvasCard = ({
 
   return (
     <div
-      onMouseDown={handleMouseDown}
+      onMouseDown={(e) => {
+        if (!sEditMode) _setPressed(true);
+        handleMouseDown(e);
+      }}
+      onMouseUp={() => { if (!sEditMode) _setPressed(false); }}
+      onMouseLeave={() => { if (!sEditMode) _setPressed(false); }}
       onClick={() => {
         if (sEditMode) {
           if (didDragRef.current) return;
@@ -279,9 +286,9 @@ const QuickItemCanvasCard = ({
         borderStyle: "solid",
         borderColor: isSelected ? C.blue : C.buttonLightGreenOutline,
         borderRadius: 8,
-        backgroundColor: C.buttonLightGreenOutline,
+        backgroundColor: isInWorkorder ? lightenRGBByPercent(C.blue, 70) : C.buttonLightGreenOutline,
         cursor: sEditMode ? (sDragging ? "grabbing" : (sResizing ? "auto" : "grab")) : "pointer",
-        opacity: sDragging ? 0.7 : 1,
+        opacity: sPressed ? 0.7 : (sDragging ? 0.7 : 1),
         boxSizing: "border-box",
         paddingHorizontal: 4,
         paddingTop: 2,
@@ -521,6 +528,7 @@ const QuickItemCanvas = React.forwardRef(({
   buttonObj,
   zInventoryArr,
   zQuickItemButtons,
+  zWorkorderLines,
   onItemPress,
   onInfoPress,
   forceEditMode,
@@ -657,6 +665,7 @@ const QuickItemCanvas = React.forwardRef(({
               invItem={invItem}
               sEditMode={sEditMode}
               isSelected={sSelectedItemId === itemObj.inventoryItemID}
+              isInWorkorder={!!(zWorkorderLines || []).find((l) => l.inventoryItem?.id === itemObj.inventoryItemID)}
               onSelect={(id) => { _setSelectedItemId(id); notifyParent(sEditMode, id); }}
               containerRef={canvasRef}
               onPositionChange={handlePositionChange}
@@ -1420,6 +1429,7 @@ export function InventoryComponent({}) {
                   buttonObj={activeBtn}
                   zInventoryArr={zInventoryArr}
                   zQuickItemButtons={zQuickItemButtons}
+                  zWorkorderLines={zOpenWorkorder?.workorderLines}
                   onItemPress={inventoryItemSelected}
                   onInfoPress={handleInventoryInfoPress}
                   forceEditMode={sForceEditMode}

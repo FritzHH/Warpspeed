@@ -3447,7 +3447,7 @@ export async function startNewWorkorder(customer, { status } = {}) {
     customerLanguage: customer?.language || "",
     startedByFirst: _currentUser?.first,
     startedByLast: _currentUser?.last,
-    status: status || useSettingsStore.getState().getSettings()?.statuses?.[0]?.id || "",
+    status: status || undefined,
   });
   wo.workorderNumber = buildWorkorderNumberFromId(id, wo.startedOnMillis);
   let store = useOpenWorkordersStore.getState();

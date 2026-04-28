@@ -184,7 +184,7 @@ function bestForegroundHex(bgHex) {
   const bgLum = luminance(r, g, b);
   const contrastWithWhite = contrastRatio(bgLum, 1.0);
   const contrastWithBlack = contrastRatio(bgLum, 0.0);
-  return contrastWithWhite >= contrastWithBlack ? "white" : "rgb(71,71,71)";
+  return contrastWithWhite >= contrastWithBlack ? "white" : "rgb(20,20,20)";
 }
 
 function dollarsToCents(val) {
@@ -509,7 +509,7 @@ function extractStatusesFromWorkorders(workorderCSVText, statusCSVText) {
   const nonremovableLabels = new Set(NONREMOVABLE_STATUSES.map(function (s) { return s.label.toLowerCase(); }));
   const aliasedLabels = new Set(Object.keys(STATUS_ALIASES));
 
-  // Build CSV statuses from workorderStatuses.csv in exact CSV row order
+  // Build CSV statuses from workorderStatuses.csv, sorted by sortOrder
   var csvStatuses = [];
   if (statusCSVText) {
     var statusRows = parseCSV(statusCSVText);
@@ -517,12 +517,12 @@ function extractStatusesFromWorkorders(workorderCSVText, statusCSVText) {
       var name = (statusRows[i].name || "").trim();
       var lower = name.toLowerCase();
       if (!name) continue;
-      // Skip if it maps to a nonremovable status or is aliased to one
       if (nonremovableLabels.has(lower)) continue;
       if (aliasedLabels.has(lower)) continue;
       var bgHex = (statusRows[i].htmlColor || "").trim() || "#B8B8B8";
       var textColor = bestForegroundHex(bgHex);
       var rgb = hexToRgb(bgHex);
+      var sortOrder = parseInt(statusRows[i].sortOrder || "0", 10) || 0;
       csvStatuses.push({
         id: "ls_" + lower.replace(/[^a-z0-9]+/g, "_"),
         label: name,
@@ -530,11 +530,15 @@ function extractStatusesFromWorkorders(workorderCSVText, statusCSVText) {
         backgroundColor: "rgb(" + rgb.r + "," + rgb.g + "," + rgb.b + ")",
         removable: true,
         hidden: false,
+        _sortOrder: sortOrder,
       });
     }
+    csvStatuses.sort(function (a, b) { return a._sortOrder - b._sortOrder; });
+    // Remove temporary sort key
+    csvStatuses.forEach(function (s) { delete s._sortOrder; });
   }
 
-  // Nonremovable statuses first, then CSV statuses in their original CSV order
+  // Nonremovable statuses first, then CSV statuses sorted by LS sortOrder
   return [].concat(NONREMOVABLE_STATUSES, csvStatuses);
 }
 
@@ -1632,16 +1636,39 @@ async function main() {
 
   // Mode selection
   console.log("");
-  console.log("  full  - All workorders, customers, sales, inventory, employees");
-  console.log("  sales - Sales + transactions only (clears and rewrites sales/transactions)");
+  console.log("  Collections:");
+  console.log("    1. Statuses");
+  console.log("    2. Employees");
+  console.log("    3. Inventory");
+  console.log("    4. Customers");
+  console.log("    5. Workorders (open + completed)");
+  console.log("    6. Sales (completed + active)");
+  console.log("    7. Transactions");
+  console.log("    8. Punch history");
   console.log("");
-  let choice = "";
-  while (choice !== "full" && choice !== "sales") {
-    choice = (await askQuestion("  Type 'full' or 'sales': ")).toLowerCase();
+  console.log("  Type 'full' for all, or comma-separated numbers (e.g. 1,6,7)");
+  console.log("");
+  var selectedSet = null;
+  while (!selectedSet) {
+    var input = (await askQuestion("  Selection: ")).trim().toLowerCase();
+    if (input === "full") {
+      selectedSet = new Set([1, 2, 3, 4, 5, 6, 7, 8]);
+    } else {
+      var nums = input.split(",").map(function (s) { return parseInt(s.trim(), 10); }).filter(function (n) { return n >= 1 && n <= 8; });
+      if (nums.length > 0) selectedSet = new Set(nums);
+    }
   }
-  const salesOnly = choice === "sales";
-
-  console.log("\n  -> " + (salesOnly ? "Sales-only" : "Full") + " Migration selected\n");
+  var isFull = selectedSet.size === 8;
+  var selectedLabels = [];
+  if (selectedSet.has(1)) selectedLabels.push("statuses");
+  if (selectedSet.has(2)) selectedLabels.push("employees");
+  if (selectedSet.has(3)) selectedLabels.push("inventory");
+  if (selectedSet.has(4)) selectedLabels.push("customers");
+  if (selectedSet.has(5)) selectedLabels.push("workorders");
+  if (selectedSet.has(6)) selectedLabels.push("sales");
+  if (selectedSet.has(7)) selectedLabels.push("transactions");
+  if (selectedSet.has(8)) selectedLabels.push("punches");
+  console.log("\n  -> " + (isFull ? "Full" : "Partial") + " Migration: " + selectedLabels.join(", ") + "\n");
 
   const TOTAL_STAGES = 10;
 
@@ -1654,19 +1681,19 @@ async function main() {
   const csv = readCSVFiles();
 
   // -- STAGE 2: Clear existing collections --
-  logStage(2, TOTAL_STAGES, "Clearing existing collections");
-  if (!salesOnly) {
+  logStage(2, TOTAL_STAGES, "Clearing selected collections");
+  if (selectedSet.has(3)) await clearCollection(basePath + "/inventory", "inventory");
+  if (selectedSet.has(4)) await clearCollection(basePath + "/customers", "customers");
+  if (selectedSet.has(5)) {
     await clearCollection(basePath + "/open-workorders", "open workorders");
     await clearCollection(basePath + "/completed-workorders", "completed workorders");
-    await clearCollection(basePath + "/customers", "customers");
-    await clearCollection(basePath + "/inventory", "inventory");
-    await clearCollection(basePath + "/punches", "punches");
-  } else {
-    logInfo("Sales-only mode: skipping workorders, customers, inventory, punches");
   }
-  await clearCollection(basePath + "/completed-sales", "completed sales");
-  await clearCollection(basePath + "/active-sales", "active sales");
-  await clearCollection(basePath + "/transactions", "transactions");
+  if (selectedSet.has(6)) {
+    await clearCollection(basePath + "/completed-sales", "completed sales");
+    await clearCollection(basePath + "/active-sales", "active sales");
+  }
+  if (selectedSet.has(7)) await clearCollection(basePath + "/transactions", "transactions");
+  if (selectedSet.has(8)) await clearCollection(basePath + "/punches", "punches");
 
   // -- STAGE 3: Map statuses --
   logStage(3, TOTAL_STAGES, "Mapping statuses");
@@ -1771,52 +1798,52 @@ async function main() {
   // -- STAGE 9: Write to Firestore --
   logStage(9, TOTAL_STAGES, "Writing to Firestore");
 
-  if (!salesOnly) {
-    // 9a: Merge statuses + employees into settings
-    logInfo("Merging statuses and employees into settings...");
+  if (selectedSet.has(1) || selectedSet.has(2)) {
     const settingsRef = db.doc(basePath + "/settings/settings");
     const settingsDoc = await settingsRef.get();
     const existingSettings = settingsDoc.exists ? settingsDoc.data() : {};
-    const existingUsers = existingSettings.users || [];
-    // Deduplicate by lightspeed_id to prevent repeats across migration runs
-    const existingByLsID = {};
-    existingUsers.forEach(function (u) {
-      if (u.lightspeed_id) existingByLsID[u.lightspeed_id] = u;
-    });
-    for (const u of newUsers) {
-      if (!existingByLsID[u.lightspeed_id]) {
-        existingUsers.push(u);
-      }
+    var mergeObj = {};
+
+    if (selectedSet.has(1)) {
+      mergeObj.statuses = statuses;
+      logSuccess("Statuses ready (" + statuses.length + ")");
     }
-    await settingsRef.set({ statuses, users: existingUsers }, { merge: true });
-    logSuccess("Settings updated (statuses + " + existingUsers.length + " users)");
 
-    // 9b: Inventory
-    await batchWrite(basePath + "/inventory", inventoryItems, "inventory");
+    if (selectedSet.has(2)) {
+      const existingUsers = existingSettings.users || [];
+      const existingByLsID = {};
+      existingUsers.forEach(function (u) {
+        if (u.lightspeed_id) existingByLsID[u.lightspeed_id] = u;
+      });
+      for (const u of newUsers) {
+        if (!existingByLsID[u.lightspeed_id]) {
+          existingUsers.push(u);
+        }
+      }
+      mergeObj.users = existingUsers;
+      logSuccess("Employees ready (" + existingUsers.length + " users)");
+    }
 
-    // 9c: Customers
-    await batchWrite(basePath + "/customers", customers, "customers");
-
-    // 9d: Open workorders
-    await batchWrite(basePath + "/open-workorders", openWorkorders, "open workorders");
-
-    // 9e: Completed workorders
-    await batchWrite(basePath + "/completed-workorders", completedWorkorders, "completed workorders");
-
-    // 9i: Punch history
-    await batchWrite(basePath + "/punches", punches, "punch history");
-  } else {
-    logInfo("Sales-only mode: skipping settings, inventory, customers, workorders, punches");
+    await settingsRef.set(mergeObj, { merge: true });
+    logSuccess("Settings updated");
   }
 
-  // Sales + transactions always written
-  await batchWrite(basePath + "/completed-sales", completedSales, "completed sales");
-  await batchWrite(basePath + "/active-sales", activeSales, "active sales");
-  await batchWrite(basePath + "/transactions", transactions, "transactions");
+  if (selectedSet.has(3)) await batchWrite(basePath + "/inventory", inventoryItems, "inventory");
+  if (selectedSet.has(4)) await batchWrite(basePath + "/customers", customers, "customers");
+  if (selectedSet.has(5)) {
+    await batchWrite(basePath + "/open-workorders", openWorkorders, "open workorders");
+    await batchWrite(basePath + "/completed-workorders", completedWorkorders, "completed workorders");
+  }
+  if (selectedSet.has(6)) {
+    await batchWrite(basePath + "/completed-sales", completedSales, "completed sales");
+    await batchWrite(basePath + "/active-sales", activeSales, "active sales");
+  }
+  if (selectedSet.has(7)) await batchWrite(basePath + "/transactions", transactions, "transactions");
+  if (selectedSet.has(8)) await batchWrite(basePath + "/punches", punches, "punch history");
 
   // -- STAGE 10: Summary --
   logStage(10, TOTAL_STAGES, "Summary");
-  const modeLabel = salesOnly ? "SALES-ONLY MIGRATION" : "FULL MIGRATION";
+  const modeLabel = isFull ? "FULL MIGRATION" : "PARTIAL MIGRATION (" + selectedLabels.join(", ") + ")";
   const totalTime = ((Date.now() - globalStart) / 1000).toFixed(1);
   const minutes = Math.floor(totalTime / 60);
   const seconds = (totalTime % 60).toFixed(0);

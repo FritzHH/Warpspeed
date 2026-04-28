@@ -1,0 +1,78 @@
+/* eslint-disable */
+import { C } from "../styles";
+import { gray } from "../utils";
+
+export const PHONE_KEYS = [
+  ["1", "2", "3"],
+  ["4", "5", "6"],
+  ["7", "8", "9"],
+  ["CLR", "0", "\u232B"],
+];
+
+export const QWERTY_ROWS = [
+  ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"],
+  ["A", "S", "D", "F", "G", "H", "J", "K", "L"],
+  ["Z", "X", "C", "V", "B", "N", "M", "\u232B"],
+];
+
+const KEY_STYLE = {
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  borderRadius: 6,
+  borderWidth: 1,
+  borderStyle: "solid",
+  borderColor: C.buttonLightGreenOutline,
+  backgroundColor: C.listItemWhite,
+  cursor: "pointer",
+  userSelect: "none",
+  fontWeight: "600",
+  fontSize: 18,
+  color: C.text,
+};
+
+function KeyButton({ keyLabel, displayLabel, onClick, style }) {
+  return (
+    <div
+      onClick={() => onClick(keyLabel)}
+      onMouseDown={(e) => { e.currentTarget.style.backgroundColor = gray(0.1); }}
+      onMouseUp={(e) => { e.currentTarget.style.backgroundColor = C.listItemWhite; }}
+      onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = C.listItemWhite; }}
+      style={{ ...KEY_STYLE, ...style }}
+    >
+      {displayLabel || keyLabel}
+    </div>
+  );
+}
+
+export function StandKeypad({ mode, onKeyPress }) {
+  if (mode === "phone") {
+    return (
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {PHONE_KEYS.map((row, ri) => (
+          <div key={ri} style={{ display: "flex", flexDirection: "row", gap: 6, justifyContent: "center" }}>
+            {row.map((key) => (
+              <KeyButton key={key} keyLabel={key} onClick={onKeyPress} style={{ width: 64, height: 48 }} />
+            ))}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {QWERTY_ROWS.map((row, ri) => (
+        <div key={ri} style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
+          {row.map((key) => (
+            <KeyButton key={key} keyLabel={key} onClick={onKeyPress} style={{ flex: 1, height: 42, maxWidth: 48 }} />
+          ))}
+        </div>
+      ))}
+      <div style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
+        <KeyButton keyLabel=" " displayLabel="SPACE" onClick={onKeyPress} style={{ flex: 3, height: 42 }} />
+        <KeyButton keyLabel="CLR" onClick={onKeyPress} style={{ flex: 1, height: 42, fontSize: 13 }} />
+      </div>
+    </div>
+  );
+}

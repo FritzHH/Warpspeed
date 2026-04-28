@@ -22,7 +22,7 @@ const CACHE_DB_VERSION = 1;
 const CACHE_STORE_NAME = "shards";
 const MODEL_CACHE_VERSION = "v1"; // bump when model files in public/models/ change
 
-function openCacheDB() {
+export function openCacheDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(CACHE_DB_NAME, CACHE_DB_VERSION);
     request.onupgradeneeded = (event) => {
@@ -56,7 +56,7 @@ function setCachedShard(db, key, buffer) {
   });
 }
 
-async function clearStaleCache(db) {
+export async function clearStaleCache(db) {
   try {
     const tx = db.transaction(CACHE_STORE_NAME, "readwrite");
     const store = tx.objectStore(CACHE_STORE_NAME);
@@ -75,7 +75,7 @@ async function clearStaleCache(db) {
   }
 }
 
-async function loadModelCached(net, modelName, db) {
+export async function loadModelCached(net, modelName, db) {
   const manifestUri = MODEL_URL + "/" + modelName + "-weights_manifest.json";
   const manifestResponse = await fetch(manifestUri);
   const manifest = await manifestResponse.json();

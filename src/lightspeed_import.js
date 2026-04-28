@@ -105,6 +105,7 @@ export function mapStatuses(statusesCSVText) {
     var bgHex = (rows[i].Color || rows[i].htmlColor || "").trim() || "#B8B8B8";
     var textColor = bestForegroundHex(bgHex);
     var rgb = hexToRgb(bgHex);
+    var sortOrder = parseInt(rows[i].sortOrder || rows[i].SortOrder || "0", 10) || 0;
     csvStatuses.push({
       id: "ls_" + lower.replace(/[^a-z0-9]+/g, "_"),
       label: name,
@@ -112,8 +113,11 @@ export function mapStatuses(statusesCSVText) {
       backgroundColor: "rgb(" + rgb.r + "," + rgb.g + "," + rgb.b + ")",
       removable: true,
       hidden: false,
+      _sortOrder: sortOrder,
     });
   }
+  csvStatuses.sort(function (a, b) { return a._sortOrder - b._sortOrder; });
+  csvStatuses.forEach(function (s) { delete s._sortOrder; });
 
   return [...NONREMOVABLE_STATUSES, ...csvStatuses];
 }

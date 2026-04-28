@@ -3,13 +3,15 @@ import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { cloneDeep } from "lodash";
-import { C, ICONS } from "../styles";
+import * as faceapi from "face-api.js";
+import { C, ICONS, COLOR_GRADIENTS } from "../styles";
 import {
   useSettingsStore,
   useOpenWorkordersStore,
   useInventoryStore,
-  useLoginStore,
+  useCurrentCustomerStore,
   useUploadProgressStore,
+  useLoginStore,
 } from "../stores";
 import {
   resolveStatus,
@@ -20,7 +22,6 @@ import {
   applyDiscountToWorkorderItem,
   calculateRunningTotals,
   deepEqual,
-  formatWorkorderNumber,
   removeDashesFromPhone,
   formatPhoneWithDashes,
   checkInputForNumbersOnly,
@@ -29,6 +30,12 @@ import {
   compressImage,
   createNewWorkorder,
   scheduleAutoText,
+  usdTypeMask,
+  generateEAN13Barcode,
+  log,
+  printBuilder,
+  localStorageWrapper,
+  findTemplateByType,
 } from "../utils";
 import {
   WORKORDER_ITEM_PROTO,
@@ -37,9 +44,11 @@ import {
   NONREMOVABLE_WAIT_TIMES,
   SETTINGS_OBJ,
   CONTACT_RESTRICTIONS,
+  CUSTOMER_PROTO,
   QUICK_BUTTON_ITEM_PROTO,
   QB_DEFAULT_W,
   QB_DEFAULT_H,
+  INVENTORY_ITEM_PROTO,
 } from "../data";
 import {
   Button_,
@@ -49,6 +58,8 @@ import {
   DropdownMenu,
   StatusPickerModal,
   PhoneNumberInput,
+  Tooltip,
+  SmallLoadingIndicator,
 } from "../components";
 import {
   dbListenToSettings,
@@ -56,11 +67,18 @@ import {
   dbListenToOpenWorkorders,
   dbSaveOpenWorkorder,
   dbSearchCustomersByPhone,
+  dbSearchCustomersByName,
   dbUploadWorkorderMedia,
   startNewWorkorder,
+  dbSavePrintObj,
+  dbUploadPDFAndSendSMS,
+  dbSendEmail,
 } from "../db_calls_wrapper";
 import { WorkorderMediaModal } from "./screen_components/modal_screens/WorkorderMediaModal";
-import { MILLIS_IN_DAY } from "../constants";
+import { InventorySearchModal } from "./screen_components/modal_screens/InventorySearchModal";
+import { StandKeypad } from "../shared/StandKeypad";
+import { MILLIS_IN_DAY, DISCOUNT_TYPES, FACE_DESCRIPTOR_CONFIDENCE_DISTANCE } from "../constants";
+import { openCacheDB, clearStaleCache, loadModelCached } from "../faceDetection";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
 
@@ -78,69 +96,17 @@ function normalizeItemEntry(entry, idx) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Sort Logic (from Options_Workorders)
-////////////////////////////////////////////////////////////////////////////////
-
-function sortWorkorders(inputArr, statuses, currentUser) {
-  let finalArr = [];
-
-  // Pass 1: group by status order, sort by due date within each group
-  (statuses || []).forEach((status) => {
-    let arr = inputArr.filter((wo) => wo.status === status.id);
-    arr.sort((a, b) => {
-      let aHasWait = !!(a.waitTime?.maxWaitTimeDays != null && a.startedOnMillis);
-      let bHasWait = !!(b.waitTime?.maxWaitTimeDays != null && b.startedOnMillis);
-      if (!aHasWait && bHasWait) return -1;
-      if (aHasWait && !bHasWait) return 1;
-      if (!aHasWait && !bHasWait) return 0;
-      let aDue = a.startedOnMillis + a.waitTime.maxWaitTimeDays * 86400000;
-      let bDue = b.startedOnMillis + b.waitTime.maxWaitTimeDays * 86400000;
-      return aDue - bDue;
-    });
-    finalArr = [...finalArr, ...arr];
-  });
-
-  // Add any workorders with unrecognized statuses at the end
-  let mappedIDs = new Set(finalArr.map((o) => o.id));
-  inputArr.forEach((wo) => { if (!mappedIDs.has(wo.id)) finalArr.push(wo); });
-
-  // Pass 2: bubble current user's assigned statuses to top
-  let userStatusIDs = currentUser?.statuses || [];
-  if (userStatusIDs.length > 0) {
-    finalArr.sort((a, b) => {
-      let aMatch = userStatusIDs.includes(a.status);
-      let bMatch = userStatusIDs.includes(b.status);
-      if (aMatch && !bMatch) return -1;
-      if (!aMatch && bMatch) return 1;
-      return 0;
-    });
-  }
-
-  // Pass 3: bubble workorders where current user was last SMS sender
-  finalArr.sort((a, b) => {
-    let aIsSender = a.lastSMSSenderUserID && a.lastSMSSenderUserID === currentUser?.id;
-    let bIsSender = b.lastSMSSenderUserID && b.lastSMSSenderUserID === currentUser?.id;
-    if (aIsSender && !bIsSender) return -1;
-    if (!aIsSender && bIsSender) return 1;
-    return 0;
-  });
-
-  return finalArr;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 // Main Screen
 ////////////////////////////////////////////////////////////////////////////////
 
 export function BikeStandScreen() {
-  const zStatuses = useSettingsStore((s) => s.settings?.statuses, deepEqual);
   const zQuickItemButtons = useSettingsStore((s) => s.settings?.quickItemButtons, deepEqual);
   const zSettings = useSettingsStore((s) => s.settings) || SETTINGS_OBJ;
   const zWorkorders = useOpenWorkordersStore((state) => state.workorders);
   const zInventory = useInventoryStore((state) => state.inventoryArr);
-  const zCurrentUser = useLoginStore((state) => state.currentUser);
 
   const [sSelectedWorkorderID, _setSelectedWorkorderID] = useState(null);
+  const [sPendingCustomer, _setPendingCustomer] = useState(null); // null | customer object | "standalone"
   const qtyMapRef = useRef({});
   const [sQtyMap, _setQtyMap] = useState({});
   const qtyTimerRef = useRef(null);
@@ -150,8 +116,43 @@ export function BikeStandScreen() {
   const [sSelectedCustomer, _setSelectedCustomer] = useState(null);
   const [sShowPhoneSearch, _setShowPhoneSearch] = useState(false);
   const [sShowCustomerModal, _setShowCustomerModal] = useState(false);
+  const [sShowNewWorkorderModal, _setShowNewWorkorderModal] = useState(false);
   const [sDiscountCardID, _setDiscountCardID] = useState(null);
+  const [sShowInventoryModal, _setShowInventoryModal] = useState(false);
+  const [sShowWorkorderList, _setShowWorkorderList] = useState(false);
   const longPressTimerRef = useRef(null);
+
+  // Quick button panel state (mirrors Options_Inventory)
+  const [sSelectedButtonID, _setSelectedButtonID] = useState(null);
+  const [sCurrentParentID, _setCurrentParentID] = useState(null);
+  const [sMenuPath, _setMenuPath] = useState([]);
+  const [sCustomItemModal, _setCustomItemModal] = useState(null); // "labor" | "item" | null
+  const [sShowBikeDetails, _setShowBikeDetails] = useState(false);
+  const [sShowPrintMenu, _setShowPrintMenu] = useState(false);
+  const [sShowPrinterSelectModal, _setShowPrinterSelectModal] = useState(false);
+  const [sShowIntakeActionModal, _setShowIntakeActionModal] = useState(false);
+  const [sSelectedPrinterID, _setSelectedPrinterID] = useState(() => localStorageWrapper.getItem("selectedPrinterID") || "");
+
+  // Refs for bike detail dropdowns
+  const bikeBrandsRef = useRef(null);
+  const bikeOptBrandsRef = useRef(null);
+  const descriptionRef = useRef(null);
+  const color1Ref = useRef(null);
+  const color2Ref = useRef(null);
+  const waitTimesRef = useRef(null);
+  const swipeDividerRef = useRef(null);
+
+  // Login state (face recognition + pin)
+  const [sShowFaceModal, _setShowFaceModal] = useState(false);
+  const [sFaceCountdown, _setFaceCountdown] = useState(5);
+  const [sShowPinModal, _setShowPinModal] = useState(false);
+  const [sPin, _setPin] = useState("");
+  const faceVideoRef = useRef(null);
+  const faceStreamRef = useRef(null);
+  const faceIntervalRef = useRef(null);
+  const countdownRef = useRef(null);
+  const modelsLoadedRef = useRef(false);
+  const pendingActionRef = useRef(null);
 
   // Firebase listeners (same pattern as IntakeScreen)
   useEffect(() => {
@@ -166,33 +167,195 @@ export function BikeStandScreen() {
     });
   }, []);
 
-  let statuses = zStatuses || [];
-  let sortedWorkorders = sortWorkorders(zWorkorders || [], statuses, zCurrentUser);
+  // Pre-load face-api models on mount
+  useEffect(() => {
+    async function loadFaceModels() {
+      try {
+        let db = null;
+        try { db = await openCacheDB(); await clearStaleCache(db); } catch (e) {}
+        await Promise.all([
+          loadModelCached(faceapi.nets.tinyFaceDetector, "tiny_face_detector_model", db),
+          loadModelCached(faceapi.nets.faceLandmark68Net, "face_landmark_68_model", db),
+          loadModelCached(faceapi.nets.faceRecognitionNet, "face_recognition_model", db),
+        ]);
+        if (db) db.close();
+        modelsLoadedRef.current = true;
+      } catch (e) {
+        log("Stand face model loading failed:", e);
+      }
+    }
+    loadFaceModels();
+  }, []);
+
   let selectedWorkorder = (zWorkorders || []).find((o) => o.id === sSelectedWorkorderID);
-  let commonButton = (zQuickItemButtons || []).find((b) => b.id === "common");
-  let canvasItems = (commonButton?.items || []).map(normalizeItemEntry);
+  let hasWorkorderReady = !!selectedWorkorder || sPendingCustomer !== null;
+
+  // Auto-fire "common" button on mount once data is loaded
+  const hasAutoFiredRef = useRef(false);
+  let isDataLoaded = zQuickItemButtons && zInventory?.length > 0;
+  if (isDataLoaded && !hasAutoFiredRef.current) {
+    let commonBtn = (zQuickItemButtons || []).find((b) => b.id === "common");
+    if (commonBtn) {
+      hasAutoFiredRef.current = true;
+      setTimeout(() => handleNavButtonPress(commonBtn), 0);
+    }
+  }
+
+  // Derive the active button's canvas items
+  let activeButton = sSelectedButtonID ? (zQuickItemButtons || []).find((b) => b.id === sSelectedButtonID) : null;
+  let canvasItems = (activeButton?.items || []).map(normalizeItemEntry);
   let canvasMaxBottom = canvasItems.reduce((max, it) => Math.max(max, (it.y || 0) + (it.h || QB_DEFAULT_H)), 0);
 
+  // Derived: children of current sub-menu level
+  let currentChildren = sCurrentParentID
+    ? (zQuickItemButtons || []).filter((b) => b.parentID === sCurrentParentID)
+    : [];
+  if (sCurrentParentID) {
+    let activeBtn = (zQuickItemButtons || []).find((b) => b.id === sCurrentParentID);
+    if (activeBtn && activeBtn.parentID) currentChildren = [activeBtn, ...currentChildren];
+  }
+
+  function findInventoryItem(barcode) {
+    let item = (zInventory || []).find((i) => i.id === barcode);
+    if (item) return item;
+    return (zInventory || []).find((i) => (i.barcodes || []).includes(barcode));
+  }
+
   //////////////////////////////////////////////////////////////////////////////
-  // Quick button press
+  // Quick button navigation (ported from Options_Inventory, read-only)
   //////////////////////////////////////////////////////////////////////////////
 
-  async function handleQuickButtonPress(btn) {
-    if (!selectedWorkorder || !btn.inventoryItemID) return;
-    let invItem = (zInventory || []).find((o) => o.id === btn.inventoryItemID);
-    if (!invItem) return;
+  function handleNavButtonPress(buttonObj) {
+    // Intercept $LABOR and $ITEM buttons
+    if (buttonObj.id === "labor" || buttonObj.id === "item") {
+      if (!hasWorkorderReady) return;
+      _setCustomItemModal(buttonObj.id);
+      return;
+    }
 
-    // Persist workorder to Firestore before adding items
-    let wo = selectedWorkorder;
+    let children = (zQuickItemButtons || []).filter((b) => b.parentID === buttonObj.id);
+    let hasChildren = children.length > 0;
+
+    let items = [];
+    buttonObj.items?.forEach((entry) => {
+      let id = typeof entry === "string" ? entry : entry.inventoryItemID;
+      let item = findInventoryItem(id);
+      if (item) items.push(item);
+    });
+    let hasItems = items.length > 0;
+
+    if (hasChildren) {
+      // Toggle off if clicking the already-active root button
+      if (!buttonObj.parentID && sMenuPath.length > 0 && sMenuPath[0].id === buttonObj.id) {
+        _setCurrentParentID(null);
+        _setMenuPath([]);
+        _setSelectedButtonID(null);
+        return;
+      }
+      // Collapse up one level if clicking the active sub-button
+      if (buttonObj.parentID && sMenuPath.some((crumb) => crumb.id === buttonObj.id)) {
+        let idx = sMenuPath.findIndex((crumb) => crumb.id === buttonObj.id);
+        let newPath = sMenuPath.slice(0, idx);
+        let newParentID;
+        if (newPath.length === 0) {
+          newParentID = sMenuPath[0].id;
+          _setCurrentParentID(newParentID);
+          _setMenuPath([sMenuPath[0]]);
+        } else {
+          newParentID = newPath[newPath.length - 1].id;
+          _setCurrentParentID(newParentID);
+          _setMenuPath(newPath);
+        }
+        let parentBtn = (zQuickItemButtons || []).find((b) => b.id === newParentID);
+        if (parentBtn?.items?.length > 0) {
+          _setSelectedButtonID(parentBtn.id);
+        } else {
+          _setSelectedButtonID(null);
+        }
+        return;
+      }
+      // Button has children - show them
+      if (!buttonObj.parentID) {
+        _setMenuPath([{ id: buttonObj.id, name: buttonObj.name }]);
+      } else {
+        _setMenuPath((prev) => [...prev, { id: buttonObj.id, name: buttonObj.name }]);
+      }
+      _setCurrentParentID(buttonObj.id);
+
+      if (hasItems) {
+        _setSelectedButtonID(buttonObj.id);
+      } else {
+        _setSelectedButtonID(null);
+      }
+    } else {
+      // Leaf button (no children) - toggle selection
+      if (sSelectedButtonID === buttonObj.id) {
+        let parentBtn = buttonObj.parentID ? (zQuickItemButtons || []).find((b) => b.id === buttonObj.parentID) : null;
+        if (parentBtn) {
+          _setSelectedButtonID(parentBtn.id);
+        } else {
+          _setSelectedButtonID(null);
+        }
+      } else {
+        _setSelectedButtonID(buttonObj.id);
+      }
+      if (!buttonObj.parentID) {
+        _setCurrentParentID(null);
+        _setMenuPath([]);
+      }
+    }
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Ensure workorder exists (creates from pending customer on first item add)
+  //////////////////////////////////////////////////////////////////////////////
+
+  async function ensureWorkorderExists() {
+    if (selectedWorkorder) return selectedWorkorder;
+    if (sPendingCustomer === null) return null;
+    let customer = sPendingCustomer === "standalone" ? undefined : sPendingCustomer;
+    let wo = await startNewWorkorder(customer);
+    _setSelectedWorkorderID(wo.id);
+    _setPendingCustomer(null);
+    return wo;
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Inventory item selected (add to workorder)
+  //////////////////////////////////////////////////////////////////////////////
+
+  async function inventoryItemSelected(invItem) {
+    if (!hasWorkorderReady || !invItem) return;
+    let wo = await ensureWorkorderExists();
+    if (!wo) return;
     await dbSaveOpenWorkorder(wo);
 
     let lines = [...(wo.workorderLines || [])];
-    let line = cloneDeep(WORKORDER_ITEM_PROTO);
-    line.inventoryItem = invItem;
-    line.id = crypto.randomUUID();
-    lines.push(line);
+    let existingIdx = lines.findIndex((ln) => ln.inventoryItem?.id === invItem.id);
+    if (existingIdx !== -1) {
+      lines = cloneDeep(lines);
+      lines[existingIdx].qty = (lines[existingIdx].qty || 1) + 1;
+    } else {
+      let line = cloneDeep(WORKORDER_ITEM_PROTO);
+      line.inventoryItem = invItem;
+      line.id = crypto.randomUUID();
+      lines.push(line);
+    }
 
     useOpenWorkordersStore.getState().setField("workorderLines", lines, wo.id, true);
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Custom item save (labor / item modal)
+  //////////////////////////////////////////////////////////////////////////////
+
+  async function handleCustomItemSave(lineItem) {
+    if (!hasWorkorderReady) return;
+    let wo = await ensureWorkorderExists();
+    if (!wo) return;
+    await dbSaveOpenWorkorder(wo);
+    let workorderLines = [...(wo.workorderLines || []), lineItem];
+    useOpenWorkordersStore.getState().setField("workorderLines", workorderLines, wo.id, true);
   }
 
   //////////////////////////////////////////////////////////////////////////////
@@ -288,14 +451,250 @@ export function BikeStandScreen() {
   }
 
   //////////////////////////////////////////////////////////////////////////////
+  // Inventory modal add
+  //////////////////////////////////////////////////////////////////////////////
+
+  async function handleAddInventoryItems(items) {
+    if (!hasWorkorderReady || !items.length) return;
+    _setShowInventoryModal(false);
+
+    let wo = await ensureWorkorderExists();
+    if (!wo) return;
+    await dbSaveOpenWorkorder(wo);
+
+    let newLines = [...(wo.workorderLines || [])];
+    items.forEach((invItem) => {
+      let line = cloneDeep(WORKORDER_ITEM_PROTO);
+      line.inventoryItem = invItem;
+      line.id = crypto.randomUUID();
+      newLines.push(line);
+    });
+
+    useOpenWorkordersStore.getState().setField("workorderLines", newLines, wo.id, true);
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Status change
+  //////////////////////////////////////////////////////////////////////////////
+
+  function handleStatusSelect(val) {
+    if (!selectedWorkorder) return;
+    useOpenWorkordersStore.getState().setField("status", val.id, selectedWorkorder.id, true);
+  }
+
+  function setBikeColor(incomingColorVal, fieldName) {
+    if (!selectedWorkorder) return;
+    let newColorObj = {};
+    let foundColor = false;
+    COLORS.forEach((bikeColorObj) => {
+      if (bikeColorObj.label.toLowerCase() === incomingColorVal.toLowerCase()) {
+        foundColor = true;
+        newColorObj = cloneDeep(bikeColorObj);
+      }
+    });
+    if (!foundColor) {
+      newColorObj.label = incomingColorVal;
+      newColorObj.backgroundColor = null;
+      newColorObj.textColor = null;
+    }
+    useOpenWorkordersStore.getState().setField(fieldName, newColorObj, selectedWorkorder.id);
+  }
+
+  // Printer helpers
+  let printersObj = zSettings?.printers || {};
+  let receiptPrinters = Object.values(printersObj).filter((p) => p.type === "receipt");
+  let selectedPrinterLabel = receiptPrinters.find((p) => p.id === sSelectedPrinterID)?.label || "";
+
+  function handleSelectPrinter(printerID) {
+    localStorageWrapper.setItem("selectedPrinterID", printerID);
+    _setSelectedPrinterID(printerID);
+    _setShowPrinterSelectModal(false);
+  }
+
+  function handleWorkorderPrint() {
+    if (!selectedWorkorder || !sSelectedPrinterID) return;
+    let _settings = useSettingsStore.getState().getSettings();
+    let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    let toPrint = printBuilder.workorder(selectedWorkorder, pendingCust || {}, _settings?.salesTaxPercent, _ctx);
+    dbSavePrintObj(toPrint, sSelectedPrinterID);
+    _setShowPrintMenu(false);
+  }
+
+  function handleIntakePrint() {
+    if (!selectedWorkorder || !sSelectedPrinterID) return;
+    let _settings = useSettingsStore.getState().getSettings();
+    let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    let toPrint = printBuilder.intake(selectedWorkorder, pendingCust || {}, _settings?.salesTaxPercent, _ctx);
+    dbSavePrintObj(toPrint, sSelectedPrinterID);
+    _setShowIntakeActionModal(false);
+  }
+
+  async function handleIntakeText() {
+    if (!selectedWorkorder || !customerCell) return;
+    let _settings = useSettingsStore.getState().getSettings();
+    let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    let smsTemplate = findTemplateByType(_settings?.smsTemplates || _settings?.textTemplates, "intakeReceipt");
+    if (!smsTemplate?.body) return;
+    let receiptData = printBuilder.intake(selectedWorkorder, pendingCust || {}, _settings?.salesTaxPercent, _ctx);
+    let { generateWorkorderTicketPDF } = await import("../pdfGenerator");
+    let base64 = generateWorkorderTicketPDF(receiptData);
+    let message = smsTemplate.body;
+    await dbUploadPDFAndSendSMS({
+      base64,
+      message,
+      phoneNumber: removeDashesFromPhone(customerCell),
+      customerID: selectedWorkorder.customerID || "",
+      messageID: selectedWorkorder.id + "_intake",
+      canRespond: false,
+    });
+    _setShowIntakeActionModal(false);
+  }
+
+  async function handleIntakeEmail() {
+    if (!selectedWorkorder || !customerEmail) return;
+    let _settings = useSettingsStore.getState().getSettings();
+    let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    let emailTemplate = findTemplateByType(_settings?.emailTemplates, "intakeReceipt");
+    if (!emailTemplate?.body) return;
+    let receiptData = printBuilder.intake(selectedWorkorder, pendingCust || {}, _settings?.salesTaxPercent, _ctx);
+    let { generateWorkorderTicketPDF } = await import("../pdfGenerator");
+    let base64 = generateWorkorderTicketPDF(receiptData);
+    let subject = emailTemplate.subject || "Intake Receipt";
+    let html = emailTemplate.body;
+    await dbSendEmail(customerEmail, subject, html);
+    _setShowIntakeActionModal(false);
+  }
+
+  async function handleIntakeTextEmail() {
+    if (customerCell) await handleIntakeText();
+    if (customerEmail) await handleIntakeEmail();
+    _setShowIntakeActionModal(false);
+  }
+
+  async function handleIntakeAll() {
+    if (sSelectedPrinterID) handleIntakePrint();
+    if (customerCell) await handleIntakeText();
+    if (customerEmail) await handleIntakeEmail();
+    _setShowIntakeActionModal(false);
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
+  // Login: face recognition + pin
+  //////////////////////////////////////////////////////////////////////////////
+
+  function handleNewWorkorderPress() {
+    pendingActionRef.current = () => _setShowNewWorkorderModal(true);
+    startFaceLogin();
+  }
+
+  async function startFaceLogin() {
+    if (!modelsLoadedRef.current) {
+      _setShowPinModal(true);
+      return;
+    }
+    try {
+      let stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      faceStreamRef.current = stream;
+      _setShowFaceModal(true);
+      _setFaceCountdown(5);
+
+      // Attach stream after video element renders
+      setTimeout(() => {
+        if (faceVideoRef.current) {
+          faceVideoRef.current.srcObject = stream;
+        }
+      }, 50);
+
+      let secondsLeft = 5;
+      countdownRef.current = setInterval(() => {
+        secondsLeft--;
+        _setFaceCountdown(secondsLeft);
+        if (secondsLeft <= 0) {
+          stopFaceLogin();
+          _setShowFaceModal(false);
+          _setShowPinModal(true);
+        }
+      }, 1000);
+
+      faceIntervalRef.current = setInterval(async () => {
+        if (!faceVideoRef.current || faceVideoRef.current.readyState < 2) return;
+        let detection = await faceapi
+          .detectSingleFace(faceVideoRef.current, new faceapi.TinyFaceDetectorOptions())
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+        if (!detection) return;
+        let descriptor = detection.descriptor;
+        let users = useSettingsStore.getState().settings?.users || [];
+        for (let user of users) {
+          if (!user.faceDescriptor) continue;
+          try {
+            let distance = faceapi.euclideanDistance(Object.values(user.faceDescriptor), descriptor);
+            if (distance < FACE_DESCRIPTOR_CONFIDENCE_DISTANCE) {
+              stopFaceLogin();
+              _setShowFaceModal(false);
+              useLoginStore.getState().setCurrentUser(user);
+              useLoginStore.getState().setLastActionMillis();
+              if (pendingActionRef.current) {
+                pendingActionRef.current();
+                pendingActionRef.current = null;
+              }
+              return;
+            }
+          } catch (e) {}
+        }
+      }, 500);
+    } catch (e) {
+      _setShowPinModal(true);
+    }
+  }
+
+  function stopFaceLogin() {
+    clearInterval(faceIntervalRef.current);
+    clearInterval(countdownRef.current);
+    if (faceStreamRef.current) {
+      faceStreamRef.current.getTracks().forEach((t) => t.stop());
+      faceStreamRef.current = null;
+    }
+  }
+
+  function handleStandPinKeyPress(key) {
+    if (key === "CLR") { _setPin(""); return; }
+    if (key === "\u232B") { _setPin((prev) => prev.slice(0, -1)); return; }
+    let newPin = sPin + key;
+    _setPin(newPin);
+    let users = zSettings?.users || [];
+    let userObj = users.find((u) => u.pin == newPin);
+    if (!userObj) userObj = users.find((u) => u.alternatePin == newPin);
+    if (!userObj) return;
+    useLoginStore.getState().setCurrentUser(userObj);
+    useLoginStore.getState().setLastActionMillis();
+    _setShowPinModal(false);
+    _setPin("");
+    if (pendingActionRef.current) {
+      pendingActionRef.current();
+      pendingActionRef.current = null;
+    }
+  }
+
+  //////////////////////////////////////////////////////////////////////////////
   // Render
   //////////////////////////////////////////////////////////////////////////////
 
+  // Derive customer display info from real WO or pending customer
+  let pendingCust = sPendingCustomer && sPendingCustomer !== "standalone" ? sPendingCustomer : null;
   let customerName = selectedWorkorder
     ? (capitalizeFirstLetterOfString(selectedWorkorder.customerFirst || "") +
        " " +
        capitalizeFirstLetterOfString(selectedWorkorder.customerLast || "")).trim()
-    : "";
+    : pendingCust
+      ? (capitalizeFirstLetterOfString(pendingCust.first || "") +
+         " " +
+         capitalizeFirstLetterOfString(pendingCust.last || "")).trim()
+      : "";
+  let customerCell = selectedWorkorder?.customerCell || pendingCust?.customerCell || "";
+  let customerEmail = selectedWorkorder?.customerEmail || pendingCust?.email || "";
+
+  let rs = resolveStatus(selectedWorkorder?.status, zSettings?.statuses);
 
   let lines = selectedWorkorder?.workorderLines || [];
   let selectedItemIDs = new Set(lines.map((ln) => ln.inventoryItem?.id).filter(Boolean));
@@ -304,12 +703,24 @@ export function BikeStandScreen() {
     : { runningSubtotal: 0, runningDiscount: 0, runningTax: 0, finalTotal: 0 };
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.backgroundWhite }}>
+    <View style={{ flex: 1, backgroundColor: C.backgroundWhite, position: "relative", overflow: "hidden" }}>
       {/* Phone search modal (portal) */}
       {sShowPhoneSearch && (
         <PhoneSearchModal
           onSelect={handleCustomerSelect}
           onClose={() => _setShowPhoneSearch(false)}
+        />
+      )}
+
+      {/* New workorder modal */}
+      {sShowNewWorkorderModal && (
+        <NewWorkorderModal
+          onSelect={(customerOrStandalone) => {
+            _setPendingCustomer(customerOrStandalone);
+            _setShowBikeDetails(true);
+            _setShowNewWorkorderModal(false);
+          }}
+          onClose={() => _setShowNewWorkorderModal(false)}
         />
       )}
 
@@ -321,189 +732,1077 @@ export function BikeStandScreen() {
         />
       )}
 
-      {sViewMode === "buttons" ? (
-        <>
-          {/* ── Header: workorder dropdown + new workorder button ── */}
-          <View style={{ padding: 12, zIndex: 10 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              <View style={{ flex: 1 }}>
-                <WorkorderSelector
-                  workorders={sortedWorkorders}
-                  statuses={statuses}
-                  selectedID={sSelectedWorkorderID}
-                  onSelect={(id) => _setSelectedWorkorderID(id)}
+      {/* Inventory search modal */}
+      {sShowInventoryModal && (
+        <InventorySearchModal
+          onAddItems={handleAddInventoryItems}
+          onClose={() => _setShowInventoryModal(false)}
+        />
+      )}
+
+      {/* Custom labor/item modal */}
+      {sCustomItemModal && (
+        <StandCustomItemModal
+          type={sCustomItemModal}
+          onSave={handleCustomItemSave}
+          onClose={() => _setCustomItemModal(null)}
+        />
+      )}
+
+      {/* Workorder list modal */}
+      {sShowWorkorderList && (
+        <WorkorderListModal
+          onSelect={(wo) => {
+            _setSelectedWorkorderID(wo.id);
+            _setPendingCustomer(null);
+            _setShowBikeDetails(false);
+            _setShowWorkorderList(false);
+          }}
+          onClose={() => _setShowWorkorderList(false)}
+          activeWorkorderID={sSelectedWorkorderID}
+        />
+      )}
+
+      {/* Face recognition modal */}
+      {sShowFaceModal && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 200,
+          }}
+        >
+          <View
+            style={{
+              alignItems: "center",
+              paddingHorizontal: 40,
+              paddingVertical: 30,
+              backgroundColor: "white",
+              borderRadius: 16,
+            }}
+          >
+            <SmallLoadingIndicator />
+            <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, marginTop: 12 }}>
+              Scanning face...
+            </Text>
+            <Text style={{ fontSize: 48, fontWeight: "700", color: C.green, marginTop: 16 }}>
+              {sFaceCountdown}
+            </Text>
+          </View>
+          <video
+            ref={faceVideoRef}
+            width={0}
+            height={0}
+            autoPlay
+            muted
+            onLoadedMetadata={(e) => e.target.play()}
+            style={{ position: "absolute", opacity: 0 }}
+          />
+        </View>
+      )}
+
+      {/* Pin login modal */}
+      {sShowPinModal && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 200,
+          }}
+        >
+          <View
+            style={{
+              alignItems: "center",
+              paddingHorizontal: 40,
+              paddingVertical: 30,
+              backgroundColor: "white",
+              borderRadius: 16,
+              minWidth: 280,
+            }}
+          >
+            <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, marginBottom: 20 }}>
+              Enter PIN
+            </Text>
+            <View style={{ flexDirection: "row", marginBottom: 20, height: 24, alignItems: "center" }}>
+              {sPin.split("").map((_, i) => (
+                <View
+                  key={i}
+                  style={{
+                    width: 14,
+                    height: 14,
+                    borderRadius: 7,
+                    backgroundColor: C.text,
+                    marginHorizontal: 6,
+                  }}
                 />
-              </View>
+              ))}
+              {sPin.length === 0 && (
+                <Text style={{ fontSize: 14, color: gray(0.5) }}>-</Text>
+              )}
+            </View>
+            <StandKeypad mode="phone" onKeyPress={handleStandPinKeyPress} />
+            <TouchableOpacity
+              onPress={() => { _setShowPinModal(false); _setPin(""); pendingActionRef.current = null; }}
+              style={{ marginTop: 16 }}
+            >
+              <Text style={{ fontSize: 14, color: gray(0.5) }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
+      {sViewMode === "buttons" ? (
+        <View style={{ flex: 1 }}>
+          {/* ── Header: "Add Customer" button when no WO/pending, full header when ready ── */}
+          {!hasWorkorderReady ? (
+            <View style={{ flexDirection: "row", paddingHorizontal: 12, paddingVertical: 14, gap: 10 }}>
               <TouchableOpacity
-                onPress={() => {/* TODO: hook up new workorder logic */}}
+                onPress={handleNewWorkorderPress}
                 style={{
-                  height: 42,
-                  borderRadius: 6,
-                  borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
-                  backgroundColor: "white",
+                  flex: 1,
+                  backgroundColor: C.orange,
+                  borderRadius: 8,
+                  paddingVertical: 16,
+                  flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "center",
-                  paddingHorizontal: 12,
+                  gap: 10,
                 }}
               >
-                <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>+ New</Text>
+                <Image_ icon={ICONS.gears1} size={22} />
+                <Text style={{ fontSize: 18, fontWeight: "700", color: C.textWhite }}>New Workorder</Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  pendingActionRef.current = () => _setShowWorkorderList(true);
+                  startFaceLogin();
+                }}
+                style={{
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingHorizontal: 8,
+                }}
+              >
+                <Image_ icon={ICONS.search} size={36} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View>
+              {/* Header row: customer info + status + show/hide toggle */}
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
+                    {customerName || "Standalone Sale"}
+                  </Text>
+                  {customerCell ? (
+                    <Text style={{ fontSize: 12, color: gray(0.5) }}>
+                      {formatPhoneWithDashes(customerCell)}
+                    </Text>
+                  ) : null}
+                  {customerEmail ? (
+                    <Text style={{ fontSize: 12, color: gray(0.5) }}>
+                      {customerEmail}
+                    </Text>
+                  ) : null}
+                  {selectedWorkorder && (
+                    <StatusPickerModal
+                      statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned && !s.hidden)}
+                      enabled={true}
+                      onSelect={handleStatusSelect}
+                      buttonStyle={{
+                        backgroundColor: rs.backgroundColor,
+                        paddingHorizontal: 12,
+                      }}
+                      buttonTextStyle={{
+                        color: rs.textColor,
+                        fontWeight: "normal",
+                        fontSize: 14,
+                      }}
+                      modalCoordY={30}
+                      buttonText={rs.label}
+                    />
+                  )}
+                </View>
+                <TouchableOpacity
+                  onPress={() => _setShowBikeDetails((p) => !p)}
+                  style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+                >
+                  {selectedWorkorder?.brand ? (
+                    <Text style={{ fontSize: 13, color: gray(0.5) }}>
+                      {capitalizeFirstLetterOfString(selectedWorkorder.brand)}
+                    </Text>
+                  ) : null}
+                  {selectedWorkorder?.description ? (
+                    <Text style={{ fontSize: 13, color: gray(0.5) }}>
+                      {capitalizeFirstLetterOfString(selectedWorkorder.description)}
+                    </Text>
+                  ) : null}
+                  <Image_ icon={ICONS.info} size={20} />
+                </TouchableOpacity>
+              </View>
+
+              {/* Collapsible bike details panel */}
+              {sShowBikeDetails && selectedWorkorder && (
+                <View style={{ paddingHorizontal: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: gray(0.15) }}>
+
+                  {/* Brand row */}
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                    <TextInput_
+                      placeholder={"Brand"}
+                      editable={true}
+                      capitalize={true}
+                      style={{
+                        width: "45%",
+                        borderWidth: 1,
+                        borderColor: selectedWorkorder?.brand ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                        color: C.text,
+                        paddingVertical: 2,
+                        paddingHorizontal: 4,
+                        fontSize: 15,
+                        outlineStyle: "none",
+                        borderRadius: 5,
+                        fontWeight: selectedWorkorder?.brand ? "500" : null,
+                      }}
+                      value={capitalizeFirstLetterOfString(selectedWorkorder?.brand)}
+                      onChangeText={(val) =>
+                        useOpenWorkordersStore.getState().setField("brand", val, selectedWorkorder.id)
+                      }
+                    />
+                    <View style={{ width: "55%", flexDirection: "row", paddingLeft: 5, justifyContent: "space-between", alignItems: "center" }}>
+                      <View style={{ width: "48%", height: "100%" }}>
+                        <DropdownMenu
+                          dataArr={zSettings.bikeBrands}
+                          enabled={true}
+                          onSelect={(item) => {
+                            useOpenWorkordersStore.getState().setField("brand", item, selectedWorkorder.id);
+                          }}
+                          buttonStyle={{ opacity: selectedWorkorder?.brand ? DROPDOWN_SELECTED_OPACITY : 1 }}
+                          modalCoordX={-6}
+                          ref={bikeBrandsRef}
+                          buttonText={zSettings.bikeBrandsName}
+                        />
+                      </View>
+                      <View style={{ width: 5 }} />
+                      <View style={{ width: "48%", justifyContent: "center" }}>
+                        <DropdownMenu
+                          dataArr={zSettings.bikeOptionalBrands}
+                          enabled={true}
+                          onSelect={(item) => {
+                            useOpenWorkordersStore.getState().setField("brand", item, selectedWorkorder.id);
+                          }}
+                          buttonStyle={{ opacity: selectedWorkorder?.brand ? DROPDOWN_SELECTED_OPACITY : 1 }}
+                          modalCoordX={0}
+                          ref={bikeOptBrandsRef}
+                          buttonText={zSettings.bikeOptionalBrandsName}
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Description row */}
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                    <TextInput_
+                      placeholder={"Model/Description"}
+                      editable={true}
+                      capitalize={true}
+                      style={{
+                        width: "45%",
+                        borderWidth: 1,
+                        borderColor: selectedWorkorder?.description ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                        color: C.text,
+                        paddingVertical: 2,
+                        paddingHorizontal: 4,
+                        fontSize: 15,
+                        outlineStyle: "none",
+                        borderRadius: 5,
+                        fontWeight: selectedWorkorder?.description ? "500" : null,
+                      }}
+                      value={capitalizeFirstLetterOfString(selectedWorkorder?.description)}
+                      onChangeText={(val) => {
+                        useOpenWorkordersStore.getState().setField("description", val, selectedWorkorder.id);
+                      }}
+                    />
+                    <View style={{ width: "55%", flexDirection: "row", paddingLeft: 5, justifyContent: "center", alignItems: "center" }}>
+                      <View style={{ width: "100%" }}>
+                        <DropdownMenu
+                          modalCoordX={55}
+                          dataArr={zSettings.bikeDescriptions}
+                          enabled={true}
+                          onSelect={(item) => {
+                            useOpenWorkordersStore.getState().setField("description", item, selectedWorkorder.id);
+                          }}
+                          buttonStyle={{ opacity: selectedWorkorder?.description ? DROPDOWN_SELECTED_OPACITY : 1 }}
+                          ref={descriptionRef}
+                          buttonText={"Descriptions"}
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Color row */}
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                    <TextInput_
+                      placeholder={"Color 1"}
+                      editable={true}
+                      capitalize={true}
+                      value={capitalizeFirstLetterOfString(selectedWorkorder?.color1?.label)}
+                      style={{
+                        width: "24%",
+                        borderWidth: 1,
+                        borderColor: selectedWorkorder?.color1?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                        paddingVertical: 2,
+                        paddingHorizontal: 4,
+                        fontSize: 15,
+                        outlineStyle: "none",
+                        borderRadius: 5,
+                        fontWeight: selectedWorkorder?.color1?.label ? "500" : null,
+                        backgroundColor: selectedWorkorder?.color1?.backgroundColor,
+                        color: selectedWorkorder?.color1?.textColor || C.text,
+                      }}
+                      onChangeText={(val) => setBikeColor(val, "color1")}
+                    />
+                    <View style={{ width: 5 }} />
+                    <TextInput_
+                      placeholder={"Color 2"}
+                      editable={true}
+                      capitalize={true}
+                      value={capitalizeFirstLetterOfString(selectedWorkorder?.color2?.label)}
+                      style={{
+                        width: "24%",
+                        borderWidth: 1,
+                        borderColor: selectedWorkorder?.color2?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                        paddingVertical: 2,
+                        paddingHorizontal: 4,
+                        fontSize: 15,
+                        outlineStyle: "none",
+                        borderRadius: 5,
+                        fontWeight: selectedWorkorder?.color2?.label ? "500" : null,
+                        backgroundColor: selectedWorkorder?.color2?.backgroundColor,
+                        color: selectedWorkorder?.color2?.textColor || C.text,
+                      }}
+                      onChangeText={(val) => setBikeColor(val, "color2")}
+                    />
+                    <View style={{ width: "48%", flexDirection: "row", paddingLeft: 5, alignItems: "center", justifyContent: "space-between" }}>
+                      <View style={{ width: "48%", height: "100%", justifyContent: "center" }}>
+                        <DropdownMenu
+                          itemSeparatorStyle={{ height: 0 }}
+                          dataArr={COLORS}
+                          menuBorderColor={"transparent"}
+                          enabled={true}
+                          onSelect={(item) => {
+                            useOpenWorkordersStore.getState().setField("color1", item, selectedWorkorder.id);
+                          }}
+                          buttonStyle={{ opacity: selectedWorkorder?.color1?.label ? DROPDOWN_SELECTED_OPACITY : 1 }}
+                          ref={color1Ref}
+                          buttonText={"Color 1"}
+                          modalCoordX={0}
+                        />
+                      </View>
+                      <View style={{ width: 5 }} />
+                      <View style={{ width: "48%", height: "100%", justifyContent: "center" }}>
+                        <DropdownMenu
+                          itemSeparatorStyle={{ height: 0 }}
+                          dataArr={COLORS}
+                          enabled={true}
+                          onSelect={(item) => {
+                            useOpenWorkordersStore.getState().setField("color2", item, selectedWorkorder.id);
+                          }}
+                          modalCoordX={0}
+                          buttonStyle={{ opacity: selectedWorkorder?.color2?.label ? DROPDOWN_SELECTED_OPACITY : 1 }}
+                          ref={color2Ref}
+                          buttonText={"Color 2"}
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Wait time row */}
+                  <View style={{ flexDirection: "row", justifyContent: "flex-start", width: "100%", alignItems: "center" }}>
+                    <Text style={{ color: gray(0.5), fontSize: 13, marginRight: 4 }}>
+                      Max wait days:
+                    </Text>
+                    <TextInput_
+                      placeholder={"0"}
+                      editable={true}
+                      inputMode="numeric"
+                      style={{
+                        width: 50,
+                        borderWidth: 1,
+                        borderColor: selectedWorkorder?.waitTime?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                        color: C.text,
+                        paddingVertical: 2,
+                        paddingHorizontal: 4,
+                        fontSize: 15,
+                        outlineStyle: "none",
+                        borderRadius: 5,
+                        textAlign: "center",
+                        fontWeight: (selectedWorkorder?.waitTime?.maxWaitTimeDays != null && selectedWorkorder?.waitTime?.maxWaitTimeDays !== "") ? "500" : null,
+                      }}
+                      value={String(selectedWorkorder?.waitTime?.maxWaitTimeDays ?? "")}
+                      onChangeText={(val) => {
+                        if (val !== "" && !checkInputForNumbersOnly(val)) return;
+                        let days = val === "" ? "" : Number(val);
+                        let waitObj = {
+                          ...CUSTOM_WAIT_TIME,
+                          label: val === "" ? "" : val + (days === 1 ? " Day" : " Days"),
+                          maxWaitTimeDays: days,
+                        };
+                        useOpenWorkordersStore.getState().setField("waitTime", waitObj, selectedWorkorder.id);
+                      }}
+                    />
+                    <View style={{ flex: 1, flexDirection: "row", paddingLeft: 5, justifyContent: "flex-start", alignItems: "center" }}>
+                      <View style={{ width: "100%" }}>
+                        <DropdownMenu
+                          modalCoordX={50}
+                          dataArr={zSettings.waitTimes}
+                          enabled={true}
+                          onSelect={(item) => {
+                            let isNonRemovable = NONREMOVABLE_WAIT_TIMES.some((nr) => nr.id === item.id);
+                            let waitObj = { ...item, removable: !isNonRemovable };
+                            useOpenWorkordersStore.getState().setField("waitTime", waitObj, selectedWorkorder.id);
+                          }}
+                          buttonStyle={{ opacity: selectedWorkorder?.waitTime?.label ? DROPDOWN_SELECTED_OPACITY : 1 }}
+                          ref={waitTimesRef}
+                          buttonText={"Wait Times"}
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Wait estimate label */}
+                  {(() => {
+                    let estimateLabel = calculateWaitEstimateLabel(selectedWorkorder, zSettings);
+                    let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
+                    return estimateLabel ? (
+                      <Text
+                        style={{
+                          color: isMissing ? C.red : gray(0.5),
+                          fontSize: 13,
+                          fontStyle: "italic",
+                          marginTop: 4,
+                          paddingHorizontal: 4,
+                          paddingVertical: 2,
+                        }}
+                      >
+                        {estimateLabel}
+                      </Text>
+                    ) : null;
+                  })()}
+
+                  {/* Swipe-up divider to hide */}
+                  <View
+                    onTouchStart={(e) => { swipeDividerRef.current = e.touches[0].clientY; }}
+                    onTouchEnd={(e) => {
+                      if (swipeDividerRef.current !== null) {
+                        let diff = e.changedTouches[0].clientY - swipeDividerRef.current;
+                        if (diff < -20) _setShowBikeDetails(false);
+                        swipeDividerRef.current = null;
+                      }
+                    }}
+                    style={{
+                      height: 24,
+                      alignItems: "center",
+                      justifyContent: "center",
+                      marginTop: 4,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Text style={{ fontSize: 10, fontStyle: "italic", color: gray(0.35) }}>Swipe up to minimize</Text>
+                  </View>
+
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* ── 20% sidebar + 80% canvas ── */}
+          <View style={{ flex: 1, flexDirection: "row", opacity: hasWorkorderReady ? 1 : 0.35 }} pointerEvents={hasWorkorderReady ? "auto" : "none"}>
+            {/* Left sidebar - root buttons */}
+            <View style={{ width: "20%", borderRightWidth: 1, borderRightColor: gray(0.15) }}>
+              {/* Breadcrumbs in sidebar */}
+              {sCurrentParentID !== null && sMenuPath.length > 0 && (
+                <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 6, paddingTop: 6, paddingBottom: 4, flexWrap: "wrap" }}>
+                  <TouchableOpacity
+                    onPress={() => {
+                      _setCurrentParentID(null);
+                      _setMenuPath([]);
+                      _setSelectedButtonID(null);
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, color: C.blue, fontWeight: "600" }}>{"\u2190"} All</Text>
+                  </TouchableOpacity>
+                  {sMenuPath.map((crumb, i) => (
+                    <View key={crumb.id} style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Text style={{ color: gray(0.3), marginHorizontal: 3, fontSize: 11 }}>{">"}</Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          let newPath = sMenuPath.slice(0, i + 1);
+                          _setMenuPath(newPath);
+                          _setCurrentParentID(crumb.id);
+                          let crumbBtn = (zQuickItemButtons || []).find((b) => b.id === crumb.id);
+                          if (crumbBtn?.items?.length > 0) {
+                            _setSelectedButtonID(crumb.id);
+                          } else {
+                            _setSelectedButtonID(null);
+                          }
+                        }}
+                      >
+                        <Text style={{
+                          color: i === sMenuPath.length - 1 ? gray(0.4) : gray(0.55),
+                          fontSize: 11,
+                          fontWeight: i === sMenuPath.length - 1 ? "bold" : "normal",
+                        }}>
+                          {(crumb.name || "").toUpperCase()}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {/* Button list */}
+              <ScrollView style={{ flex: 1, paddingHorizontal: 6, paddingTop: 6 }}>
+                {/* Inventory search button — always top */}
+                <View style={{ marginBottom: 6 }}>
+                  <Button_
+                    onPress={() => _setShowInventoryModal(true)}
+                    colorGradientArr={COLOR_GRADIENTS.purple}
+                    buttonStyle={{
+                      borderWidth: 1,
+                      borderRadius: 5,
+                      borderColor: C.buttonLightGreenOutline,
+                      paddingHorizontal: 4,
+                      paddingVertical: 7,
+                      backgroundColor: undefined,
+                    }}
+                    textStyle={{
+                      fontSize: 12,
+                      fontWeight: 400,
+                      textAlign: "center",
+                      color: C.textWhite,
+                    }}
+                    text={"INVENTORY"}
+                  />
+                </View>
+                {(sCurrentParentID
+                  ? currentChildren
+                  : (zQuickItemButtons || []).filter((b) => !b.parentID)
+                ).map((item) => {
+                  let isActive =
+                    sSelectedButtonID === item.id ||
+                    (sMenuPath.length > 0 && sMenuPath[0].id === item.id);
+                  return (
+                    <View key={item.id} style={{ marginBottom: 6 }}>
+                      <Button_
+                        onPress={() => handleNavButtonPress(item)}
+                        colorGradientArr={isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "item" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
+                        buttonStyle={{
+                          borderWidth: 1,
+                          borderRadius: 5,
+                          borderColor: C.buttonLightGreenOutline,
+                          paddingHorizontal: 4,
+                          paddingVertical: item.id === "common" ? 12 : 7,
+                          backgroundColor: undefined,
+                        }}
+                        numLines={item.name.length > 17 ? 2 : 1}
+                        textStyle={{
+                          fontSize: getQuickButtonFontSize(item.name, 12),
+                          fontWeight: 400,
+                          textAlign: "center",
+                          color: isActive ? "white" : C.textWhite,
+                        }}
+                        text={item.name.toUpperCase()}
+                      />
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </View>
+
+            {/* Right panel - canvas */}
+            <View style={{ width: "80%", position: "relative" }}>
+              {/* Breadcrumbs + child buttons above canvas */}
+              {sCurrentParentID !== null && (
+                <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingBottom: 4, paddingTop: 4, flexWrap: "wrap" }}>
+                  {sMenuPath.map((crumb, i) => (
+                    <View key={crumb.id} style={{ flexDirection: "row", alignItems: "center" }}>
+                      {i > 0 && (
+                        <Text style={{ color: gray(0.3), marginHorizontal: 4, fontSize: 13 }}>{">"}</Text>
+                      )}
+                      <TouchableOpacity
+                        onPress={() => {
+                          let newPath = sMenuPath.slice(0, i + 1);
+                          _setMenuPath(newPath);
+                          _setCurrentParentID(crumb.id);
+                          let crumbBtn = (zQuickItemButtons || []).find((b) => b.id === crumb.id);
+                          if (crumbBtn?.items?.length > 0) {
+                            _setSelectedButtonID(crumb.id);
+                          } else {
+                            _setSelectedButtonID(null);
+                          }
+                        }}
+                      >
+                        <Text style={{
+                          color: i === sMenuPath.length - 1 ? gray(0.4) : gray(0.55),
+                          fontSize: 13,
+                          fontWeight: i === sMenuPath.length - 1 ? "bold" : "normal",
+                        }}>
+                          {(crumb.name || "(unnamed)").toUpperCase()}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {currentChildren.length > 0 && (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 8, paddingBottom: 4 }}>
+                  {currentChildren.map((btn) => {
+                    let isSelected = sSelectedButtonID === btn.id;
+                    return (
+                      <Button_
+                        key={btn.id}
+                        onPress={() => handleNavButtonPress(btn)}
+                        colorGradientArr={isSelected ? ["rgb(240,200,40)", "rgb(240,200,40)"] : [C.green, C.green]}
+                        buttonStyle={{
+                          borderWidth: 1,
+                          borderRadius: 5,
+                          borderColor: C.buttonLightGreenOutline,
+                          marginRight: 6,
+                          marginBottom: 6,
+                          paddingHorizontal: 12,
+                          paddingVertical: 8,
+                        }}
+                        textStyle={{
+                          fontSize: getQuickButtonFontSize(btn.name, 12),
+                          fontWeight: 400,
+                          color: C.textWhite,
+                        }}
+                        text={btn.name.toUpperCase() + (isSelected ? " \u25BC" : " \u25B6")}
+                      />
+                    );
+                  })}
+                </View>
+              )}
+
+              {/* Canvas */}
+              {sSelectedButtonID ? (
+                <ScrollView style={{ flex: 1, backgroundColor: lightenRGBByPercent(C.backgroundWhite, 20) }}>
+                  <div
+                    style={{
+                      position: "relative",
+                      width: "100%",
+                      minHeight: Math.max(500, canvasMaxBottom * 8),
+                      overflow: "hidden",
+                      borderRadius: 6,
+                      padding: 5,
+                      boxSizing: "border-box",
+                    }}
+                  >
+                    {canvasItems.map((itemObj) => {
+                      let invItem = (zInventory || []).find((i) => i.id === itemObj.inventoryItemID);
+                      let name = invItem ? (invItem.informalName || invItem.formalName || "Unknown") : "(not found)";
+                      let w = itemObj.w || QB_DEFAULT_W;
+                      let h = itemObj.h || QB_DEFAULT_H;
+                      let fontSize = getQuickButtonFontSize(name, itemObj.fontSize || 10);
+                      let isOnWorkorder = selectedItemIDs.has(itemObj.inventoryItemID);
+
+                      let workorderLine = isOnWorkorder
+                        ? (selectedWorkorder.workorderLines || []).find((ln) => ln.inventoryItem?.id === itemObj.inventoryItemID)
+                        : null;
+                      let hasDiscount = !!workorderLine?.discountObj?.value;
+
+                      return (
+                        <div
+                          key={itemObj.inventoryItemID}
+                          onClick={() => {
+                            if (sDiscountCardID) { _setDiscountCardID(null); return; }
+                            inventoryItemSelected(invItem);
+                          }}
+                          onMouseDown={() => handleLongPressStart(itemObj.inventoryItemID)}
+                          onMouseUp={handleLongPressEnd}
+                          onMouseLeave={handleLongPressEnd}
+                          onTouchStart={() => handleLongPressStart(itemObj.inventoryItemID)}
+                          onTouchEnd={handleLongPressEnd}
+                          style={{
+                            position: "absolute",
+                            left: (itemObj.x || 0) + "%",
+                            top: (itemObj.y || 0) + "%",
+                            width: w + "%",
+                            height: h + "%",
+                            display: "flex",
+                            flexDirection: "column",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderWidth: isOnWorkorder ? 2 : 1,
+                            borderStyle: "solid",
+                            borderColor: isOnWorkorder ? C.green : C.buttonLightGreenOutline,
+                            borderRadius: 8,
+                            backgroundColor: isOnWorkorder ? lightenRGBByPercent(C.green, 70) : C.buttonLightGreenOutline,
+                            cursor: "pointer",
+                            boxSizing: "border-box",
+                            paddingLeft: 4,
+                            paddingRight: 4,
+                            paddingTop: 2,
+                            paddingBottom: 2,
+                            userSelect: "none",
+                            overflow: "visible",
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: fontSize,
+                              color: invItem ? C.text : gray(0.35),
+                              textAlign: "center",
+                              fontWeight: "500",
+                              lineHeight: (itemObj.fontSize || 10) + 6,
+                            }}
+                            numberOfLines={(name || "").split("\n").length}
+                          >
+                            {name}
+                          </Text>
+                          {hasDiscount && (
+                            <Text style={{ fontSize: 8, color: C.green, fontWeight: "600" }}>
+                              {workorderLine.discountObj.name || "Discount"}
+                            </Text>
+                          )}
+                          {/* Discount dropdown on long-press */}
+                          {sDiscountCardID === itemObj.inventoryItemID && (
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                position: "absolute",
+                                top: "100%",
+                                left: 0,
+                                zIndex: 100,
+                                backgroundColor: "white",
+                                borderRadius: 6,
+                                border: "1px solid " + gray(0.2),
+                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
+                                minWidth: 140,
+                                overflow: "hidden",
+                              }}
+                            >
+                              <div
+                                onClick={() => handleDiscountSelect(itemObj.inventoryItemID, null)}
+                                style={{ padding: "6px 10px", cursor: "pointer", fontSize: 12, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
+                                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
+                              >
+                                No Discount
+                              </div>
+                              {(zSettings.discounts || [])
+                                .filter((d) => d.type !== "$" || Number(d.value) <= (invItem?.price || 0) * (workorderLine?.qty || 1))
+                                .map((d) => (
+                                <div
+                                  key={d.name}
+                                  onClick={() => handleDiscountSelect(itemObj.inventoryItemID, d)}
+                                  style={{ padding: "6px 10px", cursor: "pointer", fontSize: 12, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
+                                >
+                                  {d.name}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                    {canvasItems.length === 0 && (
+                      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 }}>
+                        <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 12 }}>No items in this menu</Text>
+                      </View>
+                    )}
+                  </div>
+                </ScrollView>
+              ) : (
+                <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+                  <Text style={{ fontSize: 14, color: gray(0.4) }}>Select a button to view items</Text>
+                </View>
+              )}
             </View>
           </View>
 
-          {/* ── Totals row ── */}
-          <View style={{ flexDirection: "row", paddingHorizontal: 12, paddingBottom: 6, gap: 12, alignItems: "center" }}>
-            <Text style={{ fontSize: 11, color: gray(0.45) }}>
-              Subtotal: <Text style={{ fontWeight: "600", color: C.text }}>${formatCurrencyDisp(totals.runningSubtotal)}</Text>
-            </Text>
-            {totals.runningDiscount > 0 && (
-              <Text style={{ fontSize: 11, color: gray(0.45) }}>
-                Disc: <Text style={{ fontWeight: "600", color: C.red }}>-${formatCurrencyDisp(totals.runningDiscount)}</Text>
-              </Text>
-            )}
-            <Text style={{ fontSize: 11, color: gray(0.45) }}>
-              Tax: <Text style={{ fontWeight: "600", color: C.text }}>${formatCurrencyDisp(totals.runningTax)}</Text>
-            </Text>
-            <Text style={{ fontSize: 11, color: gray(0.45) }}>
-              Total: <Text style={{ fontWeight: "600", color: C.text }}>${formatCurrencyDisp(totals.finalTotal)}</Text>
-            </Text>
-          </View>
+          {/* ── Footer: totals + new workorder button ── */}
+          {hasWorkorderReady && (
+            <View style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderTopWidth: 1,
+              borderTopColor: gray(0.15),
+              backgroundColor: C.backgroundWhite,
+            }}>
+              {/* Totals */}
+              {selectedWorkorder ? (
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+                  <View style={{ alignItems: "center" }}>
+                    <Text style={{ fontSize: 10, color: gray(0.5) }}>Subtotal</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>{formatCurrencyDisp(totals.runningSubtotal, true)}</Text>
+                  </View>
+                  <View style={{ alignItems: "center" }}>
+                    <Text style={{ fontSize: 10, color: gray(0.5) }}>Discount</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: C.red }}>-{formatCurrencyDisp(totals.runningDiscount, true)}</Text>
+                  </View>
+                  <View style={{ alignItems: "center" }}>
+                    <Text style={{ fontSize: 10, color: gray(0.5) }}>Tax</Text>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>{formatCurrencyDisp(totals.runningTax, true)}</Text>
+                  </View>
+                  <View style={{ alignItems: "center" }}>
+                    <Text style={{ fontSize: 10, color: gray(0.5) }}>Total</Text>
+                    <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>{formatCurrencyDisp(totals.finalTotal, true)}</Text>
+                  </View>
+                </View>
+              ) : (
+                <View />
+              )}
 
-          {/* ── Quick item canvas (common button items) ── */}
-          <ScrollView
-            style={{
-              flex: 1,
-              backgroundColor: lightenRGBByPercent(C.backgroundWhite, 20),
-            }}
-          >
-            <div
-              style={{
-                position: "relative",
-                width: "100%",
-                minHeight: Math.max(500, canvasMaxBottom * 8),
-                overflow: "hidden",
-                borderRadius: 6,
-              }}
-            >
-              {canvasItems.map((itemObj) => {
-                let invItem = (zInventory || []).find((i) => i.id === itemObj.inventoryItemID);
-                let name = invItem ? (invItem.informalName || invItem.formalName || "Unknown") : "(not found)";
-                let w = itemObj.w || QB_DEFAULT_W;
-                let h = itemObj.h || QB_DEFAULT_H;
-                let fontSize = getQuickButtonFontSize(name, itemObj.fontSize || 10);
-                let isOnWorkorder = selectedItemIDs.has(itemObj.inventoryItemID);
+              {/* Right side buttons */}
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                {/* Print dropdown (opens upward) */}
+                {selectedWorkorder && (
+                  <View style={{ position: "relative" }}>
+                    <TouchableOpacity
+                      onPress={() => _setShowPrintMenu((p) => !p)}
+                      style={{
+                        alignItems: "center",
+                        justifyContent: "center",
+                        paddingHorizontal: 8,
+                      }}
+                    >
+                      <Image_ icon={ICONS.print} size={30} />
+                    </TouchableOpacity>
 
-                let workorderLine = isOnWorkorder
-                  ? (selectedWorkorder.workorderLines || []).find((ln) => ln.inventoryItem?.id === itemObj.inventoryItemID)
-                  : null;
-                let hasDiscount = !!workorderLine?.discountObj?.value;
+                    {/* Upward dropdown menu + backdrop */}
+                    {sShowPrintMenu && (
+                      <>
+                      <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={() => _setShowPrintMenu(false)}
+                        style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }}
+                      />
+                      <View style={{
+                        position: "absolute",
+                        bottom: "100%",
+                        right: 0,
+                        marginBottom: 4,
+                        backgroundColor: C.listItemWhite,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        minWidth: 180,
+                        overflow: "hidden",
+                      }}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            _setShowPrintMenu(false);
+                            _setShowIntakeActionModal(true);
+                          }}
+                          style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}
+                        >
+                          <Text style={{ fontSize: 14, color: C.text }}>Intake</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={handleWorkorderPrint}
+                          style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}
+                        >
+                          <Text style={{ fontSize: 14, color: C.text }}>Workorder</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => {
+                            _setShowPrintMenu(false);
+                            _setShowPrinterSelectModal(true);
+                          }}
+                          style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: gray(0.05) }}
+                        >
+                          <Text style={{ fontSize: 13, color: selectedPrinterLabel ? gray(0.5) : C.orange, fontWeight: selectedPrinterLabel ? "normal" : "600" }}>
+                            {selectedPrinterLabel ? "Printer: " + selectedPrinterLabel : "Select Printer"}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      </>
+                    )}
+                  </View>
+                )}
 
-                return (
-                  <div
-                    key={itemObj.inventoryItemID}
-                    onClick={() => {
-                      if (sDiscountCardID) { _setDiscountCardID(null); return; }
-                      handleQuickButtonPress(itemObj);
-                    }}
-                    onMouseDown={() => handleLongPressStart(itemObj.inventoryItemID)}
-                    onMouseUp={handleLongPressEnd}
-                    onMouseLeave={handleLongPressEnd}
-                    onTouchStart={() => handleLongPressStart(itemObj.inventoryItemID)}
-                    onTouchEnd={handleLongPressEnd}
+                {/* New workorder button */}
+                <Tooltip text="Start new workorder" position="top">
+                  <TouchableOpacity
+                    onPress={handleNewWorkorderPress}
                     style={{
-                      position: "absolute",
-                      left: (itemObj.x || 0) + "%",
-                      top: (itemObj.y || 0) + "%",
-                      width: w + "%",
-                      height: h + "%",
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderWidth: isOnWorkorder ? 2 : 1,
-                      borderStyle: "solid",
-                      borderColor: isOnWorkorder ? C.green : C.buttonLightGreenOutline,
+                      backgroundColor: C.green,
                       borderRadius: 8,
-                      backgroundColor: isOnWorkorder ? lightenRGBByPercent(C.green, 70) : C.buttonLightGreenOutline,
-                      cursor: "pointer",
-                      boxSizing: "border-box",
-                      paddingLeft: 4,
-                      paddingRight: 4,
-                      paddingTop: 2,
-                      paddingBottom: 2,
-                      userSelect: "none",
-                      overflow: "visible",
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 6,
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: fontSize,
-                        color: invItem ? C.text : gray(0.35),
-                        textAlign: "center",
-                        fontWeight: "500",
-                        lineHeight: (itemObj.fontSize || 10) + 6,
-                      }}
-                      numberOfLines={(name || "").split("\n").length}
-                    >
-                      {name}
-                    </Text>
-                    {hasDiscount && (
-                      <Text style={{ fontSize: 8, color: C.green, fontWeight: "600" }}>
-                        {workorderLine.discountObj.name || "Discount"}
-                      </Text>
-                    )}
-                    {/* Discount dropdown on long-press */}
-                    {sDiscountCardID === itemObj.inventoryItemID && (
-                      <div
-                        onClick={(e) => e.stopPropagation()}
-                        style={{
-                          position: "absolute",
-                          top: "100%",
-                          left: 0,
-                          zIndex: 100,
-                          backgroundColor: "white",
-                          borderRadius: 6,
-                          border: "1px solid " + gray(0.2),
-                          boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                          minWidth: 140,
-                          overflow: "hidden",
-                        }}
-                      >
-                        <div
-                          onClick={() => handleDiscountSelect(itemObj.inventoryItemID, null)}
-                          style={{ padding: "6px 10px", cursor: "pointer", fontSize: 12, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
-                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
-                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
+                    <Text style={{ fontSize: 16, fontWeight: "700", color: C.textWhite }}>New</Text>
+                  </TouchableOpacity>
+                </Tooltip>
+              </View>
+            </View>
+          )}
+
+          {/* Printer selection modal */}
+          {sShowPrinterSelectModal && (
+            <View style={{
+              position: "absolute",
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              justifyContent: "center",
+              alignItems: "center",
+            }}>
+              <View style={{
+                backgroundColor: C.listItemWhite,
+                borderRadius: 10,
+                width: "60%",
+                maxHeight: "70%",
+                overflow: "hidden",
+              }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: gray(0.15) }}>
+                  <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>Select Printer</Text>
+                  <TouchableOpacity onPress={() => _setShowPrinterSelectModal(false)}>
+                    <Text style={{ fontSize: 18, fontWeight: "700", color: gray(0.4) }}>X</Text>
+                  </TouchableOpacity>
+                </View>
+                <ScrollView style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+                  {receiptPrinters.length === 0 ? (
+                    <Text style={{ fontSize: 14, color: gray(0.5), paddingVertical: 20, textAlign: "center" }}>No receipt printers configured</Text>
+                  ) : (
+                    receiptPrinters.map((printer) => {
+                      let isSelected = printer.id === sSelectedPrinterID;
+                      let isOnline = printer.lastSeen && (Date.now() - printer.lastSeen < 2 * 60 * 1000);
+                      return (
+                        <TouchableOpacity
+                          key={printer.id}
+                          onPress={() => handleSelectPrinter(printer.id)}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            paddingVertical: 12,
+                            paddingHorizontal: 8,
+                            borderBottomWidth: 1,
+                            borderBottomColor: gray(0.1),
+                            backgroundColor: isSelected ? lightenRGBByPercent(C.green, 70) : "transparent",
+                            borderRadius: 6,
+                            marginBottom: 4,
+                          }}
                         >
-                          No Discount
-                        </div>
-                        {(zSettings.discounts || [])
-                          .filter((d) => d.type !== "$" || Number(d.value) <= (invItem?.price || 0) * (workorderLine?.qty || 1))
-                          .map((d) => (
-                          <div
-                            key={d.name}
-                            onClick={() => handleDiscountSelect(itemObj.inventoryItemID, d)}
-                            style={{ padding: "6px 10px", cursor: "pointer", fontSize: 12, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
-                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
-                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
-                          >
-                            {d.name}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {canvasItems.length === 0 && (
-                <Text style={{ fontSize: 13, color: gray(0.35), textAlign: "center", paddingVertical: 12, width: "100%" }}>
-                  No common quick buttons configured.
-                </Text>
-              )}
-            </div>
-          </ScrollView>
-        </>
+                          <View style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: 5,
+                            backgroundColor: isOnline ? C.green : gray(0.3),
+                            marginRight: 10,
+                          }} />
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 15, fontWeight: isSelected ? "600" : "normal", color: C.text }}>
+                              {printer.label || printer.printerName || printer.id}
+                            </Text>
+                            {printer.printerName && printer.label ? (
+                              <Text style={{ fontSize: 12, color: gray(0.5) }}>{printer.printerName}</Text>
+                            ) : null}
+                          </View>
+                          {isSelected && (
+                            <Text style={{ fontSize: 16, color: C.green, fontWeight: "700" }}>{"\u2713"}</Text>
+                          )}
+                        </TouchableOpacity>
+                      );
+                    })
+                  )}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+
+          {/* Intake action modal (Print / Text/Email / All) — portal */}
+          {sShowIntakeActionModal && createPortal(
+            <View style={{
+              position: "fixed",
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: "rgba(0,0,0,0.5)",
+              justifyContent: "center",
+              alignItems: "center",
+            }}>
+              <View style={{
+                backgroundColor: C.listItemWhite,
+                borderRadius: 10,
+                width: 360,
+              }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: gray(0.15) }}>
+                  <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>Intake Receipt</Text>
+                  <TouchableOpacity onPress={() => _setShowIntakeActionModal(false)}>
+                    <Text style={{ fontSize: 18, fontWeight: "700", color: gray(0.4) }}>X</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={{ padding: 16 }}>
+                  <TouchableOpacity
+                    onPress={handleIntakePrint}
+                    style={{
+                      backgroundColor: sSelectedPrinterID ? C.green : gray(0.3),
+                      borderRadius: 8,
+                      paddingVertical: 14,
+                      alignItems: "center",
+                      marginBottom: 10,
+                    }}
+                    disabled={!sSelectedPrinterID}
+                  >
+                    <Text style={{ fontSize: 16, fontWeight: "600", color: C.textWhite }}>
+                      {sSelectedPrinterID ? "Print" : "Print (no printer selected)"}
+                    </Text>
+                  </TouchableOpacity>
+                  {(customerCell || customerEmail) ? (
+                    <TouchableOpacity
+                      onPress={handleIntakeTextEmail}
+                      style={{
+                        backgroundColor: C.blue,
+                        borderRadius: 8,
+                        paddingVertical: 14,
+                        alignItems: "center",
+                        marginBottom: 10,
+                      }}
+                    >
+                      <Text style={{ fontSize: 16, fontWeight: "600", color: C.textWhite }}>
+                        {customerCell && customerEmail ? "Text/Email" : customerCell ? "Text" : "Email"}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  <TouchableOpacity
+                    onPress={handleIntakeAll}
+                    style={{
+                      backgroundColor: (sSelectedPrinterID || customerCell || customerEmail) ? C.purple : gray(0.3),
+                      borderRadius: 8,
+                      paddingVertical: 14,
+                      alignItems: "center",
+                    }}
+                    disabled={!sSelectedPrinterID && !customerCell && !customerEmail}
+                  >
+                    <Text style={{ fontSize: 16, fontWeight: "600", color: C.textWhite }}>All</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>,
+            document.body
+          )}
+        </View>
       ) : (
         <StandWorkorderDetail
           workorderID={sSelectedWorkorderID}
@@ -516,122 +1815,1084 @@ export function BikeStandScreen() {
   );
 }
 
+
 ////////////////////////////////////////////////////////////////////////////////
-// Workorder Selector Dropdown
+// Workorder List Modal (browse open workorders)
 ////////////////////////////////////////////////////////////////////////////////
 
-const WorkorderSelector = ({ workorders, statuses, selectedID, onSelect }) => {
-  const [sOpen, _setOpen] = useState(false);
+function computeWaitInfo(workorder) {
+  let label = calculateWaitEstimateLabel(workorder, useSettingsStore.getState().getSettings());
+  let result = { waitEndDay: "", textColor: C.text, isMissing: false };
+  if (!label) return result;
+  if (label === "Missing estimate") { result.isMissing = true; return result; }
+  if (label === "No estimate") { result.waitEndDay = label; return result; }
+  let lowerLabel = label.toLowerCase();
+  if (lowerLabel.includes("today") || lowerLabel.includes("overdue")) result.textColor = "red";
+  else if (lowerLabel.includes("tomorrow")) result.textColor = C.green;
+  if (lowerLabel.startsWith("overdue ")) {
+    let after = label.substring(8);
+    if (after.toLowerCase() === "yesterday") after = "Yesterday";
+    result.waitEndDay = "Overdue\n" + after;
+    return result;
+  }
+  if (lowerLabel.includes("today")) {
+    let parts = label.split(/\s+(today)/i);
+    result.waitEndDay = parts[0]?.trim() ? parts[0].trim() + "\nToday" : "Today";
+    return result;
+  }
+  if (lowerLabel.includes("tomorrow")) {
+    let parts = label.split(/\s+(tomorrow)/i);
+    result.waitEndDay = parts[0]?.trim() ? parts[0].trim() + "\nTomorrow" : "Tomorrow";
+    return result;
+  }
+  let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  for (let day of dayNames) {
+    if (label.endsWith(day) && label.length > day.length) {
+      result.waitEndDay = label.slice(0, label.length - day.length).trim() + "\n" + day;
+      return result;
+    }
+  }
+  result.waitEndDay = label;
+  return result;
+}
 
-  let selected = workorders.find((o) => o.id === selectedID);
-  let label = selected
-    ? `#${formatWorkorderNumber(selected.workorderNumber) || "?"} — ${
-        selected.customerFirst || selected.brand || "(no name)"
-      } ${selected.customerLast || ""}`.trim()
-    : "Select Workorder...";
+const StandWaitTimeIndicator = ({ workorder }) => {
+  const info = computeWaitInfo(workorder);
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: "flex-end",
+        height: "100%",
+        width: 90,
+        paddingRight: 2,
+        backgroundColor: C.buttonLightGreen,
+        borderWidth: 1,
+        borderColor: C.buttonLightGreenOutline,
+        borderRadius: 5,
+        marginLeft: 5,
+      }}
+    >
+      <View style={{ flexDirection: "column", alignItems: "flex-end", justifyContent: "center" }}>
+        {info.isMissing ? null : !!info.waitEndDay && info.waitEndDay.includes("\n") ? (
+          <>
+            <Text style={{ color: info.textColor, fontSize: 10, textAlign: "right", fontStyle: "italic" }}>
+              {capitalizeFirstLetterOfString(info.waitEndDay.split("\n")[0])}
+            </Text>
+            <Text style={{ color: info.textColor, fontSize: 12, textAlign: "right" }}>
+              {info.waitEndDay.split("\n")[1]}
+            </Text>
+          </>
+        ) : !!info.waitEndDay ? (
+          <Text style={{ color: info.textColor, fontSize: 12, textAlign: "right" }}>
+            {capitalizeFirstLetterOfString(info.waitEndDay)}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+};
+
+const NUM_MILLIS_IN_DAY = 86400000;
+
+function sortWorkordersForStand(inputArr) {
+  let finalArr = [];
+  const statuses = useSettingsStore.getState().settings?.statuses || [];
+  statuses.forEach((status) => {
+    let arr = inputArr.filter((wo) => wo.status === status.id);
+    arr.sort((a, b) => {
+      let aHasWait = !!(a.waitTime?.maxWaitTimeDays != null && a.startedOnMillis);
+      let bHasWait = !!(b.waitTime?.maxWaitTimeDays != null && b.startedOnMillis);
+      if (!aHasWait && bHasWait) return -1;
+      if (aHasWait && !bHasWait) return 1;
+      if (!aHasWait && !bHasWait) return 0;
+      let aDue = a.startedOnMillis + a.waitTime.maxWaitTimeDays * NUM_MILLIS_IN_DAY;
+      let bDue = b.startedOnMillis + b.waitTime.maxWaitTimeDays * NUM_MILLIS_IN_DAY;
+      return aDue - bDue;
+    });
+    finalArr = [...finalArr, ...arr];
+  });
+
+  const currentUser = useLoginStore.getState().getCurrentUser();
+  const userStatusIDs = currentUser?.statuses || [];
+  if (userStatusIDs.length > 0) {
+    finalArr.sort((a, b) => {
+      let aMatch = userStatusIDs.includes(a.status);
+      let bMatch = userStatusIDs.includes(b.status);
+      if (aMatch && !bMatch) return -1;
+      if (!aMatch && bMatch) return 1;
+      return 0;
+    });
+  }
+
+  finalArr.sort((a, b) => {
+    let aIsSender = a.lastSMSSenderUserID && a.lastSMSSenderUserID === currentUser?.id;
+    let bIsSender = b.lastSMSSenderUserID && b.lastSMSSenderUserID === currentUser?.id;
+    if (aIsSender && !bIsSender) return -1;
+    if (!aIsSender && bIsSender) return 1;
+    return 0;
+  });
+
+  const now = new Date();
+  const todayMonth = now.getMonth() + 1;
+  const todayDay = now.getDate();
+  finalArr.sort((a, b) => {
+    const aIsToday = (a.status === "pickup" || a.status === "delivery") &&
+      Number(a.pickupDelivery?.month) === todayMonth &&
+      Number(a.pickupDelivery?.day) === todayDay;
+    const bIsToday = (b.status === "pickup" || b.status === "delivery") &&
+      Number(b.pickupDelivery?.month) === todayMonth &&
+      Number(b.pickupDelivery?.day) === todayDay;
+    if (aIsToday && !bIsToday) return -1;
+    if (!aIsToday && bIsToday) return 1;
+    if (aIsToday && bIsToday) {
+      if (a.status === "pickup" && b.status === "delivery") return -1;
+      if (a.status === "delivery" && b.status === "pickup") return 1;
+      return (a.pickupDelivery?.startTime || "").localeCompare(b.pickupDelivery?.startTime || "");
+    }
+    return 0;
+  });
+
+  return finalArr;
+}
+
+const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
+  const zWorkorders = useOpenWorkordersStore((state) => state.workorders);
+  const zStatuses = useSettingsStore((s) => s.settings?.statuses);
+
+  let sortedWorkorders = sortWorkordersForStand((zWorkorders || []).filter((wo) => !!wo.customerID));
 
   return (
-    <View>
-      <TouchableOpacity
-        onPress={() => _setOpen(!sOpen)}
+    <div
+      onClick={onClose}
+      style={{
+        position: "absolute",
+        top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
         style={{
-          flexDirection: "row",
-          alignItems: "center",
-          borderWidth: 1,
-          borderColor: C.buttonLightGreenOutline,
-          borderRadius: 6,
-          paddingHorizontal: 10,
-          paddingVertical: 8,
+          width: "95%",
+          height: "90%",
           backgroundColor: "white",
+          borderRadius: 12,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
         }}
       >
-        <Text
-          style={{
-            flex: 1,
-            fontSize: 16,
-            color: selected ? C.text : gray(0.4),
-          }}
-          numberOfLines={1}
-        >
-          {label}
-        </Text>
-        <Image_
-          icon={sOpen ? ICONS.upArrow : ICONS.downArrow}
-          size={14}
-          style={{ marginLeft: 6 }}
-        />
-      </TouchableOpacity>
+        {/* Header */}
+        <View style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          paddingHorizontal: 16,
+          paddingVertical: 12,
+          borderBottomWidth: 1,
+          borderBottomColor: gray(0.1),
+        }}>
+          <Text style={{ fontSize: 18, fontWeight: "600", color: C.text }}>Open Workorders</Text>
+          <TouchableOpacity onPress={onClose}>
+            <Text style={{ fontSize: 20, color: gray(0.5), fontWeight: "600", paddingHorizontal: 8 }}>{"\u2715"}</Text>
+          </TouchableOpacity>
+        </View>
 
-      {sOpen && (
-        <ScrollView
-          style={{
-            position: "absolute",
-            top: 42,
-            left: 0,
-            right: 0,
-            maxHeight: 350,
-            backgroundColor: "white",
-            borderWidth: 1,
-            borderColor: gray(0.2),
-            borderRadius: 6,
-            zIndex: 100,
-          }}
-        >
-          {workorders.map((wo) => {
-            let status = resolveStatus(wo.status, statuses);
-            return (
-              <TouchableOpacity
-                key={wo.id}
-                onPress={() => {
-                  onSelect(wo.id);
-                  _setOpen(false);
-                }}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  padding: 10,
-                  borderBottomWidth: 1,
-                  borderBottomColor: gray(0.08),
-                  backgroundColor: wo.id === selectedID ? "rgb(230,240,252)" : "white",
-                }}
-              >
-                <View
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: 5,
-                    backgroundColor: status.backgroundColor || gray(0.3),
-                    marginRight: 10,
-                  }}
-                />
-                <Text
-                  style={{ fontSize: 15, color: C.text, flex: 1 }}
-                  numberOfLines={1}
+        {/* Workorder list */}
+        <ScrollView style={{ flex: 1, paddingHorizontal: 12, paddingTop: 8 }}>
+          {sortedWorkorders.length === 0 ? (
+            <Text style={{ fontSize: 14, color: gray(0.4), textAlign: "center", paddingVertical: 20 }}>No open workorders.</Text>
+          ) : (
+            sortedWorkorders.map((workorder) => {
+              const rs = resolveStatus(workorder.status, zStatuses);
+              let wipUser = "";
+              if (workorder.status === "work_in_progress" && workorder.changeLog?.length) {
+                for (let i = workorder.changeLog.length - 1; i >= 0; i--) {
+                  let entry = workorder.changeLog[i];
+                  if (entry.field === "status" && entry.to === rs.label) { wipUser = entry.user || ""; break; }
+                }
+              }
+              let isActive = workorder.id === activeWorkorderID;
+              return (
+                <TouchableOpacity
+                  key={workorder.id}
+                  onPress={() => onSelect(workorder)}
                 >
-                  #{formatWorkorderNumber(wo.workorderNumber) || "?"} — {wo.customerFirst || wo.brand || "(no name)"}{" "}
-                  {wo.customerLast || ""}
-                </Text>
-                <Text style={{ fontSize: 12, color: gray(0.5) }}>
-                  {status.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-          {workorders.length === 0 && (
-            <Text
-              style={{
-                fontSize: 14,
-                color: gray(0.4),
-                padding: 14,
-                textAlign: "center",
-              }}
-            >
-              No open workorders.
-            </Text>
+                  <View
+                    style={{
+                      marginBottom: 4,
+                      borderRadius: 7,
+                      borderWidth: 1,
+                      borderLeftWidth: 4,
+                      borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
+                      borderColor: C.buttonLightGreenOutline,
+                      backgroundColor: isActive ? lightenRGBByPercent(C.lightred, 85) : C.listItemWhite,
+                      flexDirection: "column",
+                      width: "100%",
+                      paddingLeft: 5,
+                      paddingRight: 2,
+                      paddingVertical: 2,
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        width: "100%",
+                        justifyContent: "flex-start",
+                        alignItems: "center",
+                      }}
+                    >
+                      {/* Left: customer + description */}
+                      <View
+                        style={{
+                          marginVertical: 2,
+                          flexDirection: "column",
+                          width: "65%",
+                          justifyContent: "center",
+                        }}
+                      >
+                        {/* Customer name row */}
+                        <View style={{ flexDirection: "row", alignItems: "center" }}>
+                          {workorder.hasNewSMS && (
+                            <View
+                              style={{
+                                width: 8,
+                                height: 8,
+                                borderRadius: 4,
+                                backgroundColor: C.green,
+                                marginRight: 5,
+                              }}
+                            />
+                          )}
+                          <Text
+                            numberOfLines={1}
+                            style={{ fontSize: 15, color: "dimgray" }}
+                          >
+                            {capitalizeFirstLetterOfString(workorder.customerFirst) + " " + capitalizeFirstLetterOfString(workorder.customerLast)}
+                          </Text>
+                        </View>
+
+                        {/* Brand + description + line count */}
+                        <View style={{ flexDirection: "row", alignItems: "center" }}>
+                          <Text style={{ fontSize: 14, fontWeight: "500", color: C.text }}>
+                            {capitalizeFirstLetterOfString(workorder.brand) || ""}
+                          </Text>
+                          {!!workorder.description && (
+                            <View style={{ width: 7, height: 2, marginHorizontal: 5, backgroundColor: "lightgray" }} />
+                          )}
+                          <Text style={{ fontSize: 14, color: C.text }}>
+                            {capitalizeFirstLetterOfString(workorder.description)}
+                          </Text>
+                          {workorder.workorderLines?.length > 0 && (
+                            <View
+                              style={{
+                                backgroundColor: "gray",
+                                borderRadius: 10,
+                                paddingHorizontal: 6,
+                                paddingVertical: 1,
+                                marginLeft: 8,
+                              }}
+                            >
+                              <Text style={{ color: "white", fontSize: 13, fontWeight: "600" }}>
+                                {workorder.workorderLines.length}
+                              </Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+
+                      {/* Right: date, status, wait time */}
+                      <View
+                        style={{
+                          width: "35%",
+                          justifyContent: "flex-end",
+                          alignItems: "center",
+                          flexDirection: "row",
+                          height: "100%",
+                        }}
+                      >
+                        <View
+                          style={{
+                            flexDirection: "column",
+                            alignItems: "flex-end",
+                            justifyContent: "space-between",
+                            height: "100%",
+                          }}
+                        >
+                          <Text style={{ color: "dimgray", fontSize: 13 }}>
+                            {(() => {
+                              let d = new Date(workorder.startedOnMillis);
+                              let h = d.getHours();
+                              let m = d.getMinutes();
+                              h = h % 12 || 12;
+                              return h + ":" + (m < 10 ? "0" : "") + m + "  ";
+                            })()}
+                            {formatMillisForDisplay(
+                              workorder.startedOnMillis,
+                              new Date(workorder.startedOnMillis).getFullYear() !== new Date().getFullYear()
+                            )}
+                          </Text>
+                          <View style={{ width: 8 }} />
+                          <View
+                            style={{
+                              backgroundColor: rs.backgroundColor,
+                              flexDirection: "row",
+                              paddingHorizontal: 11,
+                              paddingVertical: 2,
+                              alignItems: "center",
+                              borderRadius: 10,
+                              borderColor: "transparent",
+                              borderLeftColor: rs.textColor,
+                            }}
+                          >
+                            {!!wipUser && (
+                              <Text style={{ color: C.red, fontSize: 11, fontStyle: "italic", marginRight: 5 }}>{wipUser}</Text>
+                            )}
+                            <Text style={{ color: rs.textColor, fontSize: 13, fontWeight: "normal" }}>
+                              {rs.label}
+                            </Text>
+                          </View>
+                        </View>
+                        <StandWaitTimeIndicator workorder={workorder} />
+                      </View>
+                    </View>
+
+                    {/* Part ordered / source row */}
+                    {!!(workorder.partOrdered || workorder.partSource || workorder.trackingNumber) && (
+                      <View
+                        style={{
+                          flexDirection: "row",
+                          alignItems: "center",
+                          paddingTop: 2,
+                          paddingBottom: 1,
+                          marginTop: 2,
+                        }}
+                      >
+                        {!!workorder.partOrdered && (
+                          <Text numberOfLines={1} style={{ fontSize: 14, color: C.blue, fontWeight: "500" }}>
+                            {capitalizeFirstLetterOfString(workorder.partOrdered)}
+                          </Text>
+                        )}
+                        {!!(workorder.partOrdered && workorder.partSource) && (
+                          <View style={{ width: 5, height: 2, marginHorizontal: 5, backgroundColor: "lightgray" }} />
+                        )}
+                        {!!workorder.partSource && (
+                          <Text numberOfLines={1} style={{ fontSize: 14, color: C.orange }}>
+                            {capitalizeFirstLetterOfString(workorder.partSource)}
+                          </Text>
+                        )}
+                        {!!(workorder.partOrderedMillis && workorder.partOrderEstimateMillis) && (
+                          <Text numberOfLines={1} style={{ fontSize: 12, color: "dimgray", marginLeft: 6 }}>
+                            {formatMillisForDisplay(workorder.partOrderedMillis)}
+                            {" \u2192 " + formatMillisForDisplay(workorder.partOrderEstimateMillis)}
+                          </Text>
+                        )}
+                        {!!workorder.trackingNumber && (
+                          <Text numberOfLines={1} style={{ fontSize: 12, color: C.blue, marginLeft: 6 }}>
+                            {workorder.trackingNumber}
+                          </Text>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                </TouchableOpacity>
+              );
+            })
           )}
         </ScrollView>
-      )}
-    </View>
+      </div>
+    </div>
+  );
+};
+
+
+////////////////////////////////////////////////////////////////////////////////
+// New Workorder Modal (custom keypad, search, create customer)
+////////////////////////////////////////////////////////////////////////////////
+
+const NewWorkorderModal = ({ onSelect, onClose }) => {
+  const [sMode, _setMode] = useState("search"); // "search" | "create"
+  const [sKeypadMode, _setKeypadMode] = useState("phone"); // "phone" | "alpha"
+  const [sSearchText, _setSearchText] = useState("");
+  const [sSearchResults, _setSearchResults] = useState([]);
+  const [sSearching, _setSearching] = useState(false);
+  const [sCreateForm, _setCreateForm] = useState({ first: "", last: "", phone: "", email: "" });
+  const [sActiveField, _setActiveField] = useState("first");
+  const searchTimerRef = useRef(null);
+
+  // Debounced search
+  function handleSearchTextChange(newText) {
+    _setSearchText(newText);
+    clearTimeout(searchTimerRef.current);
+    if (sKeypadMode === "phone" && newText.replace(/\D/g, "").length < 4) {
+      _setSearchResults([]);
+      return;
+    }
+    if (sKeypadMode === "alpha" && newText.length < 3) {
+      _setSearchResults([]);
+      return;
+    }
+    _setSearching(true);
+    searchTimerRef.current = setTimeout(async () => {
+      let results = [];
+      if (sKeypadMode === "phone") {
+        results = await dbSearchCustomersByPhone(newText.replace(/\D/g, ""));
+      } else {
+        results = await dbSearchCustomersByName(newText);
+      }
+      _setSearchResults(results || []);
+      _setSearching(false);
+    }, 300);
+  }
+
+  function handleKeyPress(key) {
+    if (sMode === "create") {
+      handleCreateKeyPress(key);
+      return;
+    }
+    if (key === "CLR") {
+      handleSearchTextChange("");
+    } else if (key === "\u232B") {
+      handleSearchTextChange(sSearchText.slice(0, -1));
+    } else if (key === " ") {
+      handleSearchTextChange(sSearchText + " ");
+    } else {
+      if (sKeypadMode === "phone") {
+        if (sSearchText.replace(/\D/g, "").length >= 10) return;
+        handleSearchTextChange(sSearchText + key);
+      } else {
+        handleSearchTextChange(sSearchText + key.toLowerCase());
+      }
+    }
+  }
+
+  function handleCreateKeyPress(key) {
+    let field = sActiveField;
+    let val = sCreateForm[field] || "";
+    if (key === "CLR") {
+      val = "";
+    } else if (key === "\u232B") {
+      val = val.slice(0, -1);
+    } else if (key === " ") {
+      val = val + " ";
+    } else {
+      if (field === "phone") {
+        if (val.replace(/\D/g, "").length >= 10) return;
+        val = val + key;
+      } else {
+        val = val + (field === "email" ? key.toLowerCase() : key.toLowerCase());
+      }
+    }
+    _setCreateForm({ ...sCreateForm, [field]: val });
+  }
+
+  function handleSelectCustomer(customer) {
+    onSelect(customer);
+  }
+
+  function handleStandaloneSale() {
+    onSelect("standalone");
+  }
+
+  function handleSwitchToCreate() {
+    let form = { first: "", last: "", phone: "", email: "" };
+    if (sKeypadMode === "phone" && sSearchText) {
+      form.phone = sSearchText.replace(/\D/g, "");
+    } else if (sKeypadMode === "alpha" && sSearchText) {
+      let parts = sSearchText.split(" ");
+      form.first = parts[0] || "";
+      form.last = parts[1] || "";
+    }
+    _setCreateForm(form);
+    _setActiveField("first");
+    _setMode("create");
+  }
+
+  function handleCreateAndStart() {
+    let newCustomer = cloneDeep(CUSTOMER_PROTO);
+    newCustomer.id = crypto.randomUUID();
+    newCustomer.millisCreated = Date.now();
+    newCustomer.first = (sCreateForm.first || "").trim();
+    newCustomer.last = (sCreateForm.last || "").trim();
+    newCustomer.customerCell = (sCreateForm.phone || "").replace(/\D/g, "");
+    newCustomer.email = (sCreateForm.email || "").trim();
+    useCurrentCustomerStore.getState().setCustomer(newCustomer);
+    onSelect(newCustomer);
+  }
+
+  // Auto-switch keypad for create mode fields
+  let effectiveKeypadMode = sKeypadMode;
+  if (sMode === "create") {
+    effectiveKeypadMode = sActiveField === "phone" ? "phone" : "alpha";
+  }
+
+  // Display text for search mode
+  let displayText = "";
+  if (sMode === "search") {
+    if (sKeypadMode === "phone") {
+      let digits = sSearchText.replace(/\D/g, "");
+      displayText = digits.length > 0 ? formatPhoneWithDashes(digits) : "";
+    } else {
+      displayText = sSearchText;
+    }
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "absolute",
+        top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "95%",
+          height: "95%",
+          backgroundColor: "white",
+          borderRadius: 12,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: 12,
+          borderBottom: "1px solid " + gray(0.1),
+        }}>
+          {sMode === "create" ? (
+            <TouchableOpacity
+              onPress={() => _setMode("search")}
+              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+            >
+              <Text style={{ fontSize: 16, color: C.blue, fontWeight: "600" }}>{"\u2190"} Back to Search</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity onPress={onClose}>
+              <Text style={{ fontSize: 20, color: gray(0.5), fontWeight: "600", paddingHorizontal: 8 }}>{"\u2715"}</Text>
+            </TouchableOpacity>
+          )}
+        </div>
+
+        {sMode === "search" ? (
+          <>
+            {/* Search display + mode toggle */}
+            <div style={{ padding: 12, display: "flex", flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <div style={{
+                flex: 1,
+                height: 44,
+                borderRadius: 8,
+                borderWidth: 2,
+                borderStyle: "solid",
+                borderColor: C.buttonLightGreenOutline,
+                backgroundColor: C.listItemWhite,
+                display: "flex",
+                alignItems: "center",
+                paddingLeft: 12,
+                paddingRight: 12,
+                fontSize: 20,
+                fontWeight: "500",
+                color: C.text,
+              }}>
+                {displayText || <span style={{ color: gray(0.3) }}>{sKeypadMode === "phone" ? "Phone number..." : "Name..."}</span>}
+              </div>
+              <TouchableOpacity
+                onPress={() => {
+                  let newMode = sKeypadMode === "phone" ? "alpha" : "phone";
+                  _setKeypadMode(newMode);
+                  _setSearchText("");
+                  _setSearchResults([]);
+                }}
+                style={{
+                  height: 44,
+                  paddingHorizontal: 14,
+                  borderRadius: 8,
+                  backgroundColor: C.blue,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: "600", color: "white" }}>
+                  {sKeypadMode === "phone" ? "ABC" : "123"}
+                </Text>
+              </TouchableOpacity>
+            </div>
+
+            {/* Keypad */}
+            <div style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 8 }}>
+              <StandKeypad mode={effectiveKeypadMode} onKeyPress={handleKeyPress} />
+            </div>
+
+            {/* Search results */}
+            <ScrollView style={{ flex: 1, paddingHorizontal: 12 }}>
+              {sSearching && (
+                <Text style={{ fontSize: 13, color: gray(0.4), textAlign: "center", paddingVertical: 10 }}>Searching...</Text>
+              )}
+              {sSearchResults.map((cust) => (
+                <TouchableOpacity
+                  key={cust.id}
+                  onPress={() => handleSelectCustomer(cust)}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingVertical: 12,
+                    paddingHorizontal: 12,
+                    marginBottom: 4,
+                    borderRadius: 8,
+                    borderWidth: 1,
+                    borderColor: C.buttonLightGreenOutline,
+                    backgroundColor: C.listItemWhite,
+                    gap: 16,
+                  }}
+                >
+                  <Text style={{ flex: 1, fontSize: 16, fontWeight: "600", color: C.text }}>
+                    {capitalizeFirstLetterOfString(cust.first || "")} {capitalizeFirstLetterOfString(cust.last || "")}
+                  </Text>
+                  <Text style={{ fontSize: 14, color: gray(0.5) }}>
+                    {formatPhoneWithDashes(cust.customerCell || cust.cell || "")}
+                  </Text>
+                  <Text style={{ fontSize: 13, color: gray(0.4) }} numberOfLines={1}>
+                    {cust.email || ""}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {!sSearching && sSearchText.length >= 2 && sSearchResults.length === 0 && (
+                <Text style={{ fontSize: 13, color: gray(0.4), textAlign: "center", paddingVertical: 10 }}>No results found.</Text>
+              )}
+            </ScrollView>
+
+            {/* Create new customer button - phone: 10 digits + no results; name: 3+ chars */}
+            {((sKeypadMode === "phone" && sSearchText.replace(/\D/g, "").length === 10 && sSearchResults.length === 0 && !sSearching) ||
+              (sKeypadMode === "alpha" && sSearchText.length >= 3)) && (
+              <div style={{ padding: 12, borderTop: "1px solid " + gray(0.1) }}>
+                <TouchableOpacity
+                  onPress={handleSwitchToCreate}
+                  style={{
+                    paddingVertical: 14,
+                    borderRadius: 8,
+                    backgroundColor: C.green,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>+ Create New Customer</Text>
+                </TouchableOpacity>
+              </div>
+            )}
+          </>
+        ) : (
+          /* Create customer mode */
+          <>
+            {/* Form fields */}
+            <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+              {[
+                { key: "first", label: "First Name" },
+                { key: "last", label: "Last Name" },
+                { key: "phone", label: "Phone" },
+                { key: "email", label: "Email" },
+              ].map((field) => (
+                <div
+                  key={field.key}
+                  onClick={() => _setActiveField(field.key)}
+                  style={{
+                    display: "flex",
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: 10,
+                    borderRadius: 8,
+                    borderWidth: 2,
+                    borderStyle: "solid",
+                    borderColor: sActiveField === field.key ? C.blue : C.buttonLightGreenOutline,
+                    backgroundColor: sActiveField === field.key ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
+                    cursor: "pointer",
+                  }}
+                >
+                  <Text style={{ fontSize: 13, color: gray(0.5), width: 80 }}>{field.label}</Text>
+                  <Text style={{ fontSize: 16, fontWeight: "500", color: C.text, flex: 1 }}>
+                    {field.key === "phone"
+                      ? formatPhoneWithDashes((sCreateForm[field.key] || "").replace(/\D/g, ""))
+                      : sCreateForm[field.key] || ""
+                    }
+                    {sActiveField === field.key && <span style={{ color: C.blue }}>|</span>}
+                  </Text>
+                </div>
+              ))}
+            </div>
+
+            {/* Keypad for create mode */}
+            <div style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 8 }}>
+              <StandKeypad mode={effectiveKeypadMode} onKeyPress={handleKeyPress} />
+            </div>
+
+            {/* Spacer + Create button */}
+            <View style={{ flex: 1 }} />
+            <div style={{ padding: 12, borderTop: "1px solid " + gray(0.1) }}>
+              <TouchableOpacity
+                onPress={handleCreateAndStart}
+                style={{
+                  paddingVertical: 14,
+                  borderRadius: 8,
+                  backgroundColor: C.green,
+                  alignItems: "center",
+                  opacity: (sCreateForm.first || sCreateForm.phone) ? 1 : 0.4,
+                }}
+                disabled={!(sCreateForm.first || sCreateForm.phone)}
+              >
+                <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>Create & Start Workorder</Text>
+              </TouchableOpacity>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+////////////////////////////////////////////////////////////////////////////////
+// Stand Custom Item Modal (labor / item - with on-screen keypads)
+////////////////////////////////////////////////////////////////////////////////
+
+const StandCustomItemModal = ({ type, onSave, onClose }) => {
+  const zDiscounts = useSettingsStore((s) => s.settings?.discounts);
+  const zLaborRate = useSettingsStore((s) => s.settings?.laborRateByHour);
+
+  const isLabor = type === "labor";
+
+  const [sName, _setName] = useState("");
+  const [sPriceDisplay, _setPriceDisplay] = useState("");
+  const [sPriceCents, _setPriceCents] = useState(0);
+  const [sMinutes, _setMinutes] = useState("");
+  const [sIntakeNotes, _setIntakeNotes] = useState("");
+  const [sReceiptNotes, _setReceiptNotes] = useState("");
+  const [sDiscountObj, _setDiscountObj] = useState(null);
+  const [sPriceManuallySet, _setPriceManuallySet] = useState(false);
+  const [sActiveField, _setActiveField] = useState("name"); // "name" | "minutes" | "price" | "intake" | "receipt"
+
+  function handleKeyPress(key) {
+    let field = sActiveField;
+    if (field === "name" || field === "intake" || field === "receipt") {
+      let getter = field === "name" ? sName : field === "intake" ? sIntakeNotes : sReceiptNotes;
+      let setter = field === "name" ? _setName : field === "intake" ? _setIntakeNotes : _setReceiptNotes;
+      if (key === "CLR") {
+        setter("");
+      } else if (key === "\u232B") {
+        setter(getter.slice(0, -1));
+      } else if (key === " ") {
+        setter(getter + " ");
+      } else {
+        let char = key.toLowerCase();
+        // Auto-cap first letter
+        if (getter.length === 0) char = key.toUpperCase();
+        setter(getter + char);
+      }
+    } else if (field === "minutes") {
+      if (key === "CLR") {
+        _setMinutes("");
+        return;
+      }
+      if (key === "\u232B") {
+        let newVal = sMinutes.slice(0, -1);
+        _setMinutes(newVal);
+        autoCalcFromMinutes(newVal);
+        return;
+      }
+      if (!/^\d$/.test(key)) return;
+      let newVal = sMinutes + key;
+      _setMinutes(newVal);
+      autoCalcFromMinutes(newVal);
+    } else if (field === "price") {
+      if (key === "CLR") {
+        _setPriceDisplay("");
+        _setPriceCents(0);
+        return;
+      }
+      if (key === "\u232B") {
+        let raw = String(sPriceCents);
+        let newRaw = raw.slice(0, -1) || "0";
+        let { display, cents } = usdTypeMask(newRaw);
+        _setPriceDisplay(display);
+        _setPriceCents(cents);
+        _setPriceManuallySet(true);
+        _setMinutes("");
+        return;
+      }
+      if (!/^\d$/.test(key)) return;
+      let raw = String(sPriceCents) + key;
+      let { display, cents } = usdTypeMask(raw);
+      _setPriceDisplay(display);
+      _setPriceCents(cents);
+      _setPriceManuallySet(true);
+      _setMinutes("");
+    }
+  }
+
+  function autoCalcFromMinutes(val) {
+    if (!val || !zLaborRate) return;
+    let mins = Number(val);
+    if (!mins) return;
+    let cents = Math.round((mins * zLaborRate) / 60);
+    let { display } = usdTypeMask(cents);
+    _setPriceDisplay(display);
+    _setPriceCents(cents);
+  }
+
+  function handleDiscountSelect(discountObj) {
+    _setDiscountObj(discountObj);
+  }
+
+  function handleSave() {
+    let invItem = cloneDeep(INVENTORY_ITEM_PROTO);
+    invItem.formalName = sName.trim();
+    invItem.price = sPriceCents;
+    invItem.category = isLabor ? "Labor" : "Item";
+    invItem.customLabor = isLabor;
+    invItem.customPart = !isLabor;
+    invItem.minutes = isLabor ? Number(sMinutes) || 0 : 0;
+    let barcode = generateEAN13Barcode();
+    invItem.id = barcode;
+    invItem.primaryBarcode = barcode;
+
+    let line = cloneDeep(WORKORDER_ITEM_PROTO);
+    line.inventoryItem = invItem;
+    line.intakeNotes = sIntakeNotes;
+    line.receiptNotes = sReceiptNotes;
+    line.id = crypto.randomUUID();
+
+    if (sDiscountObj) {
+      line.discountObj = sDiscountObj;
+      line = applyDiscountToWorkorderItem(line);
+    }
+
+    onSave(line);
+    onClose();
+  }
+
+  // Keypad mode based on active field
+  let keypadMode = (sActiveField === "minutes" || sActiveField === "price") ? "phone" : "alpha";
+
+  // Discount preview
+  let discountedCents = null;
+  if (sDiscountObj && sPriceCents > 0) {
+    if (sDiscountObj.type === DISCOUNT_TYPES.percent) {
+      let multiplier = 1 - Number("." + sDiscountObj.value);
+      discountedCents = Math.round(sPriceCents * multiplier);
+    } else {
+      discountedCents = sPriceCents - (sDiscountObj.value || 0);
+      if (discountedCents < 0) discountedCents = 0;
+    }
+  }
+
+  let canSave = sName.trim().length > 0 && sPriceCents > 0;
+
+  // Field definitions for rendering
+  let fields = [
+    { key: "name", label: isLabor ? "Labor Description" : "Item Name", required: true },
+  ];
+  if (isLabor) {
+    fields.push({ key: "minutes", label: "Minutes", sublabel: zLaborRate ? "@ $" + usdTypeMask(zLaborRate, { withDollar: false }).display + "/hr" : "" });
+  }
+  fields.push(
+    { key: "price", label: "Price", required: true },
+    { key: "intake", label: "Intake Notes" },
+    { key: "receipt", label: "Receipt Notes" },
+  );
+
+  function getFieldValue(key) {
+    if (key === "name") return sName;
+    if (key === "minutes") return sMinutes;
+    if (key === "price") return sPriceDisplay ? "$" + sPriceDisplay : "";
+    if (key === "intake") return sIntakeNotes;
+    if (key === "receipt") return sReceiptNotes;
+    return "";
+  }
+
+  function getFieldColor(key) {
+    if (key === "intake") return "orange";
+    if (key === "receipt") return C.green;
+    return C.text;
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "absolute",
+        top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "95%",
+          height: "95%",
+          backgroundColor: "rgba(255,255,255,0.95)",
+          borderRadius: 12,
+          display: "flex",
+          flexDirection: "column",
+          overflow: "hidden",
+        }}
+      >
+        {/* Header */}
+        <div style={{
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: 12,
+          borderBottom: "1px solid " + gray(0.1),
+        }}>
+          <Text style={{ fontSize: 18, fontWeight: "600", color: C.text }}>
+            Add Custom {isLabor ? "Labor" : "Item"}
+          </Text>
+          <TouchableOpacity onPress={onClose}>
+            <Text style={{ fontSize: 20, color: gray(0.5), fontWeight: "600", paddingHorizontal: 8 }}>{"\u2715"}</Text>
+          </TouchableOpacity>
+        </div>
+
+        {/* Fields */}
+        <ScrollView style={{ flex: 1, paddingHorizontal: 12, paddingTop: 8 }}>
+          {fields.map((field) => {
+            let isActive = sActiveField === field.key;
+            let val = getFieldValue(field.key);
+            return (
+              <div
+                key={field.key}
+                onClick={() => _setActiveField(field.key)}
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 10,
+                  padding: 10,
+                  marginBottom: 6,
+                  borderRadius: 8,
+                  borderWidth: 2,
+                  borderStyle: "solid",
+                  borderColor: isActive ? C.blue : C.buttonLightGreenOutline,
+                  backgroundColor: isActive ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
+                  cursor: "pointer",
+                }}
+              >
+                <View style={{ width: 120 }}>
+                  <Text style={{ fontSize: 13, color: gray(0.5) }}>
+                    {field.label}{field.required ? " *" : ""}
+                  </Text>
+                  {field.sublabel ? (
+                    <Text style={{ fontSize: 10, color: gray(0.4) }}>{field.sublabel}</Text>
+                  ) : null}
+                </View>
+                <Text style={{ fontSize: 16, fontWeight: "500", color: val ? getFieldColor(field.key) : gray(0.3), flex: 1 }}>
+                  {val || (field.key === "price" ? "$0.00" : "")}
+                  {isActive && <span style={{ color: C.blue }}>|</span>}
+                </Text>
+              </div>
+            );
+          })}
+
+          {/* Discount selector */}
+          <div style={{ marginTop: 4, marginBottom: 8 }}>
+            <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 4, paddingLeft: 2 }}>Discount</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+              <TouchableOpacity
+                onPress={() => _setDiscountObj(null)}
+                style={{
+                  paddingHorizontal: 12,
+                  paddingVertical: 8,
+                  borderRadius: 6,
+                  borderWidth: 1,
+                  borderColor: !sDiscountObj ? C.blue : gray(0.15),
+                  backgroundColor: !sDiscountObj ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
+                }}
+              >
+                <Text style={{ fontSize: 13, color: !sDiscountObj ? C.blue : gray(0.5) }}>None</Text>
+              </TouchableOpacity>
+              {(zDiscounts || [])
+                .filter((d) => d.type !== "$" || Number(d.value) <= sPriceCents)
+                .map((d) => {
+                  let isSelected = sDiscountObj?.name === d.name;
+                  return (
+                    <TouchableOpacity
+                      key={d.name}
+                      onPress={() => handleDiscountSelect(d)}
+                      style={{
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderRadius: 6,
+                        borderWidth: 1,
+                        borderColor: isSelected ? C.blue : gray(0.15),
+                        backgroundColor: isSelected ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, color: isSelected ? C.blue : C.text }}>{d.name}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+            </View>
+            {discountedCents !== null && (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6, paddingLeft: 2 }}>
+                <Text style={{ fontSize: 14, color: gray(0.5), textDecorationLine: "line-through" }}>
+                  {"$" + usdTypeMask(sPriceCents, { withDollar: false }).display}
+                </Text>
+                <Text style={{ fontSize: 16, fontWeight: "600", color: C.green }}>
+                  {"$" + usdTypeMask(discountedCents, { withDollar: false }).display}
+                </Text>
+                <Text style={{ fontSize: 12, color: C.lightred }}>
+                  {sDiscountObj.type === DISCOUNT_TYPES.percent
+                    ? sDiscountObj.value + "% off"
+                    : "$" + usdTypeMask(sDiscountObj.value, { withDollar: false }).display + " off"}
+                </Text>
+              </View>
+            )}
+          </div>
+        </ScrollView>
+
+        {/* Keypad */}
+        <div style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 8 }}>
+          <StandKeypad mode={keypadMode} onKeyPress={handleKeyPress} />
+        </div>
+
+        {/* Save button */}
+        <div style={{ padding: 12, borderTop: "1px solid " + gray(0.1) }}>
+          <TouchableOpacity
+            onPress={handleSave}
+            disabled={!canSave}
+            style={{
+              paddingVertical: 14,
+              borderRadius: 8,
+              backgroundColor: C.green,
+              alignItems: "center",
+              opacity: canSave ? 1 : 0.4,
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>
+              Add {isLabor ? "Labor" : "Item"} to Workorder
+            </Text>
+          </TouchableOpacity>
+        </div>
+      </div>
+    </div>
   );
 };
 

@@ -42,6 +42,7 @@ export function HomeScreen() {
       { label: "Workorders", path: ROUTES.dashboard, icon: ICONS.gears1, gradient: COLOR_GRADIENTS.blue },
       { label: "Intake", path: ROUTES.intake, icon: ICONS.bicycle, gradient: COLOR_GRADIENTS.blue },
       { label: "Bike Stand", path: ROUTES.stand, icon: ICONS.tools1, gradient: COLOR_GRADIENTS.blue },
+      { label: "Phone", path: ROUTES.phone, icon: ICONS.cellPhone, gradient: COLOR_GRADIENTS.blue },
       { label: "Login", path: ROUTES.login, icon: ICONS.userControl, gradient: COLOR_GRADIENTS.blue },
       { label: "Customer Display", path: ROUTES.display, icon: ICONS.eyeballs, gradient: COLOR_GRADIENTS.blue, popup: true },
       { label: "Translate", path: ROUTES.translate, icon: ICONS.letterI, gradient: COLOR_GRADIENTS.blue },

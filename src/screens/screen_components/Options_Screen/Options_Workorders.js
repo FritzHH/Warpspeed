@@ -11,7 +11,7 @@ import {
   resolveStatus,
   deepEqual,
 } from "../../../utils";
-import { TabMenuDivider as Divider, CheckBox_, SmallLoadingIndicator, Image_, Button_, TextInput_, Tooltip, WebPageModal } from "../../../components";
+import { TabMenuDivider as Divider, SmallLoadingIndicator, Image_, Button_, TextInput_, Tooltip, WebPageModal } from "../../../components";
 import { C, Colors, Fonts, ICONS } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
 import React, { useEffect, useRef, useState } from "react";
@@ -22,8 +22,8 @@ import {
   useOpenWorkordersStore,
   useSettingsStore,
   useTabNamesStore,
-  useWorkorderPreviewStore,
   useActiveSalesStore,
+  useWorkorderPreviewStore,
   useCustMessagesStore,
 } from "../../../stores";
 import { dbGetCustomer, dbGetCustomerMessages, dbListenToNewMessages } from "../../../db_calls_wrapper";
@@ -234,27 +234,59 @@ export function WorkordersComponent({}) {
     return score;
   }
 
-  ///////////////////////////////////////////////////////////////////
-
-  ///////////////////////////////////////////////////////////////////////////////////
-  let sAllowPreview = zCurrentUser?.preview !== false; // default true
   const enterTimerRef = useRef(null);
   const exitTimerRef = useRef(null);
   const preHoverTabsRef = useRef(null);
 
-  function handleTogglePreview() {
-    if (!zCurrentUser) return;
-    let newVal = !sAllowPreview;
-    let userArr = (zUsers || []).map((u) => {
-      if (u.id === zCurrentUser.id) return { ...u, preview: newVal };
-      return u;
-    });
-    useLoginStore.getState().setCurrentUser({ ...zCurrentUser, preview: newVal });
-    useSettingsStore.getState().setField("users", userArr);
+  function onMouseEnter(workorder) {
+    if (exitTimerRef.current) {
+      clearTimeout(exitTimerRef.current);
+      exitTimerRef.current = null;
+    }
+    if (enterTimerRef.current) {
+      clearTimeout(enterTimerRef.current);
+      enterTimerRef.current = null;
+    }
+    enterTimerRef.current = setTimeout(() => {
+      enterTimerRef.current = null;
+      if (!preHoverTabsRef.current) {
+        let tabStore = useTabNamesStore.getState();
+        preHoverTabsRef.current = {
+          infoTabName: tabStore.infoTabName,
+          itemsTabName: tabStore.itemsTabName,
+        };
+      }
+      useOpenWorkordersStore.getState().setWorkorderPreviewID(workorder.id);
+      useTabNamesStore.getState().setItems({
+        infoTabName: TAB_NAMES.infoTab.workorder,
+        itemsTabName: TAB_NAMES.itemsTab.workorderItems
+      });
+    }, 50);
   }
 
-  ///////////////////////////////////////////////////////////////////////////////////
-  ///////////////////////////////////////////////////////////////////////////////////
+  function onMouseExit() {
+    if (enterTimerRef.current) {
+      clearTimeout(enterTimerRef.current);
+      enterTimerRef.current = null;
+    }
+    exitTimerRef.current = setTimeout(() => {
+      if (preHoverTabsRef.current) {
+        useTabNamesStore.getState().setItems(preHoverTabsRef.current);
+        preHoverTabsRef.current = null;
+      } else {
+        let store = useOpenWorkordersStore.getState();
+        let activeID = store.openWorkorderID;
+        if (!activeID) {
+          useTabNamesStore.getState().setItems({
+            infoTabName: TAB_NAMES.infoTab.customer,
+            itemsTabName: TAB_NAMES.itemsTab.empty
+          });
+        }
+      }
+      useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
+      exitTimerRef.current = null;
+    }, 50);
+  }
 
   function fetchCustomerMessages(customerCell) {
     if (!customerCell || customerCell.length !== 10) return;
@@ -344,7 +376,6 @@ export function WorkordersComponent({}) {
       optionsTabName: TAB_NAMES.optionsTab.inventory,
     });
     useWorkorderPreviewStore.getState().setPreviewObj(null);
-
     // Background-fetch customer so it's ready when the customer info modal opens
     if (obj.customerID) {
       dbGetCustomer(obj.customerID).then((customer) => {
@@ -441,60 +472,6 @@ export function WorkordersComponent({}) {
     return scored.map((s) => s.wo);
   }
 
-  function onMouseEnter(workorder) {
-    if (exitTimerRef.current) {
-      clearTimeout(exitTimerRef.current);
-      exitTimerRef.current = null;
-    }
-    if (enterTimerRef.current) {
-      clearTimeout(enterTimerRef.current);
-      enterTimerRef.current = null;
-    }
-    enterTimerRef.current = setTimeout(() => {
-      enterTimerRef.current = null;
-      // Save pre-hover tab state so we can restore on exit
-      if (!preHoverTabsRef.current) {
-        let tabStore = useTabNamesStore.getState();
-        preHoverTabsRef.current = {
-          infoTabName: tabStore.infoTabName,
-          itemsTabName: tabStore.itemsTabName,
-        };
-      }
-      useOpenWorkordersStore.getState().setWorkorderPreviewID(workorder.id);
-      useTabNamesStore.getState().setItems({
-        infoTabName: TAB_NAMES.infoTab.workorder,
-        itemsTabName: TAB_NAMES.itemsTab.workorderItems
-      });
-    }, 150);
-  }
-
-  function onMouseExit(workorder) {
-    if (enterTimerRef.current) {
-      clearTimeout(enterTimerRef.current);
-      enterTimerRef.current = null;
-    }
-    exitTimerRef.current = setTimeout(() => {
-      // Restore tabs and clear preview in the same tick to avoid flicker
-      if (preHoverTabsRef.current) {
-        useTabNamesStore.getState().setItems(preHoverTabsRef.current);
-        preHoverTabsRef.current = null;
-      } else {
-        let store = useOpenWorkordersStore.getState();
-        let activeID = store.openWorkorderID;
-        if (!activeID) {
-          useTabNamesStore.getState().setItems({
-            infoTabName: TAB_NAMES.infoTab.customer,
-            itemsTabName: TAB_NAMES.itemsTab.empty
-          });
-        } else {
-          let activeWO = store.workorders.find((o) => o.id === activeID);
-        }
-      }
-      useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
-      exitTimerRef.current = null;
-    }, 50);
-  }
-
   return (
     <View
       style={{
@@ -544,18 +521,6 @@ export function WorkordersComponent({}) {
             onChangeText={handleSearchChange}
           />
         </View>
-        <CheckBox_
-          isChecked={sAllowPreview}
-          onCheck={handleTogglePreview}
-          text={"Preview On"}
-          iconSize={10}
-          buttonStyle={{
-            borderRadius: 5,
-            backgroundColor: "transparent",
-          }}
-          outerButtonStyle={{}}
-          textStyle={{ color: C.text, fontSize: 13 }}
-        />
       </View>
 
       <FlatList
@@ -595,14 +560,6 @@ export function WorkordersComponent({}) {
             <View>
               <TouchableOpacity
                 onLongPress={() => deleteWorkorder(workorder)}
-                onMouseOver={() => {
-                  if (!sAllowPreview) return;
-                  onMouseEnter(workorder)
-                }}
-                onMouseLeave={() => {
-                  if (!sAllowPreview) return;
-                  onMouseExit()
-                }}
                 onPress={() => {
                   workorderSelected(workorder);
                   if (zPendingWOIDs.includes(workorder.id)) {
@@ -696,7 +653,7 @@ export function WorkordersComponent({}) {
                             color: C.text,
                           }}
                         >
-                          {capitalizeFirstLetterOfString(workorder.brand) || "Brand"}
+                          {capitalizeFirstLetterOfString(workorder.brand) || ""}
                         </Text>
                         {!!workorder.description && (
                           <View
@@ -750,7 +707,14 @@ export function WorkordersComponent({}) {
                           height: "100%",
                         }}
                       >
-                        <Text style={{ color: "dimgray", fontSize: 15 }}>
+                        <Text style={{ color: "dimgray", fontSize: 13 }}>
+                          {(() => {
+                            let d = new Date(workorder.startedOnMillis);
+                            let h = d.getHours();
+                            let m = d.getMinutes();
+                            h = h % 12 || 12;
+                            return h + ":" + (m < 10 ? "0" : "") + m + "  ";
+                          })()}
                           {formatMillisForDisplay(
                             workorder.startedOnMillis,
                             new Date(workorder.startedOnMillis).getFullYear() !== new Date().getFullYear()
@@ -776,15 +740,20 @@ export function WorkordersComponent({}) {
                           <Text
                             style={{
                               color: rs.textColor,
-                              fontSize: 14,
-                              fontWeight: "600",
+                              fontSize: 13,
+                              fontWeight: "normal",
                             }}
                           >
                             {rs.label}
                           </Text>
                         </View>
                       </View>
-                      <WaitTimeIndicator workorder={workorder} />
+                      <View
+                        onMouseOver={() => onMouseEnter(workorder)}
+                        onMouseLeave={() => onMouseExit()}
+                      >
+                        <WaitTimeIndicator workorder={workorder} />
+                      </View>
                     </View>
                   </View>
 

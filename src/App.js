@@ -14,6 +14,7 @@ import { CustomerDisplayScreen } from "./screens/CustomerDisplayScreen";
 import { TranslateScreen } from "./screens/TranslateScreen";
 import { IntakeScreen } from "./screens/IntakeScreen";
 import { BikeStandScreen } from "./screens/BikeStandScreen";
+import { PhoneScreen } from "./screens/PhoneScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { DatabaseViewerScreen } from "./screens/DatabaseViewerScreen";
 import { CustomerWorkorderScreen } from "./screens/CustomerWorkorderScreen";
@@ -61,6 +62,39 @@ function DeviceAwareHome({ user }) {
     return <Navigate to={ROUTES.dashboard} replace />;
   }
   return <HomeScreen />;
+}
+
+// Desktop: wrap PhoneScreen in a centered phone frame for previewing mobile UI
+function PhoneScreenWrapper() {
+  const deviceType = useLayoutStore((state) => state.deviceType);
+
+  if (deviceType === "desktop") {
+    return (
+      <div style={{
+        width: "100vw",
+        height: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: gray(0.12),
+      }}>
+        <div style={{
+          height: "90vh",
+          aspectRatio: "9 / 19.5",
+          borderRadius: 40,
+          overflow: "hidden",
+          border: "6px solid " + gray(0.2),
+          backgroundColor: "white",
+          display: "flex",
+          boxShadow: "0 8px 30px rgba(0,0,0,0.2)",
+        }}>
+          <PhoneScreen />
+        </div>
+      </div>
+    );
+  }
+
+  return <PhoneScreen />;
 }
 
 // Desktop: wrap BikeStandScreen in a centered tablet portrait frame that fits the viewport
@@ -257,6 +291,16 @@ function App() {
           element={
             <ProtectedRoute user={user}>
               <BikeStandScreenWrapper />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Protected route - Phone Simulator */}
+        <Route
+          path={ROUTES.phone}
+          element={
+            <ProtectedRoute user={user}>
+              <PhoneScreenWrapper />
             </ProtectedRoute>
           }
         />

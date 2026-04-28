@@ -4066,7 +4066,7 @@ export const NoteHelperDropdown = ({
             <View key={category.id} style={{ marginBottom: 9 }}>
               <Text
                 style={{
-                  fontSize: 11 + fontSizeAdj,
+                  fontSize: 14 + fontSizeAdj,
                   fontWeight: Fonts.weight.textHeavy,
                   color: gray(0.4),
                   marginBottom: 4,
@@ -4095,9 +4095,9 @@ export const NoteHelperDropdown = ({
                     >
                       <Text
                         style={{
-                          fontSize: 13 + fontSizeAdj,
+                          fontSize: 15 + fontSizeAdj,
                           color: active ? C.blue : gray(0.5),
-                          fontWeight: active ? Fonts.weight.textHeavy : Fonts.weight.textRegular,
+                          fontWeight: Fonts.weight.textRegular,
                         }}
                       >
                         {chipText}

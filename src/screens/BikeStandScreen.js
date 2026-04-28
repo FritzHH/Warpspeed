@@ -1444,7 +1444,7 @@ export function BikeStandScreen() {
                       cursor: "pointer",
                     }}
                   >
-                    <Text style={{ fontSize: 16, fontStyle: "italic", color: gray(0.35) }}>Tap/swipe up to hide</Text>
+                    <Text style={{ fontSize: 16, fontStyle: "italic", color: gray(0.35) }}>Tap to hide</Text>
                   </View>
 
                 </View>
@@ -1474,8 +1474,8 @@ export function BikeStandScreen() {
                     borderRadius: 12,
                     alignItems: "center",
                     justifyContent: "center",
-                    paddingVertical: 30,
-                    paddingHorizontal: 30,
+                    paddingVertical: 60,
+                    paddingHorizontal: 60,
                     gap: 12,
                   }}
                 >
@@ -1492,8 +1492,8 @@ export function BikeStandScreen() {
                     borderRadius: 12,
                     alignItems: "center",
                     justifyContent: "center",
-                    paddingVertical: 30,
-                    paddingHorizontal: 30,
+                    paddingVertical: 60,
+                    paddingHorizontal: 60,
                     gap: 12,
                   }}
                 >
@@ -2370,7 +2370,7 @@ export function BikeStandScreen() {
                       <Image_ source={ICONS.add} style={{ width: 22, height: 22 }} />
                     </TouchableOpacity>
                   </View>
-                  <Text style={{ fontSize: 18, fontStyle: "italic", color: gray(0.35) }}>Tap/swipe down to close</Text>
+                  <Text style={{ fontSize: 18, fontStyle: "italic", color: gray(0.35) }}>Tap to close</Text>
                 </div>
 
                 {/* Note helper categories - horizontal sections */}
@@ -2800,7 +2800,7 @@ const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Tap/swipe down to close */}
+        {/* Tap to close */}
         <View
           onClick={onClose}
           onTouchStart={(e) => { _swipeRef.current = e.touches[0].clientY; }}
@@ -2818,7 +2818,7 @@ const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
             cursor: "pointer",
           }}
         >
-          <Text style={{ fontSize: 16, fontStyle: "italic", color: gray(0.35) }}>Tap/swipe down to close</Text>
+          <Text style={{ fontSize: 16, fontStyle: "italic", color: gray(0.35) }}>Tap to close</Text>
         </View>
 
         {/* Workorder list */}
@@ -3039,6 +3039,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
   const [sSearchText, _setSearchText] = useState("");
   const [sSearchResults, _setSearchResults] = useState([]);
   const [sSearching, _setSearching] = useState(false);
+  const _swipeRefCust = useRef(null);
   const [sCreateForm, _setCreateForm] = useState({ first: "", last: "", phone: "", email: "" });
   const [sActiveField, _setActiveField] = useState("first");
   const searchTimerRef = useRef(null);
@@ -3084,7 +3085,8 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
         if (sSearchText.replace(/\D/g, "").length >= 10) return;
         handleSearchTextChange(sSearchText + key);
       } else {
-        handleSearchTextChange(sSearchText + key.toLowerCase());
+        let char = (sSearchText.length === 0 || sSearchText.endsWith(" ")) ? key.toUpperCase() : key.toLowerCase();
+        handleSearchTextChange(sSearchText + char);
       }
     }
   }
@@ -3103,7 +3105,11 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
         if (val.replace(/\D/g, "").length >= 10) return;
         val = val + key;
       } else {
-        val = val + (field === "email" ? key.toLowerCase() : key.toLowerCase());
+        if (field === "first" || field === "last") {
+          val = val + ((val.length === 0 || val.endsWith(" ")) ? key.toUpperCase() : key.toLowerCase());
+        } else {
+          val = val + key.toLowerCase();
+        }
       }
     }
     _setCreateForm({ ...sCreateForm, [field]: val });
@@ -3186,49 +3192,69 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
         }}
       >
         {/* Header */}
-        <div style={{
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: 12,
-          borderBottom: "1px solid " + gray(0.1),
-        }}>
-          {sMode === "create" ? (
+        {sMode === "create" ? (
+          <View style={{
+            flexDirection: "row",
+            alignItems: "center",
+            padding: 12,
+            borderBottomWidth: 1,
+            borderBottomColor: gray(0.1),
+          }}>
             <TouchableOpacity
               onPress={() => _setMode("search")}
               style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
             >
               <Text style={{ fontSize: 21, color: C.blue, fontWeight: "600" }}>{"\u2190"} Back to Search</Text>
             </TouchableOpacity>
-          ) : (
-            <TouchableOpacity onPress={onClose}>
-              <Text style={{ fontSize: 25, color: gray(0.5), fontWeight: "600", paddingHorizontal: 8 }}>{"\u2715"}</Text>
-            </TouchableOpacity>
-          )}
-        </div>
+          </View>
+        ) : (
+          <View
+            onClick={onClose}
+            onTouchStart={(e) => { _swipeRefCust.current = e.touches[0].clientY; }}
+            onTouchEnd={(e) => {
+              if (_swipeRefCust.current !== null) {
+                let diff = e.changedTouches[0].clientY - _swipeRefCust.current;
+                if (diff > 20) onClose();
+                _swipeRefCust.current = null;
+              }
+            }}
+            style={{
+              paddingVertical: 12,
+              alignItems: "center",
+              justifyContent: "center",
+              cursor: "pointer",
+            }}
+          >
+            <Text style={{ fontSize: 26, fontStyle: "italic", color: gray(0.35) }}>Tap to close</Text>
+          </View>
+        )}
 
         {sMode === "search" ? (
           <>
             {/* Search display + mode toggle */}
-            <div style={{ padding: 12, display: "flex", flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <div style={{ padding: 12, display: "flex", flexDirection: "row", alignItems: "stretch", gap: 10 }}>
               <div style={{
                 flex: 1,
-                height: 44,
                 borderRadius: 8,
                 borderWidth: 2,
                 borderStyle: "solid",
                 borderColor: C.buttonLightGreenOutline,
                 backgroundColor: C.listItemWhite,
                 display: "flex",
+                flexDirection: "row",
                 alignItems: "center",
+                paddingTop: 5,
+                paddingBottom: 5,
                 paddingLeft: 12,
                 paddingRight: 12,
-                fontSize: 23,
+                fontSize: 38,
                 fontWeight: "500",
                 color: C.text,
               }}>
-                {displayText || <span style={{ color: gray(0.3) }}>{sKeypadMode === "phone" ? "Phone number..." : "Name..."}</span>}
+                <div style={{ flex: 1 }}>
+                  {displayText || <span style={{ color: gray(0.3) }}>{sKeypadMode === "phone" ? "Phone number..." : "Name..."}</span>}
+                </div>
+                {sSearching && <SmallLoadingIndicator size={35} color={C.blue} message="" />}
               </div>
               <TouchableOpacity
                 onPress={() => {
@@ -3238,15 +3264,14 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                   _setSearchResults([]);
                 }}
                 style={{
-                  height: 44,
-                  paddingHorizontal: 14,
+                  paddingHorizontal: 34,
                   borderRadius: 8,
                   backgroundColor: C.blue,
                   alignItems: "center",
                   justifyContent: "center",
                 }}
               >
-                <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>
+                <Text style={{ fontSize: 23, fontWeight: "600", color: "white" }}>
                   {sKeypadMode === "phone" ? "ABC" : "123"}
                 </Text>
               </TouchableOpacity>
@@ -3254,14 +3279,11 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
 
             {/* Keypad */}
             <div style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 8 }}>
-              <StandKeypad mode={effectiveKeypadMode} onKeyPress={handleKeyPress} />
+              <StandKeypad mode={effectiveKeypadMode} onKeyPress={handleKeyPress} fontSizeAdj={23} paddingAdj={35} />
             </div>
 
             {/* Search results */}
-            <ScrollView style={{ flex: 1, paddingHorizontal: 12 }}>
-              {sSearching && (
-                <Text style={{ fontSize: 16, color: gray(0.4), textAlign: "center", paddingVertical: 10 }}>Searching...</Text>
-              )}
+            <ScrollView style={{ flex: 1, paddingHorizontal: 12, marginTop: 15 }}>
               {sSearchResults.map((cust) => (
                 <TouchableOpacity
                   key={cust.id}
@@ -3269,7 +3291,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                   style={{
                     flexDirection: "row",
                     alignItems: "center",
-                    paddingVertical: 12,
+                    paddingVertical: 17,
                     paddingHorizontal: 12,
                     marginBottom: 4,
                     borderRadius: 8,
@@ -3279,25 +3301,25 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                     gap: 16,
                   }}
                 >
-                  <Text style={{ flex: 1, fontSize: 19, fontWeight: "600", color: C.text }}>
+                  <Text style={{ flex: 1, fontSize: 27, fontWeight: "600", color: C.text }}>
                     {capitalizeFirstLetterOfString(cust.first || "")} {capitalizeFirstLetterOfString(cust.last || "")}
                   </Text>
-                  <Text style={{ fontSize: 17, color: gray(0.5) }}>
-                    {formatPhoneWithDashes(cust.customerCell || cust.cell || "")}
-                  </Text>
-                  <Text style={{ fontSize: 16, color: gray(0.4) }} numberOfLines={1}>
-                    {cust.email || ""}
-                  </Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    {!(cust.customerCell || cust.cell) && cust.landline && <Text style={{ fontSize: 14, color: gray(0.35) }}>landline</Text>}
+                    <Text style={{ fontSize: 25, color: gray(0.5) }} numberOfLines={1}>
+                      {(cust.customerCell || cust.cell) ? formatPhoneWithDashes(cust.customerCell || cust.cell) : cust.landline ? formatPhoneWithDashes(cust.landline) : cust.email || ""}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               ))}
-              {!sSearching && sSearchText.length >= 2 && sSearchResults.length === 0 && (
-                <Text style={{ fontSize: 16, color: gray(0.4), textAlign: "center", paddingVertical: 10 }}>No results found.</Text>
+              {!sSearching && sSearchResults.length === 0 && ((sKeypadMode === "phone" && sSearchText.replace(/\D/g, "").length >= 4) || (sKeypadMode === "alpha" && sSearchText.length >= 3)) && (
+                <Text style={{ fontSize: 26, color: gray(0.4), textAlign: "center", paddingVertical: 10 }}>No results found.</Text>
               )}
             </ScrollView>
 
             {/* Create new customer button - phone: 10 digits + no results; name: 3+ chars */}
             {((sKeypadMode === "phone" && sSearchText.replace(/\D/g, "").length === 10 && sSearchResults.length === 0 && !sSearching) ||
-              (sKeypadMode === "alpha" && sSearchText.length >= 3)) && (
+              (sKeypadMode === "alpha" && sSearchText.length >= 3 && !sSearching)) && (
               <div style={{ padding: 12, borderTop: "1px solid " + gray(0.1) }}>
                 <TouchableOpacity
                   onPress={handleSwitchToCreate}

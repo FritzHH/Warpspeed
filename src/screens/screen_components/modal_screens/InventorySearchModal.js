@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef } from "react";
 import { C } from "../../../styles";
 import { gray, formatCurrencyDisp } from "../../../utils";
 import { CheckBox_ } from "../../../components";
@@ -14,6 +14,7 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
   const [sCheckedIDs, _setCheckedIDs] = useState(new Set());
   const searchTimerRef = useRef(null);
   const inputRef = useRef(null);
+  const headerSwipeRef = useRef(null);
 
   function handleSearchTextChange(newText) {
     _setSearchText(newText);
@@ -88,19 +89,29 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
         }}
       >
         {/* Header */}
-        <div style={{
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: 12,
-          borderBottom: "1px solid " + gray(0.1),
-        }}>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={{ fontSize: 20, color: gray(0.5), fontWeight: "600", paddingHorizontal: 8 }}>{"\u2715"}</Text>
-          </TouchableOpacity>
+        <div
+          onClick={onClose}
+          onTouchStart={(e) => { headerSwipeRef.current = e.touches[0].clientY; }}
+          onTouchEnd={(e) => {
+            if (headerSwipeRef.current !== null) {
+              let diff = e.changedTouches[0].clientY - headerSwipeRef.current;
+              if (diff > 20) onClose();
+              headerSwipeRef.current = null;
+            }
+          }}
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: 12,
+            borderBottom: "1px solid " + gray(0.1),
+            cursor: "pointer",
+            gap: 8,
+          }}
+        >
           <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>Search Inventory</Text>
-          <View style={{ width: 36 }} />
+          <Text style={{ fontSize: 18, fontStyle: "italic", color: gray(0.35) }}>Tap/swipe down to close</Text>
         </div>
 
         {/* Search display */}

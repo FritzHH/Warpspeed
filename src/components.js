@@ -726,9 +726,10 @@ export const DropdownMenu = ({
 
   const _fullDataArr = [...dataArr, ..._discountRows];
   const _dividerCount = _fullDataArr.filter((i) => i._isDivider).length;
+  const _itemH = (itemStyle.height === "auto" && itemStyle.paddingVertical) ? itemStyle.paddingVertical * 2 + 40 : 40;
   const calculatedMenuHeight = menuMaxHeight
-    ? Math.min((_fullDataArr.length - _dividerCount) * 40 + _dividerCount, menuMaxHeight)
-    : (_fullDataArr.length - _dividerCount) * 40 + _dividerCount;
+    ? Math.min((_fullDataArr.length - _dividerCount) * _itemH + _dividerCount, menuMaxHeight)
+    : (_fullDataArr.length - _dividerCount) * _itemH + _dividerCount;
 
   const BUTTON_STYLE = {
     // width: "100%",
@@ -1505,6 +1506,14 @@ export const LoginModalScreen = ({ modalVisible }) => {
     });
   }
 
+  const pinInputRef = useRef(null);
+
+  useEffect(() => {
+    if (modalVisible && pinInputRef.current) {
+      setTimeout(() => pinInputRef.current.focus(), 50);
+    }
+  }, [modalVisible]);
+
   if (!modalVisible) return null;
 
   return ReactDOM.createPortal(
@@ -1517,12 +1526,8 @@ export const LoginModalScreen = ({ modalVisible }) => {
         alignItems: "center",
         zIndex: 9999,
       }}
+      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
     >
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={handleClose}
-        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-      />
       <View
         style={{
           width: 360,
@@ -1557,6 +1562,7 @@ export const LoginModalScreen = ({ modalVisible }) => {
           <View>
             <Text style={{ fontSize: 13, color: gray(0.5), marginBottom: 6 }}>Enter PIN</Text>
             <TextInput
+              ref={pinInputRef}
               autoFocus={true}
               secureTextEntry={true}
               value={sPin}
@@ -3921,102 +3927,65 @@ export const NoteHelperDropdown = ({
   anchorPosition = { x: 0, y: 0 },
   noteHelpers = [],
   noteHelpersTarget = "intakeNotes",
+  centered = false,
+  fontSizeAdj = 0,
+  chipPaddingVertAdj = 0,
 }) => {
-  const [sCustomChips, _sSetCustomChips] = useState([]);
-  const [sActiveChipKeys, _sSetActiveChipKeys] = useState(new Set());
-  const [sCustomIntake, _sSetCustomIntake] = useState("");
-  const [sCustomReceipt, _sSetCustomReceipt] = useState("");
   const [sDropdownHeight, _sSetDropdownHeight] = useState(0);
-  const customIntakeRef = useRef(null);
-  const customReceiptRef = useRef(null);
+  const [sTarget, _sSetTarget] = useState(noteHelpersTarget);
   const openTimeRef = useRef(0);
-
-  // Seed active keys from existing notes when dropdown opens
   const wasVisibleRef = useRef(false);
-  if (visible && !wasVisibleRef.current && workorderLine) {
+  const prevVisibleRef = useRef(visible);
+
+  // Reset state when dropdown opens - use useEffect to avoid setState during render
+  if (visible && !prevVisibleRef.current) {
     wasVisibleRef.current = true;
     openTimeRef.current = Date.now();
-    _sSetCustomChips([]);
-    _sSetDropdownHeight(0);
-    // Build initial active set from existing notes
-    const existingNotes = workorderLine[noteHelpersTarget] || "";
-    const existingParts = existingNotes.split(", ").map((s) => s.trim()).filter(Boolean);
-    if (existingParts.length > 0) {
-      const initialKeys = new Set();
-      for (const part of existingParts) {
-        for (const cat of noteHelpers) {
-          if ((cat.items || []).includes(part)) {
-            initialKeys.add(cat.id + "::" + part);
-          }
-        }
-      }
-      _sSetActiveChipKeys(initialKeys);
-    } else {
-      _sSetActiveChipKeys(new Set());
-    }
   }
-  if (!visible && wasVisibleRef.current) {
+  if (!visible && prevVisibleRef.current) {
     wasVisibleRef.current = false;
   }
+  prevVisibleRef.current = visible;
+
+  useEffect(() => {
+    if (visible) {
+      _sSetDropdownHeight(0);
+      _sSetTarget(noteHelpersTarget);
+    }
+  }, [visible]);
 
   if (!visible || !workorderLine) return null;
 
-  function chipKey(catId, chipText) {
-    return catId + "::" + chipText;
-  }
-
   function isChipActive(catId, chipText) {
-    return sActiveChipKeys.has(chipKey(catId, chipText));
-  }
-
-  function toggleChip(chipText, targetOverride, catId) {
-    const target = targetOverride || noteHelpersTarget;
-    const notes = workorderLine[target] || "";
-    const parts = notes.split(", ").map((s) => s.trim()).filter(Boolean);
-    const key = chipKey(catId, chipText);
-    const wasActive = sActiveChipKeys.has(key);
-    let updated;
-    if (wasActive) {
-      const idx = parts.indexOf(chipText.trim());
-      if (idx !== -1) parts.splice(idx, 1);
-      updated = parts.join(", ");
-      const next = new Set(sActiveChipKeys);
-      next.delete(key);
-      _sSetActiveChipKeys(next);
-    } else {
-      parts.push(chipText.trim());
-      updated = parts.join(", ");
-      const next = new Set(sActiveChipKeys);
-      next.add(key);
-      _sSetActiveChipKeys(next);
-    }
-    onUpdateLine({ ...workorderLine, [target]: updated });
-  }
-
-  function isChipActiveForTarget(chipText, target) {
-    const notes = workorderLine[target] || "";
+    const notes = workorderLine[sTarget] || "";
     const parts = notes.split(", ").map((s) => s.trim()).filter(Boolean);
     return parts.includes(chipText.trim());
   }
 
-  function submitCustomNote(target) {
-    const val = target === "intakeNotes" ? sCustomIntake : sCustomReceipt;
-    if (!val.trim()) return;
-    const trimmed = val.trim();
-    _sSetCustomChips((prev) => {
-      if (prev.find((c) => c.text === trimmed && c.target === target)) return prev;
-      return [...prev, { text: trimmed, target }];
-    });
-    toggleChip(trimmed, target, "_custom_" + target);
-    if (target === "intakeNotes") _sSetCustomIntake("");
-    else _sSetCustomReceipt("");
+  function toggleChip(chipText, targetOverride, catId) {
+    const target = targetOverride || sTarget;
+    const notes = workorderLine[target] || "";
+    const parts = notes.split(", ").map((s) => s.trim()).filter(Boolean);
+    const idx = parts.indexOf(chipText.trim());
+    if (idx !== -1) {
+      parts.splice(idx, 1);
+    } else {
+      parts.push(chipText.trim());
+    }
+    onUpdateLine({ ...workorderLine, [target]: parts.join(", ") });
   }
 
   // Center dropdown on click point, clamp to viewport
-  const dropdownWidth = 340;
+  const dropdownWidth = centered ? 420 : 340;
   const dropdownMeasured = sDropdownHeight > 0;
-  let left = anchorPosition.x - dropdownWidth / 2;
-  let top = anchorPosition.y - sDropdownHeight / 2;
+  let left, top;
+  if (centered && typeof window !== "undefined") {
+    left = (window.innerWidth - dropdownWidth) / 2;
+    top = dropdownMeasured ? (window.innerHeight - sDropdownHeight) / 2 : window.innerHeight / 2 - 200;
+  } else {
+    left = anchorPosition.x - dropdownWidth / 2;
+    top = anchorPosition.y - sDropdownHeight / 2;
+  }
   if (typeof window !== "undefined") {
     const vh = window.innerHeight;
     const vw = window.innerWidth;
@@ -4061,16 +4030,43 @@ export const NoteHelperDropdown = ({
             borderBottomWidth: 1,
             borderBottomColor: C.buttonLightGreenOutline,
           }}>
-            <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.text }} numberOfLines={1}>
+            <Text style={{ fontSize: 13 + fontSizeAdj, fontWeight: Fonts.weight.textHeavy, color: C.text, marginBottom: 6 }} numberOfLines={1}>
               {workorderLine.inventoryItem?.informalName || workorderLine.inventoryItem?.formalName || "Item"}
             </Text>
+            <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+              <Text style={{ fontSize: 13, color: gray(0.5), fontStyle: "italic", marginRight: 7 }}>Adding to:</Text>
+              <TouchableOpacity_
+                onPress={() => _sSetTarget("intakeNotes")}
+                hoverOpacity={0.7}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  backgroundColor: sTarget === "intakeNotes" ? "orange" : gray(0.08),
+                }}
+              >
+                <Text style={{ fontSize: 12 + fontSizeAdj, fontWeight: "600", color: sTarget === "intakeNotes" ? C.textWhite : gray(0.5) }}>Intake</Text>
+              </TouchableOpacity_>
+              <TouchableOpacity_
+                onPress={() => _sSetTarget("receiptNotes")}
+                hoverOpacity={0.7}
+                style={{
+                  paddingHorizontal: 10,
+                  paddingVertical: 4,
+                  borderRadius: 6,
+                  backgroundColor: sTarget === "receiptNotes" ? "green" : gray(0.08),
+                }}
+              >
+                <Text style={{ fontSize: 12 + fontSizeAdj, fontWeight: "600", color: sTarget === "receiptNotes" ? C.textWhite : gray(0.5) }}>Receipt</Text>
+              </TouchableOpacity_>
+            </View>
           </View>
 
           {noteHelpers.map((category) => (
-            <View key={category.id} style={{ marginBottom: 6, borderWidth: 1, borderColor: gray(0.15), borderRadius: 8, padding: 6 }}>
+            <View key={category.id} style={{ marginBottom: 9 }}>
               <Text
                 style={{
-                  fontSize: 11,
+                  fontSize: 11 + fontSizeAdj,
                   fontWeight: Fonts.weight.textHeavy,
                   color: gray(0.4),
                   marginBottom: 4,
@@ -4094,14 +4090,12 @@ export const NoteHelperDropdown = ({
                           : C.buttonLightGreenOutline,
                         borderRadius: 6,
                         paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderWidth: 1,
-                        borderColor: active ? C.blue : C.buttonLightGreenOutline,
+                        paddingVertical: 5 + chipPaddingVertAdj,
                       }}
                     >
                       <Text
                         style={{
-                          fontSize: 13,
+                          fontSize: 13 + fontSizeAdj,
                           color: active ? C.blue : gray(0.5),
                           fontWeight: active ? Fonts.weight.textHeavy : Fonts.weight.textRegular,
                         }}
@@ -4115,56 +4109,6 @@ export const NoteHelperDropdown = ({
             </View>
           ))}
 
-          {sCustomChips.length > 0 && (
-            <View style={{ marginBottom: 8 }}>
-              <Text
-                style={{
-                  fontSize: 12,
-                  fontWeight: Fonts.weight.textHeavy,
-                  color: gray(0.4),
-                  marginBottom: 4,
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                }}
-              >
-                Custom
-              </Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
-                {sCustomChips.map((chip, idx) => {
-                  const customKey = "_custom_" + chip.target;
-                  const active = isChipActive(customKey, chip.text);
-                  return (
-                    <TouchableOpacity_
-                      key={chip.text + chip.target + idx}
-                      onPress={() => toggleChip(chip.text, chip.target, customKey)}
-                      hoverOpacity={0.6}
-                      style={{
-                        backgroundColor: active
-                          ? lightenRGBByPercent(C.blue, 70)
-                          : C.buttonLightGreenOutline,
-                        borderRadius: 6,
-                        paddingHorizontal: 10,
-                        paddingVertical: 5,
-                        borderWidth: 1,
-                        borderColor: active ? C.blue : C.buttonLightGreenOutline,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          fontSize: 13,
-                          color: active ? C.blue : gray(0.5),
-                          fontWeight: active ? Fonts.weight.textHeavy : Fonts.weight.textRegular,
-                        }}
-                      >
-                        {chip.text}
-                      </Text>
-                    </TouchableOpacity_>
-                  );
-                })}
-              </View>
-            </View>
-          )}
-
           <View
             style={{
               borderTopWidth: 1,
@@ -4173,46 +4117,52 @@ export const NoteHelperDropdown = ({
               paddingTop: 8,
             }}
           >
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
-              <TextInput
-                ref={customIntakeRef}
-                value={sCustomIntake}
-                onChangeText={_sSetCustomIntake}
-                onSubmitEditing={() => submitCustomNote("intakeNotes")}
-                placeholder="Custom intake note"
+            <View style={{ marginBottom: 6 }}>
+              <Text style={{ fontSize: 11 + fontSizeAdj, color: gray(0.4), fontWeight: Fonts.weight.textHeavy, textTransform: "uppercase", marginBottom: 2 }}>Intake notes</Text>
+              <TextInput_
+                multiline
+                debounceMs={500}
+                capitalize={true}
+                value={workorderLine.intakeNotes || ""}
+                onChangeText={(text) => onUpdateLine({ ...workorderLine, intakeNotes: text })}
+                placeholder="Intake notes"
                 placeholderTextColor={gray(0.35)}
                 style={{
-                  flex: 1,
-                  height: 32,
+                  width: "100%",
+                  minHeight: 32 + fontSizeAdj,
                   borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
+                  borderColor: gray(0.25),
                   borderRadius: 6,
                   paddingHorizontal: 8,
-                  fontSize: 13,
-                  color: C.text,
+                  paddingVertical: 6,
+                  fontSize: 15 + fontSizeAdj,
+                  color: "orange",
                   outlineWidth: 0,
                   outline: "none",
                   backgroundColor: "white",
                 }}
               />
             </View>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <TextInput
-                ref={customReceiptRef}
-                value={sCustomReceipt}
-                onChangeText={_sSetCustomReceipt}
-                onSubmitEditing={() => submitCustomNote("receiptNotes")}
-                placeholder="Custom receipt note"
+            <View>
+              <Text style={{ fontSize: 11 + fontSizeAdj, color: gray(0.4), fontWeight: Fonts.weight.textHeavy, textTransform: "uppercase", marginBottom: 2 }}>Receipt notes</Text>
+              <TextInput_
+                multiline
+                debounceMs={500}
+                capitalize={true}
+                value={workorderLine.receiptNotes || ""}
+                onChangeText={(text) => onUpdateLine({ ...workorderLine, receiptNotes: text })}
+                placeholder="Receipt notes"
                 placeholderTextColor={gray(0.35)}
                 style={{
-                  flex: 1,
-                  height: 32,
+                  width: "100%",
+                  minHeight: 32 + fontSizeAdj,
                   borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
+                  borderColor: gray(0.25),
                   borderRadius: 6,
                   paddingHorizontal: 8,
-                  fontSize: 13,
-                  color: C.text,
+                  paddingVertical: 6,
+                  fontSize: 15 + fontSizeAdj,
+                  color: "green",
                   outlineWidth: 0,
                   outline: "none",
                   backgroundColor: "white",

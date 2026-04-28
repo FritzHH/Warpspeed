@@ -17,7 +17,6 @@ import {
   Button_,
   CheckBox_,
   DropdownMenu,
-  Image_,
   NoteHelperDropdown,
   TextInput_,
   Tooltip,
@@ -122,6 +121,11 @@ export const Items_WorkorderItemsTab = ({}) => {
     useState(false);
 
   const [sEditingCustomLine, _setEditingCustomLine] = useState(null);
+
+  // Note Helper dropdown state (lifted to parent so only one Modal exists)
+  const zNoteHelpers = useSettingsStore((state) => state.settings?.noteHelpers);
+  const zNoteHelpersTarget = useSettingsStore((state) => state.settings?.noteHelpersTarget || "intakeNotes");
+  const [sNoteHelperDropdown, _setNoteHelperDropdown] = useState(null); // { workorderLine, targetField, centered }
 
   // dev
   const checkoutBtnRef = useRef();
@@ -590,6 +594,16 @@ export const Items_WorkorderItemsTab = ({}) => {
       </View>
     );
 
+  function openNoteHelperForLine(workorderLine) {
+    if (!zNoteHelpers || zNoteHelpers.length === 0) return;
+    _setNoteHelperDropdown({ workorderLine, targetField: "intakeNotes", centered: true });
+  }
+
+  function handleNoteHelperUpdate(updatedLine) {
+    editWorkorderLine(updatedLine);
+    _setNoteHelperDropdown((prev) => prev ? { ...prev, workorderLine: updatedLine } : null);
+  }
+
   // log("main");
   return (
     <View
@@ -672,6 +686,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               onEditCustomItem={_setEditingCustomLine}
               isLocked={isLocked}
               hasActiveSale={hasActiveSale}
+              onOpenNoteHelper={openNoteHelperForLine}
             />
           );
         }}
@@ -865,6 +880,16 @@ export const Items_WorkorderItemsTab = ({}) => {
           existingLine={sEditingCustomLine}
         />
       )}
+      <NoteHelperDropdown
+        visible={!!sNoteHelperDropdown}
+        onClose={() => _setNoteHelperDropdown(null)}
+        workorderLine={sNoteHelperDropdown?.workorderLine}
+        onUpdateLine={handleNoteHelperUpdate}
+        anchorPosition={{ x: 0, y: 0 }}
+        noteHelpers={zNoteHelpers || []}
+        noteHelpersTarget={sNoteHelperDropdown?.targetField || zNoteHelpersTarget}
+        centered={true}
+      />
     </View>
   );
 };
@@ -885,6 +910,7 @@ export const LineItemComponent = ({
   onEditCustomItem,
   isLocked,
   hasActiveSale,
+  onOpenNoteHelper,
 }) => {
   const isCustom = inventoryItem.customPart || inventoryItem.customLabor;
   const effectiveQty = localQty !== undefined ? localQty : workorderLine.qty;
@@ -896,14 +922,6 @@ export const LineItemComponent = ({
   const qtyDigits = qtyDisplayStr.length || 1;
   const qtyBoxWidth = qtyDigits <= 2 ? 31 : 31 + (qtyDigits - 2) * 10;
   const [sShowDiscountModal, _setShowDiscountModal] = useState(null);
-  const [sActiveNoteField, _sSetActiveNoteField] = useState(() => {
-    if (useOpenWorkordersStore._newLineIDs?.delete(workorderLine.id)) return "intake";
-    return null;
-  });
-  const [sNoteHelperDropdown, _setNoteHelperDropdown] = useState(null); // { targetField, anchorPosition }
-  const zNoteHelpers = useSettingsStore((state) => state.settings?.noteHelpers);
-  const intakePlusBtnRef = useRef(null);
-  const receiptPlusBtnRef = useRef(null);
 
   /////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
@@ -968,51 +986,18 @@ export const LineItemComponent = ({
             {(() => {
               const hasIntake = !!(workorderLine.intakeNotes || "").trim();
               const hasReceipt = !!(workorderLine.receiptNotes || "").trim();
-              const showIntake = hasIntake || sActiveNoteField === "intake";
-              const showReceipt = hasReceipt || sActiveNoteField === "receipt";
-
-              // Cycle logic for the note button
-              const handleNoteButtonPress = () => {
-                if (!hasIntake && !hasReceipt) {
-                  // Neither has content — cycle: null → intake → receipt → null
-                  if (!sActiveNoteField) _sSetActiveNoteField("intake");
-                  else if (sActiveNoteField === "intake") _sSetActiveNoteField("receipt");
-                  else _sSetActiveNoteField(null);
-                } else if (hasIntake && !hasReceipt) {
-                  // Only intake has content — toggle receipt
-                  _sSetActiveNoteField(sActiveNoteField === "receipt" ? null : "receipt");
-                } else if (!hasIntake && hasReceipt) {
-                  // Only receipt has content — toggle intake
-                  _sSetActiveNoteField(sActiveNoteField === "intake" ? null : "intake");
-                }
-              };
-
-              // Show button unless both fields have content
-              const showButton = !(hasIntake && hasReceipt);
-
-              // Determine which note field the next click will show
-              let nextNoteLabel = "Intake notes -> Receipt Notes";
-              if (!hasIntake && !hasReceipt) {
-                nextNoteLabel = sActiveNoteField === "intake" ? "Receipt notes" : "Intake notes -> Receipt Notes";
-              } else if (hasIntake && !hasReceipt) {
-                nextNoteLabel = "Receipt notes";
-              } else if (!hasIntake && hasReceipt) {
-                nextNoteLabel = "Intake notes";
-              }
 
               return (
                 <>
                   <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
-                    {showButton && (
-                      <Tooltip text={nextNoteLabel} position="top">
-                        <TouchableOpacity
-                          onPress={handleNoteButtonPress}
-                          style={{ marginRight: 4 }}
-                        >
-                          <Image source={ICONS.editPencil} style={{ width: 15, height: 15, opacity: 0.5 }} />
-                        </TouchableOpacity>
-                      </Tooltip>
-                    )}
+                    <Tooltip text="Notes" position="top">
+                      <TouchableOpacity
+                        onPress={() => onOpenNoteHelper?.(workorderLine)}
+                        style={{ marginRight: 4 }}
+                      >
+                        <Image source={ICONS.editPencil} style={{ width: 15, height: 15, opacity: 0.5 }} />
+                      </TouchableOpacity>
+                    </Tooltip>
                     <TouchableOpacity
                       disabled={!isCustom || isLocked}
                       onPress={() => isCustom && onEditCustomItem?.(workorderLine)}
@@ -1038,24 +1023,9 @@ export const LineItemComponent = ({
                       </Text>
                     </TouchableOpacity>
                   </View>
-                  {showIntake && (
+                  {hasIntake && (
                     <View style={{ flexDirection: "row", alignItems: "flex-start", width: "100%" }}>
-                      <Tooltip text="Note helpers">
-                        <TouchableOpacity
-                          onPress={(e) => {
-                            const el = e?.currentTarget || e?.target;
-                            if (el) {
-                              const rect = el.getBoundingClientRect();
-                              _setNoteHelperDropdown({ targetField: "intakeNotes", anchorPosition: { x: rect.right + 2, y: rect.top } });
-                            }
-                          }}
-                          style={{ paddingTop: 3, paddingRight: 3 }}
-                        >
-                          <Image_ icon={ICONS.add} size={16} />
-                        </TouchableOpacity>
-                      </Tooltip>
                       <TextInput_
-                        autoFocus={true}
                         multiline={true}
                         numberOfLines={5}
                         debounceMs={500}
@@ -1073,24 +1043,9 @@ export const LineItemComponent = ({
                       />
                     </View>
                   )}
-                  {showReceipt && (
+                  {hasReceipt && (
                     <View style={{ flexDirection: "row", alignItems: "flex-start", width: "100%" }}>
-                      <Tooltip text="Note helpers">
-                        <TouchableOpacity
-                          onPress={(e) => {
-                            const el = e?.currentTarget || e?.target;
-                            if (el) {
-                              const rect = el.getBoundingClientRect();
-                              _setNoteHelperDropdown({ targetField: "receiptNotes", anchorPosition: { x: rect.right + 2, y: rect.top } });
-                            }
-                          }}
-                          style={{ paddingTop: 3, paddingRight: 3 }}
-                        >
-                          <Image_ icon={ICONS.add} size={16} />
-                        </TouchableOpacity>
-                      </Tooltip>
                       <TextInput_
-                        autoFocus={true}
                         capitalize
                         multiline={true}
                         numberOfLines={5}
@@ -1321,18 +1276,6 @@ export const LineItemComponent = ({
           </View>
         </View>
       </View>
-      <NoteHelperDropdown
-        visible={!!sNoteHelperDropdown}
-        onClose={() => _setNoteHelperDropdown(null)}
-        workorderLine={workorderLine}
-        onUpdateLine={(updatedLine) => {
-          __setWorkorderLineItem(updatedLine);
-          _setNoteHelperDropdown((prev) => prev ? { ...prev } : null);
-        }}
-        anchorPosition={sNoteHelperDropdown?.anchorPosition || { x: 0, y: 0 }}
-        noteHelpers={zNoteHelpers || []}
-        noteHelpersTarget={sNoteHelperDropdown?.targetField || "intakeNotes"}
-      />
     </View>
   );
   // try {

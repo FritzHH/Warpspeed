@@ -5268,7 +5268,22 @@ const ParentButtonItemsList = ({
     useSettingsStore.getState().setField("quickItemButtons", updated);
   }
 
+  function handleAddToCommon(inventoryItemID) {
+    let commonBtn = quickItemButtons.find((b) => b.id === "common");
+    if (!commonBtn) return;
+    let existingIDs = (commonBtn.items || []).map((e) => typeof e === "string" ? e : e.inventoryItemID);
+    if (existingIDs.includes(inventoryItemID)) return;
+    let newEntry = { inventoryItemID, x: (existingIDs.length % 6) * (QB_DEFAULT_W + QB_SNAP_PCT), y: Math.floor(existingIDs.length / 6) * (QB_DEFAULT_H + QB_SNAP_PCT), w: QB_DEFAULT_W, h: QB_DEFAULT_H, fontSize: 10 };
+    let updated = quickItemButtons.map((b) =>
+      b.id === "common" ? { ...b, items: [...(b.items || []), newEntry] } : b
+    );
+    useSettingsStore.getState().setField("quickItemButtons", updated);
+  }
+
   if (parentItems.length === 0) return null;
+
+  let commonBtn = quickItemButtons.find((b) => b.id === "common");
+  let commonItemIDs = (commonBtn?.items || []).map((e) => typeof e === "string" ? e : e.inventoryItemID);
 
   return (
     <View style={{ marginTop: 10, width: "100%" }}>
@@ -5278,6 +5293,7 @@ const ParentButtonItemsList = ({
       {parentItems.map((inv, idx) => {
         let dividerObj = (parentButton?.dividers || []).find((d) => d.itemID === inv.id);
         let hasDivider = !!dividerObj;
+        let isInCommon = commonItemIDs.includes(inv.id);
         return (
           <React.Fragment key={inv.id}>
             {hasDivider && (
@@ -5363,6 +5379,16 @@ const ParentButtonItemsList = ({
               <Text style={{ fontSize: 12, color: gray(0.5), marginRight: 10 }}>
                 {"$" + formatCurrencyDisp(inv.price)}
               </Text>
+              {sCurrentParentID !== "common" && (
+                <Tooltip text={isInCommon ? "Already in Common menu" : "Add to Common menu"}>
+                  <TouchableOpacity
+                    onPress={isInCommon ? undefined : () => handleAddToCommon(inv.id)}
+                    style={{ marginRight: 10, opacity: isInCommon ? 0.3 : 1, cursor: isInCommon ? "default" : "pointer" }}
+                  >
+                    <Image_ icon={ICONS.add} size={17} />
+                  </TouchableOpacity>
+                </Tooltip>
+              )}
               <TouchableOpacity onPress={() => handleDeleteItem(inv.id)}>
                 <Image_ icon={ICONS.close1} size={14} />
               </TouchableOpacity>

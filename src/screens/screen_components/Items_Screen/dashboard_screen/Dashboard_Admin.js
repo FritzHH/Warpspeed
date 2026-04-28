@@ -403,6 +403,7 @@ export function Dashboard_Admin({}) {
                 fontWeight: sExpand === TAB_NAMES.users ? 500 : null,
                 color: sExpand === TAB_NAMES.users ? C.green : gray(0.6),
               }}
+              disabled={sMenuLocked}
             />
             <VerticalSpacer />
             {/****************** payroll modal *****************************/}
@@ -1100,64 +1101,6 @@ function DropdownComponent({
 
 ////////////////////////////////////////////////////////////////////////////////////
 
-function UserQuickCard({ userObj, isClockedIn }) {
-  const [sHover, _setHover] = useState(false);
-  return (
-    <TouchableOpacity
-      onPress={() => { }}
-      onMouseEnter={() => _setHover(true)}
-      onMouseLeave={() => _setHover(false)}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: C.listItemWhite,
-        borderWidth: 1,
-        borderColor: isClockedIn ? C.green : C.buttonLightGreenOutline,
-        borderRadius: 8,
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-        opacity: sHover ? 0.7 : 1,
-      }}
-    >
-      <View style={{ marginRight: 8 }}>
-        <Text style={{ fontSize: 13, color: C.text, fontWeight: "500" }}>
-          {capitalizeFirstLetterOfString(userObj.first) + " " + capitalizeFirstLetterOfString(userObj.last)}
-        </Text>
-      </View>
-      <TouchableOpacity
-        onPress={() => {
-          let option = isClockedIn ? "out" : "in";
-          let name = capitalizeFirstLetterOfString(userObj.first) + " " + capitalizeFirstLetterOfString(userObj.last);
-          useAlertScreenStore.getState().setValues({
-            title: "PUNCH CLOCK",
-            message: (option === "in" ? "Clock in " : "Clock out ") + name + "?",
-            btn1Text: option === "in" ? "CLOCK IN" : "CLOCK OUT",
-            btn2Text: "CANCEL",
-            handleBtn1Press: () => {
-              useLoginStore.getState().setCreateUserClock(userObj.id, new Date().getTime(), option);
-              if (option === "out") {
-                useLoginStore.getState().setCurrentUser(null);
-              }
-            },
-            handleBtn2Press: () => null,
-            showAlert: true,
-          });
-        }}
-        style={{
-          backgroundColor: isClockedIn ? C.lightred : C.green,
-          borderRadius: 5,
-          paddingVertical: 3,
-          paddingHorizontal: 8,
-        }}
-      >
-        <Text style={{ fontSize: 11, color: C.textWhite, fontWeight: "600" }}>
-          {isClockedIn ? "Clock Out" : "Clock In"}
-        </Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-}
-
 const AppUserListComponent = ({
   zSettingsObj,
   commitUserInfoChange,
@@ -1171,7 +1114,6 @@ const AppUserListComponent = ({
   const [sShowWageIndex, _setShowWageIndex] = useState(false);
   const [sNewUserObj, _setNewUserObj] = useState(null);
   const [sExpand, _setExpand] = useState(false);
-  const [sShowUserList, _setShowUserList] = useState(true);
   const [sLoginTimeout, _setLoginTimeout] = useState(zSettingsObj?.activeLoginTimeoutSeconds || "");
   const [sLockHours, _setLockHours] = useState(zSettingsObj?.idleLoginTimeoutHours ? String(Math.round(zSettingsObj.idleLoginTimeoutHours)) : "");
   const [sPinLength, _setPinLength] = useState(zSettingsObj?.userPinStrength || "");
@@ -1192,34 +1134,6 @@ const AppUserListComponent = ({
 
   return (
     <BoxContainerOuterComponent style={{}}>
-      {/*User quick list with clock in/out*/}
-      <BoxContainerInnerComponent
-        style={{
-          backgroundColor: C.backgroundListWhite,
-          borderWidth: 0,
-          marginBottom: 10,
-        }}
-      >
-        <TouchableOpacity
-          onPress={() => _setShowUserList(!sShowUserList)}
-          style={{ flexDirection: "row", alignItems: "center", marginBottom: sShowUserList ? 8 : 0 }}
-        >
-          <Text style={{ fontSize: 13, color: gray(0.5), fontWeight: "600" }}>
-            {sShowUserList ? "Hide Users  ▲" : "Show Users  ▼"}
-          </Text>
-        </TouchableOpacity>
-        {sShowUserList && (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-            {[...(zSettingsObj?.users || [])].sort((a, b) => {
-              let aIn = zPunchClock[a.id] ? 0 : 1;
-              let bIn = zPunchClock[b.id] ? 0 : 1;
-              return aIn - bIn;
-            }).map((userObj) => (
-              <UserQuickCard key={userObj.id} userObj={userObj} isClockedIn={!!zPunchClock[userObj.id]} />
-            ))}
-          </View>
-        )}
-      </BoxContainerInnerComponent>
       {/**Flatlist showing all app users, edit functions. sPunchClockUserObj */}
       <BoxContainerInnerComponent
         style={{
@@ -1367,12 +1281,14 @@ const AppUserListComponent = ({
             alignItems: "flex-start",
           }}
         >
-          <BoxButton1
-            iconSize={35}
-            icon={ICONS.add}
-            onPress={handleNewUserPress}
-            style={{}}
-          />
+          <View title="Add user">
+            <BoxButton1
+              iconSize={35}
+              icon={ICONS.add}
+              onPress={handleNewUserPress}
+              style={{}}
+            />
+          </View>
         </View>
         <View style={{ width: "100%" }}>
           <FlatList
@@ -1412,40 +1328,83 @@ const AppUserListComponent = ({
                 >
                   <View
                     style={{
-                      justifyContent: "space-around",
                       marginRight: 5,
                       width: "12%",
                     }}
                   >
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (!canEditUsers) return;
-                        _setEditUserIndex(sEditUserIndex != null ? null : idx);
-                        _setShowPinIndex(null);
-                        _setShowWageIndex(null);
-                      }}
-                      style={{ marginLeft: 10, opacity: canEditUsers ? 1 : 0.3 }}
-                    >
-                      <Image_ icon={editable ? ICONS.close1 : ICONS.editPencil} size={20} />
-                    </TouchableOpacity>
-                    <Button_
-                      text={"Enroll"}
-                      onPress={() => {
-                        _setFacialRecognitionModalUserObj(userObj);
-                      }}
-                      enabled={editable}
-                      buttonStyle={{
-                        borderWidth: 1,
-                        borderColor: C.buttonLightGreenOutline,
-                        backgroundColor: C.buttonLightGreen,
-                        paddingVertical: 2,
-                        paddingHorizontal: 4,
-                        borderRadius: 5,
-                        width: "100%",
-                      }}
-                      mouseOverOptions={{ opacity: 0.7 }}
-                      textStyle={{ fontSize: 11, color: C.text, fontWeight: "600", numLines: 2, width: '100%', textAlign: "center" }}
-                    />
+                    {/* Row 1 - aligns with name row */}
+                    <View style={{ height: 25, justifyContent: "center", alignItems: "center" }}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          if (!canEditUsers) return;
+                          _setEditUserIndex(sEditUserIndex != null ? null : idx);
+                          _setShowPinIndex(null);
+                          _setShowWageIndex(null);
+                        }}
+                        style={{ opacity: canEditUsers ? 1 : 0.3 }}
+                      >
+                        <Image_ icon={editable ? ICONS.close1 : ICONS.editPencil} size={20} />
+                      </TouchableOpacity>
+                    </View>
+                    {/* Row 2 - Clock In/Out button (aligns with phone/email row) */}
+                    <View style={{ height: 25, justifyContent: "center", marginTop: 7 }}>
+                      <Button_
+                        text={zPunchClock[userObj.id] ? "Clock Out" : "Clock In"}
+                        onPress={() => {
+                          let isClockedIn = !!zPunchClock[userObj.id];
+                          let option = isClockedIn ? "out" : "in";
+                          let name = capitalizeFirstLetterOfString(userObj.first) + " " + capitalizeFirstLetterOfString(userObj.last);
+                          useAlertScreenStore.getState().setValues({
+                            title: "PUNCH CLOCK",
+                            message: (option === "in" ? "Clock in " : "Clock out ") + name + "?",
+                            btn1Text: option === "in" ? "CLOCK IN" : "CLOCK OUT",
+                            btn2Text: "CANCEL",
+                            handleBtn1Press: () => {
+                              useLoginStore.getState().setCreateUserClock(userObj.id, new Date().getTime(), option);
+                              if (option === "out") {
+                                useLoginStore.getState().setCurrentUser(null);
+                              }
+                            },
+                            handleBtn2Press: () => null,
+                            showAlert: true,
+                          });
+                        }}
+                        buttonStyle={{
+                          borderWidth: 1,
+                          borderColor: zPunchClock[userObj.id] ? C.lightred : C.buttonLightGreenOutline,
+                          backgroundColor: zPunchClock[userObj.id] ? C.lightred : C.buttonLightGreen,
+                          paddingVertical: 2,
+                          paddingHorizontal: 4,
+                          borderRadius: 5,
+                          width: "100%",
+                        }}
+                        mouseOverOptions={{ opacity: 0.7 }}
+                        textStyle={{ fontSize: 11, color: zPunchClock[userObj.id] ? C.textWhite : C.text, fontWeight: "600", numLines: 2, width: '100%', textAlign: "center" }}
+                      />
+                    </View>
+                    {/* Row 3 - Enroll button (aligns with PIN/wage/role row) */}
+                    <View style={{ height: 25, justifyContent: "center", marginTop: 7 }}>
+                      <Button_
+                        text={"Enroll"}
+                        onPress={() => {
+                          _setFacialRecognitionModalUserObj(userObj);
+                        }}
+                        enabled={editable}
+                        buttonStyle={{
+                          borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          backgroundColor: C.buttonLightGreen,
+                          paddingVertical: 2,
+                          paddingHorizontal: 4,
+                          borderRadius: 5,
+                          width: "100%",
+                        }}
+                        mouseOverOptions={{ opacity: 0.7 }}
+                        textStyle={{ fontSize: 11, color: C.text, fontWeight: "600", numLines: 2, width: '100%', textAlign: "center" }}
+                      />
+                    </View>
+                    {/* Row 4 - aligns with statuses row */}
+                    <View style={{ marginTop: 7 }} />
                   </View>
                   <View
                     style={{
@@ -1475,10 +1434,10 @@ const AppUserListComponent = ({
                             : "transparent",
                           outlineWidth: 0,
                           width: "49%",
-                          // marginRight: 10,
                           borderWidth: 1,
                           fontSize: 14,
                           height: 25,
+                          color: editable ? C.text : gray(0.5),
                         }}
                         onChangeText={(value) => {
                           userObj.first = value;
@@ -1496,16 +1455,15 @@ const AppUserListComponent = ({
                         editable={editable}
                         style={{
                           paddingHorizontal: 5,
-                          // paddingHorizontal: 2,
                           borderColor: editable
                             ? C.buttonLightGreenOutline
                             : "transparent",
                           outlineWidth: 0,
                           width: "49%",
-                          // marginRight: 10,
                           borderWidth: 1,
                           fontSize: 14,
                           height: 25,
+                          color: editable ? C.text : gray(0.5),
                         }}
                       />
                     </View>
@@ -1539,6 +1497,7 @@ const AppUserListComponent = ({
                           borderWidth: 1,
                           height: 25,
                           fontSize: 14,
+                          color: editable ? C.text : gray(0.5),
                         }}
                       />
                       <TextInput_
@@ -1563,6 +1522,7 @@ const AppUserListComponent = ({
                           borderWidth: 1,
                           height: 25,
                           fontSize: 14,
+                          color: editable ? C.text : gray(0.5),
                         }}
                       />
                     </View>
@@ -1605,6 +1565,7 @@ const AppUserListComponent = ({
                             padding: 1,
                             fontSize: 14,
                             width: "80%",
+                            color: editable ? C.text : gray(0.5),
                           }}
                         />
                         {editable ? (
@@ -1654,6 +1615,7 @@ const AppUserListComponent = ({
                             padding: 1,
                             fontSize: 14,
                             width: "80%",
+                            color: editable ? C.text : gray(0.5),
                           }}
                         />
                         {editable ? (
@@ -1702,7 +1664,7 @@ const AppUserListComponent = ({
                           }}
                           buttonText={userObj.permissions.name}
                           buttonTextStyle={{
-                            color: C.text,
+                            color: editable ? C.text : gray(0.5),
                             fontSize: 14,
                           }}
                         />
@@ -1778,7 +1740,7 @@ const AppUserListComponent = ({
                             style={{
                               flexDirection: "row",
                               alignItems: "center",
-                              backgroundColor: status.backgroundColor,
+                              backgroundColor: editable ? status.backgroundColor : gray(0.85),
                               borderRadius: 4,
                               paddingHorizontal: 6,
                               paddingVertical: 2,
@@ -1786,7 +1748,7 @@ const AppUserListComponent = ({
                           >
                             <Text
                               style={{
-                                color: status.textColor,
+                                color: editable ? status.textColor : gray(0.5),
                                 fontSize: 12,
                                 fontWeight: "600",
                               }}

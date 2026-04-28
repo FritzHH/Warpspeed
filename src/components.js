@@ -1389,6 +1389,7 @@ export const InventoryItemScreeenModalComponent = ({
 export const LoginModalScreen = ({ modalVisible }) => {
   const zAdminPrivilege = useLoginStore((state) => state.adminPrivilege);
   const zUsers = useSettingsStore((state) => state.settings?.users, deepEqual);
+  const zPinStrength = useSettingsStore((state) => state.settings?.userPinStrength) || 4;
   const [sPin, _setPin] = useState("");
   const [sError, _setError] = useState("");
   const [sSuccess, _setSuccess] = useState(false);
@@ -1557,30 +1558,62 @@ export const LoginModalScreen = ({ modalVisible }) => {
           </View>
         )}
 
-        {/* PIN input */}
+        {/* PIN input — per-digit boxes */}
         {!sSuccess && (
           <View>
             <Text style={{ fontSize: 13, color: gray(0.5), marginBottom: 6 }}>Enter PIN</Text>
-            <TextInput
-              ref={pinInputRef}
-              autoFocus={true}
-              secureTextEntry={true}
-              value={sPin}
-              onChangeText={handlePinChange}
-              placeholder="PIN"
-              style={{
-                borderWidth: 2,
-                borderColor: sError ? C.red : C.buttonLightGreenOutline,
-                borderRadius: 10,
-                backgroundColor: C.listItemWhite,
-                paddingVertical: 10,
-                paddingHorizontal: 14,
-                fontSize: 20,
-                textAlign: "center",
-                letterSpacing: 8,
-                outlineStyle: "none",
-              }}
-            />
+            <Pressable
+              onPress={() => pinInputRef.current?.focus()}
+              style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", position: "relative" }}
+            >
+              {Array.from({ length: zPinStrength }).map((_, i) => {
+                const isFilled = i < sPin.length;
+                const isCursor = i === sPin.length;
+                return (
+                  <View
+                    key={i}
+                    style={{
+                      width: 44,
+                      height: 52,
+                      borderWidth: 2,
+                      borderColor: sError ? C.red : isCursor ? C.cursorRed : isFilled ? "#007bff" : "#ddd",
+                      borderRadius: 8,
+                      marginHorizontal: 4,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      backgroundColor: isCursor ? C.cursorRed : isFilled ? "#fff" : "#f8f9fa",
+                      boxShadow: isCursor ? "0 0 10px rgba(255, 107, 107, 0.5)" : "none",
+                    }}
+                  >
+                    {isFilled && (
+                      <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: C.text }} />
+                    )}
+                  </View>
+                );
+              })}
+              <TextInput
+                ref={pinInputRef}
+                autoFocus={true}
+                autoComplete="one-time-code"
+                textContentType="oneTimeCode"
+                value={sPin}
+                onChangeText={(val) => {
+                  const clean = val.replace(/\D/g, "").slice(0, zPinStrength);
+                  handlePinChange(clean);
+                }}
+                maxLength={zPinStrength}
+                keyboardType="numeric"
+                style={{
+                  position: "absolute",
+                  top: 0, left: 0, right: 0, bottom: 0,
+                  opacity: 0,
+                  backgroundColor: "transparent",
+                  color: "transparent",
+                  borderWidth: 0,
+                  outline: "none",
+                }}
+              />
+            </Pressable>
             {!!sError && (
               <Text style={{ fontSize: 12, color: C.red, marginTop: 6, textAlign: "center" }}>{sError}</Text>
             )}
@@ -3925,6 +3958,7 @@ export const NoteHelperDropdown = ({
   workorderLine,
   onUpdateLine,
   anchorPosition = { x: 0, y: 0 },
+  anchorX,
   noteHelpers = [],
   noteHelpersTarget = "intakeNotes",
   centered = false,
@@ -3975,11 +4009,15 @@ export const NoteHelperDropdown = ({
     onUpdateLine({ ...workorderLine, [target]: parts.join(", ") });
   }
 
-  // Center dropdown on click point, clamp to viewport
-  const dropdownWidth = centered ? 420 : 340;
+  // Position dropdown: anchorX = right of pencil button + vertically centered, centered = full center, else anchor point
+  const hasAnchorX = anchorX !== undefined && anchorX !== null;
+  const dropdownWidth = (centered || hasAnchorX) ? 420 : 340;
   const dropdownMeasured = sDropdownHeight > 0;
   let left, top;
-  if (centered && typeof window !== "undefined") {
+  if (hasAnchorX && typeof window !== "undefined") {
+    left = anchorX + 8;
+    top = dropdownMeasured ? (window.innerHeight - sDropdownHeight) / 2 : window.innerHeight / 2 - 200;
+  } else if (centered && typeof window !== "undefined") {
     left = (window.innerWidth - dropdownWidth) / 2;
     top = dropdownMeasured ? (window.innerHeight - sDropdownHeight) / 2 : window.innerHeight / 2 - 200;
   } else {

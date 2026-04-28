@@ -594,9 +594,9 @@ export const Items_WorkorderItemsTab = ({}) => {
       </View>
     );
 
-  function openNoteHelperForLine(workorderLine) {
+  function openNoteHelperForLine(workorderLine, anchorX) {
     if (!zNoteHelpers || zNoteHelpers.length === 0) return;
-    _setNoteHelperDropdown({ workorderLine, targetField: "intakeNotes", centered: true });
+    _setNoteHelperDropdown({ workorderLine, targetField: "intakeNotes", anchorX: anchorX || 0 });
   }
 
   function handleNoteHelperUpdate(updatedLine) {
@@ -885,10 +885,9 @@ export const Items_WorkorderItemsTab = ({}) => {
         onClose={() => _setNoteHelperDropdown(null)}
         workorderLine={sNoteHelperDropdown?.workorderLine}
         onUpdateLine={handleNoteHelperUpdate}
-        anchorPosition={{ x: 0, y: 0 }}
+        anchorX={sNoteHelperDropdown?.anchorX || 0}
         noteHelpers={zNoteHelpers || []}
         noteHelpersTarget={sNoteHelperDropdown?.targetField || zNoteHelpersTarget}
-        centered={true}
       />
     </View>
   );
@@ -917,6 +916,7 @@ export const LineItemComponent = ({
   const [sQtyFocused, _setQtyFocused] = useState(false);
   const [sQtyInputVal, _setQtyInputVal] = useState("");
   const qtyBlurredRef = useRef(false);
+  const pencilRef = useRef(null);
 
   const qtyDisplayStr = sQtyFocused ? sQtyInputVal : String(effectiveQty);
   const qtyDigits = qtyDisplayStr.length || 1;
@@ -992,7 +992,16 @@ export const LineItemComponent = ({
                   <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
                     <Tooltip text="Notes" position="top">
                       <TouchableOpacity
-                        onPress={() => onOpenNoteHelper?.(workorderLine)}
+                        ref={pencilRef}
+                        onPress={() => {
+                          if (pencilRef.current) {
+                            pencilRef.current.measure((x, y, width, height, pageX, pageY) => {
+                              onOpenNoteHelper?.(workorderLine, pageX + width);
+                            });
+                          } else {
+                            onOpenNoteHelper?.(workorderLine, 0);
+                          }
+                        }}
                         style={{ marginRight: 4 }}
                       >
                         <Image source={ICONS.editPencil} style={{ width: 15, height: 15, opacity: 0.5 }} />

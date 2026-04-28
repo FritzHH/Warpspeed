@@ -1407,46 +1407,55 @@ export const useOpenWorkordersStore = create(
         if (wo.id === get().openWorkorderID) broadcastWorkorderToDisplay(wo);
       },
       setField: (fieldName, fieldVal, workorderID, saveToDB = true) => {
-        if (!workorderID) workorderID = get().openWorkorderID;
-        if (get().lockedWorkorderID === workorderID) return;
-        let workorder = get().workorders.find((o) => o.id === workorderID);
+        const doSet = () => {
+          if (!workorderID) workorderID = get().openWorkorderID;
+          if (get().lockedWorkorderID === workorderID) return;
+          let workorder = get().workorders.find((o) => o.id === workorderID);
 
-        // changelog: append entries for discrete fields, debounce text fields
-        let logEntries = appendToChangeLog(workorder, fieldName, workorder[fieldName], fieldVal);
+          // changelog: append entries for discrete fields, debounce text fields
+          let logEntries = appendToChangeLog(workorder, fieldName, workorder[fieldName], fieldVal);
 
-        workorder = { ...workorder, [fieldName]: fieldVal };
-        if (logEntries && logEntries.length > 0) {
-          workorder.changeLog = [...(workorder.changeLog || []), ...logEntries];
+          workorder = { ...workorder, [fieldName]: fieldVal };
+          if (logEntries && logEntries.length > 0) {
+            workorder.changeLog = [...(workorder.changeLog || []), ...logEntries];
+          }
+
+          set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
+          // No-customer workorders stay local — saved explicitly by checkout or intake
+          if (saveToDB && workorder.customerID) {
+            // Mark field dirty before write
+            const dirtyFields = get()._dirtyFields;
+            const ts = Date.now();
+            const woDirty = { ...dirtyFields[workorderID], [fieldName]: ts };
+            set({ _dirtyFields: { ...dirtyFields, [workorderID]: woDirty } });
+
+            // Capture snapshot of dirty timestamps at write time
+            const dirtySnapshot = { ...woDirty };
+            dbSaveOpenWorkorder(workorder).then(() => {
+              const currentDirty = get()._dirtyFields[workorderID];
+              if (!currentDirty) return;
+              const updated = { ...currentDirty };
+              for (const key of Object.keys(dirtySnapshot)) {
+                if (updated[key] === dirtySnapshot[key]) delete updated[key];
+              }
+              if (Object.keys(updated).length === 0) {
+                const { [workorderID]: _, ...rest } = get()._dirtyFields;
+                set({ _dirtyFields: rest });
+              } else {
+                set({ _dirtyFields: { ...get()._dirtyFields, [workorderID]: updated } });
+              }
+            });
+            get()._flushPendingCustomerLink(workorderID);
+          }
+          if (workorderID === get().openWorkorderID) broadcastWorkorderToDisplay(workorder);
+        };
+
+        // Require login for any changelog-tracked field edit
+        if (CHANGELOG_TRACKED_FIELDS.includes(fieldName)) {
+          useLoginStore.getState().requireLogin(doSet);
+        } else {
+          doSet();
         }
-
-        set({ workorders: replaceOrAddToArr(get().workorders, workorder) });
-        // No-customer workorders stay local — saved explicitly by checkout or intake
-        if (saveToDB && workorder.customerID) {
-          // Mark field dirty before write
-          const dirtyFields = get()._dirtyFields;
-          const ts = Date.now();
-          const woDirty = { ...dirtyFields[workorderID], [fieldName]: ts };
-          set({ _dirtyFields: { ...dirtyFields, [workorderID]: woDirty } });
-
-          // Capture snapshot of dirty timestamps at write time
-          const dirtySnapshot = { ...woDirty };
-          dbSaveOpenWorkorder(workorder).then(() => {
-            const currentDirty = get()._dirtyFields[workorderID];
-            if (!currentDirty) return;
-            const updated = { ...currentDirty };
-            for (const key of Object.keys(dirtySnapshot)) {
-              if (updated[key] === dirtySnapshot[key]) delete updated[key];
-            }
-            if (Object.keys(updated).length === 0) {
-              const { [workorderID]: _, ...rest } = get()._dirtyFields;
-              set({ _dirtyFields: rest });
-            } else {
-              set({ _dirtyFields: { ...get()._dirtyFields, [workorderID]: updated } });
-            }
-          });
-          get()._flushPendingCustomerLink(workorderID);
-        }
-        if (workorderID === get().openWorkorderID) broadcastWorkorderToDisplay(workorder);
       },
 
       removeWorkorder: (workorderID, saveToDB = true, batch = true) => {

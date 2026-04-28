@@ -1810,18 +1810,11 @@ async function main() {
     }
 
     if (selectedSet.has(2)) {
-      const existingUsers = existingSettings.users || [];
-      const existingByLsID = {};
-      existingUsers.forEach(function (u) {
-        if (u.lightspeed_id) existingByLsID[u.lightspeed_id] = u;
-      });
-      for (const u of newUsers) {
-        if (!existingByLsID[u.lightspeed_id]) {
-          existingUsers.push(u);
-        }
-      }
-      mergeObj.users = existingUsers;
-      logSuccess("Employees ready (" + existingUsers.length + " users)");
+      var existingUsers = existingSettings.users || [];
+      // Keep non-imported users (e.g. Fritz), replace all imported ones
+      var keptUsers = existingUsers.filter(function (u) { return !u._importSource; });
+      mergeObj.users = keptUsers.concat(newUsers);
+      logSuccess("Employees ready (" + mergeObj.users.length + " users: " + keptUsers.length + " existing + " + newUsers.length + " imported)");
     }
 
     await settingsRef.set(mergeObj, { merge: true });

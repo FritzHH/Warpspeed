@@ -70,7 +70,8 @@
     "dhook": "firebase deploy --only functions:createTenant",
     "auth": "firebase login --reauth",
     "begin": "yarn build && serve -s build --ssl-cert cert.pem --ssl-key key.pem",
-    "serveit": "serve -s build --ssl-cert cert.pem --ssl-key key.pem"
+    "serveit": "serve -s build --ssl-cert cert.pem --ssl-key key.pem",
+    "host": "yarn build && firebase deploy --only hosting"
   },
   "eslintConfig": {
     "extends": [

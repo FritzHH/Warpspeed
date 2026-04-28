@@ -1016,22 +1016,32 @@ export function BikeStandScreen() {
             <Text style={{ fontSize: 35, fontWeight: "600", color: C.text, marginBottom: 20 }}>
               Enter PIN
             </Text>
-            <View style={{ flexDirection: "row", marginBottom: 20, height: 24, alignItems: "center" }}>
-              {sPin.split("").map((_, i) => (
-                <View
-                  key={i}
-                  style={{
-                    width: 14,
-                    height: 14,
-                    borderRadius: 7,
-                    backgroundColor: C.text,
-                    marginHorizontal: 6,
-                  }}
-                />
-              ))}
-              {sPin.length === 0 && (
-                <Text style={{ fontSize: 31, color: gray(0.5) }}>-</Text>
-              )}
+            <View style={{ flexDirection: "row", marginBottom: 20, alignItems: "center" }}>
+              {Array.from({ length: zSettings?.userPinStrength || 4 }).map((_, i) => {
+                const isFilled = i < sPin.length;
+                const isCursor = i === sPin.length;
+                return (
+                  <View
+                    key={i}
+                    style={{
+                      width: 44,
+                      height: 52,
+                      borderWidth: 2,
+                      borderColor: isCursor ? C.cursorRed : isFilled ? "#007bff" : "#ddd",
+                      borderRadius: 8,
+                      marginHorizontal: 4,
+                      justifyContent: "center",
+                      alignItems: "center",
+                      backgroundColor: isCursor ? C.cursorRed : isFilled ? "#fff" : "#f8f9fa",
+                      boxShadow: isCursor ? "0 0 10px rgba(255, 107, 107, 0.5)" : "none",
+                    }}
+                  >
+                    {isFilled && (
+                      <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: C.text }} />
+                    )}
+                  </View>
+                );
+              })}
             </View>
             <StandKeypad mode="phone" onKeyPress={handleStandPinKeyPress} />
             <TouchableOpacity

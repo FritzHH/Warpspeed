@@ -292,7 +292,7 @@ export function NewWorkorderComponent({}) {
       return;
     } else if (isNumeric) {
       _setTextInput(formatPhoneWithDashes(rawText));
-      if (rawText.length >= 5) searchFun([rawText], ["phone"]);
+      if (rawText.length >= 4) searchFun([rawText], ["phone"]);
       return;
     }
 

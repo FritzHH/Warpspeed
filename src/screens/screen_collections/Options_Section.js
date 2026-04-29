@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { View, ActivityIndicator } from "react-native-web";
+import { View, Text, ActivityIndicator } from "react-native-web";
 import {
   checkInternetConnection,
   convertMillisToHoursMins,
@@ -20,6 +20,7 @@ import {
   useTabNamesStore,
   useLoginStore,
   useAlertScreenStore,
+  useSettingsStore,
 } from "../../stores";
 import { INTERNET_CHECK_DELAY, LOCAL_DB_KEYS } from "../../constants";
 import { PayrollModal } from "../screen_components/modal_screens/PayrollModal";
@@ -133,6 +134,7 @@ export const TabBar = ({
   const zPunchClock = useLoginStore((state) => state.punchClock);
   const zCameraStatus = useLoginStore((state) => state.cameraStatus);
   const zCameraError = useLoginStore((state) => state.cameraError);
+  const zPrinters = useSettingsStore((state) => state.settings?.printers);
   // local state /////////////////////////////////////////////////////////////////////////
   const [sIsOnline, _setIsOnline] = useState(true);
 
@@ -299,6 +301,19 @@ export const TabBar = ({
       <View style={{ flexDirection: "row", alignItems: "center" }}>
         {renderUserArea()}
         <View style={{ width: 5 }} />
+        {(() => {
+          let selectedID = localStorageWrapper.getItem("selectedPrinterID");
+          let selectedPrinter = selectedID && zPrinters?.[selectedID];
+          if (selectedPrinter && selectedPrinter.active !== true) {
+            return (
+              <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "yellow", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginRight: 5 }}>
+                <Image_ icon={ICONS.print} size={14} style={{ marginRight: 4 }} />
+                <Text style={{ fontSize: 12, fontWeight: "700", color: "red" }}>Offline</Text>
+              </View>
+            );
+          }
+          return null;
+        })()}
         <Image_
           style={{ width: 28, height: 28 }}
           icon={sIsOnline ? ICONS.wifi : ICONS.internetOfflineGIF}

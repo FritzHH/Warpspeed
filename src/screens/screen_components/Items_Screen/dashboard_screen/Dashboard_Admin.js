@@ -3657,31 +3657,36 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               width: "100%",
             }}
           >
-            <TouchableOpacity
-              onPress={() => {
-                useAlertScreenStore.getState().setValues({
-                  title: "Remove Printer",
-                  message: "This will delete the printer from the database for all users. It must be re-added through the WarpHub app.",
-                  btn1Text: "Delete",
-                  btn2Text: "Cancel",
-                  handleBtn1Press: () => {
-                    let updated = { ...printersObj };
-                    delete updated[printer.id];
-                    handleSettingsFieldChange("printers", updated);
-                    if (sSelectedReceiptPrinter === printer.id) {
-                      localStorageWrapper.removeItem("selectedPrinterID");
-                      _setSelectedReceiptPrinter("");
-                    }
-                    useAlertScreenStore.getState().setShowAlert(false);
-                  },
-                  handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
-                  canExitOnOuterClick: true,
-                });
-              }}
-              style={{ position: "absolute", top: 6, right: 6, zIndex: 1, padding: 4 }}
-            >
-              <Image_ icon={ICONS.close1} size={14} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              {!isPrinterOnline(printer) ? (
+                <Text style={{ fontSize: 12, fontWeight: "700", color: C.red, backgroundColor: "yellow", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: "hidden" }}>Printer Offline</Text>
+              ) : <View />}
+              <TouchableOpacity
+                onPress={() => {
+                  useAlertScreenStore.getState().setValues({
+                    title: "Remove Printer",
+                    message: "This will delete the printer from the database for all users. It must be re-added through the WarpHub app.",
+                    btn1Text: "Delete",
+                    btn2Text: "Cancel",
+                    handleBtn1Press: () => {
+                      let updated = { ...printersObj };
+                      delete updated[printer.id];
+                      handleSettingsFieldChange("printers", updated);
+                      if (sSelectedReceiptPrinter === printer.id) {
+                        localStorageWrapper.removeItem("selectedPrinterID");
+                        _setSelectedReceiptPrinter("");
+                      }
+                      useAlertScreenStore.getState().setShowAlert(false);
+                    },
+                    handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                    canExitOnOuterClick: true,
+                  });
+                }}
+                style={{ padding: 4 }}
+              >
+                <Image_ icon={ICONS.close1} size={14} />
+              </TouchableOpacity>
+            </View>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isPrinterOnline(printer) ? C.green : C.red, marginRight: 8 }} />
               <View style={{ flex: 1 }}>
@@ -3715,7 +3720,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     canExitOnOuterClick: true,
                   });
                 }}
-                colorGradientArr={COLOR_GRADIENTS.lightBlue}
+                colorGradientArr={COLOR_GRADIENTS.green}
                 style={{ paddingHorizontal: 16, paddingVertical: 10 }}
                 textStyle={{ fontSize: 14, fontWeight: "700" }}
                 enabled={isPrinterOnline(printer)}
@@ -3746,31 +3751,36 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               width: "100%",
             }}
           >
-            <TouchableOpacity
-              onPress={() => {
-                useAlertScreenStore.getState().setValues({
-                  title: "Remove Printer",
-                  message: "This will delete the printer from the database for all users. It must be re-added through the WarpHub app.",
-                  btn1Text: "Delete",
-                  btn2Text: "Cancel",
-                  handleBtn1Press: () => {
-                    let updated = { ...printersObj };
-                    delete updated[printer.id];
-                    handleSettingsFieldChange("printers", updated);
-                    if (sSelectedLabelPrinter === printer.id) {
-                      localStorageWrapper.removeItem("selectedLabelPrinterID");
-                      _setSelectedLabelPrinter("");
-                    }
-                    useAlertScreenStore.getState().setShowAlert(false);
-                  },
-                  handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
-                  canExitOnOuterClick: true,
-                });
-              }}
-              style={{ position: "absolute", top: 6, right: 6, zIndex: 1, padding: 4 }}
-            >
-              <Image_ icon={ICONS.close1} size={14} />
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              {!isPrinterOnline(printer) ? (
+                <Text style={{ fontSize: 12, fontWeight: "700", color: C.red, backgroundColor: "yellow", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: "hidden" }}>Printer Offline</Text>
+              ) : <View />}
+              <TouchableOpacity
+                onPress={() => {
+                  useAlertScreenStore.getState().setValues({
+                    title: "Remove Printer",
+                    message: "This will delete the printer from the database for all users. It must be re-added through the WarpHub app.",
+                    btn1Text: "Delete",
+                    btn2Text: "Cancel",
+                    handleBtn1Press: () => {
+                      let updated = { ...printersObj };
+                      delete updated[printer.id];
+                      handleSettingsFieldChange("printers", updated);
+                      if (sSelectedLabelPrinter === printer.id) {
+                        localStorageWrapper.removeItem("selectedLabelPrinterID");
+                        _setSelectedLabelPrinter("");
+                      }
+                      useAlertScreenStore.getState().setShowAlert(false);
+                    },
+                    handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                    canExitOnOuterClick: true,
+                  });
+                }}
+                style={{ padding: 4 }}
+              >
+                <Image_ icon={ICONS.close1} size={14} />
+              </TouchableOpacity>
+            </View>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isPrinterOnline(printer) ? C.green : C.red, marginRight: 8 }} />
               <View style={{ flex: 1 }}>
@@ -3792,7 +3802,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   let testObj = labelPrintBuilder.test();
                   dbSavePrintObj(testObj, printer.id);
                 }}
-                colorGradientArr={COLOR_GRADIENTS.lightBlue}
+                colorGradientArr={COLOR_GRADIENTS.green}
                 style={{ paddingHorizontal: 16, paddingVertical: 10 }}
                 textStyle={{ fontSize: 14, fontWeight: "700" }}
                 enabled={isPrinterOnline(printer)}

@@ -3716,8 +3716,8 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   });
                 }}
                 colorGradientArr={COLOR_GRADIENTS.lightBlue}
-                style={{ paddingHorizontal: 12 }}
-                textStyle={{ fontSize: 11 }}
+                style={{ paddingHorizontal: 16, paddingVertical: 10 }}
+                textStyle={{ fontSize: 14, fontWeight: "700" }}
                 enabled={isPrinterOnline(printer)}
               />
             </View>
@@ -3793,8 +3793,8 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   dbSavePrintObj(testObj, printer.id);
                 }}
                 colorGradientArr={COLOR_GRADIENTS.lightBlue}
-                style={{ paddingHorizontal: 12 }}
-                textStyle={{ fontSize: 11 }}
+                style={{ paddingHorizontal: 16, paddingVertical: 10 }}
+                textStyle={{ fontSize: 14, fontWeight: "700" }}
                 enabled={isPrinterOnline(printer)}
               />
             </View>

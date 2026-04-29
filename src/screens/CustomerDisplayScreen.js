@@ -607,6 +607,8 @@ function TranslateDisplay({ text }) {
           fontWeight: Fonts.weight.textHeavy,
           textAlign: "center",
           lineHeight: 64,
+          width: "80%",
+          textTransform: "capitalize",
         }}
       >
         {text}
@@ -702,6 +704,30 @@ export function CustomerDisplayScreen() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("blur", handleWindowBlur);
     window.addEventListener("focus", handleWindowFocus);
+    let lastClickTime = 0;
+    function handleClick(e) {
+      let now = Date.now();
+      let gap = now - lastClickTime;
+      console.log("[CustomerDisplay] click captured on:", e.target.tagName, "| gap:", gap, "ms | fullscreen:", !!document.fullscreenElement);
+      if (gap > 0 && gap < 750) {
+        lastClickTime = 0;
+        if (document.fullscreenElement) {
+          console.log("[CustomerDisplay] double-click detected, exiting fullscreen...");
+          document.exitFullscreen()
+            .then(() => console.log("[CustomerDisplay] exit fullscreen SUCCESS"))
+            .catch((err) => console.log("[CustomerDisplay] exit fullscreen FAILED:", err.message));
+        } else {
+          console.log("[CustomerDisplay] double-click detected, requesting fullscreen...");
+          document.documentElement.requestFullscreen()
+            .then(() => console.log("[CustomerDisplay] fullscreen SUCCESS"))
+            .catch((err) => console.log("[CustomerDisplay] fullscreen FAILED:", err.message));
+        }
+      } else {
+        lastClickTime = now;
+      }
+    }
+    console.log("[CustomerDisplay] attaching click listener for double-click fullscreen");
+    document.addEventListener("click", handleClick, true);
     return () => {
       clearInterval(heartbeatInterval);
       unsubDisplay();
@@ -713,6 +739,7 @@ export function CustomerDisplayScreen() {
       window.removeEventListener("beforeunload", handleBeforeUnload);
       window.removeEventListener("blur", handleWindowBlur);
       window.removeEventListener("focus", handleWindowFocus);
+      document.removeEventListener("click", handleClick, true);
     };
   }, []);
 
@@ -801,25 +828,7 @@ export function CustomerDisplayScreen() {
         </div>
       )}
 
-      {/* Fullscreen button — hidden when already fullscreen */}
-      {!sIsFullscreen && (
-        <TouchableOpacity
-          onPress={() => document.documentElement.requestFullscreen().catch(() => { })}
-          style={{
-            position: "absolute",
-            bottom: 12,
-            left: 12,
-            backgroundColor: "rgba(255, 255, 255, 0.25)",
-            paddingVertical: 6,
-            paddingHorizontal: 14,
-            borderRadius: 6,
-          }}
-        >
-          <Text style={{ color: "rgba(255, 255, 255, 0.7)", fontSize: 12 }}>
-            {t(lang, "fullScreen")}
-          </Text>
-        </TouchableOpacity>
-      )}
+
     </View>
   );
 }

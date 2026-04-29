@@ -3612,12 +3612,8 @@ const PaymentProcessingComponent = ({
   );
 };
 
-const PRINTER_ONLINE_THRESHOLD_MS = 2 * 60 * 1000; // 2 minutes
-
 function isPrinterOnline(printer) {
-  let lastSeen = printer.lastSeen;
-  if (!lastSeen || typeof lastSeen !== "number") return false;
-  return Date.now() - lastSeen < PRINTER_ONLINE_THRESHOLD_MS;
+  return printer.active === true;
 }
 
 const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
@@ -3643,7 +3639,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
     <BoxContainerOuterComponent style={{ marginTop: 20 }}>
       <BoxContainerInnerComponent>
         <View style={{ width: "100%", marginBottom: 10 }}>
-          <Text style={{ fontSize: 12, color: gray(0.6) }}>RECEIPT PRINTER (this device)</Text>
+          <Text style={{ fontSize: 12, color: gray(0.6) }}>RECEIPT PRINTER</Text>
         </View>
         {receiptPrinters.length === 0 && (
           <Text style={{ fontSize: 13, color: gray(0.5) }}>No receipt printers configured</Text>
@@ -3661,6 +3657,31 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               width: "100%",
             }}
           >
+            <TouchableOpacity
+              onPress={() => {
+                useAlertScreenStore.getState().setValues({
+                  title: "Remove Printer",
+                  message: "This will delete the printer from the database for all users. It must be re-added through the WarpHub app.",
+                  btn1Text: "Delete",
+                  btn2Text: "Cancel",
+                  handleBtn1Press: () => {
+                    let updated = { ...printersObj };
+                    delete updated[printer.id];
+                    handleSettingsFieldChange("printers", updated);
+                    if (sSelectedReceiptPrinter === printer.id) {
+                      localStorageWrapper.removeItem("selectedPrinterID");
+                      _setSelectedReceiptPrinter("");
+                    }
+                    useAlertScreenStore.getState().setShowAlert(false);
+                  },
+                  handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                  canExitOnOuterClick: true,
+                });
+              }}
+              style={{ position: "absolute", top: 6, right: 6, zIndex: 1, padding: 4 }}
+            >
+              <Image_ icon={ICONS.close1} size={14} />
+            </TouchableOpacity>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isPrinterOnline(printer) ? C.green : C.red, marginRight: 8 }} />
               <View style={{ flex: 1 }}>
@@ -3671,7 +3692,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, justifyContent: "space-between" }}>
               <CheckBox_
                 isChecked={sSelectedReceiptPrinter === printer.id}
-                text="Use for receipts"
+                text="Use this printer"
                 textStyle={{ fontSize: 13 }}
                 buttonStyle={{ backgroundColor: "transparent" }}
                 onCheck={() => handleSelectReceiptPrinter(printer.id)}
@@ -3681,6 +3702,18 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                 onPress={() => {
                   let testObj = printBuilder.test();
                   dbSavePrintObj(testObj, printer.id);
+                  useAlertScreenStore.getState().setValues({
+                    title: "Test Print",
+                    message: "Was the test print successful?",
+                    btn1Text: "Yes",
+                    btn2Text: "No",
+                    handleBtn1Press: () => {
+                      handleSelectReceiptPrinter(printer.id);
+                      useAlertScreenStore.getState().setShowAlert(false);
+                    },
+                    handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                    canExitOnOuterClick: true,
+                  });
                 }}
                 colorGradientArr={COLOR_GRADIENTS.lightBlue}
                 style={{ paddingHorizontal: 12 }}
@@ -3695,7 +3728,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
     <BoxContainerOuterComponent style={{ marginTop: 20 }}>
       <BoxContainerInnerComponent>
         <View style={{ width: "100%", marginBottom: 10 }}>
-          <Text style={{ fontSize: 12, color: gray(0.6) }}>LABEL PRINTER (this device)</Text>
+          <Text style={{ fontSize: 12, color: gray(0.6) }}>LABEL PRINTER</Text>
         </View>
         {labelPrinters.length === 0 && (
           <Text style={{ fontSize: 13, color: gray(0.5) }}>No label printers configured</Text>
@@ -3713,6 +3746,31 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               width: "100%",
             }}
           >
+            <TouchableOpacity
+              onPress={() => {
+                useAlertScreenStore.getState().setValues({
+                  title: "Remove Printer",
+                  message: "This will delete the printer from the database for all users. It must be re-added through the WarpHub app.",
+                  btn1Text: "Delete",
+                  btn2Text: "Cancel",
+                  handleBtn1Press: () => {
+                    let updated = { ...printersObj };
+                    delete updated[printer.id];
+                    handleSettingsFieldChange("printers", updated);
+                    if (sSelectedLabelPrinter === printer.id) {
+                      localStorageWrapper.removeItem("selectedLabelPrinterID");
+                      _setSelectedLabelPrinter("");
+                    }
+                    useAlertScreenStore.getState().setShowAlert(false);
+                  },
+                  handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                  canExitOnOuterClick: true,
+                });
+              }}
+              style={{ position: "absolute", top: 6, right: 6, zIndex: 1, padding: 4 }}
+            >
+              <Image_ icon={ICONS.close1} size={14} />
+            </TouchableOpacity>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isPrinterOnline(printer) ? C.green : C.red, marginRight: 8 }} />
               <View style={{ flex: 1 }}>
@@ -3723,7 +3781,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, justifyContent: "space-between" }}>
               <CheckBox_
                 isChecked={sSelectedLabelPrinter === printer.id}
-                text="Use for labels"
+                text="Use this printer"
                 textStyle={{ fontSize: 13 }}
                 buttonStyle={{ backgroundColor: "transparent" }}
                 onCheck={() => handleSelectLabelPrinter(printer.id)}

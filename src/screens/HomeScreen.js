@@ -1,12 +1,13 @@
 /* eslint-disable */
 
 import React, { useState } from "react";
-import { View, Text, ScrollView } from "react-native-web";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { C, COLOR_GRADIENTS, ICONS } from "../styles";
 import { Button_, CheckBox_, Image_ } from "../components";
 import { ROUTES } from "../routes";
 import { useSettingsStore, useLayoutStore } from "../stores";
 import { gray } from "../utils";
+import { dbLogout } from "../db_calls_wrapper";
 
 export function HomeScreen() {
   const deviceType = useLayoutStore((state) => state.deviceType);
@@ -26,26 +27,19 @@ export function HomeScreen() {
   if (deviceType === "tablet") {
     linkItems = [
       { label: "Bike Stand", path: ROUTES.stand, icon: ICONS.tools1, gradient: COLOR_GRADIENTS.green, recommended: true },
-      { label: "Intake", path: ROUTES.intake, icon: ICONS.bicycle, gradient: COLOR_GRADIENTS.green },
       { label: "Workorders", path: ROUTES.dashboard, icon: ICONS.gears1, gradient: COLOR_GRADIENTS.blue },
-      { label: "Login", path: ROUTES.login, icon: ICONS.userControl, gradient: COLOR_GRADIENTS.blue },
     ];
   } else if (deviceType === "mobile") {
     linkItems = [
       { label: "Workorders", path: ROUTES.dashboard, icon: ICONS.gears1, gradient: COLOR_GRADIENTS.green, recommended: true },
       { label: "Bike Stand", path: ROUTES.stand, icon: ICONS.tools1, gradient: COLOR_GRADIENTS.blue },
-      { label: "Login", path: ROUTES.login, icon: ICONS.userControl, gradient: COLOR_GRADIENTS.blue },
     ];
   } else {
     // Desktop
     linkItems = [
       { label: "Workorders", path: ROUTES.dashboard, icon: ICONS.gears1, gradient: COLOR_GRADIENTS.blue },
-      { label: "Intake", path: ROUTES.intake, icon: ICONS.bicycle, gradient: COLOR_GRADIENTS.blue },
       { label: "Bike Stand", path: ROUTES.stand, icon: ICONS.tools1, gradient: COLOR_GRADIENTS.blue },
       { label: "Phone", path: ROUTES.phone, icon: ICONS.cellPhone, gradient: COLOR_GRADIENTS.blue },
-      { label: "Login", path: ROUTES.login, icon: ICONS.userControl, gradient: COLOR_GRADIENTS.blue },
-      { label: "Customer Display", path: ROUTES.display, icon: ICONS.eyeballs, gradient: COLOR_GRADIENTS.blue, popup: true },
-      { label: "Translate", path: ROUTES.translate, icon: ICONS.letterI, gradient: COLOR_GRADIENTS.blue },
       { label: "Database Viewer", path: ROUTES.dbViewer, icon: ICONS.gears1, gradient: COLOR_GRADIENTS.purple },
     ];
   }
@@ -164,6 +158,21 @@ export function HomeScreen() {
           buttonStyle={{ marginTop: 10 }}
         />
       )}
+
+      <Button_
+        onPress={() => dbLogout()}
+        text="Logout"
+        colorGradientArr={COLOR_GRADIENTS.red}
+        buttonStyle={{
+          borderRadius: 5,
+          paddingVertical: isMobileOrTablet ? 14 : 10,
+          paddingHorizontal: 20,
+          marginTop: 30,
+          width: isMobileOrTablet ? "100%" : 300,
+          maxWidth: 400,
+        }}
+        textStyle={{ fontSize: isMobileOrTablet ? 16 : 14 }}
+      />
     </ScrollView>
   );
 }

@@ -2157,7 +2157,7 @@ export function BikeStandScreen() {
                   ) : (
                     receiptPrinters.map((printer) => {
                       let isSelected = printer.id === sSelectedPrinterID;
-                      let isOnline = printer.lastSeen && (Date.now() - printer.lastSeen < 2 * 60 * 1000);
+                      let isOnline = printer.active === true;
                       return (
                         <TouchableOpacity
                           key={printer.id}

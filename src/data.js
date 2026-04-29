@@ -644,8 +644,7 @@ export const PRINTER_PROTO = {
   printerName: "",
   printerInfo: "",
   label: "",
-  online: "",
-  lastSeen: "",
+  active: false,
 }
 
 export const WAIT_TIMES_PROTO = {

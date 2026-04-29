@@ -547,7 +547,7 @@ export function BaseScreen() {
                 fontWeight: "600",
               }}
             >
-              Please press the Full-Screen button on the Customer Display!
+              Double-click anywhere in the secondary display to go Full Screen!
             </Text>
           </div>
         )}

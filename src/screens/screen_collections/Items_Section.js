@@ -5,7 +5,7 @@ import React, { useState, useCallback, useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 
 import { TAB_NAMES } from "../../data";
-import { TabMenuButton, Image_, TextInput_, Button_, Tooltip } from "../../components";
+import { TabMenuButton, Image_, TextInput_, Button_, Tooltip, DropdownMenu } from "../../components";
 import { Items_Dashboard } from "../screen_components/Items_Screen/Items_Dashboard";
 import { CustomerSearchListComponent } from "../screen_components/Items_Screen/Items_CustomerSearchList";
 import { WorkorderPreview } from "../screen_components/Items_Screen/Items_WorkorderPreview";
@@ -89,13 +89,23 @@ export const Items_Section = React.memo(({}) => {
 });
 
 const EMPTY_STARTERS = [];
+const TRANSLATION_LANGUAGES = [
+  { label: "English", code: "en" },
+  { label: "Spanish", code: "es" },
+  { label: "French", code: "fr" },
+  { label: "German", code: "de" },
+  { label: "Creole", code: "ht" },
+  { label: "Arabic", code: "ar" },
+];
 const TranslateModal = ({ visible, onClose }) => {
   const [sInputText, _sSetInputText] = useState("");
+  const [sFromLang, _sSetFromLang] = useState("en");
+  const [sToLang, _sSetToLang] = useState("es");
   const zTranslateStarters = useSettingsStore((state) => state.settings?.translateStarters) || EMPTY_STARTERS;
 
   const {
-    translatedText, isEnToEs, isLoading, sourceLabel, targetLabel, targetLang,
-    doTranslate, debouncedTranslate, flipDirection, clearTranslation,
+    translatedText, isLoading,
+    doTranslate, debouncedTranslate, clearTranslation,
   } = useTranslation({
     defaultDirection: "en-to-es",
     onTranslated: (translated, text, target) => {
@@ -111,18 +121,10 @@ const TranslateModal = ({ visible, onClose }) => {
   const handleTextChange = useCallback(
     (text) => {
       _sSetInputText(text);
-      debouncedTranslate(text, targetLang);
+      debouncedTranslate(text, sToLang);
     },
-    [targetLang, debouncedTranslate]
+    [sToLang, debouncedTranslate]
   );
-
-  const handleFlip = useCallback(() => {
-    flipDirection();
-    let newTarget = isEnToEs ? "en" : "es";
-    if (sInputText.trim()) {
-      doTranslate(sInputText, newTarget);
-    }
-  }, [isEnToEs, sInputText, doTranslate, flipDirection]);
 
   const handleClose = useCallback(() => {
     _sSetInputText("");
@@ -132,11 +134,11 @@ const TranslateModal = ({ visible, onClose }) => {
 
   function handleStarterPress(starter) {
     _sSetInputText(starter.text);
-    // Set direction based on starter language — if starter is Spanish, translate to English
-    let starterIsEnToEs = starter.language === "en";
-    if (starterIsEnToEs !== isEnToEs) flipDirection();
-    let target = starter.language === "es" ? "en" : "es";
-    doTranslate(starter.text, target);
+    let from = starter.language || "en";
+    _sSetFromLang(from);
+    let to = sToLang === from ? sFromLang : sToLang;
+    _sSetToLang(to);
+    doTranslate(starter.text, to);
   }
 
   // Auto-close after 60 seconds — ref avoids timer reset on parent re-renders
@@ -211,7 +213,7 @@ const TranslateModal = ({ visible, onClose }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Language toggle row */}
+          {/* Language dropdowns */}
           <View
             style={{
               flexDirection: "row",
@@ -220,41 +222,27 @@ const TranslateModal = ({ visible, onClose }) => {
               marginBottom: 14,
             }}
           >
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: Fonts.weight.textHeavy,
-                color: C.blue,
+            <DropdownMenu
+              dataArr={TRANSLATION_LANGUAGES}
+              onSelect={(item) => {
+                _sSetFromLang(item.code);
+                if (item.code && sToLang && item.code !== sToLang && sInputText.trim()) debouncedTranslate(sInputText, sToLang);
+                if (!item.code || item.code === sToLang) clearTranslation();
               }}
-            >
-              {sourceLabel}
-            </Text>
-            <TouchableOpacity
-              onPress={handleFlip}
-              style={{
-                paddingHorizontal: 14,
-                paddingVertical: 4,
+              buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}
+              buttonStyle={{ paddingVertical: 5 }}
+            />
+            <Image_ icon={ICONS.rightArrowBlue} size={16} style={{ marginHorizontal: 10 }} />
+            <DropdownMenu
+              dataArr={TRANSLATION_LANGUAGES}
+              onSelect={(item) => {
+                _sSetToLang(item.code);
+                if (sFromLang && item.code && sFromLang !== item.code && sInputText.trim()) debouncedTranslate(sInputText, item.code);
+                if (!item.code || sFromLang === item.code) clearTranslation();
               }}
-            >
-              <Text
-                style={{
-                  fontSize: 18,
-                  color: C.green,
-                  fontWeight: Fonts.weight.textHeavy,
-                }}
-              >
-                ⇄
-              </Text>
-            </TouchableOpacity>
-            <Text
-              style={{
-                fontSize: 14,
-                fontWeight: Fonts.weight.textHeavy,
-                color: C.blue,
-              }}
-            >
-              {targetLabel}
-            </Text>
+              buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sToLang)?.label || "Spanish"}
+              buttonStyle={{ paddingVertical: 5 }}
+            />
           </View>
 
           {/* Starter buttons */}
@@ -284,10 +272,11 @@ const TranslateModal = ({ visible, onClose }) => {
             value={sInputText}
             onChangeText={handleTextChange}
             debounceMs={0}
-            placeholder={`Type in ${sourceLabel}...`}
+            placeholder={`Type in ${TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}...`}
             multiline={true}
             numberOfLines={10}
             autoFocus={true}
+            autoCapitalize="sentences"
             style={{
               borderColor: C.buttonLightGreenOutline,
               borderRadius: 10,
@@ -296,6 +285,7 @@ const TranslateModal = ({ visible, onClose }) => {
               paddingVertical: 10,
               paddingHorizontal: 10,
               fontSize: 16,
+              textTransform: "capitalize",
               marginBottom: 14,
             }}
           />
@@ -317,7 +307,7 @@ const TranslateModal = ({ visible, onClose }) => {
                 Translating...
               </Text>
             ) : (
-              <Text style={{ fontSize: 16, color: C.text }}>
+              <Text style={{ fontSize: 16, color: C.text, textTransform: "capitalize" }}>
                 {translatedText}
               </Text>
             )}

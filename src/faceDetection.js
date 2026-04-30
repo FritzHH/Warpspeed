@@ -291,6 +291,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
 
     const stream = await navigator.mediaDevices.getUserMedia({ video: true });
     streamRef.current = stream;
+    useLoginStore.getState().setCameraStream(stream);
     if (videoRef.current) {
       videoRef.current.srcObject = stream;
     }

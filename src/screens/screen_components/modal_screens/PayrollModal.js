@@ -233,8 +233,9 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
   const hasAutoFetchedRef = useRef(false);
 
   // Manual fetch — called by Go button and shortcut buttons
-  function fetchPunches(overrideStart, overrideEnd) {
-    if (!sSelectedUser) return;
+  function fetchPunches(overrideStart, overrideEnd, overrideUser) {
+    let user = overrideUser || sSelectedUser;
+    if (!user) return;
     let start = overrideStart || sStartDate;
     let end = overrideEnd || sEndDate;
     if (!start || !end) return;
@@ -248,7 +249,7 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     modifiedPunchIdsRef.current = new Set();
 
     dbGetPunchesByTimeFrame(startMillis, endMillis, {
-      userID: sSelectedUser.id,
+      userID: user.id,
       timestampField: "millis",
     })
       .then((resArr) => {
@@ -333,6 +334,9 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     _setFilteredArr([]);
     _setHasUnsavedChanges(false);
     modifiedPunchIdsRef.current = new Set();
+    let start = sPendingStart || sStartDate;
+    let end = sPendingEnd || sEndDate;
+    if (start && end) fetchPunches(start, end, userObj);
   }
 
   function handleFullTimeChange(item, prefix, hour, minute, period) {
@@ -1675,7 +1679,7 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
                       }}
                       style={{ padding: 2, marginLeft: 4 }}
                     >
-                      <Image_ icon={ICONS.close1} size={14} />
+                      <Image_ icon={ICONS.trash} size={14} />
                     </TouchableOpacity>
                   )}
                 </View>

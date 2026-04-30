@@ -312,7 +312,7 @@ function FieldPalette({ fields, onAddField, onRemoveField }) {
                 }}
                 style={{ paddingLeft: 6 }}
               >
-                <Text style={{ fontSize: 11, color: C.red, fontWeight: "bold" }}>X</Text>
+                <Image_ icon={ICONS.trash} size={11} />
               </TouchableOpacity>
             )}
           </TouchableOpacity>
@@ -448,6 +448,8 @@ function PropertiesPanel({ field, onUpdate, onRemove }) {
       <Button_
         text="Remove Field"
         onPress={onRemove}
+        icon={ICONS.trash}
+        iconSize={14}
         colorGradientArr={COLOR_GRADIENTS.red}
         style={{ marginTop: 15 }}
         textStyle={{ fontSize: 12 }}
@@ -1052,6 +1054,8 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
                   <Button_
                     text="Delete"
                     onPress={handleDeleteLayout}
+                    icon={ICONS.trash}
+                    iconSize={14}
                     colorGradientArr={COLOR_GRADIENTS.red}
                     style={{ marginRight: 6, paddingHorizontal: 12 }}
                     textStyle={{ fontSize: 12 }}

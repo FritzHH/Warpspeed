@@ -476,7 +476,7 @@ export const WorkorderMediaModal = ({
                       />
                     </TouchableOpacity>
 
-                    {/* Delete X — top-right */}
+                    {/* Delete — top-right */}
                     <TouchableOpacity
                       onPress={() => handleDeleteSingle(item)}
                       style={{
@@ -486,12 +486,12 @@ export const WorkorderMediaModal = ({
                         width: 22,
                         height: 22,
                         borderRadius: 11,
-                        backgroundColor: C.red,
+                        backgroundColor: C.purple,
                         justifyContent: "center",
                         alignItems: "center",
                       }}
                     >
-                      <Text style={{ color: "white", fontSize: 13, fontWeight: "700", lineHeight: 14, marginTop: -1 }}>X</Text>
+                      <Image_ icon={ICONS.trash} size={13} />
                     </TouchableOpacity>
 
                     {/* Sent badge — bottom-right */}
@@ -588,7 +588,7 @@ export const WorkorderMediaModal = ({
               <Button_
                 text={sDeleting ? "Deleting..." : "Delete Media"}
                 colorGradientArr={COLOR_GRADIENTS.red}
-                icon={ICONS.close1}
+                icon={ICONS.trash}
                 iconSize={14}
                 onPress={handleDeleteSelected}
                 enabled={!sDeleting && !sSending}

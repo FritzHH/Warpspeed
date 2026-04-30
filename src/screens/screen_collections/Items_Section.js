@@ -285,7 +285,6 @@ const TranslateModal = ({ visible, onClose }) => {
               paddingVertical: 10,
               paddingHorizontal: 10,
               fontSize: 16,
-              textTransform: "capitalize",
               marginBottom: 14,
             }}
           />
@@ -307,7 +306,7 @@ const TranslateModal = ({ visible, onClose }) => {
                 Translating...
               </Text>
             ) : (
-              <Text style={{ fontSize: 16, color: C.text, textTransform: "capitalize" }}>
+              <Text style={{ fontSize: 16, color: C.text }}>
                 {translatedText}
               </Text>
             )}

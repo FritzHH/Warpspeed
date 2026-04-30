@@ -4124,7 +4124,7 @@ export const NoteHelperDropdown = ({
                       hoverOpacity={0.6}
                       style={{
                         backgroundColor: active
-                          ? lightenRGBByPercent(C.blue, 70)
+                          ? lightenRGBByPercent(C.red, 70)
                           : C.buttonLightGreenOutline,
                         borderRadius: 6,
                         paddingHorizontal: 10,
@@ -4134,7 +4134,7 @@ export const NoteHelperDropdown = ({
                       <Text
                         style={{
                           fontSize: 15 + fontSizeAdj,
-                          color: active ? C.blue : gray(0.5),
+                          color: active ? C.red : gray(0.5),
                           fontWeight: Fonts.weight.textRegular,
                         }}
                       >
@@ -4208,6 +4208,134 @@ export const NoteHelperDropdown = ({
               />
             </View>
           </View>
+      </View>
+    </Modal>
+  );
+};
+
+// Customer Quick Notes Dropdown ////////////////////////////////////////////
+
+export const CustomerQuickNotesDropdown = ({
+  visible,
+  onClose,
+  quickNotes = [],
+  onToggleChip,
+  activeChips = [],
+}) => {
+  const [sDropdownHeight, _sSetDropdownHeight] = useState(0);
+  const openTimeRef = useRef(0);
+  const prevVisibleRef = useRef(visible);
+
+  if (visible && !prevVisibleRef.current) {
+    openTimeRef.current = Date.now();
+  }
+  prevVisibleRef.current = visible;
+
+  useEffect(() => {
+    if (visible) _sSetDropdownHeight(0);
+  }, [visible]);
+
+  if (!visible) return null;
+
+  const dropdownWidth = 340;
+  const dropdownMeasured = sDropdownHeight > 0;
+  let left, top;
+  if (typeof window !== "undefined") {
+    left = (window.innerWidth - dropdownWidth) / 2;
+    top = dropdownMeasured ? (window.innerHeight - sDropdownHeight) / 2 : window.innerHeight / 2 - 200;
+    const vh = window.innerHeight;
+    const vw = window.innerWidth;
+    if (dropdownMeasured && top + sDropdownHeight > vh - 10) top = vh - sDropdownHeight - 10;
+    if (left + dropdownWidth > vw - 10) left = vw - dropdownWidth - 10;
+    if (left < 10) left = 10;
+    if (top < 10) top = 10;
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <TouchableWithoutFeedback onPress={() => { if (Date.now() - openTimeRef.current > 150) onClose(); }}>
+        <View style={{ width: "100%", height: "100%", position: "absolute" }} />
+      </TouchableWithoutFeedback>
+      <View
+        onLayout={(e) => {
+          const h = e.nativeEvent.layout.height;
+          if (h > 0 && h !== sDropdownHeight) _sSetDropdownHeight(h);
+        }}
+        style={{
+          position: "absolute",
+          left: left,
+          top: top,
+          width: dropdownWidth,
+          backgroundColor: "white",
+          borderRadius: 10,
+          borderWidth: 2,
+          borderColor: C.buttonLightGreenOutline,
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.25,
+          shadowRadius: 4,
+          elevation: 5,
+          padding: 10,
+          opacity: dropdownMeasured ? 1 : 0,
+        }}
+      >
+        <View style={{
+          marginBottom: 8,
+          paddingBottom: 8,
+          borderBottomWidth: 1,
+          borderBottomColor: C.buttonLightGreenOutline,
+        }}>
+          <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.text }}>
+            Customer Quick Notes
+          </Text>
+        </View>
+
+        {quickNotes.map((category) => (
+          <View key={category.id} style={{ marginBottom: 9 }}>
+            <Text
+              style={{
+                fontSize: 14,
+                fontWeight: Fonts.weight.textHeavy,
+                color: gray(0.4),
+                marginBottom: 4,
+                textTransform: "uppercase",
+                letterSpacing: 0.5,
+              }}
+            >
+              {category.label}
+            </Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
+              {(category.items || []).map((item, chipIdx) => {
+                const active = activeChips.includes(item.id);
+                return (
+                  <TouchableOpacity_
+                    key={item.id || chipIdx}
+                    onPress={() => onToggleChip(item)}
+                    hoverOpacity={0.6}
+                    style={{
+                      backgroundColor: active
+                        ? lightenRGBByPercent(C.red, 70)
+                        : C.buttonLightGreenOutline,
+                      borderRadius: 6,
+                      paddingHorizontal: 10,
+                      paddingVertical: 5,
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 15,
+                        color: active ? C.red : gray(0.5),
+                        fontWeight: Fonts.weight.textRegular,
+                      }}
+                    >
+                      {item.buttonLabel}
+                    </Text>
+                  </TouchableOpacity_>
+                );
+              })}
+            </View>
+          </View>
+        ))}
       </View>
     </Modal>
   );

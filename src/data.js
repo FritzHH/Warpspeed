@@ -639,6 +639,19 @@ export const QUICK_TEXT_PROTO = {
   text: "",
 }
 
+export const QUICK_CUSTOMER_NOTE_PROTO = {
+  id: '',
+  label: '',
+  items: [
+  ]
+}
+
+export const QUICK_CUSTOMER_NOTE_ITEM_PROTO = {
+  id: "",
+  buttonLabel: "",
+  text: ""
+}
+
 export const PRINTER_PROTO = {
   id: "",
   printerName: "",
@@ -692,13 +705,6 @@ export const QUICK_ITEM_BUTTON_PROTO = {
   removable: true,
 }
 
-// // fill in this proto
-// export const QUICK_BUTTON_PROTO = {
-//   id: "",
-//   label: "",
-//   inventoryItemIDs: "",
-//   removable: true,
-// }
 
 
 // Objects with initial data /////////////////////////////////////////
@@ -711,7 +717,7 @@ export const FRITZ_USER_OBJ = {
     level: 4,
   },
   phone: "2393369177",
-  pin: "33",
+  pin: "",
   hourlyWage: 25,
   faceDescriptor: {
     0: -0.08356249332427979,
@@ -1235,24 +1241,6 @@ export const SETTINGS_OBJ = {
       type: "intakeReceipt",
     },
   ],
-  staticNotes: [
-    {
-      id: 'position',
-      label: 'Position',
-      items: [
-        'Front',
-        'Rear',
-      ]
-    },
-    {
-      id: 'brakes',
-      label: 'Brakes',
-      itesm: [
-        'Squealing',
-        'Broken',
-      ]
-    }
-  ],
   statusAutoText: [],
   noteHelpers: [{
     id: 'position',
@@ -1339,6 +1327,32 @@ export const SETTINGS_OBJ = {
   },
   ],
   noteHelpersTarget: "intakeNotes",
+  customerQuickNotes: [{
+    id: 'tune',
+    label: 'Tune-up',
+    items: [ // usese QUICK_CUSTOMER_NOTE_ITEM_PROTO
+      {
+        id: 'dndkjk',
+        buttonLabel: "Standard",
+        text: `- tuned shifting
+      - tuned/adjusted brakes
+      - cleaned & lubed chain
+      - cleaned frame`
+      }
+    ]
+  },
+  {
+    id: 'tube',
+    label: 'Tubes',
+    items: [
+      {
+        id: "dknfdk",
+        buttonLabel: "Small sharp",
+        text: `Did some stuff`
+      }
+    ]
+  }
+  ],
   nextWorkorderCounter: 1,
   nextSaleCounter: 1,
 };

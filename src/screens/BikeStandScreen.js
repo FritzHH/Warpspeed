@@ -12,6 +12,7 @@ import {
   useCurrentCustomerStore,
   useUploadProgressStore,
   useLoginStore,
+  useAlertScreenStore,
 } from "../stores";
 import {
   resolveStatus,
@@ -81,6 +82,8 @@ import { InventorySearchModal } from "./screen_components/modal_screens/Inventor
 import { StandKeypad } from "../shared/StandKeypad";
 import { MILLIS_IN_DAY, DISCOUNT_TYPES, FACE_DESCRIPTOR_CONFIDENCE_DISTANCE } from "../constants";
 import { openCacheDB, clearStaleCache, loadModelCached } from "../faceDetection";
+import warningIcon from "../assets/warning.png";
+import plusIcon from "../assets/plus.png";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
 
@@ -139,9 +142,7 @@ export function BikeStandScreen() {
   const [sDetailForm, _setDetailForm] = useState({ brand: "", description: "", color1: "", color2: "", waitDays: "" });
   const detailDebounceRef = useRef(null);
   const waitDaysDebounceRef = useRef(null);
-  const [sShowPrintMenu, _setShowPrintMenu] = useState(false);
   const [sShowPrinterSelectModal, _setShowPrinterSelectModal] = useState(false);
-  const [sShowIntakeActionModal, _setShowIntakeActionModal] = useState(false);
   const [sSelectedPrinterID, _setSelectedPrinterID] = useState(() => localStorageWrapper.getItem("selectedPrinterID") || "");
   const [sShowItemOverlay, _setShowItemOverlay] = useState(true);
   const [sSwipedCardID, _setSwipedCardID] = useState(null); // line.id of swiped card
@@ -683,12 +684,13 @@ export function BikeStandScreen() {
   // Printer helpers
   let printersObj = zSettings?.printers || {};
   let receiptPrinters = Object.values(printersObj).filter((p) => p.type === "receipt");
-  let selectedPrinterLabel = receiptPrinters.find((p) => p.id === sSelectedPrinterID)?.label || "";
+  let selectedPrinter = receiptPrinters.find((p) => p.id === sSelectedPrinterID);
+  let selectedPrinterLabel = selectedPrinter?.label || "";
+  let selectedPrinterOffline = selectedPrinter && selectedPrinter.active !== true;
 
   function handleSelectPrinter(printerID) {
     localStorageWrapper.setItem("selectedPrinterID", printerID);
     _setSelectedPrinterID(printerID);
-    _setShowPrinterSelectModal(false);
   }
 
   function handleWorkorderPrint() {
@@ -697,7 +699,6 @@ export function BikeStandScreen() {
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
     let toPrint = printBuilder.workorder(selectedWorkorder, pendingCust || {}, _settings?.salesTaxPercent, _ctx);
     dbSavePrintObj(toPrint, sSelectedPrinterID);
-    _setShowPrintMenu(false);
   }
 
   function handleIntakePrint() {
@@ -706,56 +707,62 @@ export function BikeStandScreen() {
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
     let toPrint = printBuilder.intake(selectedWorkorder, pendingCust || {}, _settings?.salesTaxPercent, _ctx);
     dbSavePrintObj(toPrint, sSelectedPrinterID);
-    _setShowIntakeActionModal(false);
   }
 
-  async function handleIntakeText() {
-    if (!selectedWorkorder || !customerCell) return;
+  async function handleIntakeElectronic() {
+    if (!selectedWorkorder || (!customerCell && !customerEmail)) return;
     let _settings = useSettingsStore.getState().getSettings();
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
-    let smsTemplate = findTemplateByType(_settings?.smsTemplates || _settings?.textTemplates, "intakeReceipt");
-    if (!smsTemplate?.body) return;
     let receiptData = printBuilder.intake(selectedWorkorder, pendingCust || {}, _settings?.salesTaxPercent, _ctx);
     let { generateWorkorderTicketPDF } = await import("../pdfGenerator");
     let base64 = generateWorkorderTicketPDF(receiptData);
-    let message = smsTemplate.body;
-    await dbUploadPDFAndSendSMS({
-      base64,
-      message,
-      phoneNumber: removeDashesFromPhone(customerCell),
-      customerID: selectedWorkorder.customerID || "",
-      messageID: selectedWorkorder.id + "_intake",
-      canRespond: false,
-    });
-    _setShowIntakeActionModal(false);
+    if (customerCell) {
+      let smsTemplate = findTemplateByType(_settings?.smsTemplates || _settings?.textTemplates, "intakeReceipt");
+      if (smsTemplate?.body) {
+        await dbUploadPDFAndSendSMS({
+          base64,
+          message: smsTemplate.body,
+          phoneNumber: removeDashesFromPhone(customerCell),
+          customerID: selectedWorkorder.customerID || "",
+          messageID: selectedWorkorder.id + "_intake",
+          canRespond: false,
+        });
+      }
+    }
+    if (customerEmail) {
+      let emailTemplate = findTemplateByType(_settings?.emailTemplates, "intakeReceipt");
+      if (emailTemplate?.body) {
+        await dbSendEmail(customerEmail, emailTemplate.subject || "Intake Receipt", emailTemplate.body);
+      }
+    }
   }
 
-  async function handleIntakeEmail() {
-    if (!selectedWorkorder || !customerEmail) return;
+  async function handleWorkorderElectronic() {
+    if (!selectedWorkorder || (!customerCell && !customerEmail)) return;
     let _settings = useSettingsStore.getState().getSettings();
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
-    let emailTemplate = findTemplateByType(_settings?.emailTemplates, "intakeReceipt");
-    if (!emailTemplate?.body) return;
-    let receiptData = printBuilder.intake(selectedWorkorder, pendingCust || {}, _settings?.salesTaxPercent, _ctx);
+    let receiptData = printBuilder.workorder(selectedWorkorder, pendingCust || {}, _settings?.salesTaxPercent, _ctx);
     let { generateWorkorderTicketPDF } = await import("../pdfGenerator");
     let base64 = generateWorkorderTicketPDF(receiptData);
-    let subject = emailTemplate.subject || "Intake Receipt";
-    let html = emailTemplate.body;
-    await dbSendEmail(customerEmail, subject, html);
-    _setShowIntakeActionModal(false);
-  }
-
-  async function handleIntakeTextEmail() {
-    if (customerCell) await handleIntakeText();
-    if (customerEmail) await handleIntakeEmail();
-    _setShowIntakeActionModal(false);
-  }
-
-  async function handleIntakeAll() {
-    if (sSelectedPrinterID) handleIntakePrint();
-    if (customerCell) await handleIntakeText();
-    if (customerEmail) await handleIntakeEmail();
-    _setShowIntakeActionModal(false);
+    if (customerCell) {
+      let smsTemplate = findTemplateByType(_settings?.smsTemplates || _settings?.textTemplates, "intakeReceipt");
+      if (smsTemplate?.body) {
+        await dbUploadPDFAndSendSMS({
+          base64,
+          message: smsTemplate.body,
+          phoneNumber: removeDashesFromPhone(customerCell),
+          customerID: selectedWorkorder.customerID || "",
+          messageID: selectedWorkorder.id + "_workorder",
+          canRespond: false,
+        });
+      }
+    }
+    if (customerEmail) {
+      let emailTemplate = findTemplateByType(_settings?.emailTemplates, "intakeReceipt");
+      if (emailTemplate?.body) {
+        await dbSendEmail(customerEmail, emailTemplate.subject || "Workorder Receipt", emailTemplate.body);
+      }
+    }
   }
 
   //////////////////////////////////////////////////////////////////////////////
@@ -1098,12 +1105,12 @@ export function BikeStandScreen() {
                 )}
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginRight: 10 }}>
                   {selectedWorkorder?.brand ? (
-                    <Text style={{ fontSize: 17, color: gray(0.5) }}>
+                    <Text style={{ fontSize: 17, fontWeight: "600", color: gray(0.5) }}>
                       {capitalizeFirstLetterOfString(selectedWorkorder.brand)}
                     </Text>
                   ) : null}
                   {selectedWorkorder?.description ? (
-                    <Text style={{ fontSize: 17, color: gray(0.5) }}>
+                    <Text style={{ fontSize: 17, fontWeight: "600", color: gray(0.5) }}>
                       {capitalizeFirstLetterOfString(selectedWorkorder.description)}
                     </Text>
                   ) : null}
@@ -1621,70 +1628,18 @@ export function BikeStandScreen() {
               {hasWorkorderReady && (
                 <View style={{ paddingHorizontal: 6, paddingVertical: 6, borderTopWidth: 1, borderTopColor: gray(0.15) }}>
                   <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                    {/* Print dropdown (opens upward) */}
+                    {/* Print button — opens unified print modal */}
                     {selectedWorkorder && (
-                      <View style={{ position: "relative" }}>
-                        <TouchableOpacity
-                          onPress={() => _setShowPrintMenu((p) => !p)}
-                          style={{
-                            alignItems: "center",
-                            justifyContent: "center",
-                            paddingHorizontal: 4,
-                          }}
-                        >
-                          <Image_ icon={ICONS.print} size={28} />
-                        </TouchableOpacity>
-
-                        {/* Upward dropdown menu + backdrop */}
-                        {sShowPrintMenu && (
-                          <>
-                          <TouchableOpacity
-                            activeOpacity={1}
-                            onPress={() => _setShowPrintMenu(false)}
-                            style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0 }}
-                          />
-                          <View style={{
-                            position: "absolute",
-                            bottom: "100%",
-                            left: 0,
-                            marginBottom: 4,
-                            backgroundColor: C.listItemWhite,
-                            borderRadius: 8,
-                            borderWidth: 1,
-                            borderColor: C.buttonLightGreenOutline,
-                            minWidth: 180,
-                            overflow: "hidden",
-                          }}>
-                            <TouchableOpacity
-                              onPress={() => {
-                                _setShowPrintMenu(false);
-                                _setShowIntakeActionModal(true);
-                              }}
-                              style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}
-                            >
-                              <Text style={{ fontSize: 18, color: C.text }}>Intake</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={handleWorkorderPrint}
-                              style={{ paddingHorizontal: 14, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}
-                            >
-                              <Text style={{ fontSize: 18, color: C.text }}>Workorder</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                              onPress={() => {
-                                _setShowPrintMenu(false);
-                                _setShowPrinterSelectModal(true);
-                              }}
-                              style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: gray(0.05) }}
-                            >
-                              <Text style={{ fontSize: 17, color: selectedPrinterLabel ? gray(0.5) : C.orange, fontWeight: selectedPrinterLabel ? "normal" : "600" }}>
-                                {selectedPrinterLabel ? "Printer: " + selectedPrinterLabel : "Select Printer"}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                          </>
-                        )}
-                      </View>
+                      <TouchableOpacity
+                        onPress={() => _setShowPrinterSelectModal(true)}
+                        style={{
+                          alignItems: "center",
+                          justifyContent: "center",
+                          paddingHorizontal: 4,
+                        }}
+                      >
+                        <Image_ icon={selectedPrinterOffline ? warningIcon : ICONS.print} size={28} />
+                      </TouchableOpacity>
                     )}
 
                     {/* Search workorders button */}
@@ -1703,15 +1658,12 @@ export function BikeStandScreen() {
                     <TouchableOpacity
                       onPress={handleNewWorkorderPress}
                       style={{
-                        backgroundColor: C.green,
-                        borderRadius: 6,
-                        paddingHorizontal: 10,
-                        paddingVertical: 6,
-                        flexDirection: "row",
                         alignItems: "center",
+                        justifyContent: "center",
+                        paddingHorizontal: 4,
                       }}
                     >
-                      <Text style={{ fontSize: 20, fontWeight: "700", color: C.textWhite }}>New</Text>
+                      <Image_ icon={plusIcon} size={30} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -2140,135 +2092,179 @@ export function BikeStandScreen() {
             }}>
               <View style={{
                 backgroundColor: C.listItemWhite,
-                borderRadius: 10,
-                width: "60%",
-                maxHeight: "70%",
+                borderRadius: 14,
+                width: "75%",
+                maxHeight: "85%",
                 overflow: "hidden",
               }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: gray(0.15) }}>
-                  <Text style={{ fontSize: 18, fontWeight: "700", color: C.text }}>Select Printer</Text>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: gray(0.15) }}>
+                  <Text style={{ fontSize: 20, fontWeight: "700", color: C.text }}>Print & Send</Text>
                   <TouchableOpacity onPress={() => _setShowPrinterSelectModal(false)}>
-                    <Text style={{ fontSize: 20, fontWeight: "700", color: gray(0.4) }}>X</Text>
+                    <Text style={{ fontSize: 22, fontWeight: "700", color: gray(0.4) }}>X</Text>
                   </TouchableOpacity>
                 </View>
-                <ScrollView style={{ paddingHorizontal: 16, paddingVertical: 8 }}>
+                <ScrollView style={{ paddingHorizontal: 20, paddingVertical: 16 }}>
+
+                  {/* Intake section */}
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: gray(0.5), marginBottom: 8, letterSpacing: 1 }}>INTAKE</Text>
+                  <View style={{
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: C.buttonLightGreenOutline,
+                    backgroundColor: C.backgroundListWhite,
+                    padding: 14,
+                    marginBottom: 20,
+                  }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 15 }}>
+                        <Button_
+                          text="Print"
+                          onPress={() => { handleIntakePrint(); _setShowPrinterSelectModal(false); }}
+                          colorGradientArr={COLOR_GRADIENTS.green}
+                          style={{ paddingVertical: 14, paddingHorizontal: 24 }}
+                          textStyle={{ fontSize: 16, fontWeight: "700" }}
+                          enabled={!!sSelectedPrinterID && !selectedPrinterOffline}
+                        />
+                        {(customerCell || customerEmail) ? (
+                          <Button_
+                            text={customerCell && customerEmail ? "Text & Email" : customerCell ? "Text" : "Email"}
+                            onPress={() => { handleIntakeElectronic(); _setShowPrinterSelectModal(false); }}
+                            colorGradientArr={COLOR_GRADIENTS.blue}
+                            style={{ paddingVertical: 14, paddingHorizontal: 24 }}
+                            textStyle={{ fontSize: 16, fontWeight: "700" }}
+                          />
+                        ) : null}
+                      </View>
+                      {(customerCell || customerEmail) ? (
+                        <Button_
+                          text="Both"
+                          onPress={() => { handleIntakePrint(); handleIntakeElectronic(); _setShowPrinterSelectModal(false); }}
+                          colorGradientArr={COLOR_GRADIENTS.purple}
+                          style={{ paddingVertical: 14, paddingHorizontal: 24 }}
+                          textStyle={{ fontSize: 16, fontWeight: "700" }}
+                          enabled={!!sSelectedPrinterID && !selectedPrinterOffline}
+                        />
+                      ) : null}
+                    </View>
+                  </View>
+
+                  {/* Workorder section */}
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: gray(0.5), marginBottom: 8, letterSpacing: 1 }}>WORKORDER</Text>
+                  <View style={{
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: C.buttonLightGreenOutline,
+                    backgroundColor: C.backgroundListWhite,
+                    padding: 14,
+                    marginBottom: 20,
+                  }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 15 }}>
+                        <Button_
+                          text="Print"
+                          onPress={() => { handleWorkorderPrint(); _setShowPrinterSelectModal(false); }}
+                          colorGradientArr={COLOR_GRADIENTS.green}
+                          style={{ paddingVertical: 14, paddingHorizontal: 24 }}
+                          textStyle={{ fontSize: 16, fontWeight: "700" }}
+                          enabled={!!sSelectedPrinterID && !selectedPrinterOffline}
+                        />
+                        {(customerCell || customerEmail) ? (
+                          <Button_
+                            text={customerCell && customerEmail ? "Text & Email" : customerCell ? "Text" : "Email"}
+                            onPress={() => { handleWorkorderElectronic(); _setShowPrinterSelectModal(false); }}
+                            colorGradientArr={COLOR_GRADIENTS.blue}
+                            style={{ paddingVertical: 14, paddingHorizontal: 24 }}
+                            textStyle={{ fontSize: 16, fontWeight: "700" }}
+                          />
+                        ) : null}
+                      </View>
+                      {(customerCell || customerEmail) ? (
+                        <Button_
+                          text="Both"
+                          onPress={() => { handleWorkorderPrint(); handleWorkorderElectronic(); _setShowPrinterSelectModal(false); }}
+                          colorGradientArr={COLOR_GRADIENTS.purple}
+                          style={{ paddingVertical: 14, paddingHorizontal: 24 }}
+                          textStyle={{ fontSize: 16, fontWeight: "700" }}
+                          enabled={!!sSelectedPrinterID && !selectedPrinterOffline}
+                        />
+                      ) : null}
+                    </View>
+                  </View>
+
+                  {/* Printer selection section */}
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: gray(0.5), marginBottom: 8, letterSpacing: 1 }}>PRINTER</Text>
                   {receiptPrinters.length === 0 ? (
                     <Text style={{ fontSize: 16, color: gray(0.5), paddingVertical: 20, textAlign: "center" }}>No receipt printers configured</Text>
                   ) : (
-                    receiptPrinters.map((printer) => {
+                    receiptPrinters.map((printer, idx) => {
                       let isSelected = printer.id === sSelectedPrinterID;
                       let isOnline = printer.active === true;
                       return (
-                        <TouchableOpacity
+                        <View
                           key={printer.id}
-                          onPress={() => handleSelectPrinter(printer.id)}
                           style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            paddingVertical: 12,
-                            paddingHorizontal: 8,
-                            borderBottomWidth: 1,
-                            borderBottomColor: gray(0.1),
-                            backgroundColor: isSelected ? lightenRGBByPercent(C.green, 70) : "transparent",
-                            borderRadius: 6,
-                            marginBottom: 4,
+                            borderRadius: 10,
+                            borderWidth: 1,
+                            borderColor: isSelected ? C.green : gray(0.15),
+                            backgroundColor: isSelected ? lightenRGBByPercent(C.green, 70) : C.backgroundListWhite,
+                            padding: 12,
+                            marginBottom: idx < receiptPrinters.length - 1 ? 8 : 0,
                           }}
                         >
-                          <View style={{
-                            width: 10,
-                            height: 10,
-                            borderRadius: 5,
-                            backgroundColor: isOnline ? C.green : gray(0.3),
-                            marginRight: 10,
-                          }} />
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 17, fontWeight: isSelected ? "600" : "normal", color: C.text }}>
-                              {printer.label || printer.printerName || printer.id}
-                            </Text>
-                            {printer.printerName && printer.label ? (
-                              <Text style={{ fontSize: 14, color: gray(0.5) }}>{printer.printerName}</Text>
-                            ) : null}
+                          {!isOnline ? (
+                            <View style={{ marginBottom: 6 }}>
+                              <Text style={{ fontSize: 12, fontWeight: "700", color: C.red, backgroundColor: "yellow", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: "hidden", alignSelf: "flex-start" }}>Printer Offline</Text>
+                            </View>
+                          ) : null}
+                          <TouchableOpacity
+                            onPress={() => handleSelectPrinter(printer.id)}
+                            style={{ flexDirection: "row", alignItems: "center" }}
+                          >
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ fontSize: 17, fontWeight: isSelected ? "700" : "normal", color: C.text }}>
+                                {printer.label || printer.printerName || printer.id}
+                              </Text>
+                              {printer.printerName && printer.label ? (
+                                <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 2 }}>{printer.printerName}</Text>
+                              ) : null}
+                            </View>
+                            {isSelected && (
+                              <Text style={{ fontSize: 18, color: C.green, fontWeight: "700" }}>{"\u2713"}</Text>
+                            )}
+                          </TouchableOpacity>
+                          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10, justifyContent: "flex-end" }}>
+                            <Button_
+                              text="Test Print"
+                              onPress={() => {
+                                let testObj = printBuilder.test();
+                                dbSavePrintObj(testObj, printer.id);
+                                useAlertScreenStore.getState().setValues({
+                                  title: "Test Print",
+                                  message: "Was the test print successful?",
+                                  btn1Text: "Yes",
+                                  btn2Text: "No",
+                                  handleBtn1Press: () => {
+                                    handleSelectPrinter(printer.id);
+                                    useAlertScreenStore.getState().setShowAlert(false);
+                                  },
+                                  handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                                  canExitOnOuterClick: true,
+                                });
+                              }}
+                              colorGradientArr={COLOR_GRADIENTS.green}
+                              style={{ paddingHorizontal: 16, paddingVertical: 10 }}
+                              textStyle={{ fontSize: 14, fontWeight: "700" }}
+                              enabled={isOnline}
+                            />
                           </View>
-                          {isSelected && (
-                            <Text style={{ fontSize: 18, color: C.green, fontWeight: "700" }}>{"\u2713"}</Text>
-                          )}
-                        </TouchableOpacity>
+                        </View>
                       );
                     })
                   )}
+                  <View style={{ height: 16 }} />
                 </ScrollView>
               </View>
             </View>
-          )}
-
-          {/* Intake action modal (Print / Text/Email / All) — portal */}
-          {sShowIntakeActionModal && createPortal(
-            <View style={{
-              position: "fixed",
-              top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: "rgba(0,0,0,0.5)",
-              justifyContent: "center",
-              alignItems: "center",
-            }}>
-              <View style={{
-                backgroundColor: C.listItemWhite,
-                borderRadius: 10,
-                width: 360,
-              }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: gray(0.15) }}>
-                  <Text style={{ fontSize: 18, fontWeight: "700", color: C.text }}>Intake Receipt</Text>
-                  <TouchableOpacity onPress={() => _setShowIntakeActionModal(false)}>
-                    <Text style={{ fontSize: 20, fontWeight: "700", color: gray(0.4) }}>X</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={{ padding: 16 }}>
-                  <TouchableOpacity
-                    onPress={handleIntakePrint}
-                    style={{
-                      backgroundColor: sSelectedPrinterID ? C.green : gray(0.3),
-                      borderRadius: 8,
-                      paddingVertical: 14,
-                      alignItems: "center",
-                      marginBottom: 10,
-                    }}
-                    disabled={!sSelectedPrinterID}
-                  >
-                    <Text style={{ fontSize: 18, fontWeight: "600", color: C.textWhite }}>
-                      {sSelectedPrinterID ? "Print" : "Print (no printer selected)"}
-                    </Text>
-                  </TouchableOpacity>
-                  {(customerCell || customerEmail) ? (
-                    <TouchableOpacity
-                      onPress={handleIntakeTextEmail}
-                      style={{
-                        backgroundColor: C.blue,
-                        borderRadius: 8,
-                        paddingVertical: 14,
-                        alignItems: "center",
-                        marginBottom: 10,
-                      }}
-                    >
-                      <Text style={{ fontSize: 18, fontWeight: "600", color: C.textWhite }}>
-                        {customerCell && customerEmail ? "Text/Email" : customerCell ? "Text" : "Email"}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null}
-                  <TouchableOpacity
-                    onPress={handleIntakeAll}
-                    style={{
-                      backgroundColor: (sSelectedPrinterID || customerCell || customerEmail) ? C.purple : gray(0.3),
-                      borderRadius: 8,
-                      paddingVertical: 14,
-                      alignItems: "center",
-                    }}
-                    disabled={!sSelectedPrinterID && !customerCell && !customerEmail}
-                  >
-                    <Text style={{ fontSize: 18, fontWeight: "600", color: C.textWhite }}>All</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>,
-            document.body
           )}
 
           {/* Intake notes modal for editing a line's intake notes */}

@@ -968,7 +968,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                                 }
                               }}
                               iconSize={16}
-                              icon={ICONS.close1}
+                              icon={ICONS.trash}
                             />
                           )}
                         </View>

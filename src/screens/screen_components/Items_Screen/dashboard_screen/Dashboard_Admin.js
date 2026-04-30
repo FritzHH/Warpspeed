@@ -70,7 +70,7 @@ import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
-import { APP_USER, INTAKE_QUICK_BUTTON_PROTO, NOTE_HELPER_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../../data";
+import { APP_USER, INTAKE_QUICK_BUTTON_PROTO, NOTE_HELPER_PROTO, QUICK_CUSTOMER_NOTE_PROTO, QUICK_CUSTOMER_NOTE_ITEM_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
@@ -605,18 +605,18 @@ export function Dashboard_Admin({}) {
                 fontWeight: 500,
               }}
             >
-              {sExpand?.toUpperCase()}
+              {sExpand === TAB_NAMES.payments ? "CARD READERS / RECEIPT PRINTERS" : sExpand?.toUpperCase()}
             </Text>
           {sExpand === TAB_NAMES.payments && (
             <>
+              <PrintersComponent
+                zSettingsObj={zSettingsObj}
+                handleSettingsFieldChange={handleSettingsFieldChange}
+              />
               <PaymentProcessingComponent
                 zSettingsObj={zSettingsObj}
                 handleSettingsFieldChange={handleSettingsFieldChange}
                 liveReaders={zLiveReaders}
-              />
-              <PrintersComponent
-                zSettingsObj={zSettingsObj}
-                handleSettingsFieldChange={handleSettingsFieldChange}
               />
             </>
           )}
@@ -1024,7 +1024,7 @@ function CardReaderManager({ liveReaders = [], savedReaders = [], onSaveReaders 
                   onPress={() => handleDeleteReader(reader)}
                   style={{ padding: 6, marginLeft: 4 }}
                 >
-                  <Image_ source={ICONS.close1} style={{ width: 12, height: 12, opacity: 0.4 }} />
+                  <Image_ source={ICONS.trash} style={{ width: 12, height: 12, opacity: 0.4 }} />
                 </TouchableOpacity>
               </View>
             );
@@ -1818,6 +1818,10 @@ const ListOptionsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
           zSettingsObj={zSettingsObj}
           handleSettingsFieldChange={handleSettingsFieldChange}
         />
+        <CustomerQuickNotesAdminComponent
+          zSettingsObj={zSettingsObj}
+          handleSettingsFieldChange={handleSettingsFieldChange}
+        />
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );
@@ -1913,7 +1917,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     }}
                     style={{ marginLeft: 15 }}
                     iconSize={15}
-                    icon={ICONS.close1}
+                    icon={ICONS.trash}
                   />
                 </View>
               );
@@ -2010,7 +2014,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     }}
                     style={{ marginLeft: 15 }}
                     iconSize={15}
-                    icon={ICONS.close1}
+                    icon={ICONS.trash}
                   />
                 </View>
               );
@@ -2092,7 +2096,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     }}
                     style={{ marginLeft: 15 }}
                     iconSize={15}
-                    icon={ICONS.close1}
+                    icon={ICONS.trash}
                   />
                 </View>
               );
@@ -2227,7 +2231,7 @@ const DiscountsComponent = ({
                       }}
                       style={{ marginLeft: 15 }}
                       iconSize={15}
-                      icon={ICONS.close1}
+                      icon={ICONS.trash}
                     />
                   </View>
                 </View>
@@ -2412,7 +2416,7 @@ const WaitTimesComponent = ({
                       }}
                       style={{ marginLeft: 15 }}
                       iconSize={15}
-                      icon={ICONS.close1}
+                      icon={ICONS.trash}
                     />
                   </View>
                 </View>
@@ -2495,7 +2499,7 @@ const PartSourcesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     }}
                     style={{ marginLeft: 15 }}
                     iconSize={15}
-                    icon={ICONS.close1}
+                    icon={ICONS.trash}
                   />
                 </View>
               );
@@ -2698,7 +2702,7 @@ const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) 
                     }}
                     style={{ marginLeft: 4, backgroundColor: "transparent" }}
                     iconSize={15}
-                    icon={ICONS.close1}
+                    icon={ICONS.trash}
                   />
                 </Tooltip>
               </View>
@@ -2803,7 +2807,7 @@ const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) 
                           }}
                           style={{ padding: 2 }}
                         >
-                          <Image_ icon={ICONS.close1} size={12} />
+                          <Image_ icon={ICONS.trash} size={12} />
                         </TouchableOpacity>
                       </Tooltip>
                     </div>
@@ -2814,6 +2818,376 @@ const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) 
           ))}
         </View>
       </View>
+    </BoxContainerInnerComponent>
+  );
+};
+
+const CustomerQuickNoteEditorModal = ({ visible, category, isNew, onClose, onSave, onDelete }) => {
+  const [sCategory, _setCategory] = useState(null);
+  const [sEditingName, _setEditingName] = useState(false);
+  const prevVisibleRef = useRef(false);
+
+  if (visible && !prevVisibleRef.current) {
+    _setCategory(cloneDeep(category));
+    _setEditingName(isNew);
+  }
+  prevVisibleRef.current = visible;
+
+  if (!visible || !sCategory) return null;
+
+  let nameValid = (sCategory.label || "").trim().length >= 3;
+
+  function updateItem(itemIdx, field, val) {
+    let updated = cloneDeep(sCategory);
+    updated.items[itemIdx] = { ...updated.items[itemIdx], [field]: val };
+    _setCategory(updated);
+  }
+
+  function addItem() {
+    let updated = cloneDeep(sCategory);
+    updated.items = [...(updated.items || []), { ...cloneDeep(QUICK_CUSTOMER_NOTE_ITEM_PROTO), id: crypto.randomUUID(), buttonLabel: "", text: "" }];
+    _setCategory(updated);
+  }
+
+  function removeItem(itemIdx) {
+    let updated = cloneDeep(sCategory);
+    updated.items = updated.items.filter((_, i) => i !== itemIdx);
+    _setCategory(updated);
+  }
+
+  function handleSave() {
+    if (!nameValid) return;
+    onSave(sCategory);
+    onClose();
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={{ width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
+          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+            <View style={{
+              width: 500,
+              height: "75%",
+              backgroundColor: "white",
+              borderRadius: 12,
+              borderWidth: 2,
+              borderColor: C.buttonLightGreenOutline,
+              overflow: "hidden",
+            }}>
+              {/* Header */}
+              <View style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                borderBottomWidth: 1,
+                borderBottomColor: C.buttonLightGreenOutline,
+                backgroundColor: C.buttonLightGreen,
+              }}>
+                {sEditingName ? (
+                  <TextInput_
+                    value={sCategory.label}
+                    autoFocus
+                    capitalize={true}
+                    placeholder="Category name"
+                    placeholderTextColor={gray(0.4)}
+                    onChangeText={(val) => _setCategory({ ...sCategory, label: val })}
+                    onBlur={() => { if (nameValid) _setEditingName(false); }}
+                    onSubmitEditing={() => { if (nameValid) _setEditingName(false); }}
+                    style={{
+                      flex: 1,
+                      borderWidth: 1,
+                      borderColor: nameValid ? C.buttonLightGreenOutline : C.lightred,
+                      borderRadius: 5,
+                      padding: 5,
+                      fontSize: 15,
+                      color: C.text,
+                      fontWeight: "600",
+                      outlineWidth: 0,
+                      backgroundColor: "white",
+                    }}
+                  />
+                ) : (
+                  <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: C.text }}>{sCategory.label}</Text>
+                    <TouchableOpacity onPress={() => _setEditingName(true)} style={{ marginLeft: 8, padding: 2 }}>
+                      <Image_ icon={ICONS.editPencil} size={14} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {!isNew && (
+                  <TouchableOpacity
+                    onPress={() => { onDelete(sCategory.id); onClose(); }}
+                    style={{ marginLeft: 10, padding: 4 }}
+                  >
+                    <Image_ icon={ICONS.trash} size={16} />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Items list */}
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 14 }}>
+                {(sCategory.items || []).map((item, itemIdx) => (
+                  <View
+                    key={item.id || itemIdx}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: C.buttonLightGreenOutline,
+                      borderRadius: 8,
+                      backgroundColor: C.listItemWhite,
+                      padding: 10,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                      <Text style={{ fontSize: 12, color: gray(0.4), width: 50 }}>Label</Text>
+                      <TextInput_
+                        value={item.buttonLabel}
+                        capitalize={true}
+                        placeholder="Button label"
+                        placeholderTextColor={gray(0.35)}
+                        onChangeText={(val) => updateItem(itemIdx, "buttonLabel", val)}
+                        style={{
+                          flex: 1,
+                          borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderRadius: 5,
+                          paddingVertical: 5,
+                          paddingHorizontal: 8,
+                          fontSize: 13,
+                          color: C.text,
+                          outlineWidth: 0,
+                          backgroundColor: "white",
+                        }}
+                      />
+                      <TouchableOpacity
+                        onPress={() => removeItem(itemIdx)}
+                        style={{ marginLeft: 8, padding: 4 }}
+                      >
+                        <Image_ icon={ICONS.trash} size={14} />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                      <Text style={{ fontSize: 12, color: gray(0.4), width: 50, marginTop: 6 }}>Text</Text>
+                      <TextInput_
+                        value={item.text}
+                        multiline
+                        capitalize={true}
+                        placeholder="Note injected into customer notes (optional)"
+                        placeholderTextColor={gray(0.35)}
+                        onChangeText={(val) => updateItem(itemIdx, "text", val)}
+                        style={{
+                          flex: 1,
+                          borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderRadius: 5,
+                          paddingVertical: 5,
+                          paddingHorizontal: 8,
+                          fontSize: 13,
+                          color: C.text,
+                          outlineWidth: 0,
+                          backgroundColor: "white",
+                          minHeight: 60,
+                          overflow: "hidden",
+                          resize: "none",
+                        }}
+                      />
+                    </View>
+                  </View>
+                ))}
+
+                <TouchableOpacity
+                  onPress={addItem}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderWidth: 1,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderRadius: 8,
+                    borderStyle: "dashed",
+                    paddingVertical: 10,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, color: gray(0.4), fontWeight: "600" }}>+ Add Item</Text>
+                </TouchableOpacity>
+              </ScrollView>
+
+              {/* Footer */}
+              <View style={{
+                flexDirection: "row",
+                justifyContent: "flex-end",
+                alignItems: "center",
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                borderTopWidth: 1,
+                borderTopColor: C.buttonLightGreenOutline,
+              }}>
+                {!nameValid && (
+                  <Text style={{ fontSize: 12, color: C.lightred, marginRight: 10 }}>Category name must be 3+ characters</Text>
+                )}
+                <Button_
+                  text="Cancel"
+                  colorGradientArr={COLOR_GRADIENTS.grey}
+                  onPress={onClose}
+                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 7, marginRight: 8 }}
+                  textStyle={{ fontSize: 13 }}
+                />
+                <Button_
+                  text="Save"
+                  colorGradientArr={nameValid ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
+                  onPress={handleSave}
+                  enabled={nameValid}
+                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 7 }}
+                  textStyle={{ fontSize: 13 }}
+                />
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
+  );
+};
+
+const CustomerQuickNotesAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
+  const [sCatDragIdx, _setCatDragIdx] = useState(null);
+  const [sCatDragOverIdx, _setCatDragOverIdx] = useState(null);
+  const [sEditorModal, _setEditorModal] = useState(null); // { category, isNew }
+
+  const quickNotes = zSettingsObj?.customerQuickNotes || [];
+
+  function reorderCategories(fromIdx, toIdx) {
+    if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
+    let arr = [...quickNotes];
+    let [dragged] = arr.splice(fromIdx, 1);
+    arr.splice(toIdx, 0, dragged);
+    handleSettingsFieldChange("customerQuickNotes", arr);
+  }
+
+  function handleAddCategory() {
+    let newCat = { ...cloneDeep(QUICK_CUSTOMER_NOTE_PROTO), id: crypto.randomUUID(), label: "" };
+    _setEditorModal({ category: newCat, isNew: true });
+  }
+
+  function handleEditCategory(cat) {
+    _setEditorModal({ category: cloneDeep(cat), isNew: false });
+  }
+
+  function handleSaveCategory(updatedCat) {
+    let exists = quickNotes.find((c) => c.id === updatedCat.id);
+    let arr;
+    if (exists) {
+      arr = quickNotes.map((c) => c.id === updatedCat.id ? updatedCat : c);
+    } else {
+      arr = [...quickNotes, updatedCat];
+    }
+    handleSettingsFieldChange("customerQuickNotes", arr);
+  }
+
+  function handleDeleteCategory(catId) {
+    let arr = quickNotes.filter((c) => c.id !== catId);
+    handleSettingsFieldChange("customerQuickNotes", arr);
+  }
+
+  return (
+    <BoxContainerInnerComponent
+      style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
+    >
+      <View style={{ width: "100%", alignItems: "center" }}>
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "center",
+            backgroundColor: C.buttonLightGreen,
+            borderRadius: 5,
+            paddingVertical: 5,
+            width: "95%",
+          }}
+        >
+          <Text style={{ color: C.text, marginRight: 20 }}>Customer Quick Notes</Text>
+          <Tooltip text="Add category">
+            <BoxButton1 onPress={handleAddCategory} />
+          </Tooltip>
+        </View>
+
+        <View style={{ marginTop: 10, width: "95%" }}>
+          {quickNotes.map((cat, catIdx) => (
+            <div
+              key={cat.id}
+              draggable
+              onDragStart={(e) => { _setCatDragIdx(catIdx); }}
+              onDragOver={(e) => { e.preventDefault(); _setCatDragOverIdx(catIdx); }}
+              onDragEnd={() => { _setCatDragIdx(null); _setCatDragOverIdx(null); }}
+              onDrop={(e) => {
+                e.preventDefault();
+                reorderCategories(sCatDragIdx, catIdx);
+                _setCatDragIdx(null);
+                _setCatDragOverIdx(null);
+              }}
+              style={{
+                borderWidth: sCatDragOverIdx === catIdx ? 2 : 1,
+                borderStyle: "solid",
+                borderColor: sCatDragOverIdx === catIdx ? C.blue : C.buttonLightGreenOutline,
+                borderRadius: 8,
+                backgroundColor: C.listItemWhite,
+                padding: 8,
+                marginBottom: 6,
+                cursor: "grab",
+                opacity: sCatDragIdx === catIdx ? 0.5 : 1,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Text style={{ flex: 1, fontSize: 14, fontWeight: "600", color: C.text }}>{cat.label}</Text>
+                <Text style={{ fontSize: 12, color: gray(0.4), marginRight: 8 }}>{(cat.items || []).length} items</Text>
+                <Tooltip text="Edit category">
+                  <TouchableOpacity onPress={() => handleEditCategory(cat)} style={{ padding: 4 }}>
+                    <Image_ icon={ICONS.editPencil} size={15} />
+                  </TouchableOpacity>
+                </Tooltip>
+                <Tooltip text="Delete category">
+                  <TouchableOpacity
+                    onPress={() => handleDeleteCategory(cat.id)}
+                    style={{ padding: 4, marginLeft: 4 }}
+                  >
+                    <Image_ icon={ICONS.trash} size={15} />
+                  </TouchableOpacity>
+                </Tooltip>
+              </View>
+              {(cat.items || []).length > 0 && (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                  {(cat.items || []).map((item, itemIdx) => (
+                    <View
+                      key={item.id || itemIdx}
+                      style={{
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        borderRadius: 6,
+                        backgroundColor: "white",
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
+                      }}
+                    >
+                      <Text style={{ fontSize: 13, color: C.text }}>{item.buttonLabel}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </div>
+          ))}
+        </View>
+      </View>
+
+      <CustomerQuickNoteEditorModal
+        visible={!!sEditorModal}
+        category={sEditorModal?.category}
+        isNew={sEditorModal?.isNew || false}
+        onClose={() => _setEditorModal(null)}
+        onSave={handleSaveCategory}
+        onDelete={handleDeleteCategory}
+      />
     </BoxContainerInnerComponent>
   );
 };
@@ -2913,6 +3287,8 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             {!!zSettingsObj?.storeInfo?.storeLogo && (
               <Button_
                 text="Remove"
+                icon={ICONS.trash}
+                iconSize={14}
                 colorGradientArr={COLOR_GRADIENTS.red}
                 buttonStyle={{
                   marginLeft: 10,
@@ -3684,11 +4060,10 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                 }}
                 style={{ padding: 4 }}
               >
-                <Image_ icon={ICONS.close1} size={14} />
+                <Image_ icon={ICONS.trash} size={14} />
               </TouchableOpacity>
             </View>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isPrinterOnline(printer) ? C.green : C.red, marginRight: 8 }} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>{printer.label || "Unlabeled"}</Text>
                 <Text style={{ fontSize: 12, color: gray(0.5), marginTop: 2 }}>{printer.printerName || "—"}</Text>
@@ -3778,11 +4153,10 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                 }}
                 style={{ padding: 4 }}
               >
-                <Image_ icon={ICONS.close1} size={14} />
+                <Image_ icon={ICONS.trash} size={14} />
               </TouchableOpacity>
             </View>
             <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: isPrinterOnline(printer) ? C.green : C.red, marginRight: 8 }} />
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>{printer.label || "Unlabeled"}</Text>
                 <Text style={{ fontSize: 12, color: gray(0.5), marginTop: 2 }}>{printer.printerName || "—"}</Text>
@@ -4107,7 +4481,7 @@ const WorkorderStatusesComponent = ({
                         <BoxButton1
                           style={{ paddingHorizontal: 5 }}
                           iconSize={15}
-                          icon={ICONS.close1}
+                          icon={ICONS.trash}
                           onPress={() => {
                             let newStatuses = zSettingsObj.statuses.filter(
                               (o) => o.id != item.id
@@ -4118,7 +4492,7 @@ const WorkorderStatusesComponent = ({
                       </Tooltip>
                     ) : (
                       <View style={{ paddingHorizontal: 5, opacity: 0.3, cursor: "not-allowed" }}>
-                        <Image_ icon={ICONS.close1} size={15} />
+                        <Image_ icon={ICONS.trash} size={15} />
                       </View>
                     )}
                     <Tooltip text="Edit colors" position="top">
@@ -5041,7 +5415,7 @@ const QuickItemButtonsComponent = () => {
               onPress={() => handleDelete(btn)}
               style={{ marginLeft: 6 }}
               iconSize={17}
-              icon={ICONS.close1}
+              icon={ICONS.trash}
             />
           )}
         </View>
@@ -5420,7 +5794,7 @@ const ParentButtonItemsList = ({
                 </Tooltip>
               )}
               <TouchableOpacity onPress={() => handleDeleteItem(inv.id)}>
-                <Image_ icon={ICONS.close1} size={14} />
+                <Image_ icon={ICONS.trash} size={14} />
               </TouchableOpacity>
               {sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx > idx && (
                 <Image_
@@ -8306,7 +8680,7 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                           onPress={() => handleDeleteTemplate(templateObj)}
                           style={{ marginLeft: 8 }}
                           iconSize={15}
-                          icon={ICONS.close1}
+                          icon={ICONS.trash}
                         />
                       </Tooltip>
                     )}
@@ -8665,7 +9039,7 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
                           onPress={() => handleDeleteTemplate(templateObj)}
                           style={{ marginLeft: 8 }}
                           iconSize={15}
-                          icon={ICONS.close1}
+                          icon={ICONS.trash}
                         />
                       </Tooltip>
                     )}
@@ -8922,6 +9296,8 @@ const BlockedNumbersComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
             <Button_
               onPress={() => handleRemoveNumber(phone)}
               text={"Remove"}
+              icon={ICONS.trash}
+              iconSize={14}
               colorGradientArr={COLOR_GRADIENTS.red}
               buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
             />
@@ -10493,9 +10869,7 @@ const StandButtonCard = ({
               justifyContent: "center",
             }}
           >
-            <Text style={{ fontSize: 10, color: C.lightred, fontWeight: "700" }}>
-              ×
-            </Text>
+            <Image_ icon={ICONS.trash} size={10} />
           </TouchableOpacity>
         </div>
       )}

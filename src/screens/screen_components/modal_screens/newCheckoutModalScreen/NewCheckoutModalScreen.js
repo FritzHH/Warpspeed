@@ -211,6 +211,8 @@ function SplitDepositModal({ payment, maxAvailable, onConfirm, onRemove, onClose
         <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
           <Button_
             text="Remove From Sale"
+            icon={ICONS.trash}
+            iconSize={14}
             colorGradientArr={COLOR_GRADIENTS.red}
             textStyle={{ color: C.textWhite, fontSize: 12 }}
             buttonStyle={{ height: 32, borderRadius: 5, paddingHorizontal: 10 }}

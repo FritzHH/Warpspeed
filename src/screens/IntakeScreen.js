@@ -689,7 +689,7 @@ const LineItemRow = ({ line, onDelete }) => {
           paddingVertical: 6,
         }}
       >
-        <Image_ icon={ICONS.close1} size={14} />
+        <Image_ icon={ICONS.trash} size={14} />
       </TouchableOpacity>
     </View>
   );

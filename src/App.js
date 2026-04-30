@@ -4,12 +4,6 @@ import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { BaseScreen } from "./screens/BaseScreen";
 import { LoginScreen } from "./screens/LoginScreen";
 import { ProtectedRoute } from "./components";
-import { MobileBaseScreen } from "./screens/mobile/MobileBaseScreen";
-import { MobileHomeScreen } from "./screens/mobile/MobileHomeScreen";
-import { MobileWorkorderListScreen } from "./screens/mobile/MobileWorkorderListScreen";
-import { MobileWorkorderDetailScreen } from "./screens/mobile/MobileWorkorderDetailScreen";
-import { MobileItemEditScreen } from "./screens/mobile/MobileItemEditScreen";
-import { MobileMessagesScreen } from "./screens/mobile/MobileMessagesScreen";
 import { CustomerDisplayScreen } from "./screens/CustomerDisplayScreen";
 import { TranslateScreen } from "./screens/TranslateScreen";
 import { IntakeScreen } from "./screens/IntakeScreen";
@@ -62,16 +56,32 @@ document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") checkForAppUpdate();
 });
 
-// Redirects tablet → /stand, mobile → / (workorders), desktop → shows HomeScreen
+// Returns the correct home route for the current device type
+function DeviceAwareRedirect() {
+  const deviceType = useLayoutStore((state) => state.deviceType);
+  if (deviceType === "tablet") return <Navigate to={ROUTES.stand} replace />;
+  if (deviceType === "mobile") return <Navigate to={ROUTES.phone} replace />;
+  return <Navigate to={ROUTES.dashboard} replace />;
+}
+
+// Redirects tablet → /stand, mobile → /phone, desktop → shows HomeScreen
 function DeviceAwareHome({ user }) {
   const deviceType = useLayoutStore((state) => state.deviceType);
   if (deviceType === "tablet" && user) {
     return <Navigate to={ROUTES.stand} replace />;
   }
   if (deviceType === "mobile" && user) {
-    return <Navigate to={ROUTES.dashboard} replace />;
+    return <Navigate to={ROUTES.phone} replace />;
   }
   return <HomeScreen />;
+}
+
+// Tablet → /stand, mobile → /phone, desktop → BaseScreen
+function DashboardRoute() {
+  const deviceType = useLayoutStore((state) => state.deviceType);
+  if (deviceType === "tablet") return <Navigate to={ROUTES.stand} replace />;
+  if (deviceType === "mobile") return <Navigate to={ROUTES.phone} replace />;
+  return <BaseScreen />;
 }
 
 // Desktop: wrap PhoneScreen in a centered phone frame for previewing mobile UI
@@ -146,7 +156,6 @@ function App() {
   const [sessionError, setSessionError] = useState("");
   const setIsMobile = useLayoutStore((state) => state.setIsMobile);
   const setDeviceType = useLayoutStore((state) => state.setDeviceType);
-  const isMobile = useLayoutStore((state) => state.isMobile);
 
   // Detect if app is running on mobile, tablet, or desktop
   useEffect(() => {
@@ -243,32 +252,22 @@ function App() {
           path={ROUTES.login}
           element={
             user ? (
-              <Navigate to={ROUTES.dashboard} replace />
+              <DeviceAwareRedirect />
             ) : (
               <LoginScreen sessionError={sessionError} onClearError={() => setSessionError("")} />
             )
           }
         />
 
-        {/* Protected route - Dashboard/Base Screen (desktop) or Mobile UI */}
+        {/* Protected route - Dashboard/Base Screen */}
         <Route
           path={ROUTES.dashboard}
           element={
             <ProtectedRoute user={user}>
-              {isMobile ? <MobileBaseScreen /> : <BaseScreen />}
+              <DashboardRoute />
             </ProtectedRoute>
           }
-        >
-          {isMobile && (
-            <>
-              <Route index element={<MobileHomeScreen />} />
-              <Route path="workorders" element={<MobileWorkorderListScreen />} />
-              <Route path="workorder/:id" element={<MobileWorkorderDetailScreen />} />
-              <Route path="workorder/:id/items" element={<MobileItemEditScreen />} />
-              <Route path="workorder/:id/messages" element={<MobileMessagesScreen />} />
-            </>
-          )}
-        </Route>
+        />
 
         {/* Public route - Home (auto-redirects by device type) */}
         <Route path={ROUTES.home} element={<DeviceAwareHome user={user} />} />
@@ -315,11 +314,11 @@ function App() {
           }
         />
 
-        {/* Catch-all redirect to dashboard for authenticated users, login for unauthenticated */}
+        {/* Catch-all redirect */}
         <Route
           path="*"
           element={
-            <Navigate to={user ? ROUTES.dashboard : ROUTES.login} replace />
+            user ? <DeviceAwareRedirect /> : <Navigate to={ROUTES.login} replace />
           }
         />
       </Routes>

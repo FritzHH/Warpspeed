@@ -132,7 +132,7 @@ const CanvasButtonCard = ({
         userSelect: "none",
       }}
     >
-      {/* Delete X - edit mode */}
+      {/* Delete - edit mode */}
       {sEditMode && !sDragging && (
         <div
           onClick={(e) => { e.stopPropagation(); onDelete(btn.id); }}
@@ -151,7 +151,7 @@ const CanvasButtonCard = ({
             zIndex: 3,
           }}
         >
-          <Text style={{ fontSize: 10, color: "white", fontWeight: "700", lineHeight: 16 }}>×</Text>
+          <Image_ icon={ICONS.trash} size={10} />
         </div>
       )}
 

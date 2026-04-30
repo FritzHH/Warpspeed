@@ -716,7 +716,7 @@ const QuickItemCanvas = React.forwardRef(({
           );
         })}
 
-        {/* Delete X overlay for selected item in edit mode */}
+        {/* Delete overlay for selected item in edit mode */}
         {sEditMode && sSelectedItemId && (() => {
           let sel = rawItems.find((it) => it.inventoryItemID === sSelectedItemId);
           if (!sel) return null;
@@ -738,7 +738,7 @@ const QuickItemCanvas = React.forwardRef(({
                 zIndex: 10,
               }}
             >
-              <Text style={{ fontSize: 10, color: "white", fontWeight: "700", lineHeight: 16 }}>{"\u00D7"}</Text>
+              <Image_ icon={ICONS.trash} size={10} />
             </div>
           );
         })()}

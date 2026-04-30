@@ -137,6 +137,10 @@ export const useTabNamesStore = create(
       getDashboardExpand: () => get().dashboardExpand,
       setDashboardExpand: (val) => set({ dashboardExpand: val }),
 
+      dashboardScrollTarget: null,
+      getDashboardScrollTarget: () => get().dashboardScrollTarget,
+      setDashboardScrollTarget: (val) => set({ dashboardScrollTarget: val }),
+
       dashboardQBParentID: null,
       getDashboardQBParentID: () => get().dashboardQBParentID,
       setDashboardQBParentID: (val) => set({ dashboardQBParentID: val }),
@@ -588,16 +592,18 @@ export const useLoginStore = create(
   webcamDetected: false,
   adminPrivilege: "",
   loginTimeout: 0,
-  currentUser: { ...FRITZ_USER_OBJ }, //testing
-  // currentUser: null,
+  // currentUser: { ...FRITZ_USER_OBJ }, //testing
+  currentUser: null,
   punchClock: {}, // object of current user punches showing who is currently logged in
   modalVisible: false,
-  lastActionMillis: Date.now(), //testing
+  // lastActionMillis: Date.now(), //testing
+  lastActionMillis: 0,
   postLoginFunctionCallback: null,
   showLoginScreen: false,
   cameraStatus: "loading", // "loading" | "ready" | "failed" | "idle" | "matched"
   cameraError: null,
   cameraRetryTrigger: 0,
+  cameraStream: null,
 
   // face login
   runBackgroundRecognition: true,
@@ -651,6 +657,7 @@ export const useLoginStore = create(
   setWebcamDetected: (webcamDetected) => set(() => ({ webcamDetected })),
   setCameraStatus: (cameraStatus) => set({ cameraStatus }),
   setCameraError: (cameraError) => set({ cameraError }),
+  setCameraStream: (cameraStream) => set({ cameraStream }),
   triggerCameraRetry: () => set((state) => ({ cameraRetryTrigger: state.cameraRetryTrigger + 1, cameraStatus: "loading", cameraError: null })),
   setPostLoginFunctionCallback: (postLoginFunctionCallback) => set({ postLoginFunctionCallback }),
   setRunBackgroundRecognition: (runBackgroundRecognition) =>
@@ -670,11 +677,11 @@ export const useLoginStore = create(
     let timeout = useSettingsStore.getState().getSettings()?.activeLoginTimeoutSeconds || 60;
     let userObj = get().currentUser;
 
-    // DEV: skip timeout for testing user
-    if (userObj?.id === FRITZ_USER_OBJ.id) {
-      set({ lastActionMillis: now });
-      diffSeconds = 0;
-    }
+    // // DEV: skip timeout for testing user
+    // if (userObj?.id === FRITZ_USER_OBJ.id) {
+    //   set({ lastActionMillis: now });
+    //   diffSeconds = 0;
+    // }
 
     if (!userObj || diffSeconds > timeout) {
       // If we know who the user is (face recognized) but they're not clocked in,
@@ -721,11 +728,11 @@ export const useLoginStore = create(
     let diff = (cur - lastMillis) / 1000;
     let userObj = get().currentUser;
 
-    // DEV: skip timeout for testing user
-    if (userObj?.id === FRITZ_USER_OBJ.id) {
-      set({ lastActionMillis: cur });
-      diff = 0;
-    }
+    // // DEV: skip timeout for testing user
+    // if (userObj?.id === FRITZ_USER_OBJ.id) {
+    //   set({ lastActionMillis: cur });
+    //   diff = 0;
+    // }
 
     let hasAccess = true;
 

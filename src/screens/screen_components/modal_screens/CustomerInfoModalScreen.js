@@ -1158,6 +1158,8 @@ const CreditEditModal = ({ credit, onClose, onSave, onDelete }) => {
         <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
           <Button_
             text="Delete Credit"
+            icon={ICONS.trash}
+            iconSize={14}
             colorGradientArr={COLOR_GRADIENTS.red}
             textStyle={{ color: C.textWhite, fontSize: 13 }}
             buttonStyle={{ height: 34, borderRadius: 5, paddingHorizontal: 14 }}

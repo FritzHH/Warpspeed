@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { View, Text, ActivityIndicator } from "react-native-web";
+import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native-web";
 import {
   checkInternetConnection,
   convertMillisToHoursMins,
@@ -9,10 +9,11 @@ import {
   log,
 } from "../../utils";
 import { TabMenuButton, Image_, Button_ } from "../../components";
-import { C, ICONS } from "../../styles";
+import { C, Fonts, ICONS } from "../../styles";
 import { TAB_NAMES } from "../../data";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
-import React, { useEffect, useRef, useState } from "react";
+import ReactDOM from "react-dom";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { WorkordersComponent } from "../screen_components/Options_Screen/Options_Workorders";
 import { InventoryComponent } from "../screen_components/Options_Screen/Options_Inventory";
 import { MessagesComponent } from "../screen_components/Options_Screen/Options_Messages";
@@ -137,6 +138,7 @@ export const TabBar = ({
   const zPrinters = useSettingsStore((state) => state.settings?.printers);
   // local state /////////////////////////////////////////////////////////////////////////
   const [sIsOnline, _setIsOnline] = useState(true);
+  const [sShowCameraPreview, _sSetShowCameraPreview] = useState(false);
 
   // run constant checks to check if interent is connected
   useEffect(() => {
@@ -167,27 +169,36 @@ export const TabBar = ({
 
   function UserButton() {
     return (
-      <Button_
-        onPress={() => handleUserPress(zCurrentUser)}
-        icon={isClockedIn ? ICONS.check : ICONS.redx}
-        text={
-          zCurrentUser.first +
-          " " +
-          (zCurrentUser?.last?.length >= 0 ? zCurrentUser.last[0] : "") +
-          "."
-        }
-        textStyle={{ fontSize: 13, color: C.text }}
-        iconSize={13}
-        buttonStyle={{
-          paddingHorizontal: 7,
-          paddingVertical: 2,
-          marginRight: 5,
-          borderWidth: 1,
-          borderColor: C.buttonLightGreenOutline,
-          backgroundColor: C.buttonLightGreen,
-          borderRadius: 5,
+      <View
+        title="Right click to log out"
+        onContextMenu={(e) => {
+          e.preventDefault();
+          useLoginStore.getState().setCurrentUser(null);
+          useLoginStore.getState().setLastActionMillis();
         }}
-      />
+      >
+        <Button_
+          onPress={() => handleUserPress(zCurrentUser)}
+          icon={isClockedIn ? ICONS.check : ICONS.redx}
+          text={
+            zCurrentUser.first +
+            " " +
+            (zCurrentUser?.last?.length >= 0 ? zCurrentUser.last[0] : "") +
+            "."
+          }
+          textStyle={{ fontSize: 13, color: C.text }}
+          iconSize={13}
+          buttonStyle={{
+            paddingHorizontal: 7,
+            paddingVertical: 2,
+            marginRight: 5,
+            borderWidth: 1,
+            borderColor: C.buttonLightGreenOutline,
+            backgroundColor: C.buttonLightGreen,
+            borderRadius: 5,
+          }}
+        />
+      </View>
     );
   }
 
@@ -214,9 +225,12 @@ export const TabBar = ({
 
   function CameraIcon() {
     return (
-      <View title="Camera on and identifying">
+      <TouchableOpacity
+        title="Camera on and identifying"
+        onPress={() => _sSetShowCameraPreview(true)}
+      >
         <Image_ style={{ width: 19, height: 19 }} icon={ICONS.camera} />
-      </View>
+      </TouchableOpacity>
     );
   }
 
@@ -306,10 +320,16 @@ export const TabBar = ({
           let selectedPrinter = selectedID && zPrinters?.[selectedID];
           if (selectedPrinter && selectedPrinter.active !== true) {
             return (
-              <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "yellow", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginRight: 5 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.dashboard);
+                  useTabNamesStore.getState().setDashboardExpand("Readers/Printers");
+                }}
+                style={{ flexDirection: "row", alignItems: "center", backgroundColor: "yellow", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginRight: 5 }}
+              >
                 <Image_ icon={ICONS.print} size={14} style={{ marginRight: 4 }} />
                 <Text style={{ fontSize: 12, fontWeight: "700", color: "red" }}>Offline</Text>
-              </View>
+              </TouchableOpacity>
             );
           }
           return null;
@@ -319,6 +339,117 @@ export const TabBar = ({
           icon={sIsOnline ? ICONS.wifi : ICONS.internetOfflineGIF}
         />
       </View>
+      <CameraPreviewModal
+        visible={sShowCameraPreview}
+        onClose={() => _sSetShowCameraPreview(false)}
+      />
     </View>
+  );
+};
+
+const CameraPreviewModal = ({ visible, onClose }) => {
+  const videoRef = useRef(null);
+  const zCameraStream = useLoginStore((state) => state.cameraStream);
+
+  useEffect(() => {
+    if (!visible || !videoRef.current || !zCameraStream) return;
+    videoRef.current.srcObject = zCameraStream;
+    videoRef.current.play().catch(() => {});
+  }, [visible, zCameraStream]);
+
+  if (!visible) return null;
+
+  return ReactDOM.createPortal(
+    <View
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0, 0, 0, 0.5)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9999,
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={onClose}
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          cursor: "default",
+        }}
+      />
+      <View
+        style={{
+          width: 520,
+          backgroundColor: C.backgroundWhite,
+          borderRadius: 12,
+          borderWidth: 2,
+          borderColor: C.buttonLightGreenOutline,
+          padding: 20,
+        }}
+      >
+        <View
+          style={{
+            flexDirection: "row",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 16,
+          }}
+        >
+          <Text
+            style={{
+              fontSize: 18,
+              fontWeight: Fonts.weight.textHeavy,
+              color: C.text,
+            }}
+          >
+            Camera Preview
+          </Text>
+          <TouchableOpacity onPress={onClose}>
+            <Image_ source={ICONS.close1} width={18} height={18} />
+          </TouchableOpacity>
+        </View>
+        <View
+          style={{
+            borderRadius: 10,
+            overflow: "hidden",
+            borderWidth: 2,
+            borderColor: C.buttonLightGreenOutline,
+            backgroundColor: "black",
+          }}
+        >
+          <video
+            ref={videoRef}
+            autoPlay
+            muted
+            style={{
+              width: "100%",
+              display: "block",
+              borderRadius: 8,
+            }}
+          />
+        </View>
+        {!zCameraStream && (
+          <Text
+            style={{
+              fontSize: 14,
+              color: C.red,
+              textAlign: "center",
+              marginTop: 12,
+            }}
+          >
+            No camera stream available
+          </Text>
+        )}
+      </View>
+    </View>,
+    document.body
   );
 };

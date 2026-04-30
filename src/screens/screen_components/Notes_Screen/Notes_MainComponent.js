@@ -6,7 +6,7 @@ import {
   FlatList,
 } from "react-native-web";
 import { gray, resolveStatus, lightenRGBByPercent, capitalizeFirstLetterOfString } from "../../../utils";
-import { Image_, TouchableOpacity_, TextInput_, Tooltip } from "../../../components";
+import { Image_, TouchableOpacity_, TextInput_, Tooltip, CustomerQuickNotesDropdown } from "../../../components";
 import { C, Colors, ICONS } from "../../../styles";
 import { useState } from "react";
 import { useOpenWorkordersStore, useLoginStore, useSettingsStore } from "../../../stores";
@@ -58,9 +58,11 @@ export function Notes_MainComponent() {
   const zStatuses = useSettingsStore((state) => state.settings?.statuses);
   const isDonePaid = resolveStatus(zWorkorderStatus, zStatuses)?.label?.toLowerCase() === "done & paid";
   const zIsPreview = useOpenWorkordersStore((state) => !!state.workorderPreviewID && state.workorderPreviewID !== state.openWorkorderID);
+  const zCustomerQuickNotes = useSettingsStore((state) => state.settings?.customerQuickNotes) || EMPTY_NOTES;
 
   /////////////////////////////////////////////////////////////////////////////////
   const [sEditingNoteId, _setEditingNoteId] = useState(null);
+  const [sShowQuickNotes, _setShowQuickNotes] = useState(false);
 
   function formatUserShowName() {
     return (
@@ -145,7 +147,29 @@ export function Notes_MainComponent() {
     // ''(wo);
   }
 
-  // clog(zWorkorderObj);
+  let activeQuickChips = zCustomerNotes.map((n) => n.quickNoteItemId).filter(Boolean);
+
+  function handleQuickNoteToggle(item) {
+    useLoginStore.getState().requireLogin(() => {
+      let currentUser = useLoginStore.getState().currentUser;
+      let existing = zCustomerNotes.find((n) => n.quickNoteItemId === item.id);
+      let updatedNotes;
+      if (existing) {
+        updatedNotes = zCustomerNotes.filter((n) => n.id !== existing.id);
+      } else {
+        let userName = "(" + currentUser.first + " " + (currentUser.last?.[0] || "") + ")  ";
+        updatedNotes = [...zCustomerNotes, {
+          name: userName,
+          userID: currentUser.id,
+          value: item.text || item.buttonLabel,
+          id: crypto.randomUUID(),
+          quickNoteItemId: item.id,
+          createdAt: Date.now(),
+        }];
+      }
+      useOpenWorkordersStore.getState().setField("customerNotes", updatedNotes);
+    });
+  }
 
   if (!zOpenWorkorderID) {
     return <View style={{ flex: 1 }}></View>;
@@ -175,53 +199,65 @@ export function Notes_MainComponent() {
             paddingRight: 10,
           }}
         >
-          <Tooltip text="Add note" position="top">
+          <View
+            style={{
+              flexDirection: "row",
+              width: "100%",
+              height: 35,
+              alignItems: "center",
+              borderColor: C.buttonLightGreenOutline,
+              borderWidth: 1,
+              borderRadius: 15,
+              marginBottom: 5,
+              overflow: "hidden",
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingLeft: 8,
+              }}
+            >
+              <Image_ icon={ICONS.notes} size={20} />
+              <Text
+                style={{
+                  fontSize: 15,
+                  color: C.text,
+                  fontWeight: 500,
+                  marginLeft: 10,
+                }}
+              >
+                Customer Notes
+              </Text>
+            </View>
             <TouchableOpacity_
               onPress={() => outsideClicked("customer")}
               style={{
-                flexDirection: "row",
-                width: "100%",
-                height: 35,
-                justifyContent: "space-between",
+                flex: 1,
+                height: "100%",
+                justifyContent: "center",
                 alignItems: "center",
-                borderColor: C.buttonLightGreenOutline,
-                borderWidth: 1,
-                borderRadius: 15,
-                marginBottom: 5,
               }}
             >
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  width: "30%",
-                  paddingLeft: 8,
-                }}
-              >
-                <Image_ icon={ICONS.notes} size={20} />
-                <Text
-                  style={{
-                    fontSize: 15,
-                    color: C.text,
-                    fontWeight: 500,
-                    marginLeft: 10,
-                  }}
-                >
-                  {"Customer Notes"}
-                </Text>
-            </View>
-            <Text
-              style={{
-                fontSize: 16,
-                color: gray(0.18),
-                width: "70%",
-                textAlign: "center",
-              }}
-            >
+              <Text style={{ fontSize: 14, color: gray(0.18) }}>
                 Click to add
-            </Text>
+              </Text>
             </TouchableOpacity_>
-          </Tooltip>
+            <TouchableOpacity_
+              onPress={() => _setShowQuickNotes(true)}
+              style={{
+                flex: 1,
+                height: "100%",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <Text style={{ fontSize: 14, color: gray(0.18) }}>
+                Quick notes
+              </Text>
+            </TouchableOpacity_>
+          </View>
 
           <View
             style={{
@@ -470,6 +506,13 @@ export function Notes_MainComponent() {
           </View>
         </View>
       </View>
+      <CustomerQuickNotesDropdown
+        visible={sShowQuickNotes}
+        onClose={() => _setShowQuickNotes(false)}
+        quickNotes={zCustomerQuickNotes}
+        onToggleChip={handleQuickNoteToggle}
+        activeChips={activeQuickChips}
+      />
     </View>
   );
 }

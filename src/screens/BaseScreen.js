@@ -79,7 +79,7 @@ export function BaseScreen() {
   const zShowAlert = useAlertScreenStore((state) => state.showAlert);
   const throttledSetLastAction = useRef(throttle(() => {
     useLoginStore.getState().setLastActionMillis();
-  }, 5000)).current;
+  }, 1000)).current;
 
   // display window status — "closed" until display broadcasts otherwise
   const [sDisplayStatus, _setDisplayStatus] = useState(DISPLAY_STATUS.CLOSED);

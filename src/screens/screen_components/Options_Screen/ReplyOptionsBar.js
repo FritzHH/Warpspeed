@@ -75,9 +75,10 @@ export function ReplyOptionsBar({ visible, forwardReplies, hasActivePhone, onSel
             </TouchableOpacity_>
             <TouchableOpacity_
               onPress={audioUploading ? undefined : onDeleteAudio}
-              style={{ paddingVertical: 8, paddingHorizontal: 16, backgroundColor: C.red, borderRadius: 5, opacity: audioUploading ? 0.4 : 1 }}
+              style={{ paddingVertical: 8, paddingHorizontal: 16, backgroundColor: C.red, borderRadius: 5, opacity: audioUploading ? 0.4 : 1, flexDirection: "row", alignItems: "center" }}
               hoverOpacity={0.7}
             >
+              <Image_ icon={ICONS.trash} size={14} style={{ marginRight: 6 }} />
               <Text style={{ color: "white", fontWeight: "600", fontSize: 15 }}>Delete</Text>
             </TouchableOpacity_>
           </View>

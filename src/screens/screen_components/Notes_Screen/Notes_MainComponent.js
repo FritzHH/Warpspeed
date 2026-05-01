@@ -62,7 +62,7 @@ export function Notes_MainComponent() {
 
   /////////////////////////////////////////////////////////////////////////////////
   const [sEditingNoteId, _setEditingNoteId] = useState(null);
-  const [sShowQuickNotes, _setShowQuickNotes] = useState(false);
+  const [sShowQuickNotes, _setShowQuickNotes] = useState(null);
 
   function formatUserShowName() {
     return (
@@ -245,7 +245,10 @@ export function Notes_MainComponent() {
               </Text>
             </TouchableOpacity_>
             <TouchableOpacity_
-              onPress={() => _setShowQuickNotes(true)}
+              onPress={(e) => {
+                const nativeEvent = e.nativeEvent || e;
+                _setShowQuickNotes({ x: nativeEvent.pageX, y: nativeEvent.pageY });
+              }}
               style={{
                 flex: 1,
                 height: "100%",
@@ -507,8 +510,9 @@ export function Notes_MainComponent() {
         </View>
       </View>
       <CustomerQuickNotesDropdown
-        visible={sShowQuickNotes}
-        onClose={() => _setShowQuickNotes(false)}
+        visible={!!sShowQuickNotes}
+        anchorPosition={sShowQuickNotes}
+        onClose={() => _setShowQuickNotes(null)}
         quickNotes={zCustomerQuickNotes}
         onToggleChip={handleQuickNoteToggle}
         activeChips={activeQuickChips}

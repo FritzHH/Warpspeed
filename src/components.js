@@ -351,8 +351,8 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
               <View
                 style={{
                   marginTop: 25,
-                  flexDirection: "row",
-                  justifyContent: "center",
+                  flexDirection: "column",
+                  alignItems: "center",
                   marginBottom: 25,
                   width: "100%",
                 }}
@@ -360,8 +360,8 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
                 <Button_
                   colorGradientArr={zButton1Text ? COLOR_GRADIENTS.green : []}
                   text={zButton1Text}
-                  buttonStyle={{ marginRight: 20 }}
-                  textStyle={{ color: C.textWhite }}
+                  buttonStyle={{ marginBottom: 12, paddingVertical: 4 }}
+                  textStyle={{ color: C.textWhite, fontWeight: "600" }}
                   onPress={handleButton1Press}
                   iconSize={zIcon1Size || 60}
                   icon={zButton1Icon || (zButton1Text ? null : ICONS.check1)}
@@ -370,8 +370,8 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
                   <Button_
                     colorGradientArr={zButton2Text ? COLOR_GRADIENTS.blue : []}
                     text={zButton2Text}
-                    buttonStyle={{ marginRight: 20 }}
-                    textStyle={zButton2Text ? { color: C.textWhite } : {}}
+                    buttonStyle={{ marginBottom: 12, paddingVertical: 4 }}
+                    textStyle={zButton2Text ? { color: C.textWhite, fontWeight: "600" } : {}}
                     onPress={handleButton2Press}
                     iconSize={zIcon2Size || 60}
                     icon={zButton2Icon || (zButton2Text ? null : ICONS.close1)}
@@ -383,8 +383,8 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
                       zButton3Text ? COLOR_GRADIENTS.purple : []
                     }
                     text={zButton3Text}
-                    buttonStyle={zButton3Text ? {} : {}}
-                    textStyle={zButton3Text ? { color: C.textWhite } : {}}
+                    buttonStyle={{ marginBottom: 12, paddingVertical: 4 }}
+                    textStyle={zButton3Text ? { color: C.textWhite, fontWeight: "600" } : {}}
                     onPress={handleButton3Press}
                     iconSize={zIcon3Size || 60}
                     icon={zButton3Icon || (zButton3Text ? null : ICONS.close1)}
@@ -3484,6 +3484,8 @@ export const StatusPickerModal = ({
   buttonTextStyle: buttonTextStyleProp = {},
   modalCoordX = 0,
   modalCoordY = 30,
+  menuWidth,
+  centered = false,
 }) => {
   const [sVisible, _setVisible] = useState(false);
   const [sAnimation, _setAnimation] = useState("fade");
@@ -3502,10 +3504,10 @@ export const StatusPickerModal = ({
     }
   }, [ref]);
 
-  const MENU_WIDTH = 320;
+  const MENU_WIDTH = menuWidth || 320;
   const ITEM_HEIGHT = 40;
   const VIEWPORT_PADDING = 10;
-  const anchorLeft = sCoords.x + modalCoordX;
+  const anchorLeft = centered ? (window.innerWidth - MENU_WIDTH) / 2 : sCoords.x + modalCoordX;
   const buttonCenterY = sCoords.y + (sCoords.height || 25) / 2;
   const listHeight = Math.min(
     statuses.length * ITEM_HEIGHT,
@@ -4221,8 +4223,8 @@ export const CustomerQuickNotesDropdown = ({
   quickNotes = [],
   onToggleChip,
   activeChips = [],
+  anchorPosition,
 }) => {
-  const [sDropdownHeight, _sSetDropdownHeight] = useState(0);
   const openTimeRef = useRef(0);
   const prevVisibleRef = useRef(visible);
 
@@ -4231,41 +4233,39 @@ export const CustomerQuickNotesDropdown = ({
   }
   prevVisibleRef.current = visible;
 
-  useEffect(() => {
-    if (visible) _sSetDropdownHeight(0);
-  }, [visible]);
-
   if (!visible) return null;
 
   const dropdownWidth = 340;
-  const dropdownMeasured = sDropdownHeight > 0;
+  const maxHeight = 400;
   let left, top;
   if (typeof window !== "undefined") {
-    left = (window.innerWidth - dropdownWidth) / 2;
-    top = dropdownMeasured ? (window.innerHeight - sDropdownHeight) / 2 : window.innerHeight / 2 - 200;
     const vh = window.innerHeight;
     const vw = window.innerWidth;
-    if (dropdownMeasured && top + sDropdownHeight > vh - 10) top = vh - sDropdownHeight - 10;
+    if (anchorPosition) {
+      left = anchorPosition.x;
+      top = anchorPosition.y;
+    } else {
+      left = (vw - dropdownWidth) / 2;
+      top = (vh - maxHeight) / 2;
+    }
     if (left + dropdownWidth > vw - 10) left = vw - dropdownWidth - 10;
+    if (top + maxHeight > vh - 10) top = vh - maxHeight - 10;
     if (left < 10) left = 10;
     if (top < 10) top = 10;
   }
 
-  return (
-    <Modal visible={visible} transparent animationType="fade">
+  return ReactDOM.createPortal(
+    <View style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999 }}>
       <TouchableWithoutFeedback onPress={() => { if (Date.now() - openTimeRef.current > 150) onClose(); }}>
         <View style={{ width: "100%", height: "100%", position: "absolute" }} />
       </TouchableWithoutFeedback>
       <View
-        onLayout={(e) => {
-          const h = e.nativeEvent.layout.height;
-          if (h > 0 && h !== sDropdownHeight) _sSetDropdownHeight(h);
-        }}
         style={{
           position: "absolute",
           left: left,
           top: top,
           width: dropdownWidth,
+          maxHeight: maxHeight,
           backgroundColor: "white",
           borderRadius: 10,
           borderWidth: 2,
@@ -4276,7 +4276,7 @@ export const CustomerQuickNotesDropdown = ({
           shadowRadius: 4,
           elevation: 5,
           padding: 10,
-          opacity: dropdownMeasured ? 1 : 0,
+          overflow: "auto",
         }}
       >
         <View style={{
@@ -4337,7 +4337,8 @@ export const CustomerQuickNotesDropdown = ({
           </View>
         ))}
       </View>
-    </Modal>
+    </View>,
+    document.body
   );
 };
 

@@ -21,6 +21,8 @@ import {
   TextInput_,
   DropdownMenu,
   LoginModalScreen,
+  CustomerQuickNotesDropdown,
+  Tooltip,
   SHADOW_RADIUS_PROTO,
 } from "../../../components";
 import { C, ICONS } from "../../../styles";
@@ -322,10 +324,9 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
   const quickButtons = zQuickItemButtons || [];
 
   const [sItem, _setItem] = useState(() => cloneDeep(item));
-  const [sEditing, _setEditing] = useState(!!isNew);
+  const userLevel = useLoginStore.getState().currentUser?.permissions?.level || 0;
+  const [sEditing, _setEditing] = useState(!!isNew || userLevel >= 2);
   const [sShowQBPicker, _setShowQBPicker] = useState(false);
-  const [sShowQBSection, _setShowQBSection] = useState(true);
-  const [sShowAutoNote, _setShowAutoNote] = useState(true);
   const [sDirty, _setDirty] = useState(false);
   const [sPrintSuccess, _setPrintSuccess] = useState(false);
 
@@ -345,9 +346,11 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
 
   // auto customer note
   const zAutoNoteTexts = zAutoCustomerNoteTexts || [];
-  const [sAutoNoteText, _setAutoNoteText] = useState(
-    () => zAutoNoteTexts.find((n) => n.inventoryItemID === item.id)?.text || ""
-  );
+  const zCustomerQuickNotes = useSettingsStore((s) => s.settings?.customerQuickNotes, deepEqual) || [];
+  const existingAutoNote = zAutoNoteTexts.find((n) => n.inventoryItemID === item.id);
+  const [sAutoNoteText, _setAutoNoteText] = useState(() => existingAutoNote?.text || "");
+  const [sAutoQuickNoteIDs, _setAutoQuickNoteIDs] = useState(() => existingAutoNote?.quickNoteIDs || []);
+  const [sShowQuickNotePicker, _setShowQuickNotePicker] = useState(null);
   const debouncedAutoNoteSaveRef = useRef(
     debounce((updatedArr) => {
       useSettingsStore.getState().setField("autoCustomerNoteTexts", updatedArr);
@@ -369,15 +372,13 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
   function handleSaveNewItem() {
     useInventoryStore.getState().setItem(sItem, false);
     dbSaveInventoryItem(sItem);
-    // save auto note if set
-    if (sAutoNoteText && sAutoNoteText.trim()) {
+    let hasContent = (sAutoNoteText && sAutoNoteText.trim()) || sAutoQuickNoteIDs.length > 0;
+    if (hasContent) {
       let updatedArr = [...zAutoNoteTexts];
+      let entry = { inventoryItemID: sItem.id, text: sAutoNoteText || "", quickNoteIDs: sAutoQuickNoteIDs };
       let idx = updatedArr.findIndex((n) => n.inventoryItemID === sItem.id);
-      if (idx >= 0) {
-        updatedArr[idx] = { ...updatedArr[idx], text: sAutoNoteText };
-      } else {
-        updatedArr.push({ inventoryItemID: sItem.id, text: sAutoNoteText });
-      }
+      if (idx >= 0) updatedArr[idx] = entry;
+      else updatedArr.push(entry);
       useSettingsStore.getState().setField("autoCustomerNoteTexts", updatedArr);
     }
     handleExit();
@@ -385,12 +386,27 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
 
   function handlePriceChange(fieldName, rawInput) {
     const { cents } = usdTypeMask(rawInput);
-    handleFieldChange(fieldName, cents);
+    let updated = { ...sItem, [fieldName]: cents };
+    if (fieldName === "price" && cents > 0) updated.minutes = 0;
+    _setItem(updated);
+    _setDirty(true);
+    if (!isNew) {
+      useInventoryStore.getState().setItem(updated, false);
+      debouncedInvSaveRef.current(updated);
+    }
   }
 
   function handleMinutesChange(rawInput) {
     const digits = rawInput.replace(/\D/g, "");
-    handleFieldChange("minutes", digits === "" ? 0 : Number(digits));
+    let mins = digits === "" ? 0 : Number(digits);
+    let updated = { ...sItem, minutes: mins };
+    if (mins > 0) { updated.price = 0; updated.salePrice = 0; }
+    _setItem(updated);
+    _setDirty(true);
+    if (!isNew) {
+      useInventoryStore.getState().setItem(updated, false);
+      debouncedInvSaveRef.current(updated);
+    }
   }
 
   // ─── delete ────────────────────────────────────────────────────────────
@@ -419,26 +435,38 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
 
   // ─── auto customer note handler ─────────────────────────────────────────
 
-  function handleAutoNoteChange(text) {
-    _setAutoNoteText(text);
-    _setDirty(true);
-    if (isNew) return; // save handled by handleSaveNewItem
+  function saveAutoNote(text, quickNoteIDs) {
+    if (isNew) return;
     let updatedArr = [...zAutoNoteTexts];
-    if (!text || text.trim() === "") {
+    let hasContent = (text && text.trim()) || (quickNoteIDs && quickNoteIDs.length > 0);
+    if (!hasContent) {
       updatedArr = updatedArr.filter((n) => n.inventoryItemID !== sItem.id);
     } else {
       let idx = updatedArr.findIndex((n) => n.inventoryItemID === sItem.id);
-      if (idx >= 0) {
-        updatedArr[idx] = { ...updatedArr[idx], text: text };
-      } else {
-        updatedArr.push({
-          inventoryItemID: sItem.id,
-          text: text,
-        });
-      }
+      let entry = { inventoryItemID: sItem.id, text: text || "", quickNoteIDs: quickNoteIDs || [] };
+      if (idx >= 0) updatedArr[idx] = entry;
+      else updatedArr.push(entry);
     }
     useSettingsStore.getState().setField("autoCustomerNoteTexts", updatedArr, false);
     debouncedAutoNoteSaveRef.current(updatedArr);
+  }
+
+  function handleAutoNoteChange(text) {
+    _setAutoNoteText(text);
+    _setDirty(true);
+    saveAutoNote(text, sAutoQuickNoteIDs);
+  }
+
+  function handleAutoQuickNoteToggle(noteItem) {
+    let updated;
+    if (sAutoQuickNoteIDs.includes(noteItem.id)) {
+      updated = sAutoQuickNoteIDs.filter((id) => id !== noteItem.id);
+    } else {
+      updated = [...sAutoQuickNoteIDs, noteItem.id];
+    }
+    _setAutoQuickNoteIDs(updated);
+    _setDirty(true);
+    saveAutoNote(sAutoNoteText, updated);
   }
 
   // ─── quick print label ─────────────────────────────────────────────────
@@ -638,14 +666,6 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
                   )}
                 </View>
               )}
-              {(!isNew || !!sItem.formalName?.trim()) && (
-                <TouchableOpacity
-                  onPress={() => _setEditing(!sEditing)}
-                  style={{ padding: 6, marginRight: 10 }}
-                >
-                  <Image_ icon={ICONS.editPencil} size={30} />
-                </TouchableOpacity>
-              )}
             </View>
           </View>
 
@@ -691,15 +711,15 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
                   <Text style={valueStyle}>{sItem.category || "Item"}</Text>
                 )}
               </View>
-              {sItem.category === "Labor" && (
-                <View style={{ width: 80 }}>
-                  {renderField("Minutes", "minutes", { numeric: true })}
-                </View>
-              )}
             </View>
 
             {/* Prices */}
             <View style={{ ...sectionCardStyle, flexDirection: "row" }}>
+              {sItem.category === "Labor" && (
+                <View style={{ width: 80, marginRight: 10 }}>
+                  {renderField("Minutes", "minutes", { numeric: true })}
+                </View>
+              )}
               {renderField("Price", "price", { currency: true, flex: 1 })}
               {renderField("Sale Price", "salePrice", { currency: true, flex: 1 })}
               {renderField("Cost", "cost", { currency: true, flex: 1, last: true })}
@@ -760,49 +780,40 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
                 )}
               </View>
             </View>
-            </View>
 
-            {/* SECTION 2: Quick Button Placement */}
-            <View style={sectionCardStyle}>
-              <TouchableOpacity
-                onPress={() => _setShowQBSection(!sShowQBSection)}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-              >
-                <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
-                  Quick Button Placement
-                </Text>
-                <Text style={{ fontSize: 17, color: gray(0.4), marginLeft: 8 }}>
-                  {sShowQBSection ? "▲" : "▶"}
-                </Text>
-              </TouchableOpacity>
-              {sShowQBSection && (
-                <View style={{ marginTop: 8 }}>
-                  <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 6 }}>
-                    <TouchableOpacity
-                      onPress={() => _setShowQBPicker(true)}
-                      style={{ padding: 4 }}
-                    >
-                      <Image_ icon={ICONS.add} size={40} style={{ tintColor: C.green }} />
-                    </TouchableOpacity>
-                  </View>
-                  {placements.length === 0 ? (
-                    <Text style={{ fontSize: 13, color: gray(0.5), marginBottom: 6 }}>
-                      Not assigned to any quick button menu
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+              {/* SECTION 2: Quick Button Placement */}
+              <View style={{ ...sectionCardStyle, flex: 1, marginTop: 0 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
+                      Quick Button Placement
                     </Text>
-                  ) : (
-                    placements.map((p) => (
+                    <Tooltip text="Assign this item to quick button menus for fast access" position="right">
+                      <Image_ icon={ICONS.info} size={16} style={{ marginLeft: 6, opacity: 0.4 }} />
+                    </Tooltip>
+                  </View>
+                  <TouchableOpacity
+                    onPress={() => _setShowQBPicker(true)}
+                    style={{ padding: 4 }}
+                  >
+                    <Image_ icon={ICONS.add} size={30} style={{ tintColor: C.green }} />
+                  </TouchableOpacity>
+                </View>
+                {placements.length === 0 ? (
+                  <Text style={{ fontSize: 13, color: gray(0.5), marginBottom: 6 }}>
+                    Not assigned to any quick button menu
+                  </Text>
+                ) : (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                    {placements.map((p) => (
                       <View
                         key={p.buttonID}
                         style={{
                           flexDirection: "row",
                           alignItems: "center",
-                          justifyContent: "space-between",
                           paddingVertical: 5,
                           paddingHorizontal: 8,
-                          marginBottom: 4,
                           backgroundColor: "white",
                           borderRadius: 6,
                         }}
@@ -810,95 +821,155 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
                         <Text style={{ fontSize: 13, color: C.text }}>{p.path}</Text>
                         <TouchableOpacity
                           onPress={() => handleRemoveFromButton(p.buttonID)}
-                          style={{ padding: 4 }}
+                          style={{ padding: 4, marginLeft: 4 }}
                         >
                           <Image_ icon={ICONS.trash} size={18} />
                         </TouchableOpacity>
                       </View>
-                    ))
-                  )}
+                    ))}
+                  </View>
+                )}
+              </View>
+
+              {/* SECTION 3: Auto Customer Note */}
+              <View style={{ ...sectionCardStyle, flex: 1, marginTop: 0 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
+                      Auto Customer Note
+                    </Text>
+                    <Tooltip text="When this item is added to a workorder, these notes will automatically appear in Customer Notes" position="right">
+                      <Image_ icon={ICONS.info} size={16} style={{ marginLeft: 6, opacity: 0.4 }} />
+                    </Tooltip>
+                  </View>
+                  <Tooltip text="Select from pre-configured customer quick notes to auto-add when this item is used" position="bottom">
+                    <TouchableOpacity
+                      onPress={(e) => {
+                        const nativeEvent = e.nativeEvent || e;
+                        _setShowQuickNotePicker({ x: nativeEvent.pageX, y: nativeEvent.pageY });
+                      }}
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        backgroundColor: C.buttonLightGreen,
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        borderRadius: 5,
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                      }}
+                    >
+                      <Image_ icon={ICONS.add} size={16} style={{ tintColor: C.green }} />
+                      <Text style={{ fontSize: 13, color: C.text, marginLeft: 4 }}>Quick Notes</Text>
+                    </TouchableOpacity>
+                  </Tooltip>
                 </View>
-              )}
+                {sAutoQuickNoteIDs.length > 0 && (
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+                    {sAutoQuickNoteIDs.map((qnID) => {
+                      let label = "";
+                      zCustomerQuickNotes.forEach((cat) => {
+                        let found = (cat.items || []).find((i) => i.id === qnID);
+                        if (found) label = found.buttonLabel;
+                      });
+                      if (!label) return null;
+                      return (
+                        <TouchableOpacity
+                          key={qnID}
+                          onPress={() => handleAutoQuickNoteToggle({ id: qnID })}
+                          style={{
+                            backgroundColor: "rgb(240, 200, 200)",
+                            borderRadius: 6,
+                            paddingHorizontal: 10,
+                            paddingVertical: 5,
+                            flexDirection: "row",
+                            alignItems: "center",
+                          }}
+                        >
+                          <Text style={{ fontSize: 13, color: C.lightred, fontWeight: "500" }}>
+                            {label}
+                          </Text>
+                          <Text style={{ fontSize: 11, color: C.lightred, marginLeft: 6 }}>✕</Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </View>
+                )}
+
+                <TextInput_
+                  multiline={true}
+                  numberOfLines={10}
+                  debounceMs={0}
+                  onChangeText={handleAutoNoteChange}
+                  value={sAutoNoteText}
+                  placeholder="Enter custom receipt note here"
+                  placeholderTextColor={gray(0.3)}
+                  style={{
+                    fontSize: 14,
+                    lineHeight: 18,
+                    paddingVertical: 6,
+                    paddingHorizontal: 4,
+                    outlineWidth: 0,
+                    outlineStyle: "none",
+                    color: C.text,
+                    width: "100%",
+                  }}
+                />
+              </View>
+            </View>
             </View>
 
-            {/* SECTION 3: Auto Customer Note */}
-            <View style={sectionCardStyle}>
-              <TouchableOpacity
-                onPress={() => _setShowAutoNote(!sShowAutoNote)}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-              >
-                <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
-                  Auto Customer Note
-                </Text>
-                <Text style={{ fontSize: 17, color: gray(0.4), marginLeft: 8 }}>
-                  {sShowAutoNote ? "▲" : "▶"}
-                </Text>
-              </TouchableOpacity>
-              {sShowAutoNote && (
-                <View style={{ marginTop: 8 }}>
-                  <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 6 }}>
-                    When this item is added to a workorder, this note will automatically appear in Customer Notes.
-                  </Text>
-                  <TextInput_
-                    multiline={true}
-                    numberOfLines={10}
-                    debounceMs={0}
-                    onChangeText={handleAutoNoteChange}
-                    value={sAutoNoteText}
-                    placeholder="Leave empty for no auto-note"
-                    placeholderTextColor={gray(0.3)}
-                    style={{
-                      fontSize: 14,
-                      lineHeight: 18,
-                      paddingVertical: 6,
-                      paddingHorizontal: 4,
-                      outlineWidth: 0,
-                      outlineStyle: "none",
-                      color: C.text,
-                      width: "100%",
-                    }}
-                  />
-                </View>
-              )}
-            </View>
+            <CustomerQuickNotesDropdown
+              visible={!!sShowQuickNotePicker}
+              anchorPosition={sShowQuickNotePicker}
+              onClose={() => _setShowQuickNotePicker(null)}
+              quickNotes={zCustomerQuickNotes}
+              onToggleChip={handleAutoQuickNoteToggle}
+              activeChips={sAutoQuickNoteIDs}
+            />
 
           </ScrollView>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <TouchableOpacity
-                onPress={handleExit}
-                style={{ padding: 6, borderRadius: 6 }}
-              >
-                <Image_ icon={ICONS.close1} size={36} />
-              </TouchableOpacity>
-              {!isNew && (
+            {!isNew ? (
+              <Tooltip text="Delete this item" position="top">
                 <TouchableOpacity
                   onPress={handleDeleteItem}
-                  style={{ padding: 6, borderRadius: 6, marginLeft: 6 }}
+                  style={{ padding: 6, borderRadius: 6 }}
                 >
                   <Image_ icon={ICONS.trash} size={40} />
                 </TouchableOpacity>
+              </Tooltip>
+            ) : <View />}
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+              {isNew && !!sItem.formalName?.trim() && (
+                <Tooltip text="Save new item" position="top">
+                  <TouchableOpacity
+                    onPress={handleSaveNewItem}
+                    style={{ padding: 6, borderRadius: 6 }}
+                  >
+                    <Image_ icon={ICONS.check1} size={36} />
+                  </TouchableOpacity>
+                </Tooltip>
               )}
+              {!isNew && sDirty && (
+                <Tooltip text="Save changes" position="top">
+                  <TouchableOpacity
+                    onPress={handleExit}
+                    style={{ padding: 6, borderRadius: 6 }}
+                  >
+                    <Image_ icon={ICONS.check1} size={36} />
+                  </TouchableOpacity>
+                </Tooltip>
+              )}
+              <Tooltip text="Close" position="top">
+                <TouchableOpacity
+                  onPress={handleExit}
+                  style={{ padding: 6, borderRadius: 6 }}
+                >
+                  <Image_ icon={ICONS.close1} size={36} />
+                </TouchableOpacity>
+              </Tooltip>
             </View>
-            {isNew && !!sItem.formalName?.trim() && (
-              <TouchableOpacity
-                onPress={handleSaveNewItem}
-                style={{ padding: 6, borderRadius: 6 }}
-              >
-                <Image_ icon={ICONS.check1} size={36} />
-              </TouchableOpacity>
-            )}
-            {!isNew && sDirty && (
-              <TouchableOpacity
-                onPress={handleExit}
-                style={{ padding: 6, borderRadius: 6 }}
-              >
-                <Image_ icon={ICONS.check1} size={36} />
-              </TouchableOpacity>
-            )}
           </View>
         </View>
       </TouchableWithoutFeedback>

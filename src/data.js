@@ -502,6 +502,7 @@ export const WORKORDER_PROTO = {
   customerNotes: [],
   status: "newly_created",
   taxFree: false,
+  itemNotHere: false,
   archived: false,
   media: [],
   customerPin: "",
@@ -628,6 +629,7 @@ export const INTAKE_QUICK_BUTTON_PROTO = {
 export const AUTO_CUSTOMER_NOTE_PROTO = {
   inventoryItemID: "",
   text: "",
+  quickNoteIDs: [],
 }
 
 export const AUTO_CUSTOMER_NOTE_TEXTS = [

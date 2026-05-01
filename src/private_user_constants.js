@@ -17,3 +17,6 @@ export const SMS_URL =
 // Stripe publishable key (client-side tokenization)
 export const STRIPE_PUBLISHABLE_KEY = "pk_test_51RRLB9QIJQpcXP9dFNqDeOHSo2gzvP6RvdEP0oWQ0jMyyGIrvIZqwEE6ZOJdSL8M8aAtqxjnNwFvjAq3D1ScrLQz005Zk6g3Cp";
 
+// Google Maps API key (enable Maps JavaScript API + Directions API in GCP console)
+export const GOOGLE_MAPS_API_KEY = "AIzaSyCUjRH7Yi9fNNDAUTyYzD-P-tUGGMvfPPM";
+

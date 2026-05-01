@@ -17,19 +17,35 @@ import {
   capitalizeFirstLetterOfString,
   formatMillisForDisplay,
   formatPhoneWithDashes,
+  removeDashesFromPhone,
+  checkInputForNumbersOnly,
   calculateRunningTotals,
   calculateWaitEstimateLabel,
   lightenRGBByPercent,
   compressImage,
   log,
 } from "../utils";
-import { dbUploadWorkorderMedia } from "../db_calls_wrapper";
-import { Image_, AlertBox_, SmallLoadingIndicator, StatusPickerModal } from "../components";
+import { dbUploadWorkorderMedia, dbGetCustomer, dbSaveCustomer, dbListenToOpenWorkorders } from "../db_calls_wrapper";
+import { Image_, AlertBox_, SmallLoadingIndicator, TextInput_, CheckBox_, DropdownMenu, StatusPickerModal } from "../components";
 import { StandKeypad } from "../shared/StandKeypad";
-import { FACE_DESCRIPTOR_CONFIDENCE_DISTANCE } from "../constants";
+import { FACE_DESCRIPTOR_CONFIDENCE_DISTANCE, MILLIS_IN_DAY } from "../constants";
+import { COLORS, NONREMOVABLE_WAIT_TIMES } from "../data";
+import { cloneDeep } from "lodash";
 import { openCacheDB, clearStaleCache, loadModelCached } from "../faceDetection";
 
 const LOCAL_STORAGE_KEY = "warpspeed_phone_user_id";
+
+const PHONE_CUSTOMER_INPUT_STYLE = {
+  width: "100%",
+  height: 38,
+  borderColor: gray(0.08),
+  borderWidth: 1,
+  marginTop: 10,
+  paddingHorizontal: 8,
+  outlineWidth: 0,
+  borderRadius: 7,
+  fontSize: 14,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Main Screen
@@ -64,6 +80,13 @@ export function PhoneScreen() {
   const faceStreamRef = useRef(null);
   const faceIntervalRef = useRef(null);
   const countdownRef = useRef(null);
+
+  useEffect(() => {
+    let unsub = dbListenToOpenWorkorders((data) => {
+      useOpenWorkordersStore.getState().setOpenWorkorders(data);
+    });
+    return () => { if (typeof unsub === "function") unsub(); };
+  }, []);
 
   // Face recognition login - runs when sLoginPhase is "face"
   useEffect(() => {
@@ -447,7 +470,7 @@ function WorkorderCard({ workorder, zStatuses, zSettings, onPress }) {
                 <View style={{ width: 6, height: 2, marginHorizontal: 4, backgroundColor: "lightgray" }} />
               )}
               {!!workorder.description && (
-                <Text numberOfLines={1} style={{ fontSize: 13, color: C.text, flex: 1 }}>
+                <Text numberOfLines={1} style={{ fontSize: 13, color: C.text, flexShrink: 1 }}>
                   {capitalizeFirstLetterOfString(workorder.description)}
                 </Text>
               )}
@@ -496,22 +519,30 @@ function WorkorderCard({ workorder, zStatuses, zSettings, onPress }) {
           </View>
         </View>
 
-        {/* Wait time estimate row (bottom) */}
-        {!waitInfo.isMissing && !!waitInfo.waitEndDay && (
+        {/* Bike not here badge + wait time estimate row */}
+        {(workorder.itemNotHere || (!waitInfo.isMissing && !!waitInfo.waitEndDay)) && (
           <View
             style={{
               flexDirection: "row",
               alignItems: "center",
+              justifyContent: "space-between",
               marginTop: 2,
               paddingTop: 2,
-              borderTopWidth: 1,
-              borderTopColor: gray(0.92),
             }}
           >
-            <Image_ icon={ICONS.clock} size={12} style={{ marginRight: 4 }} />
-            <Text style={{ color: waitInfo.textColor, fontSize: 12 }}>
-              {waitInfo.waitEndDay.replace("\n", " ")}
-            </Text>
+            {!!workorder.itemNotHere ? (
+              <View style={{ backgroundColor: "rgb(255, 243, 176)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 1 }}>
+                <Text style={{ color: "rgb(90, 75, 0)", fontSize: 11, fontWeight: "600" }}>Item not here</Text>
+              </View>
+            ) : <View />}
+            {!waitInfo.isMissing && !!waitInfo.waitEndDay && (
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Image_ icon={ICONS.clock} size={12} style={{ marginRight: 4 }} />
+                <Text style={{ color: waitInfo.textColor, fontSize: 12 }}>
+                  {waitInfo.waitEndDay.replace("\n", " ")}
+                </Text>
+              </View>
+            )}
           </View>
         )}
 
@@ -547,16 +578,143 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
     ? `${capitalizeFirstLetterOfString(workorder.customerFirst || "")} ${capitalizeFirstLetterOfString(workorder.customerLast || "")}`.trim()
     : "Walk-in";
   let { runningTotal, runningQty } = calculateRunningTotals(workorder);
-  let statusObj = resolveStatus(workorder.status, zSettings?.statuses);
-  let statusColor = statusObj?.backgroundColor || C.green;
+  let rs = resolveStatus(workorder.status, zSettings?.statuses);
 
   const [sViewMedia, _setViewMedia] = useState(null);
   const [sUploading, _setUploading] = useState(false);
   const uploadInputRef = useRef(null);
   const zUploadProgress = useUploadProgressStore((s) => s.progress);
+  const zShowAlert = useAlertScreenStore((s) => s.showAlert);
+
+  const [sCustomerOpen, _setCustomerOpen] = useState(false);
+  const [sCustomerEditing, _setCustomerEditing] = useState(false);
+  const [sCustomer, _setCustomer] = useState(null);
+  const [sCustomerLoading, _setCustomerLoading] = useState(false);
+  const [sBikeEditing, _setBikeEditing] = useState(false);
+  const [sOrderingOpen, _setOrderingOpen] = useState(
+    !!(workorder.partOrdered || workorder.partSource || workorder.trackingNumber || workorder.partOrderEstimateMillis)
+  );
+  const [sWaitDays, _setWaitDays] = useState(() => {
+    if (!workorder.partOrderEstimateMillis || !workorder.partOrderedMillis) return 0;
+    return Math.max(0, Math.round((workorder.partOrderEstimateMillis - workorder.partOrderedMillis) / MILLIS_IN_DAY));
+  });
+  const waitDaysTimerRef = useRef(null);
+
+  function setField(fieldName, val) {
+    useOpenWorkordersStore.getState().setField(fieldName, val, workorder.id);
+  }
 
   function handleStatusSelect(val) {
-    useOpenWorkordersStore.getState().setField("status", val.id, workorder.id);
+    setField("status", val.id);
+  }
+
+  function setBikeColor(incomingColorVal, fieldName) {
+    let foundColor = false;
+    let newColorObj = {};
+    COLORS.forEach((bikeColorObj) => {
+      if (bikeColorObj.label.toLowerCase() === incomingColorVal.toLowerCase()) {
+        foundColor = true;
+        newColorObj = cloneDeep(bikeColorObj);
+      }
+    });
+    if (!foundColor) {
+      newColorObj.label = incomingColorVal;
+      newColorObj.backgroundColor = null;
+      newColorObj.textColor = null;
+    }
+    setField(fieldName, newColorObj);
+  }
+
+  function updateWaitDays(newDays) {
+    _setWaitDays(newDays);
+    clearTimeout(waitDaysTimerRef.current);
+    waitDaysTimerRef.current = setTimeout(() => {
+      let now = Date.now();
+      useOpenWorkordersStore.getState().setField("partOrderedMillis", now, workorder.id, false);
+      setField("partOrderEstimateMillis", now + (newDays * MILLIS_IN_DAY));
+    }, 700);
+  }
+
+  function handleToggleCustomer() {
+    if (!workorder.customerID) return;
+    const opening = !sCustomerOpen;
+    _setCustomerOpen(opening);
+    if (opening && !sCustomer) {
+      _setCustomerLoading(true);
+      dbGetCustomer(workorder.customerID).then((c) => {
+        _setCustomer(c);
+        _setCustomerLoading(false);
+      }).catch(() => _setCustomerLoading(false));
+    }
+  }
+
+  const CUSTOMER_TO_WORKORDER_FIELDS = {
+    first: "customerFirst",
+    last: "customerLast",
+    customerCell: "customerCell",
+    customerLandline: "customerLandline",
+    email: "customerEmail",
+  };
+
+  function saveCustomerField(fieldName, val) {
+    _setCustomer((prev) => {
+      const updated = { ...prev, [fieldName]: val };
+      dbSaveCustomer(updated);
+      const woField = CUSTOMER_TO_WORKORDER_FIELDS[fieldName];
+      if (woField) {
+        const allWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
+        allWOs
+          .filter((wo) => wo.customerID === prev.id)
+          .forEach((wo) => {
+            useOpenWorkordersStore.getState().setField(woField, val, wo.id);
+          });
+      }
+      return updated;
+    });
+  }
+
+  function buildFullAddress(customer) {
+    let parts = [];
+    if (customer.streetAddress) parts.push(customer.streetAddress);
+    if (customer.unit) parts.push(customer.unit);
+    if (customer.city) parts.push(customer.city);
+    if (customer.state) parts.push(customer.state);
+    if (customer.zip) parts.push(customer.zip);
+    return parts.join(", ");
+  }
+
+  function handleAddressPress() {
+    if (!sCustomer) return;
+    const dest = buildFullAddress(sCustomer);
+    if (!dest) return;
+    const storeInfo = zSettings?.storeInfo || {};
+    let originParts = [];
+    if (storeInfo.street) originParts.push(storeInfo.street);
+    if (storeInfo.city) originParts.push(storeInfo.city);
+    if (storeInfo.state) originParts.push(storeInfo.state);
+    if (storeInfo.zip) originParts.push(storeInfo.zip);
+    const origin = originParts.join(", ");
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}`;
+    window.open(url, "_blank");
+  }
+
+  function handleCellPress(phone) {
+    const formatted = formatPhoneWithDashes(phone);
+    navigator.clipboard.writeText(phone).catch(() => {});
+    useAlertScreenStore.getState().setValues({
+      title: "Phone Number Copied",
+      message: formatted + " has been copied to your clipboard. Select a dialer to open:",
+      btn1Text: "VONAGE",
+      btn2Text: "PHONE DIALER",
+      handleBtn1Press: () => {
+        window.open("https://app.vonage.com", "_blank");
+      },
+      handleBtn2Press: () => {
+        window.open("tel:" + phone);
+      },
+      showAlert: true,
+      canExitOnOuterClick: true,
+    });
   }
 
   function handleUploadPress() {
@@ -655,24 +813,183 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
         style={{ flex: 1 }}
         contentContainerStyle={{ padding: 16 }}
       >
-        {/* Customer + Status */}
-        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 21, fontWeight: "700", color: C.text }}>{customerName}</Text>
-            {workorder.cell ? (
-              <Text style={{ fontSize: 15, color: gray(0.45), marginTop: 2 }}>
-                {formatPhoneWithDashes(workorder.cell)}
-              </Text>
+        {/* Customer name + accordion */}
+        <View style={{ marginBottom: 16 }}>
+          <TouchableOpacity
+            onPress={handleToggleCustomer}
+            activeOpacity={workorder.customerID ? 0.6 : 1}
+            style={{ flexDirection: "row", alignItems: "center" }}
+          >
+            <Text style={{ fontSize: 21, fontWeight: "700", color: C.text, flex: 1 }}>{customerName}</Text>
+            {workorder.customerID ? (
+              <Image_
+                icon={ICONS.downChevron}
+                size={14}
+                style={{ transform: [{ rotate: sCustomerOpen ? "-90deg" : "0deg" }], marginLeft: 8 }}
+              />
             ) : null}
-          </View>
+          </TouchableOpacity>
+
+          {sCustomerOpen && workorder.customerID ? (
+            <View style={{ marginTop: 12, backgroundColor: C.listItemWhite, borderRadius: 10, borderWidth: 1, borderColor: C.buttonLightGreenOutline, padding: 12 }}>
+              {sCustomerLoading ? (
+                <SmallLoadingIndicator />
+              ) : sCustomer ? (
+                <View>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "600", color: gray(0.45) }}>CUSTOMER INFO</Text>
+                    <TouchableOpacity onPress={() => _setCustomerEditing(!sCustomerEditing)} style={{ padding: 4 }}>
+                      <Image_ icon={ICONS.editPencil} size={18} />
+                    </TouchableOpacity>
+                  </View>
+
+                  {sCustomerEditing ? (
+                    <View>
+                      <TextInput_
+                        value={capitalizeFirstLetterOfString(sCustomer.first || "")}
+                        onChangeText={(val) => saveCustomerField("first", capitalizeFirstLetterOfString(val))}
+                        placeholder="First name"
+                        capitalize={true}
+                        style={PHONE_CUSTOMER_INPUT_STYLE}
+                      />
+                      <TextInput_
+                        value={capitalizeFirstLetterOfString(sCustomer.last || "")}
+                        onChangeText={(val) => saveCustomerField("last", capitalizeFirstLetterOfString(val))}
+                        placeholder="Last name"
+                        capitalize={true}
+                        style={PHONE_CUSTOMER_INPUT_STYLE}
+                      />
+                      <TextInput_
+                        value={formatPhoneWithDashes(sCustomer.customerCell || "")}
+                        onChangeText={(val) => {
+                          val = removeDashesFromPhone(val);
+                          if (val.length > 10) return;
+                          saveCustomerField("customerCell", val);
+                        }}
+                        placeholder="Cell phone"
+                        style={PHONE_CUSTOMER_INPUT_STYLE}
+                      />
+                      <TextInput_
+                        value={formatPhoneWithDashes(sCustomer.customerLandline || "")}
+                        onChangeText={(val) => {
+                          val = removeDashesFromPhone(val);
+                          if (val.length > 10) return;
+                          saveCustomerField("customerLandline", val);
+                        }}
+                        placeholder="Landline"
+                        style={PHONE_CUSTOMER_INPUT_STYLE}
+                      />
+                      <TextInput_
+                        value={sCustomer.email || ""}
+                        onChangeText={(val) => saveCustomerField("email", val)}
+                        placeholder="Email"
+                        style={PHONE_CUSTOMER_INPUT_STYLE}
+                      />
+                      <TextInput_
+                        value={capitalizeFirstLetterOfString(sCustomer.streetAddress || "")}
+                        onChangeText={(val) => saveCustomerField("streetAddress", capitalizeFirstLetterOfString(val))}
+                        placeholder="Street address"
+                        capitalize={true}
+                        style={PHONE_CUSTOMER_INPUT_STYLE}
+                      />
+                      <TextInput_
+                        value={capitalizeFirstLetterOfString(sCustomer.city || "")}
+                        onChangeText={(val) => saveCustomerField("city", capitalizeFirstLetterOfString(val))}
+                        placeholder="City"
+                        capitalize={true}
+                        style={PHONE_CUSTOMER_INPUT_STYLE}
+                      />
+                      <TextInput_
+                        value={(sCustomer.state || "").toUpperCase()}
+                        onChangeText={(val) => saveCustomerField("state", val.toUpperCase())}
+                        placeholder="State"
+                        style={PHONE_CUSTOMER_INPUT_STYLE}
+                      />
+                      <TextInput_
+                        value={sCustomer.zip || ""}
+                        onChangeText={(val) => {
+                          if (!checkInputForNumbersOnly(val)) return;
+                          saveCustomerField("zip", val);
+                        }}
+                        placeholder="Zip code"
+                        style={PHONE_CUSTOMER_INPUT_STYLE}
+                      />
+                      <TextInput_
+                        value={capitalizeFirstLetterOfString(sCustomer.addressNotes || "")}
+                        onChangeText={(val) => saveCustomerField("addressNotes", capitalizeFirstLetterOfString(val))}
+                        placeholder="Address notes"
+                        multiline={true}
+                        numberOfLines={3}
+                        capitalize={true}
+                        style={{ ...PHONE_CUSTOMER_INPUT_STYLE, height: undefined, minHeight: 40, paddingVertical: 8 }}
+                      />
+                    </View>
+                  ) : (
+                    <View>
+                      {sCustomer.first || sCustomer.last ? (
+                        <Text style={{ fontSize: 15, color: C.text, marginBottom: 4 }}>
+                          {capitalizeFirstLetterOfString(sCustomer.first || "")} {capitalizeFirstLetterOfString(sCustomer.last || "")}
+                        </Text>
+                      ) : null}
+                      {sCustomer.customerCell ? (
+                        <TouchableOpacity onPress={() => handleCellPress(sCustomer.customerCell)} style={{ marginBottom: 3 }}>
+                          <Text style={{ fontSize: 14, color: C.blue, textDecorationLine: "underline" }}>
+                            Cell: {formatPhoneWithDashes(sCustomer.customerCell)}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      {sCustomer.customerLandline ? (
+                        <Text style={{ fontSize: 14, color: gray(0.4), marginBottom: 3 }}>
+                          Landline: {formatPhoneWithDashes(sCustomer.customerLandline)}
+                        </Text>
+                      ) : null}
+                      {sCustomer.email ? (
+                        <Text style={{ fontSize: 14, color: gray(0.4), marginBottom: 3 }}>
+                          {sCustomer.email}
+                        </Text>
+                      ) : null}
+                      {buildFullAddress(sCustomer) ? (
+                        <TouchableOpacity onPress={handleAddressPress} style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
+                          <Image_ icon={ICONS.map} size={16} style={{ marginRight: 6 }} />
+                          <Text style={{ fontSize: 14, color: C.blue, textDecorationLine: "underline" }}>
+                            {buildFullAddress(sCustomer)}
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
+                      {sCustomer.addressNotes ? (
+                        <Text style={{ fontSize: 13, color: gray(0.5), marginTop: 4, fontStyle: "italic" }}>
+                          {sCustomer.addressNotes}
+                        </Text>
+                      ) : null}
+                    </View>
+                  )}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
+        </View>
+
+        {/* Status picker */}
+        <View style={{ marginBottom: 12, alignItems: "center" }}>
           <StatusPickerModal
             statuses={(zSettings?.statuses || []).filter((s) => !s.systemOwned && !s.hidden)}
             enabled={true}
             onSelect={handleStatusSelect}
+            menuWidth={Math.round(window.innerWidth * 0.6)}
+            centered={true}
             buttonStyle={{
-              backgroundColor: statusColor,
-              paddingHorizontal: 10,
+              alignSelf: "flex-start",
+              backgroundColor: rs.backgroundColor,
+              paddingHorizontal: 12,
+              paddingVertical: 8,
+              borderRadius: 8,
             }}
+            buttonTextStyle={{
+              color: rs.textColor,
+              fontWeight: "500",
+              fontSize: 14,
+            }}
+            buttonText={rs.label}
           />
         </View>
 
@@ -802,24 +1119,412 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
           )}
         </View>
 
-        {/* Bike info */}
-        {(workorder.brand || workorder.model) && (
-          <View
-            style={{
-              backgroundColor: C.listItemWhite,
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: C.buttonLightGreenOutline,
-              padding: 12,
-              marginBottom: 12,
-            }}
-          >
-            <Text style={{ fontSize: 14, fontWeight: "600", color: gray(0.45), marginBottom: 4 }}>BIKE</Text>
-            <Text style={{ fontSize: 16, color: C.text }}>
-              {[workorder.brand, workorder.model].filter(Boolean).join(" ")}
-            </Text>
+        {/* Bike + workorder info */}
+        <View
+          style={{
+            backgroundColor: C.listItemWhite,
+            borderRadius: 10,
+            borderWidth: 1,
+            borderColor: C.buttonLightGreenOutline,
+            padding: 12,
+            marginBottom: 12,
+          }}
+        >
+          {/* Edit toggle */}
+          <View style={{ flexDirection: "row", justifyContent: "flex-end", marginBottom: 4 }}>
+            <TouchableOpacity onPress={() => _setBikeEditing(!sBikeEditing)} style={{ padding: 4 }}>
+              <Image_ icon={ICONS.editPencil} size={18} />
+            </TouchableOpacity>
           </View>
-        )}
+
+          {sBikeEditing ? (
+            <View>
+              {/* Brand */}
+              <Text style={{ fontSize: 11, color: gray(0.45), marginBottom: 2 }}>Brand</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                <TextInput_
+                  value={capitalizeFirstLetterOfString(workorder.brand || "")}
+                  onChangeText={(val) => setField("brand", capitalizeFirstLetterOfString(val))}
+                  placeholder="Brand"
+                  capitalize={true}
+                  style={{ ...PHONE_CUSTOMER_INPUT_STYLE, flex: 1, marginTop: 0 }}
+                />
+                <DropdownMenu
+                  dataArr={zSettings.bikeBrands}
+                  onSelect={(item) => setField("brand", item)}
+                  buttonText={zSettings.bikeBrandsName || "Bikes"}
+                  buttonStyle={{ marginLeft: 6, paddingHorizontal: 8 }}
+                />
+                {zSettings.bikeOptionalBrands?.length > 0 && (
+                  <DropdownMenu
+                    dataArr={zSettings.bikeOptionalBrands}
+                    onSelect={(item) => setField("brand", item)}
+                    buttonText={zSettings.bikeOptionalBrandsName || "Other"}
+                    buttonStyle={{ marginLeft: 4, paddingHorizontal: 8 }}
+                  />
+                )}
+              </View>
+
+              {/* Description */}
+              <Text style={{ fontSize: 11, color: gray(0.45), marginBottom: 2 }}>Description</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                <TextInput_
+                  value={capitalizeFirstLetterOfString(workorder.description || "")}
+                  onChangeText={(val) => setField("description", capitalizeFirstLetterOfString(val))}
+                  placeholder="Description"
+                  capitalize={true}
+                  style={{ ...PHONE_CUSTOMER_INPUT_STYLE, flex: 1, marginTop: 0 }}
+                />
+                <DropdownMenu
+                  dataArr={zSettings.bikeDescriptions}
+                  onSelect={(item) => setField("description", item)}
+                  buttonText="Descriptions"
+                  buttonStyle={{ marginLeft: 6, paddingHorizontal: 8 }}
+                />
+              </View>
+
+              {/* Colors */}
+              <Text style={{ fontSize: 11, color: gray(0.45), marginBottom: 2 }}>Colors</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
+                  <TextInput_
+                    value={workorder.color1?.label || ""}
+                    onChangeText={(val) => setBikeColor(val, "color1")}
+                    placeholder="Color 1"
+                    style={{
+                      ...PHONE_CUSTOMER_INPUT_STYLE,
+                      flex: 1,
+                      marginTop: 0,
+                      backgroundColor: workorder.color1?.backgroundColor || undefined,
+                      color: workorder.color1?.textColor || C.text,
+                    }}
+                  />
+                  <DropdownMenu
+                    dataArr={COLORS}
+                    itemSeparatorStyle={{ height: 0 }}
+                    menuBorderColor="transparent"
+                    onSelect={(item) => setField("color1", item)}
+                    buttonText="1"
+                    buttonStyle={{ marginLeft: 4, paddingHorizontal: 8 }}
+                  />
+                </View>
+                <View style={{ width: 8 }} />
+                <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
+                  <TextInput_
+                    value={workorder.color2?.label || ""}
+                    onChangeText={(val) => setBikeColor(val, "color2")}
+                    placeholder="Color 2"
+                    style={{
+                      ...PHONE_CUSTOMER_INPUT_STYLE,
+                      flex: 1,
+                      marginTop: 0,
+                      backgroundColor: workorder.color2?.backgroundColor || undefined,
+                      color: workorder.color2?.textColor || C.text,
+                    }}
+                  />
+                  <DropdownMenu
+                    dataArr={COLORS}
+                    itemSeparatorStyle={{ height: 0 }}
+                    menuBorderColor="transparent"
+                    onSelect={(item) => setField("color2", item)}
+                    buttonText="2"
+                    buttonStyle={{ marginLeft: 4, paddingHorizontal: 8 }}
+                  />
+                </View>
+              </View>
+
+              {/* Max wait */}
+              <Text style={{ fontSize: 11, color: gray(0.45), marginBottom: 2 }}>Max wait (days)</Text>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                <TextInput_
+                  value={String(workorder.waitTime?.maxWaitTimeDays ?? "")}
+                  onChangeText={(val) => {
+                    if (val && !checkInputForNumbersOnly(val, false)) return;
+                    let waitObj = { ...(workorder.waitTime || {}), maxWaitTimeDays: val ? parseInt(val) : "" };
+                    setField("waitTime", waitObj);
+                  }}
+                  placeholder="Days"
+                  style={{ ...PHONE_CUSTOMER_INPUT_STYLE, width: 60, marginTop: 0 }}
+                />
+                <DropdownMenu
+                  dataArr={zSettings.waitTimes}
+                  onSelect={(item) => {
+                    let isNonRemovable = NONREMOVABLE_WAIT_TIMES.some((nr) => nr.id === item.id);
+                    let waitObj = { ...item, removable: !isNonRemovable };
+                    setField("waitTime", waitObj);
+                  }}
+                  buttonText="Wait Times"
+                  buttonStyle={{ marginLeft: 6, paddingHorizontal: 8 }}
+                />
+              </View>
+
+              {/* Wait estimate display */}
+              {(() => {
+                let estimateLabel = calculateWaitEstimateLabel(workorder, zSettings);
+                let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
+                return estimateLabel ? (
+                  <Text style={{ fontSize: 13, fontStyle: "italic", color: isMissing ? C.red : gray(0.5), marginBottom: 6 }}>
+                    {estimateLabel}
+                  </Text>
+                ) : null;
+              })()}
+
+              {/* Item not here */}
+              <CheckBox_
+                isChecked={!!workorder.itemNotHere}
+                text="Item not here"
+                textStyle={{ fontSize: 13 }}
+                buttonStyle={{ backgroundColor: "transparent", marginBottom: 8 }}
+                onCheck={() => setField("itemNotHere", !workorder.itemNotHere)}
+              />
+
+              {/* Ordering section */}
+              <TouchableOpacity
+                onPress={() => _setOrderingOpen(!sOrderingOpen)}
+                style={{ flexDirection: "row", alignItems: "center", paddingVertical: 4, marginBottom: 4 }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.45) }}>ORDERING</Text>
+                <Image_
+                  icon={ICONS.downChevron}
+                  size={10}
+                  style={{ transform: [{ rotate: sOrderingOpen ? "0deg" : "-90deg" }], marginLeft: 6 }}
+                />
+              </TouchableOpacity>
+
+              {sOrderingOpen && (
+                <View>
+                  {/* Part ordered */}
+                  <Text style={{ fontSize: 11, color: gray(0.45), marginBottom: 2 }}>Item ordered</Text>
+                  <TextInput_
+                    value={capitalizeFirstLetterOfString(workorder.partOrdered || "")}
+                    onChangeText={(val) => {
+                      setField("partOrdered", val);
+                      if (!workorder.partOrderedMillis) setField("partOrderedMillis", Date.now());
+                    }}
+                    placeholder="Item names/descriptions"
+                    capitalize={true}
+                    style={{ ...PHONE_CUSTOMER_INPUT_STYLE, marginTop: 0, marginBottom: 8 }}
+                  />
+
+                  {/* Part source */}
+                  <Text style={{ fontSize: 11, color: gray(0.45), marginBottom: 2 }}>Source</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                    <TextInput_
+                      value={capitalizeFirstLetterOfString(workorder.partSource || "")}
+                      onChangeText={(val) => {
+                        setField("partSource", val);
+                        if (!workorder.partOrderedMillis) setField("partOrderedMillis", Date.now());
+                      }}
+                      placeholder="Item sources"
+                      capitalize={true}
+                      style={{ ...PHONE_CUSTOMER_INPUT_STYLE, flex: 1, marginTop: 0 }}
+                    />
+                    <DropdownMenu
+                      dataArr={zSettings.partSources}
+                      onSelect={(item) => {
+                        setField("partSource", item);
+                        setField("partOrderedMillis", Date.now());
+                      }}
+                      buttonText="Sources"
+                      buttonStyle={{ marginLeft: 6, paddingHorizontal: 8 }}
+                    />
+                  </View>
+
+                  {/* Delivery estimate */}
+                  <Text style={{ fontSize: 11, color: gray(0.45), marginBottom: 4 }}>Est. delivery</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                    <TouchableOpacity
+                      onPress={() => updateWaitDays(Math.max(0, sWaitDays - 1))}
+                      style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: C.buttonLightGreen, justifyContent: "center", alignItems: "center" }}
+                    >
+                      <Text style={{ color: gray(0.55), fontSize: 16, fontWeight: "700", marginTop: -1 }}>{"\u2212"}</Text>
+                    </TouchableOpacity>
+                    <Text style={{ fontSize: 14, color: C.text, minWidth: 60, textAlign: "center" }}>
+                      {sWaitDays + " days"}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => updateWaitDays(sWaitDays + 1)}
+                      style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: C.buttonLightGreen, justifyContent: "center", alignItems: "center" }}
+                    >
+                      <Text style={{ color: gray(0.55), fontSize: 16, fontWeight: "700", marginTop: -1 }}>+</Text>
+                    </TouchableOpacity>
+                    {!!workorder.partOrderEstimateMillis && (
+                      <Text style={{ fontSize: 13, color: gray(0.45), marginLeft: 8 }}>
+                        {formatMillisForDisplay(workorder.partOrderEstimateMillis)}
+                      </Text>
+                    )}
+                  </View>
+
+                  {/* Ordered / Not ordered toggle */}
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      const newVal = !workorder.partToBeOrdered;
+                      setField("partToBeOrdered", newVal);
+                      setField("status", newVal ? "open" : "part_ordered");
+                    }}
+                    style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}
+                  >
+                    <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: workorder.partToBeOrdered ? C.red : C.green, justifyContent: "center", alignItems: "center", marginRight: 5 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: workorder.partToBeOrdered ? C.red : C.green }} />
+                    </View>
+                    <Text style={{ fontSize: 12, fontWeight: "600", color: workorder.partToBeOrdered ? C.red : C.green }}>
+                      {workorder.partToBeOrdered ? "Not ordered" : "Ordered"}
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Tracking */}
+                  <Text style={{ fontSize: 11, color: gray(0.45), marginBottom: 2 }}>Tracking</Text>
+                  <TextInput_
+                    value={workorder.trackingNumber || ""}
+                    onChangeText={(val) => setField("trackingNumber", val)}
+                    placeholder="Tracking num or website"
+                    style={{ ...PHONE_CUSTOMER_INPUT_STYLE, marginTop: 0, marginBottom: 4 }}
+                  />
+                  {!!workorder.trackingNumber && (() => {
+                    const val = workorder.trackingNumber.trim();
+                    const isURL = /^https?:\/\/|^www\./i.test(val);
+                    const openUrl = isURL && val.startsWith("www.") ? "https://" + val : val;
+                    return (
+                      <TouchableOpacity
+                        onPress={() => window.open(isURL ? openUrl : "https://parcelsapp.com/en/tracking/" + val, "_blank")}
+                        style={{ marginBottom: 4 }}
+                      >
+                        <Text style={{ fontSize: 13, color: C.blue, textDecorationLine: "underline" }}>
+                          {isURL ? "Open link" : "Track package"}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })()}
+                </View>
+              )}
+            </View>
+          ) : (
+            <View>
+              {/* Read-only view */}
+              {/* Brand + description */}
+              {(workorder.brand || workorder.description) ? (
+                <View style={{ marginBottom: 6 }}>
+                  {!!workorder.brand && (
+                    <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>
+                      {capitalizeFirstLetterOfString(workorder.brand)}
+                    </Text>
+                  )}
+                  {!!workorder.description && (
+                    <Text style={{ fontSize: 14, color: gray(0.4), marginTop: 1 }}>
+                      {capitalizeFirstLetterOfString(workorder.description)}
+                    </Text>
+                  )}
+                </View>
+              ) : null}
+
+              {/* Colors */}
+              {(workorder.color1?.label || workorder.color2?.label) ? (
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                  {!!workorder.color1?.label && (
+                    <View style={{ flexDirection: "row", alignItems: "center", marginRight: 12 }}>
+                      <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: workorder.color1.backgroundColor || gray(0.5), borderWidth: 1, borderColor: gray(0.8), marginRight: 5 }} />
+                      <Text style={{ fontSize: 13, color: C.text }}>{workorder.color1.label}</Text>
+                    </View>
+                  )}
+                  {!!workorder.color2?.label && (
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: workorder.color2.backgroundColor || gray(0.5), borderWidth: 1, borderColor: gray(0.8), marginRight: 5 }} />
+                      <Text style={{ fontSize: 13, color: C.text }}>{workorder.color2.label}</Text>
+                    </View>
+                  )}
+                </View>
+              ) : null}
+
+              {/* Wait estimate + item not here */}
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                {(() => {
+                  let estimateLabel = calculateWaitEstimateLabel(workorder, zSettings);
+                  let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
+                  return estimateLabel ? (
+                    <Text style={{ fontSize: 13, fontStyle: "italic", color: isMissing ? C.red : gray(0.5) }}>
+                      {estimateLabel}
+                    </Text>
+                  ) : <View />;
+                })()}
+                {!!workorder.itemNotHere && (
+                  <View style={{ backgroundColor: "rgb(255, 243, 176)", borderRadius: 10, paddingHorizontal: 8, paddingVertical: 1 }}>
+                    <Text style={{ color: "rgb(90, 75, 0)", fontSize: 11, fontWeight: "600" }}>Item not here</Text>
+                  </View>
+                )}
+              </View>
+
+              {/* Max wait */}
+              {!!workorder.waitTime?.maxWaitTimeDays && (
+                <Text style={{ fontSize: 13, color: gray(0.45), marginBottom: 4 }}>
+                  Max wait: {workorder.waitTime.maxWaitTimeDays} days
+                </Text>
+              )}
+
+              {/* Ordering section - show/hide */}
+              <TouchableOpacity
+                onPress={() => _setOrderingOpen(!sOrderingOpen)}
+                style={{ flexDirection: "row", alignItems: "center", marginTop: 6, paddingVertical: 4 }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.45) }}>ORDERING</Text>
+                <Image_
+                  icon={ICONS.downChevron}
+                  size={10}
+                  style={{ transform: [{ rotate: sOrderingOpen ? "0deg" : "-90deg" }], marginLeft: 6 }}
+                />
+              </TouchableOpacity>
+
+              {sOrderingOpen && (
+                <View style={{ marginTop: 6 }}>
+                  {!!workorder.partOrdered && (
+                    <View style={{ marginBottom: 6 }}>
+                      <Text style={{ fontSize: 11, color: gray(0.45), marginBottom: 2 }}>Item ordered</Text>
+                      <Text style={{ fontSize: 14, color: C.text }}>{capitalizeFirstLetterOfString(workorder.partOrdered)}</Text>
+                    </View>
+                  )}
+                  {!!workorder.partSource && (
+                    <View style={{ marginBottom: 6 }}>
+                      <Text style={{ fontSize: 11, color: gray(0.45), marginBottom: 2 }}>Source</Text>
+                      <Text style={{ fontSize: 14, color: C.text }}>{capitalizeFirstLetterOfString(workorder.partSource)}</Text>
+                    </View>
+                  )}
+                  <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                    {!!workorder.partOrderEstimateMillis && (
+                      <Text style={{ fontSize: 13, color: gray(0.45) }}>
+                        Est. delivery: {formatMillisForDisplay(workorder.partOrderEstimateMillis)}
+                      </Text>
+                    )}
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <View style={{ width: 10, height: 10, borderRadius: 5, borderWidth: 1.5, borderColor: workorder.partToBeOrdered ? C.red : C.green, justifyContent: "center", alignItems: "center", marginRight: 4 }}>
+                        <View style={{ width: 5, height: 5, borderRadius: 2.5, backgroundColor: workorder.partToBeOrdered ? C.red : C.green }} />
+                      </View>
+                      <Text style={{ fontSize: 12, fontWeight: "600", color: workorder.partToBeOrdered ? C.red : C.green }}>
+                        {workorder.partToBeOrdered ? "Not ordered" : "Ordered"}
+                      </Text>
+                    </View>
+                  </View>
+                  {!!workorder.trackingNumber && (
+                    <View style={{ marginBottom: 4 }}>
+                      <Text style={{ fontSize: 11, color: gray(0.45), marginBottom: 2 }}>Tracking</Text>
+                      {(() => {
+                        const val = workorder.trackingNumber.trim();
+                        const isURL = /^https?:\/\/|^www\./i.test(val);
+                        const openUrl = isURL && val.startsWith("www.") ? "https://" + val : val;
+                        return (
+                          <TouchableOpacity onPress={() => window.open(isURL ? openUrl : "https://parcelsapp.com/en/tracking/" + val, "_blank")}>
+                            <Text style={{ fontSize: 14, color: C.blue, textDecorationLine: "underline" }} numberOfLines={2}>
+                              {val}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })()}
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          )}
+        </View>
 
         {/* Line items */}
         <View
@@ -957,6 +1662,8 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
           </Text>
         </TouchableOpacity>
       )}
+
+      <AlertBox_ showAlert={zShowAlert} />
     </View>
   );
 }

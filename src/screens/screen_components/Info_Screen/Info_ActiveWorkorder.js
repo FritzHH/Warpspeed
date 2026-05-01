@@ -1161,7 +1161,7 @@ export const ActiveWorkorderComponent = ({}) => {
             <View
               style={{
                 flexDirection: "row",
-                justifyContent: "flex-start",
+                justifyContent: "space-between",
                 width: "100%",
                 alignItems: "center",
                 marginTop: 11,
@@ -1231,28 +1231,38 @@ export const ActiveWorkorderComponent = ({}) => {
                 </View>
               </View>
             </View>
-            {(() => {
-              let estimateLabel = calculateWaitEstimateLabel(zOpenWorkorder, useSettingsStore.getState().getSettings());
-              let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
-              return estimateLabel ? (
-                <Text
-                  style={{
-                    color: isMissing ? C.red : gray(0.5),
-                    fontSize: 13,
-                    fontStyle: "italic",
-                    marginTop: 4,
-                    width: "100%",
-                    backgroundColor: sWaitTimeBlink && isMissing ? "rgba(255, 255, 0, 0.35)" : "transparent",
-                    transition: "background-color 300ms ease",
-                    borderRadius: 3,
-                    paddingHorizontal: 4,
-                    paddingVertical: 2,
-                  }}
-                >
-                  {estimateLabel}
-                </Text>
-              ) : null;
-            })()}
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginTop: 4 }}>
+              {(() => {
+                let estimateLabel = calculateWaitEstimateLabel(zOpenWorkorder, useSettingsStore.getState().getSettings());
+                let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
+                return estimateLabel ? (
+                  <Text
+                    style={{
+                      color: isMissing ? C.red : gray(0.5),
+                      fontSize: 13,
+                      fontStyle: "italic",
+                      backgroundColor: sWaitTimeBlink && isMissing ? "rgba(255, 255, 0, 0.35)" : "transparent",
+                      transition: "background-color 300ms ease",
+                      borderRadius: 3,
+                      paddingHorizontal: 4,
+                      paddingVertical: 2,
+                    }}
+                  >
+                    {estimateLabel}
+                  </Text>
+                ) : <View />;
+              })()}
+              <CheckBox_
+                isChecked={!!zOpenWorkorder?.itemNotHere}
+                text="Item not here"
+                textStyle={{ fontSize: 13 }}
+                buttonStyle={{ backgroundColor: "transparent" }}
+                onCheck={() => {
+                  if (isDonePaid) return;
+                  useOpenWorkordersStore.getState().setField("itemNotHere", !zOpenWorkorder?.itemNotHere, zOpenWorkorder.id);
+                }}
+              />
+            </View>
           </View>
 
           <View

@@ -481,19 +481,13 @@ export function WorkordersComponent({}) {
     >
       <View
         style={{
-          paddingVertical: 5,
+          height: "5%",
           flexDirection: "row",
           alignItems: "center",
+          paddingHorizontal: 4,
           justifyContent: "space-between",
         }}
       >
-        <View
-          style={{
-            flex: 1,
-            flexDirection: "row",
-            alignItems: "center",
-          }}
-        >
           <Button_
             icon={ICONS.reset1}
             iconSize={20}
@@ -507,20 +501,20 @@ export function WorkordersComponent({}) {
             style={{
               borderBottomWidth: 1,
               borderBottomColor: gray(0.2),
-              fontSize: 15,
+              fontSize: 18,
               color: C.text,
               outlineWidth: 0,
               outlineStyle: "none",
-              flex: 1,
-              marginLeft: 8,
-              marginRight: 12,
+              width: "80%",
+              marginLeft: 20,
+              marginRight: 30,
             }}
             placeholder="Find open workorder"
             placeholderTextColor={gray(0.2)}
             value={sSearchTerm}
             onChangeText={handleSearchChange}
+            autoFocus={true}
           />
-        </View>
       </View>
 
       <FlatList
@@ -685,6 +679,21 @@ export function WorkordersComponent({}) {
                           >
                             <Text style={{ color: "white", fontSize: 13, fontWeight: "600" }}>
                               {workorder.workorderLines.length}
+                            </Text>
+                          </View>
+                        )}
+                        {!!workorder.itemNotHere && (
+                          <View
+                            style={{
+                              backgroundColor: "rgb(255, 243, 176)",
+                              borderRadius: 10,
+                              paddingHorizontal: 8,
+                              paddingVertical: 1,
+                              marginLeft: 8,
+                            }}
+                          >
+                            <Text style={{ color: "rgb(90, 75, 0)", fontSize: 11, fontWeight: "600" }}>
+                              Item not here
                             </Text>
                           </View>
                         )}

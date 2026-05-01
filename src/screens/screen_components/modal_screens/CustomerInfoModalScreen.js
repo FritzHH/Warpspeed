@@ -52,6 +52,7 @@ import { readActiveSale, readTransactions } from "./newCheckoutModalScreen/newCh
 import { ClosedWorkorderModal } from "./ClosedWorkorderModal";
 import { DepositRefundModal } from "./newCheckoutModalScreen/DepositRefundModal";
 import { FullSaleModal } from "./FullSaleModal";
+import { GoogleMapsModal } from "./GoogleMapsModal";
 
 export const CustomerInfoScreenModalComponent = ({
   incomingCustomer = null,
@@ -89,6 +90,7 @@ export const CustomerInfoScreenModalComponent = ({
   const [sRefundDeposit, _sSetRefundDeposit] = useState(null);
   const [sSaleModalItem, _sSetSaleModalItem] = useState(null);
   const [sCellDuplicateStatus, _sCellDuplicateStatus] = useState(null); // null | "checking" | "duplicate" | "unique" | "error"
+  const [sShowMapsModal, _sSetShowMapsModal] = useState(false);
   const mountedRef = useRef(true);
   const initialCellRef = useRef(initialCustomer?.customerCell || "");
 
@@ -501,15 +503,35 @@ export const CustomerInfoScreenModalComponent = ({
             style={{ ...TEXT_INPUT_STYLE }}
             value={(sCustomerInfo.state || "").toUpperCase()}
           />
-          <TextInput_
-            onChangeText={(val) => {
-              if (!checkInputForNumbersOnly(val)) return;
-              saveField("zip", val);
-            }}
-            placeholder="Zip code"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.zip}
-          />
+          <View style={{ flexDirection: "row", alignItems: "center", justifiyContent: 'center', marginTop: TEXT_INPUT_STYLE.marginTop }}>
+            <TextInput_
+              onChangeText={(val) => {
+                if (!checkInputForNumbersOnly(val)) return;
+                saveField("zip", val);
+              }}
+              placeholder="Zip code"
+              style={{ ...TEXT_INPUT_STYLE, marginTop: 0 }}
+              value={sCustomerInfo.zip}
+            />
+            {!!sCustomerInfo.streetAddress && !!sCustomerInfo.city && !!sCustomerInfo.state && (
+              <Button_
+                text="Maps"
+                icon={ICONS.map}
+                iconSize={30}
+                onPress={() => _sSetShowMapsModal(true)}
+                colorGradientArr={COLOR_GRADIENTS.blue}
+                buttonStyle={{
+                  // flex: 1,
+                  paddingVertical: 3,
+                  height: '100%',
+                  borderRadius: 7,
+                  marginLeft: 10,
+                  justifyContent: "center",
+                }}
+                textStyle={{ color: C.textWhite, fontSize: 15, fontWeight: "600" }}
+              />
+            )}
+          </View>
           <TextInput_
             onChangeText={(val) => saveField("notes", capitalizeFirstLetterOfString(val))}
             placeholder="Address notes"
@@ -788,6 +810,16 @@ export const CustomerInfoScreenModalComponent = ({
             onClose={() => _sSetSaleModalItem(null)}
           />
         )}
+        <GoogleMapsModal
+          visible={sShowMapsModal}
+          onClose={() => _sSetShowMapsModal(false)}
+          startAddress={(() => {
+            const si = useSettingsStore.getState().getSettings()?.storeInfo;
+            if (!si) return "";
+            return [si.street, si.unit, si.city, si.state, si.zip].filter(Boolean).join(", ");
+          })()}
+          endAddress={[sCustomerInfo.streetAddress, sCustomerInfo.unit, sCustomerInfo.city, sCustomerInfo.state, sCustomerInfo.zip].filter(Boolean).join(", ")}
+        />
       </View>
     </TouchableWithoutFeedback>
   );
@@ -1365,6 +1397,11 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
           keyExtractor={(item) => item.id}
           renderItem={renderMessage}
           style={{ flex: 1 }}
+          onContentSizeChange={() => {
+            if (sMessages.length > 0 && flatListRef.current) {
+              try { flatListRef.current.scrollToEnd({ animated: false }); } catch (e) {}
+            }
+          }}
           contentContainerStyle={sMessages.length === 0 ? { flex: 1, justifyContent: "center", alignItems: "center" } : { paddingVertical: 10, paddingHorizontal: 12 }}
           ListEmptyComponent={
             <View style={{ alignItems: "center" }}>

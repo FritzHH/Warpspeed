@@ -1028,6 +1028,10 @@ export function InventoryComponent({}) {
       } else {
         let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
         const { _score, ...cleanItem } = item;
+        if (cleanItem.minutes > 0 && !cleanItem.price) {
+          const laborRate = useSettingsStore.getState().settings?.laborRateByHour || 0;
+          cleanItem.price = Math.round((cleanItem.minutes / 60) * laborRate);
+        }
         lineItem.inventoryItem = cleanItem;
         lineItem.id = crypto.randomUUID();
         workorderLines = [...workorderLines, lineItem];
@@ -1042,24 +1046,59 @@ export function InventoryComponent({}) {
       // auto customer note
       const autoNoteTexts = useSettingsStore.getState().settings?.autoCustomerNoteTexts || [];
       const autoNote = autoNoteTexts.find((n) => n.inventoryItemID === item.id);
-      if (autoNote && autoNote.text) {
+      if (autoNote) {
         let customerNotes = openWorkorder.customerNotes || [];
-        const alreadyHasNote = customerNotes.some((n) => n.autoNoteItemID === item.id);
-        if (!alreadyHasNote) {
-          let currentUser = useLoginStore.getState().currentUser;
-          let userName = currentUser
-            ? "(" + currentUser.first + " " + (currentUser.last?.[0] || "") + ")  "
-            : "(Auto)";
-          customerNotes = [
-            ...customerNotes,
-            {
-              name: userName,
-              userID: currentUser?.id || "",
-              value: autoNote.text,
-              id: crypto.randomUUID(),
-              autoNoteItemID: item.id,
-            },
-          ];
+        let currentUser = useLoginStore.getState().currentUser;
+        let userName = currentUser
+          ? "(" + currentUser.first + " " + (currentUser.last?.[0] || "") + ")  "
+          : "(Auto)";
+        let notesChanged = false;
+
+        // text auto-note
+        if (autoNote.text && autoNote.text.trim()) {
+          const alreadyHasNote = customerNotes.some((n) => n.autoNoteItemID === item.id);
+          if (!alreadyHasNote) {
+            customerNotes = [
+              ...customerNotes,
+              {
+                name: userName,
+                userID: currentUser?.id || "",
+                value: autoNote.text,
+                id: crypto.randomUUID(),
+                autoNoteItemID: item.id,
+              },
+            ];
+            notesChanged = true;
+          }
+        }
+
+        // quick note auto-notes
+        if (autoNote.quickNoteIDs && autoNote.quickNoteIDs.length > 0) {
+          const quickNotes = useSettingsStore.getState().settings?.customerQuickNotes || [];
+          autoNote.quickNoteIDs.forEach((qnID) => {
+            const alreadyHas = customerNotes.some((n) => n.quickNoteItemId === qnID);
+            if (alreadyHas) return;
+            let noteItem = null;
+            quickNotes.forEach((cat) => {
+              let found = (cat.items || []).find((i) => i.id === qnID);
+              if (found) noteItem = found;
+            });
+            if (!noteItem) return;
+            customerNotes = [
+              ...customerNotes,
+              {
+                name: userName,
+                userID: currentUser?.id || "",
+                value: noteItem.text || noteItem.buttonLabel,
+                id: crypto.randomUUID(),
+                quickNoteItemId: qnID,
+              },
+            ];
+            notesChanged = true;
+          });
+        }
+
+        if (notesChanged) {
           useOpenWorkordersStore.getState().setField("customerNotes", customerNotes);
         }
       }

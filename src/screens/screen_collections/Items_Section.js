@@ -122,6 +122,7 @@ const TranslateModal = ({ visible, onClose }) => {
     (text) => {
       _sSetInputText(text);
       debouncedTranslate(text, sToLang);
+      resetInactivityTimer();
     },
     [sToLang, debouncedTranslate]
   );
@@ -139,17 +140,24 @@ const TranslateModal = ({ visible, onClose }) => {
     let to = sToLang === from ? sFromLang : sToLang;
     _sSetToLang(to);
     doTranslate(starter.text, to);
+    resetInactivityTimer();
   }
 
-  // Auto-close after 60 seconds — ref avoids timer reset on parent re-renders
   const handleCloseRef = useRef(null);
   handleCloseRef.current = handleClose;
+  const inactivityTimerRef = useRef(null);
+
+  function resetInactivityTimer() {
+    if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current);
+    inactivityTimerRef.current = setTimeout(() => {
+      if (handleCloseRef.current) handleCloseRef.current();
+    }, 120000);
+  }
+
   useEffect(() => {
     if (!visible) return;
-    let timer = setTimeout(() => {
-      if (handleCloseRef.current) handleCloseRef.current();
-    }, 60000);
-    return () => clearTimeout(timer);
+    resetInactivityTimer();
+    return () => { if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current); };
   }, [visible]);
 
   if (!visible) return null;
@@ -228,6 +236,7 @@ const TranslateModal = ({ visible, onClose }) => {
                 _sSetFromLang(item.code);
                 if (item.code && sToLang && item.code !== sToLang && sInputText.trim()) debouncedTranslate(sInputText, sToLang);
                 if (!item.code || item.code === sToLang) clearTranslation();
+                resetInactivityTimer();
               }}
               buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}
               buttonStyle={{ paddingVertical: 5 }}
@@ -239,6 +248,7 @@ const TranslateModal = ({ visible, onClose }) => {
                 _sSetToLang(item.code);
                 if (sFromLang && item.code && sFromLang !== item.code && sInputText.trim()) debouncedTranslate(sInputText, item.code);
                 if (!item.code || sFromLang === item.code) clearTranslation();
+                resetInactivityTimer();
               }}
               buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sToLang)?.label || "Spanish"}
               buttonStyle={{ paddingVertical: 5 }}

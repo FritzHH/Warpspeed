@@ -169,6 +169,7 @@ export const ICONS = {
   print: require(ASSETS_PATH + "print.png"),
   variable: require(ASSETS_PATH + "variable.png"),
   person: require(ASSETS_PATH + "person.png"),
+  map: require(ASSETS_PATH + "map.png"),
 };
 
 // rgb(64, 174, 113)

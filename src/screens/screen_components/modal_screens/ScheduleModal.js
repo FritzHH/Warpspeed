@@ -592,21 +592,6 @@ export function ScheduleModal({ handleExit }) {
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => _setShowPay(!sShowPay)}
-                style={{
-                  backgroundColor: sShowPay ? "rgb(180,180,180)" : "rgb(103,124,231)",
-                  borderRadius: 8,
-                  paddingVertical: 10,
-                  paddingHorizontal: 18,
-                  marginRight: 16,
-                }}
-              >
-                <Text style={{ color: "white", fontSize: 14, fontWeight: "700" }}>
-                  {sShowPay ? "Hide Pay" : "Show Pay"}
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
                 onPress={handleExit}
                 style={{
                   width: 40,
@@ -778,6 +763,20 @@ export function ScheduleModal({ handleExit }) {
                       </Text>
                     </View>
                   )}
+                  <TouchableOpacity
+                    onPress={() => _setShowPay(!sShowPay)}
+                    style={{
+                      backgroundColor: sShowPay ? "rgb(180,180,180)" : "rgb(103,124,231)",
+                      borderRadius: 8,
+                      paddingVertical: 8,
+                      paddingHorizontal: 14,
+                      marginLeft: 12,
+                    }}
+                  >
+                    <Text style={{ color: "white", fontSize: 13, fontWeight: "700" }}>
+                      {sShowPay ? "Hide Pay" : "Show Pay"}
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               );
             })()}

@@ -9,7 +9,7 @@ import {
   log,
 } from "../../utils";
 import { TabMenuButton, Image_, Button_ } from "../../components";
-import { C, Fonts, ICONS } from "../../styles";
+import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../styles";
 import { TAB_NAMES } from "../../data";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
 import ReactDOM from "react-dom";
@@ -25,6 +25,9 @@ import {
 } from "../../stores";
 import { INTERNET_CHECK_DELAY, LOCAL_DB_KEYS } from "../../constants";
 import { PayrollModal } from "../screen_components/modal_screens/PayrollModal";
+import { getWeekStart, formatTimeShort, getStoreHoursForDayIndex } from "../screen_components/modal_screens/ScheduleModal";
+import dayjs from "dayjs";
+import { gray } from "../../utils";
 
 export const Options_Section = React.memo(({}) => {
   // store getters ///////////////////////////////////////////////////////////////
@@ -33,67 +36,13 @@ export const Options_Section = React.memo(({}) => {
 
   // local state
   const [sShowPayroll, _setShowPayroll] = useState(false);
+  const [sShowUserClockModal, _setShowUserClockModal] = useState(false);
 
   //////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////
 
-  function handleUserClockPress(user) {
-    let millis = new Date().getTime();
-    let option = useLoginStore.getState().punchClock[user.id] ? "out" : "in";
-
-    // log("clocked in arr", zClockedInUsersArr);
-    let clockinFun = () => {
-      // _zCreateUserClockPunch(userObj.id, millis, option);
-      useLoginStore.getState().setCreateUserClock(user.id, millis, option);
-
-      // now we will pause the app asking if the user wants to clock in if they say "no". this is to let them use the app even if they aren't clocked in.
-
-      // TODO administrator can set this to not allow the user to use the app if not clocked in, let it keep bugging them as a way to stop them from using it
-      if (option === "out") {
-        let clockPauseObj = localStorageWrapper.getItem(
-          LOCAL_DB_KEYS.userClockCheckPauseObj
-        );
-        if (!clockPauseObj) clockPauseObj = {};
-        clockPauseObj[user.id] = new Date().getTime();
-        localStorageWrapper.setItem(
-          LOCAL_DB_KEYS.userClockCheckPauseObj,
-          clockPauseObj
-        );
-      }
-    };
-
-    let viewHistoryFun = () => {
-      useAlertScreenStore.getState().setShowAlert(false);
-      _setShowPayroll(true);
-    };
-
-    let clockMessage = "";
-    if (option === "out") {
-      let punchObj = useLoginStore.getState().punchClock[user.id];
-      if (punchObj && punchObj.millis) {
-        let diff = millis - punchObj.millis;
-        let t = convertMillisToHoursMins(diff);
-        clockMessage = "Clocked in for " + t.hours + "h " + String(t.minutes).padStart(2, "0") + "m";
-      }
-    } else {
-      clockMessage = "Currently clocked out";
-    }
-
-    useAlertScreenStore.getState().setShowAlert(true);
-    useAlertScreenStore.getState().setValues({
-      title: "PUNCH CLOCK",
-      message: clockMessage,
-      btn1Text: option == "in" ? "CLOCK IN" : "CLOCK OUT",
-      btn2Text: "VIEW HISTORY",
-      btn3Text: "CANCEL",
-      btn1Icon: ICONS.clockGif,
-      btn2Icon: ICONS.listGif,
-      btn3Icon: ICONS.cancelGif,
-      handleBtn1Press: clockinFun,
-      handleBtn2Press: viewHistoryFun,
-      handleBtn3Press: () => null,
-      alertBoxStyle: { width: 700 },
-    });
+  function handleUserClockPress() {
+    _setShowUserClockModal(true);
   }
 
   function ScreenComponent() {
@@ -121,6 +70,16 @@ export const Options_Section = React.memo(({}) => {
         <PayrollModal
           handleExit={() => _setShowPayroll(false)}
           employeeUser={zCurrentUser}
+        />
+      )}
+      {sShowUserClockModal && (
+        <UserClockModal
+          user={zCurrentUser}
+          handleExit={() => _setShowUserClockModal(false)}
+          handleViewHistory={() => {
+            _setShowUserClockModal(false);
+            _setShowPayroll(true);
+          }}
         />
       )}
     </View>
@@ -344,6 +303,235 @@ export const TabBar = ({
         onClose={() => _sSetShowCameraPreview(false)}
       />
     </View>
+  );
+};
+
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+function ScheduleWeekRow({ label, user, weekStart, schedules, storeHours, todayStr }) {
+  let weekShifts = schedules?.[weekStart]?.shifts || {};
+  return (
+    <View style={{ width: "100%", marginBottom: 10 }}>
+      <Text style={{ fontSize: 13, fontWeight: "700", color: gray(0.4), marginBottom: 6 }}>{label}</Text>
+      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+        {DAY_LABELS.map((dayName, i) => {
+          let dayIndex = i + 1;
+          let shiftKey = `${user?.id}_${dayIndex}`;
+          let shift = weekShifts[shiftKey];
+          let storeDay = getStoreHoursForDayIndex(storeHours, dayIndex);
+          let isClosed = storeDay ? !storeDay.isOpen : false;
+          let dateStr = dayjs(weekStart).add(i, "day").format("YYYY-MM-DD");
+          let isToday = dateStr === todayStr;
+
+          return (
+            <View
+              key={dayIndex}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                marginHorizontal: 3,
+                backgroundColor: shift ? "#e8f5e9" : gray(0.95),
+                borderRadius: 10,
+                paddingVertical: 10,
+                borderWidth: isToday ? 2 : 1,
+                borderColor: isToday ? C.blue : shift ? C.green : gray(0.85),
+                minHeight: 70,
+                justifyContent: "center",
+              }}
+            >
+              <Text
+                style={{
+                  fontSize: 14,
+                  fontWeight: isToday ? "800" : "700",
+                  color: isToday ? C.blue : gray(0.35),
+                }}
+              >
+                {dayName}
+              </Text>
+              {isClosed ? (
+                <Text style={{ fontSize: 11, color: gray(0.45), marginTop: 3, fontWeight: "600" }}>OFF</Text>
+              ) : shift ? (
+                <View style={{ alignItems: "center", marginTop: 3 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: gray(0.2) }}>
+                    {formatTimeShort(shift.startTime)}
+                  </Text>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: gray(0.2) }}>
+                    {formatTimeShort(shift.endTime)}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={{ fontSize: 12, color: gray(0.55), marginTop: 3 }}>-</Text>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+const UserClockModal = ({ user, handleExit, handleViewHistory }) => {
+  const zPunchClock = useLoginStore((state) => state.punchClock);
+  const settings = useSettingsStore((state) => state.settings);
+  const storeHours = settings?.storeHours;
+  const schedules = settings?.schedules;
+
+  let isClockedIn = zPunchClock[user?.id];
+  let millis = new Date().getTime();
+  let option = isClockedIn ? "out" : "in";
+
+  let clockMessage = "";
+  if (option === "out") {
+    let punchObj = zPunchClock[user?.id];
+    if (punchObj && punchObj.millis) {
+      let diff = millis - punchObj.millis;
+      let t = convertMillisToHoursMins(diff);
+      clockMessage = "Clocked in for " + t.hours + "h " + String(t.minutes).padStart(2, "0") + "m";
+    }
+  } else {
+    clockMessage = "Currently clocked out";
+  }
+
+  function handleClockPress() {
+    useLoginStore.getState().setCreateUserClock(user.id, millis, option);
+    if (option === "out") {
+      let clockPauseObj = localStorageWrapper.getItem(LOCAL_DB_KEYS.userClockCheckPauseObj);
+      if (!clockPauseObj) clockPauseObj = {};
+      clockPauseObj[user.id] = new Date().getTime();
+      localStorageWrapper.setItem(LOCAL_DB_KEYS.userClockCheckPauseObj, clockPauseObj);
+    }
+    handleExit();
+  }
+
+  let thisWeekStart = getWeekStart(new Date());
+  let nextWeekStart = dayjs(thisWeekStart).add(7, "day").format("YYYY-MM-DD");
+  let todayStr = dayjs().format("YYYY-MM-DD");
+
+  return ReactDOM.createPortal(
+    <View
+      style={{
+        position: "fixed",
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        justifyContent: "center",
+        alignItems: "center",
+        zIndex: 9998,
+      }}
+    >
+      <TouchableOpacity
+        activeOpacity={1}
+        onPress={handleExit}
+        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, cursor: "default" }}
+      />
+      <View
+        style={{
+          backgroundColor: C.backgroundWhite,
+          borderRadius: 15,
+          alignItems: "center",
+          minWidth: 700,
+          maxWidth: 800,
+          width: "50%",
+          overflow: "hidden",
+        }}
+      >
+        {/* ─── title + clock status ───────────────────────────── */}
+        <Text
+          style={{
+            fontWeight: "500",
+            marginTop: 25,
+            fontSize: 25,
+            color: "red",
+            textAlign: "center",
+          }}
+        >
+          PUNCH CLOCK
+        </Text>
+        <Text
+          style={{
+            textAlign: "center",
+            width: "90%",
+            marginTop: 10,
+            fontSize: 18,
+            color: gray(0.25),
+          }}
+        >
+          {clockMessage}
+        </Text>
+
+        {/* ─── 3 buttons in a row ─────────────────────────────── */}
+        <View
+          style={{
+            marginTop: 25,
+            marginBottom: 25,
+            flexDirection: "row",
+            justifyContent: "center",
+            alignItems: "center",
+            width: "100%",
+            paddingHorizontal: 20,
+          }}
+        >
+          <Button_
+            colorGradientArr={COLOR_GRADIENTS.green}
+            text={option === "in" ? "CLOCK IN" : "CLOCK OUT"}
+            buttonStyle={{ paddingVertical: 4, marginHorizontal: 6, flex: 1 }}
+            textStyle={{ color: C.textWhite, fontWeight: "600" }}
+            onPress={handleClockPress}
+            iconSize={60}
+            icon={ICONS.clockGif}
+          />
+          <Button_
+            colorGradientArr={COLOR_GRADIENTS.blue}
+            text="VIEW HISTORY"
+            buttonStyle={{ paddingVertical: 4, marginHorizontal: 6, flex: 1 }}
+            textStyle={{ color: C.textWhite, fontWeight: "600" }}
+            onPress={handleViewHistory}
+            iconSize={60}
+            icon={ICONS.listGif}
+          />
+          <Button_
+            colorGradientArr={COLOR_GRADIENTS.purple}
+            text="CANCEL"
+            buttonStyle={{ paddingVertical: 4, marginHorizontal: 6, flex: 1 }}
+            textStyle={{ color: C.textWhite, fontWeight: "600" }}
+            onPress={handleExit}
+            iconSize={60}
+            icon={ICONS.cancelGif}
+          />
+        </View>
+
+        {/* ─── schedule: this week + next week ────────────────── */}
+        <View
+          style={{
+            width: "100%",
+            borderTopWidth: 1,
+            borderTopColor: gray(0.12),
+            paddingVertical: 16,
+            paddingHorizontal: 20,
+          }}
+        >
+          <ScheduleWeekRow
+            label="This Week"
+            user={user}
+            weekStart={thisWeekStart}
+            schedules={schedules}
+            storeHours={storeHours}
+            todayStr={todayStr}
+          />
+          <ScheduleWeekRow
+            label="Next Week"
+            user={user}
+            weekStart={nextWeekStart}
+            schedules={schedules}
+            storeHours={storeHours}
+            todayStr={todayStr}
+          />
+        </View>
+      </View>
+    </View>,
+    document.body
   );
 };
 

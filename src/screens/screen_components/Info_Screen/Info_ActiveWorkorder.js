@@ -1254,7 +1254,7 @@ export const ActiveWorkorderComponent = ({}) => {
               })()}
               <CheckBox_
                 isChecked={!!zOpenWorkorder?.itemNotHere}
-                text="Item not here"
+                text="Customer item not here"
                 textStyle={{ fontSize: 13 }}
                 buttonStyle={{ backgroundColor: "transparent" }}
                 onCheck={() => {

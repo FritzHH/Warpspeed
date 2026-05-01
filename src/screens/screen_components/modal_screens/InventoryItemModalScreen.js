@@ -986,7 +986,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
           right: 0,
           bottom: 0,
           backgroundColor: "rgba(50,50,50,.5)",
-          zIndex: 10001,
+          zIndex: 9998,
           display: "flex",
           justifyContent: "center",
           alignItems: "center",

@@ -29,6 +29,7 @@ import { useTranslation } from "../../useTranslation";
 import {
   broadcastToTranslateDisplay,
   broadcastTranslateClear,
+  broadcastClear,
   TRANSLATE_MSG_TYPES,
 } from "../../broadcastChannel";
 import { DevNotesModal } from "../screen_components/modal_screens/DevNotesModal";
@@ -416,17 +417,7 @@ const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
           </Tooltip>
         )}
         {!!zOpenWorkorderID && localStorage.getItem("warpspeed_has_secondary_display") === "true" && (
-          <Tooltip text="Show workorder on customer display" position="bottom">
-            <TouchableOpacity
-              onPress={() => {
-                let wo = useOpenWorkordersStore.getState().workorders.find((o) => o.id === zOpenWorkorderID);
-                if (wo) broadcastFullWorkorderToDisplay(wo);
-              }}
-              style={{ paddingHorizontal: 10, justifyContent: "center" }}
-            >
-              <Image_ icon={ICONS.display} size={22} />
-            </TouchableOpacity>
-          </Tooltip>
+          <CastButton />
         )}
         <TouchableOpacity
           onPress={() => (window.location.href = ROUTES.home)}
@@ -453,5 +444,31 @@ const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
         />
       </View>
     </View>
+  );
+};
+
+const CastButton = () => {
+  const zCasting = useOpenWorkordersStore((s) => s.castingToDisplay);
+  const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
+  return (
+    <Tooltip text={zCasting ? "Stop casting to customer screen" : "Cast workorder to customer screen"} position="bottom">
+      <TouchableOpacity
+        onPress={() => {
+          if (zCasting) {
+            broadcastClear();
+            useOpenWorkordersStore.setState({ castingToDisplay: false });
+          } else {
+            let wo = useOpenWorkordersStore.getState().workorders.find((o) => o.id === zOpenWorkorderID);
+            if (wo) {
+              broadcastFullWorkorderToDisplay(wo);
+              useOpenWorkordersStore.setState({ castingToDisplay: true });
+            }
+          }
+        }}
+        style={{ paddingHorizontal: 10, justifyContent: "center", opacity: zCasting ? 1 : 0.4 }}
+      >
+        <Image_ icon={ICONS.display} size={22} />
+      </TouchableOpacity>
+    </Tooltip>
   );
 };

@@ -548,7 +548,7 @@ function WorkorderCard({ workorder, zStatuses, zSettings, onPress }) {
 
         {/* Part ordered / source row */}
         {!!(workorder.partOrdered || workorder.partSource) && (
-          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2, paddingTop: 2, borderTopWidth: 1, borderTopColor: gray(0.92) }}>
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2, paddingTop: 2, borderTopWidth: 1, borderTopColor: "lightgray" }}>
             {!!workorder.partOrdered && (
               <Text numberOfLines={1} style={{ fontSize: 12, color: C.blue, fontWeight: "500" }}>
                 {capitalizeFirstLetterOfString(workorder.partOrdered)}
@@ -1203,6 +1203,9 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
                     dataArr={COLORS}
                     itemSeparatorStyle={{ height: 0 }}
                     menuBorderColor="transparent"
+                    centerMenuVertically={true}
+                    centerMenuHorizontally={true}
+                    menuMaxHeight={Math.round(window.innerHeight * 0.9)}
                     onSelect={(item) => setField("color1", item)}
                     buttonText="1"
                     buttonStyle={{ marginLeft: 4, paddingHorizontal: 8 }}
@@ -1226,6 +1229,9 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
                     dataArr={COLORS}
                     itemSeparatorStyle={{ height: 0 }}
                     menuBorderColor="transparent"
+                    centerMenuVertically={true}
+                    centerMenuHorizontally={true}
+                    menuMaxHeight={Math.round(window.innerHeight * 0.9)}
                     onSelect={(item) => setField("color2", item)}
                     buttonText="2"
                     buttonStyle={{ marginLeft: 4, paddingHorizontal: 8 }}

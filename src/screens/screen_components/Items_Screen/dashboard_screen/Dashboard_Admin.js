@@ -76,6 +76,7 @@ import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
 import { SalesReportsModal } from "../../modal_screens/SalesReports";
 import { PayrollModal } from "../../modal_screens/PayrollModal";
+import { ScheduleModal } from "../../modal_screens/ScheduleModal";
 import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection, dbSaveInventoryItem } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses, mapEmployees, mapPunchHistory, parseCSV } from "../../../../lightspeed_import";
 import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead, firestoreQuery, firestoreDelete, firestoreWrite, firestoreBatchWrite } from "../../../../db_calls";
@@ -96,6 +97,7 @@ const TAB_NAMES = {
   quickItems: "Quick Buttons",
   sales: "Sales History",
   payroll: "Payroll",
+  schedule: "Schedule",
   ordering: "Ordering",
   textTemplates: "Text Templates",
   emailTemplates: "Email Templates",
@@ -122,6 +124,7 @@ export function Dashboard_Admin({}) {
   const [sPunchClockUserObj, _setPunchClockUserObj] = useState(null);
   const [sShowSalesReportModal, _setShowSalesReportModal] = useState(false);
   const [sShowPayrollModal, _setShowPayrollModal] = useState(false);
+  const [sShowScheduleModal, _setShowScheduleModal] = useState(false);
   const sExpand = useTabNamesStore((state) => state.getDashboardExpand());
   const _setExpand = useTabNamesStore((state) => state.setDashboardExpand);
   const [sOrderingMenuSelectionName, _setOrderingMenuSelectionName] = useState(
@@ -215,6 +218,9 @@ export function Dashboard_Admin({}) {
       )}
       {!!sShowPayrollModal && (
         <PayrollModal handleExit={() => _setShowPayrollModal(false)} />
+      )}
+      {!!sShowScheduleModal && (
+        <ScheduleModal handleExit={() => _setShowScheduleModal(false)} />
       )}
       {!!sShowLabelDesigner && (
         <LabelDesignerModal
@@ -417,6 +423,20 @@ export function Dashboard_Admin({}) {
               text={TAB_NAMES.payroll}
               icon={ICONS.greenDollar}
               iconSize={25}
+              disabled={sMenuLocked}
+            />
+            <VerticalSpacer />
+            {/****************** schedule modal ****************************/}
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.schedule}
+              handleExpandPress={() => _setShowScheduleModal(true)}
+              style={{
+                fontWeight: sExpand === TAB_NAMES.schedule ? 500 : null,
+                color: sExpand === TAB_NAMES.schedule ? C.green : gray(0.6),
+              }}
+              text={TAB_NAMES.schedule}
+              icon={ICONS.clock}
+              iconSize={22}
               disabled={sMenuLocked}
             />
             <VerticalSpacer />

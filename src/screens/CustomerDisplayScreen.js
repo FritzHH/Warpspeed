@@ -10,7 +10,7 @@ import {
   onDisplayStatusMessage,
   DISPLAY_STATUS,
 } from "../broadcastChannel";
-import { formatCurrencyDisp, formatPhoneForDisplay, gray } from "../utils";
+import { formatCurrencyDisp, formatPhoneForDisplay, gray, capitalizeFirstLetterOfString } from "../utils";
 import { C, Fonts, ICONS } from "../styles";
 
 const logo = require("../resources/default_app_logo_large.png");
@@ -346,151 +346,209 @@ function WorkorderOverlay({ data, isTall, lang }) {
   let lines = data?.workorderLines || [];
   let totals = data?.totals || {};
   let status = data?.status || {};
+  let customer = data?.customer || {};
   let customerFirst = data?.customerFirst || "";
   let amountPaid = data?.amountPaid || 0;
   let paymentComplete = data?.paymentComplete || false;
   let hasColors = (data?.color1 && data.color1.label) || (data?.color2 && data.color2.label);
-  let bikeDesc = [data?.brand, data?.description].filter(Boolean).join(" — ");
+  let bikeDesc = [data?.brand, data?.description].filter(Boolean).join(" - ");
+  let customerNotes = data?.customerNotes || [];
+  let hasCustomer = !!customerFirst || customer.customerCell || customer.customerLandline || customer.email;
+  let greetingName = customerFirst ? capitalizeFirstLetterOfString(customerFirst) : "";
 
   return (
-    <View style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.92)", justifyContent: "space-between" }}>
-
-      {/* Greeting */}
-      {!!customerFirst && (
-        <View style={{ paddingHorizontal: 20, paddingTop: 16, paddingBottom: 4 }}>
-          <Text style={{ fontSize: isTall ? 28 : 24, fontWeight: "700", color: C.text }}>
-            {t(lang, "greeting") + " " + customerFirst + "!"}
-          </Text>
-        </View>
-      )}
-
-      {/* Status badge */}
+    <View style={{ flex: 1, flexDirection: "row" }}>
+      {/* LEFT PANEL - Bike Info & Customer */}
       <View style={{
-        flexDirection: "row",
-        alignItems: "center",
-        backgroundColor: status.backgroundColor || gray(0.15),
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-        marginHorizontal: 12,
-        marginTop: 6,
-        borderRadius: 10,
+        width: hasCustomer ? "38%" : "0%",
+        backgroundColor: "rgba(240, 248, 255, 0.95)",
+        borderRightWidth: hasCustomer ? 1 : 0,
+        borderRightColor: "rgba(0,0,0,0.08)",
+        justifyContent: "space-between",
+        overflow: "hidden",
       }}>
-        <Image source={ICONS.workorder} style={{ width: 22, height: 22, marginRight: 10, tintColor: status.textColor || "#000" }} />
-        <Text style={{ fontSize: 18, fontWeight: "700", color: status.textColor || "#000" }}>
-          {status.label || t(lang, "inProgress")}
-        </Text>
-      </View>
-
-      <SectionDivider />
-
-      {/* Bike info */}
-      {!!bikeDesc && (
-        <IconRow icon={ICONS.bicycle} iconSize={24}>
-          <Text style={{ fontSize: isTall ? 20 : 18, color: C.text, fontWeight: "500" }} numberOfLines={2}>
-            {bikeDesc}
-          </Text>
-        </IconRow>
-      )}
-
-      {/* Color swatches */}
-      {hasColors && (
-        <IconRow icon={ICONS.colorWheel}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <ColorPill colorObj={data.color1} />
-            <ColorPill colorObj={data.color2} />
+        <View>
+          {/* Greeting */}
+          <View style={{
+            paddingHorizontal: 16,
+            paddingTop: 18,
+            paddingBottom: 10,
+            backgroundColor: "rgba(64, 174, 113, 0.12)",
+          }}>
+            <Text style={{ fontSize: isTall ? 26 : 22, fontWeight: "700", color: C.text }}>
+              {greetingName ? t(lang, "greeting") + " " + greetingName + "!" : t(lang, "greeting") + "!"}
+            </Text>
           </View>
-        </IconRow>
-      )}
 
-      {/* Wait time + Date — side by side on portrait, stacked on landscape */}
-      {(!!data?.waitTimeEstimateLabel || !!data?.startedOnMillis) && (
-        <View style={{ flexDirection: isTall ? "row" : "column", paddingHorizontal: 0 }}>
-          {!!data.waitTimeEstimateLabel && (
-            <View style={{ flex: isTall ? 1 : undefined }}>
-              <IconRow icon={ICONS.clock}>
-                <Text style={{ fontSize: 16, color: C.text }}>
-                  {data.waitTimeEstimateLabel}
-                </Text>
-              </IconRow>
+          {/* Customer contact info */}
+          {(customer.customerCell || customer.customerLandline || customer.email) && (
+            <View style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
+              {!!customer.customerCell && (
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+                  <Image source={ICONS.cellPhone} style={{ width: 14, height: 14, marginRight: 8, opacity: 0.5 }} />
+                  <Text style={{ fontSize: 15, color: C.text }}>{formatPhoneForDisplay(customer.customerCell)}</Text>
+                </View>
+              )}
+              {!!customer.customerLandline && (
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
+                  <Image source={ICONS.cellPhone} style={{ width: 14, height: 14, marginRight: 8, opacity: 0.5 }} />
+                  <Text style={{ fontSize: 15, color: C.text }}>{formatPhoneForDisplay(customer.customerLandline)}</Text>
+                </View>
+              )}
+              {!!customer.email && (
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Image source={ICONS.paperPlane} style={{ width: 14, height: 14, marginRight: 8, opacity: 0.5 }} />
+                  <Text style={{ fontSize: 14, color: C.text }}>{customer.email}</Text>
+                </View>
+              )}
             </View>
           )}
-          {!!data.startedOnMillis && (
-            <View style={{ flex: isTall ? 1 : undefined }}>
-              <IconRow icon={ICONS.workorder} iconSize={18}>
-                <Text style={{ fontSize: 14, color: gray(0.5) }}>
+
+          <SectionDivider />
+
+          {/* Bike info */}
+          {!!bikeDesc && (
+            <IconRow icon={ICONS.bicycle} iconSize={22}>
+              <Text style={{ fontSize: 17, color: C.text, fontWeight: "500" }} numberOfLines={2}>
+                {bikeDesc}
+              </Text>
+            </IconRow>
+          )}
+
+          {/* Color swatches */}
+          {hasColors && (
+            <IconRow icon={ICONS.colorWheel} iconSize={18}>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <ColorPill colorObj={data.color1} />
+                <ColorPill colorObj={data.color2} />
+              </View>
+            </IconRow>
+          )}
+
+          {/* Customer notes */}
+          {customerNotes.length > 0 && (
+            <View>
+              <SectionDivider />
+              <View style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+                  <Image source={ICONS.notes} style={{ width: 18, height: 18, marginRight: 8, opacity: 0.6 }} />
+                  <Text style={{ fontSize: 14, fontWeight: "600", color: gray(0.5) }}>Notes</Text>
+                </View>
+                <ScrollView style={{ maxHeight: 140 }}>
+                  {customerNotes.map((note, i) => (
+                    <View key={i} style={{
+                      backgroundColor: "rgba(255, 243, 176, 0.5)",
+                      borderRadius: 8,
+                      paddingHorizontal: 10,
+                      paddingVertical: 6,
+                      marginBottom: 4,
+                    }}>
+                      <Text style={{ fontSize: 13, color: C.text }}>{note.value}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* Wait time + Date at bottom of left panel */}
+        {(!!data?.waitTimeEstimateLabel || !!data?.startedOnMillis) && (
+          <View style={{ paddingBottom: 12 }}>
+            <SectionDivider />
+            {!!data.waitTimeEstimateLabel && (
+              <IconRow icon={ICONS.clock} iconSize={18}>
+                <Text style={{ fontSize: 15, color: C.text }}>{data.waitTimeEstimateLabel}</Text>
+              </IconRow>
+            )}
+            {!!data.startedOnMillis && (
+              <IconRow icon={ICONS.workorder} iconSize={16}>
+                <Text style={{ fontSize: 13, color: gray(0.5) }}>
                   {t(lang, "checkedIn") + " " + formatDateShort(data.startedOnMillis)}
                 </Text>
               </IconRow>
-            </View>
-          )}
-        </View>
-      )}
-
-      <SectionDivider />
-
-      {/* Items header */}
-      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingVertical: 4 }}>
-        <Image source={ICONS.tools1} style={{ width: 20, height: 20, marginRight: 8, opacity: 0.7 }} />
-        <Text style={{ fontSize: 16, fontWeight: "700", color: C.green }}>
-          {t(lang, "items")}
-        </Text>
-        <Text style={{ fontSize: 14, color: gray(0.4), marginLeft: 8 }}>
-          {"(" + (totals.runningQty || lines.length) + ")"}
-        </Text>
+            )}
+          </View>
+        )}
       </View>
 
-      {/* Scrollable items list */}
-      <ScrollView style={{ flex: 1 }}>
-        {lines.map((line, i) => (
-          <View key={line.id || i} style={{ backgroundColor: i % 2 === 0 ? "transparent" : "rgba(0,0,0,0.02)" }}>
-            <OverlayLineItemRow item={line} />
-          </View>
-        ))}
-      </ScrollView>
-
-      {/* Totals section */}
-      {lines.length > 0 && (
-        <View style={{ paddingVertical: 10, borderTopWidth: 1, borderTopColor: C.buttonLightGreenOutline }}>
-          <OverlayTotalRow label={t(lang, "subtotal")} value={totals.runningSubtotal || 0} />
-          {(totals.runningDiscount || 0) > 0 && (
-            <OverlayTotalRow
-              label={t(lang, "discounts")}
-              value={"-$" + formatCurrencyDisp(totals.runningDiscount)}
-              color={discountTextColor}
-            />
-          )}
-          <OverlayTotalRow
-            label={t(lang, "tax") + " (" + (totals.salesTaxPercent || 0) + "%)"}
-            value={totals.runningTax || 0}
-          />
-          <View style={{ height: 1, backgroundColor: "rgba(0,0,0,0.12)", marginHorizontal: 20, marginVertical: 6 }} />
-          <OverlayTotalRow label={t(lang, "total")} value={totals.runningTotal || 0} bold />
-
-          {/* Amount paid / Balance due */}
-          {amountPaid > 0 && !paymentComplete && (
-            <>
-              <OverlayTotalRow label={t(lang, "paid")} value={amountPaid} color={C.green} />
-              <OverlayTotalRow label={t(lang, "balanceDue")} value={(totals.runningTotal || 0) - amountPaid} bold />
-            </>
-          )}
-
-          {/* PAID badge */}
-          {paymentComplete && (
-            <View style={{
-              backgroundColor: C.green,
-              borderRadius: 8,
-              paddingVertical: 10,
-              marginHorizontal: 20,
-              marginTop: 8,
-              alignItems: "center",
-            }}>
-              <Text style={{ fontSize: 22, fontWeight: "800", color: "#fff", letterSpacing: 2 }}>
-                {t(lang, "paidBadge")}
-              </Text>
-            </View>
-          )}
+      {/* RIGHT PANEL - Workorder Lines & Totals */}
+      <View style={{ flex: 1, backgroundColor: "rgba(255,255,255,0.95)", justifyContent: "space-between" }}>
+        {/* Items header */}
+        <View style={{
+          flexDirection: "row",
+          alignItems: "center",
+          paddingHorizontal: 20,
+          paddingVertical: 10,
+          backgroundColor: "rgba(64, 174, 113, 0.08)",
+        }}>
+          <Image source={ICONS.tools1} style={{ width: 22, height: 22, marginRight: 10, opacity: 0.8 }} />
+          <Text style={{ fontSize: 18, fontWeight: "700", color: C.green }}>
+            {t(lang, "items")}
+          </Text>
+          <Text style={{ fontSize: 15, color: gray(0.4), marginLeft: 8 }}>
+            {"(" + (totals.runningQty || lines.length) + ")"}
+          </Text>
         </View>
-      )}
+
+        {/* Scrollable items list */}
+        <ScrollView style={{ flex: 1 }}>
+          {lines.map((line, i) => (
+            <View key={line.id || i} style={{ backgroundColor: i % 2 === 0 ? "transparent" : "rgba(0,0,0,0.02)" }}>
+              <OverlayLineItemRow item={line} />
+              {!!line.receiptNotes && (
+                <View style={{ paddingHorizontal: 50, paddingBottom: 8 }}>
+                  <Text style={{ fontSize: 13, color: gray(0.45), fontStyle: "italic" }}>
+                    {line.receiptNotes}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ))}
+        </ScrollView>
+
+        {/* Totals section */}
+        {lines.length > 0 && (
+          <View style={{ paddingVertical: 10, borderTopWidth: 2, borderTopColor: C.buttonLightGreenOutline }}>
+            <OverlayTotalRow label={t(lang, "subtotal")} value={totals.runningSubtotal || 0} />
+            {(totals.runningDiscount || 0) > 0 && (
+              <OverlayTotalRow
+                label={t(lang, "discounts")}
+                value={"-$" + formatCurrencyDisp(totals.runningDiscount)}
+                color={discountTextColor}
+              />
+            )}
+            <OverlayTotalRow
+              label={t(lang, "tax") + " (" + (totals.salesTaxPercent || 0) + "%)"}
+              value={totals.runningTax || 0}
+            />
+            <View style={{ height: 2, backgroundColor: "rgba(0,0,0,0.12)", marginHorizontal: 20, marginVertical: 6 }} />
+            <OverlayTotalRow label={t(lang, "total")} value={totals.runningTotal || 0} bold />
+
+            {amountPaid > 0 && !paymentComplete && (
+              <>
+                <OverlayTotalRow label={t(lang, "paid")} value={amountPaid} color={C.green} />
+                <OverlayTotalRow label={t(lang, "balanceDue")} value={(totals.runningTotal || 0) - amountPaid} bold />
+              </>
+            )}
+
+            {paymentComplete && (
+              <View style={{
+                backgroundColor: C.green,
+                borderRadius: 8,
+                paddingVertical: 10,
+                marginHorizontal: 20,
+                marginTop: 8,
+                alignItems: "center",
+              }}>
+                <Text style={{ fontSize: 22, fontWeight: "800", color: "#fff", letterSpacing: 2 }}>
+                  {t(lang, "paidBadge")}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+      </View>
     </View>
   );
 }

@@ -114,7 +114,11 @@ function PhoneScreenWrapper() {
     );
   }
 
-  return <PhoneScreen />;
+  return (
+    <div style={{ width: "100%", height: "100vh", overflow: "hidden" }}>
+      <PhoneScreen />
+    </div>
+  );
 }
 
 // Desktop: wrap BikeStandScreen in a centered tablet portrait frame that fits the viewport

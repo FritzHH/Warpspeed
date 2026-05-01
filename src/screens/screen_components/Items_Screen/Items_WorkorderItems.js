@@ -18,6 +18,7 @@ import {
   GradientView,
   Button_,
   CheckBox_,
+  Image_,
   NoteHelperDropdown,
   TextInput_,
   Tooltip,
@@ -44,7 +45,9 @@ import {
   useLoginStore,
   useAlertScreenStore,
   useActiveSalesStore,
+  broadcastFullWorkorderToDisplay,
 } from "../../../stores";
+import { broadcastClear } from "../../../broadcastChannel";
 import { CustomItemModal } from "../modal_screens/CustomItemModal";
 import { calculateSaleTotals } from "../modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { deleteActiveSale, writeActiveSale } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
@@ -122,6 +125,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     useState(false);
 
   const [sEditingCustomLine, _setEditingCustomLine] = useState(null);
+  const zCasting = useOpenWorkordersStore((s) => s.castingToDisplay);
 
   // Note Helper dropdown state (lifted to parent so only one Modal exists)
   const zNoteHelpers = useSettingsStore((state) => state.settings?.noteHelpers);
@@ -195,6 +199,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     _setTotals(
       calculateRunningTotals(zOpenWorkorder, zSalesTaxPercent, [], false, !!zOpenWorkorder.taxFree)
     );
+    if (useOpenWorkordersStore.getState().castingToDisplay) broadcastFullWorkorderToDisplay(zOpenWorkorder);
   }, [zOpenWorkorder]);
 
   ////////////////////////////////////////////////////////////////////////
@@ -660,6 +665,38 @@ export const Items_WorkorderItemsTab = ({}) => {
         </Animated.View>
       )}
 
+      {zCasting && (
+        <TouchableOpacity
+          activeOpacity={0.7}
+          onPress={() => {
+            broadcastClear();
+            useOpenWorkordersStore.setState({ castingToDisplay: false });
+          }}
+          style={{
+            backgroundColor: "#FFD600",
+            marginHorizontal: 8,
+            marginTop: 3,
+            borderRadius: 5,
+            overflow: "hidden",
+            height: 24,
+            justifyContent: "center",
+            cursor: "pointer",
+          }}
+        >
+          <style>{`
+            @keyframes castScroll {
+              from { transform: translateX(100%); }
+              to { transform: translateX(-100%); }
+            }
+          `}</style>
+          <div style={{ whiteSpace: "nowrap", animation: "castScroll 8s linear infinite" }}>
+            <Text style={{ color: "red", fontSize: 12, fontWeight: "700" }}>
+              Workorder casting to customer screen — tap to stop
+            </Text>
+          </div>
+        </TouchableOpacity>
+      )}
+
       <FlatList
         style={{ marginTop: 3, marginRight: 5 }}
         data={zOpenWorkorder.workorderLines}
@@ -868,7 +905,13 @@ export const Items_WorkorderItemsTab = ({}) => {
             iconSize={34}
             enabled={!isDonePaid}
             buttonStyle={{ paddingVertical: 0, opacity: isDonePaid ? 0.3 : 1 }}
-            onPress={() => useLoginStore.getState().requireLogin(() => useCheckoutStore.getState().setIsCheckingOut(true))}
+            onPress={() => useLoginStore.getState().requireLogin(() => {
+              if (useOpenWorkordersStore.getState().castingToDisplay) {
+                broadcastClear();
+                useOpenWorkordersStore.setState({ castingToDisplay: false });
+              }
+              useCheckoutStore.getState().setIsCheckingOut(true);
+            })}
           />
         </Tooltip>
       </View>

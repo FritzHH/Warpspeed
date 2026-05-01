@@ -502,6 +502,7 @@ export const ScreenModal = ({
   handleOuterClick = () => {},
   openUpward = false,
   centerMenuVertically = false,
+  centerMenuHorizontally = false,
   menuHeight,
 }) => {
   const [sModalCoordinates, _setModalCoordinates] = useState(null);
@@ -608,7 +609,13 @@ export const ScreenModal = ({
                   : sModalCoordinates.y + modalCoordinateVars.y
                 : null,
               bottom: sModalCoordinates && openUpward ? window.innerHeight - sModalCoordinates.y : null,
-              left: sModalCoordinates ? sModalCoordinates.x + modalCoordinateVars.x : null,
+              left: sModalCoordinates
+                ? centerMenuHorizontally
+                  ? 0
+                  : sModalCoordinates.x + modalCoordinateVars.x
+                : null,
+              right: sModalCoordinates && centerMenuHorizontally ? 0 : undefined,
+              alignItems: centerMenuHorizontally ? "center" : undefined,
             }}
           >
             {Component()}
@@ -695,6 +702,7 @@ export const DropdownMenu = ({
   openUpward = false,
   menuMaxHeight,
   centerMenuVertically = false,
+  centerMenuHorizontally = false,
   isDiscountMenu = false,
   discountMaxCents = 0,
 }) => {
@@ -899,6 +907,7 @@ export const DropdownMenu = ({
       enabled={enabled}
       openUpward={openUpward}
       centerMenuVertically={centerMenuVertically}
+      centerMenuHorizontally={centerMenuHorizontally}
       menuHeight={calculatedMenuHeight}
     />
   );

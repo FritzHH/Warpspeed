@@ -1130,6 +1130,7 @@ export function broadcastFullWorkorderToDisplay(wo) {
     discountObj: line.discountObj
       ? { name: line.discountObj.name, savings: line.discountObj.savings || 0, newPrice: line.discountObj.newPrice || 0 }
       : null,
+    receiptNotes: line.receiptNotes || "",
   }));
 
   let totals = calculateRunningTotals(wo, salesTaxPercent, [], false, !!wo.taxFree);
@@ -1170,6 +1171,8 @@ export function broadcastFullWorkorderToDisplay(wo) {
       return sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
     })(),
     paymentComplete: wo.paymentComplete || false,
+    customerNotes: (wo.customerNotes || []).map((n) => ({ name: n.name || "", value: n.value || "" })),
+    receiptNotes: wo.receiptNotes || "",
   });
 }
 
@@ -1323,6 +1326,7 @@ export const useOpenWorkordersStore = create(
       workorderPreviewID: null,
       lockedWorkorderID: null,
       saleModalObj: null,
+      castingToDisplay: false,
       _pendingCustomerLinks: {},
       _dirtyFields: {},
 

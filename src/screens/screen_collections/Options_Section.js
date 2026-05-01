@@ -312,7 +312,7 @@ function ScheduleWeekRow({ label, user, weekStart, schedules, storeHours, todayS
   let weekShifts = schedules?.[weekStart]?.shifts || {};
   return (
     <View style={{ width: "100%", marginBottom: 10 }}>
-      <Text style={{ fontSize: 13, fontWeight: "700", color: gray(0.4), marginBottom: 6 }}>{label}</Text>
+      <Text style={{ fontSize: 13, fontWeight: "700", color: "rgb(130,130,130)", marginBottom: 6 }}>{label}</Text>
       <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
         {DAY_LABELS.map((dayName, i) => {
           let dayIndex = i + 1;
@@ -330,11 +330,11 @@ function ScheduleWeekRow({ label, user, weekStart, schedules, storeHours, todayS
                 flex: 1,
                 alignItems: "center",
                 marginHorizontal: 3,
-                backgroundColor: shift ? "#e8f5e9" : gray(0.95),
+                backgroundColor: shift ? "#e8f5e9" : "rgb(235,235,235)",
                 borderRadius: 10,
                 paddingVertical: 10,
                 borderWidth: isToday ? 2 : 1,
-                borderColor: isToday ? C.blue : shift ? C.green : gray(0.85),
+                borderColor: isToday ? C.blue : shift ? C.green : "rgb(210,210,210)",
                 minHeight: 70,
                 justifyContent: "center",
               }}
@@ -343,24 +343,24 @@ function ScheduleWeekRow({ label, user, weekStart, schedules, storeHours, todayS
                 style={{
                   fontSize: 14,
                   fontWeight: isToday ? "800" : "700",
-                  color: isToday ? C.blue : gray(0.35),
+                  color: isToday ? C.blue : C.text,
                 }}
               >
                 {dayName}
               </Text>
               {isClosed ? (
-                <Text style={{ fontSize: 11, color: gray(0.45), marginTop: 3, fontWeight: "600" }}>OFF</Text>
+                <Text style={{ fontSize: 11, color: "rgb(140,140,140)", marginTop: 3, fontWeight: "600" }}>OFF</Text>
               ) : shift ? (
                 <View style={{ alignItems: "center", marginTop: 3 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: gray(0.2) }}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: C.text }}>
                     {formatTimeShort(shift.startTime)}
                   </Text>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: gray(0.2) }}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: C.text }}>
                     {formatTimeShort(shift.endTime)}
                   </Text>
                 </View>
               ) : (
-                <Text style={{ fontSize: 12, color: gray(0.55), marginTop: 3 }}>-</Text>
+                <Text style={{ fontSize: 12, color: "rgb(160,160,160)", marginTop: 3 }}>-</Text>
               )}
             </View>
           );

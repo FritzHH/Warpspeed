@@ -1024,7 +1024,6 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
             </View>
             <TouchableOpacity
               onPress={handleUploadPress}
-              disabled={sUploading}
               style={{
                 flexDirection: "row",
                 alignItems: "center",
@@ -1032,7 +1031,6 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
                 borderRadius: 6,
                 paddingHorizontal: 12,
                 paddingVertical: 6,
-                opacity: sUploading ? 0.5 : 1,
               }}
             >
               <Text style={{ color: "white", fontSize: 15, fontWeight: "600" }}>+ Add</Text>

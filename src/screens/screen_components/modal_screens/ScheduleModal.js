@@ -11,8 +11,8 @@ import ReactDOM from "react-dom";
 import { cloneDeep, debounce } from "lodash";
 import dayjs from "dayjs";
 import { C, ICONS } from "../../../styles";
-import { gray } from "../../../utils";
-import { Image_ } from "../../../components";
+import { gray, trimToTwoDecimals } from "../../../utils";
+import { Image_, TimePicker_ } from "../../../components";
 import { useSettingsStore, useAlertScreenStore } from "../../../stores";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -59,141 +59,51 @@ function pruneOldWeeks(schedulesObj) {
   return pruned;
 }
 
-const HOURS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
-const MINUTES = [0, 15, 30, 45];
-const PERIODS = ["AM", "PM"];
-
-// ─── time dropdown ──────────────────────────────────────────────────────────
-
-function TimeDropdownRow({ label, timeStr, onChange }) {
+function timeToMinutes(timeStr) {
   let { hour, minute, period } = parseTime(timeStr);
-
-  function handleChange(newHour, newMinute, newPeriod) {
-    onChange(formatTime(newHour, newMinute, newPeriod));
-  }
-
-  let selectStyle = {
-    fontSize: 16,
-    fontWeight: "600",
-    color: C.text,
-    backgroundColor: "white",
-    borderWidth: 2,
-    borderColor: C.buttonLightGreenOutline,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 6,
-    textAlign: "center",
-    cursor: "pointer",
-    outline: "none",
-    appearance: "none",
-    WebkitAppearance: "none",
-  };
-
-  return (
-    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-      <Text style={{ fontSize: 14, fontWeight: "600", color: gray(0.45), width: 50 }}>{label}</Text>
-      <select
-        value={hour}
-        onChange={(e) => handleChange(parseInt(e.target.value), minute, period)}
-        style={{ ...selectStyle, width: 56, marginRight: 6 }}
-      >
-        {HOURS.map((h) => (
-          <option key={h} value={h}>{h}</option>
-        ))}
-      </select>
-      <select
-        value={minute}
-        onChange={(e) => handleChange(hour, parseInt(e.target.value), period)}
-        style={{ ...selectStyle, width: 60, marginRight: 6 }}
-      >
-        {MINUTES.map((m) => (
-          <option key={m} value={m}>{String(m).padStart(2, "0")}</option>
-        ))}
-      </select>
-      <select
-        value={period}
-        onChange={(e) => handleChange(hour, minute, e.target.value)}
-        style={{ ...selectStyle, width: 62 }}
-      >
-        {PERIODS.map((p) => (
-          <option key={p} value={p}>{p}</option>
-        ))}
-      </select>
-    </View>
-  );
+  let h24 = period === "PM" ? (hour === 12 ? 12 : hour + 12) : (hour === 12 ? 0 : hour);
+  return h24 * 60 + minute;
 }
 
-// ─── shift edit popover ─────────────────────────────────────────────────────
+function getShiftHours(shift) {
+  if (!shift) return 0;
+  let start = timeToMinutes(shift.startTime);
+  let end = timeToMinutes(shift.endTime);
+  if (end <= start) end += 1440;
+  return (end - start) / 60;
+}
 
-function ShiftEditPopover({ shift, onUpdate, onRemove, onClose }) {
-  return (
-    <View
-      style={{
-        position: "absolute",
-        top: "100%",
-        left: "50%",
-        transform: [{ translateX: "-50%" }],
-        zIndex: 9999,
-        backgroundColor: "white",
-        borderRadius: 12,
-        borderWidth: 2,
-        borderColor: C.buttonLightGreenOutline,
-        padding: 14,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 12,
-        minWidth: 250,
-      }}
-    >
-      <TimeDropdownRow
-        label="Start"
-        timeStr={shift.startTime}
-        onChange={(t) => onUpdate({ ...shift, startTime: t })}
-      />
-      <TimeDropdownRow
-        label="End"
-        timeStr={shift.endTime}
-        onChange={(t) => onUpdate({ ...shift, endTime: t })}
-      />
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
-        <TouchableOpacity
-          onPress={onRemove}
-          style={{
-            backgroundColor: C.red,
-            borderRadius: 8,
-            paddingVertical: 8,
-            paddingHorizontal: 16,
-            flex: 1,
-            marginRight: 8,
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ color: "white", fontSize: 14, fontWeight: "700" }}>Remove</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={onClose}
-          style={{
-            backgroundColor: gray(0.85),
-            borderRadius: 8,
-            paddingVertical: 8,
-            paddingHorizontal: 16,
-            flex: 1,
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ color: C.text, fontSize: 14, fontWeight: "600" }}>Done</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+function getUserWeekHours(userId, shifts) {
+  let total = 0;
+  for (let dayIndex = 1; dayIndex <= 7; dayIndex++) {
+    let shift = shifts[`${userId}_${dayIndex}`];
+    if (shift) total += getShiftHours(shift);
+  }
+  return total;
 }
 
 // ─── shift cell ─────────────────────────────────────────────────────────────
 
-function ShiftCell({ shift, isClosed, storeHoursDay, onAdd, onUpdate, onRemove }) {
-  let [sShowPopover, _setShowPopover] = useState(false);
-  let [sHover, _setHover] = useState(false);
+const PICKER_W = 208;
+const PICKER_H = 360;
+
+function openPickerAt(e, setter) {
+  let x = e.nativeEvent?.pageX ?? e.pageX ?? 0;
+  let y = e.nativeEvent?.pageY ?? e.pageY ?? 0;
+  let left = x - PICKER_W / 2;
+  let top = y - PICKER_H + 40;
+  let vw = window.innerWidth;
+  let vh = window.innerHeight;
+  if (left < 8) left = 8;
+  if (left + PICKER_W > vw - 8) left = vw - PICKER_W - 8;
+  if (top < 8) top = 8;
+  if (top + PICKER_H > vh - 8) top = vh - PICKER_H - 8;
+  setter({ left, top });
+}
+
+function ShiftCell({ shift, isClosed, storeHoursDay, onAddWithTimes, onUpdate, onRemove, isPastWeek }) {
+  let [sPickerFor, _setPickerFor] = useState(null);
+  let [sPickerPos, _setPickerPos] = useState(null);
 
   if (isClosed) {
     return (
@@ -203,80 +113,192 @@ function ShiftCell({ shift, isClosed, storeHoursDay, onAdd, onUpdate, onRemove }
           minHeight: 60,
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: gray(0.94),
+          backgroundColor: "rgb(235,235,235)",
           borderRadius: 6,
           margin: 2,
         }}
       >
-        <Text style={{ fontSize: 11, color: gray(0.55), fontWeight: "500" }}>CLOSED</Text>
+        <Text style={{ fontSize: 11, color: "rgb(140,140,140)", fontWeight: "500" }}>CLOSED</Text>
       </View>
     );
   }
 
-  if (!shift) {
+  let defaultStart = parseTime(storeHoursDay?.openTime || "9:00 AM");
+  let defaultEnd = parseTime(storeHoursDay?.closeTime || "5:00 PM");
+  let hasShift = !!shift;
+
+  let inInitial = hasShift ? parseTime(shift.startTime) : defaultStart;
+  let outInitial = hasShift ? parseTime(shift.endTime) : defaultEnd;
+
+  // past week: light gray; current/future: dark gray
+  let filledBg = isPastWeek ? "rgb(190,190,190)" : "rgb(120,120,120)";
+
+  function handlePickerConfirm({ hour, minute, period }) {
+    let newTime = formatTime(hour, minute, period);
+    if (sPickerFor === "in") {
+      if (hasShift) {
+        onUpdate({ ...shift, startTime: newTime });
+      } else {
+        let endTime = formatTime(defaultEnd.hour, defaultEnd.minute, defaultEnd.period);
+        onAddWithTimes(newTime, endTime);
+      }
+    } else {
+      if (hasShift) {
+        onUpdate({ ...shift, endTime: newTime });
+      } else {
+        let startTime = formatTime(defaultStart.hour, defaultStart.minute, defaultStart.period);
+        onAddWithTimes(startTime, newTime);
+      }
+    }
+    _setPickerFor(null);
+  }
+
+  // past week with no shift: just an empty gray cell
+  if (isPastWeek && !hasShift) {
     return (
-      <TouchableOpacity
-        onPress={onAdd}
-        onMouseEnter={() => _setHover(true)}
-        onMouseLeave={() => _setHover(false)}
+      <View
         style={{
           flex: 1,
           minHeight: 60,
           justifyContent: "center",
           alignItems: "center",
-          backgroundColor: sHover ? "#e8f5e9" : gray(0.96),
+          backgroundColor: "rgb(240,240,240)",
           borderRadius: 6,
           margin: 2,
-          borderWidth: 1,
-          borderColor: sHover ? C.green : "transparent",
-          borderStyle: "dashed",
-          cursor: "pointer",
         }}
       >
-        <Text style={{ fontSize: 24, color: sHover ? C.green : gray(0.5), fontWeight: "300" }}>+</Text>
-      </TouchableOpacity>
+        <Text style={{ fontSize: 12, color: "rgb(190,190,190)" }}>-</Text>
+      </View>
+    );
+  }
+
+  // past week with shift: read-only display
+  if (isPastWeek && hasShift) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          minHeight: 60,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: "rgb(240,240,240)",
+          borderRadius: 6,
+          margin: 2,
+        }}
+      >
+        <View style={{ backgroundColor: filledBg, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 4, marginBottom: 3, width: "90%", alignItems: "center" }}>
+          <Text style={{ fontSize: 12, color: "white", fontWeight: "700" }}>{formatTimeShort(shift.startTime)}</Text>
+        </View>
+        <View style={{ backgroundColor: filledBg, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 4, width: "90%", alignItems: "center" }}>
+          <Text style={{ fontSize: 12, color: "white", fontWeight: "700" }}>{formatTimeShort(shift.endTime)}</Text>
+        </View>
+      </View>
     );
   }
 
   return (
-    <View style={{ flex: 1, margin: 2, position: "relative" }}>
+    <View
+      style={{
+        flex: 1,
+        minHeight: 60,
+        justifyContent: "center",
+        alignItems: "center",
+        backgroundColor: hasShift ? "#e8f5e9" : "rgb(240,240,240)",
+        borderRadius: 6,
+        margin: 2,
+        borderWidth: hasShift ? 1 : 0,
+        borderColor: hasShift ? C.green : "transparent",
+        position: "relative",
+      }}
+    >
+      {hasShift && (
+        <TouchableOpacity
+          onPress={onRemove}
+          style={{
+            position: "absolute",
+            top: 2,
+            right: 2,
+            width: 18,
+            height: 18,
+            borderRadius: 9,
+            backgroundColor: "rgb(210,210,210)",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 1,
+          }}
+        >
+          <Text style={{ fontSize: 11, fontWeight: "700", color: "rgb(100,100,100)", marginTop: -1 }}>x</Text>
+        </TouchableOpacity>
+      )}
       <TouchableOpacity
-        onPress={() => _setShowPopover(!sShowPopover)}
-        onMouseEnter={() => _setHover(true)}
-        onMouseLeave={() => _setHover(false)}
+        onPress={(e) => { openPickerAt(e, _setPickerPos); _setPickerFor("in"); }}
         style={{
-          minHeight: 60,
-          justifyContent: "center",
+          backgroundColor: hasShift ? filledBg : C.green,
+          borderRadius: 5,
+          paddingHorizontal: 6,
+          paddingVertical: 4,
+          marginBottom: 3,
+          width: "90%",
           alignItems: "center",
-          backgroundColor: sHover ? "#e3f2fd" : "#e8f5e9",
-          borderRadius: 6,
-          borderWidth: 1,
-          borderColor: C.green,
-          paddingVertical: 6,
-          paddingHorizontal: 4,
-          cursor: "pointer",
         }}
       >
-        <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>
-          {formatTimeShort(shift.startTime)}
-        </Text>
-        <Text style={{ fontSize: 11, color: gray(0.45), fontWeight: "500" }}>to</Text>
-        <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>
-          {formatTimeShort(shift.endTime)}
+        <Text style={{ fontSize: 12, color: "white", fontWeight: "700" }}>
+          {hasShift ? formatTimeShort(shift.startTime) : "In"}
         </Text>
       </TouchableOpacity>
-      {sShowPopover && (
-        <ShiftEditPopover
-          shift={shift}
-          onUpdate={(updated) => {
-            onUpdate(updated);
+      <TouchableOpacity
+        onPress={(e) => { openPickerAt(e, _setPickerPos); _setPickerFor("out"); }}
+        style={{
+          backgroundColor: hasShift ? filledBg : C.blue,
+          borderRadius: 5,
+          paddingHorizontal: 6,
+          paddingVertical: 4,
+          width: "90%",
+          alignItems: "center",
+        }}
+      >
+        <Text style={{ fontSize: 12, color: "white", fontWeight: "700" }}>
+          {hasShift ? formatTimeShort(shift.endTime) : "Out"}
+        </Text>
+      </TouchableOpacity>
+      {!!sPickerFor && sPickerPos && ReactDOM.createPortal(
+        <View
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 10000,
           }}
-          onRemove={() => {
-            onRemove();
-            _setShowPopover(false);
-          }}
-          onClose={() => _setShowPopover(false)}
-        />
+        >
+          <TouchableWithoutFeedback onPress={() => { _setPickerFor(null); _setPickerPos(null); }}>
+            <View style={{ width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.25)" }}>
+              <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+                <View
+                  style={{
+                    position: "absolute",
+                    left: sPickerPos.left,
+                    top: sPickerPos.top,
+                    alignItems: "center",
+                  }}
+                >
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "white", marginBottom: 6 }}>
+                    {sPickerFor === "in" ? "Clock In Time" : "Clock Out Time"}
+                  </Text>
+                  <TimePicker_
+                    initialHour={sPickerFor === "in" ? inInitial.hour : outInitial.hour}
+                    initialMinute={sPickerFor === "in" ? inInitial.minute : outInitial.minute}
+                    initialPeriod={sPickerFor === "in" ? inInitial.period : outInitial.period}
+                    onConfirm={(val) => { handlePickerConfirm(val); _setPickerPos(null); }}
+                    onCancel={() => { _setPickerFor(null); _setPickerPos(null); }}
+                  />
+                </View>
+              </TouchableWithoutFeedback>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>,
+        document.body
       )}
     </View>
   );
@@ -294,7 +316,7 @@ export function ScheduleModal({ handleExit }) {
     let weekKey = getWeekStart(new Date());
     return cloneDeep(settings?.schedules?.[weekKey]?.shifts || {});
   });
-  let [sEditingCell, _setEditingCell] = useState(null);
+  let [sShowPay, _setShowPay] = useState(false);
 
   let debouncedSaveRef = useRef(
     debounce((allSchedules) => {
@@ -312,10 +334,7 @@ export function ScheduleModal({ handleExit }) {
     debouncedSaveRef.current(allSchedules);
   }
 
-  function handleAddShift(userID, dayIndex) {
-    let day = getStoreHoursForDayIndex(storeHours, dayIndex);
-    let startTime = day?.open || "9:00 AM";
-    let endTime = day?.close || "5:00 PM";
+  function handleAddShift(userID, dayIndex, startTime, endTime) {
     let key = `${userID}_${dayIndex}`;
     let updated = { ...sShifts };
     updated[key] = { id: key, userID, dayIndex, startTime, endTime };
@@ -382,12 +401,58 @@ export function ScheduleModal({ handleExit }) {
     }
   }
 
+  function handleCopyForward() {
+    if (Object.keys(sShifts).length === 0) {
+      useAlertScreenStore.getState().setValues({
+        title: "No Schedule",
+        message: "There are no shifts on this week to copy forward.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+
+    let nextStart = dayjs(sWeekStart).add(7, "day").format("YYYY-MM-DD");
+    let nextShifts = settings?.schedules?.[nextStart]?.shifts;
+    let hasNextShifts = nextShifts && Object.keys(nextShifts).length > 0;
+
+    if (hasNextShifts) {
+      useAlertScreenStore.getState().setValues({
+        title: "Copy Forward",
+        message: "This will replace all shifts for next week with this week's schedule. Continue?",
+        btn1Text: "Copy",
+        btn2Text: "Cancel",
+        handleBtn1Press: () => {
+          useAlertScreenStore.getState().setShowAlert(false);
+          let copied = cloneDeep(sShifts);
+          let allSchedules = cloneDeep(settings?.schedules || {});
+          allSchedules[nextStart] = { weekStart: nextStart, shifts: copied };
+          allSchedules = pruneOldWeeks(allSchedules);
+          useSettingsStore.getState().setField("schedules", allSchedules, false);
+          debouncedSaveRef.current(allSchedules);
+        },
+        handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+    } else {
+      let copied = cloneDeep(sShifts);
+      let allSchedules = cloneDeep(settings?.schedules || {});
+      allSchedules[nextStart] = { weekStart: nextStart, shifts: copied };
+      allSchedules = pruneOldWeeks(allSchedules);
+      useSettingsStore.getState().setField("schedules", allSchedules, false);
+      debouncedSaveRef.current(allSchedules);
+    }
+  }
+
   // week date range label
   let weekStartDay = dayjs(sWeekStart);
   let weekEndDay = weekStartDay.add(6, "day");
   let weekLabel =
     weekStartDay.format("MMM D") + " - " + weekEndDay.format("MMM D, YYYY");
-  let isCurrentWeek = sWeekStart === getWeekStart(new Date());
+  let currentWeekStart = getWeekStart(new Date());
+  let isCurrentWeek = sWeekStart === currentWeekStart;
+  let isPastWeek = sWeekStart < currentWeekStart;
 
   // build day columns
   let dayColumns = [];
@@ -429,7 +494,7 @@ export function ScheduleModal({ handleExit }) {
               paddingHorizontal: 20,
               paddingVertical: 14,
               borderBottomWidth: 1,
-              borderBottomColor: gray(0.12),
+              borderBottomColor: "rgb(220,220,220)",
               backgroundColor: "white",
             }}
           >
@@ -441,7 +506,7 @@ export function ScheduleModal({ handleExit }) {
                   height: 44,
                   justifyContent: "center",
                   alignItems: "center",
-                  backgroundColor: gray(0.92),
+                  backgroundColor: "rgb(230,230,230)",
                   borderRadius: 10,
                 }}
               >
@@ -468,7 +533,7 @@ export function ScheduleModal({ handleExit }) {
                   height: 44,
                   justifyContent: "center",
                   alignItems: "center",
-                  backgroundColor: gray(0.92),
+                  backgroundColor: "rgb(230,230,230)",
                   borderRadius: 10,
                 }}
               >
@@ -493,9 +558,43 @@ export function ScheduleModal({ handleExit }) {
 
             <View style={{ flexDirection: "row", alignItems: "center" }}>
               <TouchableOpacity
-                onPress={handleCopyLastWeek}
+                onPress={isPastWeek ? undefined : handleCopyLastWeek}
                 style={{
                   backgroundColor: C.green,
+                  borderRadius: 8,
+                  paddingVertical: 10,
+                  paddingHorizontal: 18,
+                  marginRight: 16,
+                  opacity: isPastWeek ? 0.4 : 1,
+                }}
+                disabled={isPastWeek}
+              >
+                <Text style={{ color: "white", fontSize: 14, fontWeight: "700" }}>
+                  Copy Last Week
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={isPastWeek ? undefined : handleCopyForward}
+                style={{
+                  backgroundColor: C.orange,
+                  borderRadius: 8,
+                  paddingVertical: 10,
+                  paddingHorizontal: 18,
+                  marginRight: 16,
+                  opacity: isPastWeek ? 0.4 : 1,
+                }}
+                disabled={isPastWeek}
+              >
+                <Text style={{ color: "white", fontSize: 14, fontWeight: "700" }}>
+                  Copy Forward
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => _setShowPay(!sShowPay)}
+                style={{
+                  backgroundColor: sShowPay ? "rgb(180,180,180)" : "rgb(103,124,231)",
                   borderRadius: 8,
                   paddingVertical: 10,
                   paddingHorizontal: 18,
@@ -503,7 +602,7 @@ export function ScheduleModal({ handleExit }) {
                 }}
               >
                 <Text style={{ color: "white", fontSize: 14, fontWeight: "700" }}>
-                  Copy Last Week
+                  {sShowPay ? "Hide Pay" : "Show Pay"}
                 </Text>
               </TouchableOpacity>
 
@@ -514,11 +613,9 @@ export function ScheduleModal({ handleExit }) {
                   height: 40,
                   justifyContent: "center",
                   alignItems: "center",
-                  borderRadius: 20,
-                  backgroundColor: gray(0.9),
                 }}
               >
-                <Image_ icon={ICONS.close1} size={16} />
+                <Image_ icon={ICONS.close1} size={31} />
               </TouchableOpacity>
             </View>
           </View>
@@ -527,7 +624,7 @@ export function ScheduleModal({ handleExit }) {
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
             {/* day header row */}
             <View style={{ flexDirection: "row", marginBottom: 6 }}>
-              <View style={{ width: 120, paddingRight: 8 }} />
+              <View style={{ width: 100, paddingRight: 8 }} />
               {dayColumns.map((col) => (
                 <View
                   key={col.dayIndex}
@@ -536,7 +633,7 @@ export function ScheduleModal({ handleExit }) {
                     alignItems: "center",
                     paddingVertical: 8,
                     margin: 2,
-                    backgroundColor: col.isClosed ? gray(0.94) : "#f0f7f0",
+                    backgroundColor: col.isClosed ? "rgb(235,235,235)" : C.blue,
                     borderRadius: 8,
                     opacity: col.isClosed ? 0.6 : 1,
                   }}
@@ -544,83 +641,146 @@ export function ScheduleModal({ handleExit }) {
                   <Text
                     style={{
                       fontSize: 16,
-                      fontWeight: "700",
-                      color: col.isClosed ? gray(0.5) : C.text,
+                      fontWeight: "600",
+                      color: col.isClosed ? "rgb(140,140,140)" : "white",
                     }}
                   >
                     {col.name} {col.date}
                   </Text>
                   {col.isClosed ? (
-                    <Text style={{ fontSize: 11, color: gray(0.5), marginTop: 2 }}>Closed</Text>
+                    <Text style={{ fontSize: 11, color: "rgb(140,140,140)", marginTop: 2 }}>Closed</Text>
                   ) : (
-                    <Text style={{ fontSize: 11, color: gray(0.45), marginTop: 2 }}>
+                    <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 2 }}>
                       {formatTimeShort(col.openTime)} - {formatTimeShort(col.closeTime)}
                     </Text>
                   )}
                 </View>
               ))}
+              {sShowPay && (
+                <View style={{ width: 80, justifyContent: "center", alignItems: "center", margin: 2 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: C.text }}>Pay</Text>
+                </View>
+              )}
             </View>
 
             {/* employee rows */}
-            {users.map((user) => (
-              <View
-                key={user.id}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "stretch",
-                  marginBottom: 4,
-                  minHeight: 64,
-                }}
-              >
+            {users.map((user) => {
+              let weekHours = getUserWeekHours(user.id, sShifts);
+              let wage = Number(user.hourlyWage) || 0;
+              let weekPay = trimToTwoDecimals(weekHours * wage);
+              return (
                 <View
+                  key={user.id}
                   style={{
-                    width: 120,
-                    justifyContent: "center",
-                    paddingRight: 8,
-                    paddingLeft: 4,
+                    flexDirection: "row",
+                    alignItems: "stretch",
+                    marginBottom: 4,
+                    minHeight: 64,
                   }}
                 >
-                  <Text
+                  <View
                     style={{
-                      fontSize: 15,
-                      fontWeight: "700",
-                      color: C.text,
+                      width: 100,
+                      justifyContent: "center",
+                      paddingRight: 6,
+                      paddingLeft: 4,
                     }}
-                    numberOfLines={1}
                   >
-                    {user.first}
-                  </Text>
-                  {!!user.last && (
                     <Text
                       style={{
-                        fontSize: 12,
-                        color: gray(0.5),
-                        fontWeight: "500",
+                        fontSize: 14,
+                        fontWeight: "700",
+                        color: C.text,
                       }}
                       numberOfLines={1}
                     >
-                      {user.last}
+                      {user.first}
                     </Text>
+                    {!!user.last && (
+                      <Text
+                        style={{
+                          fontSize: 11,
+                          color: "rgb(140,140,140)",
+                          fontWeight: "500",
+                        }}
+                        numberOfLines={1}
+                      >
+                        {user.last}
+                      </Text>
+                    )}
+                    <Text style={{ fontSize: 10, color: "rgb(160,160,160)", fontWeight: "500", marginTop: 1 }}>
+                      {trimToTwoDecimals(weekHours)}
+                    </Text>
+                  </View>
+
+                  {dayColumns.map((col) => {
+                    let shiftKey = `${user.id}_${col.dayIndex}`;
+                    let shift = sShifts[shiftKey] || null;
+                    return (
+                      <ShiftCell
+                        key={shiftKey}
+                        shift={shift}
+                        isClosed={col.isClosed}
+                        storeHoursDay={col}
+                        isPastWeek={isPastWeek}
+                        onAddWithTimes={(startTime, endTime) => handleAddShift(user.id, col.dayIndex, startTime, endTime)}
+                        onUpdate={(updated) => handleUpdateShift(shiftKey, updated)}
+                        onRemove={() => handleRemoveShift(shiftKey)}
+                      />
+                    );
+                  })}
+
+                  {sShowPay && (
+                    <View style={{ width: 80, justifyContent: "center", alignItems: "center", margin: 2 }}>
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>
+                        ${weekPay.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </Text>
+                    </View>
                   )}
                 </View>
+              );
+            })}
 
-                {dayColumns.map((col) => {
-                  let shiftKey = `${user.id}_${col.dayIndex}`;
-                  let shift = sShifts[shiftKey] || null;
-                  return (
-                    <ShiftCell
-                      key={shiftKey}
-                      shift={shift}
-                      isClosed={col.isClosed}
-                      storeHoursDay={col}
-                      onAdd={() => handleAddShift(user.id, col.dayIndex)}
-                      onUpdate={(updated) => handleUpdateShift(shiftKey, updated)}
-                      onRemove={() => handleRemoveShift(shiftKey)}
-                    />
-                  );
-                })}
-              </View>
-            ))}
+            {/* ─── summary row ──────────────────────────────────────── */}
+            {(() => {
+              let totalHours = 0;
+              let totalPay = 0;
+              users.forEach((user) => {
+                let h = getUserWeekHours(user.id, sShifts);
+                totalHours += h;
+                totalPay += h * (Number(user.hourlyWage) || 0);
+              });
+              totalHours = trimToTwoDecimals(totalHours);
+              totalPay = trimToTwoDecimals(totalPay);
+              return (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    marginTop: 8,
+                    paddingTop: 10,
+                    borderTopWidth: 1,
+                    borderTopColor: "rgb(220,220,220)",
+                  }}
+                >
+                  <View style={{ width: 100, paddingLeft: 4 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>Total</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: "rgb(100,100,100)" }}>
+                      {totalHours} scheduled
+                    </Text>
+                  </View>
+                  {sShowPay && (
+                    <View style={{ width: 80, alignItems: "center" }}>
+                      <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>
+                        ${totalPay.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              );
+            })()}
           </ScrollView>
         </View>
       </TouchableWithoutFeedback>

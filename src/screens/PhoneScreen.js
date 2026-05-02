@@ -32,6 +32,7 @@ import { FACE_DESCRIPTOR_CONFIDENCE_DISTANCE, MILLIS_IN_DAY } from "../constants
 import { COLORS, NONREMOVABLE_WAIT_TIMES } from "../data";
 import { cloneDeep } from "lodash";
 import { openCacheDB, clearStaleCache, loadModelCached } from "../faceDetection";
+import { MobileMessagesScreen } from "./mobile/MobileMessagesScreen";
 
 const LOCAL_STORAGE_KEY = "warpspeed_phone_user_id";
 
@@ -586,6 +587,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
   const zUploadProgress = useUploadProgressStore((s) => s.progress);
   const zShowAlert = useAlertScreenStore((s) => s.showAlert);
 
+  const [sShowMessages, _setShowMessages] = useState(false);
   const [sCustomerOpen, _setCustomerOpen] = useState(false);
   const [sCustomerEditing, _setCustomerEditing] = useState(false);
   const [sCustomer, _setCustomer] = useState(null);
@@ -703,13 +705,18 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
     navigator.clipboard.writeText(phone).catch(() => {});
     useAlertScreenStore.getState().setValues({
       title: "Phone Number Copied",
-      message: formatted + " has been copied to your clipboard. Select a dialer to open:",
-      btn1Text: "VONAGE",
-      btn2Text: "PHONE DIALER",
+      message: formatted + " has been copied to your clipboard.",
+      btn1Text: "TEXT",
+      btn2Text: "VONAGE",
+      btn3Text: "PHONE DIALER",
       handleBtn1Press: () => {
-        window.open("https://app.vonage.com", "_blank");
+        useAlertScreenStore.getState().resetAll();
+        _setShowMessages(true);
       },
       handleBtn2Press: () => {
+        window.open("https://app.vonage.com", "_blank");
+      },
+      handleBtn3Press: () => {
         window.open("tel:" + phone);
       },
       showAlert: true,
@@ -768,6 +775,14 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
     useUploadProgressStore.getState().setProgress({ completed, total, failed, done: true });
     _setUploading(false);
     setTimeout(() => useUploadProgressStore.getState().setProgress(null), failed > 0 ? 5000 : 3000);
+  }
+
+  if (sShowMessages) {
+    return (
+      <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: C.backgroundWhite }}>
+        <MobileMessagesScreen workorderID={workorder.id} onBack={() => _setShowMessages(false)} />
+      </View>
+    );
   }
 
   return (
@@ -1043,7 +1058,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
               <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
                 <SmallLoadingIndicator text="" color={C.blue} />
                 <Text style={{ fontSize: 14, color: gray(0.45), marginLeft: 6 }}>
-                  Uploading {zUploadProgress.completed}/{zUploadProgress.total}...
+                  Uploading {zUploadProgress.completed}/{zUploadProgress.total} - don't leave this page
                 </Text>
               </View>
               <View style={{ height: 4, borderRadius: 2, backgroundColor: gray(0.9) }}>
@@ -1365,7 +1380,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
                     onPress={() => {
                       const newVal = !workorder.partToBeOrdered;
                       setField("partToBeOrdered", newVal);
-                      setField("status", newVal ? "open" : "part_ordered");
+                      setField("status", newVal ? "is_order_part_for_customer" : "part_ordered");
                     }}
                     style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}
                   >

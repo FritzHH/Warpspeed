@@ -217,16 +217,14 @@ const COLORS = [
 
 const NONREMOVABLE_STATUSES = [
   { id: "newly_created", label: "Newly Created", textColor: "white", backgroundColor: "red", removable: false, requireWaitTime: false, hidden: false },
-  { id: "sale_in_progress", label: "Sale in Progress", textColor: "yellow", backgroundColor: "black", removable: false, requireWaitTime: false, systemOwned: true, hidden: false },
-  { id: "finished_and_paid", label: "Finished & Paid", textColor: "white", backgroundColor: "green", removable: false, requireWaitTime: false, systemOwned: true, hidden: false },
-  { id: "intake", label: "Intake", textColor: "white", backgroundColor: "pink", removable: false, requireWaitTime: false, hidden: false },
-  { id: "service", textColor: "black", backgroundColor: "rgb(192,192,192)", label: "Service", removable: false, requireWaitTime: false, hidden: false },
-  { id: "finished", textColor: "white", backgroundColor: "green", label: "Finished", removable: false, requireWaitTime: false, hidden: false },
-  { id: "part_ordered", textColor: "white", backgroundColor: "orange", label: "Item Ordered", removable: false, hidden: true },
-  { id: "is_order_part_for_customer", textColor: "rgb(38,38,38)", backgroundColor: "rgb(226,126,56)", label: "Order Item for Customer", removable: false, hidden: false },
+  { id: "work_in_progress", textColor: "black", backgroundColor: "rgb(192,192,192)", label: "Work in Progress", removable: false, hidden: false },
   { id: "pickup", textColor: "white", backgroundColor: "purple", label: "Pickup", removable: false, hidden: false },
   { id: "delivery", textColor: "white", backgroundColor: "purple", label: "Delivery", removable: false, hidden: false },
-  { id: "work_in_progress", textColor: "black", backgroundColor: "rgb(192,192,192)", label: "Work in Progress", removable: false, hidden: false },
+  { id: "service", textColor: "rgb(71,71,71)", backgroundColor: "rgb(192,192,192)", label: "Service", removable: false, requireWaitTime: false, hidden: false },
+  { id: "is_order_part_for_customer", textColor: "rgb(38,38,38)", backgroundColor: "rgb(226,126,56)", label: "Order Item for Customer", removable: false, hidden: false },
+  { id: "finished", textColor: "white", backgroundColor: "green", label: "Finished", removable: false, requireWaitTime: false, hidden: false },
+  { id: "part_ordered", textColor: "white", backgroundColor: "orange", label: "Item Ordered", removable: false, hidden: true },
+  { id: "finished_and_paid", label: "Finished & Paid", textColor: "white", backgroundColor: "green", removable: false, requireWaitTime: false, systemOwned: true, hidden: false },
 ];
 
 const CUSTOMER_LANGUAGES = {

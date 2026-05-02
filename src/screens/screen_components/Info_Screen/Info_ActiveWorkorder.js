@@ -295,6 +295,47 @@ export const ActiveWorkorderComponent = ({}) => {
     }, 700);
   }
 
+  // Brand autocomplete
+  const [sBrandFocused, _setBrandFocused] = useState(false);
+  const brandWrapperRef = useRef(null);
+  const brandBackspaced = useRef(false);
+
+  const brandSuggestions = sBrandFocused && zOpenWorkorder?.brand?.trim()
+    ? (zSettings.allBrands || []).filter(
+        (b) => b.toLowerCase().startsWith(zOpenWorkorder.brand.trim().toLowerCase()) && b.toLowerCase() !== zOpenWorkorder.brand.trim().toLowerCase()
+      ).slice(0, 8)
+    : [];
+
+  function saveBrandToAllBrands(brand) {
+    if (!brand || !brand.trim()) return;
+    const trimmed = brand.trim();
+    const existing = zSettings.allBrands || [];
+    if (existing.some((b) => b.toLowerCase() === trimmed.toLowerCase())) return;
+    const updated = [...existing, trimmed].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    useSettingsStore.getState().setField("allBrands", updated);
+  }
+
+  // Description autocomplete
+  const [sDescFocused, _setDescFocused] = useState(false);
+  const descInputRef = useRef(null);
+  const color1InputRef = useRef(null);
+  const descBackspaced = useRef(false);
+
+  const descSuggestions = sDescFocused && zOpenWorkorder?.description?.trim()
+    ? (zSettings.allDescriptions || []).filter(
+        (d) => d.toLowerCase().startsWith(zOpenWorkorder.description.trim().toLowerCase()) && d.toLowerCase() !== zOpenWorkorder.description.trim().toLowerCase()
+      ).slice(0, 8)
+    : [];
+
+  function saveDescToAllDescriptions(desc) {
+    if (!desc || !desc.trim()) return;
+    const trimmed = desc.trim();
+    const existing = zSettings.allDescriptions || [];
+    if (existing.some((d) => d.toLowerCase() === trimmed.toLowerCase())) return;
+    const updated = [...existing, trimmed].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    useSettingsStore.getState().setField("allDescriptions", updated);
+  }
+
   // Refs for dropdown components
   const bikesRef = useRef();
   const ebikeRef = useRef();
@@ -717,6 +758,8 @@ export const ActiveWorkorderComponent = ({}) => {
 
               borderWidth: 1,
               borderRadius: 5,
+              zIndex: 10,
+              overflow: "visible",
             }}
           >
             <View
@@ -725,32 +768,99 @@ export const ActiveWorkorderComponent = ({}) => {
                 justifyContent: "flex-start",
                 alignItems: "center",
                 width: "100%",
+                zIndex: 10,
+                overflow: "visible",
                 // backgroundColor: "blue",
               }}
             >
-              {/* <View style={{}}> */}
-              <TextInput_
-                placeholder={"Brand"}
-                editable={!isDonePaid}
-                capitalize={true}
-                style={{
-                  width: "45%",
-                  borderWidth: 1,
-                  borderColor: zOpenWorkorder?.brand ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
-                  color: C.text,
-                  paddingVertical: 2,
-                  paddingHorizontal: 4,
-                  fontSize: 15,
-                  outlineStyle: "none",
-                  borderRadius: 5,
-                  fontWeight: zOpenWorkorder?.brand ? "500" : null,
-                }}
-                value={capitalizeFirstLetterOfString(zOpenWorkorder?.brand)}
-                onChangeText={(val) =>
-                  useOpenWorkordersStore.getState().setField("brand", val, zOpenWorkorder.id)
-                }
-              />
-              {/* </View> */}
+              <View ref={brandWrapperRef} style={{ width: "45%", zIndex: 10 }}>
+                <TextInput_
+                  placeholder={"Brand"}
+                  editable={!isDonePaid}
+                  capitalize={true}
+                  style={{
+                    width: "100%",
+                    borderWidth: 1,
+                    borderColor: zOpenWorkorder?.brand ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
+                    color: C.text,
+                    paddingVertical: 2,
+                    paddingHorizontal: 4,
+                    fontSize: 15,
+                    outlineStyle: "none",
+                    borderRadius: 5,
+                    fontWeight: zOpenWorkorder?.brand ? "500" : null,
+                  }}
+                  value={capitalizeFirstLetterOfString(zOpenWorkorder?.brand)}
+                  onKeyPress={(e) => { if (e.nativeEvent.key === "Backspace") brandBackspaced.current = true; }}
+                  onChangeText={(val) => {
+                    useOpenWorkordersStore.getState().setField("brand", val, zOpenWorkorder.id);
+                    if (!brandBackspaced.current && val.trim().length >= 2) {
+                      const q = val.trim().toLowerCase();
+                      const matches = (useSettingsStore.getState().settings.allBrands || []).filter(
+                        (b) => b.toLowerCase().startsWith(q) && b.toLowerCase() !== q
+                      );
+                      if (matches.length === 1) {
+                        useOpenWorkordersStore.getState().setField("brand", matches[0], zOpenWorkorder.id);
+                        _setBrandFocused(false);
+                        setTimeout(() => { const el = descInputRef.current?.querySelector?.("input"); if (el) el.focus(); }, 50);
+                      }
+                    }
+                  }}
+                  onFocus={() => { _setBrandFocused(true); brandBackspaced.current = false; }}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      _setBrandFocused(false);
+                      brandBackspaced.current = false;
+                      saveBrandToAllBrands(zOpenWorkorder?.brand);
+                    }, 150);
+                  }}
+                />
+                {brandSuggestions.length > 0 && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      backgroundColor: C.listItemWhite,
+                      borderWidth: 1,
+                      borderColor: C.buttonLightGreenOutline,
+                      borderRadius: 5,
+                      maxHeight: 200,
+                      overflow: "auto",
+                      zIndex: 999,
+                    }}
+                  >
+                    {brandSuggestions.map((item) => (
+                      <View
+                        key={item}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                        style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, paddingHorizontal: 8 }}
+                      >
+                        <TouchableOpacity
+                          onPress={() => {
+                            useOpenWorkordersStore.getState().setField("brand", item, zOpenWorkorder.id);
+                            _setBrandFocused(false);
+                          }}
+                          style={{ flex: 1, cursor: "pointer" }}
+                        >
+                          <Text style={{ fontSize: 14, color: C.text }}>{item}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => {
+                            const updated = (zSettings.allBrands || []).filter((b) => b !== item);
+                            useSettingsStore.getState().setField("allBrands", updated);
+                          }}
+                          style={{ paddingLeft: 8, cursor: "pointer" }}
+                        >
+                          <Text style={{ fontSize: 12, color: gray(0.55) }}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
               <View
                 style={{
                   // marginTop: 11,
@@ -775,6 +885,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     enabled={!isDonePaid}
                     onSelect={(item, idx) => {
                       useOpenWorkordersStore.getState().setField("brand", item, zOpenWorkorder.id);
+                      saveBrandToAllBrands(item);
                     }}
                     buttonStyle={{
                       opacity: zOpenWorkorder?.brand
@@ -799,6 +910,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     enabled={!isDonePaid}
                     onSelect={(item, idx) => {
                       useOpenWorkordersStore.getState().setField("brand", item, zOpenWorkorder.id);
+                      saveBrandToAllBrands(item);
                     }}
                     buttonStyle={{
                       opacity: zOpenWorkorder?.brand
@@ -818,32 +930,100 @@ export const ActiveWorkorderComponent = ({}) => {
                 justifyContent: "flex-start",
                 width: "100%",
                 alignItems: "center",
-
+                zIndex: 9,
+                overflow: "visible",
                 marginTop: 11,
                 // backgroundColor: "blue",
               }}
             >
-              <TextInput_
-                placeholder={"Model/Description"}
-                editable={!isDonePaid}
-                capitalize={true}
-                style={{
-                  width: "45%",
-                  borderWidth: 1,
-                  borderColor: zOpenWorkorder?.description ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
-                  color: C.text,
-                  paddingVertical: 2,
-                  paddingHorizontal: 4,
-                  fontSize: 15,
-                  outlineStyle: "none",
-                  borderRadius: 5,
-                  fontWeight: zOpenWorkorder?.description ? "500" : null,
-                }}
-                value={capitalizeFirstLetterOfString(zOpenWorkorder?.description)}
-                onChangeText={(val) => {
-                  useOpenWorkordersStore.getState().setField("description", val, zOpenWorkorder.id);
-                }}
-              />
+              <View ref={descInputRef} style={{ width: "45%", zIndex: 10 }}>
+                <TextInput_
+                  placeholder={"Model/Description"}
+                  editable={!isDonePaid}
+                  capitalize={true}
+                  style={{
+                    width: "100%",
+                    borderWidth: 1,
+                    borderColor: zOpenWorkorder?.description ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
+                    color: C.text,
+                    paddingVertical: 2,
+                    paddingHorizontal: 4,
+                    fontSize: 15,
+                    outlineStyle: "none",
+                    borderRadius: 5,
+                    fontWeight: zOpenWorkorder?.description ? "500" : null,
+                  }}
+                  value={capitalizeFirstLetterOfString(zOpenWorkorder?.description)}
+                  onKeyPress={(e) => { if (e.nativeEvent.key === "Backspace") descBackspaced.current = true; }}
+                  onChangeText={(val) => {
+                    useOpenWorkordersStore.getState().setField("description", val, zOpenWorkorder.id);
+                    if (!descBackspaced.current && val.trim().length >= 2) {
+                      const q = val.trim().toLowerCase();
+                      const matches = (useSettingsStore.getState().settings.allDescriptions || []).filter(
+                        (d) => d.toLowerCase().startsWith(q) && d.toLowerCase() !== q
+                      );
+                      if (matches.length === 1) {
+                        useOpenWorkordersStore.getState().setField("description", matches[0], zOpenWorkorder.id);
+                        _setDescFocused(false);
+                        setTimeout(() => { const el = color1InputRef.current?.querySelector?.("input"); if (el) el.focus(); }, 50);
+                      }
+                    }
+                  }}
+                  onFocus={() => { _setDescFocused(true); descBackspaced.current = false; }}
+                  onBlur={() => {
+                    setTimeout(() => {
+                      _setDescFocused(false);
+                      descBackspaced.current = false;
+                      saveDescToAllDescriptions(zOpenWorkorder?.description);
+                    }, 150);
+                  }}
+                />
+                {descSuggestions.length > 0 && (
+                  <View
+                    style={{
+                      position: "absolute",
+                      top: "100%",
+                      left: 0,
+                      right: 0,
+                      backgroundColor: C.listItemWhite,
+                      borderWidth: 1,
+                      borderColor: C.buttonLightGreenOutline,
+                      borderRadius: 5,
+                      maxHeight: 200,
+                      overflow: "auto",
+                      zIndex: 999,
+                    }}
+                  >
+                    {descSuggestions.map((item) => (
+                      <View
+                        key={item}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                        onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                        style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, paddingHorizontal: 8 }}
+                      >
+                        <TouchableOpacity
+                          onPress={() => {
+                            useOpenWorkordersStore.getState().setField("description", item, zOpenWorkorder.id);
+                            _setDescFocused(false);
+                          }}
+                          style={{ flex: 1, cursor: "pointer" }}
+                        >
+                          <Text style={{ fontSize: 14, color: C.text }}>{item}</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => {
+                            const updated = (zSettings.allDescriptions || []).filter((d) => d !== item);
+                            useSettingsStore.getState().setField("allDescriptions", updated);
+                          }}
+                          style={{ paddingLeft: 8, cursor: "pointer" }}
+                        >
+                          <Text style={{ fontSize: 12, color: gray(0.55) }}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
               <View
                 style={{
                   // marginTop: 11,
@@ -866,6 +1046,7 @@ export const ActiveWorkorderComponent = ({}) => {
                         item,
                         zOpenWorkorder.id
                       );
+                      saveDescToAllDescriptions(item);
                     }}
                     // modalCoordinateVars={{ x: 30, y: 30 }}
                     buttonStyle={{
@@ -881,6 +1062,7 @@ export const ActiveWorkorderComponent = ({}) => {
             </View>
 
             <View
+              ref={color1InputRef}
               style={{
                 flexDirection: "row",
                 justifyContent: "space-between",
@@ -1466,7 +1648,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   const newVal = !zOpenWorkorder?.partToBeOrdered;
                   const store = useOpenWorkordersStore.getState();
                   store.setField("partToBeOrdered", newVal, zOpenWorkorder.id);
-                  store.setField("status", newVal ? "open" : "part_ordered", zOpenWorkorder.id);
+                  store.setField("status", newVal ? "is_order_part_for_customer" : "part_ordered", zOpenWorkorder.id);
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center' }}
               >

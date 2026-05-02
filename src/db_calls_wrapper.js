@@ -37,6 +37,7 @@ import {
   createTextToPayInvoiceCallable,
   firestoreBatchWrite,
   firestoreBatchDelete,
+  migrateCustomerPhoneCallable,
 } from "./db_calls";
 import { removeUnusedFields, createNewWorkorder, buildWorkorderNumberFromId } from "./utils";
 import { useSettingsStore, useLoginStore, useOpenWorkordersStore, clearPersistedStores } from "./stores";
@@ -3429,6 +3430,17 @@ export async function dbManualArchiveAndCleanup() {
   } catch (error) {
     log("Error in dbManualArchiveAndCleanup:", error);
     return { success: false, error: error.message || "Manual archive failed" };
+  }
+}
+
+export async function dbMigrateCustomerPhone(oldPhone, newPhone, customerID, first, last) {
+  const { tenantID, storeID } = getTenantAndStore();
+  try {
+    const result = await migrateCustomerPhoneCallable({ tenantID, storeID, oldPhone, newPhone, customerID, first, last });
+    return result.data;
+  } catch (error) {
+    log("Error in dbMigrateCustomerPhone:", error);
+    return { success: false, error: error.message || "Phone migration failed" };
   }
 }
 

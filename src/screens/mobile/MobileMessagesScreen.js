@@ -9,7 +9,7 @@ import {
 } from "react-native-web";
 import { useParams } from "react-router-dom";
 import { C, ICONS } from "../../styles";
-import { Button_, Image_ } from "../../components";
+import { Button_, Image_, CheckBox_ } from "../../components";
 import {
   formatPhoneWithDashes,
   formatDateTimeForReceipt,
@@ -21,20 +21,25 @@ import {
   useOpenWorkordersStore,
   useLoginStore,
   useAlertScreenStore,
+  useSettingsStore,
 } from "../../stores";
-import { dbListenToCustomerMessages } from "../../db_calls_wrapper";
+import { dbListenToCustomerMessages, dbUpdateMessageCanRespond } from "../../db_calls_wrapper";
+import { firestoreRead } from "../../db_calls";
 import { smsService } from "../../data_service_modules";
 import { SMS_PROTO } from "../../data";
 
-export function MobileMessagesScreen() {
-  const { id } = useParams();
+export function MobileMessagesScreen({ workorderID, onBack }) {
+  const params = useParams();
+  const woID = workorderID || params?.id;
   const zWorkorder = useOpenWorkordersStore((state) =>
-    state.workorders.find((o) => o.id === id) || null
+    state.workorders.find((o) => o.id === woID) || null
   );
 
   const [sMessages, _setMessages] = useState([]);
   const [sNewMessage, _setNewMessage] = useState("");
   const [sSending, _setSending] = useState(false);
+  const [sInputHeight, _setInputHeight] = useState(36);
+  const [sCanRespond, _setCanRespond] = useState(true);
   const scrollRef = useRef(null);
 
   const customerPhone = zWorkorder?.customerCell;
@@ -42,17 +47,24 @@ export function MobileMessagesScreen() {
   const customerLast = zWorkorder?.customerLast || "";
   const customerID = zWorkorder?.customerID || "";
 
-  // Listen to customer messages
+  // Listen to customer messages + load canRespond from thread parent doc
   useEffect(() => {
     if (!customerPhone) return;
+    const cleanPhone = customerPhone.replace(/\D/g, "");
     const unsubscribe = dbListenToCustomerMessages(customerPhone, (messages) => {
-      if (messages) {
-        _setMessages(messages);
-      }
+      if (messages) _setMessages(messages);
     });
-    return () => {
-      if (unsubscribe) unsubscribe();
-    };
+    const zSettings = useSettingsStore.getState().getSettings();
+    const tenantID = zSettings?.tenantID;
+    const storeID = zSettings?.storeID;
+    if (tenantID && storeID && cleanPhone.length === 10) {
+      firestoreRead(`tenants/${tenantID}/stores/${storeID}/sms-messages/${cleanPhone}`)
+        .then((data) => {
+          if (data && data.canRespond !== undefined) _setCanRespond(!!data.canRespond);
+        })
+        .catch(() => {});
+    }
+    return () => { if (unsubscribe) unsubscribe(); };
   }, [customerPhone]);
 
   // Auto-scroll to bottom when messages change
@@ -74,7 +86,7 @@ export function MobileMessagesScreen() {
       msg.phoneNumber = customerPhone;
       if (customerFirst) msg.customerFirst = customerFirst;
       if (customerLast) msg.customerLast = customerLast;
-      msg.canRespond = null;
+      msg.canRespond = sCanRespond ? true : null;
       msg.millis = new Date().getTime();
       msg.customerID = customerID;
       msg.id = crypto.randomUUID();
@@ -106,6 +118,12 @@ export function MobileMessagesScreen() {
       }
       _setSending(false);
     });
+  }
+
+  async function handleToggleCanRespond() {
+    let newVal = !sCanRespond;
+    _setCanRespond(newVal);
+    await dbUpdateMessageCanRespond(customerPhone, null, newVal);
   }
 
   if (!zWorkorder) {
@@ -142,19 +160,29 @@ export function MobileMessagesScreen() {
           borderBottomColor: C.buttonLightGreenOutline,
           paddingHorizontal: 16,
           paddingVertical: 10,
+          flexDirection: "row",
+          alignItems: "center",
         }}
       >
-        <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>
-          {capitalizeFirstLetterOfString(customerFirst) +
-            " " +
-            capitalizeFirstLetterOfString(customerLast)}
-        </Text>
-        <Text style={{ fontSize: 13, color: C.lightText, marginTop: 2 }}>
-          {formatPhoneWithDashes(customerPhone)}
-        </Text>
+        <TouchableOpacity onPress={onBack} style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+          {onBack ? (
+            <Image_ icon={ICONS.downChevron} size={16} style={{ transform: [{ rotate: "90deg" }], marginRight: 10 }} />
+          ) : null}
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>
+              {capitalizeFirstLetterOfString(customerFirst) +
+                " " +
+                capitalizeFirstLetterOfString(customerLast)}
+            </Text>
+            <Text style={{ fontSize: 13, color: C.lightText, marginTop: 2 }}>
+              {formatPhoneWithDashes(customerPhone)}
+            </Text>
+          </View>
+        </TouchableOpacity>
       </View>
 
       {/* Messages list */}
+      <View style={{ flex: 1, overflow: "hidden" }}>
       <ScrollView
         ref={scrollRef}
         style={{ flex: 1 }}
@@ -184,24 +212,42 @@ export function MobileMessagesScreen() {
         })}
         <View style={{ height: 10 }} />
       </ScrollView>
+      </View>
 
       {/* Input area */}
       <View
         style={{
           borderTopWidth: 1,
-          borderTopColor: gray(0.88),
+          borderTopColor: "lightgray",
           backgroundColor: C.listItemWhite,
           paddingHorizontal: 12,
-          paddingVertical: 10,
+          paddingBottom: 10,
         }}
       >
+        <View style={{ marginVertical: 2 }}>
+          <CheckBox_
+            isChecked={sCanRespond}
+            onCheck={handleToggleCanRespond}
+            text="User can respond"
+          />
+        </View>
         <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
           <TextInput
             value={sNewMessage}
-            onChangeText={_setNewMessage}
+            onChangeText={(val) => {
+              if (val.length === 1) val = val.toUpperCase();
+              _setNewMessage(val);
+            }}
             placeholder="Type a message..."
+            autoCapitalize="sentences"
             placeholderTextColor={gray(0.5)}
             multiline={true}
+            onContentSizeChange={(e) => {
+              let h = e?.nativeEvent?.contentSize?.height;
+              if (typeof h === "number" && h > 0) {
+                _setInputHeight(Math.max(36, Math.ceil(h)));
+              }
+            }}
             style={{
               flex: 1,
               borderWidth: 1,
@@ -210,10 +256,13 @@ export function MobileMessagesScreen() {
               paddingHorizontal: 14,
               paddingVertical: 10,
               fontSize: 16,
+              lineHeight: 20,
               color: C.text,
-              maxHeight: 100,
+              height: sInputHeight,
               outlineWidth: 0,
+              overflow: "hidden",
               backgroundColor: C.backgroundWhite,
+              textAlignVertical: "top",
             }}
           />
           <TouchableOpacity

@@ -46,6 +46,7 @@ import {
   dbGetCustomerMessages,
   dbListenToNewMessages,
   dbCheckCellPhoneExists,
+  dbMigrateCustomerPhone,
 } from "../../../db_calls_wrapper";
 import { smsService } from "../../../data_service_modules";
 import { readActiveSale, readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
@@ -91,6 +92,9 @@ export const CustomerInfoScreenModalComponent = ({
   const [sSaleModalItem, _sSetSaleModalItem] = useState(null);
   const [sCellDuplicateStatus, _sCellDuplicateStatus] = useState(null); // null | "checking" | "duplicate" | "unique" | "error"
   const [sShowMapsModal, _sSetShowMapsModal] = useState(false);
+  const [sCellEditing, _sCellEditing] = useState(false);
+  const [sCellEditValue, _sCellEditValue] = useState("");
+  const [sCellMigrating, _sCellMigrating] = useState(false);
   const mountedRef = useRef(true);
   const initialCellRef = useRef(initialCustomer?.customerCell || "");
 
@@ -350,6 +354,78 @@ export const CustomerInfoScreenModalComponent = ({
     }
   }
 
+  function handleCellEditStart() {
+    _sCellEditValue(sCustomerInfo.customerCell || "");
+    _sCellEditing(true);
+    _sCellDuplicateStatus(null);
+  }
+
+  function handleCellEditCancel() {
+    _sCellEditing(false);
+    _sCellEditValue("");
+    _sCellDuplicateStatus(null);
+  }
+
+  function handleCellSavePress() {
+    const oldPhone = sCustomerInfo.customerCell;
+    const newPhone = sCellEditValue.replace(/\D/g, "");
+    if (newPhone === oldPhone) {
+      handleCellEditCancel();
+      return;
+    }
+    if (sCellDuplicateStatus === "duplicate") return;
+    useAlertScreenStore.getState().setValues({
+      title: "Change Phone Number",
+      message: `Change cell from ${formatPhoneWithDashes(oldPhone)} to ${formatPhoneWithDashes(newPhone)}?\n\nA system copy of recent messages will take place. It may be a few minutes before the customer can send a message.`,
+      btn1Text: "CONFIRM",
+      btn2Text: "CANCEL",
+      handleBtn1Press: () => executeCellMigration(oldPhone, newPhone),
+      handleBtn2Press: () => useAlertScreenStore.getState().resetAll(),
+      showAlert: true,
+      canExitOnOuterClick: false,
+    });
+  }
+
+  async function executeCellMigration(oldPhone, newPhone) {
+    useAlertScreenStore.getState().resetAll();
+    _sCellMigrating(true);
+    try {
+      const result = await dbMigrateCustomerPhone(
+        oldPhone, newPhone,
+        sCustomerInfo.id, sCustomerInfo.first, sCustomerInfo.last
+      );
+      if (!mountedRef.current) return;
+      if (result.success) {
+        saveField("customerCell", newPhone);
+        initialCellRef.current = newPhone;
+        _sCellEditing(false);
+        _sCellEditValue("");
+        _sCellDuplicateStatus(null);
+      } else {
+        useAlertScreenStore.getState().setValues({
+          title: "Migration Failed",
+          message: result.error || "Failed to migrate phone number.",
+          btn1Text: "OK",
+          handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+          showAlert: true,
+          canExitOnOuterClick: true,
+        });
+      }
+    } catch (e) {
+      if (!mountedRef.current) return;
+      useAlertScreenStore.getState().setValues({
+        title: "Migration Error",
+        message: e.message || "An unexpected error occurred.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+    } finally {
+      if (mountedRef.current) _sCellMigrating(false);
+    }
+  }
+
   const TEXT_INPUT_STYLE = {
     width: "100%",
     height: 40,
@@ -412,7 +488,7 @@ export const CustomerInfoScreenModalComponent = ({
             />
           </View>
           <View>
-            {!!sCustomerInfo?.customerCell && (
+            {(!!sCustomerInfo?.customerCell || sCellEditing) && (
               <View style={{ flexDirection: "row", alignItems: "center", marginLeft: 2 }}>
                 {sCellDuplicateStatus === "duplicate" ? (
                   <Text style={{ color: C.red, fontSize: 11, fontWeight: "600" }}>Phone number duplicate</Text>
@@ -428,23 +504,88 @@ export const CustomerInfoScreenModalComponent = ({
                 )}
               </View>
             )}
-            <TextInput_
-              onChangeText={(val) => {
-                val = removeDashesFromPhone(val);
-                if (val.length > 10) return;
-                saveField("customerCell", val);
-                checkCellPhoneUnique(val);
-              }}
-              placeholder="Cell phone"
-              style={{
-                ...TEXT_INPUT_STYLE,
-                marginTop: sCustomerInfo.customerCell ? 1 : TEXT_INPUT_STYLE.marginTop,
-                ...(sCellDuplicateStatus === "duplicate" || sCellDuplicateStatus === "error"
-                  ? { borderColor: C.red, borderWidth: 2 }
-                  : {}),
-              }}
-              value={formatPhoneWithDashes(sCustomerInfo.customerCell)}
-            />
+            {(!isNewCustomer && !sCellEditing) ? (
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <TextInput_
+                  editable={false}
+                  placeholder="Cell phone"
+                  style={{
+                    ...TEXT_INPUT_STYLE,
+                    flex: 1,
+                    marginTop: sCustomerInfo.customerCell ? 1 : TEXT_INPUT_STYLE.marginTop,
+                    backgroundColor: gray(0.04),
+                  }}
+                  value={formatPhoneWithDashes(sCustomerInfo.customerCell)}
+                />
+                {sCellMigrating ? (
+                  <SmallLoadingIndicator style={{ marginLeft: 8 }} />
+                ) : (
+                  <TouchableOpacity
+                    disabled={(sCustomerInfo.customerCell || "").replace(/\D/g, "").length !== 10}
+                    onPress={handleCellEditStart}
+                    style={{ marginLeft: 8, opacity: (sCustomerInfo.customerCell || "").replace(/\D/g, "").length === 10 ? 1 : 0.3 }}
+                    title="Edit customer cell phone number"
+                  >
+                    <Image_ source={ICONS.editPencil} style={{ width: 18, height: 18 }} />
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : sCellEditing ? (
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <TextInput_
+                  onChangeText={(val) => {
+                    val = removeDashesFromPhone(val);
+                    if (val.length > 10) return;
+                    _sCellEditValue(val);
+                    checkCellPhoneUnique(val);
+                  }}
+                  placeholder="Cell phone"
+                  style={{
+                    ...TEXT_INPUT_STYLE,
+                    flex: 1,
+                    marginTop: 1,
+                    ...(sCellDuplicateStatus === "duplicate" || sCellDuplicateStatus === "error"
+                      ? { borderColor: C.red, borderWidth: 2 }
+                      : {}),
+                  }}
+                  value={formatPhoneWithDashes(sCellEditValue)}
+                />
+                {sCellEditValue.replace(/\D/g, "").length === 10 && sCellDuplicateStatus !== "duplicate" ? (
+                  <TouchableOpacity
+                    onPress={handleCellSavePress}
+                    style={{ marginLeft: 8 }}
+                    title="Save new phone number"
+                  >
+                    <Image_ source={ICONS.check1} style={{ width: 18, height: 18 }} />
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  onPress={handleCellEditCancel}
+                  style={{ marginLeft: 6 }}
+                  title="Cancel"
+                >
+                  <Image_ source={ICONS.close1} style={{ width: 16, height: 16 }} />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TextInput_
+                onChangeText={(val) => {
+                  val = removeDashesFromPhone(val);
+                  if (val.length > 10) return;
+                  saveField("customerCell", val);
+                  checkCellPhoneUnique(val);
+                }}
+                placeholder="Cell phone"
+                style={{
+                  ...TEXT_INPUT_STYLE,
+                  marginTop: sCustomerInfo.customerCell ? 1 : TEXT_INPUT_STYLE.marginTop,
+                  ...(sCellDuplicateStatus === "duplicate" || sCellDuplicateStatus === "error"
+                    ? { borderColor: C.red, borderWidth: 2 }
+                    : {}),
+                }}
+                value={formatPhoneWithDashes(sCustomerInfo.customerCell)}
+              />
+            )}
           </View>
 
           <TextInput_

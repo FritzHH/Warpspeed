@@ -642,6 +642,7 @@ export const createTextToPayInvoiceCallable = httpsCallable(
   "createTextToPayInvoice"
 );
 export const generateIdCallable = httpsCallable(functions, "generateId");
+export const migrateCustomerPhoneCallable = httpsCallable(functions, "migrateCustomerPhone");
 
 export function sendSMS(messageBody) {
   return sendSMSCallable(messageBody)

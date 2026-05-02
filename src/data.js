@@ -115,6 +115,7 @@ export const COLORS = [
 ];
 
 export const NONREMOVABLE_STATUSES = [
+
   {
     id: "newly_created",
     label: "Newly Created",
@@ -124,66 +125,12 @@ export const NONREMOVABLE_STATUSES = [
     requireWaitTime: false,
     hidden: false,
   },
+
   {
-    id: "sale_in_progress",
-    label: "Sale in Progress",
-    textColor: "yellow",
-    backgroundColor: "black",
-    removable: false,
-    requireWaitTime: false,
-    systemOwned: true,
-    hidden: false,
-  },
-  {
-    id: "finished_and_paid",
-    label: "Finished & Paid",
-    textColor: "white",
-    backgroundColor: "green",
-    removable: false,
-    requireWaitTime: false,
-    systemOwned: true,
-    hidden: false,
-  },
-  {
-    id: "service",
-    textColor: lightenRGBByPercent("rgb(0,0,0)", 28),
+    id: "work_in_progress",
+    textColor: "black",
     backgroundColor: "rgb(192,192,192)",
-    label: "Service",
-    removable: false,
-    requireWaitTime: false,
-    hidden: false,
-  },
-  {
-    id: "open",
-    textColor: lightenRGBByPercent("rgb(0,0,0)", 28),
-    backgroundColor: "rgb(192,192,192)",
-    label: "Open",
-    removable: false,
-    requireWaitTime: false,
-    hidden: true,
-  },
-  {
-    id: "finished",
-    textColor: "white",
-    backgroundColor: "green",
-    label: "Finished",
-    removable: false,
-    requireWaitTime: false,
-    hidden: false,
-  },
-  {
-    id: "part_ordered",
-    textColor: "white",
-    backgroundColor: "orange",
-    label: "Item Ordered",
-    removable: false,
-    hidden: true,
-  },
-  {
-    id: "is_order_part_for_customer",
-    textColor: "rgb(38,38,38)",
-    backgroundColor: "rgb(226,126,56)",
-    label: "Order Item for Customer",
+    label: "Work in Progress",
     removable: false,
     hidden: false,
   },
@@ -204,14 +151,52 @@ export const NONREMOVABLE_STATUSES = [
     hidden: false,
   },
   {
-    id: "work_in_progress",
-    textColor: "black",
+    id: "service",
+    textColor: lightenRGBByPercent("rgb(0,0,0)", 28),
     backgroundColor: "rgb(192,192,192)",
-    label: "Work in Progress",
+    label: "Service",
+    removable: false,
+    requireWaitTime: false,
+    hidden: false,
+  },
+  {
+    id: "is_order_part_for_customer",
+    textColor: "rgb(38,38,38)",
+    backgroundColor: "rgb(226,126,56)",
+    label: "Order Item for Customer",
     removable: false,
     hidden: false,
   },
+  {
+    id: "finished",
+    textColor: "white",
+    backgroundColor: "green",
+    label: "Finished",
+    removable: false,
+    requireWaitTime: false,
+    hidden: false,
+  },
+  {
+    id: "part_ordered",
+    textColor: "white",
+    backgroundColor: "orange",
+    label: "Item Ordered",
+    removable: false,
+    hidden: true,
+  },
 
+
+
+  {
+    id: "finished_and_paid",
+    label: "Finished & Paid",
+    textColor: "white",
+    backgroundColor: "green",
+    removable: false,
+    requireWaitTime: false,
+    systemOwned: true,
+    hidden: false,
+  },
 ];
 
 export const CONTACT_RESTRICTIONS = {
@@ -908,6 +893,8 @@ export const SETTINGS_OBJ = {
   bikeBrandsName: "Bikes",
   bikeOptionalBrands: ["Euphree", "Lectric", "Hiboy", "Ridstar", "Velowave"],
   bikeOptionalBrandsName: "E-bikes",
+  allBrands: ["Cannondale", "Euphree", "Hiboy", "Jamis", "Lectric", "Marin", "Ridstar", "Specialized", "Sun", "Trek", "Velowave"],
+  allDescriptions: ["Cruiser", "E-Bike", "Hybrid", "Road Bike"],
   discounts: [
     {
       id: "1333k",

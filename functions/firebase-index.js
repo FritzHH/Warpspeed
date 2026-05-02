@@ -7548,3 +7548,77 @@ exports.generateId = onCall(
   }
 );
 
+exports.migrateCustomerPhone = onCall(
+  { secrets: [firebaseServiceAccountKey] },
+  async (request) => {
+    const { tenantID, storeID, oldPhone, newPhone, customerID, first, last } = request.data;
+    log("migrateCustomerPhone: start", { tenantID, storeID, oldPhone, newPhone, customerID });
+
+    if (!tenantID || !storeID) {
+      throw new HttpsError("invalid-argument", "tenantID and storeID are required");
+    }
+    const cleanOld = (oldPhone || "").replace(/\D/g, "");
+    const cleanNew = (newPhone || "").replace(/\D/g, "");
+    if (cleanOld.length !== 10 || cleanNew.length !== 10) {
+      throw new HttpsError("invalid-argument", "Both oldPhone and newPhone must be 10 digits");
+    }
+    if (cleanOld === cleanNew) {
+      return { success: true, migratedCount: 0, message: "Phones are the same, nothing to migrate" };
+    }
+
+    const db = await getDB(firebaseServiceAccountKey);
+    const basePath = db.collection("tenants").doc(tenantID).collection("stores").doc(storeID);
+    const oldConvoRef = basePath.collection("sms-messages").doc(cleanOld);
+    const newConvoRef = basePath.collection("sms-messages").doc(cleanNew);
+
+    const oldConvoDoc = await oldConvoRef.get();
+    if (!oldConvoDoc.exists) {
+      log("migrateCustomerPhone: no old thread found, nothing to migrate");
+      return { success: true, migratedCount: 0, message: "No existing thread at old phone" };
+    }
+
+    const oldConvoData = oldConvoDoc.data();
+    const messagesSnap = await oldConvoRef
+      .collection("messages")
+      .orderBy("millis", "desc")
+      .limit(25)
+      .get();
+
+    log("migrateCustomerPhone: found messages to migrate", { count: messagesSnap.size });
+
+    const batch = db.batch();
+
+    messagesSnap.docs.forEach((msgDoc) => {
+      const msgData = msgDoc.data();
+      const newMsgRef = newConvoRef.collection("messages").doc(msgDoc.id);
+      batch.set(newMsgRef, { ...msgData, phoneNumber: cleanNew });
+    });
+
+    const customerInfo = { id: customerID || "", first: first || "", last: last || "" };
+    const threadMetadata = {};
+    const metaFields = [
+      "canRespond", "lastMessage", "lastMillis", "lastType", "hasMedia",
+      "threadStatus", "lastOutgoingMessageID", "lastOutgoingMessageStatus",
+      "lastOutgoingMillis", "forwardTo", "translatedTo",
+    ];
+    metaFields.forEach((f) => { if (oldConvoData[f] !== undefined) threadMetadata[f] = oldConvoData[f]; });
+    threadMetadata.customerInfo = customerInfo;
+    threadMetadata.customerFirst = first || "";
+    threadMetadata.customerLast = last || "";
+
+    batch.set(newConvoRef, threadMetadata, { merge: true });
+
+    await batch.commit();
+    log("migrateCustomerPhone: batch write complete, deleting old thread");
+
+    const allOldMessages = await oldConvoRef.collection("messages").get();
+    const deleteBatch = db.batch();
+    allOldMessages.docs.forEach((doc) => deleteBatch.delete(doc.ref));
+    deleteBatch.delete(oldConvoRef);
+    await deleteBatch.commit();
+
+    log("migrateCustomerPhone: done", { migratedCount: messagesSnap.size });
+    return { success: true, migratedCount: messagesSnap.size };
+  }
+);
+

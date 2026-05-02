@@ -24,7 +24,6 @@ import {
   useOpenWorkordersStore,
   useInventoryStore,
   useSettingsStore,
-  useLoginStore,
 } from "../../stores";
 import { WORKORDER_ITEM_PROTO } from "../../data";
 
@@ -94,117 +93,104 @@ export function MobileItemEditScreen() {
   // Add item to workorder
   //////////////////////////////////////////////////////////////
   function addItem(item) {
-    useLoginStore.getState().requireLogin(() => {
-      let workorderLines = zWorkorder.workorderLines || [];
-      let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
-      const { _score, ...cleanItem } = item;
-      lineItem.inventoryItem = cleanItem;
-      lineItem.id = crypto.randomUUID();
-      workorderLines = [...workorderLines, lineItem];
-      useOpenWorkordersStore
-        .getState()
-        .setField("workorderLines", workorderLines, id);
-      _setSearchText("");
-      _setSearchResults([]);
-      _setShowSearch(false);
-    });
+    let workorderLines = zWorkorder.workorderLines || [];
+    let lineItem = cloneDeep(WORKORDER_ITEM_PROTO);
+    const { _score, ...cleanItem } = item;
+    lineItem.inventoryItem = cleanItem;
+    lineItem.id = crypto.randomUUID();
+    workorderLines = [...workorderLines, lineItem];
+    useOpenWorkordersStore
+      .getState()
+      .setField("workorderLines", workorderLines, id);
+    _setSearchText("");
+    _setSearchResults([]);
+    _setShowSearch(false);
   }
 
   //////////////////////////////////////////////////////////////
   // Delete item
   //////////////////////////////////////////////////////////////
   function deleteItem(index) {
-    useLoginStore.getState().requireLogin(() => {
-      let workorderLines = zWorkorder.workorderLines.filter(
-        (o, idx) => idx !== index
-      );
-      useOpenWorkordersStore
-        .getState()
-        .setField("workorderLines", workorderLines, id);
-    });
+    let workorderLines = zWorkorder.workorderLines.filter(
+      (o, idx) => idx !== index
+    );
+    useOpenWorkordersStore
+      .getState()
+      .setField("workorderLines", workorderLines, id);
   }
 
   //////////////////////////////////////////////////////////////
   // Modify qty
   //////////////////////////////////////////////////////////////
   function modifyQty(workorderLine, option) {
-    useLoginStore.getState().requireLogin(() => {
-      let newLine = cloneDeep(workorderLine);
-      if (option === "up") {
-        newLine.qty = newLine.qty + 1;
-      } else {
-        if (newLine.qty <= 1) return;
-        newLine.qty = newLine.qty - 1;
-      }
-      // Recalculate discount if applied
-      if (newLine.discountObj?.name) {
-        let discounted = applyDiscountToWorkorderItem(newLine);
-        if (discounted.discountObj?.newPrice > 0) newLine = discounted;
-      }
-      useOpenWorkordersStore
-        .getState()
-        .setField(
-          "workorderLines",
-          replaceOrAddToArr(zWorkorder.workorderLines, newLine),
-          id
-        );
-    });
+    let newLine = cloneDeep(workorderLine);
+    if (option === "up") {
+      newLine.qty = newLine.qty + 1;
+    } else {
+      if (newLine.qty <= 1) return;
+      newLine.qty = newLine.qty - 1;
+    }
+    if (newLine.discountObj?.name) {
+      let discounted = applyDiscountToWorkorderItem(newLine);
+      if (discounted.discountObj?.newPrice > 0) newLine = discounted;
+    }
+    useOpenWorkordersStore
+      .getState()
+      .setField(
+        "workorderLines",
+        replaceOrAddToArr(zWorkorder.workorderLines, newLine),
+        id
+      );
   }
 
   //////////////////////////////////////////////////////////////
   // Split items
   //////////////////////////////////////////////////////////////
   function splitItem(workorderLine, index) {
-    useLoginStore.getState().requireLogin(() => {
-      let num = workorderLine.qty;
-      let workorderLines = cloneDeep(zWorkorder.workorderLines);
-      for (let i = 0; i <= num - 1; i++) {
-        let newLine = cloneDeep(workorderLine);
-        newLine.qty = 1;
-        newLine.id = crypto.randomUUID();
-        newLine.discountObj = null;
-        if (i === 0) {
-          workorderLines[index] = newLine;
-          continue;
-        }
-        workorderLines.splice(index + 1, 0, newLine);
+    let num = workorderLine.qty;
+    let workorderLines = cloneDeep(zWorkorder.workorderLines);
+    for (let i = 0; i <= num - 1; i++) {
+      let newLine = cloneDeep(workorderLine);
+      newLine.qty = 1;
+      newLine.id = crypto.randomUUID();
+      newLine.discountObj = null;
+      if (i === 0) {
+        workorderLines[index] = newLine;
+        continue;
       }
-      useOpenWorkordersStore
-        .getState()
-        .setField("workorderLines", workorderLines, id);
-    });
+      workorderLines.splice(index + 1, 0, newLine);
+    }
+    useOpenWorkordersStore
+      .getState()
+      .setField("workorderLines", workorderLines, id);
   }
 
   //////////////////////////////////////////////////////////////
   // Apply discount
   //////////////////////////////////////////////////////////////
   function applyDiscount(workorderLine, discountObj) {
-    useLoginStore.getState().requireLogin(() => {
-      let workorderLines = zWorkorder.workorderLines.map((o) => {
-        if (o.id === workorderLine.id) {
-          workorderLine = { ...workorderLine, discountObj };
-          return applyDiscountToWorkorderItem(workorderLine);
-        }
-        return o;
-      });
-      useOpenWorkordersStore
-        .getState()
-        .setField("workorderLines", workorderLines, id);
+    let workorderLines = zWorkorder.workorderLines.map((o) => {
+      if (o.id === workorderLine.id) {
+        workorderLine = { ...workorderLine, discountObj };
+        return applyDiscountToWorkorderItem(workorderLine);
+      }
+      return o;
     });
+    useOpenWorkordersStore
+      .getState()
+      .setField("workorderLines", workorderLines, id);
   }
 
   function clearDiscount(workorderLine) {
-    useLoginStore.getState().requireLogin(() => {
-      let workorderLines = zWorkorder.workorderLines.map((o) => {
-        if (o.id === workorderLine.id) {
-          return { ...workorderLine, discountObj: null };
-        }
-        return o;
-      });
-      useOpenWorkordersStore
-        .getState()
-        .setField("workorderLines", workorderLines, id);
+    let workorderLines = zWorkorder.workorderLines.map((o) => {
+      if (o.id === workorderLine.id) {
+        return { ...workorderLine, discountObj: null };
+      }
+      return o;
     });
+    useOpenWorkordersStore
+      .getState()
+      .setField("workorderLines", workorderLines, id);
   }
 
   //////////////////////////////////////////////////////////////

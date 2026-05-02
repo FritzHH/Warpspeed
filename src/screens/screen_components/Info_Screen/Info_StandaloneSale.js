@@ -164,30 +164,32 @@ export const StandaloneSaleComponent = ({}) => {
         />
       )}
 
-      <Button_
-        text="CLEAR SALE"
-        onPress={() => {
-          let store = useOpenWorkordersStore.getState();
-          let oldWo = store.getOpenWorkorder();
-          if (!oldWo) return;
-          store.removeWorkorder(oldWo.id);
-          let wo = cloneDeep(WORKORDER_PROTO);
-          wo.id = generateEAN13Barcode();
-          wo.startedBy = useLoginStore.getState().currentUser?.id;
-          wo.startedOnMillis = Date.now();
-          store.setWorkorder(wo);
-          store.setOpenWorkorderID(wo.id);
-        }}
-        enabled={!clearDisabled}
-        colorGradientArr={COLOR_GRADIENTS.red}
-        buttonStyle={{
-          borderRadius: 5,
-          paddingHorizontal: 30,
-          paddingVertical: 10,
-          marginBottom: 30,
-        }}
-        textStyle={{ color: C.textWhite, fontSize: 14, fontWeight: "600" }}
-      />
+      <View style={{ opacity: clearDisabled ? 0 : 1 }}>
+        <Button_
+          text="CLEAR SALE"
+          onPress={() => {
+            if (clearDisabled) return;
+            let store = useOpenWorkordersStore.getState();
+            let oldWo = store.getOpenWorkorder();
+            if (!oldWo) return;
+            store.removeWorkorder(oldWo.id);
+            let wo = cloneDeep(WORKORDER_PROTO);
+            wo.id = generateEAN13Barcode();
+            wo.startedBy = useLoginStore.getState().currentUser?.id;
+            wo.startedOnMillis = Date.now();
+            store.setWorkorder(wo);
+            store.setOpenWorkorderID(wo.id);
+          }}
+          colorGradientArr={COLOR_GRADIENTS.red}
+          buttonStyle={{
+            borderRadius: 5,
+            paddingHorizontal: 30,
+            paddingVertical: 10,
+            marginBottom: 30,
+          }}
+          textStyle={{ color: C.textWhite, fontSize: 14, fontWeight: "600" }}
+        />
+      </View>
       <View
         style={{
           flexDirection: "row",

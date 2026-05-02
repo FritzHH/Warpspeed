@@ -183,28 +183,21 @@ export const TabBar = ({
   }
 
   function CameraIcon() {
+    const showError = zCameraStatus === "failed";
     return (
-      <TouchableOpacity
-        title="Camera on and identifying"
-        onPress={() => _sSetShowCameraPreview(true)}
-      >
-        <Image_ style={{ width: 19, height: 19 }} icon={ICONS.camera} />
-      </TouchableOpacity>
-    );
-  }
-
-  function ErrorIcon() {
-    return (
-      <Button_
-        onPress={showCameraError}
-        icon={ICONS.redx}
-        iconSize={15}
-        buttonStyle={{
-          paddingHorizontal: 4,
-          paddingVertical: 2,
-          marginRight: 3,
-        }}
-      />
+      <View style={{ width: 19, height: 19 }}>
+        <TouchableOpacity
+          title="Camera on and identifying"
+          onPress={showError ? showCameraError : () => _sSetShowCameraPreview(true)}
+        >
+          <Image_ style={{ width: 19, height: 19 }} icon={ICONS.camera} />
+          {showError && (
+            <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center" }}>
+              <Image_ style={{ width: 19, height: 19 }} icon={ICONS.redx} />
+            </View>
+          )}
+        </TouchableOpacity>
+      </View>
     );
   }
 
@@ -214,12 +207,12 @@ export const TabBar = ({
       return <ActivityIndicator size={16} color={C.green} />;
     }
 
-    // failed — show user or login button + error icon
+    // failed — show user or login button + camera icon (with error overlay)
     if (zCameraStatus === "failed") {
       return (
         <>
           {zCurrentUser ? <UserButton /> : <LoginButton />}
-          <ErrorIcon />
+          <CameraIcon />
         </>
       );
     }

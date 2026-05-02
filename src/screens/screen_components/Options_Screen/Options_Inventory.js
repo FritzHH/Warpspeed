@@ -30,6 +30,7 @@ import {
 } from "../../../components";
 import { InventoryItemModalScreen } from "../modal_screens/InventoryItemModalScreen";
 import { CustomItemModal } from "../modal_screens/CustomItemModal";
+import { ColorPickerModal } from "../modal_screens/ColorPickerModal";
 import { cloneDeep } from "lodash";
 import {
   useSettingsStore,
@@ -311,7 +312,7 @@ const QuickItemCanvasCard = ({
         borderStyle: "solid",
         borderColor: isSelected ? C.blue : C.buttonLightGreenOutline,
         borderRadius: 8,
-        backgroundColor: isInWorkorder ? lightenRGBByPercent(C.blue, 70) : C.buttonLightGreenOutline,
+        backgroundColor: itemObj.backgroundColor || (isInWorkorder ? lightenRGBByPercent(C.blue, 70) : C.buttonLightGreenOutline),
         cursor: sEditMode ? (sDragging ? "grabbing" : (sResizing ? "auto" : "grab")) : "pointer",
         opacity: sPressed ? 0.7 : (sDragging ? 0.7 : 1),
         boxSizing: "border-box",
@@ -387,7 +388,7 @@ const QuickItemCanvasCard = ({
             numberOfLines={sLineCount}
             style={{
               fontSize: itemObj.fontSize || 10,
-              color: C.text,
+              color: itemObj.textColor || C.text,
               textAlign: "center",
               borderWidth: 0,
               paddingTop: 2,
@@ -406,7 +407,7 @@ const QuickItemCanvasCard = ({
           <Text
             style={{
               fontSize: itemObj.fontSize || 10,
-              color: invItem ? C.text : gray(0.35),
+              color: itemObj.textColor || (invItem ? C.text : gray(0.35)),
               textAlign: "center",
               fontWeight: "500",
               lineHeight: (itemObj.fontSize || 10) + 6,
@@ -579,6 +580,7 @@ const QuickItemCanvas = React.forwardRef(({
   useImperativeHandle(ref, () => ({
     resizeSelected: (axis, delta) => handleResizeSelected(axis, delta),
     fontSizeSelected: (delta) => handleFontSizeSelected(delta),
+    setColorSelected: (bg, text) => handleSetColorSelected(bg, text),
   }));
 
   // Normalize items (backward compat: string IDs -> objects)
@@ -662,6 +664,14 @@ const QuickItemCanvas = React.forwardRef(({
       if (it.inventoryItemID !== sSelectedItemId) return it;
       let newSize = Math.max(6, Math.min(20, (it.fontSize || 10) + delta));
       return { ...it, fontSize: newSize };
+    }));
+  }
+
+  function handleSetColorSelected(backgroundColor, textColor) {
+    if (!sSelectedItemId) return;
+    saveItems(rawItems.map((it) => {
+      if (it.inventoryItemID !== sSelectedItemId) return it;
+      return { ...it, backgroundColor, textColor };
     }));
   }
 
@@ -787,6 +797,8 @@ export function InventoryComponent({}) {
   const [sForceEditMode, _setForceEditMode] = useState(false);
   const [sCanvasEditMode, _setCanvasEditMode] = useState(false);
   const [sCanvasSelectedItemId, _setCanvasSelectedItemId] = useState(null);
+  const [sShowColorPickerModal, _setShowColorPickerModal] = useState(false);
+  const [sColorPickerAnchor, _setColorPickerAnchor] = useState({ x: 0, y: 0 });
   const quickCanvasRef = useRef(null);
   const [sListPrintPickerID, _setListPrintPickerID] = useState(null);
   const [sListPrintSuccessID, _setListPrintSuccessID] = useState(null);
@@ -1115,7 +1127,7 @@ export function InventoryComponent({}) {
     let x = 0, y = 0;
     if (event?.pageX != null) { x = event.pageX; y = event.pageY; }
     else if (event?.nativeEvent) { x = event.nativeEvent.pageX || 0; y = event.nativeEvent.pageY || 0; }
-    _setNoteHelperDropdown({ workorderLine: line, anchorPosition: { x, y } });
+    _setNoteHelperDropdown({ workorderLine: line, anchorX: x, anchorY: y });
   }
 
   function handleNoteHelperUpdate(updatedLine) {
@@ -1205,13 +1217,38 @@ export function InventoryComponent({}) {
   }
 
   let canvasSelectedFontSize = 10;
+  let canvasSelectedBgColor = "";
+  let canvasSelectedTextColor = "";
+  let canvasSelectedName = "";
   if (sCanvasEditMode && sCanvasSelectedItemId && sSelectedButtonID) {
     let activeEditBtn = (zQuickItemButtons || []).find((b) => b.id === sSelectedButtonID);
     if (activeEditBtn) {
       let editItems = (activeEditBtn.items || []).map(normalizeItemEntry);
       let selItem = editItems.find((it) => it.inventoryItemID === sCanvasSelectedItemId);
-      if (selItem) canvasSelectedFontSize = selItem.fontSize || 10;
+      if (selItem) {
+        canvasSelectedFontSize = selItem.fontSize || 10;
+        canvasSelectedBgColor = selItem.backgroundColor || "";
+        canvasSelectedTextColor = selItem.textColor || "";
+      }
+      let invItem = (zInventoryArr || []).find((i) => i.id === sCanvasSelectedItemId);
+      if (invItem) canvasSelectedName = invItem.informalName || invItem.formalName || "";
     }
+  }
+
+  let existingColorSchemes = [];
+  if (sCanvasEditMode && sCanvasSelectedItemId) {
+    let seen = new Set();
+    (zQuickItemButtons || []).forEach((btn) => {
+      (btn.items || []).map(normalizeItemEntry).forEach((it) => {
+        if (!it.backgroundColor || it.inventoryItemID === sCanvasSelectedItemId) return;
+        let key = it.backgroundColor + "|" + (it.textColor || "");
+        if (seen.has(key)) return;
+        seen.add(key);
+        let inv = (zInventoryArr || []).find((i) => i.id === it.inventoryItemID);
+        let name = inv ? (inv.informalName || inv.formalName || "Item") : "Item";
+        existingColorSchemes.push({ backgroundColor: it.backgroundColor, textColor: it.textColor || C.text, name });
+      });
+    });
   }
 
   // Show loading state until all data is ready and component is ready
@@ -1264,6 +1301,18 @@ export function InventoryComponent({}) {
           </Text>
           {sCanvasSelectedItemId && (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+              <Tooltip text="Card Colors" position="bottom">
+                <TouchableOpacity
+                  onPress={(e) => {
+                    let evt = e?.nativeEvent || e;
+                    _setColorPickerAnchor({ x: evt.pageX || 0, y: evt.pageY || 0 });
+                    _setShowColorPickerModal(true);
+                  }}
+                  style={{ width: 25, height: 25, borderRadius: 4, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center", marginRight: 8 }}
+                >
+                  <Image_ icon={ICONS.colorWheel} size={18} />
+                </TouchableOpacity>
+              </Tooltip>
                 <Text style={{ fontSize: 13, color: gray(0.45), marginRight: 4 }}>Font size:</Text>
               <TouchableOpacity
                 onPress={() => quickCanvasRef.current?.fontSizeSelected(-1)}
@@ -1370,7 +1419,8 @@ export function InventoryComponent({}) {
                 >
                   <Button_
                     onPress={() => handleQuickButtonPress(item)}
-                    colorGradientArr={isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "item" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
+                    enabled={!!zOpenWorkorderID}
+                    colorGradientArr={!zOpenWorkorderID ? COLOR_GRADIENTS.grey : isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "item" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
                     buttonStyle={{
                       borderWidth: 1,
                       borderRadius: 5,
@@ -1776,10 +1826,25 @@ export function InventoryComponent({}) {
           onClose={() => _setNoteHelperDropdown(null)}
           workorderLine={sNoteHelperDropdown?.workorderLine}
           onUpdateLine={handleNoteHelperUpdate}
-          anchorPosition={sNoteHelperDropdown?.anchorPosition || { x: 0, y: 0 }}
+          anchorX={sNoteHelperDropdown?.anchorX || 0}
+          anchorY={sNoteHelperDropdown?.anchorY || 0}
           noteHelpers={zNoteHelpers || []}
           noteHelpersTarget={zNoteHelpersTarget}
         />
+        {sShowColorPickerModal && (
+          <ColorPickerModal
+            onClose={() => _setShowColorPickerModal(false)}
+            onSave={(bg, text) => {
+              quickCanvasRef.current?.setColorSelected(bg, text);
+            }}
+            title="Edit Card Colors"
+            previewText={canvasSelectedName || "Preview"}
+            initialBgColor={canvasSelectedBgColor || C.buttonLightGreenOutline}
+            initialTextColor={canvasSelectedTextColor || C.text}
+            anchorPosition={sColorPickerAnchor}
+            colorSchemes={existingColorSchemes}
+          />
+        )}
       </View>
       </View>
     </View>

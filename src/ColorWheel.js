@@ -126,6 +126,9 @@ export function ColorWheel({
 
   const [hsv, setHsv] = useState(initialHsv);
 
+  const uidRef = useRef("cw-" + Math.random().toString(36).slice(2, 8));
+  const uid = uidRef.current;
+
   const center = { x: radius, y: radius };
 
   // derived current color
@@ -289,16 +292,16 @@ export function ColorWheel({
       <Svg width={size} height={size}>
         <Defs>
           {/* Clip inner SV square to a circle */}
-          <ClipPath id="svClip">
+          <ClipPath id={"svClip-" + uid}>
             <Circle cx={center.x} cy={center.y} r={svRadius} />
           </ClipPath>
 
           {/* SV gradients (horizontal: white -> hue), (vertical overlay: transparent -> black) */}
-          <LinearGradient id="svSaturation" x1="0" y1="0" x2="1" y2="0">
+          <LinearGradient id={"svSaturation-" + uid} x1="0" y1="0" x2="1" y2="0">
             <Stop offset="0" stopColor="#FFFFFF" />
             <Stop offset="1" stopColor={hueHex} />
           </LinearGradient>
-          <LinearGradient id="svValue" x1="0" y1="0" x2="0" y2="1">
+          <LinearGradient id={"svValue-" + uid} x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor="rgba(0,0,0,0)" />
             <Stop offset="1" stopColor="rgba(0,0,0,1)" />
           </LinearGradient>
@@ -312,14 +315,14 @@ export function ColorWheel({
         </G>
 
         {/* Inner SV area */}
-        <G clipPath="url(#svClip)">
+        <G clipPath={"url(#svClip-" + uid + ")"}>
           {/* Base white->hue gradient */}
           <Rect
             x={svSquareTopLeft.x}
             y={svSquareTopLeft.y}
             width={svSquareSize}
             height={svSquareSize}
-            fill="url(#svSaturation)"
+            fill={"url(#svSaturation-" + uid + ")"}
           />
           {/* Overlay top->bottom to darken (value) */}
           <Rect
@@ -327,7 +330,7 @@ export function ColorWheel({
             y={svSquareTopLeft.y}
             width={svSquareSize}
             height={svSquareSize}
-            fill="url(#svValue)"
+            fill={"url(#svValue-" + uid + ")"}
           />
         </G>
 

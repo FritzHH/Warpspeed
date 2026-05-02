@@ -162,7 +162,7 @@ export const NONREMOVABLE_STATUSES = [
   {
     id: "is_order_part_for_customer",
     textColor: "rgb(38,38,38)",
-    backgroundColor: "rgb(226,126,56)",
+    backgroundColor: "red",
     label: "Order Item for Customer",
     removable: false,
     hidden: false,
@@ -682,6 +682,8 @@ export const QUICK_BUTTON_ITEM_PROTO = {
   w: QB_DEFAULT_W,
   h: QB_DEFAULT_H,
   fontSize: 10,
+  backgroundColor: "",
+  textColor: "",
 }
 
 export const QUICK_ITEM_BUTTON_PROTO = {

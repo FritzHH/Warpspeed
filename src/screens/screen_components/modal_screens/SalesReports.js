@@ -7,7 +7,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native-web";
-import { Button_ } from "../../../components";
+import { Button_, LoadingIndicator } from "../../../components";
 import { C, COLOR_GRADIENTS } from "../../../styles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
@@ -123,15 +123,31 @@ export const SalesReportsModal = ({ handleExit }) => {
   const txnQueryIdRef = useRef(0);
   const hasUserSelected = useRef(false);
 
-  // Fetch data when dates change
+  // Cache: { startMillis, endMillis, data }
+  const saleCacheRef = useRef(null);
+  const txnCacheRef = useRef(null);
+
+  // Fetch data when dates change (with session cache)
   useEffect(() => {
     if (!hasUserSelected.current) return;
     if (!sStartDate || !sEndDate) return;
     let startMillis = dayjs(sStartDate).startOf("day").valueOf();
     let endMillis = dayjs(sEndDate).endOf("day").valueOf();
+    _setPage(0);
+
+    // Check if cached data covers the requested range
+    let cache = saleCacheRef.current;
+    if (cache && startMillis >= cache.startMillis && endMillis <= cache.endMillis) {
+      let filtered = cache.data.filter((r) => {
+        let m = r.millis || 0;
+        return m >= startMillis && m <= endMillis;
+      });
+      _setResults(filtered);
+      return;
+    }
+
     let thisQueryId = ++queryIdRef.current;
     _setLoading(true);
-    _setPage(0);
 
     let activeSales = useActiveSalesStore.getState().getActiveSales();
     let filteredActive = activeSales.filter((s) => {
@@ -147,9 +163,9 @@ export const SalesReportsModal = ({ handleExit }) => {
         if (thisQueryId !== queryIdRef.current) return;
         let tagged = (completedRows || []).map((r) => ({ ...r, source: "completed" }));
         let combined = [...tagged, ...(activeRows || [])];
+        saleCacheRef.current = { startMillis, endMillis, data: combined };
         _setResults(combined);
         _setLoading(false);
-        console.log("[SalesReport]", JSON.stringify(combined, null, 2));
       })
       .catch(() => {
         if (thisQueryId !== queryIdRef.current) return;
@@ -753,7 +769,10 @@ export const SalesReportsModal = ({ handleExit }) => {
           </ScrollView>
 
           {/* ═══ RIGHT COLUMN: Results ═══ */}
-          <View style={{ flex: 2 }}>
+          <View style={{ flex: 2, position: "relative" }}>
+            {(sLoading || sTransactionLoading) && (
+              <LoadingIndicator message={sLoading ? "Loading sales..." : "Loading transactions..."} color={C.blue} />
+            )}
             {/* Results Count + Loading */}
             <View
               style={{
@@ -815,12 +834,24 @@ export const SalesReportsModal = ({ handleExit }) => {
                     if (!sStartDate || !sEndDate) return;
                     let startMillis = dayjs(sStartDate).startOf("day").valueOf();
                     let endMillis = dayjs(sEndDate).endOf("day").valueOf();
+
+                    // Check if cached data covers the requested range
+                    let cache = txnCacheRef.current;
+                    if (cache && startMillis >= cache.startMillis && endMillis <= cache.endMillis) {
+                      let filtered = cache.data.filter((tx) => {
+                        let m = tx.millis || tx.createdAt || 0;
+                        return m >= startMillis && m <= endMillis;
+                      });
+                      _setTransactionResults(filtered);
+                      return;
+                    }
+
                     let thisQueryId = ++txnQueryIdRef.current;
                     _setTransactionLoading(true);
                     queryTransactionsByDateRange(startMillis, endMillis)
                       .then((txns) => {
                         if (thisQueryId !== txnQueryIdRef.current) return;
-                        console.log("[SalesReport] [By Transaction]", JSON.stringify(txns, null, 2));
+                        txnCacheRef.current = { startMillis, endMillis, data: txns };
                         _setTransactionResults(txns);
                         _setTransactionLoading(false);
                       })

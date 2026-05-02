@@ -600,9 +600,14 @@ export const Items_WorkorderItemsTab = ({}) => {
       </View>
     );
 
-  function openNoteHelperForLine(workorderLine, anchorX) {
-    if (!zNoteHelpers || zNoteHelpers.length === 0) return;
-    _setNoteHelperDropdown({ workorderLine, targetField: "intakeNotes", anchorX: anchorX || 0 });
+  function openNoteHelperForLine(workorderLine, anchorX, anchorY) {
+    console.log("[PENCIL] openNoteHelperForLine called", { hasNoteHelpers: !!(zNoteHelpers && zNoteHelpers.length), anchorX, anchorY, lineId: workorderLine?.id });
+    if (!zNoteHelpers || zNoteHelpers.length === 0) {
+      console.log("[PENCIL] BLOCKED - no noteHelpers configured");
+      return;
+    }
+    console.log("[PENCIL] setting sNoteHelperDropdown state");
+    _setNoteHelperDropdown({ workorderLine, targetField: "intakeNotes", anchorX: anchorX || 0, anchorY: anchorY || 0 });
   }
 
   function handleNoteHelperUpdate(updatedLine) {
@@ -930,6 +935,7 @@ export const Items_WorkorderItemsTab = ({}) => {
         workorderLine={sNoteHelperDropdown?.workorderLine}
         onUpdateLine={handleNoteHelperUpdate}
         anchorX={sNoteHelperDropdown?.anchorX || 0}
+        anchorY={sNoteHelperDropdown?.anchorY || 0}
         noteHelpers={zNoteHelpers || []}
         noteHelpersTarget={sNoteHelperDropdown?.targetField || zNoteHelpersTarget}
       />
@@ -1042,16 +1048,15 @@ export const LineItemComponent = ({
                   <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
                     <Tooltip text="Notes" position="top">
                       <TouchableOpacity
-                        ref={pencilRef}
-                        onPress={() => {
-                          if (pencilRef.current) {
-                            pencilRef.current.measure((x, y, width, height, pageX, pageY) => {
-                              onOpenNoteHelper?.(workorderLine, pageX + width);
-                            });
-                          } else {
-                            onOpenNoteHelper?.(workorderLine, 0);
-                          }
+                        onPress={(e) => {
+                          console.log("[PENCIL] onPress fired", { hasEvent: !!e, nativeEvent: !!e?.nativeEvent, pageX: e?.nativeEvent?.pageX || e?.pageX, pageY: e?.nativeEvent?.pageY || e?.pageY, timestamp: Date.now() });
+                          const x = e?.nativeEvent?.pageX || e?.pageX || 0;
+                          const y = e?.nativeEvent?.pageY || e?.pageY || 0;
+                          console.log("[PENCIL] calling onOpenNoteHelper", { x, y, hasCallback: !!onOpenNoteHelper });
+                          onOpenNoteHelper?.(workorderLine, x, y);
                         }}
+                        onPressIn={(e) => console.log("[PENCIL] onPressIn", Date.now())}
+                        onPressOut={(e) => console.log("[PENCIL] onPressOut", Date.now())}
                         style={{ marginRight: 4 }}
                       >
                         <Image source={ICONS.editPencil} style={{ width: 15, height: 15, opacity: 0.5 }} />

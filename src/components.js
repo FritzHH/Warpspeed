@@ -3332,12 +3332,7 @@ export const Tooltip = ({
   const [sRect, _setRect] = useState(null);
   const GAP = 6;
 
-  useEffect(() => {
-    if (!sRect) return;
-    const dismiss = () => _setRect(null);
-    document.addEventListener("mousedown", dismiss);
-    return () => document.removeEventListener("mousedown", dismiss);
-  }, [sRect]);
+  const containerRef = useRef(null);
 
   function handleMouseEnter(e) {
     _setRect(e.currentTarget.getBoundingClientRect());
@@ -3364,6 +3359,7 @@ export const Tooltip = ({
 
   return (
     <View
+      ref={containerRef}
       style={style}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -3970,19 +3966,18 @@ export const NoteHelperDropdown = ({
   onUpdateLine,
   anchorPosition = { x: 0, y: 0 },
   anchorX,
+  anchorY,
   noteHelpers = [],
   noteHelpersTarget = "intakeNotes",
   centered = false,
   fontSizeAdj = 0,
   chipPaddingVertAdj = 0,
 }) => {
-  const [sDropdownHeight, _sSetDropdownHeight] = useState(0);
   const [sTarget, _sSetTarget] = useState(noteHelpersTarget);
   const openTimeRef = useRef(0);
   const wasVisibleRef = useRef(false);
   const prevVisibleRef = useRef(visible);
 
-  // Reset state when dropdown opens - use useEffect to avoid setState during render
   if (visible && !prevVisibleRef.current) {
     wasVisibleRef.current = true;
     openTimeRef.current = Date.now();
@@ -3994,12 +3989,11 @@ export const NoteHelperDropdown = ({
 
   useEffect(() => {
     if (visible) {
-      _sSetDropdownHeight(0);
       _sSetTarget(noteHelpersTarget);
     }
   }, [visible]);
 
-  if (!visible || !workorderLine) return null;
+  if (!visible) return <Modal visible={false} transparent animationType="fade"><View /></Modal>;
 
   function isChipActive(catId, chipText) {
     const notes = workorderLine[sTarget] || "";
@@ -4020,44 +4014,43 @@ export const NoteHelperDropdown = ({
     onUpdateLine({ ...workorderLine, [target]: parts.join(", ") });
   }
 
-  // Position dropdown: anchorX = right of pencil button + vertically centered, centered = full center, else anchor point
-  const hasAnchorX = anchorX !== undefined && anchorX !== null;
-  const dropdownWidth = (centered || hasAnchorX) ? 420 : 340;
-  const dropdownMeasured = sDropdownHeight > 0;
-  let left, top;
-  if (hasAnchorX && typeof window !== "undefined") {
-    left = anchorX + 8;
-    top = dropdownMeasured ? (window.innerHeight - sDropdownHeight) / 2 : window.innerHeight / 2 - 200;
-  } else if (centered && typeof window !== "undefined") {
+  const dropdownWidth = 580;
+  let left;
+  if (centered && typeof window !== "undefined") {
     left = (window.innerWidth - dropdownWidth) / 2;
-    top = dropdownMeasured ? (window.innerHeight - sDropdownHeight) / 2 : window.innerHeight / 2 - 200;
+  } else if (anchorX != null) {
+    left = (anchorX || 0) + 8;
   } else {
-    left = anchorPosition.x - dropdownWidth / 2;
-    top = anchorPosition.y - sDropdownHeight / 2;
+    left = (anchorPosition.x || 0) + 8;
   }
   if (typeof window !== "undefined") {
-    const vh = window.innerHeight;
     const vw = window.innerWidth;
-    if (dropdownMeasured && top + sDropdownHeight > vh - 10) top = vh - sDropdownHeight - 10;
     if (left + dropdownWidth > vw - 10) left = vw - dropdownWidth - 10;
     if (left < 10) left = 10;
-    if (top < 10) top = 10;
+  }
+
+  const clickY = anchorY ?? anchorPosition?.y ?? 0;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 900;
+  const third = clickY / vh;
+  let verticalStyle;
+  if (third < 1 / 3) {
+    verticalStyle = { top: 15 };
+  } else if (third < 2 / 3) {
+    verticalStyle = { top: "50%", transform: [{ translateY: "-50%" }] };
+  } else {
+    verticalStyle = { bottom: 15 };
   }
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-      <TouchableWithoutFeedback onPress={() => { if (Date.now() - openTimeRef.current > 150) onClose(); }}>
+      <TouchableWithoutFeedback onPress={() => { console.log("[NOTEHELPER] backdrop pressed", { elapsed: Date.now() - openTimeRef.current }); if (Date.now() - openTimeRef.current > 150) onClose(); }}>
         <View style={{ width: "100%", height: "100%", position: "absolute" }} />
       </TouchableWithoutFeedback>
       <View
-        onLayout={(e) => {
-          const h = e.nativeEvent.layout.height;
-          if (h > 0 && h !== sDropdownHeight) _sSetDropdownHeight(h);
-        }}
         style={{
           position: "absolute",
           left: left,
-          top: top,
+          ...verticalStyle,
           width: dropdownWidth,
           backgroundColor: "white",
           borderRadius: 10,
@@ -4069,7 +4062,6 @@ export const NoteHelperDropdown = ({
           shadowRadius: 4,
           elevation: 5,
           padding: 10,
-          opacity: dropdownMeasured ? 1 : 0,
         }}
       >
           {/* Item header */}
@@ -4111,52 +4103,105 @@ export const NoteHelperDropdown = ({
             </View>
           </View>
 
-          {noteHelpers.map((category) => (
-            <View key={category.id} style={{ marginBottom: 9 }}>
-              <Text
-                style={{
-                  fontSize: 14 + fontSizeAdj,
-                  fontWeight: Fonts.weight.textHeavy,
-                  color: gray(0.4),
-                  marginBottom: 4,
-                  textTransform: "uppercase",
-                  letterSpacing: 0.5,
-                }}
-              >
-                {category.label}
-              </Text>
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
-                {(category.items || []).map((chipText, chipIdx) => {
-                  const active = isChipActive(category.id, chipText);
-                  return (
-                    <TouchableOpacity_
-                      key={chipText + chipIdx}
-                      onPress={() => toggleChip(chipText, null, category.id)}
-                      hoverOpacity={0.6}
+          <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+            <View style={{ flex: 1, paddingRight: 8 }}>
+              {noteHelpers.filter((_, i) => i % 2 === 0).map((category) => (
+                <View key={category.id} style={{ marginBottom: 19 }}>
+                  <Text
+                    style={{
+                      fontSize: 14 + fontSizeAdj,
+                      fontWeight: Fonts.weight.textHeavy,
+                      color: gray(0.4),
+                      marginBottom: 4,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.5,
+                    }}
+                  >
+                    {category.label}
+                  </Text>
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
+                    {(category.items || []).map((chipText, chipIdx) => {
+                      const active = isChipActive(category.id, chipText);
+                      return (
+                        <TouchableOpacity_
+                          key={chipText + chipIdx}
+                          onPress={() => toggleChip(chipText, null, category.id)}
+                          hoverOpacity={0.6}
+                          style={{
+                            backgroundColor: active
+                              ? lightenRGBByPercent(C.red, 70)
+                              : C.buttonLightGreenOutline,
+                            borderRadius: 6,
+                            paddingHorizontal: 10,
+                            paddingVertical: 5 + chipPaddingVertAdj,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 15 + fontSizeAdj,
+                              color: active ? C.red : gray(0.5),
+                              fontWeight: Fonts.weight.textRegular,
+                            }}
+                          >
+                            {chipText}
+                          </Text>
+                        </TouchableOpacity_>
+                      );
+                    })}
+                  </View>
+                </View>
+              ))}
+            </View>
+            <View style={{ width: 1, backgroundColor: C.buttonLightGreenOutline, alignSelf: "stretch" }} />
+            <View style={{ flex: 1, paddingLeft: 14 }}>
+              {noteHelpers.filter((_, i) => i % 2 === 1).map((category) => (
+                <View key={category.id} style={{ marginBottom: 19 }}>
+                    <Text
                       style={{
-                        backgroundColor: active
-                          ? lightenRGBByPercent(C.red, 70)
-                          : C.buttonLightGreenOutline,
-                        borderRadius: 6,
-                        paddingHorizontal: 10,
-                        paddingVertical: 5 + chipPaddingVertAdj,
+                        fontSize: 14 + fontSizeAdj,
+                        fontWeight: Fonts.weight.textHeavy,
+                        color: gray(0.4),
+                        marginBottom: 4,
+                        textTransform: "uppercase",
+                        letterSpacing: 0.5,
                       }}
                     >
-                      <Text
-                        style={{
-                          fontSize: 15 + fontSizeAdj,
-                          color: active ? C.red : gray(0.5),
-                          fontWeight: Fonts.weight.textRegular,
-                        }}
-                      >
-                        {chipText}
-                      </Text>
-                    </TouchableOpacity_>
-                  );
-                })}
-              </View>
+                      {category.label}
+                    </Text>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
+                      {(category.items || []).map((chipText, chipIdx) => {
+                        const active = isChipActive(category.id, chipText);
+                        return (
+                          <TouchableOpacity_
+                            key={chipText + chipIdx}
+                            onPress={() => toggleChip(chipText, null, category.id)}
+                            hoverOpacity={0.6}
+                            style={{
+                              backgroundColor: active
+                                ? lightenRGBByPercent(C.red, 70)
+                                : C.buttonLightGreenOutline,
+                              borderRadius: 6,
+                              paddingHorizontal: 10,
+                              paddingVertical: 5 + chipPaddingVertAdj,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 15 + fontSizeAdj,
+                                color: active ? C.red : gray(0.5),
+                                fontWeight: Fonts.weight.textRegular,
+                              }}
+                            >
+                              {chipText}
+                            </Text>
+                          </TouchableOpacity_>
+                        );
+                      })}
+                    </View>
+                  </View>
+                ))}
             </View>
-          ))}
+          </View>
 
           <View
             style={{
@@ -4170,6 +4215,7 @@ export const NoteHelperDropdown = ({
               <Text style={{ fontSize: 11 + fontSizeAdj, color: gray(0.4), fontWeight: Fonts.weight.textHeavy, textTransform: "uppercase", marginBottom: 2 }}>Intake notes</Text>
               <TextInput_
                 multiline
+                numberOfLines={0}
                 debounceMs={500}
                 capitalize={true}
                 value={workorderLine.intakeNotes || ""}
@@ -4188,6 +4234,7 @@ export const NoteHelperDropdown = ({
                   color: "orange",
                   outlineWidth: 0,
                   outline: "none",
+                  overflow: "hidden",
                   backgroundColor: "white",
                 }}
               />
@@ -4196,6 +4243,7 @@ export const NoteHelperDropdown = ({
               <Text style={{ fontSize: 11 + fontSizeAdj, color: gray(0.4), fontWeight: Fonts.weight.textHeavy, textTransform: "uppercase", marginBottom: 2 }}>Receipt notes</Text>
               <TextInput_
                 multiline
+                numberOfLines={0}
                 debounceMs={500}
                 capitalize={true}
                 value={workorderLine.receiptNotes || ""}
@@ -4214,6 +4262,7 @@ export const NoteHelperDropdown = ({
                   color: "green",
                   outlineWidth: 0,
                   outline: "none",
+                  overflow: "hidden",
                   backgroundColor: "white",
                 }}
               />

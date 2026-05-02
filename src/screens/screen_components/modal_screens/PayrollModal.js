@@ -74,6 +74,16 @@ function getTimeFrameRange(tf) {
 
 const STATIC_SHORTCUTS = [
   {
+    label: "Today",
+    start: () => dayjs().startOf("day"),
+    end: () => dayjs().endOf("day"),
+  },
+  {
+    label: "Yesterday",
+    start: () => dayjs().subtract(1, "day").startOf("day"),
+    end: () => dayjs().subtract(1, "day").endOf("day"),
+  },
+  {
     label: "This Month",
     start: () => dayjs().startOf("month"),
     end: () => dayjs(),
@@ -208,10 +218,10 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
   // selected user — auto-set for employee mode
   const [sSelectedUser, _setSelectedUser] = useState(employeeUser || null);
 
-  // date state — default to settings range
-  const [sStartDate, _setStartDate] = useState(defaultRange.start);
-  const [sEndDate, _setEndDate] = useState(defaultRange.end);
-  const [sActiveShortcut, _setActiveShortcut] = useState("Pay Period");
+  // date state — employee mode defaults to today, admin to pay period
+  const [sStartDate, _setStartDate] = useState(employeeUser ? dayjs().startOf("day") : defaultRange.start);
+  const [sEndDate, _setEndDate] = useState(employeeUser ? dayjs().endOf("day") : defaultRange.end);
+  const [sActiveShortcut, _setActiveShortcut] = useState(employeeUser ? "Today" : "Pay Period");
   const [sPendingStart, _setPendingStart] = useState(null);
   const [sPendingEnd, _setPendingEnd] = useState(null);
   const [sEndCalMonth, _setEndCalMonth] = useState(dayjs().month());
@@ -647,17 +657,19 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
             }}
           >
             <View>
-              <Text
-                style={{
-                  fontSize: 13,
-                  fontWeight: "700",
-                  color: C.text,
-                  marginBottom: 6,
-                  textAlign: "center",
-                }}
-              >
-                {isAdmin ? "Payroll" : "My Punches"}
-              </Text>
+              {isAdmin && (
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontWeight: "700",
+                    color: C.text,
+                    marginBottom: 6,
+                    textAlign: "center",
+                  }}
+                >
+                  Payroll
+                </Text>
+              )}
 
               {isAdmin && (
                 <>
@@ -1042,54 +1054,13 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
           {/* ═══ RIGHT COLUMN: Punch List + Summary ═══ */}
           <View style={{ flex: 2 }}>
             {/* Header */}
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                paddingHorizontal: 10,
-                paddingVertical: 6,
-              }}
-            >
-              <View
-                style={{ flexDirection: "row", alignItems: "center" }}
-              >
-                <Text
-                  style={{
-                    fontSize: 14,
-                    fontWeight: "700",
-                    color: C.text,
-                  }}
-                >
-                  {sSelectedUser
-                    ? sSelectedUser.first + " " + sSelectedUser.last
-                    : "Select a user"}
-                </Text>
-              </View>
-              <View
-                style={{ flexDirection: "row", alignItems: "center" }}
-              >
-                {isAdmin && !!sSelectedUser && (
-                  <Button_
-                    text="Add Punch"
-                    onPress={handleNewPunchPress}
-                    colorGradientArr={COLOR_GRADIENTS.blue}
-                    buttonStyle={{
-                      paddingVertical: 4,
-                      paddingHorizontal: 10,
-                      borderRadius: 5,
-                      marginRight: 8,
-                    }}
-                    textStyle={{ fontSize: 12 }}
-                  />
-                )}
-                {!!sSelectedUser && !sLoading && (
-                  <Text style={{ fontSize: 12, color: gray(0.4) }}>
-                    {displayArr.length} entries
-                  </Text>
-                )}
-              </View>
-            </View>
+            <PunchListHeader
+              sSelectedUser={sSelectedUser}
+              isAdmin={isAdmin}
+              sLoading={sLoading}
+              displayArr={displayArr}
+              handleNewPunchPress={handleNewPunchPress}
+            />
 
             {/* Table Header */}
             <View
@@ -1467,6 +1438,74 @@ const PayrollSummaryItem = ({ label, value, highlight }) => (
     </Text>
   </View>
 );
+
+const PunchListHeader = ({ sSelectedUser, isAdmin, sLoading, displayArr, handleNewPunchPress }) => {
+  const zPunchClock = useLoginStore((state) => state.punchClock);
+  const isClockedIn = sSelectedUser ? !!zPunchClock[sSelectedUser.id] : false;
+
+  function handleClockToggle() {
+    if (!sSelectedUser) return;
+    let millis = Date.now();
+    let option = isClockedIn ? "out" : "in";
+    useLoginStore.getState().setCreateUserClock(sSelectedUser.id, millis, option);
+  }
+
+  return (
+    <View
+      style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>
+          {sSelectedUser
+            ? sSelectedUser.first + " " + sSelectedUser.last
+            : "Select a user"}
+        </Text>
+      </View>
+      {!!sSelectedUser && (
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isClockedIn ? C.green : C.red, marginRight: 5 }} />
+          <Text style={{ fontSize: 12, fontWeight: "600", color: isClockedIn ? C.green : C.red, marginRight: 8 }}>
+            {isClockedIn ? "Clocked In" : "Clocked Out"}
+          </Text>
+          <Button_
+            text={isClockedIn ? "CLOCK OUT" : "CLOCK IN"}
+            onPress={handleClockToggle}
+            colorGradientArr={isClockedIn ? COLOR_GRADIENTS.red : COLOR_GRADIENTS.green}
+            buttonStyle={{ paddingVertical: 3, paddingHorizontal: 10, borderRadius: 5 }}
+            textStyle={{ fontSize: 10, fontWeight: "600" }}
+          />
+        </View>
+      )}
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        {isAdmin && !!sSelectedUser && (
+          <Button_
+            text="Add Punch"
+            onPress={handleNewPunchPress}
+            colorGradientArr={COLOR_GRADIENTS.blue}
+            buttonStyle={{
+              paddingVertical: 4,
+              paddingHorizontal: 10,
+              borderRadius: 5,
+              marginRight: 8,
+            }}
+            textStyle={{ fontSize: 12 }}
+          />
+        )}
+        {!!sSelectedUser && !sLoading && (
+          <Text style={{ fontSize: 12, color: gray(0.4) }}>
+            {displayArr.length} entries
+          </Text>
+        )}
+      </View>
+    </View>
+  );
+};
 
 const PAGE_SIZE = 50;
 

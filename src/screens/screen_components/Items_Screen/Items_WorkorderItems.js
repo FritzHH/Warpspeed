@@ -1075,7 +1075,7 @@ export const LineItemComponent = ({
                     >
                       {(inventoryItem.customPart || inventoryItem.customLabor) && (
                         <View style={{ backgroundColor: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 55) : lightenRGBByPercent(C.green, 55), borderRadius: 15, paddingHorizontal: 7, paddingVertical: 3, marginRight: 5 }}>
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 15) : lightenRGBByPercent(C.green, 15) }}>{inventoryItem.customPart ? "ITEM" : "LABOR"}</Text>
+                          <Text style={{ fontSize: 12, fontWeight: "700", color: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 15) : lightenRGBByPercent(C.green, 15) }}>{inventoryItem.customPart ? "ITEM" : inventoryItem.minutes ? inventoryItem.minutes + " MINS" : "LABOR"}</Text>
                         </View>
                       )}
                       <Text

@@ -127,22 +127,25 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   let selectedIsCash = sSelectedPayments.length > 0 && (sSelectedPayments[0].method === "cash" || sSelectedPayments[0].method === "check");
   let selectedIsCard = sSelectedPayments.length > 0 && !selectedIsCash;
 
-  // Selected payment's available balance
+  // Selected payment(s) combined available balance
   let selectedPaymentAvailable = 0;
-  if (sSelectedPayments.length > 0) {
-    let sp = sSelectedPayments[0];
+  sSelectedPayments.forEach((sp) => {
     let spRefunded = (sp.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
-    selectedPaymentAvailable = sp.amountCaptured - spRefunded;
-  }
+    selectedPaymentAvailable += sp.amountCaptured - spRefunded;
+  });
 
-  // Split item refund: if a payment is selected, route to that payment type
+  // Split item refund: if a payment is selected, route to that payment type.
+  // Suggested amount must equal items+tax exactly so the user cannot silently
+  // process a refund for less than what was selected. If the selected payment
+  // can't cover it, the per-method PROCESS guards / handleProcessRefund will
+  // surface a clear error.
   let itemCardAmount = 0;
   let itemCashAmount = 0;
   if (hasItemSelection) {
     if (selectedIsCash) {
-      itemCashAmount = Math.min(itemRefundTotal, selectedPaymentAvailable);
+      itemCashAmount = itemRefundTotal;
     } else if (selectedIsCard) {
-      itemCardAmount = Math.min(itemRefundTotal, selectedPaymentAvailable);
+      itemCardAmount = itemRefundTotal;
     } else {
       // Fallback: card first, then cash
       itemCardAmount = Math.min(itemRefundTotal, cardPaymentsTotal);
@@ -156,15 +159,20 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   // Payment-first: require payment selection when multiple payments exist
   let needsPaymentSelection = sTransactions.length > 1 && sSelectedPayments.length === 0;
 
+  let reasonMissing = !sRefundNote.trim();
+
   // Compute which items would exceed the refund limit or selected payment's available balance
   let disabledItemIDs = useMemo(() => {
     let set = new Set();
     let taxRate = zSalesTaxPercent || 0;
     let maxCap = refundLimits.maxRefund;
     if (sSelectedPayments.length > 0) {
-      let sp = sSelectedPayments[0];
-      let spRefunded = (sp.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
-      maxCap = Math.min(maxCap, sp.amountCaptured - spRefunded);
+      let combinedAvailable = 0;
+      sSelectedPayments.forEach((sp) => {
+        let spRefunded = (sp.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+        combinedAvailable += sp.amountCaptured - spRefunded;
+      });
+      maxCap = Math.min(maxCap, combinedAvailable);
     }
     sWorkordersInSale.forEach((wo) => {
       (wo.workorderLines || []).forEach((line) => {
@@ -319,14 +327,21 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   function handleSelectPayment(payment) {
     dlog(DCAT.BUTTON, "select_payment", "RefundModal", { paymentID: payment?.id, method: payment?.method, amountCaptured: payment?.amountCaptured, alreadySelected: !!sSelectedPayments.find((p) => p.id === payment?.id) });
     let alreadySelected = sSelectedPayments.find((p) => p.id === payment.id);
+    let isCashOrCheck = payment.method === "cash" || payment.method === "check";
+
     if (alreadySelected) {
-      // Deselecting: clear items and amounts
-      _setSelectedPayments([]);
-      _setSelectedItems([]);
+      let remaining = sSelectedPayments.filter((p) => p.id !== payment.id);
+      _setSelectedPayments(remaining);
+      if (remaining.length === 0) _setSelectedItems([]);
       return;
     }
-    // Only one payment at a time
-    _setSelectedPayments([payment]);
+
+    if (isCashOrCheck) {
+      let existingCash = sSelectedPayments.filter((p) => p.method === "cash" || p.method === "check");
+      _setSelectedPayments([...existingCash, payment]);
+    } else {
+      _setSelectedPayments([payment]);
+    }
   }
 
   // ─── Pending Refund Tracking (crash recovery) ────────────
@@ -388,20 +403,85 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
         refundObjects.push({ transactionID: cardDetails.paymentId, refundObj: refund });
       }
     } else if (type === "cash") {
-      // Cash refund: write to the selected transaction, or fallback to first cash/check with balance
-      let targetTxn = sSelectedPayments[0];
-      if (!targetTxn) {
-        targetTxn = updatedTxns.find((t) => {
+      let cashTargets = sSelectedPayments.filter((p) => p.method === "cash" || p.method === "check");
+      if (cashTargets.length === 0) {
+        cashTargets = updatedTxns.filter((t) => {
           if (t.method !== "cash" && t.method !== "check") return false;
           let refunded = (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
           return (t.amountCaptured - refunded) > 0;
         });
       }
-      let txnIdx = targetTxn ? updatedTxns.findIndex((t) => t.id === targetTxn.id) : -1;
-      if (txnIdx >= 0) {
-        let refund = buildRefundObject(amount, updatedTxns[txnIdx].id, "cash", sSelectedItems, "", refundSalesTax, refundNotes);
+
+      // Compute items+tax total. When items are attached we must guarantee
+      // that the refund object holding the items has amount >= items+tax,
+      // otherwise the receipt's items/tax/total will not match refund.amount.
+      let itemsSum = 0;
+      sSelectedItems.forEach((item) => {
+        let p = item.discountObj?.newPrice != null
+          ? item.discountObj.newPrice
+          : item.inventoryItem?.price || 0;
+        itemsSum += p;
+      });
+      let itemTotal = sSelectedItems.length > 0
+        ? itemsSum + Math.round(itemsSum * ((zSalesTaxPercent || 0) / 100))
+        : 0;
+
+      if (sSelectedItems.length > 0) {
+        if (amount < itemTotal) {
+          useAlertScreenStore.getState().setValues({
+            title: "Refund Amount Mismatch",
+            message: "Refund amount " + formatCurrencyDisp(amount, true) + " does not cover the selected items total " + formatCurrencyDisp(itemTotal, true) + ". Increase the refund amount or remove items.",
+            btn1Text: "OK",
+            handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+            canExitOnOuterClick: true,
+          });
+          return;
+        }
+        // Sort descending so the first cash target (where items attach) has
+        // the most available balance and can cover items+tax in a single hit.
+        cashTargets.sort((a, b) => {
+          let aAvail = a.amountCaptured - ((a.refunds || []).reduce((s, r) => s + (r.amount || 0), 0));
+          let bAvail = b.amountCaptured - ((b.refunds || []).reduce((s, r) => s + (r.amount || 0), 0));
+          return bAvail - aAvail;
+        });
+        let largestAvail = cashTargets[0]
+          ? cashTargets[0].amountCaptured - ((cashTargets[0].refunds || []).reduce((s, r) => s + (r.amount || 0), 0))
+          : 0;
+        if (largestAvail < itemTotal) {
+          useAlertScreenStore.getState().setValues({
+            title: "Insufficient Single-Payment Balance",
+            message: "Selected items total " + formatCurrencyDisp(itemTotal, true) + " exceeds the largest selected cash payment's available balance " + formatCurrencyDisp(largestAvail, true) + ". Item refunds must come from a single payment with enough balance.",
+            btn1Text: "OK",
+            handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+            canExitOnOuterClick: true,
+          });
+          return;
+        }
+      } else {
+        cashTargets.sort((a, b) => {
+          let aAvail = a.amountCaptured - ((a.refunds || []).reduce((s, r) => s + (r.amount || 0), 0));
+          let bAvail = b.amountCaptured - ((b.refunds || []).reduce((s, r) => s + (r.amount || 0), 0));
+          return aAvail - bAvail;
+        });
+      }
+
+      let remaining = amount;
+      let taxRemaining = refundSalesTax;
+      let isFirst = true;
+      for (let target of cashTargets) {
+        if (remaining <= 0) break;
+        let txnIdx = updatedTxns.findIndex((t) => t.id === target.id);
+        if (txnIdx < 0) continue;
+        let txnAvail = updatedTxns[txnIdx].amountCaptured - ((updatedTxns[txnIdx].refunds || []).reduce((s, r) => s + (r.amount || 0), 0));
+        let portion = Math.min(remaining, txnAvail);
+        if (portion <= 0) continue;
+        let portionTax = remaining === portion ? taxRemaining : Math.round(refundSalesTax * (portion / amount));
+        taxRemaining -= portionTax;
+        let refund = buildRefundObject(portion, updatedTxns[txnIdx].id, "cash", isFirst ? sSelectedItems : [], "", portionTax, refundNotes);
         updatedTxns[txnIdx].refunds = [...(updatedTxns[txnIdx].refunds || []), refund];
         refundObjects.push({ transactionID: updatedTxns[txnIdx].id, refundObj: refund });
+        remaining -= portion;
+        isFirst = false;
       }
     }
 
@@ -472,7 +552,14 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
     let settings = useSettingsStore.getState().getSettings();
     let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
-    let _ctx = { currentUser, settings };
+    let currentRefundIDs = new Set(refundObjects.map((ro) => ro.refundObj.id));
+    let previousRefunds = [];
+    for (let txn of updatedTxns) {
+      for (let r of (txn.refunds || [])) {
+        if (!currentRefundIDs.has(r.id)) previousRefunds.push(r);
+      }
+    }
+    let _ctx = { currentUser, settings, previousRefunds };
     let refundReceipt = printBuilder.refund(
       primaryRefund,
       sale,
@@ -789,6 +876,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                       : 0
                     }
                     onManualInput={handleManualAmountInput}
+                    reasonMissing={reasonMissing}
                   />
                 </View>
                 <View
@@ -811,6 +899,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                       : 0
                     }
                     onManualInput={handleManualAmountInput}
+                    reasonMissing={reasonMissing}
                   />
                 </View>
               </View>
@@ -904,8 +993,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     {!sRefundComplete && (
                       <View
                         style={{
-                          borderWidth: 1,
-                          borderColor: gray(0.15),
+                          borderWidth: reasonMissing ? 2 : 1,
+                          borderColor: reasonMissing ? C.red : gray(0.15),
                           borderRadius: 6,
                           paddingHorizontal: 8,
                           paddingVertical: 6,
@@ -915,16 +1004,16 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                       >
                         <TextInput
                           style={{
-                            fontSize: 12,
+                            fontSize: 15,
                             color: C.text,
-                            minHeight: 40,
+                            minHeight: 70,
                             outlineWidth: 0,
                             outlineStyle: "none",
                           }}
                           value={sRefundNote}
                           onChangeText={(val) => _setRefundNote(val.length === 1 ? val.toUpperCase() : val)}
-                          placeholder="Reason for refund..."
-                          placeholderTextColor={gray(0.3)}
+                          placeholder={reasonMissing ? "Refund reason (required)" : "Reason for refund..."}
+                          placeholderTextColor={reasonMissing ? C.red : gray(0.3)}
                           multiline
                         />
                       </View>

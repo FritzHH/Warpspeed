@@ -418,6 +418,14 @@ export function generateRefundReceiptPDF(data) {
   doc.text("REFUND RECEIPT", centerX, y, { align: "center" });
   y += 14;
 
+  // Refund ID
+  if (data.barcode || data.id) {
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.barcode || data.id, centerX, y, { align: "center" });
+    y += 10;
+  }
+
   // Date/time
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
@@ -496,14 +504,6 @@ export function generateRefundReceiptPDF(data) {
       y += 9;
     });
     y += 6;
-  }
-
-  // Barcode
-  if (data.barcode) {
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.text(data.barcode, centerX, y, { align: "center" });
-    y += 10;
   }
 
   return doc.output("datauristring").split(",")[1];

@@ -63,9 +63,8 @@ export function LoginScreen({ sessionError, onClearError }) {
   const getErrorMessage = (errorCode) => {
     switch (errorCode) {
       case "auth/user-not-found":
-        return "No account found with this email address";
       case "auth/wrong-password":
-        return "Incorrect password";
+        return "Invalid email or password";
       case "auth/invalid-email":
         return "Invalid email address";
       case "auth/user-disabled":

@@ -133,7 +133,7 @@ const RefundCard = ({ refund, index }) => {
         </Text>
       </View>
       {!!r.notes && (
-        <Text style={{ fontSize: 11, color: gray(0.45), marginTop: 4 }}>{r.notes}</Text>
+        <Text style={{ fontSize: 11, color: gray(0.45), marginTop: 4 }}>{typeof r.notes === "string" ? r.notes : r.notes.reason || ""}</Text>
       )}
       {!!r.millis && (
         <Text style={{ fontSize: 10, color: gray(0.35), marginTop: 3 }}>

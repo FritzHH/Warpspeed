@@ -1419,8 +1419,8 @@ export function InventoryComponent({}) {
                 >
                   <Button_
                     onPress={() => handleQuickButtonPress(item)}
-                    enabled={!!zOpenWorkorderID}
-                    colorGradientArr={!zOpenWorkorderID ? COLOR_GRADIENTS.grey : isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "item" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
+                    enabled={(item.id === "labor" || item.id === "item") ? !!zOpenWorkorderID : true}
+                    colorGradientArr={(item.id === "labor" || item.id === "item") && !zOpenWorkorderID ? COLOR_GRADIENTS.grey : isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "item" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
                     buttonStyle={{
                       borderWidth: 1,
                       borderRadius: 5,

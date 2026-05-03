@@ -2,15 +2,16 @@
 import { View, TextInput } from "react-native-web";
 import { useState, useRef } from "react";
 import { gray } from "../utils";
-import { SmallLoadingIndicator } from "../components";
-import { C } from "../styles";
+import { SmallLoadingIndicator, Button_ } from "../components";
+import { C, ICONS } from "../styles";
 import { executeTicketSearch, executeLiveSearch } from "./ticketSearch";
 import { ClosedWorkorderModal } from "../screens/screen_components/modal_screens/ClosedWorkorderModal";
 import { TransactionModal } from "../screens/screen_components/modal_screens/TransactionModal";
 import { FullSaleModal } from "../screens/screen_components/modal_screens/FullSaleModal";
 import { NewRefundModalScreen } from "../screens/screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
 import { findSaleByTransactionID } from "../screens/screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
-import { useAlertScreenStore } from "../stores";
+import { useAlertScreenStore, useTicketSearchStore, useTabNamesStore } from "../stores";
+import { TAB_NAMES } from "../data";
 
 export function TicketSearchInput({}) {
   const [sTicketSearch, _setTicketSearch] = useState("");
@@ -22,10 +23,22 @@ export function TicketSearchInput({}) {
   const [sRefundInitialPayment, _sSetRefundInitialPayment] = useState(null);
   const debounceRef = useRef(null);
 
+  function clearResults() {
+    useTicketSearchStore.getState().reset();
+    if (useTabNamesStore.getState().itemsTabName === TAB_NAMES.itemsTab.ticketSearchResults) {
+      useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.empty);
+    }
+  }
+
+  function clearSearch() {
+    _setTicketSearch("");
+    clearResults();
+  }
+
   const searchCallbacks = {
-    onCompletedWorkorderFound: (wo) => _sSetClosedWorkorder(wo),
-    onTransactionFound: (txn) => _sSetTransaction(txn),
-    onSaleFound: (sale) => _sSetSale(sale),
+    onCompletedWorkorderFound: (wo) => { clearResults(); _sSetClosedWorkorder(wo); },
+    onTransactionFound: (txn) => { clearResults(); _sSetTransaction(txn); },
+    onSaleFound: (sale) => { clearResults(); _sSetSale(sale); },
   };
 
   async function handleTransactionRefund(txn) {
@@ -106,9 +119,7 @@ export function TicketSearchInput({}) {
             if (hasWoPrefix && trimmed.length >= 1) {
               executeLiveSearch(trimmed, "woNumber", {
                 onSingleResult: clearOnMatch,
-                onCompletedWorkorderFound: (wo) => _sSetClosedWorkorder(wo),
-                onSaleFound: (sale) => _sSetSale(sale),
-                onTransactionFound: (txn) => _sSetTransaction(txn),
+                ...searchCallbacks,
               });
               return;
             }
@@ -116,9 +127,7 @@ export function TicketSearchInput({}) {
             if (!hasWoPrefix && trimmed.length >= 4) {
               executeLiveSearch(trimmed, "salesTransactions", {
                 onSingleResult: clearOnMatch,
-                onCompletedWorkorderFound: (wo) => _sSetClosedWorkorder(wo),
-                onSaleFound: (sale) => _sSetSale(sale),
-                onTransactionFound: (txn) => _sSetTransaction(txn),
+                ...searchCallbacks,
               });
             }
           }}
@@ -136,6 +145,13 @@ export function TicketSearchInput({}) {
             paddingHorizontal: 10,
             backgroundColor: C.listItemWhite,
           }}
+        />
+        <Button_
+          icon={ICONS.reset1}
+          iconSize={20}
+          onPress={clearSearch}
+          useColorGradient={false}
+          enabled={!!sTicketSearch}
         />
         {sTicketSearching && (
           <View style={{ marginLeft: 8 }}>
@@ -156,6 +172,10 @@ export function TicketSearchInput({}) {
         <FullSaleModal
           item={{ saleID: sSale.id }}
           onClose={() => _sSetSale(null)}
+          onRefund={(saleID) => {
+            _sSetSale(null);
+            _sSetRefundSaleID(saleID);
+          }}
         />
       )}
       {!!sRefundSaleID && (

@@ -13998,3 +13998,94 @@ id,method,amountCaptured,amountTendered,chargeID,paymentIntentID,last4,cardType,
 17734,card,7988,0,ch_3TQB7ZFfuIutquDb0uAZQSGv,,1238,MASTERCARD,Credit Card,,stripe,,1777142405000
 17735,check,16188,0,,,,,,,check,,1777143536000
 17736,card,3320,0,ch_3TQCbZFfuIutquDb0bQMp9ZN,,9813,MASTERCARD,Credit Card,,stripe,,1777148172000
+17737,cash,4047,4047,,,,,,,cash,,1777214984000
+17738,card,2799,0,ch_3TQUQaFfuIutquDb1IU3uols,,9457,VISA,Debit Card,,stripe,,1777216620000
+17740,card,2500,0,ch_3TQUQwFfuIutquDb0R6E9KIH,,6539,VISA,Debit Card,deposit,stripe,,1777216642000
+17741,card,1065,0,ch_3TQUhjFfuIutquDb1aDM4mai,,0317,AMEX,Credit Card,,stripe,,1777217682000
+17742,card,8793,0,ch_3TQVNaFfuIutquDb0jV70ipC,,0215,VISA,Debit Card,,stripe,,1777220278000
+17743,card,4260,0,ch_3TQVSyFfuIutquDb1B4tbE77,,1224,AMEX,Credit Card,,stripe,,1777220612000
+17744,card,3269,0,ch_3TQVkTFfuIutquDb1Z2Py0pp,,6490,VISA,Credit Card,,stripe,,1777221697000
+17745,cash,2219,2219,,,,,,,cash,,1777226600000
+17747,cash,2713,2713,,,,,,,cash,,1777299910000
+17748,card,1491,0,,,,,Credit Card,,stripe,,1777301169000
+17749,card,8201,0,,,,,Credit Card,,stripe,,1777304562000
+17750,card,479153,0,,,,,Credit Card,,stripe,,1777304781000
+17751,card,8733,0,,,,,Credit Card,,stripe,,1777306472000
+17752,cash,6390,6390,,,,,,,cash,,1777308456000
+17754,card,14910,0,,,,,Credit Card,,stripe,,1777309982000
+17755,card,1100,0,,,,,Debit Card,,stripe,,1777310576000
+17756,card,852,0,,,,,Credit Card,,stripe,,1777311004000
+17757,card,4260,0,,,,,Debit Card,,stripe,,1777311166000
+17758,card,4260,0,,,,,Debit Card,,stripe,,1777312571000
+17759,cash,7360,7360,,,,,,,cash,,1777313109000
+17760,card,4260,0,,,,,Debit Card,,stripe,,1777314807000
+17762,card,4047,0,,,,,Debit Card,,stripe,,1777315196000
+17763,card,7721,0,,,,,Credit Card,,stripe,,1777315287000
+17764,cash,3728,3728,,,,,,,cash,,1777317170000
+17765,card,4793,0,,,,,Credit Card,,stripe,,1777317724000
+17766,card,7455,0,,,,,Debit Card,,stripe,,1777317751000
+17767,card,1100,0,,,,,Debit Card,,stripe,,1777321944000
+17768,card,4000,0,,,,,Debit Card,,stripe,,1777324975000
+17769,card,2130,0,,,,,Credit Card,,stripe,,1777385733000
+17770,cash,7455,7455,,,,,,,cash,,1777390060000
+17773,card,1757,0,,,,,Debit Card,,stripe,,1777391403000
+17774,card,6923,0,,,,,Credit Card,,stripe,,1777396362000
+17775,card,7721,0,,,,,Credit Card,,stripe,,1777399231000
+17776,card,3089,0,,,,,Credit Card,,stripe,,1777404812000
+17777,card,3728,0,,,,,Debit Card,,stripe,,1777408347000
+17778,card,2219,0,,,,,Credit Card,,stripe,,1777408789000
+17779,card,6819,0,,,,,Debit Card,,stripe,,1777408986000
+17781,card,5162,0,,,,,Debit Card,,stripe,,1777411426000
+17782,cash,1065,1065,,,,,,,cash,,1777412841000
+17784,card,2500,0,,,,,Credit Card,deposit,stripe,,1777471939000
+17785,card,11183,0,,,,,Credit Card,,stripe,,1777473670000
+17786,cash,5000,5000,,,,,,,cash,,1777476884000
+17787,card,12000,0,,,,,Debit Card,,stripe,,1777479804000
+17788,card,5065,0,,,,,Debit Card,,stripe,,1777483887000
+17789,card,2219,0,,,,,Credit Card,,stripe,,1777484119000
+17790,card,2500,0,,,,,Credit Card,,stripe,,1777485363000
+17791,card,12248,0,,,,,Credit Card,,stripe,,1777488869000
+17792,card,4456,0,,,,,Debit Card,,stripe,,1777490906000
+17794,card,2219,0,,,,,Credit Card,,stripe,,1777493285000
+17795,card,6068,0,,,,,Credit Card,,stripe,,1777493577000
+17797,card,2500,0,,,,,Credit Card,deposit,stripe,,1777496649000
+17798,card,5414,0,,,,,Debit Card,,stripe,,1777558721000
+17799,cash,4999,4999,,,,,,,cash,,1777575164000
+17800,card,12520,0,,,,,Credit Card,,stripe,,1777577772000
+17801,card,9476,0,,,,,Credit Card,,stripe,,1777578849000
+17802,cash,3000,3000,,,,,,,cash,,1777579339000
+17803,card,7351,0,,,,,Debit Card,,stripe,,1777582928000
+17805,card,4260,0,,,,,Credit Card,,stripe,,1777583301000
+17806,card,15780,0,,,,,Credit Card,,stripe,,1777585947000
+17807,card,14910,0,,,,,Credit Card,,stripe,,1777644496000
+17808,cash,14250,14250,,,,,,,cash,,1777645123000
+17809,cash,533,533,,,,,,,cash,,1777647542000
+17811,card,2500,0,,,,,Debit Card,deposit,stripe,,1777648602000
+17812,card,3100,0,,,,,Credit Card,,stripe,,1777648933000
+17813,card,4163,0,,,,,Credit Card,,stripe,,1777650405000
+17814,card,4000,0,,,,,Credit Card,,stripe,,1777650860000
+17815,cash,7309,7309,,,,,,,cash,,1777650892000
+17816,card,5325,0,,,,,Credit Card,,stripe,,1777654920000
+17817,card,10890,0,,,,,Credit Card,,stripe,,1777655061000
+17818,cash,2000,2000,,,,,,,cash,,1777657806000
+17819,card,10086,0,,,,,Credit Card,,stripe,,1777659546000
+17821,card,193447,0,,,,,Credit Card,,stripe,,1777660138000
+17822,cash,4692,4692,,,,,,,cash,,1777660525000
+17823,card,9319,0,,,,,Debit Card,,stripe,,1777660808000
+17824,card,26229,0,,,,,Credit Card,,stripe,,1777661249000
+17826,card,4000,0,,,,,Debit Card,,stripe,,1777663144000
+17827,card,3263,0,,,,,Credit Card,,stripe,,1777664822000
+17829,card,1278,0,,,,,Debit Card,,stripe,,1777669824000
+17831,card,24708,0,,,,,Credit Card,,stripe,,1777670288000
+17832,card,1065,0,,,,,Credit Card,,stripe,,1777670735000
+17833,card,9748,0,,,,,Credit Card,,stripe,,1777670841000
+17835,card,9319,0,,,,,Credit Card,,stripe,,1777731108000
+17836,card,8609,0,,,,,Credit Card,,stripe,,1777732056000
+17837,cash,1598,1598,,,,,,,cash,,1777732442000
+17838,cash,1399,1399,,,,,,,cash,,1777732753000
+17840,card,20129,0,,,,,Credit Card,,stripe,,1777733343000
+17842,card,4220,0,,,,,Credit Card,deposit,stripe,,1777739807000
+17843,card,60000,0,,,,,Debit Card,,stripe,,1777740845000
+17845,card,3100,0,,,,,Debit Card,,stripe,,1777741573000
+17846,card,2500,0,,,,,Debit Card,,stripe,,1777742262000
+17847,cash,3089,3089,,,,,,,cash,,1777743863000

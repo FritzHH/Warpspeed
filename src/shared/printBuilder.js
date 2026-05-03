@@ -432,10 +432,57 @@ var printBuilder = {
     // Refund-specific fields
     receipt.refundAmount = refund.amount || 0;
     receipt.refundType = refund.method || ""; // "cash" or "card"
-    receipt.refundNotes = refund.notes || "";
+    var rawNotes = refund.notes;
+    if (rawNotes && typeof rawNotes === "object") {
+      receipt.refundNotes = {
+        reason: rawNotes.reason || "",
+        millis: String(rawNotes.millis || refund.millis || Date.now()),
+        userInitials: rawNotes.userInitials || "",
+        userID: rawNotes.userID || "",
+      };
+    } else {
+      receipt.refundNotes = {
+        reason: rawNotes || "",
+        millis: String(refund.millis || Date.now()),
+        userInitials: currentUser ? (((currentUser.first || "")[0] || "") + ((currentUser.last || "")[0] || "")) : "",
+        userID: currentUser?.id || "",
+      };
+    }
     receipt.originalSaleID = sale?.id || "";
     receipt.originalSaleTotal = sale?.total || 0;
     receipt.cardRefundID = refund.stripeRefundID || "";
+
+    receipt.previousRefunds = (_ctx.previousRefunds || []).map(function (pr) {
+      var prNotes = pr.notes;
+      var normalizedNotes;
+      if (prNotes && typeof prNotes === "object") {
+        normalizedNotes = {
+          reason: prNotes.reason || "",
+          millis: String(prNotes.millis || pr.millis || 0),
+          userInitials: prNotes.userInitials || "",
+          userID: prNotes.userID || "",
+        };
+      } else {
+        normalizedNotes = {
+          reason: prNotes || "",
+          millis: String(pr.millis || 0),
+          userInitials: "",
+          userID: "",
+        };
+      }
+      var entry = {
+        id: pr.id || "",
+        refundAmount: String(pr.amount || 0),
+        refundType: pr.method || "",
+        refundNotes: normalizedNotes,
+      };
+      if (pr.method === "card" && pr.stripeRefundID) {
+        entry.cardRefundID = pr.stripeRefundID;
+      }
+      return entry;
+    }).sort(function (a, b) {
+      return Number(a.refundNotes.millis) - Number(b.refundNotes.millis);
+    });
 
     // Refunded line items
     if (refund.workorderLines && refund.workorderLines.length > 0) {

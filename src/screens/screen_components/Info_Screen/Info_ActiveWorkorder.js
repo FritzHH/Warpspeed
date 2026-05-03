@@ -701,7 +701,7 @@ export const ActiveWorkorderComponent = ({}) => {
             />
           </Tooltip>
           {!!zCustomerLanguage && zCustomerLanguage !== CUSTOMER_LANGUAGES.english && (
-            <Text style={{ fontSize: 11, color: gray(0.5), textAlign: "center" }}>
+            <Text style={{ fontSize: 12, color: gray(0.5), textAlign: "center", fontStyle: "italic" }}>
               {zCustomerLanguage}
             </Text>
           )}

@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { View, Text, TextInput } from "react-native-web";
 import { useState, useRef, memo } from "react";
-import { Button_ } from "../../../../components";
+import { Button_, Tooltip } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import { usdTypeMask, formatCurrencyDisp, gray } from "../../../../utils";
 import { dlog, DCAT } from "./checkoutDebugLog";
@@ -12,6 +12,7 @@ export const CashRefund = memo(function CashRefund({
   refundComplete = false,
   suggestedAmount = 0,
   onManualInput,
+  reasonMissing = false,
 }) {
   const [sRefundAmount, _setRefundAmount] = useState("");
   const [sRefundAmountDisp, _setRefundAmountDisp] = useState("");
@@ -142,20 +143,41 @@ export const CashRefund = memo(function CashRefund({
       ) : null}
 
       {/* Button */}
-      <Button_
-        text="PROCESS CASH REFUND"
-        onPress={handleProcessRefund}
-        enabled={isEnabled && sRefundAmount > 0}
-        colorGradientArr={COLOR_GRADIENTS.yellow}
-        textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
-        buttonStyle={{
-          paddingVertical: 8,
-          borderRadius: 6,
-          alignItems: "center",
-          justifyContent: "center",
-          opacity: isEnabled && sRefundAmount > 0 ? 1 : 0.4,
-        }}
-      />
+      {reasonMissing ? (
+        <Tooltip text="Enter a refund reason first" position="top">
+          <View>
+            <Button_
+              text="PROCESS CASH REFUND"
+              onPress={() => {}}
+              enabled={false}
+              colorGradientArr={COLOR_GRADIENTS.green}
+              textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
+              buttonStyle={{
+                paddingVertical: 8,
+                borderRadius: 6,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: 0.4,
+              }}
+            />
+          </View>
+        </Tooltip>
+      ) : (
+        <Button_
+          text="PROCESS CASH REFUND"
+          onPress={handleProcessRefund}
+          enabled={isEnabled && sRefundAmount > 0}
+          colorGradientArr={COLOR_GRADIENTS.green}
+          textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
+          buttonStyle={{
+            paddingVertical: 8,
+            borderRadius: 6,
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: isEnabled && sRefundAmount > 0 ? 1 : 0.4,
+          }}
+        />
+      )}
     </View>
   );
 });

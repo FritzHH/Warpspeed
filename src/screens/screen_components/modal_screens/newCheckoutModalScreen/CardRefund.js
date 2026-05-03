@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { View, Text, TextInput, Image } from "react-native-web";
 import { useState, useRef, memo } from "react";
-import { Button_, SmallLoadingIndicator } from "../../../../components";
+import { Button_, SmallLoadingIndicator, Tooltip } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import {
   usdTypeMask,
@@ -26,6 +26,7 @@ export const CardRefund = memo(function CardRefund({
   refundComplete = false,
   suggestedAmount = 0,
   onManualInput,
+  reasonMissing = false,
 }) {
   const [sRefundAmount, _setRefundAmount] = useState("");
   const [sRefundAmountDisp, _setRefundAmountDisp] = useState("");
@@ -91,6 +92,26 @@ export const CardRefund = memo(function CardRefund({
         `Exceeds max refund allowed (${formatCurrencyDisp(maxCardRefund)})`
       );
       return;
+    }
+
+    // If items are attached, the refund amount must cover items+tax exactly
+    // or higher — otherwise the receipt's items/tax block will not match
+    // refund.amount (the bug that produced the $1 receipt for $2.13 of items).
+    if (workorderLines.length > 0) {
+      let itemsSum = 0;
+      workorderLines.forEach((item) => {
+        let p = item.discountObj?.newPrice != null
+          ? item.discountObj.newPrice
+          : item.inventoryItem?.price || 0;
+        itemsSum += p;
+      });
+      let itemTotal = itemsSum + Math.round(itemsSum * ((salesTaxPercent || 0) / 100));
+      if (sRefundAmount < itemTotal) {
+        _setErrorMessage(
+          `Refund must cover selected items (${formatCurrencyDisp(itemTotal)})`
+        );
+        return;
+      }
     }
 
     _setProcessing(true);
@@ -277,20 +298,41 @@ export const CardRefund = memo(function CardRefund({
       </View>
 
       {/* Button */}
-      <Button_
-        text={sProcessing ? "PROCESSING..." : "PROCESS CARD REFUND"}
-        onPress={handleProcessRefund}
-        enabled={isEnabled && sRefundAmount >= 50 && !sProcessing}
-        colorGradientArr={COLOR_GRADIENTS.yellow}
-        textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
-        buttonStyle={{
-          paddingVertical: 8,
-          borderRadius: 6,
-          alignItems: "center",
-          justifyContent: "center",
-          opacity: isEnabled && sRefundAmount >= 50 && !sProcessing ? 1 : 0.4,
-        }}
-      />
+      {reasonMissing ? (
+        <Tooltip text="Enter a refund reason first" position="bottom">
+          <View>
+            <Button_
+              text="PROCESS CARD REFUND"
+              onPress={() => {}}
+              enabled={false}
+              colorGradientArr={COLOR_GRADIENTS.green}
+              textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
+              buttonStyle={{
+                paddingVertical: 8,
+                borderRadius: 6,
+                alignItems: "center",
+                justifyContent: "center",
+                opacity: 0.4,
+              }}
+            />
+          </View>
+        </Tooltip>
+      ) : (
+        <Button_
+          text={sProcessing ? "PROCESSING..." : "PROCESS CARD REFUND"}
+          onPress={handleProcessRefund}
+          enabled={isEnabled && sRefundAmount >= 50 && !sProcessing}
+          colorGradientArr={COLOR_GRADIENTS.green}
+          textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
+          buttonStyle={{
+            paddingVertical: 8,
+            borderRadius: 6,
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: isEnabled && sRefundAmount >= 50 && !sProcessing ? 1 : 0.4,
+          }}
+        />
+      )}
     </View>
   );
 });

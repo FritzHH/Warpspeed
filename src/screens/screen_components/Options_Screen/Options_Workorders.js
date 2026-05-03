@@ -257,6 +257,7 @@ export function WorkordersComponent({}) {
   const enterTimerRef = useRef(null);
   const exitTimerRef = useRef(null);
   const preHoverItemsTabRef = useRef(null);
+  const preHoverInfoTabRef = useRef(null);
 
   function onMouseEnter(workorder) {
     if (exitTimerRef.current) { clearTimeout(exitTimerRef.current); exitTimerRef.current = null; }
@@ -266,8 +267,12 @@ export function WorkordersComponent({}) {
       if (!preHoverItemsTabRef.current) {
         preHoverItemsTabRef.current = useTabNamesStore.getState().itemsTabName;
       }
+      if (!preHoverInfoTabRef.current) {
+        preHoverInfoTabRef.current = useTabNamesStore.getState().infoTabName;
+      }
       useOpenWorkordersStore.getState().setWorkorderPreviewID(workorder.id);
       useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.workorderItems);
+      useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.workorder);
     }, 50);
   }
 
@@ -277,6 +282,10 @@ export function WorkordersComponent({}) {
       if (preHoverItemsTabRef.current) {
         useTabNamesStore.getState().setItemsTabName(preHoverItemsTabRef.current);
         preHoverItemsTabRef.current = null;
+      }
+      if (preHoverInfoTabRef.current) {
+        useTabNamesStore.getState().setInfoTabName(preHoverInfoTabRef.current);
+        preHoverInfoTabRef.current = null;
       }
       useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
       exitTimerRef.current = null;

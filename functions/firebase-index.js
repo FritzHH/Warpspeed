@@ -181,12 +181,121 @@ function log(one, two) {
   logger.log(str);
 }
 
+// ═══════════════════════════════════════════════════════════════
+// SECURITY HELPERS
+// ═══════════════════════════════════════════════════════════════
+
+const ALLOWED_ORIGINS = [
+  "https://warpspeed-bonitabikes.web.app",
+  "http://localhost:3000",
+];
+
+function setCorsHeaders(res, req) {
+  const origin = req.headers.origin;
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.set("Access-Control-Allow-Origin", origin);
+  }
+  res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+}
+
+const MAX_SESSION_SECONDS = 12 * 3600; // 12-hour max session
+
+function requireCallableAuth(request) {
+  if (!request.auth) {
+    throw new HttpsError("unauthenticated", "Authentication required.");
+  }
+  const authTime = request.auth.token?.auth_time;
+  if (authTime && (Math.floor(Date.now() / 1000) - authTime) > MAX_SESSION_SECONDS) {
+    throw new HttpsError("unauthenticated", "Session expired. Please log in again.");
+  }
+  return request.auth;
+}
+
+function requireTenantMatch(request, tenantID, storeID) {
+  const auth = requireCallableAuth(request);
+  const claims = auth.token || {};
+  if (claims.tenantID && claims.tenantID !== tenantID) {
+    throw new HttpsError("permission-denied", "Tenant access denied.");
+  }
+  if (storeID && claims.storeID && claims.storeID !== storeID) {
+    throw new HttpsError("permission-denied", "Store access denied.");
+  }
+  return auth;
+}
+
+async function requireHTTPAuth(req, res) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    res.status(401).json({ success: false, message: "Authentication required." });
+    return null;
+  }
+  try {
+    const token = authHeader.split("Bearer ")[1];
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    if (decodedToken.auth_time && (Math.floor(Date.now() / 1000) - decodedToken.auth_time) > MAX_SESSION_SECONDS) {
+      res.status(401).json({ success: false, message: "Session expired. Please log in again." });
+      return null;
+    }
+    return decodedToken;
+  } catch (error) {
+    res.status(401).json({ success: false, message: "Invalid or expired token." });
+    return null;
+  }
+}
+
+// Permission levels: SuperUser=4, Admin=3, Editor=2, User=1
+const PERM_SUPER_USER = 4;
+const PERM_ADMIN = 3;
+const PERM_EDITOR = 2;
+
+async function requirePermissionLevel(db, request, minLevel) {
+  const auth = requireCallableAuth(request);
+  const claims = auth.token || {};
+  const { tenantID, storeID } = claims;
+
+  if (!tenantID || !storeID) {
+    throw new HttpsError("permission-denied", "User has no tenant/store assignment.");
+  }
+
+  const userDoc = await db.collection("tenants").doc(tenantID)
+    .collection("stores").doc(storeID)
+    .collection("users").doc(auth.uid)
+    .get();
+
+  if (!userDoc.exists) {
+    throw new HttpsError("permission-denied", "User not found in store.");
+  }
+
+  const perms = userDoc.data().permissions || {};
+  const level = typeof perms === "object" ? (perms.level || 0) : 0;
+
+  if (level < minLevel) {
+    throw new HttpsError("permission-denied", "Insufficient permissions for this operation.");
+  }
+
+  return { permissions: perms, level };
+}
+
+async function setUserCustomClaims(uid, tenantID, storeID) {
+  try {
+    const claims = { tenantID };
+    if (storeID) claims.storeID = storeID;
+    await admin.auth().setCustomUserClaims(uid, claims);
+    log("Custom claims set", { uid, tenantID, storeID });
+  } catch (error) {
+    log("Error setting custom claims", { uid, error: error.message });
+  }
+}
+
 // server driven Stripe payments
 
 exports.getAvailableStripeReaders = onRequest(
   { cors: true, secrets: [stripeSecretKey] },
   async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+    setCorsHeaders(res, req);
+    const decodedToken = await requireHTTPAuth(req, res);
+    if (!decodedToken) return;
     log("Incoming get available Stripe readers body", req.body);
     const readers = await stripe.terminal.readers.list({});
     log("available Stripe readers", readers);
@@ -197,16 +306,18 @@ exports.getAvailableStripeReaders = onRequest(
 exports.initiatePaymentIntent = onRequest(
   { cors: true, secrets: [stripeSecretKey] },
   async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+    setCorsHeaders(res, req);
+    const decodedToken = await requireHTTPAuth(req, res);
+    if (!decodedToken) return;
     log("Incoming process Stripe server-driven payment", req.body);
 
     let amount = req.body.amount;
     let readerID = req.body.readerID;
 
-    if (!amount || typeof amount !== "number") {
+    if (!amount || typeof amount !== "number" || amount <= 0) {
       return res.status(400).json({
         success: false,
-        message: "Amount must be a valid number in cents.",
+        message: "Amount must be a positive number in cents.",
       });
     }
 
@@ -377,7 +488,7 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
     ],
   },
   async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+    setCorsHeaders(res, req);
 
     // ── Verify webhook signature ──
     const stripeClient = Stripe(stripeSecretKey.value());
@@ -571,7 +682,9 @@ exports.stripeCheckoutWebhook_Terminal = onRequest(
 exports.cancelServerDrivenStripePayment = onRequest(
   { cors: true, secrets: [stripeSecretKey] },
   async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+    setCorsHeaders(res, req);
+    const decodedToken = await requireHTTPAuth(req, res);
+    if (!decodedToken) return;
 
     const readerId = req.body.readerID;
 
@@ -682,6 +795,7 @@ exports.sendSMSEnhanced = onCall(
   },
   async (request) => {
     log("Incoming enhanced SMS callable request", request.data);
+    requireCallableAuth(request);
 
     try {
       // Initialize Firestore with service account
@@ -1062,7 +1176,6 @@ exports.incomingSMSEnhanced = onRequest(
   async (request, response) => {
     const requestStartTime = Date.now();
 
-    // Set CORS headers
     response.set("Access-Control-Allow-Origin", "*");
     response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
     response.set("Access-Control-Allow-Headers", "Content-Type");
@@ -1580,7 +1693,7 @@ function ftpReader() {
  * Authenticates user with email/password and returns user and tenant information
  */
 exports.loginAppUser = onRequest({ cors: true }, async (req, res) => {
-  res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+  setCorsHeaders(res, req);
   log("Incoming login request", req.body);
 
   // Input validation
@@ -1767,7 +1880,9 @@ exports.loginAppUser = onRequest({ cors: true }, async (req, res) => {
  * Creates user in Firebase Auth and stores data in Firestore
  */
 exports.createAppUser = onRequest({ cors: true }, async (req, res) => {
-  res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+  setCorsHeaders(res, req);
+  const decodedToken = await requireHTTPAuth(req, res);
+  if (!decodedToken) return;
   log("Incoming create app user request", req.body);
 
   // Input validation
@@ -1955,7 +2070,9 @@ exports.createAppUser = onRequest({ cors: true }, async (req, res) => {
  * Creates store with initial SETTINGS_OBJ data
  */
 exports.createStore = onRequest({ cors: true }, async (req, res) => {
-  res.set("Access-Control-Allow-Origin", "http://localhost:3000");
+  setCorsHeaders(res, req);
+  const decodedToken = await requireHTTPAuth(req, res);
+  if (!decodedToken) return;
 
   // return res.status(200).send("complete");
   // Handle preflight requests
@@ -2354,8 +2471,9 @@ exports.createStore = onRequest({ cors: true }, async (req, res) => {
  * Creates Firebase Auth accounts for both emails
  */
 exports.createTenant = onRequest({ cors: true }, async (req, res) => {
-  res.set("Access-Control-Allow-Origin", "*");
-  res.set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+  setCorsHeaders(res, req);
+  const decodedToken = await requireHTTPAuth(req, res);
+  if (!decodedToken) return;
   res.set(
     "Access-Control-Allow-Headers",
     "Content-Type, Authorization, X-Requested-With"
@@ -2636,6 +2754,7 @@ exports.getAvailableStripeReadersCallable = onCall(
   { secrets: [stripeSecretKey] },
   async (request) => {
     log("Incoming get available Stripe readers callable request", request.data);
+    requireCallableAuth(request);
 
     try {
       const readers = await stripe.terminal.readers.list({});
@@ -2660,6 +2779,7 @@ exports.initiateRefundCallable = onCall(
   { secrets: [stripeSecretKey] },
   async (request) => {
     log("Incoming refund callable request", request.data);
+    requireCallableAuth(request);
 
     const { paymentIntentID, amount } = request.data;
 
@@ -2670,10 +2790,10 @@ exports.initiateRefundCallable = onCall(
       );
     }
 
-    if (amount !== undefined && typeof amount !== "number") {
+    if (amount !== undefined && (typeof amount !== "number" || amount <= 0)) {
       throw new HttpsError(
         "invalid-argument",
-        "If provided, refund amount must be a valid number in cents."
+        "If provided, refund amount must be a positive number in cents."
       );
     }
 
@@ -2714,13 +2834,14 @@ exports.initiatePaymentIntentCallable = onCall(
       "Incoming process Stripe server-driven payment callable request",
       request.data
     );
+    requireCallableAuth(request);
 
     const { amount, readerID, paymentIntentID, captureMethod } = request.data;
 
-    if (!amount || typeof amount !== "number") {
+    if (!amount || typeof amount !== "number" || amount <= 0) {
       throw new HttpsError(
         "invalid-argument",
-        "Amount must be a valid number in cents."
+        "Amount must be a positive number in cents."
       );
     }
 
@@ -2830,6 +2951,7 @@ exports.cancelServerDrivenStripePaymentCallable = onCall(
       "Incoming cancel server driven Stripe payment callable request",
       request.data
     );
+    requireCallableAuth(request);
 
     const { readerID } = request.data;
 
@@ -2891,6 +3013,7 @@ exports.loginAppUserCallable = onCall(
   { secrets: [firebaseServiceAccountKey] },
   async (request) => {
     log("Incoming login callable request", request.data);
+    requireCallableAuth(request);
 
     // Initialize Firestore with service account
     const db = await getDB(firebaseServiceAccountKey);
@@ -2948,6 +3071,13 @@ exports.loginAppUserCallable = onCall(
           "not-found",
           "❌ User is not associated with any store."
         );
+      }
+
+      // Backfill custom claims if not already set
+      const currentUser = await admin.auth().getUser(userID);
+      const currentClaims = currentUser.customClaims || {};
+      if (currentClaims.tenantID !== tenantID || currentClaims.storeID !== storeID) {
+        await setUserCustomClaims(userID, tenantID, storeID);
       }
 
       // Retrieve user details from tenant/store-specific collection
@@ -3075,6 +3205,7 @@ exports.createAppUserCallable = onCall(
   { secrets: [firebaseServiceAccountKey] },
   async (request) => {
     log("Incoming create app user callable request", request.data);
+    requireCallableAuth(request);
 
     // Initialize Firestore with service account
     const db = await getDB(firebaseServiceAccountKey);
@@ -3103,7 +3234,11 @@ exports.createAppUserCallable = onCall(
       throw new HttpsError("invalid-argument", "Store ID is required.");
     }
 
+    requireTenantMatch(request, tenantID, storeID);
+
     try {
+      await requirePermissionLevel(db, request, PERM_ADMIN);
+
       // Check if tenant exists
       const tenantRef = db.collection("tenants").doc(tenantID);
       const tenantDoc = await tenantRef.get();
@@ -3173,6 +3308,9 @@ exports.createAppUserCallable = onCall(
         .collection("users")
         .doc(userID)
         .set(userData);
+
+      // Set custom claims for tenant isolation
+      await setUserCustomClaims(userID, tenantID, storeID);
 
       // Create user index entry for quick lookup
       await db.collection("users").doc(userID).set({
@@ -3258,6 +3396,7 @@ exports.createStoreCallable = onCall(
   { secrets: [firebaseServiceAccountKey] },
   async (request) => {
     log("Incoming create store callable request", request.data);
+    requireCallableAuth(request);
 
     // Initialize Firestore with service account
     const db = await getDB(firebaseServiceAccountKey);
@@ -3277,7 +3416,9 @@ exports.createStoreCallable = onCall(
     }
 
     try {
-        // Check if tenant exists
+      await requirePermissionLevel(db, request, PERM_ADMIN);
+
+      // Check if tenant exists
       const tenantRef = db.collection("tenants").doc(tenantID);
       const tenantDoc = await tenantRef.get();
 
@@ -3372,6 +3513,7 @@ exports.createTenantCallable = onCall(
   { secrets: [firebaseServiceAccountKey] },
   async (request) => {
     log("Incoming create tenant callable request", request.data);
+    requireCallableAuth(request);
 
     // Initialize Firestore with service account
     const db = await getDB(firebaseServiceAccountKey);
@@ -3536,6 +3678,10 @@ exports.createTenantCallable = onCall(
       // Store tenant document in Firestore
       await tenantRef.set(tenantData);
 
+      // Set custom claims for tenant isolation (no storeID yet - assigned later)
+      await setUserCustomClaims(primaryUserRecord.uid, tenantID, null);
+      await setUserCustomClaims(secondaryUserRecord.uid, tenantID, null);
+
       // Create user index entries for quick lookup
       await db.collection("users").doc(primaryUserRecord.uid).set({
         email: primaryEmail,
@@ -3613,7 +3759,8 @@ exports.createTenantCallable = onCall(
 
 // Helper function for generating tenant ID
 function generateTenantID() {
-  return Math.floor(100000000000 + Math.random() * 900000000000).toString();
+  const bytes = require("crypto").randomBytes(6);
+  return Array.from(bytes).map(b => b % 10).join("") + String(Date.now()).slice(-6);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -3629,6 +3776,7 @@ exports.newCheckoutGetAvailableReadersCallable = onCall(
   { secrets: [stripeSecretKey] },
   async (request) => {
     log("newCheckout: get available readers request", request.data);
+    requireCallableAuth(request);
 
     try {
       const stripeClient = Stripe(stripeSecretKey.value());
@@ -3656,11 +3804,12 @@ exports.newCheckoutInitiatePaymentIntentCallable = onCall(
     log("newCheckout: initiate payment intent request", request.data);
 
     const { amount, readerID, paymentIntentID, tenantID, storeID, saleID, customerID, customerEmail, transactionID, salesTax } = request.data;
+    requireTenantMatch(request, tenantID, storeID);
 
-    if (!amount || typeof amount !== "number") {
+    if (!amount || typeof amount !== "number" || amount <= 0) {
       throw new HttpsError(
         "invalid-argument",
-        "Amount must be a valid number in cents."
+        "Amount must be a positive number in cents."
       );
     }
 
@@ -3780,8 +3929,14 @@ exports.newCheckoutProcessRefundCallable = onCall(
   { secrets: [stripeSecretKey, firebaseServiceAccountKey] },
   async (request) => {
     log("newCheckout: process refund request", request.data);
+    requireCallableAuth(request);
 
     const { paymentIntentID, amount, transactionID, tenantID, storeID, refundId, method, salesTax, workorderLines, notes } = request.data;
+
+    if (tenantID && storeID) {
+      const db = await getDB(firebaseServiceAccountKey);
+      await requirePermissionLevel(db, request, PERM_EDITOR);
+    }
 
     if (!paymentIntentID || typeof paymentIntentID !== "string") {
       throw new HttpsError(
@@ -3790,10 +3945,10 @@ exports.newCheckoutProcessRefundCallable = onCall(
       );
     }
 
-    if (amount !== undefined && typeof amount !== "number") {
+    if (amount !== undefined && (typeof amount !== "number" || amount <= 0)) {
       throw new HttpsError(
         "invalid-argument",
-        "If provided, refund amount must be a valid number in cents."
+        "If provided, refund amount must be a positive number in cents."
       );
     }
 
@@ -3878,6 +4033,7 @@ exports.newCheckoutCancelPaymentCallable = onCall(
   { secrets: [stripeSecretKey] },
   async (request) => {
     log("newCheckout: cancel payment request", request.data);
+    requireCallableAuth(request);
 
     const { readerID } = request.data;
 
@@ -3934,8 +4090,9 @@ exports.newCheckoutManualCardPaymentCallable = onCall(
     });
 
     const { amount, paymentMethodID, tenantID, storeID, saleID, customerID, customerEmail, transactionID } = request.data;
+    requireTenantMatch(request, tenantID, storeID);
 
-    if (!amount || amount < 50) {
+    if (!amount || typeof amount !== "number" || amount < 50) {
       throw new HttpsError("invalid-argument", "Amount must be at least $0.50 (50 cents).");
     }
     if (!paymentMethodID) {
@@ -4263,6 +4420,7 @@ exports.lightspeedInitiateAuth = onCall(
   async (request) => {
     log("Lightspeed: initiate auth", request.data);
     const { tenantID, storeID } = request.data;
+    requireTenantMatch(request, tenantID, storeID);
     if (!tenantID || !storeID) {
       throw new HttpsError("invalid-argument", "tenantID and storeID required");
     }
@@ -4368,6 +4526,7 @@ exports.lightspeedCheckConnection = onCall(
   async (request) => {
     log("Lightspeed: check connection", request.data);
     const { tenantID, storeID } = request.data;
+    requireTenantMatch(request, tenantID, storeID);
     if (!tenantID || !storeID) {
       throw new HttpsError("invalid-argument", "tenantID and storeID required");
     }
@@ -4406,11 +4565,13 @@ exports.lightspeedImportData = onCall(
   async (request) => {
     log("Lightspeed: import data", request.data);
     const { tenantID, storeID, importType, saveToDB, resetLogs } = request.data;
+    requireTenantMatch(request, tenantID, storeID);
     if (!tenantID || !storeID || !importType) {
       throw new HttpsError("invalid-argument", "tenantID, storeID, and importType required");
     }
 
     const db = await getDB(firebaseServiceAccountKey);
+    await requirePermissionLevel(db, request, PERM_ADMIN);
     const docData = (await db.collection("tenants").doc(tenantID)
       .collection("stores").doc(storeID)
       .collection("integrations").doc("lightspeed").get()).data();
@@ -5322,6 +5483,7 @@ exports.sendEmailCallable = onCall(
   },
   async (request) => {
     log("Incoming email callable request", request.data);
+    requireCallableAuth(request);
 
     try {
       const { to, subject, htmlBody, tenantID, storeID, attachments } = request.data;
@@ -5402,6 +5564,7 @@ exports.uploadPDFAndSendSMSCallable = onCall(
   },
   async (request) => {
     log("Incoming uploadPDFAndSendSMS request");
+    requireCallableAuth(request);
 
     try {
       const db = await getDB(firebaseServiceAccountKey);
@@ -5569,6 +5732,7 @@ exports.translateTextCallable = onCall(
   },
   async (request) => {
     log("Incoming translateText callable request", request.data);
+    requireCallableAuth(request);
 
     try {
       const { text, targetLanguage, sourceLanguage } = request.data;
@@ -6249,11 +6413,14 @@ exports.manualArchiveAndCleanup = onCall(
     log("manualArchiveAndCleanup: Manual archive triggered");
 
     const { tenantID, storeID } = request.data || {};
+    requireTenantMatch(request, tenantID, storeID);
     if (!tenantID || !storeID) {
       throw new HttpsError("invalid-argument", "tenantID and storeID are required");
     }
 
     const db = await getDB(firebaseServiceAccountKey);
+    await requirePermissionLevel(db, request, PERM_ADMIN);
+
     const bucket = admin
       .storage()
       .bucket("warpspeed-bonitabikes.firebasestorage.app");
@@ -6304,6 +6471,7 @@ exports.rehydrateFromArchive = onCall(
     log("rehydrateFromArchive: Request received", request.data);
 
     const { tenantID, storeID, collections } = request.data;
+    requireTenantMatch(request, tenantID, storeID);
 
     if (!tenantID || typeof tenantID !== "string") {
       throw new HttpsError("invalid-argument", "tenantID is required");
@@ -6311,6 +6479,7 @@ exports.rehydrateFromArchive = onCall(
     if (!storeID || typeof storeID !== "string") {
       throw new HttpsError("invalid-argument", "storeID is required");
     }
+
     if (!collections || !Array.isArray(collections) || collections.length === 0) {
       throw new HttpsError("invalid-argument", "collections must be a non-empty array");
     }
@@ -6322,6 +6491,8 @@ exports.rehydrateFromArchive = onCall(
     }
 
     const db = await getDB(firebaseServiceAccountKey);
+    await requirePermissionLevel(db, request, PERM_ADMIN);
+
     const bucket = admin
       .storage()
       .bucket("warpspeed-bonitabikes.firebasestorage.app");
@@ -6941,6 +7112,7 @@ exports.createTextToPayInvoice = onCall(
   },
   async (request) => {
     log("createTextToPayInvoice: incoming request", request.data);
+    requireCallableAuth(request);
 
     try {
       const { workorderID, channel, tenantID, storeID } = request.data;
@@ -7522,6 +7694,7 @@ exports.generateId = onCall(
   { secrets: [firebaseServiceAccountKey] },
   async (request) => {
     log("generateId: request", request.data);
+    requireCallableAuth(request);
 
     const { node } = request.data;
 
@@ -7552,6 +7725,7 @@ exports.migrateCustomerPhone = onCall(
   { secrets: [firebaseServiceAccountKey] },
   async (request) => {
     const { tenantID, storeID, oldPhone, newPhone, customerID, first, last } = request.data;
+    requireTenantMatch(request, tenantID, storeID);
     log("migrateCustomerPhone: start", { tenantID, storeID, oldPhone, newPhone, customerID });
 
     if (!tenantID || !storeID) {
@@ -7567,6 +7741,7 @@ exports.migrateCustomerPhone = onCall(
     }
 
     const db = await getDB(firebaseServiceAccountKey);
+    await requirePermissionLevel(db, request, PERM_ADMIN);
     const basePath = db.collection("tenants").doc(tenantID).collection("stores").doc(storeID);
     const oldConvoRef = basePath.collection("sms-messages").doc(cleanOld);
     const newConvoRef = basePath.collection("sms-messages").doc(cleanNew);
@@ -7619,6 +7794,59 @@ exports.migrateCustomerPhone = onCall(
 
     log("migrateCustomerPhone: done", { migratedCount: messagesSnap.size });
     return { success: true, migratedCount: messagesSnap.size };
+  }
+);
+
+// ═══════════════════════════════════════════════════════════════
+// ONE-TIME MIGRATION: Backfill Custom Claims for existing users
+// Run once via Firebase console or client, then remove/disable
+// ═══════════════════════════════════════════════════════════════
+
+exports.backfillCustomClaims = onCall(
+  {
+    secrets: [firebaseServiceAccountKey],
+    timeoutSeconds: 540,
+    memory: "512MiB",
+  },
+  async (request) => {
+    requireCallableAuth(request);
+
+    const db = await getDB(firebaseServiceAccountKey);
+
+    const usersSnapshot = await db.collection("users").get();
+    let updated = 0;
+    let skipped = 0;
+    let errors = 0;
+
+    for (const doc of usersSnapshot.docs) {
+      const data = doc.data();
+      const uid = doc.id;
+      const { tenantID, storeID } = data;
+
+      if (!tenantID) {
+        skipped++;
+        continue;
+      }
+
+      try {
+        const userRecord = await admin.auth().getUser(uid);
+        const claims = userRecord.customClaims || {};
+
+        if (claims.tenantID === tenantID && claims.storeID === (storeID || undefined)) {
+          skipped++;
+          continue;
+        }
+
+        await setUserCustomClaims(uid, tenantID, storeID || null);
+        updated++;
+      } catch (err) {
+        log("backfillCustomClaims: error for user", { uid, error: err.message });
+        errors++;
+      }
+    }
+
+    log("backfillCustomClaims: complete", { updated, skipped, errors });
+    return { success: true, updated, skipped, errors };
   }
 );
 

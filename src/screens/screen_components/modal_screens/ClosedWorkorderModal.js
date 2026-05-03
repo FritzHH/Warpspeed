@@ -106,6 +106,7 @@ const SaleCard = ({ sale, transactions = [], onRefund, onPress }) => {
           </View>
           <TouchableOpacity
             onPress={() => onRefund && onRefund(sale.id)}
+            disabled={totalRefunded >= sale.total}
             style={{
               marginLeft: 8,
               borderWidth: 1,
@@ -113,6 +114,7 @@ const SaleCard = ({ sale, transactions = [], onRefund, onPress }) => {
               borderRadius: 6,
               paddingHorizontal: 8,
               paddingVertical: 2,
+              opacity: totalRefunded >= sale.total ? 0.4 : 1,
             }}
           >
             <Text style={{ fontSize: 10, fontWeight: "600", color: C.lightred }}>Refund</Text>
@@ -194,7 +196,7 @@ const SaleCard = ({ sale, transactions = [], onRefund, onPress }) => {
           {allRefunds.map((r, idx) => (
             <View key={r.id || idx} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
               <Text style={{ fontSize: 13, color: C.lightred }}>
-                {r.notes ? r.notes : (r.method || "card").toUpperCase() + " Refund"}
+                {r.notes ? (typeof r.notes === "string" ? r.notes : r.notes.reason || "") : (r.method || "card").toUpperCase() + " Refund"}
               </Text>
               <Text style={{ fontSize: 13, color: C.lightred }}>{"-$" + formatCurrencyDisp(r.amount)}</Text>
             </View>

@@ -268,6 +268,7 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                     text="Refund"
                     colorGradientArr={COLOR_GRADIENTS.red}
                     onPress={handleRefund}
+                    disabled={totalRefunded >= sSale?.total}
                     buttonStyle={{ paddingHorizontal: 20, height: 32, marginRight: 8 }}
                     textStyle={{ color: C.textWhite, fontSize: 12 }}
                   />
@@ -528,7 +529,7 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                             </Text>
                           </View>
                           {!!r.notes && (
-                            <Text style={{ fontSize: 10, color: gray(0.4), marginTop: 2 }}>{r.notes}</Text>
+                            <Text style={{ fontSize: 10, color: gray(0.4), marginTop: 2 }}>{typeof r.notes === "string" ? r.notes : r.notes.reason || ""}</Text>
                           )}
                         </View>
                       ))}

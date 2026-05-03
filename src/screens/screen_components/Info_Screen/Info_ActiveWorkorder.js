@@ -339,6 +339,7 @@ export const ActiveWorkorderComponent = ({}) => {
   // Color autocomplete
   const [sColor1Focused, _setColor1Focused] = useState(false);
   const [sColor2Focused, _setColor2Focused] = useState(false);
+  const [sHoveredDropdown, _setHoveredDropdown] = useState(null);
   const color1WrapperRef = useRef(null);
   const color2WrapperRef = useRef(null);
   const color2InputRef = useRef(null);
@@ -893,10 +894,12 @@ export const ActiveWorkorderComponent = ({}) => {
                 }}
               >
                 <View
+                  onMouseEnter={() => _setHoveredDropdown("brandBikes")}
+                  onMouseLeave={() => _setHoveredDropdown(null)}
                   style={{
                     width: "48%",
                     height: "100%",
-                    // marginTop: 11,
+                    opacity: sHoveredDropdown === "brandBikes" ? 1 : (zOpenWorkorder?.brand ? FILLED_DROPDOWN_OPACITY : 1),
                   }}
                 >
                   <DropdownMenu
@@ -906,11 +909,6 @@ export const ActiveWorkorderComponent = ({}) => {
                       useOpenWorkordersStore.getState().setField("brand", item, zOpenWorkorder.id);
                       saveBrandToAllBrands(item);
                     }}
-                    buttonStyle={{
-                      opacity: zOpenWorkorder?.brand
-                        ? FILLED_DROPDOWN_OPACITY
-                        : 1,
-                    }}
                     modalCoordX={-6}
                     ref={bikesRef}
                     buttonText={zSettings.bikeBrandsName}
@@ -918,10 +916,13 @@ export const ActiveWorkorderComponent = ({}) => {
                 </View>
                 <View style={{ width: 5 }} />
                 <View
+                  onMouseEnter={() => _setHoveredDropdown("brandOptional")}
+                  onMouseLeave={() => _setHoveredDropdown(null)}
                   style={{
                     width: "48%",
                     alignItems: null,
                     justifyContent: "center",
+                    opacity: sHoveredDropdown === "brandOptional" ? 1 : (zOpenWorkorder?.brand ? FILLED_DROPDOWN_OPACITY : 1),
                   }}
                 >
                   <DropdownMenu
@@ -930,11 +931,6 @@ export const ActiveWorkorderComponent = ({}) => {
                     onSelect={(item, idx) => {
                       useOpenWorkordersStore.getState().setField("brand", item, zOpenWorkorder.id);
                       saveBrandToAllBrands(item);
-                    }}
-                    buttonStyle={{
-                      opacity: zOpenWorkorder?.brand
-                        ? FILLED_DROPDOWN_OPACITY
-                        : 1,
                     }}
                     modalCoordX={0}
                     ref={ebikeRef}
@@ -1054,7 +1050,11 @@ export const ActiveWorkorderComponent = ({}) => {
                   // backgroundColor: "green",
                 }}
               >
-                <View style={{ width: "100%" }}>
+                <View
+                  onMouseEnter={() => _setHoveredDropdown("description")}
+                  onMouseLeave={() => _setHoveredDropdown(null)}
+                  style={{ width: "100%", opacity: sHoveredDropdown === "description" ? 1 : (zOpenWorkorder?.description ? FILLED_DROPDOWN_OPACITY : 1) }}
+                >
                   <DropdownMenu
                     modalCoordX={55}
                     dataArr={zSettings.bikeDescriptions}
@@ -1066,12 +1066,6 @@ export const ActiveWorkorderComponent = ({}) => {
                         zOpenWorkorder.id
                       );
                       saveDescToAllDescriptions(item);
-                    }}
-                    // modalCoordinateVars={{ x: 30, y: 30 }}
-                    buttonStyle={{
-                      opacity: zOpenWorkorder?.description
-                        ? FILLED_DROPDOWN_OPACITY
-                        : 1,
                     }}
                     ref={descriptionRef}
                     buttonText={"Descriptions"}
@@ -1263,11 +1257,13 @@ export const ActiveWorkorderComponent = ({}) => {
                 }}
               >
                 <View
+                  onMouseEnter={() => _setHoveredDropdown("color1")}
+                  onMouseLeave={() => _setHoveredDropdown(null)}
                   style={{
                     width: "48%",
                     height: "100%",
                     justifyContent: "center",
-                    // marginTop: 11,
+                    opacity: sHoveredDropdown === "color1" ? 1 : (zOpenWorkorder?.color1?.label ? FILLED_DROPDOWN_OPACITY : 1),
                   }}
                 >
                   <DropdownMenu
@@ -1278,11 +1274,6 @@ export const ActiveWorkorderComponent = ({}) => {
                     onSelect={(item, idx) => {
                       useOpenWorkordersStore.getState().setField("color1", item, zOpenWorkorder.id);
                     }}
-                    buttonStyle={{
-                      opacity: zOpenWorkorder?.color1?.label
-                        ? FILLED_DROPDOWN_OPACITY
-                        : 1,
-                    }}
                     ref={color1Ref}
                     buttonText={"Color 1"}
                     modalCoordX={0}
@@ -1291,11 +1282,13 @@ export const ActiveWorkorderComponent = ({}) => {
                 <View style={{ width: 5 }} />
 
                 <View
+                  onMouseEnter={() => _setHoveredDropdown("color2")}
+                  onMouseLeave={() => _setHoveredDropdown(null)}
                   style={{
                     width: "48%",
                     height: "100%",
                     justifyContent: "center",
-                    // marginTop: 11,
+                    opacity: sHoveredDropdown === "color2" ? 1 : ((zOpenWorkorder?.color2?.label || zOpenWorkorder?.color1?.label) ? FILLED_DROPDOWN_OPACITY : 1),
                   }}
                 >
                   <DropdownMenu
@@ -1306,11 +1299,6 @@ export const ActiveWorkorderComponent = ({}) => {
                       useOpenWorkordersStore.getState().setField("color2", item, zOpenWorkorder.id);
                     }}
                     modalCoordX={0}
-                    buttonStyle={{
-                      opacity: zOpenWorkorder?.color2?.label
-                        ? FILLED_DROPDOWN_OPACITY
-                        : 1,
-                    }}
                     ref={color2Ref}
                     buttonText={"Color 2"}
                   />
@@ -1527,7 +1515,11 @@ export const ActiveWorkorderComponent = ({}) => {
                   alignItems: "center",
                 }}
               >
-                <View style={{ width: "100%" }}>
+                <View
+                  onMouseEnter={() => _setHoveredDropdown("waitTime")}
+                  onMouseLeave={() => _setHoveredDropdown(null)}
+                  style={{ width: "100%", opacity: sHoveredDropdown === "waitTime" ? 1 : (zOpenWorkorder?.waitTime?.label ? FILLED_DROPDOWN_OPACITY : 1) }}
+                >
                   <DropdownMenu
                     modalCoordX={50}
                     dataArr={zSettings.waitTimes}
@@ -1536,11 +1528,6 @@ export const ActiveWorkorderComponent = ({}) => {
                       let isNonRemovable = NONREMOVABLE_WAIT_TIMES.some((nr) => nr.id === item.id);
                       let waitObj = { ...item, removable: !isNonRemovable };
                       useOpenWorkordersStore.getState().setField("waitTime", waitObj, zOpenWorkorder.id);
-                    }}
-                    buttonStyle={{
-                      opacity: zOpenWorkorder?.waitTime?.label
-                        ? FILLED_DROPDOWN_OPACITY
-                        : 1,
                     }}
                     ref={waitTimesRef}
                     buttonText={"Wait Times"}
@@ -1653,7 +1640,6 @@ export const ActiveWorkorderComponent = ({}) => {
 
             <View
               style={{
-                // marginTop: 8,
                 flexDirection: "row",
                 justifyContent: "flex-start",
                 alignItems: "center",
@@ -1697,23 +1683,26 @@ export const ActiveWorkorderComponent = ({}) => {
                   // backgroundColor: "blue",
                 }}
               >
-                <DropdownMenu
-                  dataArr={zSettings.partSources}
-                  enabled={!isDonePaid}
-                  onSelect={(item, idx) => {
-                    useOpenWorkordersStore.getState().setField("partSource", item, zOpenWorkorder.id);
-                    useOpenWorkordersStore.getState().setField("partOrderedMillis", Date.now(), zOpenWorkorder.id);
-                  }}
-                  modalCoordX={20}
-                  buttonStyle={{
-                    opacity: zOpenWorkorder?.partSource
-                      ? FILLED_DROPDOWN_OPACITY
-                      : 1,
-                    paddingHorizontal: 40,
-                  }}
-                  ref={partSourcesRef}
-                  buttonText={"Sources"}
-                />
+                <View
+                  onMouseEnter={() => _setHoveredDropdown("partSource")}
+                  onMouseLeave={() => _setHoveredDropdown(null)}
+                  style={{ opacity: sHoveredDropdown === "partSource" ? 1 : (zOpenWorkorder?.partSource ? FILLED_DROPDOWN_OPACITY : 1) }}
+                >
+                  <DropdownMenu
+                    dataArr={zSettings.partSources}
+                    enabled={!isDonePaid}
+                    onSelect={(item, idx) => {
+                      useOpenWorkordersStore.getState().setField("partSource", item, zOpenWorkorder.id);
+                      useOpenWorkordersStore.getState().setField("partOrderedMillis", Date.now(), zOpenWorkorder.id);
+                    }}
+                    modalCoordX={20}
+                    buttonStyle={{
+                      paddingHorizontal: 40,
+                    }}
+                    ref={partSourcesRef}
+                    buttonText={"Sources"}
+                  />
+                </View>
               </View>
             </View>
 

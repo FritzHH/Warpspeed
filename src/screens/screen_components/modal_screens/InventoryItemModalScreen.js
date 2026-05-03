@@ -19,6 +19,7 @@ import {
   Image_,
   Button_,
   TextInput_,
+  CheckBox_,
   DropdownMenu,
   LoginModalScreen,
   CustomerQuickNotesDropdown,
@@ -779,6 +780,15 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
                   <Text style={valueStyle}>-</Text>
                 )}
               </View>
+            </View>
+
+            <View style={{ alignItems: "center", marginVertical: 10 }}>
+              <CheckBox_
+                text="Receipt Note Required"
+                isChecked={!!sItem.receiptNoteRequired}
+                onCheck={() => handleFieldChange("receiptNoteRequired", !sItem.receiptNoteRequired)}
+                textStyle={{ fontSize: 14, color: sItem.receiptNoteRequired ? C.green : gray(0.5) }}
+              />
             </View>
 
             <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>

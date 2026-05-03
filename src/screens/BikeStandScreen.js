@@ -1947,7 +1947,12 @@ export function BikeStandScreen() {
                             let existing = targetText.split(", ").map((s) => s.trim()).filter(Boolean);
                             let keys = new Set();
                             existing.forEach((part) => {
-                              helpers.forEach((cat) => { if ((cat.items || []).includes(part)) keys.add(cat.id + "::" + part); });
+                              helpers.forEach((cat) => {
+                                (cat.items || []).forEach((item) => {
+                                  let insertText = typeof item === "string" ? item : (item.text || item.buttonLabel || "").trim();
+                                  if (insertText === part) keys.add(cat.id + "::" + insertText);
+                                });
+                              });
                             });
                             _setActiveNoteChips(keys);
                           }}
@@ -2275,18 +2280,19 @@ export function BikeStandScreen() {
             let activeText = sNotesTarget === "intakeNotes" ? sIntakeNotesText : sReceiptNotesText;
             let activeSetText = sNotesTarget === "intakeNotes" ? _setIntakeNotesText : _setReceiptNotesText;
 
-            function toggleNoteChip(catId, chipText) {
-              let key = catId + "::" + chipText;
+            function toggleNoteChip(catId, item) {
+              let insertText = typeof item === "string" ? item : (item.text || item.buttonLabel || "").trim();
+              let key = catId + "::" + insertText;
               let parts = activeText.split(", ").map((s) => s.trim()).filter(Boolean);
               let wasActive = sActiveNoteChips.has(key);
               if (wasActive) {
-                let idx = parts.indexOf(chipText.trim());
+                let idx = parts.indexOf(insertText);
                 if (idx !== -1) parts.splice(idx, 1);
                 let next = new Set(sActiveNoteChips);
                 next.delete(key);
                 _setActiveNoteChips(next);
               } else {
-                parts.push(chipText.trim());
+                parts.push(insertText);
                 let next = new Set(sActiveNoteChips);
                 next.add(key);
                 _setActiveNoteChips(next);
@@ -2295,12 +2301,16 @@ export function BikeStandScreen() {
             }
 
             function switchNotesTarget(target) {
-              // Re-seed active chips for the new target
               let text = target === "intakeNotes" ? sIntakeNotesText : sReceiptNotesText;
               let existing = text.split(", ").map((s) => s.trim()).filter(Boolean);
               let keys = new Set();
               existing.forEach((part) => {
-                noteHelpers.forEach((cat) => { if ((cat.items || []).includes(part)) keys.add(cat.id + "::" + part); });
+                noteHelpers.forEach((cat) => {
+                  (cat.items || []).forEach((item) => {
+                    let insertText = typeof item === "string" ? item : (item.text || item.buttonLabel || "").trim();
+                    if (insertText === part) keys.add(cat.id + "::" + insertText);
+                  });
+                });
               });
               _setActiveNoteChips(keys);
               _setNotesTarget(target);
@@ -2388,12 +2398,14 @@ export function BikeStandScreen() {
                           {category.label}
                         </Text>
                         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
-                          {(category.items || []).map((chipText, chipIdx) => {
-                            let active = sActiveNoteChips.has(category.id + "::" + chipText);
+                          {(category.items || []).map((item, chipIdx) => {
+                            let insertText = typeof item === "string" ? item : (item.text || item.buttonLabel || "").trim();
+                            let displayLabel = typeof item === "string" ? item : (item.buttonLabel || "");
+                            let active = sActiveNoteChips.has(category.id + "::" + insertText);
                             return (
                               <TouchableOpacity
-                                key={chipText + chipIdx}
-                                onPress={() => toggleNoteChip(category.id, chipText)}
+                                key={(item.id || displayLabel) + chipIdx}
+                                onPress={() => toggleNoteChip(category.id, item)}
                                 style={{
                                   backgroundColor: active ? lightenRGBByPercent(C.blue, 70) : C.buttonLightGreenOutline,
                                   borderRadius: 5,
@@ -2404,7 +2416,7 @@ export function BikeStandScreen() {
                                 }}
                               >
                                 <Text style={{ fontSize: 25 + sNoteHelperFontAdj, color: active ? C.blue : gray(0.5), fontWeight: active ? "600" : "400" }}>
-                                  {chipText}
+                                  {displayLabel}
                                 </Text>
                               </TouchableOpacity>
                             );

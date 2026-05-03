@@ -145,6 +145,7 @@ export function BaseScreen() {
   const [sRefundSaleID, _setRefundSaleID] = useState("");
 
   const zReceiptScan = useCheckoutStore((state) => state.receiptScan);
+  const zPendingRefundSaleID = useCheckoutStore((state) => state.pendingRefundSaleID);
   const zSaleModalObj = useOpenWorkordersStore((s) => s.saleModalObj);
 
   // Detect sale-ID scans to open refund modal
@@ -175,6 +176,13 @@ export function BaseScreen() {
       })();
     }
   }, [zReceiptScan]);
+
+  useEffect(() => {
+    if (!zPendingRefundSaleID) return;
+    _setRefundSaleID(zPendingRefundSaleID);
+    _setRefundModalVisible(true);
+    useCheckoutStore.getState().setPendingRefundSaleID("");
+  }, [zPendingRefundSaleID]);
 
   // local state ////////////////////////////////////////////////////////////////////////
   const [screenWidth, _setScreenWidth] = useState(window.innerWidth);

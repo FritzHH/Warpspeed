@@ -408,6 +408,7 @@ export function NewWorkorderComponent({}) {
               color: C.text,
             }}
             autoFocus={true}
+            autoComplete="one-time-code"
             value={sTextInput}
             onChangeText={(val) => handleTextChange(val)}
             dashStyle={{ width: 10, marginHorizontal: 4 }}
@@ -421,6 +422,7 @@ export function NewWorkorderComponent({}) {
             placeholderTextColor={gray(0.3)}
             onChangeText={(val) => handleTextChange(val)}
             autoFocus={true}
+            autoComplete="one-time-code"
             style={{
               caretColor: C.cursorRed,
               color: C.text,

@@ -954,6 +954,11 @@ export const CustomerInfoScreenModalComponent = ({
           <FullSaleModal
             item={sSaleModalItem}
             onClose={() => _sSetSaleModalItem(null)}
+            onRefund={(saleID) => {
+              _sSetSaleModalItem(null);
+              if (handleButton2Press) handleButton2Press();
+              useCheckoutStore.getState().setPendingRefundSaleID(saleID);
+            }}
           />
         )}
         <GoogleMapsModal

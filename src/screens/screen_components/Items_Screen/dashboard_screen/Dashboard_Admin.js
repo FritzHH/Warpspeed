@@ -70,7 +70,7 @@ import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
-import { APP_USER, INTAKE_QUICK_BUTTON_PROTO, NOTE_HELPER_PROTO, QUICK_CUSTOMER_NOTE_PROTO, QUICK_CUSTOMER_NOTE_ITEM_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../../data";
+import { APP_USER, INTAKE_QUICK_BUTTON_PROTO, NOTE_HELPER_PROTO, NOTE_HELPER_ITEM_PROTO, QUICK_CUSTOMER_NOTE_PROTO, QUICK_CUSTOMER_NOTE_ITEM_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
@@ -2542,10 +2542,7 @@ const PartSourcesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
 const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
   const [sCatDragIdx, _setCatDragIdx] = useState(null);
   const [sCatDragOverIdx, _setCatDragOverIdx] = useState(null);
-  const [sItemDragCatId, _setItemDragCatId] = useState(null);
-  const [sItemDragIdx, _setItemDragIdx] = useState(null);
-  const [sItemDragOverIdx, _setItemDragOverIdx] = useState(null);
-  const [sEditingItem, _setEditingItem] = useState(null); // { catId, itemIdx }
+  const [sEditorModal, _setEditorModal] = useState(null); // { category, isNew }
 
   const noteHelpers = zSettingsObj?.noteHelpers || [];
   const noteHelpersTarget = zSettingsObj?.noteHelpersTarget || "intakeNotes";
@@ -2558,15 +2555,28 @@ const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) 
     handleSettingsFieldChange("noteHelpers", arr);
   }
 
-  function reorderItems(catId, fromIdx, toIdx) {
-    if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
-    let arr = noteHelpers.map((cat) => {
-      if (cat.id !== catId) return cat;
-      let items = [...(cat.items || [])];
-      let [dragged] = items.splice(fromIdx, 1);
-      items.splice(toIdx, 0, dragged);
-      return { ...cat, items };
-    });
+  function handleAddCategory() {
+    let newCat = { ...cloneDeep(NOTE_HELPER_PROTO), id: crypto.randomUUID(), label: "" };
+    _setEditorModal({ category: newCat, isNew: true });
+  }
+
+  function handleEditCategory(cat) {
+    _setEditorModal({ category: cloneDeep(cat), isNew: false });
+  }
+
+  function handleSaveCategory(updatedCat) {
+    let exists = noteHelpers.find((c) => c.id === updatedCat.id);
+    let arr;
+    if (exists) {
+      arr = noteHelpers.map((c) => c.id === updatedCat.id ? updatedCat : c);
+    } else {
+      arr = [...noteHelpers, updatedCat];
+    }
+    handleSettingsFieldChange("noteHelpers", arr);
+  }
+
+  function handleDeleteCategory(catId) {
+    let arr = noteHelpers.filter((c) => c.id !== catId);
     handleSettingsFieldChange("noteHelpers", arr);
   }
 
@@ -2589,12 +2599,7 @@ const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) 
         >
           <Text style={{ color: C.text, marginRight: 20 }}>Workorder Item Note Helpers</Text>
           <Tooltip text="Add category">
-            <BoxButton1
-              onPress={() => {
-                let newCat = { ...cloneDeep(NOTE_HELPER_PROTO), id: crypto.randomUUID(), label: "New Category" };
-                handleSettingsFieldChange("noteHelpers", [...noteHelpers, newCat]);
-              }}
-            />
+            <BoxButton1 onPress={handleAddCategory} />
           </Tooltip>
         </View>
 
@@ -2661,27 +2666,19 @@ const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) 
             <div
               key={cat.id}
               draggable
-              onDragStart={(e) => {
-                if (sItemDragIdx !== null) { e.preventDefault(); return; }
-                _setCatDragIdx(catIdx);
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                if (sItemDragIdx === null) _setCatDragOverIdx(catIdx);
-              }}
+              onDragStart={() => { _setCatDragIdx(catIdx); }}
+              onDragOver={(e) => { e.preventDefault(); _setCatDragOverIdx(catIdx); }}
               onDragEnd={() => { _setCatDragIdx(null); _setCatDragOverIdx(null); }}
               onDrop={(e) => {
                 e.preventDefault();
-                if (sItemDragIdx === null) {
-                  reorderCategories(sCatDragIdx, catIdx);
-                  _setCatDragIdx(null);
-                  _setCatDragOverIdx(null);
-                }
+                reorderCategories(sCatDragIdx, catIdx);
+                _setCatDragIdx(null);
+                _setCatDragOverIdx(null);
               }}
               style={{
-                borderWidth: sCatDragOverIdx === catIdx && sItemDragIdx === null ? 2 : 1,
+                borderWidth: sCatDragOverIdx === catIdx ? 2 : 1,
                 borderStyle: "solid",
-                borderColor: sCatDragOverIdx === catIdx && sItemDragIdx === null ? C.blue : C.buttonLightGreenOutline,
+                borderColor: sCatDragOverIdx === catIdx ? C.blue : C.buttonLightGreenOutline,
                 borderRadius: 8,
                 backgroundColor: C.listItemWhite,
                 padding: 8,
@@ -2690,165 +2687,279 @@ const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) 
                 opacity: sCatDragIdx === catIdx ? 0.5 : 1,
               }}
             >
-              {/* Category header row */}
-              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
-                <TextInput_
-                  debounceMs={500}
-                  value={cat.label}
-                  onChangeText={(val) => {
-                    let arr = noteHelpers.map((c) => c.id === cat.id ? { ...c, label: val } : c);
-                    handleSettingsFieldChange("noteHelpers", arr);
-                  }}
-                  style={{
-                    flex: 1,
-                    borderColor: C.buttonLightGreenOutline,
-                    borderWidth: 1,
-                    borderRadius: 5,
-                    padding: 5,
-                    color: C.text,
-                    fontWeight: "600",
-                    outlineWidth: 0,
-                  }}
-                />
-                <Tooltip text="Add item">
-                  <BoxButton1
-                    onPress={() => {
-                      let arr = noteHelpers.map((c) => {
-                        if (c.id !== cat.id) return c;
-                        return { ...c, items: [...(c.items || []), "New Item"] };
-                      });
-                      handleSettingsFieldChange("noteHelpers", arr);
-                    }}
-                    style={{ marginLeft: 8, backgroundColor: "transparent" }}
-                    iconSize={17}
-                  />
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Text style={{ flex: 1, fontSize: 14, fontWeight: "600", color: C.text }}>{cat.label}</Text>
+                <Text style={{ fontSize: 12, color: gray(0.4), marginRight: 8 }}>{(cat.items || []).length} items</Text>
+                <Tooltip text="Edit category">
+                  <TouchableOpacity onPress={() => handleEditCategory(cat)} style={{ padding: 4 }}>
+                    <Image_ icon={ICONS.editPencil} size={15} />
+                  </TouchableOpacity>
                 </Tooltip>
                 <Tooltip text="Delete category">
-                  <BoxButton1
-                    onPress={() => {
-                      let arr = noteHelpers.filter((c) => c.id !== cat.id);
-                      handleSettingsFieldChange("noteHelpers", arr);
-                    }}
-                    style={{ marginLeft: 4, backgroundColor: "transparent" }}
-                    iconSize={15}
-                    icon={ICONS.trash}
-                  />
+                  <TouchableOpacity
+                    onPress={() => handleDeleteCategory(cat.id)}
+                    style={{ padding: 4, marginLeft: 4 }}
+                  >
+                    <Image_ icon={ICONS.trash} size={15} />
+                  </TouchableOpacity>
                 </Tooltip>
               </View>
-
-              {/* Items within category */}
-              <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
-                {(cat.items || []).map((itemText, itemIdx) => {
-                  const isEditing = sEditingItem?.catId === cat.id && sEditingItem?.itemIdx === itemIdx;
-                  return (
-                    <div
-                      key={itemText + itemIdx}
-                      draggable={!isEditing}
-                      onDragStart={(e) => {
-                        if (isEditing) { e.preventDefault(); return; }
-                        e.stopPropagation();
-                        _setItemDragCatId(cat.id);
-                        _setItemDragIdx(itemIdx);
-                      }}
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (sItemDragCatId === cat.id) _setItemDragOverIdx(itemIdx);
-                      }}
-                      onDragEnd={() => {
-                        _setItemDragCatId(null);
-                        _setItemDragIdx(null);
-                        _setItemDragOverIdx(null);
-                      }}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        if (sItemDragCatId === cat.id) {
-                          reorderItems(cat.id, sItemDragIdx, itemIdx);
-                          _setItemDragCatId(null);
-                          _setItemDragIdx(null);
-                          _setItemDragOverIdx(null);
-                        }
-                      }}
+              {(cat.items || []).length > 0 && (
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
+                  {(cat.items || []).map((item, itemIdx) => (
+                    <View
+                      key={item.id || itemIdx}
                       style={{
-                        display: "flex",
-                        flexDirection: "row",
-                        alignItems: "center",
-                        borderWidth: sItemDragCatId === cat.id && sItemDragOverIdx === itemIdx ? 2 : 1,
-                        borderStyle: "solid",
-                        borderColor: isEditing ? C.blue : (sItemDragCatId === cat.id && sItemDragOverIdx === itemIdx ? C.blue : C.buttonLightGreenOutline),
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
                         borderRadius: 6,
                         backgroundColor: "white",
-                        paddingHorizontal: 4,
-                        paddingVertical: 2,
-                        cursor: isEditing ? "text" : "grab",
-                        opacity: sItemDragCatId === cat.id && sItemDragIdx === itemIdx ? 0.5 : 1,
+                        paddingHorizontal: 8,
+                        paddingVertical: 3,
                       }}
                     >
-                      {isEditing ? (
-                        <TextInput_
-                          debounceMs={500}
-                          value={itemText}
-                          autoFocus
-                          onChangeText={(val) => {
-                            let arr = noteHelpers.map((c) => {
-                              if (c.id !== cat.id) return c;
-                              let items = [...(c.items || [])];
-                              items[itemIdx] = val;
-                              return { ...c, items };
-                            });
-                            handleSettingsFieldChange("noteHelpers", arr);
-                          }}
-                          onBlur={() => _setEditingItem(null)}
-                          onSubmitEditing={() => _setEditingItem(null)}
-                          style={{
-                            borderWidth: 0,
-                            paddingVertical: 3,
-                            paddingHorizontal: 4,
-                            fontSize: 13,
-                            color: C.text,
-                            outlineWidth: 0,
-                            width: Math.max(40, (itemText || "").length * 8 + 16),
-                          }}
-                        />
-                      ) : (
-                        <Text style={{ fontSize: 13, color: C.text, paddingVertical: 3, paddingHorizontal: 4 }}>
-                          {itemText}
-                        </Text>
-                      )}
-                      <Tooltip text="Edit item">
-                        <TouchableOpacity
-                          onPress={() => _setEditingItem(isEditing ? null : { catId: cat.id, itemIdx })}
-                          style={{ padding: 2 }}
-                        >
-                          <Image_ icon={ICONS.editPencil} size={12} />
-                        </TouchableOpacity>
-                      </Tooltip>
-                      <Tooltip text="Remove item">
-                        <TouchableOpacity
-                          onPress={() => {
-                            let arr = noteHelpers.map((c) => {
-                              if (c.id !== cat.id) return c;
-                              let items = (c.items || []).filter((_, i) => i !== itemIdx);
-                              return { ...c, items };
-                            });
-                            handleSettingsFieldChange("noteHelpers", arr);
-                            if (isEditing) _setEditingItem(null);
-                          }}
-                          style={{ padding: 2 }}
-                        >
-                          <Image_ icon={ICONS.trash} size={12} />
-                        </TouchableOpacity>
-                      </Tooltip>
-                    </div>
-                  );
-                })}
-              </View>
+                      <Text style={{ fontSize: 13, color: C.text }}>{item.buttonLabel || item}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
             </div>
           ))}
         </View>
       </View>
+
+      <NoteHelperEditorModal
+        key={sEditorModal?.category?.id || "closed"}
+        visible={!!sEditorModal}
+        category={sEditorModal?.category}
+        isNew={sEditorModal?.isNew || false}
+        onClose={() => _setEditorModal(null)}
+        onSave={handleSaveCategory}
+        onDelete={handleDeleteCategory}
+      />
     </BoxContainerInnerComponent>
+  );
+};
+
+const NoteHelperEditorModal = ({ visible, category, isNew, onClose, onSave, onDelete }) => {
+  const [sCategory, _setCategory] = useState(() => category ? cloneDeep(category) : null);
+  const [sEditingName, _setEditingName] = useState(isNew);
+
+  if (!visible || !sCategory) return null;
+
+  let nameValid = (sCategory.label || "").trim().length >= 3;
+
+  function updateItem(itemIdx, field, val) {
+    let updated = cloneDeep(sCategory);
+    updated.items[itemIdx] = { ...updated.items[itemIdx], [field]: val };
+    _setCategory(updated);
+  }
+
+  function addItem() {
+    let updated = cloneDeep(sCategory);
+    updated.items = [...(updated.items || []), { ...cloneDeep(NOTE_HELPER_ITEM_PROTO), id: crypto.randomUUID(), buttonLabel: "", text: "" }];
+    _setCategory(updated);
+  }
+
+  function removeItem(itemIdx) {
+    let updated = cloneDeep(sCategory);
+    updated.items = updated.items.filter((_, i) => i !== itemIdx);
+    _setCategory(updated);
+  }
+
+  function handleSave() {
+    if (!nameValid) return;
+    onSave(sCategory);
+    onClose();
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade">
+      <TouchableWithoutFeedback onPress={onClose}>
+        <View style={{ width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
+          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+            <View style={{
+              width: 500,
+              height: "75%",
+              backgroundColor: "white",
+              borderRadius: 12,
+              borderWidth: 2,
+              borderColor: C.buttonLightGreenOutline,
+              overflow: "hidden",
+            }}>
+              {/* Header */}
+              <View style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                borderBottomWidth: 1,
+                borderBottomColor: C.buttonLightGreenOutline,
+                backgroundColor: C.buttonLightGreen,
+              }}>
+                {sEditingName ? (
+                  <TextInput_
+                    value={sCategory.label}
+                    autoFocus
+                    capitalize={true}
+                    placeholder="Category name"
+                    placeholderTextColor={gray(0.4)}
+                    onChangeText={(val) => _setCategory({ ...sCategory, label: val })}
+                    onBlur={() => { if (nameValid) _setEditingName(false); }}
+                    onSubmitEditing={() => { if (nameValid) _setEditingName(false); }}
+                    style={{
+                      flex: 1,
+                      borderWidth: 1,
+                      borderColor: nameValid ? C.buttonLightGreenOutline : C.lightred,
+                      borderRadius: 5,
+                      padding: 5,
+                      fontSize: 15,
+                      color: C.text,
+                      fontWeight: "600",
+                      outlineWidth: 0,
+                      backgroundColor: "white",
+                    }}
+                  />
+                ) : (
+                  <View style={{ flex: 1, flexDirection: "row", alignItems: "center" }}>
+                    <Text style={{ fontSize: 15, fontWeight: "700", color: C.text }}>{sCategory.label}</Text>
+                    <TouchableOpacity onPress={() => _setEditingName(true)} style={{ marginLeft: 8, padding: 2 }}>
+                      <Image_ icon={ICONS.editPencil} size={14} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {!isNew && (
+                  <TouchableOpacity
+                    onPress={() => { onDelete(sCategory.id); onClose(); }}
+                    style={{ marginLeft: 10, padding: 4 }}
+                  >
+                    <Image_ icon={ICONS.trash} size={16} />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Items list */}
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 14 }}>
+                {(sCategory.items || []).map((item, itemIdx) => (
+                  <View
+                    key={item.id || itemIdx}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: C.buttonLightGreenOutline,
+                      borderRadius: 8,
+                      backgroundColor: C.listItemWhite,
+                      padding: 10,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
+                      <Text style={{ fontSize: 12, color: gray(0.4), width: 50 }}>Label</Text>
+                      <TextInput_
+                        value={item.buttonLabel}
+                        capitalize={true}
+                        placeholder="Button label"
+                        placeholderTextColor={gray(0.35)}
+                        onChangeText={(val) => updateItem(itemIdx, "buttonLabel", val)}
+                        style={{
+                          flex: 1,
+                          borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderRadius: 5,
+                          paddingVertical: 5,
+                          paddingHorizontal: 8,
+                          fontSize: 13,
+                          color: C.text,
+                          outlineWidth: 0,
+                          backgroundColor: "white",
+                        }}
+                      />
+                      <TouchableOpacity
+                        onPress={() => removeItem(itemIdx)}
+                        style={{ marginLeft: 8, padding: 4 }}
+                      >
+                        <Image_ icon={ICONS.trash} size={14} />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                      <Text style={{ fontSize: 12, color: gray(0.4), width: 50, marginTop: 6 }}>Text</Text>
+                      <TextInput_
+                        value={item.text}
+                        multiline
+                        capitalize={true}
+                        placeholder="Text inserted into notes (optional - uses label if empty)"
+                        placeholderTextColor={gray(0.35)}
+                        onChangeText={(val) => updateItem(itemIdx, "text", val)}
+                        style={{
+                          flex: 1,
+                          borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderRadius: 5,
+                          paddingVertical: 5,
+                          paddingHorizontal: 8,
+                          fontSize: 13,
+                          color: C.text,
+                          outlineWidth: 0,
+                          backgroundColor: "white",
+                          minHeight: 60,
+                          overflow: "hidden",
+                          resize: "none",
+                        }}
+                      />
+                    </View>
+                  </View>
+                ))}
+
+                <TouchableOpacity
+                  onPress={addItem}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    borderWidth: 1,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderRadius: 8,
+                    borderStyle: "dashed",
+                    paddingVertical: 10,
+                  }}
+                >
+                  <Text style={{ fontSize: 13, color: gray(0.4), fontWeight: "600" }}>+ Add Item</Text>
+                </TouchableOpacity>
+              </ScrollView>
+
+              {/* Footer */}
+              <View style={{
+                flexDirection: "row",
+                justifyContent: "flex-end",
+                alignItems: "center",
+                paddingHorizontal: 14,
+                paddingVertical: 10,
+                borderTopWidth: 1,
+                borderTopColor: C.buttonLightGreenOutline,
+              }}>
+                {!nameValid && (
+                  <Text style={{ fontSize: 12, color: C.lightred, marginRight: 10 }}>Category name must be 3+ characters</Text>
+                )}
+                <Button_
+                  text="Cancel"
+                  colorGradientArr={COLOR_GRADIENTS.grey}
+                  onPress={onClose}
+                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 7, marginRight: 8 }}
+                  textStyle={{ fontSize: 13 }}
+                />
+                <Button_
+                  text="Save"
+                  colorGradientArr={nameValid ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
+                  onPress={handleSave}
+                  enabled={nameValid}
+                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 7 }}
+                  textStyle={{ fontSize: 13 }}
+                />
+              </View>
+            </View>
+          </TouchableWithoutFeedback>
+        </View>
+      </TouchableWithoutFeedback>
+    </Modal>
   );
 };
 

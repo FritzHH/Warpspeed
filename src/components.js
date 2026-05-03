@@ -3998,28 +3998,38 @@ export const NoteHelperDropdown = ({
 
   if (!visible) return <Modal visible={false} transparent animationType="fade"><View /></Modal>;
 
-  function isChipActive(catId, chipText) {
+  function getInsertText(item) {
+    if (typeof item === "string") return item;
+    return (item.text || item.buttonLabel || "").trim();
+  }
+
+  function getDisplayLabel(item) {
+    if (typeof item === "string") return item;
+    return item.buttonLabel || "";
+  }
+
+  function isChipActive(catId, item) {
+    const insertText = getInsertText(item);
     const notes = workorderLine[sTarget] || "";
     const parts = notes.split(", ").map((s) => s.trim()).filter(Boolean);
-    const trimmed = chipText.trim();
-    if (!parts.includes(trimmed)) return false;
-    const trackedCat = sClickedMap[sTarget + "|" + trimmed];
+    if (!parts.includes(insertText)) return false;
+    const trackedCat = sClickedMap[sTarget + "|" + insertText];
     if (trackedCat !== undefined) return trackedCat === catId;
     return true;
   }
 
-  function toggleChip(chipText, targetOverride, catId) {
+  function toggleChip(item, targetOverride, catId) {
     const target = targetOverride || sTarget;
+    const insertText = getInsertText(item);
     const notes = workorderLine[target] || "";
     const parts = notes.split(", ").map((s) => s.trim()).filter(Boolean);
-    const trimmed = chipText.trim();
-    const key = target + "|" + trimmed;
-    const idx = parts.indexOf(trimmed);
+    const key = target + "|" + insertText;
+    const idx = parts.indexOf(insertText);
     if (idx !== -1) {
       parts.splice(idx, 1);
       _sSetClickedMap((prev) => { const next = { ...prev }; delete next[key]; return next; });
     } else {
-      parts.push(trimmed);
+      parts.push(insertText);
       _sSetClickedMap((prev) => ({ ...prev, [key]: catId }));
     }
     onUpdateLine({ ...workorderLine, [target]: parts.join(", ") });
@@ -4131,12 +4141,13 @@ export const NoteHelperDropdown = ({
                     {category.label}
                   </Text>
                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
-                    {(category.items || []).map((chipText, chipIdx) => {
-                      const active = isChipActive(category.id, chipText);
+                    {(category.items || []).map((item, chipIdx) => {
+                      const active = isChipActive(category.id, item);
+                      const label = getDisplayLabel(item);
                       return (
                         <TouchableOpacity_
-                          key={chipText + chipIdx}
-                          onPress={() => toggleChip(chipText, null, category.id)}
+                          key={(item.id || label) + chipIdx}
+                          onPress={() => toggleChip(item, null, category.id)}
                           hoverOpacity={0.6}
                           style={{
                             backgroundColor: active
@@ -4154,7 +4165,7 @@ export const NoteHelperDropdown = ({
                               fontWeight: Fonts.weight.textRegular,
                             }}
                           >
-                            {chipText}
+                            {label}
                           </Text>
                         </TouchableOpacity_>
                       );
@@ -4180,12 +4191,13 @@ export const NoteHelperDropdown = ({
                       {category.label}
                     </Text>
                     <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
-                      {(category.items || []).map((chipText, chipIdx) => {
-                        const active = isChipActive(category.id, chipText);
+                      {(category.items || []).map((item, chipIdx) => {
+                        const active = isChipActive(category.id, item);
+                        const label = getDisplayLabel(item);
                         return (
                           <TouchableOpacity_
-                            key={chipText + chipIdx}
-                            onPress={() => toggleChip(chipText, null, category.id)}
+                            key={(item.id || label) + chipIdx}
+                            onPress={() => toggleChip(item, null, category.id)}
                             hoverOpacity={0.6}
                             style={{
                               backgroundColor: active
@@ -4203,7 +4215,7 @@ export const NoteHelperDropdown = ({
                                 fontWeight: Fonts.weight.textRegular,
                               }}
                             >
-                              {chipText}
+                              {label}
                             </Text>
                           </TouchableOpacity_>
                         );

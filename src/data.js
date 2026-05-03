@@ -584,6 +584,7 @@ export const INVENTORY_ITEM_PROTO = {
   minutes: 0,
   customPart: false,
   customLabor: false,
+  receiptNoteRequired: false,
 };
 
 
@@ -1237,83 +1238,83 @@ export const SETTINGS_OBJ = {
     id: 'position',
     label: 'Position',
     items: [
-      'Front',
-      'Rear',
+      { id: 'pos1', buttonLabel: 'Front', text: '' },
+      { id: 'pos2', buttonLabel: 'Rear', text: '' },
     ]
   },
   {
     id: 'brakes',
     label: 'Brakes',
     items: [
-      'Squealing',
-      'Broken',
-      'Very contaminated'
+      { id: 'brk1', buttonLabel: 'Squealing', text: '' },
+      { id: 'brk2', buttonLabel: 'Broken', text: '' },
+      { id: 'brk3', buttonLabel: 'Very contaminated', text: '' },
     ]
   },
   {
     id: 'tires',
     label: 'Tires',
     items: [
-      'worn',
-      'broken'
+      { id: 'tir1', buttonLabel: 'Worn', text: '' },
+      { id: 'tir2', buttonLabel: 'Broken', text: '' },
     ]
   },
   {
     id: 'tube',
     label: 'Tube',
     items: [
-      'Slow leak'
+      { id: 'tub1', buttonLabel: 'Slow leak', text: '' },
     ]
   },
   {
     id: 'cable',
     label: 'Cables',
     items: [
-      'Brake',
-      'Shifter',
-      'Corroded',
-      'Kinked'
+      { id: 'cab1', buttonLabel: 'Brake', text: '' },
+      { id: 'cab2', buttonLabel: 'Shifter', text: '' },
+      { id: 'cab3', buttonLabel: 'Corroded', text: '' },
+      { id: 'cab4', buttonLabel: 'Kinked', text: '' },
     ]
   },
   {
     id: 'chain',
     label: 'Chain',
     items: [
-      'Stretched',
-      'Corroded',
-      'Twisted'
+      { id: 'chn1', buttonLabel: 'Stretched', text: '' },
+      { id: 'chn2', buttonLabel: 'Corroded', text: '' },
+      { id: 'chn3', buttonLabel: 'Twisted', text: '' },
     ]
   },
   {
     id: 'gears',
     label: 'Gears',
     items: [
-      'Worn',
-      'Corroded'
+      { id: 'ger1', buttonLabel: 'Worn', text: '' },
+      { id: 'ger2', buttonLabel: 'Corroded', text: '' },
     ]
   },
   {
     id: 'wheels',
     label: 'Wheels',
     items: [
-      'Spokes',
-      'Damaged'
+      { id: 'whl1', buttonLabel: 'Spokes', text: '' },
+      { id: 'whl2', buttonLabel: 'Damaged', text: '' },
     ]
   },
   {
     id: 'shifter',
     label: 'Shifter',
     items: [
-      'Gummed',
-      'Broken',
-      'Try to recover'
+      { id: 'shf1', buttonLabel: 'Gummed', text: '' },
+      { id: 'shf2', buttonLabel: 'Broken', text: '' },
+      { id: 'shf3', buttonLabel: 'Try to recover', text: '' },
     ]
   },
   {
     id: 'customer',
     label: 'Customer Request',
     items: [
-      'Customer Request'
+      { id: 'cst1', buttonLabel: 'Customer Request', text: '' },
     ]
   },
   ],
@@ -1390,6 +1391,12 @@ export const NOTE_HELPER_PROTO = {
   id: "",
   label: "",
   items: [],
+};
+
+export const NOTE_HELPER_ITEM_PROTO = {
+  id: "",
+  buttonLabel: "",
+  text: "",
 };
 
 // RECEIPT STUFF ////////////////////////////////////////////////////

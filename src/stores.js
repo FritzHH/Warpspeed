@@ -272,6 +272,7 @@ export const useCheckoutStore = create((set, get) => ({
   viewOnlySale: null,
   isViewOnly: false,
   depositInfo: null,
+  pendingRefundSaleID: "",
 
   getMessage: () => get().message,
   getLoading: () => get().loading,
@@ -280,6 +281,7 @@ export const useCheckoutStore = create((set, get) => ({
   getReceiptScan: () => get().receiptScan,
 
   setStringOnly: (receiptScan) => set({ receiptScan }),
+  setPendingRefundSaleID: (pendingRefundSaleID) => set({ pendingRefundSaleID }),
   setLoading: (loading) => set({ loading }),
   // setSaleObj: (saleObj) => set({ saleObj }),
   setIsCheckingOut: (isCheckingOut) => set({ isCheckingOut }),

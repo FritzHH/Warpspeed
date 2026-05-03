@@ -91,6 +91,9 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   const isDonePaid = resolveStatus(zOpenWorkorder?.status, zStatuses)?.label?.toLowerCase() === "done & paid";
   const isLocked = isDonePaid;
+  const hasMissingReceiptNotes = (zOpenWorkorder?.workorderLines || []).some(
+    (line) => line.inventoryItem?.receiptNoteRequired && !(line.receiptNotes || "").trim()
+  );
   const activeSale = zOpenWorkorder?.activeSaleID
     ? zActiveSales.find((s) => s.id === zOpenWorkorder.activeSaleID)
     : null;
@@ -902,14 +905,14 @@ export const Items_WorkorderItemsTab = ({}) => {
             backgroundColor: C.buttonLightGreenOutline,
           }}
         />
-        <Tooltip text="Check out workorder" position="top">
+        <Tooltip text={hasMissingReceiptNotes ? "Enter the required receipt note info to check out" : "Check out workorder"} position="top">
           <Button_
             ref={checkoutBtnRef}
             textStyle={{ color: C.textWhite, fontSize: 16 }}
             icon={ICONS.shoppingCart}
             iconSize={34}
-            enabled={!isDonePaid}
-            buttonStyle={{ paddingVertical: 0, opacity: isDonePaid ? 0.3 : 1 }}
+            enabled={!isDonePaid && !hasMissingReceiptNotes}
+            buttonStyle={{ paddingVertical: 0, opacity: (isDonePaid || hasMissingReceiptNotes) ? 0.3 : 1 }}
             onPress={() => useLoginStore.getState().requireLogin(() => {
               if (useOpenWorkordersStore.getState().castingToDisplay) {
                 broadcastClear();
@@ -1042,6 +1045,8 @@ export const LineItemComponent = ({
             {(() => {
               const hasIntake = !!(workorderLine.intakeNotes || "").trim();
               const hasReceipt = !!(workorderLine.receiptNotes || "").trim();
+              const receiptNoteRequired = !!inventoryItem.receiptNoteRequired;
+              const showReceiptNote = hasReceipt || receiptNoteRequired;
 
               return (
                 <>
@@ -1107,7 +1112,7 @@ export const LineItemComponent = ({
                       />
                     </View>
                   )}
-                  {hasReceipt && (
+                  {showReceiptNote && (
                     <View style={{ flexDirection: "row", alignItems: "flex-start", width: "100%" }}>
                       <TextInput_
                         capitalize
@@ -1121,8 +1126,8 @@ export const LineItemComponent = ({
                             __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
                           });
                         }}
-                        placeholder="Receipt notes..."
-                        placeholderTextColor={gray(0.2)}
+                        placeholder={receiptNoteRequired ? "Receipt note required for this item before checkout" : "Receipt notes..."}
+                        placeholderTextColor={receiptNoteRequired ? C.lightred : gray(0.2)}
                         value={workorderLine.receiptNotes || ""}
                       />
                     </View>
@@ -1325,8 +1330,8 @@ export const LineItemComponent = ({
                       }}
                     >
                       <View style={{ flexDirection: "row", borderBottomWidth: 1, borderBottomColor: gray(0.1) }}>
-                        <View style={{ width: "50%", alignItems: "center", justifyContent: "center", backgroundColor: lightenRGBByPercent(C.blue, 85) }}>
-                          {effectiveQty > 1 ? (
+                        {effectiveQty > 1 && (
+                          <View style={{ width: "50%", alignItems: "center", justifyContent: "center", backgroundColor: lightenRGBByPercent(C.blue, 85) }}>
                             <Tooltip text="Split into individual lines" position="top">
                               <Button_
                                 icon={ICONS.axe}
@@ -1338,16 +1343,9 @@ export const LineItemComponent = ({
                                 buttonStyle={{ backgroundColor: "transparent", borderRadius: 0, borderWidth: 0, paddingVertical: 10 }}
                               />
                             </Tooltip>
-                          ) : (
-                            <Button_
-                              icon={ICONS.axe}
-                              iconSize={28}
-                              enabled={false}
-                              buttonStyle={{ backgroundColor: "transparent", borderRadius: 0, borderWidth: 0, paddingVertical: 10, opacity: 0.25 }}
-                            />
-                          )}
-                        </View>
-                        <View style={{ width: "50%", alignItems: "center", justifyContent: "center", backgroundColor: lightenRGBByPercent(C.lightred, 85), borderLeftWidth: 1, borderLeftColor: gray(0.1) }}>
+                          </View>
+                        )}
+                        <View style={{ width: effectiveQty > 1 ? "50%" : "100%", alignItems: "center", justifyContent: "center", backgroundColor: lightenRGBByPercent(C.lightred, 85), borderLeftWidth: effectiveQty > 1 ? 1 : 0, borderLeftColor: gray(0.1) }}>
                           <Tooltip text="Remove item" position="top">
                             <Button_
                               icon={ICONS.trash}

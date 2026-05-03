@@ -18,6 +18,7 @@ export function LoginScreen({ sessionError, onClearError }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(sessionError || "");
   const [emailFocused, setEmailFocused] = useState(false);
+  const [showPassword, setShowPassword] = useState(true);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
   const handleSignIn = async () => {
@@ -33,7 +34,7 @@ export function LoginScreen({ sessionError, onClearError }) {
     try {
       const result = await dbLoginUser(email, password);
       if (!result.success) {
-        setError("Login failed. Please try again.");
+        setError(result.error ? getErrorMessage(result.error) : "Login failed. Please try again.");
       }
     } catch (error) {
       setError(getErrorMessage(error.message || error.code));
@@ -87,7 +88,8 @@ export function LoginScreen({ sessionError, onClearError }) {
 
   return (
     <View style={{
-      flex: 1,
+      width: "100%",
+      height: "100vh",
       backgroundColor: BRAND_BLUE,
       justifyContent: "center",
       alignItems: "center",
@@ -176,43 +178,54 @@ export function LoginScreen({ sessionError, onClearError }) {
             marginBottom: 4,
             marginLeft: 2,
           }}>PASSWORD</Text>
-          <TextInput
-            style={{
-              width: "100%",
-              borderWidth: 2,
-              borderColor: passwordBorder,
-              borderRadius: 10,
-              paddingVertical: 11,
-              paddingHorizontal: 14,
-              fontSize: 15,
-              backgroundColor: "#FAFBFC",
-              outlineWidth: 0,
-              outlineStyle: "none",
-              color: "#333",
-            }}
-            placeholder="Enter password"
-            placeholderTextColor={gray(0.65)}
-            value={password}
-            onChangeText={setPassword}
-            secureTextEntry
-            autoComplete="current-password"
-            nativeID="password"
-            onFocus={() => setPasswordFocused(true)}
-            onBlur={() => setPasswordFocused(false)}
-            onSubmitEditing={handleSignIn}
-          />
+          <View style={{ width: "100%", flexDirection: "row", alignItems: "center", borderWidth: 2, borderColor: passwordBorder, borderRadius: 10, backgroundColor: "#FAFBFC" }}>
+            <TextInput
+              style={{
+                flex: 1,
+                paddingVertical: 11,
+                paddingHorizontal: 14,
+                fontSize: 15,
+                outlineWidth: 0,
+                outlineStyle: "none",
+                color: "#333",
+                backgroundColor: "transparent",
+              }}
+              placeholder="Enter password"
+              placeholderTextColor={gray(0.65)}
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              autoComplete="current-password"
+              nativeID="password"
+              onFocus={() => setPasswordFocused(true)}
+              onBlur={() => setPasswordFocused(false)}
+              onSubmitEditing={handleSignIn}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
+              <Text style={{ fontSize: 16, color: gray(0.45), userSelect: "none" }}>{showPassword ? "\u{1F441}" : "\u{1F441}\u{200D}\u{1F5E8}"}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Error message */}
         {error ? (
-          <Text style={{
-            color: "#D44",
-            fontSize: 13,
-            textAlign: "center",
-            marginTop: 8,
+          <View style={{
+            width: "100%",
+            backgroundColor: "#FEF2F2",
+            borderWidth: 1,
+            borderColor: "#FECACA",
+            borderRadius: 8,
+            paddingVertical: 10,
+            paddingHorizontal: 12,
+            marginTop: 10,
             marginBottom: 4,
-            fontWeight: "500",
-          }}>{error}</Text>
+          }}>
+            <Text style={{
+              color: "#B91C1C",
+              fontSize: 13,
+              fontWeight: "500",
+            }}>{error}</Text>
+          </View>
         ) : (
           <View style={{ height: 16 }} />
         )}

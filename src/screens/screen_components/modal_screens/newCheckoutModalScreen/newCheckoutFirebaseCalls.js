@@ -34,6 +34,7 @@ let _newCheckoutCancelPaymentCallable = null;
 let _newCheckoutProcessRefundCallable = null;
 let _newCheckoutGetAvailableReadersCallable = null;
 let _newCheckoutManualCardPaymentCallable = null;
+let _processCashRefundCallable = null;
 
 async function getCallables() {
   if (!_newCheckoutInitiatePaymentIntentCallable) {
@@ -44,6 +45,7 @@ async function getCallables() {
     _newCheckoutProcessRefundCallable = httpsCallable(fns, "newCheckoutProcessRefundCallable");
     _newCheckoutGetAvailableReadersCallable = httpsCallable(fns, "newCheckoutGetAvailableReadersCallable");
     _newCheckoutManualCardPaymentCallable = httpsCallable(fns, "newCheckoutManualCardPaymentCallable");
+    _processCashRefundCallable = httpsCallable(fns, "processCashRefundCallable");
   }
   return {
     initiatePayment: _newCheckoutInitiatePaymentIntentCallable,
@@ -52,6 +54,7 @@ async function getCallables() {
     processRefund: _newCheckoutProcessRefundCallable,
     getReaders: _newCheckoutGetAvailableReadersCallable,
     manualCardPayment: _newCheckoutManualCardPaymentCallable,
+    processCashRefund: _processCashRefundCallable,
   };
 }
 
@@ -318,7 +321,7 @@ export async function findSaleByTransactionID(transactionID) {
   }
 }
 
-// ─── Cash Refund (Firestore) ─────────────────────────────────
+// ─── Cash Refund (server-validated via callable) ─────────────
 
 export async function writeCashRefund(transactionID, refundObj) {
   dlog(DCAT.FIREBASE_REQ, "writeCashRefund", "FirebaseCalls", { transactionID, refundAmount: refundObj?.amount, refundId: refundObj?.id });
@@ -329,18 +332,10 @@ export async function writeCashRefund(transactionID, refundObj) {
       dlog(DCAT.FIREBASE_ERR, "writeCashRefund", "FirebaseCalls", { reason: "missing params" });
       return { success: false };
     }
-    const path = buildTransactionPath(tenantID, storeID, transactionID);
-    const transaction = await firestoreRead(path);
-    if (!transaction) {
-      log("writeCashRefund: transaction not found");
-      dlog(DCAT.FIREBASE_ERR, "writeCashRefund", "FirebaseCalls", { reason: "transaction not found", transactionID });
-      return { success: false };
-    }
-    const refunds = transaction.refunds || [];
-    refunds.push(refundObj);
-    await firestoreWrite(path, { ...transaction, refunds });
-    dlog(DCAT.FIREBASE_RES, "writeCashRefund", "FirebaseCalls", { success: true, transactionID, totalRefunds: refunds.length });
-    return { success: true };
+    const callables = await getCallables();
+    const result = await callables.processCashRefund({ transactionID, refundObj, tenantID, storeID });
+    dlog(DCAT.FIREBASE_RES, "writeCashRefund", "FirebaseCalls", { success: result.data?.success, transactionID });
+    return { success: result.data?.success || false };
   } catch (error) {
     log("writeCashRefund error:", error);
     dlog(DCAT.FIREBASE_ERR, "writeCashRefund", "FirebaseCalls", { message: error?.message });
@@ -569,12 +564,12 @@ export async function newCheckoutCancelStripePayment(readerID) {
 }
 
 export async function newCheckoutProcessStripeRefund(amount, paymentIntentID, transactionFields) {
-  dlog(DCAT.STRIPE_REQ, "processStripeRefund", "FirebaseCalls", { amount, paymentIntentID, transactionID: transactionFields?.transactionID });
+  dlog(DCAT.STRIPE_REQ, "processStripeRefund", "FirebaseCalls", { amount, paymentIntentID, chargeID: transactionFields?.chargeID, transactionID: transactionFields?.transactionID });
   try {
     const callables = await getCallables();
     const result = await callables.processRefund({
       amount: Number(amount),
-      paymentIntentID,
+      paymentIntentID: paymentIntentID || "",
       ...(transactionFields || {}),
     });
     log("newCheckout refund processed:", result.data);

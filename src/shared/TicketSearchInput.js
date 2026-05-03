@@ -107,29 +107,29 @@ export function TicketSearchInput({}) {
               executeTicketSearch(trimmed, clearOnMatch, searchCallbacks);
               return;
             }
-            // 12 digits (old barcodes) — debounce 120ms so scanner can finish 13th char
-            if (trimmed.length === 12) {
-              debounceRef.current = setTimeout(() => {
+            // All other searches debounce 300ms so barcode scanners finish before any search fires
+            debounceRef.current = setTimeout(() => {
+              // 12 digits (old barcodes) — exact search
+              if (trimmed.length === 12) {
                 executeTicketSearch(trimmed, clearOnMatch, searchCallbacks);
-              }, 120);
-              return;
-            }
-            // WO mode: auto-search workorderNumber after 1+ digits typed (4th total char = WO- + 1 digit)
-            // Searches open-workorders + completed-workorders only
-            if (hasWoPrefix && trimmed.length >= 1) {
-              executeLiveSearch(trimmed, "woNumber", {
-                onSingleResult: clearOnMatch,
-                ...searchCallbacks,
-              });
-              return;
-            }
-            // Non-WO mode: auto-search sales + transactions after 4 digits typed
-            if (!hasWoPrefix && trimmed.length >= 4) {
-              executeLiveSearch(trimmed, "salesTransactions", {
-                onSingleResult: clearOnMatch,
-                ...searchCallbacks,
-              });
-            }
+                return;
+              }
+              // WO mode: auto-search workorderNumber after 1+ digits typed
+              if (hasWoPrefix && trimmed.length >= 1) {
+                executeLiveSearch(trimmed, "woNumber", {
+                  onSingleResult: clearOnMatch,
+                  ...searchCallbacks,
+                });
+                return;
+              }
+              // Non-WO mode: auto-search sales + transactions after 4 digits typed
+              if (!hasWoPrefix && trimmed.length >= 4) {
+                executeLiveSearch(trimmed, "salesTransactions", {
+                  onSingleResult: clearOnMatch,
+                  ...searchCallbacks,
+                });
+              }
+            }, 300);
           }}
           onSubmitEditing={() => handleExecuteTicketSearch()}
           style={{

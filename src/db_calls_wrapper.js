@@ -2472,6 +2472,15 @@ export async function dbLoginUser(email, password, options = {}) {
       throw new Error("Login failed - no user data returned");
     }
 
+    try {
+      await loginAppUserCallable({ email, password });
+    } catch (claimsErr) {
+      log("Claims callable error (non-fatal):", claimsErr);
+    }
+    await user.getIdToken(true);
+    let tokenResult = await user.getIdTokenResult();
+    log("Token claims after refresh:", tokenResult.claims);
+
     return {
       success: true,
       user: {

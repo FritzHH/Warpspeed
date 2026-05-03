@@ -50,6 +50,7 @@ import {
 } from "../../../db_calls_wrapper";
 import { smsService } from "../../../data_service_modules";
 import { readActiveSale, readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { sendCreditReceipt } from "./newCheckoutModalScreen/newCheckoutUtils";
 import { ClosedWorkorderModal } from "./ClosedWorkorderModal";
 import { DepositRefundModal } from "./newCheckoutModalScreen/DepositRefundModal";
 import { FullSaleModal } from "./FullSaleModal";
@@ -865,13 +866,14 @@ export const CustomerInfoScreenModalComponent = ({
         <DepositModal
           visible={sShowDepositModal}
           onClose={() => _sSetShowDepositModal(false)}
+          customer={sCustomerInfo}
           onPay={(depositInfo) => {
             _sSetShowDepositModal(false);
             if (handleButton2Press) handleButton2Press();
             useCheckoutStore.getState().setDepositInfo(depositInfo);
             useCheckoutStore.getState().setIsCheckingOut(true);
           }}
-          onCredit={({ amountCents, text }) => {
+          onCredit={({ amountCents, text, sendSMS, sendEmail }) => {
             let credit = { ...CUSTOMER_CREDIT_PROTO };
             credit.id = generateEAN13Barcode();
             credit.text = text;
@@ -881,6 +883,17 @@ export const CustomerInfoScreenModalComponent = ({
             _setCustomerInfo(updated);
             useCurrentCustomerStore.getState().setCustomer(updated);
             dbSaveCustomer(updated);
+            if (sendSMS || sendEmail) {
+              let settings = useSettingsStore.getState().getSettings();
+              let customerForReceipt = {
+                first: sCustomerInfo.first || "",
+                last: sCustomerInfo.last || "",
+                customerCell: sCustomerInfo.customerCell || "",
+                email: sCustomerInfo.email || "",
+                id: sCustomerInfo.id || "",
+              };
+              sendCreditReceipt(credit, customerForReceipt, settings, sendSMS, sendEmail);
+            }
           }}
         />
         <DepositRefundModal

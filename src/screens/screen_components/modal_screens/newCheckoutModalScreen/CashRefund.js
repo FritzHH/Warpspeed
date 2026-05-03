@@ -144,7 +144,7 @@ export const CashRefund = memo(function CashRefund({
 
       {/* Button */}
       {reasonMissing ? (
-        <Tooltip text="Enter a refund reason first" position="top">
+        <Tooltip text="Enter a refund reason first (min 10 characters)" position="top">
           <View>
             <Button_
               text="PROCESS CASH REFUND"

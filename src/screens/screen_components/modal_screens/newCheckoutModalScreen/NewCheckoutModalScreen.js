@@ -42,6 +42,7 @@ import {
   updateSaleWithTotals,
   calculateSaleTotals,
   sendSaleReceipt,
+  sendGiftCardReceipt,
   recomputeSaleAmounts,
   getAllAppliedCredits,
 } from "./newCheckoutUtils";
@@ -1073,6 +1074,20 @@ export function NewCheckoutModalScreen() {
       updatedCustomer.deposits = [...(updatedCustomer.deposits || []), newDeposit];
       useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
       dbSaveCustomer(updatedCustomer);
+    }
+
+    // Send gift card receipt if requested from deposit modal
+    if (newDeposit.type === "giftcard" && (depositInfo.sendSMS || depositInfo.sendEmail)) {
+      let gcSettings = useSettingsStore.getState().getSettings();
+      let gcCustomer = {
+        first: zCustomer?.first || "",
+        last: zCustomer?.last || "",
+        customerCell: zCustomer?.customerCell || "",
+        email: zCustomer?.email || "",
+        id: zCustomer?.id || "",
+      };
+      let gcObj = { id: newDeposit.id, amountCents: newDeposit.amountCents, note: newDeposit.note, millis: newDeposit.millis };
+      sendGiftCardReceipt(gcObj, gcCustomer, gcSettings, depositInfo.sendSMS, depositInfo.sendEmail);
     }
 
     // Mark transactions with deposit type before persisting

@@ -671,7 +671,7 @@ export const NONREMOVABLE_WAIT_TIMES = [
   }
 ]
 
-export const QB_DEFAULT_W = 10;
+export const QB_DEFAULT_W = 20;
 export const QB_DEFAULT_H = 8;
 export const QB_SNAP_PCT = 1;
 
@@ -1188,6 +1188,20 @@ export const SETTINGS_OBJ = {
       label: "Intake Receipt",
       content: "🔧 Hey {firstName}! Your {brand} {description} is checked in and in good hands. Here's your receipt: {link}\n\nTrack your workorder: {workorderLink}\n\nWe'll keep you posted! — {storeName} 🚲",
       type: "intakeReceipt",
+    },
+    {
+      id: "default_sms_credit_receipt",
+      label: "Credit Receipt",
+      content: "💰 Hey {firstName}! A store credit of {amount} has been added to your account. Here's your receipt: {link}\n\nThank you! — {storeName}",
+      type: "creditReceipt",
+      removable: false,
+    },
+    {
+      id: "default_sms_giftcard_receipt",
+      label: "Gift Card Receipt",
+      content: "🎁 Hey {firstName}! A gift card of {amount} has been loaded to your account. Here's your receipt: {link}\n\nThank you! — {storeName}",
+      type: "giftCardReceipt",
+      removable: false,
       order: 0,
       showInChat: false,
       removable: false,
@@ -1231,6 +1245,20 @@ export const SETTINGS_OBJ = {
       subject: "Your {brand} is checked in — {storeName}",
       content: "Hi {firstName},\n\nYour {brand} {description} has been checked in and is in good hands. Here's a copy of your intake receipt for your records.\n\n{receiptLink}\n\n{workorderLink}\n\nWe'll keep you updated on the progress. If you have any questions in the meantime, don't hesitate to reach out!\n\n---\n{storeName}",
       type: "intakeReceipt",
+    },
+    {
+      id: "default_email_credit_receipt",
+      label: "Credit Receipt",
+      subject: "Store credit added — {storeName}",
+      content: "Hi {firstName},\n\nA store credit of {amount} has been added to your account.\n\n{receiptLink}\n\nThank you for your business!\n\n---\n{storeName}",
+      type: "creditReceipt",
+    },
+    {
+      id: "default_email_giftcard_receipt",
+      label: "Gift Card Receipt",
+      subject: "Gift card loaded — {storeName}",
+      content: "Hi {firstName},\n\nA gift card of {amount} has been loaded to your account.\n\n{receiptLink}\n\nThank you!\n\n---\n{storeName}",
+      type: "giftCardReceipt",
     },
   ],
   statusAutoText: [],

@@ -123,7 +123,7 @@ const CanvasButtonCard = ({
         borderStyle: "solid",
         borderColor: isSelected ? C.blue : C.buttonLightGreenOutline,
         borderRadius: 8,
-        backgroundColor: C.listItemWhite,
+        backgroundColor: btn.backgroundColor || C.listItemWhite,
         cursor: sEditMode ? (sDragging ? "grabbing" : "grab") : "pointer",
         opacity: sDragging ? 0.7 : 1,
         boxSizing: "border-box",
@@ -185,7 +185,7 @@ const CanvasButtonCard = ({
           <TextInput_
             style={{
               fontSize: btn.fontSize || 11,
-              color: C.text,
+              color: btn.textColor || C.text,
               textAlign: "center",
               borderBottomWidth: 1,
               borderBottomColor: gray(0.3),
@@ -206,7 +206,7 @@ const CanvasButtonCard = ({
         <Text
           style={{
             fontSize: btn.fontSize || 11,
-            color: btn.label ? C.text : gray(0.35),
+            color: btn.textColor || (btn.label ? C.text : gray(0.35)),
             textAlign: "center",
             fontWeight: "500",
           }}

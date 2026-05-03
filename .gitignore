@@ -27,3 +27,4 @@ functions/creds.json.json
 scripts/.env
 scripts/serviceAccountKey.json
 scripts/csv/
+src/assets/import_data/

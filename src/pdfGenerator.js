@@ -510,6 +510,182 @@ export function generateRefundReceiptPDF(data) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
+// Credit Receipt PDF
+////////////////////////////////////////////////////////////////////////////////
+
+export function generateCreditReceiptPDF(data) {
+  let pageWidth = 226;
+  let margin = 10;
+  let contentWidth = pageWidth - margin * 2;
+  let centerX = pageWidth / 2;
+  let leftX = margin;
+  let rightX = pageWidth - margin;
+
+  let doc = new jsPDF({ unit: "pt", format: [pageWidth, 500] });
+  let y = margin + 10;
+
+  y = addShopHeader(doc, y, data, centerX);
+  y = addDivider(doc, y, leftX, rightX);
+
+  y += 10;
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("STORE CREDIT RECEIPT", centerX, y, { align: "center" });
+  y += 14;
+
+  if (data.barcode || data.id) {
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.barcode || data.id, centerX, y, { align: "center" });
+    y += 10;
+  }
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  if (data.transactionDateTime) {
+    doc.text(data.transactionDateTime, centerX, y, { align: "center" });
+    y += 10;
+  }
+  y += 6;
+
+  let custName = [(data.first || data.customerFirstName || ""), (data.last || data.customerLastName || "")].filter(Boolean).join(" ");
+  if (custName) {
+    doc.text("Customer: " + custName, leftX, y);
+    y += 11;
+  }
+  if (data.customerContact) {
+    doc.text("Contact: " + data.customerContact, leftX, y);
+    y += 11;
+  }
+  if (data.startedBy) {
+    doc.text("Processed by: " + data.startedBy, leftX, y);
+    y += 11;
+  }
+
+  y += 4;
+  y = addDivider(doc, y, leftX, rightX);
+
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.text("Credit Amount: $" + formatCents(data.creditAmount || 0), leftX, y);
+  y += 16;
+
+  if (data.creditNote) {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    let noteLines = doc.splitTextToSize("Reason: " + data.creditNote, contentWidth);
+    noteLines.forEach(function (nl) {
+      doc.text(nl, leftX, y);
+      y += 10;
+    });
+    y += 4;
+  }
+
+  y = addDivider(doc, y, leftX, rightX);
+
+  if (data.thankYouBlurb) {
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "italic");
+    let thankLines = doc.splitTextToSize(data.thankYouBlurb, contentWidth);
+    thankLines.forEach(function (line) {
+      doc.text(line, centerX, y, { align: "center" });
+      y += 9;
+    });
+    y += 6;
+  }
+
+  return doc.output("datauristring").split(",")[1];
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Gift Card Receipt PDF
+////////////////////////////////////////////////////////////////////////////////
+
+export function generateGiftCardReceiptPDF(data) {
+  let pageWidth = 226;
+  let margin = 10;
+  let contentWidth = pageWidth - margin * 2;
+  let centerX = pageWidth / 2;
+  let leftX = margin;
+  let rightX = pageWidth - margin;
+
+  let doc = new jsPDF({ unit: "pt", format: [pageWidth, 500] });
+  let y = margin + 10;
+
+  y = addShopHeader(doc, y, data, centerX);
+  y = addDivider(doc, y, leftX, rightX);
+
+  y += 10;
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text("GIFT CARD RECEIPT", centerX, y, { align: "center" });
+  y += 14;
+
+  if (data.barcode || data.id) {
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.barcode || data.id, centerX, y, { align: "center" });
+    y += 10;
+  }
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  if (data.transactionDateTime) {
+    doc.text(data.transactionDateTime, centerX, y, { align: "center" });
+    y += 10;
+  }
+  y += 6;
+
+  let custName = [(data.first || data.customerFirstName || ""), (data.last || data.customerLastName || "")].filter(Boolean).join(" ");
+  if (custName) {
+    doc.text("Customer: " + custName, leftX, y);
+    y += 11;
+  }
+  if (data.customerContact) {
+    doc.text("Contact: " + data.customerContact, leftX, y);
+    y += 11;
+  }
+  if (data.startedBy) {
+    doc.text("Processed by: " + data.startedBy, leftX, y);
+    y += 11;
+  }
+
+  y += 4;
+  y = addDivider(doc, y, leftX, rightX);
+
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.text("Gift Card Amount: $" + formatCents(data.giftCardAmount || 0), leftX, y);
+  y += 16;
+
+  if (data.giftCardNote) {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    let noteLines = doc.splitTextToSize("Note: " + data.giftCardNote, contentWidth);
+    noteLines.forEach(function (nl) {
+      doc.text(nl, leftX, y);
+      y += 10;
+    });
+    y += 4;
+  }
+
+  y = addDivider(doc, y, leftX, rightX);
+
+  if (data.thankYouBlurb) {
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "italic");
+    let thankLines = doc.splitTextToSize(data.thankYouBlurb, contentWidth);
+    thankLines.forEach(function (line) {
+      doc.text(line, centerX, y, { align: "center" });
+      y += 9;
+    });
+    y += 6;
+  }
+
+  return doc.output("datauristring").split(",")[1];
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Workorder Ticket PDF
 ////////////////////////////////////////////////////////////////////////////////
 

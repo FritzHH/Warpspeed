@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
+import { useNavigate } from "react-router-dom";
 import { C, COLOR_GRADIENTS, ICONS } from "../styles";
 import { Button_, CheckBox_, Image_ } from "../components";
 import { ROUTES } from "../routes";
@@ -10,6 +11,7 @@ import { gray } from "../utils";
 import { dbLogout } from "../db_calls_wrapper";
 
 export function HomeScreen() {
+  const navigate = useNavigate();
   const deviceType = useLayoutStore((state) => state.deviceType);
   const [sHasDisplay, _setHasDisplay] = useState(
     localStorage.getItem("warpspeed_has_secondary_display") === "true"
@@ -160,7 +162,7 @@ export function HomeScreen() {
       )}
 
       <Button_
-        onPress={() => dbLogout()}
+        onPress={async () => { await dbLogout(); navigate(ROUTES.login); }}
         text="Logout"
         colorGradientArr={COLOR_GRADIENTS.red}
         buttonStyle={{

@@ -15,6 +15,7 @@ const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const fetch = require("node-fetch");
 const sharp = require("sharp");
+const twilio = require("twilio");
 const { printBuilder: sharedPrintBuilder } = require("./shared/printBuilder");
 
 // Firebase Admin SDK - initialize once at module load (don't delete/recreate)
@@ -215,10 +216,13 @@ function requireCallableAuth(request) {
 function requireTenantMatch(request, tenantID, storeID) {
   const auth = requireCallableAuth(request);
   const claims = auth.token || {};
-  if (claims.tenantID && claims.tenantID !== tenantID) {
+  if (!claims.tenantID || !claims.storeID) {
+    throw new HttpsError("permission-denied", "User has no tenant/store assignment.");
+  }
+  if (claims.tenantID !== tenantID) {
     throw new HttpsError("permission-denied", "Tenant access denied.");
   }
-  if (storeID && claims.storeID && claims.storeID !== storeID) {
+  if (storeID && claims.storeID !== storeID) {
     throw new HttpsError("permission-denied", "Store access denied.");
   }
   return auth;
@@ -244,37 +248,13 @@ async function requireHTTPAuth(req, res) {
   }
 }
 
-// Permission levels: SuperUser=4, Admin=3, Editor=2, User=1
-const PERM_SUPER_USER = 4;
-const PERM_ADMIN = 3;
-const PERM_EDITOR = 2;
-
-async function requirePermissionLevel(db, request, minLevel) {
-  const auth = requireCallableAuth(request);
-  const claims = auth.token || {};
-  const { tenantID, storeID } = claims;
-
-  if (!tenantID || !storeID) {
-    throw new HttpsError("permission-denied", "User has no tenant/store assignment.");
-  }
-
-  const userDoc = await db.collection("tenants").doc(tenantID)
-    .collection("stores").doc(storeID)
-    .collection("users").doc(auth.uid)
-    .get();
-
-  if (!userDoc.exists) {
-    throw new HttpsError("permission-denied", "User not found in store.");
-  }
-
-  const perms = userDoc.data().permissions || {};
-  const level = typeof perms === "object" ? (perms.level || 0) : 0;
-
-  if (level < minLevel) {
-    throw new HttpsError("permission-denied", "Insufficient permissions for this operation.");
-  }
-
-  return { permissions: perms, level };
+function validateTwilioWebhook(request, authToken) {
+  const sig = request.headers["x-twilio-signature"];
+  if (!sig) return false;
+  const proto = request.headers["x-forwarded-proto"] || request.protocol;
+  const host = request.headers["x-forwarded-host"] || request.get("host");
+  const url = `${proto}://${host}${request.originalUrl}`;
+  return twilio.validateRequest(authToken, sig, url, request.body || {});
 }
 
 async function setUserCustomClaims(uid, tenantID, storeID) {
@@ -820,6 +800,8 @@ exports.sendSMSEnhanced = onCall(
         translatedTo = "",
       } = request.data;
 
+      if (tenantID && storeID) requireTenantMatch(request, tenantID, storeID);
+
       // Validate required fields
       if (
         (!message || typeof message !== "string" || message.trim().length === 0) && !imageUrl && !(mediaUrlsParam.length > 0)
@@ -1088,9 +1070,14 @@ exports.sendSMSEnhanced = onCall(
  * (queued, sending, sent, delivered, undelivered, failed)
  */
 exports.smsStatusCallback = onRequest(
-  { cors: true, secrets: [firebaseServiceAccountKey] },
+  { cors: true, secrets: [firebaseServiceAccountKey, twilioSecretKey] },
   async (request, response) => {
     try {
+      if (!validateTwilioWebhook(request, twilioSecretKey.value())) {
+        log("smsStatusCallback: invalid Twilio signature");
+        return response.status(403).send("Forbidden");
+      }
+
       const { MessageSid, MessageStatus, ErrorCode } = request.body || {};
       const { tenantID, storeID, phone, messageID } = request.query || {};
 
@@ -1187,6 +1174,11 @@ exports.incomingSMSEnhanced = onRequest(
       // ============================================================================
       // STEP 1: VALIDATE TWILIO WEBHOOK & EXTRACT DATA
       // ============================================================================
+
+      if (!validateTwilioWebhook(request, twilioSecretKey.value())) {
+        log("incomingSMSEnhanced: invalid Twilio signature");
+        return response.status(403).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+      }
 
       const twilioData = request.body;
 
@@ -1728,18 +1720,22 @@ exports.loginAppUser = onRequest({ cors: true }, async (req, res) => {
     // Get user ID for Firestore lookup
     const userID = userRecord.uid;
 
-    // Look up user in the global users index for quick tenant retrieval
-    const userIndexRef = DB.collection("users").doc(userID);
-    const userIndexDoc = await userIndexRef.get();
+    // Look up user in the global email_users index for quick tenant retrieval
+    let emailUsersSnap = await DB.collection("email_users").where("id", "==", userID).limit(1).get();
 
-    if (!userIndexDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        message: "❌ User not found in system.",
-      });
+    if (emailUsersSnap.empty) {
+      // Fallback: try document ID = uid
+      const directDoc = await DB.collection("email_users").doc(userID).get();
+      if (!directDoc.exists) {
+        return res.status(404).json({
+          success: false,
+          message: "❌ User not found in system.",
+        });
+      }
+      emailUsersSnap = { empty: false, docs: [directDoc] };
     }
 
-    const userIndexData = userIndexDoc.data();
+    const userIndexData = emailUsersSnap.docs[0].data();
     const tenantID = userIndexData.tenantID;
     const storeID = userIndexData.storeID;
 
@@ -1992,7 +1988,8 @@ exports.createAppUser = onRequest({ cors: true }, async (req, res) => {
       .set(userData);
 
     // Create user index entry for quick tenant/store lookup
-    await DB.collection("users").doc(userID).set({
+    await DB.collection("email_users").doc(userID).set({
+      id: userID,
       email: email,
       tenantID: tenantID,
       storeID: storeID,
@@ -2652,7 +2649,8 @@ exports.createTenant = onRequest({ cors: true }, async (req, res) => {
     await tenantRef.set(tenantData);
 
     // Create user index entries for quick lookup
-    await db.collection("users").doc(primaryUserRecord.uid).set({
+    await db.collection("email_users").doc(primaryUserRecord.uid).set({
+      id: primaryUserRecord.uid,
       email: primaryEmail,
       tenantID: tenantID,
       role: "primary_contact",
@@ -2660,7 +2658,8 @@ exports.createTenant = onRequest({ cors: true }, async (req, res) => {
       status: "active",
     });
 
-    await db.collection("users").doc(secondaryUserRecord.uid).set({
+    await db.collection("email_users").doc(secondaryUserRecord.uid).set({
+      id: secondaryUserRecord.uid,
       email: secondaryEmail,
       tenantID: tenantID,
       role: "secondary_contact",
@@ -3046,16 +3045,24 @@ exports.loginAppUserCallable = onCall(
       }
 
       const userID = userRecord.uid;
+      log("loginAppUserCallable looking up email_users for uid:", userID);
 
-      // Look up user in the global users index
-      const userIndexRef = db.collection("users").doc(userID);
-      const userIndexDoc = await userIndexRef.get();
+      // Look up user in email_users index (query by id field, fallback to doc ID)
+      const emailUsersRef = db.collection("email_users");
+      let emailUsersSnap = await emailUsersRef.where("id", "==", userID).limit(1).get();
 
-      if (!userIndexDoc.exists) {
-        throw new HttpsError("not-found", "❌ User not found in system.");
+      if (emailUsersSnap.empty) {
+        // Fallback: try document ID = uid
+        const directDoc = await emailUsersRef.doc(userID).get();
+        if (!directDoc.exists) {
+          log("email_users lookup failed for uid:", userID, "- not found by field or doc ID");
+          throw new HttpsError("not-found", "❌ User or tenant not found.");
+        }
+        emailUsersSnap = { empty: false, docs: [directDoc] };
       }
 
-      const userIndexData = userIndexDoc.data();
+      const userIndexData = emailUsersSnap.docs[0].data();
+      log("loginAppUserCallable found user data:", JSON.stringify(userIndexData));
       const tenantID = userIndexData.tenantID;
       const storeID = userIndexData.storeID;
 
@@ -3078,84 +3085,12 @@ exports.loginAppUserCallable = onCall(
       const currentClaims = currentUser.customClaims || {};
       if (currentClaims.tenantID !== tenantID || currentClaims.storeID !== storeID) {
         await setUserCustomClaims(userID, tenantID, storeID);
+        log("Claims set for user", { userID, tenantID, storeID });
+      } else {
+        log("Claims already current", { userID, tenantID, storeID });
       }
 
-      // Retrieve user details from tenant/store-specific collection
-      const userRef = db
-        .collection("tenants")
-        .doc(tenantID)
-        .collection("stores")
-        .doc(storeID)
-        .collection("users")
-        .doc(userID);
-      const userDoc = await userRef.get();
-
-      if (!userDoc.exists) {
-        throw new HttpsError(
-          "not-found",
-          "❌ User details not found in tenant system."
-        );
-      }
-
-      const userData = userDoc.data();
-
-      // Retrieve tenant information
-      const tenantRef = db.collection("tenants").doc(tenantID);
-      const tenantDoc = await tenantRef.get();
-
-      if (!tenantDoc.exists) {
-        throw new HttpsError("not-found", "❌ Tenant information not found.");
-      }
-
-      const tenantData = tenantDoc.data();
-
-      // Update last login timestamp
-      await userRef.update({
-        lastLogin: admin.firestore.FieldValue.serverTimestamp(),
-        loginCount: admin.firestore.FieldValue.increment(1),
-      });
-
-      log("User login successful", {
-        userID,
-        email,
-        tenantID,
-        storeID,
-        displayName: userData.displayName,
-      });
-
-      return {
-        success: true,
-        message: `✅ Login successful for ${email} (Tenant: ${tenantID}, Store: ${storeID})`,
-        data: {
-          user: {
-            id: userID,
-            email: userData.email,
-            displayName: userData.displayName,
-            tenantID: tenantID,
-            storeID: storeID,
-            permissions: userData.permissions,
-            status: userData.status,
-            lastLogin: userData.lastLogin,
-            createdAt: userData.createdAt,
-            metadata: userData.metadata,
-          },
-          tenant: {
-            id: tenantID,
-            name: tenantData.name,
-            status: tenantData.status,
-            settings: tenantData.settings,
-            userCount: tenantData.userCount,
-            createdAt: tenantData.createdAt,
-            subscription: tenantData.subscription,
-          },
-          auth: {
-            uid: userID,
-            email: email,
-            emailVerified: userRecord.emailVerified,
-            disabled: userRecord.disabled,
-          },
-        },
-      };
+      return { success: true, tenantID, storeID };
     } catch (error) {
       log("Error during login", error);
 
@@ -3237,7 +3172,7 @@ exports.createAppUserCallable = onCall(
     requireTenantMatch(request, tenantID, storeID);
 
     try {
-      await requirePermissionLevel(db, request, PERM_ADMIN);
+
 
       // Check if tenant exists
       const tenantRef = db.collection("tenants").doc(tenantID);
@@ -3313,7 +3248,8 @@ exports.createAppUserCallable = onCall(
       await setUserCustomClaims(userID, tenantID, storeID);
 
       // Create user index entry for quick lookup
-      await db.collection("users").doc(userID).set({
+      await db.collection("email_users").doc(userID).set({
+        id: userID,
         email: email,
         tenantID: tenantID,
         storeID: storeID,
@@ -3415,8 +3351,10 @@ exports.createStoreCallable = onCall(
       throw new HttpsError("invalid-argument", "Store name is required.");
     }
 
+    requireTenantMatch(request, tenantID, storeID);
+
     try {
-      await requirePermissionLevel(db, request, PERM_ADMIN);
+
 
       // Check if tenant exists
       const tenantRef = db.collection("tenants").doc(tenantID);
@@ -3683,7 +3621,8 @@ exports.createTenantCallable = onCall(
       await setUserCustomClaims(secondaryUserRecord.uid, tenantID, null);
 
       // Create user index entries for quick lookup
-      await db.collection("users").doc(primaryUserRecord.uid).set({
+      await db.collection("email_users").doc(primaryUserRecord.uid).set({
+        id: primaryUserRecord.uid,
         email: primaryEmail,
         tenantID: tenantID,
         role: "primary_contact",
@@ -3691,7 +3630,8 @@ exports.createTenantCallable = onCall(
         status: "active",
       });
 
-      await db.collection("users").doc(secondaryUserRecord.uid).set({
+      await db.collection("email_users").doc(secondaryUserRecord.uid).set({
+        id: secondaryUserRecord.uid,
         email: secondaryEmail,
         tenantID: tenantID,
         role: "secondary_contact",
@@ -3931,17 +3871,16 @@ exports.newCheckoutProcessRefundCallable = onCall(
     log("newCheckout: process refund request", request.data);
     requireCallableAuth(request);
 
-    const { paymentIntentID, amount, transactionID, tenantID, storeID, refundId, method, salesTax, workorderLines, notes } = request.data;
+    const { paymentIntentID, chargeID, amount, transactionID, tenantID, storeID, refundId, method, salesTax, workorderLines, notes } = request.data;
 
     if (tenantID && storeID) {
-      const db = await getDB(firebaseServiceAccountKey);
-      await requirePermissionLevel(db, request, PERM_EDITOR);
+      requireTenantMatch(request, tenantID, storeID);
     }
 
-    if (!paymentIntentID || typeof paymentIntentID !== "string") {
+    if ((!paymentIntentID || typeof paymentIntentID !== "string") && (!chargeID || typeof chargeID !== "string")) {
       throw new HttpsError(
         "invalid-argument",
-        "Payment Intent ID must be provided."
+        "Payment Intent ID or Charge ID must be provided."
       );
     }
 
@@ -3955,11 +3894,32 @@ exports.newCheckoutProcessRefundCallable = onCall(
     try {
       const stripeClient = Stripe(stripeSecretKey.value());
 
-      // Create the refund using payment intent ID (Stripe recommended)
-      const refund = await stripeClient.refunds.create({
-        payment_intent: paymentIntentID,
-        ...(amount ? { amount } : {}),
-      });
+      // Validate refund amount against original charge before processing
+      if (amount) {
+        let charge;
+        if (chargeID) {
+          charge = await stripeClient.charges.retrieve(chargeID);
+        } else {
+          const pi = await stripeClient.paymentIntents.retrieve(paymentIntentID);
+          if (pi.latest_charge) {
+            charge = await stripeClient.charges.retrieve(pi.latest_charge);
+          }
+        }
+        if (charge) {
+          const refundable = charge.amount - charge.amount_refunded;
+          if (amount > refundable) {
+            throw new HttpsError("invalid-argument", `Refund amount (${amount}) exceeds refundable balance (${refundable}).`);
+          }
+        }
+      }
+
+      const refundParams = { ...(amount ? { amount } : {}) };
+      if (paymentIntentID) {
+        refundParams.payment_intent = paymentIntentID;
+      } else {
+        refundParams.charge = chargeID;
+      }
+      const refund = await stripeClient.refunds.create(refundParams);
 
       // If transactionID provided, write refund to the transaction document
       let refundObj = null;
@@ -4025,6 +3985,70 @@ exports.newCheckoutProcessRefundCallable = onCall(
 );
 
 /**
+ * processCashRefundCallable
+ * Server-side validation and persistence for cash refunds.
+ * Validates refund amount against original cash transaction before writing.
+ */
+exports.processCashRefundCallable = onCall(
+  { secrets: [firebaseServiceAccountKey] },
+  async (request) => {
+    log("processCashRefund: request", request.data);
+
+    const { transactionID, refundObj, tenantID, storeID } = request.data;
+    requireTenantMatch(request, tenantID, storeID);
+
+    if (!transactionID || typeof transactionID !== "string") {
+      throw new HttpsError("invalid-argument", "Transaction ID is required.");
+    }
+    if (!refundObj || typeof refundObj !== "object" || !refundObj.amount || refundObj.amount <= 0) {
+      throw new HttpsError("invalid-argument", "Valid refund object with positive amount is required.");
+    }
+    if (!tenantID || !storeID) {
+      throw new HttpsError("invalid-argument", "Tenant and store IDs are required.");
+    }
+
+    const db = await getDB(firebaseServiceAccountKey);
+
+    const txnRef = db.collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("transactions").doc(transactionID);
+
+    const txnSnap = await txnRef.get();
+    if (!txnSnap.exists) {
+      throw new HttpsError("not-found", "Transaction not found.");
+    }
+
+    const txnData = txnSnap.data();
+    const existingRefunds = txnData.refunds || [];
+    const alreadyRefunded = existingRefunds.reduce((sum, r) => sum + (r.amount || 0), 0);
+    const refundable = (txnData.amountCaptured || 0) - alreadyRefunded;
+
+    if (refundObj.amount > refundable) {
+      throw new HttpsError("invalid-argument", `Refund amount (${refundObj.amount}) exceeds refundable balance (${refundable}).`);
+    }
+
+    existingRefunds.push(refundObj);
+
+    let written = false;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        await txnRef.update({ refunds: existingRefunds });
+        written = true;
+        break;
+      } catch (writeErr) {
+        log(`processCashRefund: write attempt ${attempt}/3 failed:`, writeErr.message);
+      }
+    }
+
+    if (!written) {
+      throw new HttpsError("internal", "Failed to write refund after 3 attempts.");
+    }
+
+    return { success: true, totalRefunds: existingRefunds.length };
+  }
+);
+
+/**
  * newCheckoutCancelPaymentCallable
  * Cancels the current action on a Stripe Terminal reader.
  * Input: { readerID }
@@ -4082,7 +4106,7 @@ exports.newCheckoutCancelPaymentCallable = onCall(
 // ── Manual Card Entry (keyed-in card payment, no terminal reader) ──────────
 
 exports.newCheckoutManualCardPaymentCallable = onCall(
-  { secrets: [stripeSecretKey] },
+  { secrets: [stripeSecretKey, firebaseServiceAccountKey] },
   async (request) => {
     log("newCheckout: manual card payment request", {
       amount: request.data?.amount,
@@ -4100,6 +4124,21 @@ exports.newCheckoutManualCardPaymentCallable = onCall(
     }
     if (!tenantID || !storeID) {
       throw new HttpsError("invalid-argument", "Tenant and store IDs are required.");
+    }
+
+    // Validate payment amount against sale total when available
+    if (saleID) {
+      const db = await getDB(firebaseServiceAccountKey);
+      const saleSnap = await db.collection("tenants").doc(tenantID)
+        .collection("stores").doc(storeID)
+        .collection("active-sales").doc(saleID).get();
+      if (saleSnap.exists) {
+        const sale = saleSnap.data();
+        const remaining = (sale.total || 0) - (sale.amountCaptured || 0);
+        if (amount > remaining && remaining > 0) {
+          throw new HttpsError("invalid-argument", `Payment amount (${amount}) exceeds remaining balance (${remaining}).`);
+        }
+      }
     }
 
     const stripeClient = Stripe(stripeSecretKey.value());
@@ -4571,7 +4610,6 @@ exports.lightspeedImportData = onCall(
     }
 
     const db = await getDB(firebaseServiceAccountKey);
-    await requirePermissionLevel(db, request, PERM_ADMIN);
     const docData = (await db.collection("tenants").doc(tenantID)
       .collection("stores").doc(storeID)
       .collection("integrations").doc("lightspeed").get()).data();
@@ -5504,6 +5542,8 @@ exports.sendEmailCallable = onCall(
         throw new HttpsError("invalid-argument", "Store ID is required");
       }
 
+      requireTenantMatch(request, tenantID, storeID);
+
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
@@ -5582,6 +5622,8 @@ exports.uploadPDFAndSendSMSCallable = onCall(
         forwardTo: forwardToParam = null,
         fromNumber = "+12393171234",
       } = request.data;
+
+      if (tenantID && storeID) requireTenantMatch(request, tenantID, storeID);
 
       // Validate required fields
       if (!base64 || typeof base64 !== "string") {
@@ -6419,7 +6461,6 @@ exports.manualArchiveAndCleanup = onCall(
     }
 
     const db = await getDB(firebaseServiceAccountKey);
-    await requirePermissionLevel(db, request, PERM_ADMIN);
 
     const bucket = admin
       .storage()
@@ -6491,7 +6532,6 @@ exports.rehydrateFromArchive = onCall(
     }
 
     const db = await getDB(firebaseServiceAccountKey);
-    await requirePermissionLevel(db, request, PERM_ADMIN);
 
     const bucket = admin
       .storage()
@@ -7128,6 +7168,8 @@ exports.createTextToPayInvoice = onCall(
         throw new HttpsError("invalid-argument", "tenantID and storeID are required");
       }
 
+      requireTenantMatch(request, tenantID, storeID);
+
       const db = await getDB(firebaseServiceAccountKey);
       const stripeClient = Stripe(stripeSecretKey.value());
 
@@ -7741,7 +7783,6 @@ exports.migrateCustomerPhone = onCall(
     }
 
     const db = await getDB(firebaseServiceAccountKey);
-    await requirePermissionLevel(db, request, PERM_ADMIN);
     const basePath = db.collection("tenants").doc(tenantID).collection("stores").doc(storeID);
     const oldConvoRef = basePath.collection("sms-messages").doc(cleanOld);
     const newConvoRef = basePath.collection("sms-messages").doc(cleanNew);
@@ -7813,14 +7854,14 @@ exports.backfillCustomClaims = onCall(
 
     const db = await getDB(firebaseServiceAccountKey);
 
-    const usersSnapshot = await db.collection("users").get();
+    const usersSnapshot = await db.collection("email_users").get();
     let updated = 0;
     let skipped = 0;
     let errors = 0;
 
     for (const doc of usersSnapshot.docs) {
       const data = doc.data();
-      const uid = doc.id;
+      const uid = data.id || doc.id;
       const { tenantID, storeID } = data;
 
       if (!tenantID) {

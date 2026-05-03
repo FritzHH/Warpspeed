@@ -119,9 +119,10 @@ export const CardRefund = memo(function CardRefund({
     _setErrorMessage("");
     _setSuccessMessage("Processing refund...");
 
+    let refundId;
     try {
       let { tenantID, storeID } = useSettingsStore.getState().getSettings();
-      let refundId = generateEAN13Barcode();
+      refundId = generateEAN13Barcode();
 
       // Persist pending refund marker before calling Cloud Function (crash recovery)
       if (onRefundStarted) onRefundStarted({ refundId, transactionID: selectedPayment.id, amount: sRefundAmount });
@@ -131,6 +132,7 @@ export const CardRefund = memo(function CardRefund({
         selectedPayment.paymentIntentID,
         {
           transactionID: selectedPayment.id,
+          chargeID: selectedPayment.chargeID || "",
           tenantID,
           storeID,
           refundId,
@@ -166,15 +168,13 @@ export const CardRefund = memo(function CardRefund({
     } catch (error) {
       dlog(DCAT.ACTION, "refundError", "CardRefund", { error: error?.message || "Unknown error" });
       log("Card refund error:", error);
-      // HttpsError has a .code property — means the Cloud Function responded (refund failed server-side)
-      // No .code means network/timeout — refund may have succeeded, keep pending marker for reconciliation
-      if (error?.code && onRefundFailed) onRefundFailed(refundId);
+      if (error?.code && refundId && onRefundFailed) onRefundFailed(refundId);
       _setErrorMessage(error?.message || "Refund processing failed");
       _setSuccessMessage("");
+    } finally {
+      _setProcessing(false);
+      if (onProcessingChange) onProcessingChange(false);
     }
-
-    _setProcessing(false);
-    if (onProcessingChange) onProcessingChange(false);
   }
 
   let isEnabled =
@@ -299,7 +299,7 @@ export const CardRefund = memo(function CardRefund({
 
       {/* Button */}
       {reasonMissing ? (
-        <Tooltip text="Enter a refund reason first" position="bottom">
+        <Tooltip text="Enter a refund reason first (min 10 characters)" position="bottom">
           <View>
             <Button_
               text="PROCESS CARD REFUND"

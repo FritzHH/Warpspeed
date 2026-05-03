@@ -87,12 +87,16 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   });
 
   // Calculate card payments total and cash payments total from transactions
+  // Lightspeed card payments cannot be Stripe-refunded; their available balance
+  // counts toward cash refund pool instead.
   let cardPaymentsTotal = 0;
   let cashPaymentsTotal = 0;
   sTransactions.forEach((p) => {
     let refunded = (p.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
     let available = p.amountCaptured - refunded;
     if (p.method === "cash" || p.method === "check") {
+      cashPaymentsTotal += available;
+    } else if (p._importSource === "lightspeed") {
       cashPaymentsTotal += available;
     } else {
       cardPaymentsTotal += available;
@@ -124,7 +128,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   // Suggested refund total: items take priority, then payments
   let suggestedRefundTotal = hasItemSelection ? itemRefundTotal : selectedPaymentsTotal;
 
-  let selectedIsCash = sSelectedPayments.length > 0 && (sSelectedPayments[0].method === "cash" || sSelectedPayments[0].method === "check");
+  let selectedIsCash = sSelectedPayments.length > 0 && (sSelectedPayments[0].method === "cash" || sSelectedPayments[0].method === "check" || sSelectedPayments[0]._importSource === "lightspeed");
   let selectedIsCard = sSelectedPayments.length > 0 && !selectedIsCash;
 
   // Selected payment(s) combined available balance
@@ -159,7 +163,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   // Payment-first: require payment selection when multiple payments exist
   let needsPaymentSelection = sTransactions.length > 1 && sSelectedPayments.length === 0;
 
-  let reasonMissing = !sRefundNote.trim();
+  let reasonMissing = sRefundNote.trim().length < 10;
 
   // Compute which items would exceed the refund limit or selected payment's available balance
   let disabledItemIDs = useMemo(() => {
@@ -327,7 +331,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   function handleSelectPayment(payment) {
     dlog(DCAT.BUTTON, "select_payment", "RefundModal", { paymentID: payment?.id, method: payment?.method, amountCaptured: payment?.amountCaptured, alreadySelected: !!sSelectedPayments.find((p) => p.id === payment?.id) });
     let alreadySelected = sSelectedPayments.find((p) => p.id === payment.id);
-    let isCashOrCheck = payment.method === "cash" || payment.method === "check";
+    let isCashOrCheck = payment.method === "cash" || payment.method === "check" || payment._importSource === "lightspeed";
 
     if (alreadySelected) {
       let remaining = sSelectedPayments.filter((p) => p.id !== payment.id);
@@ -403,10 +407,12 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
         refundObjects.push({ transactionID: cardDetails.paymentId, refundObj: refund });
       }
     } else if (type === "cash") {
-      let cashTargets = sSelectedPayments.filter((p) => p.method === "cash" || p.method === "check");
+      let cashTargets = sSelectedPayments.filter((p) => p.method === "cash" || p.method === "check" || p._importSource === "lightspeed");
       if (cashTargets.length === 0) {
         cashTargets = updatedTxns.filter((t) => {
-          if (t.method !== "cash" && t.method !== "check") return false;
+          let isCashOrCheck = t.method === "cash" || t.method === "check";
+          let isLightspeedCard = t._importSource === "lightspeed" && t.method !== "cash" && t.method !== "check";
+          if (!isCashOrCheck && !isLightspeedCard) return false;
           let refunded = (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
           return (t.amountCaptured - refunded) > 0;
         });
@@ -871,9 +877,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     onProcessRefund={handleProcessRefund}
                     refundComplete={sRefundComplete}
                     suggestedAmount={
-                      hasItemSelection ? itemCashAmount
-                      : !selectedIsCard ? suggestedRefundTotal
-                      : 0
+                      hasItemSelection ? itemCashAmount : 0
                     }
                     onManualInput={handleManualAmountInput}
                     reasonMissing={reasonMissing}
@@ -1012,7 +1016,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                           }}
                           value={sRefundNote}
                           onChangeText={(val) => _setRefundNote(val.length === 1 ? val.toUpperCase() : val)}
-                          placeholder={reasonMissing ? "Refund reason (required)" : "Reason for refund..."}
+                          placeholder={reasonMissing ? "Refund reason required (min 10 characters)" : "Reason for refund..."}
                           placeholderTextColor={reasonMissing ? C.red : gray(0.3)}
                           multiline
                         />

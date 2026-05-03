@@ -14089,3 +14089,12 @@ id,method,amountCaptured,amountTendered,chargeID,paymentIntentID,last4,cardType,
 17845,card,3100,0,,,,,Debit Card,,stripe,,1777741573000
 17846,card,2500,0,,,,,Debit Card,,stripe,,1777742262000
 17847,cash,3089,3089,,,,,,,cash,,1777743863000
+17850,card,1065,0,,,,,Credit Card,,stripe,,1777819183000
+17851,card,7988,0,,,,,Credit Card,,stripe,,1777819409000
+17853,card,150000,0,,,,,Credit Card,,stripe,,1777824296000
+17855,card,33180,0,,,,,Debit Card,,stripe,,1777824305000
+17856,card,6710,0,,,,,Credit Card,,stripe,,1777824326000
+17858,cash,2500,2500,,,,,,deposit,cash,,1777825493000
+17859,cash,4295,4295,,,,,,,cash,,1777826039000
+17860,cash,8520,8520,,,,,,,cash,,1777826585000
+17861,card,4260,0,,,,,Credit Card,,stripe,,1777827854000

@@ -654,6 +654,72 @@ var printBuilder = {
 
     return receipt;
   },
+  credit: function (creditObj, customer, context) {
+    var _ctx = context || {};
+    var _settings = _ctx.settings || {};
+    var currentUser = _ctx.currentUser || {};
+
+    var receipt = Object.assign({}, RECEIPT_PROTO);
+    receipt.receiptType = "Credit";
+    receipt.id = creditObj.id || "";
+    receipt.barcode = creditObj.id || "";
+    receipt.shopName = _settings.storeInfo?.displayName || SHOP_NAME;
+    receipt.shopContactBlurb = _settings.shopContactBlurb || SHOP_CONTACT_BLURB;
+    receipt.thankYouBlurb = _settings.thankYouBlurb || THANK_YOU_BLURB;
+
+    receipt.first = capitalizeFirstLetterOfString((customer?.first || "").trim());
+    receipt.last = capitalizeFirstLetterOfString((customer?.last || "").trim());
+    receipt.customerFirstName = receipt.first;
+    receipt.customerLastName = receipt.last;
+    receipt.customerCell = customer?.customerCell || customer?.cell || customer?.phone || "";
+    receipt.customerEmail = customer?.email || "";
+    receipt.customerContact = formatPhoneForDisplay(receipt.customerCell) || receipt.customerEmail;
+
+    var userFirst = capitalizeFirstLetterOfString((currentUser?.first || "").trim());
+    var userLastInitial = (currentUser?.last || "").trim().charAt(0).toUpperCase();
+    receipt.startedBy = userFirst + (userLastInitial ? " " + userLastInitial + "." : "");
+
+    receipt.creditAmount = creditObj.amountCents || 0;
+    receipt.creditNote = creditObj.text || creditObj.note || "";
+
+    var txDate = new Date(Number(creditObj.millis) || Date.now());
+    receipt.transactionDateTime = txDate.toLocaleDateString() + "  " + txDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+    return receipt;
+  },
+  giftcard: function (giftcardObj, customer, context) {
+    var _ctx = context || {};
+    var _settings = _ctx.settings || {};
+    var currentUser = _ctx.currentUser || {};
+
+    var receipt = Object.assign({}, RECEIPT_PROTO);
+    receipt.receiptType = "GiftCard";
+    receipt.id = giftcardObj.id || "";
+    receipt.barcode = giftcardObj.id || "";
+    receipt.shopName = _settings.storeInfo?.displayName || SHOP_NAME;
+    receipt.shopContactBlurb = _settings.shopContactBlurb || SHOP_CONTACT_BLURB;
+    receipt.thankYouBlurb = _settings.thankYouBlurb || THANK_YOU_BLURB;
+
+    receipt.first = capitalizeFirstLetterOfString((customer?.first || "").trim());
+    receipt.last = capitalizeFirstLetterOfString((customer?.last || "").trim());
+    receipt.customerFirstName = receipt.first;
+    receipt.customerLastName = receipt.last;
+    receipt.customerCell = customer?.customerCell || customer?.cell || customer?.phone || "";
+    receipt.customerEmail = customer?.email || "";
+    receipt.customerContact = formatPhoneForDisplay(receipt.customerCell) || receipt.customerEmail;
+
+    var userFirst = capitalizeFirstLetterOfString((currentUser?.first || "").trim());
+    var userLastInitial = (currentUser?.last || "").trim().charAt(0).toUpperCase();
+    receipt.startedBy = userFirst + (userLastInitial ? " " + userLastInitial + "." : "");
+
+    receipt.giftCardAmount = giftcardObj.amountCents || 0;
+    receipt.giftCardNote = giftcardObj.note || "";
+
+    var txDate = new Date(Number(giftcardObj.millis) || Date.now());
+    receipt.transactionDateTime = txDate.toLocaleDateString() + "  " + txDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+
+    return receipt;
+  },
 };
 
 module.exports = {

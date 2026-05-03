@@ -107,7 +107,6 @@ const QuickItemCanvasCard = ({
   const [sDragging, _setDragging] = useState(false);
   const [sResizing, _setResizing] = useState(false);
   const [sPressed, _setPressed] = useState(false);
-  const [sLineCount, _setLineCount] = useState(1);
   const [sShowActions, _setShowActions] = useState(false);
   const [sShowPrintPicker, _setShowPrintPicker] = useState(false);
   const [sPrintSuccess, _setPrintSuccess] = useState(false);
@@ -155,8 +154,6 @@ const QuickItemCanvasCard = ({
   let h = itemObj.h || DEFAULT_ITEM_H;
   let defaultName = invItem ? (invItem.formalName || "Unknown") : "(not found)";
   let name = invItem ? (invItem.informalName || invItem.formalName || "Unknown") : "(not found)";
-  let nameLineCount = (name || "").split("\n").length;
-  if (sLineCount !== nameLineCount && !sEditMode) _setLineCount(nameLineCount);
   let price = invItem ? formatCurrencyDisp(invItem.price) : "";
 
   function handleMouseDown(e) {
@@ -324,13 +321,14 @@ const QuickItemCanvasCard = ({
       }}
     >
       {/* Formal name helper - above card in edit mode */}
-      {sEditMode && isSelected && invItem?.formalName && (
+      {sEditMode && invItem?.formalName && (
         <div
           style={{
             position: "absolute",
-            top: -16,
+            bottom: "100%",
             left: "50%",
             transform: "translateX(-50%)",
+            width: "200%",
             fontSize: 12,
             color: gray(0.5),
             backgroundColor: "rgba(255,255,255,0.95)",
@@ -341,7 +339,11 @@ const QuickItemCanvasCard = ({
             paddingRight: 4,
             pointerEvents: "none",
             zIndex: 10,
-            whiteSpace: "nowrap",
+            textAlign: "center",
+            overflow: "hidden",
+            display: "-webkit-box",
+            WebkitLineClamp: 3,
+            WebkitBoxOrient: "vertical",
           }}
         >
           {invItem.formalName}
@@ -371,7 +373,7 @@ const QuickItemCanvasCard = ({
       ))}
 
       {sEditMode ? (
-        <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} style={{ width: "90%" }}>
+        <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} style={{ width: "90%", flex: 1, display: "flex", alignItems: "center", overflow: "hidden" }}>
           <TextInput_
             value={invItem?.informalName || ""}
             placeholder={defaultName}
@@ -379,13 +381,9 @@ const QuickItemCanvasCard = ({
             onChangeText={(val) => {
               if (onLabelChange) onLabelChange(itemObj.inventoryItemID, val);
             }}
-            onChange={(e) => {
-              let val = e?.nativeEvent?.text || e?.target?.value || "";
-              _setLineCount((val).split("\n").length);
-            }}
             debounceMs={400}
             multiline
-            numberOfLines={sLineCount}
+            numberOfLines={99}
             style={{
               fontSize: itemObj.fontSize || 10,
               color: itemObj.textColor || C.text,
@@ -399,11 +397,13 @@ const QuickItemCanvasCard = ({
               backgroundColor: "transparent",
               lineHeight: (itemObj.fontSize || 10) + 6,
               outlineWidth: 0,
+              overflow: "hidden",
+              resize: "none",
             }}
           />
         </div>
       ) : (
-          <div title={defaultName} style={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div title={defaultName} style={{ display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", width: "100%", height: "100%" }}>
           <Text
             style={{
               fontSize: itemObj.fontSize || 10,
@@ -412,7 +412,6 @@ const QuickItemCanvasCard = ({
               fontWeight: "500",
               lineHeight: (itemObj.fontSize || 10) + 6,
             }}
-            numberOfLines={(name || "").split("\n").length}
           >
             {name}
           </Text>
@@ -569,6 +568,7 @@ const QuickItemCanvas = React.forwardRef(({
     if (onForceEditConsumed) onForceEditConsumed();
   }
   const [sSelectedItemId, _setSelectedItemId] = useState(null);
+  const [sPaintStyle, _setPaintStyle] = useState(null);
   const canvasRef = useRef(null);
   const dbSaveTimerRef = useRef(null);
   const migratedRef = useRef(false);
@@ -675,6 +675,21 @@ const QuickItemCanvas = React.forwardRef(({
     }));
   }
 
+  function handleCopyStyle() {
+    if (!sSelectedItemId) return;
+    let sel = rawItems.find((it) => it.inventoryItemID === sSelectedItemId);
+    if (!sel) return;
+    _setPaintStyle({ w: sel.w || DEFAULT_ITEM_W, h: sel.h || DEFAULT_ITEM_H, fontSize: sel.fontSize, backgroundColor: sel.backgroundColor, textColor: sel.textColor });
+  }
+
+  function handlePasteStyle(targetId) {
+    if (!sPaintStyle) return;
+    saveItems(rawItems.map((it) => {
+      if (it.inventoryItemID !== targetId) return it;
+      return { ...it, ...sPaintStyle, x: it.x, y: it.y, inventoryItemID: it.inventoryItemID };
+    }));
+  }
+
   return (
     <View style={{ flex: 1 }}>
       {/* Canvas */}
@@ -702,7 +717,10 @@ const QuickItemCanvas = React.forwardRef(({
               sEditMode={sEditMode}
               isSelected={sSelectedItemId === itemObj.inventoryItemID}
               isInWorkorder={!!(zWorkorderLines || []).find((l) => l.inventoryItem?.id === itemObj.inventoryItemID)}
-              onSelect={(id) => { _setSelectedItemId(id); notifyParent(sEditMode, id); }}
+              onSelect={(id) => {
+                if (sPaintStyle && id !== sSelectedItemId) { handlePasteStyle(id); return; }
+                _setSelectedItemId(id); notifyParent(sEditMode, id);
+              }}
               containerRef={canvasRef}
               onPositionChange={handlePositionChange}
               onResize={handleResize}
@@ -713,6 +731,7 @@ const QuickItemCanvas = React.forwardRef(({
                 if (sEditMode) {
                   _setEditMode(false);
                   _setSelectedItemId(null);
+                  _setPaintStyle(null);
                   notifyParent(false, null);
                   dbSaveSettingsField("quickItemButtons", useSettingsStore.getState().settings?.quickItemButtons);
                 } else {
@@ -726,32 +745,76 @@ const QuickItemCanvas = React.forwardRef(({
           );
         })}
 
-        {/* Delete overlay for selected item in edit mode */}
+        {/* Delete + Format Painter overlays for selected item in edit mode */}
         {sEditMode && sSelectedItemId && (() => {
           let sel = rawItems.find((it) => it.inventoryItemID === sSelectedItemId);
           if (!sel) return null;
           return (
-            <div
-              onClick={() => handleDeleteItem(sSelectedItemId)}
-              style={{
-                position: "absolute",
-                left: `calc(${(sel.x || 0) + (sel.w || DEFAULT_ITEM_W)}% - 8px)`,
-                top: `calc(${(sel.y || 0)}% - 6px)`,
-                width: 16,
-                height: 16,
-                borderRadius: 8,
-                backgroundColor: C.lightred,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                cursor: "pointer",
-                zIndex: 10,
-              }}
-            >
-              <Image_ icon={ICONS.trash} size={10} />
-            </div>
+            <>
+              <div
+                onClick={() => handleDeleteItem(sSelectedItemId)}
+                style={{
+                  position: "absolute",
+                  left: `calc(${(sel.x || 0) + (sel.w || DEFAULT_ITEM_W)}% - 8px)`,
+                  top: `calc(${(sel.y || 0)}% - 6px)`,
+                  width: 16,
+                  height: 16,
+                  borderRadius: 8,
+                  backgroundColor: C.lightred,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  zIndex: 10,
+                }}
+              >
+                <Image_ icon={ICONS.trash} size={10} />
+              </div>
+              <div
+                onClick={handleCopyStyle}
+                style={{
+                  position: "absolute",
+                  left: `calc(${(sel.x || 0) + (sel.w || DEFAULT_ITEM_W)}% - 8px)`,
+                  top: `calc(${(sel.y || 0)}% + 14px)`,
+                  width: 16,
+                  height: 16,
+                  borderRadius: 8,
+                  backgroundColor: sPaintStyle ? C.blue : C.green,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                  zIndex: 10,
+                }}
+              >
+                <Image_ icon={ICONS.colorWheel} size={10} />
+              </div>
+            </>
           );
         })()}
+        {/* Paint mode indicator */}
+        {sEditMode && sPaintStyle && (
+          <div
+            onClick={() => _setPaintStyle(null)}
+            style={{
+              position: "absolute",
+              top: 4,
+              right: 4,
+              fontSize: 11,
+              backgroundColor: C.blue,
+              color: "white",
+              borderRadius: 4,
+              paddingTop: 2,
+              paddingBottom: 2,
+              paddingLeft: 6,
+              paddingRight: 6,
+              cursor: "pointer",
+              zIndex: 12,
+            }}
+          >
+            Paint Mode (click to exit)
+          </div>
+        )}
 
         {rawItems.length === 0 && (
           <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 60 }}>

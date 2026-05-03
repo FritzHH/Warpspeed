@@ -191,6 +191,12 @@ export const build_db_path = {
     intakeReceiptPDF: (workorderID, tenantID, storeID) => {
       return `${tenantID}/${storeID}/intake-receipts/${workorderID}.pdf`;
     },
+    creditReceiptPDF: (creditID, tenantID, storeID) => {
+      return `${tenantID}/${storeID}/receipts/credits/${creditID}.pdf`;
+    },
+    giftCardReceiptPDF: (giftCardID, tenantID, storeID) => {
+      return `${tenantID}/${storeID}/receipts/giftcards/${giftCardID}.pdf`;
+    },
   },
 };
 

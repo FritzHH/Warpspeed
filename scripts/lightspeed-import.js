@@ -1039,6 +1039,7 @@ function mapSales(salesCSVText, salesPaymentsCSVText, paymentsCSVText, workorder
         depositType: isDepositSale ? "deposit" : "",
         refunds: [],
         items: [],
+        _importSource: "lightspeed",
       };
     });
 

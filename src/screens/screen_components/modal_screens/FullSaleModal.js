@@ -336,9 +336,17 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                     <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
                       <Text style={{ fontSize: 13, color: gray(0.45) }}>Amount Paid</Text>
                       <Text style={{ fontSize: 14, fontWeight: "600", color: C.green }}>
-                        {"$" + formatCurrencyDisp(sSale.amountCaptured)}
+                        {"$" + formatCurrencyDisp(sSale.amountCaptured + totalRefunded)}
                       </Text>
                     </View>
+                    {totalRefunded > 0 && (
+                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+                        <Text style={{ fontSize: 13, color: gray(0.45) }}>Refunded</Text>
+                        <Text style={{ fontSize: 14, fontWeight: "600", color: C.lightred }}>
+                          {"-$" + formatCurrencyDisp(totalRefunded)}
+                        </Text>
+                      </View>
+                    )}
                     {!sSale.paymentComplete && (
                       <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
                         <Text style={{ fontSize: 13, color: gray(0.45) }}>Remaining</Text>
@@ -437,11 +445,6 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                           {!!p.authorizationCode && (
                             <Text style={{ fontSize: 10, color: gray(0.35) }}>
                               {"Auth: " + p.authorizationCode}
-                            </Text>
-                          )}
-                          {!!p.chargeID && (
-                            <Text style={{ fontSize: 10, color: gray(0.35) }}>
-                              {"Charge: " + p.chargeID}
                             </Text>
                           )}
                         </View>

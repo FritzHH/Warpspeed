@@ -18,6 +18,7 @@ function formatTransactionDate(millis) {
 const PaymentSelectRow = memo(function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
   let isCash = payment.method === "cash";
   let isCheck = payment.method === "check";
+  let isLightspeedCard = !isCash && !isCheck && payment._importSource === "lightspeed";
   let typeLabel = isCheck ? "CHECK" : isCash ? "CASH" : "CARD";
   let amountRefunded = (payment.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
   let available = payment.amountCaptured - amountRefunded;
@@ -40,6 +41,8 @@ const PaymentSelectRow = memo(function PaymentSelectRow({ payment, isSelected, o
         borderBottomColor: gray(0.05),
         backgroundColor: isSelected
           ? "rgb(230, 240, 252)"
+          : isLightspeedCard
+          ? "rgb(255, 248, 230)"
           : fullyRefunded
           ? gray(0.04)
           : "transparent",
@@ -104,6 +107,15 @@ const PaymentSelectRow = memo(function PaymentSelectRow({ payment, isSelected, o
           <Text style={{ fontSize: 11, color: C.lightText, marginTop: 2 }}>
             {payment.cardIssuer} ****{payment.last4} {payment.expMonth}/{payment.expYear}
           </Text>
+        )}
+
+        {/* Lightspeed import indicator */}
+        {isLightspeedCard && (
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 3, backgroundColor: "rgb(255, 237, 180)", borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2, alignSelf: "flex-start" }}>
+            <Text style={{ fontSize: 9, fontWeight: Fonts.weight.textHeavy, color: "rgb(140, 100, 0)" }}>
+              LIGHTSPEED - CASH REFUND ONLY
+            </Text>
+          </View>
         )}
 
         {/* Refund history */}
@@ -186,15 +198,17 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
         {payments.map((payment, idx) => {
           let isSelected = selectedPayments.some((p) => p.id === payment.id);
           let paymentIsCash = payment.method === "cash" || payment.method === "check";
+          let isLsCard = !paymentIsCash && payment._importSource === "lightspeed";
 
           // Disable logic
           let rowDisabled = disabled;
           if (!rowDisabled && selectedPayments.length > 0 && !isSelected) {
-            let selIsCash = selectedPayments[0].method === "cash" || selectedPayments[0].method === "check";
-            if (paymentIsCash !== selIsCash) {
-              // Different type than current selection
+            let selFirst = selectedPayments[0];
+            let selIsCashLike = selFirst.method === "cash" || selFirst.method === "check" || (selFirst._importSource === "lightspeed");
+            let thisCashLike = paymentIsCash || isLsCard;
+            if (thisCashLike !== selIsCashLike) {
               rowDisabled = true;
-            } else if (!paymentIsCash) {
+            } else if (!thisCashLike) {
               // Card: only one card at a time
               rowDisabled = true;
             }

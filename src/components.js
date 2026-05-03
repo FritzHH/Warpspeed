@@ -3617,23 +3617,30 @@ export const StatusPickerModal = ({
   );
 };
 
-export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inlineStyle }) => {
+export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inlineStyle, customer }) => {
   const [sDepositType, _sSetDepositType] = useState(CUSTOMER_DEPOST_TYPES.deposit);
   const [sDepositAmount, _sSetDepositAmount] = useState("");
   const [sDepositAmountCents, _sSetDepositAmountCents] = useState(0);
   const [sDepositNote, _sSetDepositNote] = useState("");
+  const [sSendSMS, _sSetSendSMS] = useState(false);
+  const [sSendEmail, _sSetSendEmail] = useState(false);
 
   let isCredit = sDepositType === CUSTOMER_DEPOST_TYPES.credit;
   let isGiftCard = sDepositType === CUSTOMER_DEPOST_TYPES.giftcard;
   let creditReady = isCredit && sDepositAmountCents >= 100 && sDepositNote.trim().length > 3;
   let depositReady = (!isCredit && !isGiftCard) && sDepositAmountCents > 0;
   let giftCardReady = isGiftCard && sDepositAmountCents > 0;
+  let hasPhone = !!(customer?.customerCell || customer?.cell);
+  let hasEmail = !!customer?.email;
+  let showSendReceipt = (isCredit || isGiftCard) && (hasPhone || hasEmail);
 
   function resetAndClose() {
     _sSetDepositAmount("");
     _sSetDepositAmountCents(0);
     _sSetDepositNote("");
     _sSetDepositType(CUSTOMER_DEPOST_TYPES.deposit);
+    _sSetSendSMS(false);
+    _sSetSendEmail(false);
     onClose();
   }
 
@@ -3642,6 +3649,8 @@ export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inline
       onCredit({
         amountCents: sDepositAmountCents,
         text: sDepositNote.trim(),
+        sendSMS: sSendSMS,
+        sendEmail: sSendEmail,
       });
     }
     resetAndClose();
@@ -3751,6 +3760,32 @@ export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inline
             color: C.text,
           }}
         />
+        {showSendReceipt && (
+          <View style={{ marginBottom: 14 }}>
+            <Text style={{ fontSize: 12, color: gray(0.45), fontWeight: "600", marginBottom: 6 }}>
+              Send Receipt
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              {hasPhone && (
+                <CheckBox_
+                  text="SMS"
+                  isChecked={sSendSMS}
+                  onCheck={() => _sSetSendSMS(!sSendSMS)}
+                  textStyle={{ fontSize: 13 }}
+                  buttonStyle={{ marginRight: 18 }}
+                />
+              )}
+              {hasEmail && (
+                <CheckBox_
+                  text="Email"
+                  isChecked={sSendEmail}
+                  onCheck={() => _sSetSendEmail(!sSendEmail)}
+                  textStyle={{ fontSize: 13 }}
+                />
+              )}
+            </View>
+          </View>
+        )}
         <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
           <Button_
             text="Cancel"
@@ -3775,6 +3810,8 @@ export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inline
                   type: sDepositType,
                   amountCents: sDepositAmountCents,
                   note: sDepositNote,
+                  sendSMS: sSendSMS,
+                  sendEmail: sSendEmail,
                 });
                 resetAndClose();
               } else {

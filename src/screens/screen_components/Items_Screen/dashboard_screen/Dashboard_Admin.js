@@ -5043,7 +5043,7 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
   );
 };
 
-const QBInventorySearchModal = ({ parentName, onClose, onAddItems }) => {
+const QBInventorySearchModal = ({ parentName, onClose, onAddItems, existingItemIDs = [] }) => {
   const [sInvSearch, _setInvSearch] = useState("");
   const [sInvResults, _setInvResults] = useState([]);
   const [sSelectedIDs, _setSelectedIDs] = useState(new Set());
@@ -5182,10 +5182,11 @@ const QBInventorySearchModal = ({ parentName, onClose, onAddItems }) => {
           style={{ flex: 1, paddingHorizontal: 8 }}
           renderItem={({ item, index }) => {
             let isChecked = sSelectedIDs.has(item.id);
+            let alreadyAdded = existingItemIDs.includes(item.id);
             return (
               <div
-                onMouseEnter={(e) => { e.currentTarget.style.opacity = "0.7"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.opacity = "1"; }}
+                onMouseEnter={(e) => { if (!alreadyAdded) e.currentTarget.style.opacity = "0.7"; }}
+                onMouseLeave={(e) => { e.currentTarget.style.opacity = alreadyAdded ? "0.4" : "1"; }}
                 style={{
                   display: "flex",
                   flexDirection: "row",
@@ -5198,20 +5199,22 @@ const QBInventorySearchModal = ({ parentName, onClose, onAddItems }) => {
                   paddingBottom: 6,
                   paddingLeft: 6,
                   paddingRight: 6,
-                  cursor: "pointer",
+                  cursor: alreadyAdded ? "default" : "pointer",
+                  opacity: alreadyAdded ? 0.4 : 1,
                 }}
               >
                 <CheckBox_
                   isChecked={isChecked}
-                  onCheck={() => toggleSelected(item.id)}
+                  onCheck={alreadyAdded ? undefined : () => toggleSelected(item.id)}
                   buttonStyle={{ marginRight: 4 }}
                 />
                 <TouchableOpacity
-                  onPress={() => handleSingleSelect(item.id)}
+                  onPress={alreadyAdded ? undefined : () => handleSingleSelect(item.id)}
                   style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+                  disabled={alreadyAdded}
                 >
                   <View style={{ flex: 1, paddingLeft: 4 }}>
-                    <Text style={{ fontSize: 14, color: C.text }} numberOfLines={1}>
+                    <Text style={{ fontSize: 14, color: alreadyAdded ? gray(0.4) : C.text }} numberOfLines={1}>
                       {item.informalName || item.formalName}
                     </Text>
                     {!!item.informalName && (
@@ -5220,7 +5223,7 @@ const QBInventorySearchModal = ({ parentName, onClose, onAddItems }) => {
                       </Text>
                     )}
                   </View>
-                  <Text style={{ fontSize: 13, color: C.text, marginLeft: 8 }}>
+                  <Text style={{ fontSize: 13, color: alreadyAdded ? gray(0.4) : C.text, marginLeft: 8 }}>
                     {"$" + formatCurrencyDisp(item.price)}
                   </Text>
                 </TouchableOpacity>
@@ -5333,11 +5336,13 @@ const QuickItemButtonsComponent = () => {
     if (!sShowInvSearchModal) return null;
     const parentBtn = (zSettingsObj?.quickItemButtons || []).find((b) => b.id === sCurrentParentID);
     const parentName = parentBtn?.name || "(unnamed)";
+    const existingItemIDs = (parentBtn?.items || []).map((e) => typeof e === "string" ? e : e.inventoryItemID);
     return (
       <QBInventorySearchModal
         parentName={parentName}
         onClose={() => _setShowInvSearchModal(false)}
         onAddItems={handleAddItemsToButton}
+        existingItemIDs={existingItemIDs}
       />
     );
   }
@@ -5835,22 +5840,31 @@ const ParentButtonItemsList = ({
     useSettingsStore.getState().setField("quickItemButtons", updated);
   }
 
-  function handleAddToCommon(inventoryItemID) {
-    let commonBtn = quickItemButtons.find((b) => b.id === "common");
-    if (!commonBtn) return;
-    let existingIDs = (commonBtn.items || []).map((e) => typeof e === "string" ? e : e.inventoryItemID);
+  function handleAddToTargetQB(inventoryItemID, targetBtnID) {
+    let targetBtn = quickItemButtons.find((b) => b.id === targetBtnID);
+    if (!targetBtn) return;
+    let existingIDs = (targetBtn.items || []).map((e) => typeof e === "string" ? e : e.inventoryItemID);
     if (existingIDs.includes(inventoryItemID)) return;
-    let newEntry = { inventoryItemID, x: (existingIDs.length % 6) * (QB_DEFAULT_W + QB_SNAP_PCT), y: Math.floor(existingIDs.length / 6) * (QB_DEFAULT_H + QB_SNAP_PCT), w: QB_DEFAULT_W, h: QB_DEFAULT_H, fontSize: 10 };
+    let sourceEntry = (parentButton?.items || []).find((e) => {
+      let id = typeof e === "string" ? e : e.inventoryItemID;
+      return id === inventoryItemID;
+    });
+    let w = (sourceEntry && typeof sourceEntry !== "string") ? sourceEntry.w || QB_DEFAULT_W : QB_DEFAULT_W;
+    let h = (sourceEntry && typeof sourceEntry !== "string") ? sourceEntry.h || QB_DEFAULT_H : QB_DEFAULT_H;
+    let fontSize = (sourceEntry && typeof sourceEntry !== "string") ? sourceEntry.fontSize || 10 : 10;
+    let newEntry = { inventoryItemID, x: (existingIDs.length % 6) * (QB_DEFAULT_W + QB_SNAP_PCT), y: Math.floor(existingIDs.length / 6) * (QB_DEFAULT_H + QB_SNAP_PCT), w, h, fontSize };
+    if (sourceEntry && typeof sourceEntry !== "string" && sourceEntry.color) newEntry.color = sourceEntry.color;
     let updated = quickItemButtons.map((b) =>
-      b.id === "common" ? { ...b, items: [...(b.items || []), newEntry] } : b
+      b.id === targetBtnID ? { ...b, items: [...(b.items || []), newEntry] } : b
     );
     useSettingsStore.getState().setField("quickItemButtons", updated);
   }
 
   if (parentItems.length === 0) return null;
 
-  let commonBtn = quickItemButtons.find((b) => b.id === "common");
-  let commonItemIDs = (commonBtn?.items || []).map((e) => typeof e === "string" ? e : e.inventoryItemID);
+  let dropdownTargets = quickItemButtons
+    .filter((b) => b.id !== "labor" && b.id !== "item" && b.id !== sCurrentParentID)
+    .map((b) => ({ id: b.id, label: b.name || "(unnamed)" }));
 
   return (
     <View style={{ marginTop: 10, width: "100%" }}>
@@ -5860,7 +5874,6 @@ const ParentButtonItemsList = ({
       {parentItems.map((inv, idx) => {
         let dividerObj = (parentButton?.dividers || []).find((d) => d.itemID === inv.id);
         let hasDivider = !!dividerObj;
-        let isInCommon = commonItemIDs.includes(inv.id);
         return (
           <React.Fragment key={inv.id}>
             {hasDivider && (
@@ -5946,15 +5959,18 @@ const ParentButtonItemsList = ({
               <Text style={{ fontSize: 12, color: gray(0.5), marginRight: 10 }}>
                 {"$" + formatCurrencyDisp(inv.price)}
               </Text>
-              {sCurrentParentID !== "common" && (
-                <Tooltip text={isInCommon ? "Already in Common menu" : "Add to Common menu"}>
-                  <TouchableOpacity
-                    onPress={isInCommon ? undefined : () => handleAddToCommon(inv.id)}
-                    style={{ marginRight: 10, opacity: isInCommon ? 0.3 : 1, cursor: isInCommon ? "default" : "pointer" }}
-                  >
-                    <Image_ icon={ICONS.add} size={17} />
-                  </TouchableOpacity>
-                </Tooltip>
+              {dropdownTargets.length > 0 && (
+                <View style={{ marginRight: 10 }}>
+                  <DropdownMenu
+                    dataArr={dropdownTargets}
+                    onSelect={(item) => handleAddToTargetQB(inv.id, item.id)}
+                    buttonIcon={ICONS.add}
+                    buttonIconSize={17}
+                    buttonStyle={{ backgroundColor: "transparent", borderWidth: 0, paddingVertical: 0, paddingHorizontal: 0 }}
+                    centerMenuVertically
+                    menuMaxHeight={window.innerHeight - 20}
+                  />
+                </View>
               )}
               <TouchableOpacity onPress={() => handleDeleteItem(inv.id)}>
                 <Image_ icon={ICONS.trash} size={14} />

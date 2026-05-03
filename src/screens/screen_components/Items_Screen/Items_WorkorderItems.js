@@ -729,7 +729,7 @@ export const Items_WorkorderItemsTab = ({}) => {
               index={idx}
               applyDiscount={applyDiscount}
               zSettingsObj={{ discounts: zDiscounts }}
-              onEditCustomItem={_setEditingCustomLine}
+              onEditCustomItem={(line, x, y) => _setEditingCustomLine({ line, anchorX: x, anchorY: y })}
               isLocked={isLocked}
               hasActiveSale={hasActiveSale}
               onOpenNoteHelper={openNoteHelperForLine}
@@ -928,8 +928,10 @@ export const Items_WorkorderItemsTab = ({}) => {
           visible={!!sEditingCustomLine}
           onClose={() => _setEditingCustomLine(null)}
           onSave={handleCustomItemEditSave}
-          type={sEditingCustomLine.inventoryItem?.customLabor ? "labor" : "part"}
-          existingLine={sEditingCustomLine}
+          type={sEditingCustomLine.line?.inventoryItem?.customLabor ? "labor" : "part"}
+          existingLine={sEditingCustomLine.line}
+          anchorX={sEditingCustomLine.anchorX}
+          anchorY={sEditingCustomLine.anchorY}
         />
       )}
       <NoteHelperDropdown
@@ -1069,14 +1071,21 @@ export const LineItemComponent = ({
                     </Tooltip>
                     <TouchableOpacity
                       disabled={!isCustom || isLocked}
-                      onPress={() => isCustom && onEditCustomItem?.(workorderLine)}
+                      onPress={(e) => {
+                        if (!isCustom) return;
+                        const x = e?.nativeEvent?.pageX || e?.pageX || 0;
+                        const y = e?.nativeEvent?.pageY || e?.pageY || 0;
+                        onEditCustomItem?.(workorderLine, x, y);
+                      }}
                       activeOpacity={isCustom ? 0.6 : 1}
                       style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
                     >
                       {(inventoryItem.customPart || inventoryItem.customLabor) && (
-                        <View style={{ backgroundColor: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 55) : lightenRGBByPercent(C.green, 55), borderRadius: 15, paddingHorizontal: 7, paddingVertical: 3, marginRight: 5 }}>
-                          <Text style={{ fontSize: 12, fontWeight: "700", color: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 15) : lightenRGBByPercent(C.green, 15) }}>{inventoryItem.customPart ? "ITEM" : inventoryItem.minutes ? inventoryItem.minutes + " MINS" : "LABOR"}</Text>
-                        </View>
+                        <Tooltip text={inventoryItem.customPart ? "Edit item" : "Edit labor charge"} position="top">
+                          <View style={{ backgroundColor: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 55) : lightenRGBByPercent(C.green, 55), borderRadius: 15, paddingHorizontal: 7, paddingVertical: 3, marginRight: 5 }}>
+                            <Text style={{ fontSize: 12, fontWeight: "700", color: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 15) : lightenRGBByPercent(C.green, 15) }}>{inventoryItem.customPart ? "ITEM" : inventoryItem.minutes ? inventoryItem.minutes + " MINS" : "LABOR"}</Text>
+                          </View>
+                        </Tooltip>
                       )}
                       <Text
                         style={{
@@ -1282,52 +1291,52 @@ export const LineItemComponent = ({
                 enabled={!isLocked}
                 icon={ICONS.menu2}
                 iconSize={22}
-                onPress={() => {
-                  if (lineActionRef.current) {
-                    const rect = lineActionRef.current.getBoundingClientRect();
-                    _setModalTop(null);
-                    _setLineActionModal({ x: rect.x + rect.width + 5, y: rect.y });
-                    _setCustomPercent("");
-                    _setCustomDollar("");
-                    _setCustomDollarCents(0);
-                  }
+                onPress={(e) => {
+                  const nativeEl = e?.target || e?.currentTarget || lineActionRef.current;
+                  const rect = nativeEl?.getBoundingClientRect?.();
+                  const x = rect ? rect.x + rect.width / 2 : 0;
+                  const y = rect ? rect.y + rect.height + 5 : 0;
+                  _setModalTop(null);
+                  _setLineActionModal({ x, y });
+                  _setCustomPercent("");
+                  _setCustomDollar("");
+                  _setCustomDollarCents(0);
                 }}
                 buttonStyle={{ backgroundColor: "transparent", borderWidth: 0, paddingHorizontal: 4, marginRight: 3 }}
               />
             </Tooltip>
             <Modal visible={!!sLineActionModal} transparent animationType="fade">
               <TouchableWithoutFeedback onPress={() => { _setLineActionModal(null); _setModalTop(null); }}>
-                <View style={{ width: "100%", height: "100%", position: "absolute", top: 0, left: 0 }}>
-                  <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-                    <View
-                      ref={modalContentRef}
-                      onLayout={() => {
-                        if (modalContentRef.current && sLineActionModal && sModalTop === null) {
-                          const el = modalContentRef.current;
-                          const rect = typeof el.getBoundingClientRect === "function" ? el.getBoundingClientRect() : null;
-                          if (rect) {
-                            const bottom = sLineActionModal.y + rect.height;
-                            const viewportH = window.innerHeight;
-                            const margin = 10;
-                            if (bottom > viewportH - margin) {
-                              _setModalTop(Math.max(margin, viewportH - rect.height - margin));
-                            } else {
-                              _setModalTop(sLineActionModal.y);
-                            }
-                          }
-                        }
-                      }}
-                      style={{
-                        position: "absolute",
-                        top: sModalTop !== null ? sModalTop : (sLineActionModal?.y || 0),
-                        left: sLineActionModal?.x || 0,
-                        backgroundColor: "white",
-                        borderRadius: 10,
-                        borderWidth: 2,
-                        borderColor: gray(0.08),
-                        minWidth: 180,
-                        overflow: "hidden",
-                      }}
+                <View style={{ width: "100%", height: "100%", position: "absolute" }} />
+              </TouchableWithoutFeedback>
+              <View
+                ref={modalContentRef}
+                onLayout={() => {
+                  if (modalContentRef.current && sLineActionModal && sModalTop === null) {
+                    const el = modalContentRef.current;
+                    const rect = typeof el.getBoundingClientRect === "function" ? el.getBoundingClientRect() : null;
+                    if (rect) {
+                      const viewportH = window.innerHeight;
+                      const margin = 10;
+                      const bottom = sLineActionModal.y + rect.height;
+                      if (bottom > viewportH - margin) {
+                        _setModalTop(Math.max(margin, viewportH - rect.height - margin));
+                      } else {
+                        _setModalTop(sLineActionModal.y);
+                      }
+                    }
+                  }
+                }}
+                style={{
+                  position: "absolute",
+                  top: sModalTop !== null ? sModalTop : (sLineActionModal?.y || 0),
+                  left: sLineActionModal?.x || 0,
+                  backgroundColor: "white",
+                  borderRadius: 10,
+                  borderWidth: 2,
+                  borderColor: gray(0.08),
+                  overflow: "hidden",
+                }}
                     >
                       <View style={{ flexDirection: "row", borderBottomWidth: 1, borderBottomColor: gray(0.1) }}>
                         {effectiveQty > 1 && (
@@ -1387,9 +1396,9 @@ export const LineItemComponent = ({
                         <View
                           onClick={(e) => e.stopPropagation()}
                           onMouseDown={(e) => e.stopPropagation()}
-                          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", height: 40, paddingLeft: 2, backgroundColor: lightenRGBByPercent(C.blue, 60) }}
+                          style={{ flexDirection: "row", alignItems: "center", height: 40, paddingLeft: 8, backgroundColor: lightenRGBByPercent(C.blue, 60) }}
                         >
-                          <Text style={{ fontSize: 16, color: gray(0.5), marginRight: 6 }}>Custom %</Text>
+                          <Text style={{ fontSize: 14, color: gray(0.5), marginRight: 6, whiteSpace: "nowrap" }}>Custom %</Text>
                           <TextInput
                             value={sCustomPercent}
                             placeholder="0"
@@ -1424,9 +1433,9 @@ export const LineItemComponent = ({
                         <View
                           onClick={(e) => e.stopPropagation()}
                           onMouseDown={(e) => e.stopPropagation()}
-                          style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", height: 40, paddingLeft: 2, backgroundColor: lightenRGBByPercent(C.blue, 60) }}
+                          style={{ flexDirection: "row", alignItems: "center", height: 40, paddingLeft: 8, backgroundColor: lightenRGBByPercent(C.blue, 60) }}
                         >
-                          <Text style={{ fontSize: 16, color: gray(0.5), marginRight: 6 }}>Custom $</Text>
+                          <Text style={{ fontSize: 14, color: gray(0.5), marginRight: 6, whiteSpace: "nowrap" }}>Custom $</Text>
                           <TextInput
                             value={sCustomDollar}
                             placeholder="0.00"
@@ -1460,10 +1469,7 @@ export const LineItemComponent = ({
                           />
                         </View>
                       </View>
-                    </View>
-                  </TouchableWithoutFeedback>
-                </View>
-              </TouchableWithoutFeedback>
+              </View>
             </Modal>
           </View>
         </View>

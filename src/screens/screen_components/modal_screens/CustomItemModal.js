@@ -21,6 +21,8 @@ export const CustomItemModal = ({
   onSave,
   type, // "labor" | "item"
   existingLine = null, // workorder line for editing
+  anchorX = 0,
+  anchorY = 0,
 }) => {
   const zDiscounts = useSettingsStore((s) => s.settings?.discounts);
   const zLaborRate = useSettingsStore((s) => s.settings?.laborRateByHour);
@@ -162,6 +164,13 @@ export const CustomItemModal = ({
 
   const canSave = sName.trim().length > 0 && sPriceCents > 0;
 
+  const modalWidth = 420;
+  const margin = 10;
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+  let left = anchorX - modalWidth / 2;
+  if (left + modalWidth > vw - margin) left = vw - modalWidth - margin;
+  if (left < margin) left = margin;
+
   return createPortal(
     <div
       onClick={onClose}
@@ -173,15 +182,12 @@ export const CustomItemModal = ({
         bottom: 0,
         backgroundColor: "rgba(0,0,0,0.5)",
         zIndex: 9999,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
       }}
     >
-      <div onClick={(e) => e.stopPropagation()}>
+      <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: anchorY + 5, left }}>
         <View
           style={{
-            width: 420,
+            width: modalWidth,
             backgroundColor: C.backgroundWhite,
             borderRadius: 10,
             borderWidth: 2,

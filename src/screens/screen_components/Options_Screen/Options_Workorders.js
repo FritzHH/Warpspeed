@@ -1,6 +1,7 @@
 /* eslint-disable */
 import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
 import {
+  calculateRunningTotals,
   calculateWaitEstimateLabel,
   capitalizeFirstLetterOfString,
   formatCurrencyDisp,
@@ -682,6 +683,14 @@ export function WorkordersComponent({}) {
                             </Text>
                           </View>
                         )}
+                        {workorder.workorderLines?.length > 0 && (() => {
+                          let totals = calculateRunningTotals(workorder);
+                          return totals.runningTotal > 0 ? (
+                            <Text style={{ color: "gray", fontSize: 13, fontWeight: "500", marginLeft: 6 }}>
+                              {"$" + formatCurrencyDisp(totals.runningTotal)}
+                            </Text>
+                          ) : null;
+                        })()}
                         {!!workorder.itemNotHere && (
                           <View
                             style={{

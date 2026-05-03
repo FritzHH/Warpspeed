@@ -66,7 +66,7 @@ import { SaleHeader } from "./SaleHeader";
 import { CashPayment } from "./CashPayment";
 import { CardPayment } from "./CardPayment";
 import { CardReaderPayment } from "./CardReaderPayment";
-import { SaleTotals, PaymentStatus } from "./SaleTotals";
+import { SaleTotals, PaymentStatus, CashChangeNeeded } from "./SaleTotals";
 import { PaymentsList } from "./PaymentsList";
 import { WorkorderCombiner } from "./WorkorderCombiner";
 import { InventorySearch } from "./InventorySearch";
@@ -75,9 +75,6 @@ import { InventoryItemModalScreen } from "../InventoryItemModalScreen";
 import { NewRefundModalScreen } from "./NewRefundModalScreen";
 import { SendReceiptModal } from "./SendReceiptModal";
 import { dlog, DCAT } from "./checkoutDebugLog";
-
-// DEV FLAG default — toggled via on-screen switch
-let _devSkipCompletion = false;
 
 // Stable empty array reference to prevent re-renders from || [] patterns
 const EMPTY_ARR = [];
@@ -264,7 +261,6 @@ export function NewCheckoutModalScreen() {
   const [sCardProcessingAmount, _setCardProcessingAmount] = useState(0);
   const [sCardMode, _setCardMode] = useState("reader"); // "reader" or "manual"
   const [sNewItemModal, _setNewItemModal] = useState(null);
-  const [sDevSkip, _setDevSkip] = useState(_devSkipCompletion);
   const [sShowRefundModal, _setShowRefundModal] = useState(false);
   const [sRefundPayment, _setRefundPayment] = useState(null);
   const [sSplitDepositPayment, _setSplitDepositPayment] = useState(null);
@@ -770,7 +766,7 @@ export function NewCheckoutModalScreen() {
         let updated = cloneDeep(wo);
         updated.activeSaleID = sale.id;
         updated.changeLog = [...(updated.changeLog || []), ...changeLogEntries];
-        if (!sDevSkip) useOpenWorkordersStore.getState().setWorkorder(updated, true);
+        useOpenWorkordersStore.getState().setWorkorder(updated, true);
         updatedWorkorders.push(updated);
       }
       _setCombinedWorkorders(updatedWorkorders);
@@ -782,7 +778,7 @@ export function NewCheckoutModalScreen() {
 
     _setSale(sale);
     broadcastSaleToDisplay(sale, sCombinedWorkorders, custFirst, custLast, custLanguage);
-    if (!sDevSkip && !sale.paymentComplete) persistSale(sale, sTransactions, newCredits);
+    if (!sale.paymentComplete) persistSale(sale, sTransactions, newCredits);
   }
 
   function handleApplyDeposit(deposit) {
@@ -834,7 +830,7 @@ export function NewCheckoutModalScreen() {
 
     _setSale(sale);
     broadcastSaleToDisplay(sale, sCombinedWorkorders, custFirst, custLast, custLanguage);
-    if (!sDevSkip && !sale.paymentComplete) persistSale(sale, sTransactions, newCredits);
+    if (!sale.paymentComplete) persistSale(sale, sTransactions, newCredits);
   }
 
   function handleRemoveDeposit(credit) {
@@ -871,7 +867,7 @@ export function NewCheckoutModalScreen() {
     for (let wo of sCombinedWorkorders) {
       let updated = cloneDeep(wo);
       updated.changeLog = [...(updated.changeLog || []), entry];
-      if (!sDevSkip) useOpenWorkordersStore.getState().setWorkorder(updated, true);
+      useOpenWorkordersStore.getState().setWorkorder(updated, true);
       updatedWorkorders.push(updated);
     }
     _setCombinedWorkorders(updatedWorkorders);
@@ -932,7 +928,7 @@ export function NewCheckoutModalScreen() {
     for (let wo of sCombinedWorkorders) {
       let updated = cloneDeep(wo);
       updated.changeLog = [...(updated.changeLog || []), entry];
-      if (!sDevSkip) useOpenWorkordersStore.getState().setWorkorder(updated, true);
+      useOpenWorkordersStore.getState().setWorkorder(updated, true);
       updatedWorkorders.push(updated);
     }
     _setCombinedWorkorders(updatedWorkorders);
@@ -971,7 +967,7 @@ export function NewCheckoutModalScreen() {
     _setSale(sale);
 
     // Persist the pending transaction ID on the sale (already in Firestore)
-    if (!sDevSkip) persistSale(sale);
+    persistSale(sale);
   }
 
   function handlePaymentFailed(transactionID) {
@@ -980,7 +976,7 @@ export function NewCheckoutModalScreen() {
     let sale = cloneDeep(sSale);
     sale.pendingTransactionIDs = (sale.pendingTransactionIDs || []).filter((id) => id !== transactionID);
     _setSale(sale);
-    if (!sDevSkip) persistSale(sale);
+    persistSale(sale);
   }
 
   function handlePaymentCapture(payment) {
@@ -1013,21 +1009,11 @@ export function NewCheckoutModalScreen() {
     } else {
       updateWorkordersWithPaymentStatus(sale, payment, newTransactions);
 
-      // Print receipt after partial cash payment (includes popCashRegister if change is due)
-      if (payment.method === "cash") {
-        let settings = useSettingsStore.getState().getSettings();
+      // Pop register if cash payment has change due
+      if (payment.method === "cash" && payment.amountTendered > payment.amountCaptured) {
         let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
         if (printerID) {
-          let primaryWO = sCombinedWorkorders[0];
-          let _noCustomer = !primaryWO?.customerID;
-          let customer = (_noCustomer)
-            ? { first: zCustomer?.first || "", last: zCustomer?.last || "", customerCell: zCustomer?.customerCell || "", email: zCustomer?.email || "", id: zCustomer?.id || "" }
-            : { first: primaryWO.customerFirst || "", last: primaryWO.customerLast || "", customerCell: primaryWO.customerCell || "", email: primaryWO.customerEmail || "", id: primaryWO.customerID || "" };
-          let wo = primaryWO || { workorderLines: [], taxFree: false };
-          let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-          let receipt = printBuilder.sale(sale, [payment], customer, wo, settings?.salesTaxPercent, _ctx);
-          receipt.transactionOnly = true;
-          dbSavePrintObj(receipt, printerID);
+          dbSavePrintObj({ id: crypto.randomUUID(), receiptType: RECEIPT_TYPES.register }, printerID);
         }
       }
     }
@@ -1036,7 +1022,7 @@ export function NewCheckoutModalScreen() {
     broadcastSaleToDisplay(sale, sCombinedWorkorders, custFirst, custLast, custLanguage);
 
     // Persist immediately (skip if complete — handleSaleComplete handles deletion)
-    if (!sDevSkip && !sale.paymentComplete) persistSale(sale, newTransactions, sCredits);
+    if (!sale.paymentComplete) persistSale(sale, newTransactions, sCredits);
   }
 
   // Update workorders to track that a sale is in progress
@@ -1057,11 +1043,8 @@ export function NewCheckoutModalScreen() {
       entries.push({ timestamp, user, field: "payment", action: "recorded", from: "", to: paymentLabel + " " + formatCurrencyDisp(entryAmount || 0, true) });
 
       updated.changeLog = [...(updated.changeLog || []), ...entries];
-      if (!sDevSkip) {
-        useOpenWorkordersStore.getState().setWorkorder(updated, true);
-        // Standalone workorders are local-only — persist to Firestore on first real payment
-        if (!updated.customerID) newCheckoutSaveWorkorder(updated);
-      }
+      useOpenWorkordersStore.getState().setWorkorder(updated, true);
+      if (!updated.customerID) newCheckoutSaveWorkorder(updated);
       updatedWorkorders.push(updated);
     }
     _setCombinedWorkorders(updatedWorkorders);
@@ -1071,10 +1054,6 @@ export function NewCheckoutModalScreen() {
     dlog(DCAT.ACTION, "handleDepositSaleComplete", "CheckoutModal", { saleID: sale?.id, total: sale?.total, amountCaptured: sale?.amountCaptured, transactionCount: (txns || sTransactions)?.length, creditCount: (creds || sCredits)?.length });
     let localTxns = txns || sTransactions;
     let localCreds = creds || sCredits;
-    if (sDevSkip) {
-      log("sDevSkip: deposit sale complete locally, skipping DB/print/SMS", sale);
-      return;
-    }
     let depositInfo = useCheckoutStore.getState().depositInfo;
     if (!depositInfo) return;
 
@@ -1174,11 +1153,6 @@ export function NewCheckoutModalScreen() {
     // Deposit sale — separate completion path
     if (sale.isDepositSale) {
       handleDepositSaleComplete(sale, localTxns, localCreds);
-      return;
-    }
-    // DEV: skip all DB writes, printing, SMS — freeze UI for layout work
-    if (sDevSkip) {
-      log("sDevSkip: sale complete locally, skipping DB/print/SMS", sale);
       return;
     }
     // Mark all combined workorders as complete
@@ -1724,6 +1698,7 @@ export function NewCheckoutModalScreen() {
             backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
             width: "85%",
             height: "90%",
+            alignSelf: "center",
             borderRadius: 6,
             ...SHADOW_RADIUS_PROTO,
             shadowColor: C.green,
@@ -1745,15 +1720,6 @@ export function NewCheckoutModalScreen() {
               <LoadingIndicator />
             </View>
           )}
-          {/* DEV TOGGLE */}
-          <View style={{ flexDirection: "row", justifyContent: "center", alignItems: "center", paddingVertical: 4 }}>
-            <CheckBox_
-              text={"DEV: Skip DB/Print"}
-              isChecked={sDevSkip}
-              onCheck={() => { dlog(DCAT.CHECKBOX, "devSkipToggle", "CheckoutModal", { newValue: !sDevSkip }); _setDevSkip(!sDevSkip); }}
-              textStyle={{ fontSize: 11, color: sDevSkip ? C.red : gray(0.4) }}
-            />
-          </View>
           {/* ── Main 3-Column Layout ────────────────────── */}
           <View
             style={{
@@ -1895,7 +1861,6 @@ export function NewCheckoutModalScreen() {
 
                 <SaleTotals
                   sale={sSale}
-                  cashChangeNeeded={sCashChangeNeeded}
                   settings={zSettings}
                 />
 
@@ -1907,6 +1872,8 @@ export function NewCheckoutModalScreen() {
                     onPrintReceipt={handlePrintReceipt}
                   />
                 </View>
+
+                <CashChangeNeeded cashChangeNeeded={sCashChangeNeeded} />
 
                 {/* Bottom Buttons */}
                 <View
@@ -2141,10 +2108,9 @@ export function NewCheckoutModalScreen() {
                 );
               })()}
 
-              {/* Sale Totals (includes Amount Left To Pay + Change) */}
+              {/* Sale Totals */}
               <SaleTotals
                 sale={sSale}
-                cashChangeNeeded={sCashChangeNeeded}
                 settings={zSettings}
               />
 
@@ -2194,6 +2160,8 @@ export function NewCheckoutModalScreen() {
               </View>
 
               <View style={{ flex: 1 }} />
+
+              <CashChangeNeeded cashChangeNeeded={sCashChangeNeeded} />
 
               {/* Bottom Buttons: Cancel/Close + Reprint */}
               <View

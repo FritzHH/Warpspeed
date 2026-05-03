@@ -190,6 +190,15 @@ export function generateSaleReceiptPDF(data, labels) {
 
   // Shop header
   y = addShopHeader(doc, y, data, centerX);
+
+  // Barcode ID
+  if (data.barcode) {
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.barcode, centerX, y, { align: "center" });
+    y += 10;
+  }
+
   y = addDivider(doc, y, leftX, rightX);
 
   // Receipt type
@@ -379,14 +388,6 @@ export function generateSaleReceiptPDF(data, labels) {
     y += 6;
   }
 
-  // Barcode text
-  if (data.barcode) {
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.text(data.barcode, centerX, y, { align: "center" });
-    y += 10;
-  }
-
   // Return base64 for Cloud Storage upload
   return doc.output("datauristring").split(",")[1];
 }
@@ -525,6 +526,15 @@ export function generateWorkorderTicketPDF(data) {
 
   // Shop header
   y = addShopHeader(doc, y, data, centerX);
+
+  // Barcode ID
+  if (data.barcode) {
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.barcode, centerX, y, { align: "center" });
+    y += 10;
+  }
+
   y = addDivider(doc, y, leftX, rightX);
 
   // Title
@@ -645,14 +655,6 @@ export function generateWorkorderTicketPDF(data) {
     });
     doc.setTextColor(0);
     y += 8;
-  }
-
-  // Barcode text
-  if (data.barcode) {
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.text(data.barcode, centerX, y, { align: "center" });
-    y += 10;
   }
 
   // Return base64 for Cloud Storage upload

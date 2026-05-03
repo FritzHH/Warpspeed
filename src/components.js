@@ -615,7 +615,7 @@ export const ScreenModal = ({
                   : sModalCoordinates.x + modalCoordinateVars.x
                 : null,
               right: sModalCoordinates && centerMenuHorizontally ? 0 : undefined,
-              alignItems: centerMenuHorizontally ? "center" : undefined,
+              ...(centerMenuHorizontally ? { alignItems: "center" } : {}),
             }}
           >
             {Component()}
@@ -2300,7 +2300,7 @@ export const Button_ = ({
   icon = null,
   ref,
   iconSize = 25,
-  onPress,
+  onPress = () => {},
   onLongPress,
   numLines = 1,
   text,
@@ -2402,6 +2402,7 @@ export const Button_ = ({
             // paddingVertical: 5,
             paddingHorizontal: 15,
             paddingLeft: icon ? 10 : null,
+            paddingVertical: 5,
             ...shadowStyle,
             ...buttonStyle,
             backgroundColor: icon && !text ? null : getBackgroundColor(),
@@ -3974,6 +3975,7 @@ export const NoteHelperDropdown = ({
   chipPaddingVertAdj = 0,
 }) => {
   const [sTarget, _sSetTarget] = useState(noteHelpersTarget);
+  const [sClickedMap, _sSetClickedMap] = useState({});
   const openTimeRef = useRef(0);
   const wasVisibleRef = useRef(false);
   const prevVisibleRef = useRef(visible);
@@ -3990,6 +3992,7 @@ export const NoteHelperDropdown = ({
   useEffect(() => {
     if (visible) {
       _sSetTarget(noteHelpersTarget);
+      _sSetClickedMap({});
     }
   }, [visible]);
 
@@ -3998,18 +4001,26 @@ export const NoteHelperDropdown = ({
   function isChipActive(catId, chipText) {
     const notes = workorderLine[sTarget] || "";
     const parts = notes.split(", ").map((s) => s.trim()).filter(Boolean);
-    return parts.includes(chipText.trim());
+    const trimmed = chipText.trim();
+    if (!parts.includes(trimmed)) return false;
+    const trackedCat = sClickedMap[sTarget + "|" + trimmed];
+    if (trackedCat !== undefined) return trackedCat === catId;
+    return true;
   }
 
   function toggleChip(chipText, targetOverride, catId) {
     const target = targetOverride || sTarget;
     const notes = workorderLine[target] || "";
     const parts = notes.split(", ").map((s) => s.trim()).filter(Boolean);
-    const idx = parts.indexOf(chipText.trim());
+    const trimmed = chipText.trim();
+    const key = target + "|" + trimmed;
+    const idx = parts.indexOf(trimmed);
     if (idx !== -1) {
       parts.splice(idx, 1);
+      _sSetClickedMap((prev) => { const next = { ...prev }; delete next[key]; return next; });
     } else {
-      parts.push(chipText.trim());
+      parts.push(trimmed);
+      _sSetClickedMap((prev) => ({ ...prev, [key]: catId }));
     }
     onUpdateLine({ ...workorderLine, [target]: parts.join(", ") });
   }

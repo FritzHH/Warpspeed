@@ -107,11 +107,6 @@ const TAB_NAMES = {
   labelDesigner: "Label Designer",
 };
 
-const DROPDOWN_ORDERING_SELECTION_NAMES = {
-  importOrder: "Import Order",
-  viewPreviousOrders: "View Previous Orders",
-};
-
 export function Dashboard_Admin({}) {
   // store getters ///////////////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.settings);
@@ -127,9 +122,6 @@ export function Dashboard_Admin({}) {
   const [sShowScheduleModal, _setShowScheduleModal] = useState(false);
   const sExpand = useTabNamesStore((state) => state.getDashboardExpand());
   const _setExpand = useTabNamesStore((state) => state.setDashboardExpand);
-  const [sOrderingMenuSelectionName, _setOrderingMenuSelectionName] = useState(
-    DROPDOWN_ORDERING_SELECTION_NAMES.importOrder
-  );
   const [sStandEditButtonObj, _setStandEditButtonObj] = useState(null);
   const [sShowStandButtonsModal, _setShowStandButtonsModal] = useState(false);
   const [sShowLabelDesigner, _setShowLabelDesigner] = useState(false);
@@ -674,10 +666,7 @@ export function Dashboard_Admin({}) {
             <QuickItemButtonsComponent />
           )}
           {sExpand === TAB_NAMES.ordering && (
-            <OrderingComponent
-              sOrderingMenuSelectionName={sOrderingMenuSelectionName}
-              _setOrderingMenuSelectionName={_setOrderingMenuSelectionName}
-            />
+            <OrderingComponent />
           )}
           {sExpand === TAB_NAMES.textTemplates && (
             <TextTemplatesComponent
@@ -1007,6 +996,7 @@ function CardReaderManager({ liveReaders = [], savedReaders = [], onSaveReaders 
                   {(!hasLabel || isEditing) && (
                     <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
                       <TextInput_
+                        debounceMs={500}
                         value={isEditing ? sLabelDraft : ""}
                         onChangeText={(val) => {
                           _setLabelDraft(val);
@@ -1172,6 +1162,7 @@ const AppUserListComponent = ({
               {"Seconds to log user out: "}
             </Text>
             <TextInput_
+              debounceMs={500}
               onChangeText={(val) => {
                 _setLoginTimeout(val);
                 handleSettingsFieldChange("activeLoginTimeoutSeconds", val);
@@ -1207,6 +1198,7 @@ const AppUserListComponent = ({
               {"Hours to lock app: "}
             </Text>
             <TextInput_
+              debounceMs={500}
               onChangeText={(val) => {
                 _setLockHours(val);
                 handleSettingsFieldChange("idleLoginTimeoutHours", val);
@@ -1235,6 +1227,7 @@ const AppUserListComponent = ({
                 {"User login PIN length: "}
               </Text>
               <TextInput_
+                debounceMs={500}
                 onChangeText={(val) => {
                   _setPinLength(val);
                   handleSettingsFieldChange("userPinStrength", val);
@@ -1442,6 +1435,7 @@ const AppUserListComponent = ({
                       }}
                     >
                       <TextInput_
+                        debounceMs={500}
                         value={userObj.first}
                         placeholder="First name"
                         placeholderTextColor={"lightgray"}
@@ -1465,6 +1459,7 @@ const AppUserListComponent = ({
                         }}
                       />
                       <TextInput_
+                        debounceMs={500}
                         value={userObj.last}
                         onChangeText={(value) => {
                           userObj.last = value;
@@ -1496,7 +1491,8 @@ const AppUserListComponent = ({
                         marginTop: 7,
                       }}
                     >
-                      <TextInput
+                      <TextInput_
+                        debounceMs={500}
                         value={formatPhoneWithDashes(userObj.phone)}
                         onChangeText={(value) => {
                           let val = removeDashesFromPhone(value);
@@ -1521,6 +1517,7 @@ const AppUserListComponent = ({
                         }}
                       />
                       <TextInput_
+                        debounceMs={500}
                         value={userObj.email || ""}
                         onChangeText={(value) => {
                           userObj.email = value;
@@ -1569,6 +1566,7 @@ const AppUserListComponent = ({
                         }}
                       >
                         <TextInput_
+                          debounceMs={500}
                           caretHidden={sShowPinIndex != idx}
                           focused={sShowPinIndex === idx}
                           value={sShowPinIndex === idx ? userObj.pin : ""}
@@ -1616,6 +1614,7 @@ const AppUserListComponent = ({
                         }}
                       >
                         <TextInput_
+                          debounceMs={500}
                           caretHidden={sShowWageIndex != idx}
                           value={
                             sShowWageIndex === idx ? userObj.hourlyWage : ""
@@ -1870,6 +1869,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
         >
           <Text style={{ color: C.text }}>Category Name:</Text>
           <TextInput_
+            debounceMs={500}
             style={{
               width: "50%",
               marginLeft: 10,
@@ -1910,6 +1910,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   }}
                 >
                   <TextInput_
+                    debounceMs={500}
                     onChangeText={(val) => {
                       let brandsArr = zSettingsObj.bikeBrands;
                       brandsArr[idx] = val;
@@ -1964,6 +1965,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
         >
           <Text style={{ color: C.text }}>Category Name:</Text>
           <TextInput_
+            debounceMs={500}
             style={{
               width: "50%",
               marginLeft: 10,
@@ -2004,6 +2006,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   }}
                 >
                   <TextInput_
+                    debounceMs={500}
                     onChangeText={(val) => {
                       let brandsArr = zSettingsObj.bikeOptionalBrands;
                       brandsArr[idx] = val;
@@ -2086,6 +2089,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   }}
                 >
                   <TextInput_
+                    debounceMs={500}
                     onChangeText={(val) => {
                       let descriptionsArr = zSettingsObj.bikeDescriptions;
                       descriptionsArr[idx] = val;
@@ -2198,6 +2202,7 @@ const DiscountsComponent = ({
                   }}
                 >
                   <TextInput_
+                    debounceMs={500}
                     onChangeText={(val) => {
                       let discountsArr = zSettingsObj.discounts.map((o) => {
                         if (o.id === item.id) return { ...o, name: val };
@@ -2370,6 +2375,7 @@ const WaitTimesComponent = ({
                   }}
                 >
                   <TextInput_
+                    debounceMs={500}
                     onChangeText={(val) => {
                       let arr = zSettingsObj.waitTimes.map((o) => {
                         if (o.id === item.id) return { ...o, label: val };
@@ -2395,6 +2401,7 @@ const WaitTimesComponent = ({
                     value={item.label}
                   />
                   <TextInput_
+                    debounceMs={500}
                     onChangeText={(val) => {
                       let arr = zSettingsObj.waitTimes.map((o) => {
                         if (o.id === item.id)
@@ -2492,6 +2499,7 @@ const PartSourcesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   }}
                 >
                   <TextInput_
+                    debounceMs={500}
                     onChangeText={(val) => {
                       let partSourcesArr = zSettingsObj.partSources;
                       partSourcesArr[idx] = val;
@@ -2685,6 +2693,7 @@ const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) 
               {/* Category header row */}
               <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
                 <TextInput_
+                  debounceMs={500}
                   value={cat.label}
                   onChangeText={(val) => {
                     let arr = noteHelpers.map((c) => c.id === cat.id ? { ...c, label: val } : c);
@@ -2778,6 +2787,7 @@ const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) 
                     >
                       {isEditing ? (
                         <TextInput_
+                          debounceMs={500}
                           value={itemText}
                           autoFocus
                           onChangeText={(val) => {
@@ -2843,15 +2853,8 @@ const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) 
 };
 
 const CustomerQuickNoteEditorModal = ({ visible, category, isNew, onClose, onSave, onDelete }) => {
-  const [sCategory, _setCategory] = useState(null);
-  const [sEditingName, _setEditingName] = useState(false);
-  const prevVisibleRef = useRef(false);
-
-  if (visible && !prevVisibleRef.current) {
-    _setCategory(cloneDeep(category));
-    _setEditingName(isNew);
-  }
-  prevVisibleRef.current = visible;
+  const [sCategory, _setCategory] = useState(() => category ? cloneDeep(category) : null);
+  const [sEditingName, _setEditingName] = useState(isNew);
 
   if (!visible || !sCategory) return null;
 
@@ -3201,6 +3204,7 @@ const CustomerQuickNotesAdminComponent = ({ zSettingsObj, handleSettingsFieldCha
       </View>
 
       <CustomerQuickNoteEditorModal
+        key={sEditorModal?.category?.id || "closed"}
         visible={!!sEditorModal}
         category={sEditorModal?.category}
         isNew={sEditorModal?.isNew || false}
@@ -3219,6 +3223,14 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
   const [sPickerType, _sSetPickerType] = useState(null);
   const [sLogoUploading, _sSetLogoUploading] = useState(false);
   const logoInputRef = useRef(null);
+
+  function toggleReceiptField(fieldName) {
+    let arr = [...(zSettingsObj?.receiptSetup?.includeFieldsInReceipt || [])];
+    let idx = arr.indexOf(fieldName);
+    if (idx !== -1) arr.splice(idx, 1);
+    else arr.push(fieldName);
+    handleSettingsFieldChange("receiptSetup", { ...zSettingsObj.receiptSetup, includeFieldsInReceipt: arr });
+  }
 
   const handleLogoUpload = async (e) => {
     const file = e.target.files?.[0];
@@ -3352,6 +3364,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             Display Name:
           </Text>
           <TextInput_
+            debounceMs={500}
             style={{
               width: "50%",
               marginLeft: 10,
@@ -3371,7 +3384,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             }}
           />
           <CheckBox_
-            onCheck={() => {}}
+            onCheck={() => toggleReceiptField("displayName")}
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
             textStyle={{ fontSize: 12 }}
@@ -3401,6 +3414,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             Phone Number:
           </Text>
           <TextInput_
+            debounceMs={500}
             style={{
               width: "50%",
               marginLeft: 10,
@@ -3420,6 +3434,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             }}
           />
           <CheckBox_
+            onCheck={() => toggleReceiptField("phone")}
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
             textStyle={{ fontSize: 12 }}
@@ -3458,6 +3473,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               textAlign: "right",
               outlineWidth: 0,
             }}
+            debounceMs={500}
             value={zSettingsObj?.storeInfo.supportEmail || ""}
             onChangeText={(supportEmail) => {
               handleSettingsFieldChange("storeInfo", {
@@ -3467,6 +3483,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             }}
           />
           <CheckBox_
+            onCheck={() => toggleReceiptField("supportEmail")}
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
             textStyle={{ fontSize: 12 }}
@@ -3505,6 +3522,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               textAlign: "right",
               outlineWidth: 0,
             }}
+            debounceMs={500}
             value={zSettingsObj?.storeInfo.officeEmail || ""}
             onChangeText={(officeEmail) => {
               handleSettingsFieldChange("storeInfo", {
@@ -3547,6 +3565,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               textAlign: "right",
               outlineWidth: 0,
             }}
+            debounceMs={500}
             value={zSettingsObj?.storeInfo.street}
             onChangeText={(street) => {
               handleSettingsFieldChange("storeInfo", {
@@ -3556,6 +3575,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             }}
           />
           <CheckBox_
+            onCheck={() => toggleReceiptField("street")}
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
             textStyle={{ fontSize: 12 }}
@@ -3585,6 +3605,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             Unit:
           </Text>
           <TextInput_
+            debounceMs={500}
             style={{
               width: "50%",
               marginLeft: 10,
@@ -3604,6 +3625,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             }}
           />
           <CheckBox_
+            onCheck={() => toggleReceiptField("unit")}
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
             textStyle={{ fontSize: 12 }}
@@ -3633,6 +3655,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             City:
           </Text>
           <TextInput_
+            debounceMs={500}
             style={{
               width: "50%",
               marginLeft: 10,
@@ -3652,6 +3675,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             }}
           />
           <CheckBox_
+            onCheck={() => toggleReceiptField("city")}
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
             textStyle={{ fontSize: 12 }}
@@ -3681,6 +3705,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             State or Abbrev.
           </Text>
           <TextInput_
+            debounceMs={500}
             style={{
               width: "50%",
               marginLeft: 10,
@@ -3700,6 +3725,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             }}
           />
           <CheckBox_
+            onCheck={() => toggleReceiptField("state")}
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
             textStyle={{ fontSize: 12 }}
@@ -3729,6 +3755,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             Zip Code:
           </Text>
           <TextInput_
+            debounceMs={500}
             style={{
               width: "50%",
               marginLeft: 10,
@@ -3754,6 +3781,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             isChecked={zSettingsObj?.receiptSetup.includeFieldsInReceipt?.find(
               (o) => o === "zip"
             )}
+            onCheck={() => toggleReceiptField("zip")}
           />
         </View>
         {/***************** open and closing hours **************************/}
@@ -3980,7 +4008,8 @@ const PaymentProcessingComponent = ({
           }}
         >
           <Text style={{ marginRight: 20 }}>State Sales Tax:</Text>
-          <TextInput
+          <TextInput_
+            debounceMs={500}
             style={{
               outlineWidth: 0,
               borderRadius: 5,
@@ -4431,6 +4460,7 @@ const WorkorderStatusesComponent = ({
                     )}
                     <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
                       <TextInput_
+                        debounceMs={500}
                         style={{
                           width: "100%",
                           textAlign: "center",
@@ -4839,6 +4869,7 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
             <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
               <Text style={{ fontSize: 12, color: gray(0.5), width: 70 }}>Delay</Text>
               <TextInput_
+                debounceMs={500}
                 value={String(rule.delayMinutes || 0)}
                 onChangeText={(val) => {
                   let num = parseInt(val, 10);
@@ -4859,6 +4890,7 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
               />
               <Text style={{ fontSize: 11, color: gray(0.4), marginHorizontal: 4 }}>min</Text>
               <TextInput_
+                debounceMs={500}
                 value={String(rule.delaySeconds || 0)}
                 onChangeText={(val) => {
                   let num = parseInt(val, 10);
@@ -5882,62 +5914,14 @@ const TEXT_TEMPLATE_VARIABLES = [
   { label: "Part Source", variable: "{partSource}" },
   { label: "Store Hours", variable: "{storeHours}" },
   { label: "Store Phone", variable: "{storePhone}" },
+  { label: "Support Email", variable: "{supportEmail}" },
 ];
 
-const OrderingComponent = ({
-  sOrderingMenuSelectionName,
-  _setOrderingMenuSelectionName,
-}) => {
+const OrderingComponent = () => {
   return (
     <BoxContainerOuterComponent>
-      <BoxContainerInnerComponent style={{ width: "100%", alignItems: "center" }}>
-        {/* Sub-tab buttons */}
-        <View
-          style={{
-            flexDirection: "row",
-            width: "100%",
-            marginBottom: 15,
-            borderBottomWidth: 1,
-            borderColor: C.buttonLightGreenOutline,
-            paddingBottom: 10,
-          }}
-        >
-          {Object.values(DROPDOWN_ORDERING_SELECTION_NAMES).map((name) => {
-            let isActive = sOrderingMenuSelectionName === name;
-            return (
-              <TouchableOpacity
-                key={name}
-                onPress={() => _setOrderingMenuSelectionName(name)}
-                style={{
-                  marginRight: 10,
-                  paddingHorizontal: 12,
-                  paddingVertical: 5,
-                  borderRadius: 7,
-                  borderWidth: 1,
-                  borderColor: isActive ? C.green : C.buttonLightGreenOutline,
-                  backgroundColor: isActive ? C.buttonLightGreen : "transparent",
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: isActive ? "500" : "400",
-                    color: isActive ? C.green : gray(0.5),
-                  }}
-                >
-                  {name}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Content area */}
-        <View style={{ width: "100%", alignItems: "center" }}>
-          <Text style={{ color: gray(0.4), fontSize: 14 }}>
-            {sOrderingMenuSelectionName}
-          </Text>
-        </View>
+      <BoxContainerInnerComponent style={{ width: "100%", alignItems: "center", justifyContent: "center", minHeight: 200 }}>
+        <Text style={{ color: gray(0.15), fontSize: 28, fontWeight: "600" }}>Ordering system not ready</Text>
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );
@@ -8675,6 +8659,7 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                     }}
                   >
                     <TextInput_
+                      debounceMs={500}
                       onChangeText={(val) =>
                         handleFieldChange(templateObj, "label", val)
                       }
@@ -8734,8 +8719,14 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
 
                   {/* Message body */}
                   <TextInput_
+                    ref={(el) => {
+                      if (el) {
+                        textInputRefs.current[templateObj.id] = el;
+                        setTimeout(() => { if (el.style) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }, 0);
+                      }
+                    }}
+                    debounceMs={500}
                     multiline={true}
-                    numberOfLines={6}
                     onChangeText={(val) =>
                       handleFieldChange(templateObj, "content", val)
                     }
@@ -8743,6 +8734,13 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                     onSelectionChange={(event) => {
                       let { start } = event.nativeEvent.selection;
                       cursorPositionRefs.current[templateObj.id] = start;
+                    }}
+                    onContentSizeChange={(event) => {
+                      let el = event?.target || event?.nativeEvent?.target;
+                      if (el) {
+                        el.style.height = "auto";
+                        el.style.height = el.scrollHeight + "px";
+                      }
                     }}
                     placeholder="Message body..."
                     placeholderTextColor={gray(0.3)}
@@ -8755,6 +8753,7 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                       outlineWidth: 0,
                       fontSize: 14,
                       minHeight: 80,
+                      textAlignVertical: "top",
                       overflow: "hidden",
                     }}
                     value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "content") ?? getContent(templateObj)) : getContent(templateObj)}
@@ -8882,6 +8881,7 @@ const EMAIL_TEMPLATE_VARIABLES = [
   { label: "Total Hours", variable: "{totalHours}" },
   { label: "Pay Rate", variable: "{payRate}" },
   { label: "Total Pay", variable: "{totalPay}" },
+  { label: "Support Email", variable: "{supportEmail}" },
 ];
 
 const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
@@ -9034,6 +9034,7 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
                     }}
                   >
                     <TextInput_
+                      debounceMs={500}
                       onChangeText={(val) =>
                         handleFieldChange(templateObj, "label", val)
                       }
@@ -9067,6 +9068,7 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
 
                   {/* Subject line */}
                   <TextInput_
+                    debounceMs={500}
                     onChangeText={(val) =>
                       handleFieldChange(templateObj, "subject", val)
                     }
@@ -9087,13 +9089,14 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
                   />
 
                   {/* Email body */}
-                  <TextInput
+                  <TextInput_
                     ref={(el) => {
                       if (el) {
                         textInputRefs.current[templateObj.id] = el;
                         setTimeout(() => { if (el.style) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }, 0);
                       }
                     }}
+                    debounceMs={500}
                     multiline={true}
                     onChangeText={(val) =>
                       handleFieldChange(templateObj, "content", val)
@@ -10898,6 +10901,7 @@ const StandButtonCard = ({
       {sEditMode && sIsEditingLabel ? (
         <div onClick={(e) => e.stopPropagation()}>
           <TextInput_
+            debounceMs={500}
             style={{
               fontSize: 11,
               color: C.text,

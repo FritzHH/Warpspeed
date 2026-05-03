@@ -178,11 +178,12 @@ export function CustomerSearchListComponent({}) {
                   />
                 </Tooltip>
               </View>
+              <Tooltip text="Start new workorder" style={{ flex: 1 }}>
               <TouchableOpacity_
-                style={{ width: "92%", height: "100%", flexDirection: "row" }}
+                style={{ flex: 1, height: "100%", flexDirection: "row" }}
                 onPress={() => handleCustomerSelected(customer)}
               >
-                <View style={{ width: "92%" }}>
+                <View style={{ flex: 1 }}>
                   <Text style={{ fontSize: 16, color: C.text }}>
                     {capitalizeFirstLetterOfString(customer?.first) + " " + capitalizeFirstLetterOfString(customer?.last)}
                   </Text>
@@ -193,10 +194,8 @@ export function CustomerSearchListComponent({}) {
                       marginTop: 5,
                     }}
                   >
-                    <Text style={{ color: gray(0.35), fontSize: 12 }}>
-                      {"cell:  "}
-                    </Text>
                     <Text style={{ color: C.text, fontSize: 14 }}>
+                      <Text style={{ color: gray(0.35), fontSize: 12 }}>{"cell:  "}</Text>
                       {formatPhoneForDisplay(customer?.customerCell)}
                     </Text>
                     {!!(customer?.customerLandline || customer?.land) && (
@@ -226,6 +225,7 @@ export function CustomerSearchListComponent({}) {
                   </View>
                 </View>
               </TouchableOpacity_>
+              </Tooltip>
             </View>
           );
         }}

@@ -91,6 +91,7 @@ const TEXT_TEMPLATE_VARIABLES = [
   { label: "Part Source", variable: "{partSource}" },
   { label: "Store Hours", variable: "{storeHours}" },
   { label: "Store Phone", variable: "{storePhone}" },
+  { label: "Support Email", variable: "{supportEmail}" },
 ];
 
 // Auto-capitalize: first letter, after sentence-ending punctuation, standalone "i"
@@ -488,7 +489,8 @@ export function MessagesComponent({}) {
       .replace(/\{partOrdered\}/g, zWorkorderObj?.partOrdered || "")
       .replace(/\{partSource\}/g, zWorkorderObj?.partSource || "")
       .replace(/\{storeHours\}/g, storeHoursText)
-      .replace(/\{storePhone\}/g, ((p) => p.length === 10 ? "(" + p.slice(0, 3) + ") " + p.slice(3, 6) + "-" + p.slice(6) : p)(zSettings?.storeInfo?.phone || ""));
+      .replace(/\{storePhone\}/g, ((p) => p.length === 10 ? "(" + p.slice(0, 3) + ") " + p.slice(3, 6) + "-" + p.slice(6) : p)(zSettings?.storeInfo?.phone || ""))
+      .replace(/\{supportEmail\}/g, zSettings?.storeInfo?.supportEmail || "");
   }
   async function handleSendWorkorderTicket(canRespondVal, forwardOverride) {
     if (!zWorkorderObj || !zCustomer?.customerCell) return;
@@ -1149,7 +1151,7 @@ export function MessagesComponent({}) {
                 if (!hasInitialScrolledRef.current && messagesArr.length > 0) {
                   hasInitialScrolledRef.current = true;
                   lastMsgIdRef.current = messagesArr[messagesArr.length - 1]?.id;
-                  messageListRef.current?.scrollToEnd({ animated: false });
+                  setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: false }); }, 100);
                 }
               }}
               ref={messageListRef}
@@ -1296,14 +1298,6 @@ export function MessagesComponent({}) {
                   >
                     <Image_ icon={ICONS.airplane} size={41} />
                   </TouchableOpacity>
-                  <Tooltip text={!sHasMicrophone ? "No microphone detected" : sAudioRecording ? "Stop recording" : "Record audio clip"} position="top">
-                    <TouchableOpacity
-                      onPress={sHasMicrophone ? (sAudioRecording ? handleStopRecording : handleStartRecording) : undefined}
-                      style={{ marginRight: 4, marginBottom: 4, padding: 4, opacity: sHasMicrophone ? 1 : 0.3 }}
-                    >
-                      <Image_ icon={sAudioRecording ? ICONS.stopRecord : ICONS.microphone} size={30} />
-                    </TouchableOpacity>
-                  </Tooltip>
                 </View>
               </View>
           </View>
@@ -2078,7 +2072,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
               if (!hasInitialScrolledRef.current && sMessages.length > 0) {
                 hasInitialScrolledRef.current = true;
                 lastMsgIdRef.current = sMessages[sMessages.length - 1]?.id;
-                messageListRef.current?.scrollToEnd({ animated: false });
+                setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: false }); }, 100);
               }
             }}
             scrollEnabled={!previewMode}
@@ -2159,14 +2153,6 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
             <TouchableOpacity onPress={() => !sHubMediaUploading && !(sFromLang !== sToLang && sTranslateLoading) && handleSend()} style={{ padding: 6, opacity: (sHubMediaUploading || (sFromLang !== sToLang && sTranslateLoading)) ? 0.3 : (sNewMessage.trim() ? 1 : 0.3) }}>
               <Image_ icon={ICONS.airplane} size={41} />
             </TouchableOpacity>
-            <Tooltip text={!sHasMicrophone ? "No microphone detected" : sAudioRecording ? "Stop recording" : "Record audio clip"} position="top">
-              <TouchableOpacity
-                onPress={sHasMicrophone ? (sAudioRecording ? handleStopRecording : handleStartRecording) : undefined}
-                style={{ padding: 4, opacity: sHasMicrophone ? 1 : 0.3 }}
-              >
-                <Image_ icon={sAudioRecording ? ICONS.stopRecord : ICONS.microphone} size={30} />
-              </TouchableOpacity>
-            </Tooltip>
           </View>
         </View>
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, marginBottom: 8, paddingHorizontal: 4 }}>

@@ -93,8 +93,12 @@ function ean13CheckDigit(first12) {
 }
 
 function buildLightspeedEAN13(prefix2digit, lsID) {
-  let padded = String(lsID).padStart(10, "0");
-  return prefix2digit + padded;
+  var digits12 = prefix2digit + String(lsID).padStart(10, "0");
+  var sum = 0;
+  for (var i = 0; i < 12; i++) {
+    sum += parseInt(digits12[i], 10) * (i % 2 === 0 ? 1 : 3);
+  }
+  return digits12 + ((10 - (sum % 10)) % 10);
 }
 
 function buildWorkorderNumberFromId(ean13) {
@@ -1650,13 +1654,13 @@ async function main() {
   while (!selectedSet) {
     var input = (await askQuestion("  Selection: ")).trim().toLowerCase();
     if (input === "full") {
-      selectedSet = new Set([1, 2, 3, 4, 5, 6, 7, 8]);
+      selectedSet = new Set([1, 2, 4, 5, 6, 7, 8]);
     } else {
       var nums = input.split(",").map(function (s) { return parseInt(s.trim(), 10); }).filter(function (n) { return n >= 1 && n <= 8; });
       if (nums.length > 0) selectedSet = new Set(nums);
     }
   }
-  var isFull = selectedSet.size === 8;
+  var isFull = selectedSet.size >= 7 && !selectedSet.has(3);
   var selectedLabels = [];
   if (selectedSet.has(1)) selectedLabels.push("statuses");
   if (selectedSet.has(2)) selectedLabels.push("employees");
@@ -1681,16 +1685,17 @@ async function main() {
   // -- STAGE 2: Clear existing collections --
   logStage(2, TOTAL_STAGES, "Clearing selected collections");
   if (selectedSet.has(3)) await clearCollection(basePath + "/inventory", "inventory");
-  if (selectedSet.has(4)) await clearCollection(basePath + "/customers", "customers");
-  if (selectedSet.has(5)) {
+  // Customers, workorders, sales, and transactions are interdependent —
+  // selecting any one clears and rewrites all four for data consistency
+  var hasDataGroup = selectedSet.has(4) || selectedSet.has(5) || selectedSet.has(6) || selectedSet.has(7);
+  if (hasDataGroup) {
+    await clearCollection(basePath + "/customers", "customers");
     await clearCollection(basePath + "/open-workorders", "open workorders");
     await clearCollection(basePath + "/completed-workorders", "completed workorders");
-  }
-  if (selectedSet.has(6)) {
     await clearCollection(basePath + "/completed-sales", "completed sales");
     await clearCollection(basePath + "/active-sales", "active sales");
+    await clearCollection(basePath + "/transactions", "transactions");
   }
-  if (selectedSet.has(7)) await clearCollection(basePath + "/transactions", "transactions");
   if (selectedSet.has(8)) await clearCollection(basePath + "/punches", "punches");
 
   // -- STAGE 3: Map statuses --
@@ -1826,16 +1831,14 @@ async function main() {
   }
 
   if (selectedSet.has(3)) await batchWrite(basePath + "/inventory", inventoryItems, "inventory");
-  if (selectedSet.has(4)) await batchWrite(basePath + "/customers", customers, "customers");
-  if (selectedSet.has(5)) {
+  if (hasDataGroup) {
+    await batchWrite(basePath + "/customers", customers, "customers");
     await batchWrite(basePath + "/open-workorders", openWorkorders, "open workorders");
     await batchWrite(basePath + "/completed-workorders", completedWorkorders, "completed workorders");
-  }
-  if (selectedSet.has(6)) {
     await batchWrite(basePath + "/completed-sales", completedSales, "completed sales");
     await batchWrite(basePath + "/active-sales", activeSales, "active sales");
+    await batchWrite(basePath + "/transactions", transactions, "transactions");
   }
-  if (selectedSet.has(7)) await batchWrite(basePath + "/transactions", transactions, "transactions");
   if (selectedSet.has(8)) await batchWrite(basePath + "/punches", punches, "punch history");
 
   // -- STAGE 10: Summary --

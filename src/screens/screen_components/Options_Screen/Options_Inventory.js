@@ -1629,68 +1629,6 @@ export function InventoryComponent({}) {
                         marginBottom: 5,
                       }}
                     >
-                      <View style={{ width: "5%", position: "relative" }}>
-                        <Button_
-                          icon={ICONS.print}
-                          iconSize={15}
-                          buttonStyle={{ width: 30 }}
-                          onPress={() => handleListPrintClick(item)}
-                        />
-                        {sListPrintPickerID === item.id && (() => {
-                          let settings = useSettingsStore.getState().settings;
-                          let allTemplates = settings?.labelTemplates || {};
-                          let templateEntries = Object.entries(allTemplates);
-                          let quickPrintSlugs = settings?.quickPrintLayouts || [];
-                          let qpEntries = templateEntries.filter(([slug]) => quickPrintSlugs.includes(slug));
-                          return (
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              onMouseDown={(e) => e.stopPropagation()}
-                              style={{
-                                position: "absolute",
-                                top: "100%",
-                                left: 0,
-                                zIndex: 10,
-                                backgroundColor: "white",
-                                borderRadius: 6,
-                                border: "1px solid " + gray(0.2),
-                                boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                                minWidth: 120,
-                                overflow: "hidden",
-                              }}
-                            >
-                              {qpEntries.map(([slug, template]) => (
-                                <div
-                                  key={slug}
-                                  onClick={(e) => { e.stopPropagation(); handleListPrintWithTemplate(slug, item); }}
-                                  style={{
-                                    padding: "5px 8px",
-                                    cursor: "pointer",
-                                    fontSize: 10,
-                                    color: C.text,
-                                    borderBottom: "1px solid " + gray(0.1),
-                                  }}
-                                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
-                                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
-                                >
-                                  {template.name}
-                                </div>
-                              ))}
-                              <div
-                                onClick={(e) => { e.stopPropagation(); _setListPrintPickerID(null); }}
-                                style={{ padding: "4px 8px", cursor: "pointer", fontSize: 9, color: gray(0.5), textAlign: "center" }}
-                              >
-                                Cancel
-                              </div>
-                            </div>
-                          );
-                        })()}
-                        {sListPrintSuccessID === item.id && (
-                          <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(88,145,65,0.15)", borderRadius: 8, zIndex: 5, pointerEvents: "none" }}>
-                            <Text style={{ fontSize: 9, color: C.green, fontWeight: "600" }}>Sent!</Text>
-                          </div>
-                        )}
-                      </View>
                       {!!zOpenWorkorderID && (
                         <View style={{ width: "5%" }}>
                           <Button_
@@ -1706,7 +1644,7 @@ export function InventoryComponent({}) {
                       <TouchableOpacity_
                         style={{
                           height: "100%",
-                          width: zOpenWorkorderID ? "90%" : "95%",
+                          width: zOpenWorkorderID ? "95%" : "100%",
                         }}
                         onPress={(e) => {
                           const now = Date.now();

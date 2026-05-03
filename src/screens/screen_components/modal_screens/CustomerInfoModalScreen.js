@@ -37,7 +37,7 @@ import {
   useAlertScreenStore,
 } from "../../../stores";
 import { CONTACT_RESTRICTIONS, CUSTOMER_CREDIT_PROTO, CUSTOMER_LANGUAGES, CUSTOMER_PROTO, SMS_PROTO, TAB_NAMES } from "../../../data";
-import { Button_, CheckBox_, DepositModal, DepositsList, DropdownMenu, Image_, SmallLoadingIndicator, TextInput_, TouchableOpacity_ } from "../../../components";
+import { Button_, CheckBox_, DepositModal, DepositsList, DropdownMenu, Image_, SmallLoadingIndicator, TextInput_, Tooltip, TouchableOpacity_ } from "../../../components";
 import {
   dbSaveCustomer,
   dbGetCustomer,
@@ -101,6 +101,10 @@ export const CustomerInfoScreenModalComponent = ({
   // Fetch fresh customer on mount (background refresh even if we have cached data)
   useEffect(() => {
     mountedRef.current = true;
+
+    // Load workorders/sales immediately from whatever customer data we have
+    if (hasCachedCustomer) autoLoadWorkordersAndSales(initialCustomer);
+
     if (incomingCustomer || !customerID || isNewCustomer) return;
 
     // Only show loading if we don't have cached data
@@ -112,8 +116,8 @@ export const CustomerInfoScreenModalComponent = ({
         _setCustomerInfo(customer);
         useCurrentCustomerStore.getState().setCustomer(customer, false);
         _setCustomerLoading(false);
-        // Auto-load workorders and sales once fresh customer arrives
-        autoLoadWorkordersAndSales(customer);
+        // Refresh workorders/sales with fresh customer data if IDs changed
+        if (!hasCachedCustomer) autoLoadWorkordersAndSales(customer);
       } else {
         _setCustomerLoadError(true);
         _setCustomerLoading(false);
@@ -123,9 +127,6 @@ export const CustomerInfoScreenModalComponent = ({
       _setCustomerLoadError(true);
       _setCustomerLoading(false);
     });
-
-    // If we have cached data, start loading workorders/sales immediately
-    if (hasCachedCustomer) autoLoadWorkordersAndSales(initialCustomer);
 
     return () => { mountedRef.current = false; };
   }, []);
@@ -706,7 +707,7 @@ export const CustomerInfoScreenModalComponent = ({
               <Button_
                 onPress={() => handleButton1Press(sCustomerInfo)}
                 enabled={sCellDuplicateStatus !== "duplicate" && sCellDuplicateStatus !== "error" && sCellDuplicateStatus !== "checking"}
-                colorGradientArr={COLOR_GRADIENTS.blue}
+                colorGradientArr={COLOR_GRADIENTS.yellow}
                 buttonStyle={{
                   marginTop: 20,
                   height: 40,
@@ -721,37 +722,41 @@ export const CustomerInfoScreenModalComponent = ({
               />
             )}
             {!isNewCustomer && (
-              <Button_
-                onPress={() => _sSetShowDepositModal(true)}
-                colorGradientArr={COLOR_GRADIENTS.green}
-                icon={ICONS.greenDollar}
-                buttonStyle={{
-                  marginTop: 20,
-                  height: 36,
-                  width: "90%",
-                }}
-                iconSize={16}
-                textStyle={{ color: C.textWhite, fontSize: 13 }}
-                text={"Add Money"}
-              />
+              <Tooltip text="Deposits, gift cards and credits" position="top">
+                <Button_
+                  onPress={() => _sSetShowDepositModal(true)}
+                  colorGradientArr={COLOR_GRADIENTS.green}
+                  icon={ICONS.greenDollar}
+                  buttonStyle={{
+                    marginTop: 20,
+                    height: 36,
+                    width: "90%",
+                  }}
+                  iconSize={16}
+                  textStyle={{ color: C.textWhite, fontSize: 13 }}
+                  text={"Add Money"}
+                />
+              </Tooltip>
             )}
           </View>
           <View style={{}} />
           {!!button2Text && (
-            <Button_
-              icon={ICONS.close1}
-              colorGradientArr={COLOR_GRADIENTS.blue}
-              onPress={handleButton2Press}
-              buttonStyle={{
-                marginTop: 20,
-                marginBottom: 10,
-                height: 40,
-                width: "90%",
-              }}
-              iconSize={17}
-              textStyle={{ marginLeft: 15, color: C.textWhite }}
-              text={button2Text}
-            />
+            <Tooltip text="All edits auto-saved" position="top">
+              <Button_
+                icon={ICONS.close1}
+                colorGradientArr={COLOR_GRADIENTS.blue}
+                onPress={handleButton2Press}
+                buttonStyle={{
+                  marginTop: 20,
+                  marginBottom: 10,
+                  height: 40,
+                  width: "90%",
+                }}
+                iconSize={17}
+                textStyle={{ marginLeft: 15, color: C.textWhite }}
+                text={button2Text}
+              />
+            </Tooltip>
           )}
         </View>
         {!isNewCustomer && (

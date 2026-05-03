@@ -3249,8 +3249,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                 display: "flex",
                 flexDirection: "row",
                 alignItems: "center",
-                paddingTop: 5,
-                paddingBottom: 5,
+                height: 56,
                 paddingLeft: 12,
                 paddingRight: 12,
                 fontSize: 38,
@@ -3260,7 +3259,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                 <div style={{ flex: 1 }}>
                   {displayText || <span style={{ color: gray(0.3) }}>{sKeypadMode === "phone" ? "Phone number..." : "Name..."}</span>}
                 </div>
-                {sSearching && <SmallLoadingIndicator size={35} color={C.blue} message="" />}
+                {sSearching && <SmallLoadingIndicator size={35} color={C.blue} message="" containerStyle={{ padding: 0 }} />}
               </div>
               <TouchableOpacity
                 onPress={() => {

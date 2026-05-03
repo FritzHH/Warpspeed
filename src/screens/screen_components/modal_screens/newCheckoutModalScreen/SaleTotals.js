@@ -148,9 +148,57 @@ export const PaymentStatus = memo(function PaymentStatus({ sale, amountRemaining
   );
 });
 
+export const CashChangeNeeded = memo(function CashChangeNeeded({ cashChangeNeeded }) {
+  if (!cashChangeNeeded || cashChangeNeeded <= 0) return null;
+  return (
+    <View
+      style={{
+        borderColor: C.buttonLightGreenOutline,
+        borderRadius: 10,
+        borderWidth: 2,
+        backgroundColor: C.green,
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+        flexDirection: "column",
+        marginTop: 5,
+        width: "60%",
+        alignSelf: "center",
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 11,
+          color: gray(0.75),
+          width: "100%",
+          textAlign: "left",
+          paddingBottom: 3,
+        }}
+      >
+        CHANGE NEEDED
+      </Text>
+      <Text
+        style={{
+          textAlign: "right",
+          fontSize: 25,
+          color: C.textWhite,
+        }}
+      >
+        <Text
+          style={{
+            fontSize: 15,
+            paddingRight: 7,
+          }}
+        >
+          $
+        </Text>
+        {formatCurrencyDisp(cashChangeNeeded)}
+      </Text>
+    </View>
+  );
+});
+
 export const SaleTotals = memo(function SaleTotals({
   sale,
-  cashChangeNeeded,
   settings,
 }) {
   if (!sale) return null;
@@ -220,54 +268,6 @@ export const SaleTotals = memo(function SaleTotals({
           valueStyle={{ fontWeight: 500, fontSize: 18, color: gray(0.6) }}
         />
       </View>
-
-
-      {/* Cash Change */}
-      {cashChangeNeeded > 0 && (
-        <View
-          style={{
-            borderColor: C.buttonLightGreenOutline,
-            borderRadius: 10,
-            borderWidth: 2,
-            backgroundColor: C.green,
-            paddingVertical: 10,
-            paddingHorizontal: 10,
-            flexDirection: "column",
-            marginTop: 10,
-            width: "60%",
-            alignSelf: "center",
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 11,
-              color: gray(0.3),
-              width: "100%",
-              textAlign: "left",
-              paddingBottom: 3,
-            }}
-          >
-            CHANGE NEEDED
-          </Text>
-          <Text
-            style={{
-              textAlign: "right",
-              fontSize: 25,
-              color: C.textWhite,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 15,
-                paddingRight: 7,
-              }}
-            >
-              $
-            </Text>
-            {formatCurrencyDisp(cashChangeNeeded)}
-          </Text>
-        </View>
-      )}
     </View>
   );
 });

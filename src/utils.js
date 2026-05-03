@@ -1333,8 +1333,12 @@ export function decodeLightspeedBarcode(barcode) {
  * @returns {string} 12-digit barcode
  */
 export function buildLightspeedEAN13(prefix2digit, lsID) {
-  let padded = String(lsID).padStart(10, "0");
-  return prefix2digit + padded;
+  const digits12 = prefix2digit + String(lsID).padStart(10, "0");
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += parseInt(digits12[i], 10) * (i % 2 === 0 ? 1 : 3);
+  }
+  return digits12 + ((10 - (sum % 10)) % 10);
 }
 
 /**
@@ -2271,6 +2275,7 @@ export function resolveTemplateStandalone(templateStr, workorder, customer, sett
     .replace(/\{storePhone\}/g, formattedPhone)
     .replace(/\{storeName\}/g, storeName)
     .replace(/\{storeAddress\}/g, settings?.storeInfo?.address || "")
+    .replace(/\{supportEmail\}/g, settings?.storeInfo?.supportEmail || "")
     .replace(/\{customerNotes\}/g, (workorder?.customerNotes || []).map(n => n.value || n.text || n.note || "").filter(Boolean).join("\n") || "");
 }
 

@@ -249,7 +249,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sPrinterAlert, _setPrinterAlert] = useState(null); // { x, y }
   const [sTrackingModalVisible, _setTrackingModalVisible] = useState(false);
 
-  // Show/hide for Customer Item Ordering section
+  // Show/hide for Ordering Info section
   const [sShowItemOrdering, _sSetShowItemOrdering] = useState(false);
   const hasItemOrderingData = !!(zOpenWorkorder?.partOrdered || zOpenWorkorder?.partSource || zOpenWorkorder?.trackingNumber || zOpenWorkorder?.partToBeOrdered === false || zOpenWorkorder?.partOrderEstimateMillis || zOpenWorkorder?.partOrderedMillis);
 
@@ -335,6 +335,29 @@ export const ActiveWorkorderComponent = ({}) => {
     const updated = [...existing, trimmed].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
     useSettingsStore.getState().setField("allDescriptions", updated);
   }
+
+  // Color autocomplete
+  const [sColor1Focused, _setColor1Focused] = useState(false);
+  const [sColor2Focused, _setColor2Focused] = useState(false);
+  const color1WrapperRef = useRef(null);
+  const color2WrapperRef = useRef(null);
+  const color2InputRef = useRef(null);
+  const color1Backspaced = useRef(false);
+  const color2Backspaced = useRef(false);
+
+  const allColorLabels = COLORS.map((c) => c.label);
+
+  const color1Suggestions = sColor1Focused && zOpenWorkorder?.color1?.label?.trim()
+    ? allColorLabels.filter(
+        (c) => c.toLowerCase().startsWith(zOpenWorkorder.color1.label.trim().toLowerCase()) && c.toLowerCase() !== zOpenWorkorder.color1.label.trim().toLowerCase()
+      ).slice(0, 8)
+    : [];
+
+  const color2Suggestions = sColor2Focused && zOpenWorkorder?.color2?.label?.trim()
+    ? allColorLabels.filter(
+        (c) => c.toLowerCase().startsWith(zOpenWorkorder.color2.label.trim().toLowerCase()) && c.toLowerCase() !== zOpenWorkorder.color2.label.trim().toLowerCase()
+      ).slice(0, 8)
+    : [];
 
   // Refs for dropdown components
   const bikesRef = useRef();
@@ -503,7 +526,6 @@ export const ActiveWorkorderComponent = ({}) => {
     const storeName = settings?.storeInfo?.displayName || "our store";
     const brand = workorder?.brand || "";
     const description = workorder?.description || "";
-    const workorderLink = workorder?.customerPin ? (window.location.origin + "/wo/" + workorder.customerPin) : "";
 
     function applyVars(template, v) {
       let result = template;
@@ -525,7 +547,7 @@ export const ActiveWorkorderComponent = ({}) => {
       const storagePath = build_db_path.cloudStorage.intakeReceiptPDF(workorder.id, tenantID, storeID);
 
       if (smsTemplate && customer.customerCell) {
-        const vars = { firstName, storeName, brand, description, link: "{link}", workorderLink };
+        const vars = { firstName, storeName, brand, description, link: "{link}" };
         const msg = applyVars(smsTemplate.content || smsTemplate.message || smsTemplate.text || "", vars);
         try {
           const result = await dbUploadPDFAndSendSMS({
@@ -561,10 +583,7 @@ export const ActiveWorkorderComponent = ({}) => {
       const receiptLink = receiptURL
         ? "<p style='margin:24px 0'>" + linkHtml + "</p>"
         : "";
-      const workorderLinkHtml = workorderLink
-        ? "<p style='margin:16px 0'><a href='" + workorderLink + "' style='display:inline-block;padding:12px 24px;background-color:#2196F3;color:white;text-decoration:none;border-radius:6px;font-size:14px'>Track Your Workorder</a></p>"
-        : "";
-      const vars = { firstName, storeName, brand, description, link: linkHtml || receiptURL, receiptLink, workorderLink: workorderLinkHtml || workorderLink };
+      const vars = { firstName, storeName, brand, description, link: linkHtml || receiptURL, receiptLink };
       const subject = applyVars(emailTemplate.subject || "", vars);
       const html = applyVars(emailTemplate.content || emailTemplate.body || "", vars);
       try {
@@ -1066,57 +1085,173 @@ export const ActiveWorkorderComponent = ({}) => {
               style={{
                 flexDirection: "row",
                 justifyContent: "space-between",
-                width: "45%",
-                alignItems: "center",
                 width: "100%",
+                alignItems: "center",
+                zIndex: 8,
+                overflow: "visible",
                 marginTop: 11,
               }}
             >
-              <TextInput_
-                placeholder={"Color 1"}
-                editable={!isDonePaid}
-                capitalize={true}
-                value={capitalizeFirstLetterOfString(zOpenWorkorder?.color1.label)}
-                style={{
-                  width: "48%",
-                  borderWidth: 1,
-                  borderColor: zOpenWorkorder?.color1?.label ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
-                  paddingVertical: 2,
-                  paddingHorizontal: 4,
-                  fontSize: 15,
-                  outlineStyle: "none",
-                  borderRadius: 5,
-                  fontWeight: zOpenWorkorder?.color1.label ? "500" : null,
-                  backgroundColor: zOpenWorkorder?.color1.backgroundColor,
-                  color: zOpenWorkorder?.color1.textColor,
-                }}
-                onChangeText={(val) => {
-                  setBikeColor(val, "color1");
-                }}
-              />
-              <View style={{ width: 5 }} />
-              <TextInput_
-                placeholder={"Color 2"}
-                editable={!isDonePaid}
-                capitalize={true}
-                value={capitalizeFirstLetterOfString(zOpenWorkorder?.color2.label)}
-                style={{
-                  width: "48%",
-                  borderWidth: 1,
-                  borderColor: zOpenWorkorder?.color2?.label ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
-                  paddingVertical: 2,
-                  paddingHorizontal: 4,
-                  fontSize: 15,
-                  outlineStyle: "none",
-                  borderRadius: 5,
-                  fontWeight: zOpenWorkorder?.color2.label ? "500" : null,
-                  backgroundColor: zOpenWorkorder?.color2.backgroundColor,
-                  color: zOpenWorkorder?.color2.textColor,
-                }}
-                onChangeText={(val) => {
-                  setBikeColor(val, "color2");
-                }}
-              />
+              <View style={{ width: "45%", flexDirection: "row", zIndex: 10 }}>
+                <View ref={color1WrapperRef} style={{ width: "48%", zIndex: 10 }}>
+                  <TextInput_
+                    placeholder={"Color 1"}
+                    editable={!isDonePaid}
+                    capitalize={true}
+                    value={capitalizeFirstLetterOfString(zOpenWorkorder?.color1.label)}
+                    style={{
+                      width: "100%",
+                      borderWidth: 1,
+                      borderColor: zOpenWorkorder?.color1?.label ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
+                      paddingVertical: 2,
+                      paddingHorizontal: 4,
+                      fontSize: 15,
+                      outlineStyle: "none",
+                      borderRadius: 5,
+                      fontWeight: zOpenWorkorder?.color1.label ? "500" : null,
+                      backgroundColor: zOpenWorkorder?.color1.backgroundColor,
+                      color: zOpenWorkorder?.color1.textColor,
+                    }}
+                    onKeyPress={(e) => { if (e.nativeEvent.key === "Backspace") color1Backspaced.current = true; }}
+                    onChangeText={(val) => {
+                      setBikeColor(val, "color1");
+                      if (!color1Backspaced.current && val.trim().length >= 2) {
+                        const q = val.trim().toLowerCase();
+                        const matches = allColorLabels.filter(
+                          (c) => c.toLowerCase().startsWith(q) && c.toLowerCase() !== q
+                        );
+                        if (matches.length === 1) {
+                          setBikeColor(matches[0], "color1");
+                          _setColor1Focused(false);
+                          setTimeout(() => { const el = color2InputRef.current?.querySelector?.("input"); if (el) el.focus(); }, 50);
+                        }
+                      }
+                    }}
+                    onFocus={() => { _setColor1Focused(true); color1Backspaced.current = false; }}
+                    onBlur={() => {
+                      setTimeout(() => {
+                        _setColor1Focused(false);
+                        color1Backspaced.current = false;
+                      }, 150);
+                    }}
+                  />
+                  {color1Suggestions.length > 0 && (
+                    <View
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        right: 0,
+                        backgroundColor: C.listItemWhite,
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        borderRadius: 5,
+                        maxHeight: 200,
+                        overflow: "auto",
+                        zIndex: 999,
+                      }}
+                    >
+                      {color1Suggestions.map((item) => (
+                        <View
+                          key={item}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                          style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, paddingHorizontal: 8 }}
+                        >
+                          <TouchableOpacity
+                            onPress={() => {
+                              setBikeColor(item, "color1");
+                              _setColor1Focused(false);
+                            }}
+                            style={{ flex: 1, cursor: "pointer" }}
+                          >
+                            <Text style={{ fontSize: 14, color: C.text }}>{item}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+                <View style={{ width: 5 }} />
+                <View ref={color2InputRef} style={{ width: "48%", zIndex: 10 }}>
+                  <TextInput_
+                    placeholder={"Color 2"}
+                    editable={!isDonePaid}
+                    capitalize={true}
+                    value={capitalizeFirstLetterOfString(zOpenWorkorder?.color2.label)}
+                    style={{
+                      width: "100%",
+                      borderWidth: 1,
+                      borderColor: zOpenWorkorder?.color2?.label ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
+                      paddingVertical: 2,
+                      paddingHorizontal: 4,
+                      fontSize: 15,
+                      outlineStyle: "none",
+                      borderRadius: 5,
+                      fontWeight: zOpenWorkorder?.color2.label ? "500" : null,
+                      backgroundColor: zOpenWorkorder?.color2.backgroundColor,
+                      color: zOpenWorkorder?.color2.textColor,
+                    }}
+                    onKeyPress={(e) => { if (e.nativeEvent.key === "Backspace") color2Backspaced.current = true; }}
+                    onChangeText={(val) => {
+                      setBikeColor(val, "color2");
+                      if (!color2Backspaced.current && val.trim().length >= 2) {
+                        const q = val.trim().toLowerCase();
+                        const matches = allColorLabels.filter(
+                          (c) => c.toLowerCase().startsWith(q) && c.toLowerCase() !== q
+                        );
+                        if (matches.length === 1) {
+                          setBikeColor(matches[0], "color2");
+                          _setColor2Focused(false);
+                        }
+                      }
+                    }}
+                    onFocus={() => { _setColor2Focused(true); color2Backspaced.current = false; }}
+                    onBlur={() => {
+                      setTimeout(() => {
+                        _setColor2Focused(false);
+                        color2Backspaced.current = false;
+                      }, 150);
+                    }}
+                  />
+                  {color2Suggestions.length > 0 && (
+                    <View
+                      style={{
+                        position: "absolute",
+                        top: "100%",
+                        left: 0,
+                        right: 0,
+                        backgroundColor: C.listItemWhite,
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        borderRadius: 5,
+                        maxHeight: 200,
+                        overflow: "auto",
+                        zIndex: 999,
+                      }}
+                    >
+                      {color2Suggestions.map((item) => (
+                        <View
+                          key={item}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                          onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                          style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, paddingHorizontal: 8 }}
+                        >
+                          <TouchableOpacity
+                            onPress={() => {
+                              setBikeColor(item, "color2");
+                              _setColor2Focused(false);
+                            }}
+                            style={{ flex: 1, cursor: "pointer" }}
+                          >
+                            <Text style={{ fontSize: 14, color: C.text }}>{item}</Text>
+                          </TouchableOpacity>
+                        </View>
+                      ))}
+                    </View>
+                  )}
+                </View>
+              </View>
               <View
                 style={{
                   // marginTop: 11,
@@ -1144,7 +1279,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       useOpenWorkordersStore.getState().setField("color1", item, zOpenWorkorder.id);
                     }}
                     buttonStyle={{
-                      opacity: zOpenWorkorder?.color1
+                      opacity: zOpenWorkorder?.color1?.label
                         ? FILLED_DROPDOWN_OPACITY
                         : 1,
                     }}
@@ -1172,7 +1307,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     modalCoordX={0}
                     buttonStyle={{
-                      opacity: zOpenWorkorder?.color2
+                      opacity: zOpenWorkorder?.color2?.label
                         ? FILLED_DROPDOWN_OPACITY
                         : 1,
                     }}
@@ -1437,8 +1572,8 @@ export const ActiveWorkorderComponent = ({}) => {
               <CheckBox_
                 isChecked={!!zOpenWorkorder?.itemNotHere}
                 text="Customer item not here"
-                textStyle={{ fontSize: 13 }}
-                buttonStyle={{ backgroundColor: "transparent" }}
+                textStyle={{ fontSize: 13, opacity: zOpenWorkorder?.itemNotHere ? 1 : 0.6, color: zOpenWorkorder?.itemNotHere ? C.red : undefined }}
+                buttonStyle={{ backgroundColor: "transparent", opacity: zOpenWorkorder?.itemNotHere ? 1 : 0.6 }}
                 onCheck={() => {
                   if (isDonePaid) return;
                   useOpenWorkordersStore.getState().setField("itemNotHere", !zOpenWorkorder?.itemNotHere, zOpenWorkorder.id);
@@ -1475,7 +1610,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8 }}
                 activeOpacity={hasItemOrderingData ? 1 : 0.6}
               >
-                <Text style={{ fontSize: 12, fontWeight: '600', fontStyle: 'italic', color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : gray(0.5), marginRight: 5 }}>Customer Item Ordering</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', fontStyle: 'italic', color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : gray(0.5), marginRight: 5 }}>Ordering Info</Text>
                 <Text style={{ fontSize: 10, color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : gray(0.5), transform: [{ rotate: (sShowItemOrdering || hasItemOrderingData) ? '90deg' : '0deg' }] }}>▶</Text>
               </TouchableOpacity>
               <View style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: gray(0.25) }} />
@@ -1725,7 +1860,7 @@ export const ActiveWorkorderComponent = ({}) => {
           paddingHorizontal: 3,
         }}
       >
-        <Tooltip text="New Workorder" position="top">
+        <Tooltip text="New workorder / customer lookup" position="right">
           <Button_
             icon={ICONS.bicycle}
             iconSize={50}
@@ -1746,7 +1881,7 @@ export const ActiveWorkorderComponent = ({}) => {
             // onPress={}
           />
         </Tooltip>
-        <Tooltip text="Click to print, right-click to send text/email" position="top">
+        <Tooltip text="Print intake/estimate, right-click to send text/email" position="top">
         <Pressable_
           onPress={handleIntakePrintPress}
           onRightPress={handleIntakeSendElectronic}

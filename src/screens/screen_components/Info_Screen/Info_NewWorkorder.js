@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { View, TextInput, Button } from "react-native-web";
+import { View, Text, TextInput, Button, TouchableOpacity } from "react-native-web";
 import {
   formatPhoneWithDashes,
   createNewWorkorder,
@@ -426,14 +426,24 @@ export function NewWorkorderComponent({}) {
               color: C.text,
               borderBottomWidth: 1,
               borderColor: gray(0.2),
-              width: "80%",
+              width: "100%",
               height: 37,
               outlineStyle: "none",
               fontSize: 18,
-              alignSelf: "center",
             }}
           />
         )}
+        <TouchableOpacity
+          onPress={() => {
+            _setSearchFieldName(sSearchFieldName === "phone" ? "name" : "phone");
+            handleTextChange("");
+          }}
+          style={{ alignSelf: "flex-end", marginTop: 8, backgroundColor: C.blue, borderRadius: 5, paddingHorizontal: 10, paddingVertical: 4 }}
+        >
+          <Text style={{ fontSize: 14, fontWeight: "600", color: C.textWhite }}>
+            {sSearchFieldName === "phone" ? "ABC" : "123"}
+          </Text>
+        </TouchableOpacity>
         <View
           style={{ flexDirection: "row", alignItems: "center", marginTop: 5 }}
         >
@@ -473,20 +483,6 @@ export function NewWorkorderComponent({}) {
             ),
             [sCustomerInfo, buttonVisible]
           )}
-          <Tooltip text={sSearchFieldName === "phone" ? "Search by name" : "Search by phone"} position="top">
-            <Button_
-              icon={ICONS.reset1}
-              buttonStyle={{ marginTop: 10, paddingHorizontal: 0 }}
-              onPress={() => {
-                if (sSearchFieldName === "phone") {
-                  _setSearchFieldName("name");
-                } else {
-                  _setSearchFieldName("phone");
-                }
-                handleTextChange("");
-              }}
-            />
-          </Tooltip>
         </View>
       </View>
       <View

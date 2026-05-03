@@ -704,7 +704,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
               enabled={zCardStatus !== "clearing"}
               colorGradientArr={COLOR_GRADIENTS.red}
               textStyle={{ color: C.textWhite, fontSize: 11 }}
-              buttonStyle={{ paddingVertical: 2, paddingRight: 10, width: 90, borderRadius: 3 }}
+              buttonStyle={{ paddingRight: 10, width: 90, borderRadius: 3 }}
             />
           </Tooltip>
         </View>
@@ -714,8 +714,8 @@ export const CardReaderPayment = memo(function CardReaderPayment({
             onPress={startPayment}
             enabled={!startDisabled}
             colorGradientArr={COLOR_GRADIENTS.green}
-            textStyle={{ color: C.textWhite, fontSize: 16 }}
-            buttonStyle={{ cursor: startDisabled ? "default" : "inherit", borderRadius: 5 }}
+            textStyle={{ color: C.textWhite, fontSize: 16, fontWeight: 600 }}
+            buttonStyle={{ paddingVertical: 10, cursor: startDisabled ? "default" : "inherit", borderRadius: 5 }}
           />
         </View>
         <View style={{ width: "33%", alignItems: "flex-end", paddingRight: 7 }}>
@@ -726,7 +726,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
               enabled={!isProcessing && zCardStatus !== "waitingForCard"}
               colorGradientArr={COLOR_GRADIENTS.blue}
               textStyle={{ color: C.textWhite, fontSize: 11 }}
-              buttonStyle={{ paddingVertical: 2, paddingRight: 10, width: 90, cursor: (isProcessing || zCardStatus === "waitingForCard") ? "default" : "inherit", borderRadius: 3 }}
+              buttonStyle={{ paddingRight: 10, width: 90, cursor: (isProcessing || zCardStatus === "waitingForCard") ? "default" : "inherit", borderRadius: 3 }}
             />
           )}
         </View>

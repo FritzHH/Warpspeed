@@ -158,9 +158,12 @@ export function BikeStandScreen() {
   const lastCanvasClickTimeRef = useRef(0);
   const lastCanvasClickItemRef = useRef(null);
 
-  // Sub-menu card size adjustments (persisted per device in localStorage)
   const [sSubMenuFontAdj, _setSubMenuFontAdj] = useState(() => {
     let v = localStorageWrapper.getItem("standSubMenuFontAdj");
+    return v != null ? Number(v) : 0;
+  });
+  const [sNoteHelperFontAdj, _setNoteHelperFontAdj] = useState(() => {
+    let v = localStorageWrapper.getItem("standNoteHelperFontAdj");
     return v != null ? Number(v) : 0;
   });
   const [sSubMenuWidthAdj, _setSubMenuWidthAdj] = useState(() => {
@@ -170,7 +173,7 @@ export function BikeStandScreen() {
   const [sSubMenuHeightAdj, _setSubMenuHeightAdj] = useState(() => {
     let v = localStorageWrapper.getItem("standSubMenuHeightAdj");
     return v != null ? Number(v) : 0;
-  });
+  // });
   const [sSubMenuEditMode, _setSubMenuEditMode] = useState(false);
 
   // Refs for bike detail dropdowns
@@ -1638,7 +1641,7 @@ export function BikeStandScreen() {
                         }}
                         numLines={splitButtonLabel(item.name).split("\n").length > 1 ? splitButtonLabel(item.name).split("\n").length : (item.name.length > 17 ? 2 : 1)}
                         textStyle={{
-                          fontSize: getQuickButtonFontSize(item.name, 12 + sQuickButtonFontAdj),
+                          fontSize: getQuickButtonFontSize(item.name, 12),
                           fontWeight: 400,
                           textAlign: "center",
                           color: isActive ? "white" : C.textWhite,
@@ -1691,6 +1694,19 @@ export function BikeStandScreen() {
                     >
                       <Image_ icon={plusIcon} size={30} />
                     </TouchableOpacity>
+
+                    {/* Edit sub-menu sizing */}
+                    <TouchableOpacity
+                      onPress={() => _setSubMenuEditMode(!sSubMenuEditMode)}
+                      style={{
+                        alignItems: "center",
+                        justifyContent: "center",
+                        paddingHorizontal: 4,
+                        marginLeft: "auto",
+                      }}
+                    >
+                      <Image_ icon={ICONS.editPencil} size={24} />
+                    </TouchableOpacity>
                   </View>
                 </View>
               )}
@@ -1733,7 +1749,7 @@ export function BikeStandScreen() {
               )}
 
               {currentChildren.length > 0 && (
-                <View style={{ flexDirection: "row", flexWrap: "wrap", paddingHorizontal: 8, paddingBottom: 4 }}>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 0 }}>
                   {currentChildren.map((btn) => {
                     let isSelected = sSelectedButtonID === btn.id;
                     return (
@@ -1747,11 +1763,11 @@ export function BikeStandScreen() {
                           borderColor: C.buttonLightGreenOutline,
                           marginRight: 6,
                           marginBottom: 6,
-                          paddingHorizontal: 12,
-                          paddingVertical: 18,
+                          paddingHorizontal: 12 + (sSubMenuWidthAdj * 2),
+                          paddingVertical: 8 + (sSubMenuHeightAdj * 2),
                         }}
                         textStyle={{
-                          fontSize: getQuickButtonFontSize(btn.name, 15),
+                          fontSize: getQuickButtonFontSize(btn.name, 12 + sSubMenuFontAdj),
                           fontWeight: 400,
                           color: C.textWhite,
                         }}
@@ -1769,7 +1785,7 @@ export function BikeStandScreen() {
                     style={{
                       position: "relative",
                       width: "100%",
-                      minHeight: Math.max(500, canvasMaxBottom * 8),
+                      minHeight: Math.max(500, canvasMaxBottom * 8) * (1 + sSubMenuHeightAdj * 0.03),
                       overflow: "hidden",
                       borderRadius: 6,
                       padding: 5,
@@ -1779,9 +1795,9 @@ export function BikeStandScreen() {
                     {canvasItems.map((itemObj) => {
                       let invItem = (zInventory || []).find((i) => i.id === itemObj.inventoryItemID);
                       let name = invItem ? (invItem.informalName || invItem.formalName || "Unknown") : "(not found)";
-                      let w = itemObj.w || QB_DEFAULT_W;
-                      let h = itemObj.h || QB_DEFAULT_H;
-                      let fontSize = getQuickButtonFontSize(name, (itemObj.fontSize || 10) + 5 + sCanvasCardFontAdj);
+                      let w = (itemObj.w || QB_DEFAULT_W) + sSubMenuWidthAdj;
+                      let h = (itemObj.h || QB_DEFAULT_H);
+                      let fontSize = (itemObj.fontSize || 10) + sSubMenuFontAdj;
                       let isOnWorkorder = selectedItemIDs.has(itemObj.inventoryItemID);
 
                       let workorderLine = isOnWorkorder
@@ -1838,9 +1854,7 @@ export function BikeStandScreen() {
                               color: itemObj.textColor || (invItem ? C.text : gray(0.35)),
                               textAlign: "center",
                               fontWeight: "500",
-                              lineHeight: (itemObj.fontSize || 10) + sCanvasCardFontAdj + 6,
                             }}
-                            numberOfLines={(name || "").split("\n").length}
                           >
                             {name}
                           </Text>
@@ -2057,7 +2071,51 @@ export function BikeStandScreen() {
                 </View>
               )}
 
-              {/* Footer — always-visible totals + tap for items */}
+              {/* Footer — totals or size editor */}
+              {sSubMenuEditMode ? (
+                <View style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingVertical: 8,
+                  paddingHorizontal: 10,
+                  borderTopWidth: 1,
+                  borderTopColor: gray(0.1),
+                  backgroundColor: "rgba(255,255,255,0.65)",
+                  gap: 16,
+                }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.5) }}>W</Text>
+                    <TouchableOpacity onPress={() => { let v = sSubMenuWidthAdj - 1; _setSubMenuWidthAdj(v); localStorageWrapper.setItem("standSubMenuWidthAdj", String(v)); }} style={{ width: 30, height: 30, borderRadius: 6, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>-</Text>
+                    </TouchableOpacity>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: C.text, minWidth: 20, textAlign: "center" }}>{sSubMenuWidthAdj}</Text>
+                    <TouchableOpacity onPress={() => { let v = sSubMenuWidthAdj + 1; _setSubMenuWidthAdj(v); localStorageWrapper.setItem("standSubMenuWidthAdj", String(v)); }} style={{ width: 30, height: 30, borderRadius: 6, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.5) }}>H</Text>
+                    <TouchableOpacity onPress={() => { let v = sSubMenuHeightAdj - 1; _setSubMenuHeightAdj(v); localStorageWrapper.setItem("standSubMenuHeightAdj", String(v)); }} style={{ width: 30, height: 30, borderRadius: 6, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>-</Text>
+                    </TouchableOpacity>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: C.text, minWidth: 20, textAlign: "center" }}>{sSubMenuHeightAdj}</Text>
+                    <TouchableOpacity onPress={() => { let v = sSubMenuHeightAdj + 1; _setSubMenuHeightAdj(v); localStorageWrapper.setItem("standSubMenuHeightAdj", String(v)); }} style={{ width: 30, height: 30, borderRadius: 6, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.5) }}>Font</Text>
+                    <TouchableOpacity onPress={() => { let v = sSubMenuFontAdj - 1; _setSubMenuFontAdj(v); localStorageWrapper.setItem("standSubMenuFontAdj", String(v)); }} style={{ width: 30, height: 30, borderRadius: 6, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>-</Text>
+                    </TouchableOpacity>
+                    <Text style={{ fontSize: 13, fontWeight: "600", color: C.text, minWidth: 20, textAlign: "center" }}>{sSubMenuFontAdj}</Text>
+                    <TouchableOpacity onPress={() => { let v = sSubMenuFontAdj + 1; _setSubMenuFontAdj(v); localStorageWrapper.setItem("standSubMenuFontAdj", String(v)); }} style={{ width: 30, height: 30, borderRadius: 6, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              ) : (
               <View
                 onClick={() => _setShowItemOverlay((p) => !p)}
                 style={{
@@ -2109,6 +2167,7 @@ export function BikeStandScreen() {
                   </View>
                 )}
               </View>
+              )}
             </View>
           </View>
 

@@ -173,7 +173,7 @@ export function BikeStandScreen() {
   const [sSubMenuHeightAdj, _setSubMenuHeightAdj] = useState(() => {
     let v = localStorageWrapper.getItem("standSubMenuHeightAdj");
     return v != null ? Number(v) : 0;
-  // });
+  });
   const [sSubMenuEditMode, _setSubMenuEditMode] = useState(false);
 
   // Refs for bike detail dropdowns

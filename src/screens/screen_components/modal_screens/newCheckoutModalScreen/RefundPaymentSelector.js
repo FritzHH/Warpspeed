@@ -1,9 +1,9 @@
 /* eslint-disable */
-import { memo } from "react";
-import { View, Text, ScrollView } from "react-native-web";
+import { memo, useState } from "react";
+import { View, Text, ScrollView, TextInput } from "react-native-web";
 import { TouchableOpacity } from "react-native";
 import { C, Fonts } from "../../../../styles";
-import { formatCurrencyDisp, gray } from "../../../../utils";
+import { formatCurrencyDisp, gray, usdTypeMask } from "../../../../utils";
 import dayjs from "dayjs";
 import { dlog, DCAT } from "./checkoutDebugLog";
 
@@ -15,22 +15,46 @@ function formatTransactionDate(millis) {
   return d.format(fmt) + day + suffix + (d.year() !== dayjs().year() ? ", " + d.year() : "");
 }
 
-const CreditSelectRow = memo(function CreditSelectRow({ credit, isSelected, onSelect, isDisabled }) {
-  let amountRefunded = (credit.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
-  let available = credit.amount - amountRefunded;
+const BADGE_COLORS = {
+  credit: "rgb(103, 124, 231)",
+  deposit: C.green,
+  giftcard: C.blue,
+};
+
+const BADGE_LABELS = {
+  credit: "CREDIT",
+  deposit: "DEPOSIT",
+  giftcard: "GIFT CARD",
+};
+
+const CreditDepositRow = memo(function CreditDepositRow({
+  item,
+  isSelected,
+  onSelect,
+  isDisabled,
+  returnMode,
+  onReturnModeChange,
+  customAmountDisp,
+  onCustomAmountChange,
+}) {
+  let [sShowCustom, _setShowCustom] = useState(false);
+  let amountRefunded = (item.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+  let available = item.amount - amountRefunded;
   let fullyRefunded = available <= 0;
+  let isCredit = item.type === "credit";
+  let badgeColor = BADGE_COLORS[item.type] || "rgb(103, 124, 231)";
+  let badgeLabel = BADGE_LABELS[item.type] || "CREDIT";
 
   return (
     <TouchableOpacity
       onPress={() => {
         if (!isDisabled && !fullyRefunded) {
-          dlog(DCAT.BUTTON, "selectCredit", "RefundPaymentSelector", { creditId: credit.id, amount: credit.amount });
-          onSelect(credit);
+          dlog(DCAT.BUTTON, "selectCreditDeposit", "RefundPaymentSelector", { id: item.id, type: item.type, amount: item.amount });
+          onSelect(item);
         }
       }}
+      activeOpacity={fullyRefunded || isDisabled ? 1 : 0.7}
       style={{
-        flexDirection: "row",
-        alignItems: "center",
         paddingVertical: 8,
         paddingHorizontal: 8,
         borderBottomWidth: 1,
@@ -40,81 +64,157 @@ const CreditSelectRow = memo(function CreditSelectRow({ credit, isSelected, onSe
         opacity: fullyRefunded || isDisabled ? 0.4 : 1,
       }}
     >
-      <View
-        style={{
-          width: 16,
-          height: 16,
-          borderRadius: 3,
-          borderWidth: 2,
-          borderColor: isSelected ? "rgb(103, 124, 231)" : gray(0.2),
-          backgroundColor: isSelected ? "rgb(103, 124, 231)" : "transparent",
-          marginRight: 10,
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {isSelected && (
-          <Text style={{ color: "white", fontSize: 11, fontWeight: "700", marginTop: -1 }}>
-            ✓
-          </Text>
-        )}
-      </View>
-
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <View
+      {/* Return mode toggle - deposits and gift cards only, only when selected */}
+      {!isCredit && isSelected && (
+        <View style={{ flexDirection: "row", marginBottom: 6, gap: 4 }}>
+          <TouchableOpacity
+            onPress={(e) => { e.stopPropagation(); onReturnModeChange("account"); }}
             style={{
-              backgroundColor: "rgb(103, 124, 231)",
-              borderRadius: 3,
-              paddingHorizontal: 5,
-              paddingVertical: 1,
+              flex: 1,
+              paddingVertical: 4,
+              borderRadius: 4,
+              backgroundColor: returnMode === "account" ? "rgb(103, 124, 231)" : gray(0.08),
+              alignItems: "center",
             }}
           >
-            <Text
-              style={{
-                fontSize: 9,
-                fontWeight: Fonts.weight.textHeavy,
-                color: "white",
-              }}
-            >
-              CREDIT
+            <Text style={{ fontSize: 9, fontWeight: Fonts.weight.textHeavy, color: returnMode === "account" ? "white" : C.lightText }}>
+              RETURN TO ACCOUNT
             </Text>
-          </View>
-          <Text
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={(e) => { e.stopPropagation(); onReturnModeChange("customer"); }}
             style={{
-              fontSize: 13,
-              fontWeight: Fonts.weight.textHeavy,
-              color: C.text,
+              flex: 1,
+              paddingVertical: 4,
+              borderRadius: 4,
+              backgroundColor: returnMode === "customer" ? C.green : gray(0.08),
+              alignItems: "center",
             }}
           >
-            {formatCurrencyDisp(credit.amount)}
-          </Text>
+            <Text style={{ fontSize: 9, fontWeight: Fonts.weight.textHeavy, color: returnMode === "customer" ? "white" : C.lightText }}>
+              RETURN TO CUSTOMER
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      <View style={{ flexDirection: "row", alignItems: "center" }}>
+        {/* Checkbox */}
+        <View
+          style={{
+            width: 16,
+            height: 16,
+            borderRadius: 3,
+            borderWidth: 2,
+            borderColor: isSelected ? badgeColor : gray(0.2),
+            backgroundColor: isSelected ? badgeColor : "transparent",
+            marginRight: 10,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {isSelected && (
+            <Text style={{ color: "white", fontSize: 11, fontWeight: "700", marginTop: -1 }}>
+              ✓
+            </Text>
+          )}
         </View>
 
-        {credit._note && (
-          <Text style={{ fontSize: 11, color: C.lightText, marginTop: 2 }}>
-            {credit._note}
-          </Text>
-        )}
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <View style={{ backgroundColor: badgeColor, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1 }}>
+              <Text style={{ fontSize: 9, fontWeight: Fonts.weight.textHeavy, color: "white" }}>
+                {badgeLabel}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.text }}>
+              {formatCurrencyDisp(item.amount)}
+            </Text>
+          </View>
 
-        {amountRefunded > 0 && !fullyRefunded && (
-          <Text style={{ fontSize: 10, color: C.lightred, marginTop: 2 }}>
-            Previously refunded: {formatCurrencyDisp(amountRefunded)}
-          </Text>
-        )}
+          {(item._note || item._method) && (
+            <Text style={{ fontSize: 11, color: C.lightText, marginTop: 2 }}>
+              {item._note || ""}{item._last4 ? ` ****${item._last4}` : ""}
+            </Text>
+          )}
 
-        {!fullyRefunded && (
-          <Text style={{ fontSize: 10, color: C.green, marginTop: 1 }}>
-            Available: {formatCurrencyDisp(available)}
-          </Text>
-        )}
+          {amountRefunded > 0 && !fullyRefunded && (
+            <Text style={{ fontSize: 10, color: C.lightred, marginTop: 2 }}>
+              Previously refunded: {formatCurrencyDisp(amountRefunded)}
+            </Text>
+          )}
 
-        {fullyRefunded && (
-          <Text style={{ fontSize: 10, color: C.lightred, fontStyle: "italic", marginTop: 2 }}>
-            Fully refunded
-          </Text>
-        )}
+          {!fullyRefunded && (
+            <Text style={{ fontSize: 10, color: C.green, marginTop: 1 }}>
+              Available: {formatCurrencyDisp(available)}
+            </Text>
+          )}
+
+          {fullyRefunded && (
+            <Text style={{ fontSize: 10, color: C.lightred, fontStyle: "italic", marginTop: 2 }}>
+              Fully refunded
+            </Text>
+          )}
+        </View>
       </View>
+
+      {/* Custom Amount - only when selected and in "account" mode (or credit which is always account) */}
+      {isSelected && (isCredit || returnMode === "account") && !fullyRefunded && (
+        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, gap: 6 }}>
+          <TouchableOpacity
+            onPress={(e) => {
+              e.stopPropagation();
+              let next = !sShowCustom;
+              _setShowCustom(next);
+              if (!next) onCustomAmountChange(0, "");
+            }}
+            style={{
+              paddingVertical: 4,
+              paddingHorizontal: 8,
+              borderRadius: 4,
+              backgroundColor: sShowCustom ? "rgb(103, 124, 231)" : gray(0.08),
+            }}
+          >
+            <Text style={{ fontSize: 9, fontWeight: Fonts.weight.textHeavy, color: sShowCustom ? "white" : C.lightText }}>
+              CUSTOM AMOUNT
+            </Text>
+          </TouchableOpacity>
+          {sShowCustom && (
+            <View style={{
+              flex: 1,
+              borderWidth: 1,
+              borderColor: gray(0.15),
+              borderRadius: 4,
+              paddingHorizontal: 6,
+              paddingVertical: 3,
+              backgroundColor: "white",
+            }}>
+              <TextInput
+                style={{
+                  fontSize: 13,
+                  color: C.text,
+                  outlineWidth: 0,
+                  outlineStyle: "none",
+                  textAlign: "right",
+                }}
+                value={customAmountDisp}
+                onChangeText={(val) => {
+                  let result = usdTypeMask(val, { withDollar: false });
+                  let maxCents = available;
+                  if (result.cents > maxCents) {
+                    onCustomAmountChange(maxCents, formatCurrencyDisp(maxCents));
+                  } else {
+                    onCustomAmountChange(result.cents, result.display);
+                  }
+                }}
+                placeholder="0.00"
+                placeholderTextColor={gray(0.3)}
+                keyboardType="numeric"
+              />
+            </View>
+          )}
+        </View>
+      )}
     </TouchableOpacity>
   );
 });
@@ -271,12 +371,20 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
   selectedPayments = [],
   onSelectPayment,
   creditsApplied = [],
-  selectedCredits = [],
-  onSelectCredit,
+  depositsApplied = [],
+  selectedItem = null,
+  onSelectItem,
+  returnMode = "account",
+  onReturnModeChange,
+  customAmountDisp = "",
+  onCustomAmountChange,
   disabled = false,
 }) {
-  let hasCreditsSelected = selectedCredits.length > 0;
+  let hasItemSelected = !!selectedItem;
+  let isReturnToCustomer = hasItemSelected && returnMode === "customer" && selectedItem.type !== "credit";
   let hasPaymentsSelected = selectedPayments.length > 0;
+  let allCreditsAndDeposits = [...creditsApplied, ...depositsApplied];
+
   return (
     <View style={{ padding: 10 }}>
       <Text
@@ -310,7 +418,7 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
           let isLsCard = !paymentIsCash && payment._importSource === "lightspeed";
 
           // Disable logic
-          let rowDisabled = disabled || hasCreditsSelected;
+          let rowDisabled = disabled || (hasItemSelected && !isReturnToCustomer);
           if (!rowDisabled && selectedPayments.length > 0 && !isSelected) {
             let selFirst = selectedPayments[0];
             let selIsCashLike = selFirst.method === "cash" || selFirst.method === "check" || (selFirst._importSource === "lightspeed");
@@ -318,7 +426,6 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
             if (thisCashLike !== selIsCashLike) {
               rowDisabled = true;
             } else if (!thisCashLike) {
-              // Card: only one card at a time
               rowDisabled = true;
             }
           }
@@ -334,8 +441,8 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
           );
         })}
 
-        {/* Store Credits */}
-        {creditsApplied.length > 0 && (
+        {/* Credits & Deposits */}
+        {allCreditsAndDeposits.length > 0 && (
           <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: gray(0.1), paddingTop: 6 }}>
             <Text
               style={{
@@ -345,18 +452,22 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
                 marginBottom: 4,
               }}
             >
-              STORE CREDITS
+              CREDITS & DEPOSITS
             </Text>
-            {creditsApplied.map((credit, idx) => {
-              let isSelected = selectedCredits.some((c) => c.id === credit.id);
-              let rowDisabled = disabled || hasPaymentsSelected;
+            {allCreditsAndDeposits.map((item, idx) => {
+              let isSelected = selectedItem?.id === item.id;
+              let rowDisabled = disabled || hasPaymentsSelected || (hasItemSelected && !isSelected);
               return (
-                <CreditSelectRow
-                  key={credit.id || "cr" + idx}
-                  credit={credit}
+                <CreditDepositRow
+                  key={item.id || "cd" + idx}
+                  item={item}
                   isSelected={isSelected}
-                  onSelect={onSelectCredit}
+                  onSelect={onSelectItem}
                   isDisabled={rowDisabled}
+                  returnMode={isSelected ? returnMode : "account"}
+                  onReturnModeChange={onReturnModeChange}
+                  customAmountDisp={isSelected ? customAmountDisp : ""}
+                  onCustomAmountChange={onCustomAmountChange}
                 />
               );
             })}

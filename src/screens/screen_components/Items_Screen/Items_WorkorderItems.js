@@ -94,6 +94,10 @@ export const Items_WorkorderItemsTab = ({}) => {
   const hasMissingReceiptNotes = (zOpenWorkorder?.workorderLines || []).some(
     (line) => line.inventoryItem?.receiptNoteRequired && !(line.receiptNotes || "").trim()
   );
+  const hasPlaceholderItems = (zOpenWorkorder?.workorderLines || []).some((line) => {
+    const name = ((line.inventoryItem?.formalName || "") + " " + (line.inventoryItem?.informalName || "")).toLowerCase();
+    return name.includes("placeholder");
+  });
   const activeSale = zOpenWorkorder?.activeSaleID
     ? zActiveSales.find((s) => s.id === zOpenWorkorder.activeSaleID)
     : null;
@@ -190,10 +194,11 @@ export const Items_WorkorderItemsTab = ({}) => {
     }
   }, [zInventoryArr, zOpenWorkorder]);
 
-  // clear local qty overrides when switching workorders
+  // clear local qty overrides and placeholder replace mode when switching workorders
   useEffect(() => {
     _setQtyMap({});
     qtyMapRef.current = {};
+    useOpenWorkordersStore.setState({ placeholderReplaceLineID: null });
   }, [zOpenWorkorder?.id]);
 
   // calculate runnings totals on the open workorder ///////////////
@@ -905,14 +910,14 @@ export const Items_WorkorderItemsTab = ({}) => {
             backgroundColor: C.buttonLightGreenOutline,
           }}
         />
-        <Tooltip text={hasMissingReceiptNotes ? "Enter the required receipt note info to check out" : "Check out workorder"} position="top">
+        <Tooltip text={hasPlaceholderItems ? "Replace placeholder items with real items before checking out" : hasMissingReceiptNotes ? "Enter the required receipt note info to check out" : "Check out workorder"} position="top">
           <Button_
             ref={checkoutBtnRef}
             textStyle={{ color: C.textWhite, fontSize: 16 }}
             icon={ICONS.shoppingCart}
             iconSize={34}
-            enabled={!isDonePaid && !hasMissingReceiptNotes}
-            buttonStyle={{ paddingVertical: 0, opacity: (isDonePaid || hasMissingReceiptNotes) ? 0.3 : 1 }}
+            enabled={!isDonePaid && !hasMissingReceiptNotes && !hasPlaceholderItems}
+            buttonStyle={{ paddingVertical: 0, opacity: (isDonePaid || hasMissingReceiptNotes || hasPlaceholderItems) ? 0.3 : 1 }}
             onPress={() => useLoginStore.getState().requireLogin(() => {
               if (useOpenWorkordersStore.getState().castingToDisplay) {
                 broadcastClear();
@@ -967,6 +972,9 @@ export const LineItemComponent = ({
   onOpenNoteHelper,
 }) => {
   const isCustom = inventoryItem.customPart || inventoryItem.customLabor;
+  const isPlaceholder = ((inventoryItem.formalName || "") + " " + (inventoryItem.informalName || "")).toLowerCase().includes("placeholder");
+  const zPlaceholderReplaceLineID = useOpenWorkordersStore((s) => s.placeholderReplaceLineID);
+  const isInReplaceMode = isPlaceholder && zPlaceholderReplaceLineID === workorderLine.id;
   const effectiveQty = localQty !== undefined ? localQty : workorderLine.qty;
   const [sQtyFocused, _setQtyFocused] = useState(false);
   const [sQtyInputVal, _setQtyInputVal] = useState("");
@@ -1000,27 +1008,44 @@ export const LineItemComponent = ({
   // log("WORKORDER NOTES", workorderLine.intakeNotes);
   // console.log("RECEIPT NOTES", sReceiptNotes);
   return (
-    <View
+    <TouchableOpacity
+      disabled={!isPlaceholder || isLocked}
+      activeOpacity={isPlaceholder ? 0.7 : 1}
+      onPress={() => {
+        if (!isPlaceholder) return;
+        useOpenWorkordersStore.setState({
+          placeholderReplaceLineID: isInReplaceMode ? null : workorderLine.id,
+        });
+      }}
       style={{
         width: "100%",
       }}
     >
+      {isInReplaceMode && (
+        <View style={{ backgroundColor: C.orange, borderTopLeftRadius: 15, borderTopRightRadius: 15, marginHorizontal: 8, marginTop: 3, paddingVertical: 3, alignItems: "center" }}>
+          <Text style={{ color: "white", fontSize: 12, fontWeight: "700" }}>Placeholder Replace Mode - Select an item from inventory</Text>
+        </View>
+      )}
       <View
         style={{
           flexDirection: "row",
           width: "100%",
           alignItems: "center",
-          backgroundColor: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 80) : inventoryItem.customPart ? lightenRGBByPercent(C.green, 80) : C.backgroundListWhite,
+          backgroundColor: isInReplaceMode ? lightenRGBByPercent(C.orange, 75) : inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 80) : inventoryItem.customPart ? lightenRGBByPercent(C.green, 80) : C.backgroundListWhite,
           paddingVertical: 3,
           paddingRight: 5,
           paddingLeft: 4,
-          marginVertical: 3,
+          marginVertical: isInReplaceMode ? 0 : 3,
           marginHorizontal: 8,
-          borderColor: C.listItemBorder,
-          borderLeftColor: workorderLine.discountObj?.name ? C.lightred : lightenRGBByPercent(C.green, 60),
-          borderWidth: 1,
-          borderRadius: 15,
-          borderLeftWidth: 3,
+          borderColor: isInReplaceMode ? C.orange : C.listItemBorder,
+          borderLeftColor: isInReplaceMode ? C.orange : workorderLine.discountObj?.name ? C.lightred : lightenRGBByPercent(C.green, 60),
+          borderWidth: isInReplaceMode ? 2 : 1,
+          borderRadius: isInReplaceMode ? 0 : 15,
+          borderBottomLeftRadius: 15,
+          borderBottomRightRadius: 15,
+          borderTopLeftRadius: isInReplaceMode ? 0 : 15,
+          borderTopRightRadius: isInReplaceMode ? 0 : 15,
+          borderLeftWidth: isInReplaceMode ? 2 : 3,
         }}
       >
         <View
@@ -1087,18 +1112,29 @@ export const LineItemComponent = ({
                           </View>
                         </Tooltip>
                       )}
-                      <Text
-                        style={{
-                          fontSize: 16,
-                          color: C.text,
-                          fontWeight: "400",
-                          textDecorationLine: "none",
-                          flex: 1,
-                        }}
-                        numberOfLines={2}
-                      >
-                        {inventoryItem.formalName ? inventoryItem.formalName : (isCustom ? "(tap to edit)" : "")}
-                      </Text>
+                      {isPlaceholder ? (
+                        <View style={{ backgroundColor: lightenRGBByPercent(C.red, 85), borderRadius: 15, paddingHorizontal: 8, paddingVertical: 3, shadowColor: "black", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 3 }}>
+                          <Text
+                            style={{ fontSize: 16, color: C.red, fontWeight: "500" }}
+                            numberOfLines={2}
+                          >
+                            {inventoryItem.formalName || ""}
+                          </Text>
+                        </View>
+                      ) : (
+                        <Text
+                          style={{
+                            fontSize: 16,
+                            color: C.text,
+                            fontWeight: "400",
+                            textDecorationLine: "none",
+                            flex: 1,
+                          }}
+                          numberOfLines={2}
+                        >
+                          {inventoryItem.formalName ? inventoryItem.formalName : (isCustom ? "(tap to edit)" : "")}
+                        </Text>
+                      )}
                     </TouchableOpacity>
                   </View>
                   {hasIntake && (
@@ -1474,7 +1510,7 @@ export const LineItemComponent = ({
           </View>
         </View>
       </View>
-    </View>
+    </TouchableOpacity>
   );
   // try {
   //   return setComponent();

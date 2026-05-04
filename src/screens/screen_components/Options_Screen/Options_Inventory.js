@@ -5,6 +5,7 @@ import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO, QUICK_BUTTON_ITEM_PROTO, QB
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 
 import {
+  applyDiscountToWorkorderItem,
   formatCurrencyDisp,
   gray,
   lightenRGBByPercent,
@@ -434,23 +435,30 @@ const QuickItemCanvasCard = ({
         <>
           {/* Caret toggle */}
           <div
-            onClick={(e) => { e.stopPropagation(); _setShowActions((v) => !v); }}
-            onMouseDown={(e) => e.stopPropagation()}
-            onContextMenu={(e) => e.stopPropagation()}
             style={{
               position: "absolute",
               bottom: sShowActions ? 18 : 1,
               right: 1,
-              width: 14,
-              height: 14,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
               zIndex: 4,
             }}
           >
-            <Text style={{ fontSize: 8, color: gray(0.2), lineHeight: 14 }}>{sShowActions ? "\u25BC" : "\u25B6"}</Text>
+            <Tooltip text={sShowActions ? "Hide actions" : "Show actions"} position="left">
+              <div
+                onClick={(e) => { e.stopPropagation(); _setShowActions((v) => !v); }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onContextMenu={(e) => e.stopPropagation()}
+                style={{
+                  width: 14,
+                  height: 14,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  cursor: "pointer",
+                }}
+              >
+                <Text style={{ fontSize: 8, color: itemObj.textColor || C.text, opacity: 0.12, lineHeight: 14 }}>{sShowActions ? "\u25BC" : "\u25B6"}</Text>
+              </div>
+            </Tooltip>
           </div>
           {/* Action row */}
           {sShowActions && (
@@ -1143,13 +1151,12 @@ export function InventoryComponent({}) {
     let hasItems = items.length > 0;
 
     if (hasChildren) {
-      // Toggle off if clicking the already-active root button
+      // Already-active root button — clear search if active, otherwise no-op
       if (!buttonObj.parentID && sMenuPath.length > 0 && sMenuPath[0].id === buttonObj.id) {
-        _setCurrentParentID(null);
-        _setMenuPath([]);
-        _setSelectedButtonID(null);
-        _setSearchResults([]);
-        _setSearchTerm("");
+        if (sSearchTerm) {
+          _setSearchTerm("");
+          _setSearchResults([]);
+        }
         return;
       }
       // Collapse up one level if clicking the active sub-button
@@ -1197,23 +1204,13 @@ export function InventoryComponent({}) {
         _setSearchResults([]);
       }
     } else {
-      // Leaf button (no children) — toggle selection
+      // Leaf button (no children)
       if (sSelectedButtonID === buttonObj.id) {
-        // Deselecting child — re-select parent if it has items
-        let parentBtn = buttonObj.parentID ? (zQuickItemButtons || []).find((b) => b.id === buttonObj.parentID) : null;
-        if (parentBtn) {
-          let parentItems = [];
-          parentBtn.items?.forEach((entry) => {
-            let id = typeof entry === "string" ? entry : entry.inventoryItemID;
-            let found = findInventoryItem(id);
-            if (found) parentItems.push(found);
-          });
-          _setSelectedButtonID(parentBtn.id);
-          _setSearchResults(parentItems);
-        } else {
-          _setSelectedButtonID(null);
+        if (sSearchTerm) {
+          _setSearchTerm("");
           _setSearchResults([]);
         }
+        return;
       } else {
         _setSelectedButtonID(buttonObj.id);
         _setSearchResults(items);
@@ -1278,6 +1275,28 @@ export function InventoryComponent({}) {
       console.log("  -> adding to workorder:", openWorkorder.id);
       let workorderLines = openWorkorder.workorderLines;
       if (!workorderLines) workorderLines = [];
+
+      const replaceLineID = useOpenWorkordersStore.getState().placeholderReplaceLineID;
+      if (replaceLineID) {
+        const replaceIndex = workorderLines.findIndex((l) => l.id === replaceLineID);
+        if (replaceIndex !== -1) {
+          workorderLines = cloneDeep(workorderLines);
+          const { _score, ...cleanItem } = item;
+          if (cleanItem.minutes > 0 && !cleanItem.price) {
+            const laborRate = useSettingsStore.getState().settings?.laborRateByHour || 0;
+            cleanItem.price = Math.round((cleanItem.minutes / 60) * laborRate);
+          }
+          workorderLines[replaceIndex] = { ...workorderLines[replaceIndex], inventoryItem: cleanItem };
+          if (workorderLines[replaceIndex].discountObj?.name) {
+            workorderLines[replaceIndex] = applyDiscountToWorkorderItem(workorderLines[replaceIndex]);
+          }
+          useOpenWorkordersStore.setState({ placeholderReplaceLineID: null });
+          useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
+          return;
+        }
+        useOpenWorkordersStore.setState({ placeholderReplaceLineID: null });
+      }
+
       const existingIndex = workorderLines.findIndex((l) => l.inventoryItem?.id === item.id);
       if (existingIndex !== -1) {
         workorderLines = cloneDeep(workorderLines);

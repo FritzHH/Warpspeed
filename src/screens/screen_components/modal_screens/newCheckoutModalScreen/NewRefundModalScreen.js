@@ -64,7 +64,10 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   const [sWorkordersInSale, _setWorkordersInSale] = useState([]);
   const [sSelectedItems, _setSelectedItems] = useState([]);
   const [sSelectedPayments, _setSelectedPayments] = useState([]);
-  const [sSelectedCredits, _setSelectedCredits] = useState([]);
+  const [sSelectedCreditItem, _setSelectedCreditItem] = useState(null);
+  const [sCreditReturnMode, _setCreditReturnMode] = useState("account");
+  const [sCreditCustomAmount, _setCreditCustomAmount] = useState(0);
+  const [sCreditCustomAmountDisp, _setCreditCustomAmountDisp] = useState("");
   const [sRefundNote, _setRefundNote] = useState("");
   const [sRefundComplete, _setRefundComplete] = useState(false);
   const [sLoading, _setLoading] = useState(false);
@@ -132,7 +135,9 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
   let selectedIsCash = sSelectedPayments.length > 0 && (sSelectedPayments[0].method === "cash" || sSelectedPayments[0].method === "check" || sSelectedPayments[0]._importSource === "lightspeed");
   let selectedIsCard = sSelectedPayments.length > 0 && !selectedIsCash;
-  let selectedIsCredit = sSelectedCredits.length > 0;
+  let selectedIsCredit = !!sSelectedCreditItem;
+  let creditReturnToAccount = selectedIsCredit && (sSelectedCreditItem.type === "credit" || sCreditReturnMode === "account");
+  let creditReturnToCustomer = selectedIsCredit && !creditReturnToAccount;
 
   // Selected payment(s) combined available balance
   let selectedPaymentAvailable = 0;
@@ -164,7 +169,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   let hasCashPayments = cashPaymentsTotal > 0;
 
   // Payment-first: require payment selection when multiple payments exist
-  let needsPaymentSelection = sTransactions.length > 1 && sSelectedPayments.length === 0 && sSelectedCredits.length === 0;
+  let needsPaymentSelection = sTransactions.length > 1 && sSelectedPayments.length === 0 && !creditReturnToAccount;
 
   let reasonMissing = sRefundNote.trim().length < 10;
 
@@ -343,7 +348,12 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       return;
     }
 
-    if (sSelectedCredits.length > 0) _setSelectedCredits([]);
+    if (sSelectedCreditItem) {
+      _setSelectedCreditItem(null);
+      _setCreditReturnMode("account");
+      _setCreditCustomAmount(0);
+      _setCreditCustomAmountDisp("");
+    }
 
     if (isCashOrCheck) {
       let existingCash = sSelectedPayments.filter((p) => p.method === "cash" || p.method === "check");
@@ -353,22 +363,43 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     }
   }
 
-  // ─── Credit Selection ─────────────────────────────────────
-  function handleSelectCredit(credit) {
-    dlog(DCAT.BUTTON, "select_credit", "RefundModal", { creditID: credit?.id, amount: credit?.amount });
-    let alreadySelected = sSelectedCredits.find((c) => c.id === credit.id);
-    if (alreadySelected) {
-      _setSelectedCredits(sSelectedCredits.filter((c) => c.id !== credit.id));
+  // ─── Credit/Deposit/Gift Card Selection ────────────────────
+  function handleSelectCreditItem(item) {
+    dlog(DCAT.BUTTON, "select_credit_item", "RefundModal", { id: item?.id, type: item?.type, amount: item?.amount });
+    if (sSelectedCreditItem?.id === item.id) {
+      _setSelectedCreditItem(null);
+      _setCreditReturnMode("account");
+      _setCreditCustomAmount(0);
+      _setCreditCustomAmountDisp("");
       return;
     }
     if (sSelectedPayments.length > 0) _setSelectedPayments([]);
-    _setSelectedCredits([...sSelectedCredits, credit]);
+    _setSelectedCreditItem(item);
+    _setCreditReturnMode("account");
+    _setCreditCustomAmount(0);
+    _setCreditCustomAmountDisp("");
   }
 
-  // ─── Credit Refund (Reapply to Customer) ──────────────────
+  function handleCreditReturnModeChange(mode) {
+    _setCreditReturnMode(mode);
+    _setCreditCustomAmount(0);
+    _setCreditCustomAmountDisp("");
+    if (mode === "customer") {
+      _setSelectedItems([]);
+    }
+  }
+
+  function handleCreditCustomAmountChange(cents, disp) {
+    _setCreditCustomAmount(cents);
+    _setCreditCustomAmountDisp(disp);
+    if (cents > 0 && sSelectedItems.length > 0) _setSelectedItems([]);
+  }
+
+  // ─── Credit/Deposit Refund (Reapply to Account) ───────────
   async function handleCreditRefund() {
-    if (sSelectedCredits.length === 0) return;
-    dlog(DCAT.ACTION, "credit_refund_start", "RefundModal", { count: sSelectedCredits.length });
+    if (!sSelectedCreditItem) return;
+    let item = sSelectedCreditItem;
+    dlog(DCAT.ACTION, "credit_refund_start", "RefundModal", { id: item.id, type: item.type });
 
     let sale = cloneDeep(sOriginalSale);
     let customerID = sale.customerID || sWorkordersInSale[0]?.customerID || "";
@@ -379,45 +410,44 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       return;
     }
 
-    let totalRefundedAmount = 0;
+    let refunded = (item.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+    let available = item.amount - refunded;
+    let refundAmount = sCreditCustomAmount > 0 ? Math.min(sCreditCustomAmount, available) : (hasItemSelection ? itemRefundTotal : available);
+    if (refundAmount <= 0) return;
 
-    for (let selectedCredit of sSelectedCredits) {
-      let refunded = (selectedCredit.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
-      let available = selectedCredit.amount - refunded;
-      if (available <= 0) continue;
+    let isCredit = item.type === "credit";
+    let saleArrKey = isCredit ? "creditsApplied" : "depositsApplied";
+    let custArrKey = isCredit ? "credits" : "deposits";
 
-      let creditIdx = (sale.creditsApplied || []).findIndex((c) => c.id === selectedCredit.id);
-      if (creditIdx < 0) continue;
+    let itemIdx = (sale[saleArrKey] || []).findIndex((c) => c.id === item.id);
+    if (itemIdx < 0) return;
 
-      let refundEntry = {
-        id: generateEAN13Barcode(),
-        amount: available,
-        millis: Date.now(),
-      };
+    let refundEntry = {
+      id: generateEAN13Barcode(),
+      amount: refundAmount,
+      millis: Date.now(),
+    };
 
-      sale.creditsApplied[creditIdx].refunds = [
-        ...(sale.creditsApplied[creditIdx].refunds || []),
-        refundEntry,
-      ];
+    sale[saleArrKey][itemIdx].refunds = [
+      ...(sale[saleArrKey][itemIdx].refunds || []),
+      refundEntry,
+    ];
 
-      let custCreditIdx = (customer.credits || []).findIndex((c) => c.id === selectedCredit.id);
-      if (custCreditIdx >= 0) {
-        customer.credits[custCreditIdx].amountCents += available;
-      } else {
-        customer.credits = [...(customer.credits || []), {
-          id: selectedCredit.id,
-          text: selectedCredit._note || "Refund from sale " + sale.id,
-          amountCents: available,
-          reservedCents: 0,
-          millis: Date.now(),
-        }];
-      }
-
-      totalRefundedAmount += available;
+    let custIdx = (customer[custArrKey] || []).findIndex((c) => c.id === item.id);
+    if (custIdx >= 0) {
+      customer[custArrKey][custIdx].amountCents += refundAmount;
+    } else {
+      let restored = isCredit
+        ? { id: item.id, text: item._note || "Refund from sale " + sale.id, amountCents: refundAmount, reservedCents: 0, millis: Date.now() }
+        : { id: item.id, transactionId: item.transactionId || "", amountCents: refundAmount, reservedCents: 0, millis: Date.now(), method: item._method || "cash", note: item._note || "Refund from sale " + sale.id, last4: item._last4 || "", type: item.type };
+      customer[custArrKey] = [...(customer[custArrKey] || []), restored];
     }
 
     _setOriginalSale(sale);
-    _setSelectedCredits([]);
+    _setSelectedCreditItem(null);
+    _setCreditReturnMode("account");
+    _setCreditCustomAmount(0);
+    _setCreditCustomAmountDisp("");
     _setRefundComplete(true);
 
     useCurrentCustomerStore.getState().setCustomer(customer, false);
@@ -429,7 +459,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     }
 
     if (onSaleUpdated) onSaleUpdated(sale, sTransactions);
-    dlog(DCAT.ACTION, "credit_refund_complete", "RefundModal", { totalRefundedAmount });
+    dlog(DCAT.ACTION, "credit_refund_complete", "RefundModal", { refundAmount, type: item.type });
   }
 
   // ─── Pending Refund Tracking (crash recovery) ────────────
@@ -953,8 +983,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                 }}
               >
                 <View
-                  style={{ flex: 1, opacity: sCardRefundProcessing || selectedIsCard || selectedIsCredit || !hasCashPayments || needsPaymentSelection ? 0.3 : 1 }}
-                  pointerEvents={sCardRefundProcessing || selectedIsCard || selectedIsCredit || !hasCashPayments || needsPaymentSelection ? "none" : "auto"}
+                  style={{ flex: 1, opacity: sCardRefundProcessing || selectedIsCard || creditReturnToAccount || !hasCashPayments || needsPaymentSelection ? 0.3 : 1 }}
+                  pointerEvents={sCardRefundProcessing || selectedIsCard || creditReturnToAccount || !hasCashPayments || needsPaymentSelection ? "none" : "auto"}
                 >
                   <CashRefund
                     maxCashRefund={maxCashRefund}
@@ -968,8 +998,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                   />
                 </View>
                 <View
-                  style={{ flex: 1, opacity: selectedIsCash || selectedIsCredit || !hasCardPayments || needsPaymentSelection ? 0.3 : 1 }}
-                  pointerEvents={selectedIsCash || selectedIsCredit || !hasCardPayments || needsPaymentSelection ? "none" : "auto"}
+                  style={{ flex: 1, opacity: selectedIsCash || creditReturnToAccount || !hasCardPayments || needsPaymentSelection ? 0.3 : 1 }}
+                  pointerEvents={selectedIsCash || creditReturnToAccount || !hasCardPayments || needsPaymentSelection ? "none" : "auto"}
                 >
                   <CardRefund
                     selectedPayment={selectedIsCard ? sSelectedPayments[0] : null}
@@ -1021,43 +1051,15 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     selectedPayments={sSelectedPayments}
                     onSelectPayment={handleSelectPayment}
                     creditsApplied={getAllAppliedCredits(sOriginalSale).filter((c) => c.type === "credit")}
-                    selectedCredits={sSelectedCredits}
-                    onSelectCredit={handleSelectCredit}
+                    depositsApplied={getAllAppliedCredits(sOriginalSale).filter((c) => c.type !== "credit")}
+                    selectedItem={sSelectedCreditItem}
+                    onSelectItem={handleSelectCreditItem}
+                    returnMode={sCreditReturnMode}
+                    onReturnModeChange={handleCreditReturnModeChange}
+                    customAmountDisp={sCreditCustomAmountDisp}
+                    onCustomAmountChange={handleCreditCustomAmountChange}
                     disabled={sRefundComplete}
                   />
-
-                  {/* ── Credit Refund Button ──────────────────── */}
-                  {selectedIsCredit && !sRefundComplete && (
-                    <View style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
-                      <TouchableOpacity
-                        onPress={handleCreditRefund}
-                        style={{
-                          backgroundColor: "rgb(103, 124, 231)",
-                          borderRadius: 8,
-                          paddingVertical: 12,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Text
-                          style={{
-                            fontSize: 13,
-                            fontWeight: Fonts.weight.textHeavy,
-                            color: "white",
-                            letterSpacing: 0.5,
-                          }}
-                        >
-                          REAPPLY TO CUSTOMER ACCOUNT
-                        </Text>
-                        <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", marginTop: 3 }}>
-                          {formatCurrencyDisp(sSelectedCredits.reduce((sum, c) => {
-                            let refunded = (c.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
-                            return sum + (c.amount - refunded);
-                          }, 0))} back to store credit
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
 
                   {/* ── Refund Notes ──────────��───────────────── */}
                   <View style={{ padding: 10 }}>
@@ -1142,6 +1144,41 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                         />
                       </View>
                     )}
+
+                    {/* ── Credit Refund Button ────────────────── */}
+                    {creditReturnToAccount && !sRefundComplete && (() => {
+                      let refunded = (sSelectedCreditItem?.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+                      let available = (sSelectedCreditItem?.amount || 0) - refunded;
+                      let buttonAmount = sCreditCustomAmount > 0 ? Math.min(sCreditCustomAmount, available) : (hasItemSelection ? itemRefundTotal : available);
+                      return (
+                        <TouchableOpacity
+                          onPress={!reasonMissing && buttonAmount > 0 ? handleCreditRefund : undefined}
+                          style={{
+                            backgroundColor: "rgb(103, 124, 231)",
+                            borderRadius: 8,
+                            paddingVertical: 12,
+                            alignItems: "center",
+                            justifyContent: "center",
+                            marginTop: 8,
+                            opacity: reasonMissing || buttonAmount <= 0 ? 0.4 : 1,
+                          }}
+                        >
+                          <Text
+                            style={{
+                              fontSize: 13,
+                              fontWeight: Fonts.weight.textHeavy,
+                              color: "white",
+                              letterSpacing: 0.5,
+                            }}
+                          >
+                            REAPPLY TO CUSTOMER ACCOUNT
+                          </Text>
+                          <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", marginTop: 3 }}>
+                            {formatCurrencyDisp(buttonAmount)} back to {sSelectedCreditItem?.type === "credit" ? "store credit" : "account"}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })()}
                   </View>
 
                 </ScrollView>
@@ -1189,9 +1226,9 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                 style={{
                   width: "42%",
                   paddingLeft: 10,
-                  opacity: sCardRefundProcessing || sRefundComplete || sOriginalSale?.isDepositSale || needsPaymentSelection ? 0.3 : 1,
+                  opacity: sCardRefundProcessing || sRefundComplete || sOriginalSale?.isDepositSale || needsPaymentSelection || sCreditCustomAmount > 0 ? 0.3 : 1,
                 }}
-                pointerEvents={sCardRefundProcessing || sRefundComplete || sOriginalSale?.isDepositSale || needsPaymentSelection ? "none" : "auto"}
+                pointerEvents={sCardRefundProcessing || sRefundComplete || sOriginalSale?.isDepositSale || needsPaymentSelection || sCreditCustomAmount > 0 ? "none" : "auto"}
               >
                 {needsPaymentSelection ? (
                   <View

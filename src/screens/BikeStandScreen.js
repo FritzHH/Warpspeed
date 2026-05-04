@@ -802,6 +802,9 @@ export function BikeStandScreen() {
   }
 
   async function startFaceLogin() {
+    // Face recognition disabled — go straight to PIN
+    _setShowPinModal(true);
+    return;
     if (!modelsLoadedRef.current) {
       _setShowPinModal(true);
       return;

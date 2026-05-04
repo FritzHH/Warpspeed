@@ -1329,6 +1329,7 @@ export const useOpenWorkordersStore = create(
       lockedWorkorderID: null,
       saleModalObj: null,
       castingToDisplay: false,
+      placeholderReplaceLineID: null,
       _pendingCustomerLinks: {},
       _dirtyFields: {},
 

@@ -172,6 +172,8 @@ export function recomputeSaleAmounts(sale, transactions, credits) {
   let creditTotal = creds.reduce((sum, c) => sum + (c.amount || 0), 0);
   let creditRefundedTotal = (sale?.creditsApplied || []).reduce((sum, c) =>
     sum + (c.refunds || []).reduce((s, r) => s + (r.amount || 0), 0), 0
+  ) + (sale?.depositsApplied || []).reduce((sum, c) =>
+    sum + (c.refunds || []).reduce((s, r) => s + (r.amount || 0), 0), 0
   );
   let totalRefunded = txns.reduce((sum, t) =>
     sum + (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0), 0

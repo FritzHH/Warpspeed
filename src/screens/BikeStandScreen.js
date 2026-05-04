@@ -158,19 +158,20 @@ export function BikeStandScreen() {
   const lastCanvasClickTimeRef = useRef(0);
   const lastCanvasClickItemRef = useRef(null);
 
-  // Local font size adjustments (persisted per device, not to DB)
-  const [sCanvasCardFontAdj, _setCanvasCardFontAdj] = useState(() => {
-    let v = localStorageWrapper.getItem("standCanvasCardFontAdj");
-    return v != null ? Number(v) : 2;
-  });
-  const [sQuickButtonFontAdj, _setQuickButtonFontAdj] = useState(() => {
-    let v = localStorageWrapper.getItem("standQuickButtonFontAdj");
-    return v != null ? Number(v) : 10;
-  });
-  const [sNoteHelperFontAdj, _setNoteHelperFontAdj] = useState(() => {
-    let v = localStorageWrapper.getItem("standNoteHelperFontAdj");
+  // Sub-menu card size adjustments (persisted per device in localStorage)
+  const [sSubMenuFontAdj, _setSubMenuFontAdj] = useState(() => {
+    let v = localStorageWrapper.getItem("standSubMenuFontAdj");
     return v != null ? Number(v) : 0;
   });
+  const [sSubMenuWidthAdj, _setSubMenuWidthAdj] = useState(() => {
+    let v = localStorageWrapper.getItem("standSubMenuWidthAdj");
+    return v != null ? Number(v) : 0;
+  });
+  const [sSubMenuHeightAdj, _setSubMenuHeightAdj] = useState(() => {
+    let v = localStorageWrapper.getItem("standSubMenuHeightAdj");
+    return v != null ? Number(v) : 0;
+  });
+  const [sSubMenuEditMode, _setSubMenuEditMode] = useState(false);
 
   // Refs for bike detail dropdowns
   const bikeBrandsRef = useRef(null);
@@ -225,6 +226,27 @@ export function BikeStandScreen() {
       }
     }
     loadFaceModels();
+  }, []);
+
+  // DEV: auto-login from saved pin
+  useEffect(() => {
+    let savedPin = localStorageWrapper.getItem("standDevPin");
+    if (!savedPin) return;
+    let checkLogin = () => {
+      let users = useSettingsStore.getState().settings?.users;
+      if (!users) return false;
+      let userObj = users.find((u) => u.pin == savedPin) || users.find((u) => u.alternatePin == savedPin);
+      if (userObj) {
+        useLoginStore.getState().setCurrentUser(userObj);
+        useLoginStore.setState({ lastActionMillis: Infinity });
+        return true;
+      }
+      return false;
+    };
+    if (!checkLogin()) {
+      let interval = setInterval(() => { if (checkLogin()) clearInterval(interval); }, 500);
+      return () => clearInterval(interval);
+    }
   }, []);
 
   let selectedWorkorder = (zWorkorders || []).find((o) => o.id === sSelectedWorkorderID);
@@ -365,8 +387,10 @@ export function BikeStandScreen() {
   //////////////////////////////////////////////////////////////////////////////
 
   async function inventoryItemSelected(invItem) {
+    console.log("[STAND] inventoryItemSelected:", invItem?.formalName, "hasWorkorderReady:", hasWorkorderReady, "selectedWorkorder:", !!selectedWorkorder, "pendingCustomer:", sPendingCustomer);
     if (!hasWorkorderReady || !invItem) return;
     let wo = await ensureWorkorderExists();
+    console.log("[STAND] ensureWorkorderExists returned:", wo?.id);
     if (!wo) return;
     await dbSaveOpenWorkorder(wo);
 
@@ -819,8 +843,9 @@ export function BikeStandScreen() {
             if (distance < FACE_DESCRIPTOR_CONFIDENCE_DISTANCE) {
               stopFaceLogin();
               _setShowFaceModal(false);
+              localStorageWrapper.setItem("standDevPin", user.pin);
               useLoginStore.getState().setCurrentUser(user);
-              useLoginStore.getState().setLastActionMillis();
+              useLoginStore.setState({ lastActionMillis: Infinity });
               if (pendingActionRef.current) {
                 pendingActionRef.current();
                 pendingActionRef.current = null;
@@ -853,8 +878,9 @@ export function BikeStandScreen() {
     let userObj = users.find((u) => u.pin == newPin);
     if (!userObj) userObj = users.find((u) => u.alternatePin == newPin);
     if (!userObj) return;
+    localStorageWrapper.setItem("standDevPin", newPin);
     useLoginStore.getState().setCurrentUser(userObj);
-    useLoginStore.getState().setLastActionMillis();
+    useLoginStore.setState({ lastActionMillis: Infinity });
     _setShowPinModal(false);
     _setPin("");
     if (pendingActionRef.current) {
@@ -1800,7 +1826,7 @@ export function BikeStandScreen() {
                             borderWidth: 1,
                             borderColor: C.buttonLightGreenOutline,
                             borderRadius: 8,
-                            backgroundColor: isOnWorkorder ? lightenRGBByPercent(C.blue, 70) : C.buttonLightGreenOutline,
+                            backgroundColor: itemObj.backgroundColor || (isOnWorkorder ? lightenRGBByPercent(C.blue, 70) : C.buttonLightGreenOutline),
                             overflow: "visible",
                             paddingHorizontal: 4,
                             paddingVertical: 2,
@@ -1809,7 +1835,7 @@ export function BikeStandScreen() {
                           <Text
                             style={{
                               fontSize: fontSize,
-                              color: invItem ? C.text : gray(0.35),
+                              color: itemObj.textColor || (invItem ? C.text : gray(0.35)),
                               textAlign: "center",
                               fontWeight: "500",
                               lineHeight: (itemObj.fontSize || 10) + sCanvasCardFontAdj + 6,

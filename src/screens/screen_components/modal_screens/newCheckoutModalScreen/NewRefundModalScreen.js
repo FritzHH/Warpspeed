@@ -22,8 +22,9 @@ import {
   capitalizeFirstLetterOfString,
   formatPhoneWithDashes,
   formatMillisForDisplay,
+  generateEAN13Barcode,
 } from "../../../../utils";
-import { dbSavePrintObj } from "../../../../db_calls_wrapper";
+import { dbSavePrintObj, dbSaveCustomer } from "../../../../db_calls_wrapper";
 import {
   calculateRefundLimits,
   buildRefundObject,
@@ -63,6 +64,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   const [sWorkordersInSale, _setWorkordersInSale] = useState([]);
   const [sSelectedItems, _setSelectedItems] = useState([]);
   const [sSelectedPayments, _setSelectedPayments] = useState([]);
+  const [sSelectedCredits, _setSelectedCredits] = useState([]);
   const [sRefundNote, _setRefundNote] = useState("");
   const [sRefundComplete, _setRefundComplete] = useState(false);
   const [sLoading, _setLoading] = useState(false);
@@ -130,6 +132,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
   let selectedIsCash = sSelectedPayments.length > 0 && (sSelectedPayments[0].method === "cash" || sSelectedPayments[0].method === "check" || sSelectedPayments[0]._importSource === "lightspeed");
   let selectedIsCard = sSelectedPayments.length > 0 && !selectedIsCash;
+  let selectedIsCredit = sSelectedCredits.length > 0;
 
   // Selected payment(s) combined available balance
   let selectedPaymentAvailable = 0;
@@ -161,7 +164,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   let hasCashPayments = cashPaymentsTotal > 0;
 
   // Payment-first: require payment selection when multiple payments exist
-  let needsPaymentSelection = sTransactions.length > 1 && sSelectedPayments.length === 0;
+  let needsPaymentSelection = sTransactions.length > 1 && sSelectedPayments.length === 0 && sSelectedCredits.length === 0;
 
   let reasonMissing = sRefundNote.trim().length < 10;
 
@@ -340,12 +343,93 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       return;
     }
 
+    if (sSelectedCredits.length > 0) _setSelectedCredits([]);
+
     if (isCashOrCheck) {
       let existingCash = sSelectedPayments.filter((p) => p.method === "cash" || p.method === "check");
       _setSelectedPayments([...existingCash, payment]);
     } else {
       _setSelectedPayments([payment]);
     }
+  }
+
+  // ─── Credit Selection ─────────────────────────────────────
+  function handleSelectCredit(credit) {
+    dlog(DCAT.BUTTON, "select_credit", "RefundModal", { creditID: credit?.id, amount: credit?.amount });
+    let alreadySelected = sSelectedCredits.find((c) => c.id === credit.id);
+    if (alreadySelected) {
+      _setSelectedCredits(sSelectedCredits.filter((c) => c.id !== credit.id));
+      return;
+    }
+    if (sSelectedPayments.length > 0) _setSelectedPayments([]);
+    _setSelectedCredits([...sSelectedCredits, credit]);
+  }
+
+  // ─── Credit Refund (Reapply to Customer) ──────────────────
+  async function handleCreditRefund() {
+    if (sSelectedCredits.length === 0) return;
+    dlog(DCAT.ACTION, "credit_refund_start", "RefundModal", { count: sSelectedCredits.length });
+
+    let sale = cloneDeep(sOriginalSale);
+    let customerID = sale.customerID || sWorkordersInSale[0]?.customerID || "";
+    let customer = cloneDeep(useCurrentCustomerStore.getState().getCustomer());
+
+    if (!customer || customer.id !== customerID) {
+      log("handleCreditRefund: customer mismatch", { expected: customerID, got: customer?.id });
+      return;
+    }
+
+    let totalRefundedAmount = 0;
+
+    for (let selectedCredit of sSelectedCredits) {
+      let refunded = (selectedCredit.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+      let available = selectedCredit.amount - refunded;
+      if (available <= 0) continue;
+
+      let creditIdx = (sale.creditsApplied || []).findIndex((c) => c.id === selectedCredit.id);
+      if (creditIdx < 0) continue;
+
+      let refundEntry = {
+        id: generateEAN13Barcode(),
+        amount: available,
+        millis: Date.now(),
+      };
+
+      sale.creditsApplied[creditIdx].refunds = [
+        ...(sale.creditsApplied[creditIdx].refunds || []),
+        refundEntry,
+      ];
+
+      let custCreditIdx = (customer.credits || []).findIndex((c) => c.id === selectedCredit.id);
+      if (custCreditIdx >= 0) {
+        customer.credits[custCreditIdx].amountCents += available;
+      } else {
+        customer.credits = [...(customer.credits || []), {
+          id: selectedCredit.id,
+          text: selectedCredit._note || "Refund from sale " + sale.id,
+          amountCents: available,
+          reservedCents: 0,
+          millis: Date.now(),
+        }];
+      }
+
+      totalRefundedAmount += available;
+    }
+
+    _setOriginalSale(sale);
+    _setSelectedCredits([]);
+    _setRefundComplete(true);
+
+    useCurrentCustomerStore.getState().setCustomer(customer, false);
+    await dbSaveCustomer(customer);
+    if (sIsActiveSale) {
+      await writeActiveSale(sale);
+    } else {
+      await writeCompletedSale(sale);
+    }
+
+    if (onSaleUpdated) onSaleUpdated(sale, sTransactions);
+    dlog(DCAT.ACTION, "credit_refund_complete", "RefundModal", { totalRefundedAmount });
   }
 
   // ─── Pending Refund Tracking (crash recovery) ────────────
@@ -869,8 +953,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                 }}
               >
                 <View
-                  style={{ flex: 1, opacity: sCardRefundProcessing || selectedIsCard || !hasCashPayments || needsPaymentSelection ? 0.3 : 1 }}
-                  pointerEvents={sCardRefundProcessing || selectedIsCard || !hasCashPayments || needsPaymentSelection ? "none" : "auto"}
+                  style={{ flex: 1, opacity: sCardRefundProcessing || selectedIsCard || selectedIsCredit || !hasCashPayments || needsPaymentSelection ? 0.3 : 1 }}
+                  pointerEvents={sCardRefundProcessing || selectedIsCard || selectedIsCredit || !hasCashPayments || needsPaymentSelection ? "none" : "auto"}
                 >
                   <CashRefund
                     maxCashRefund={maxCashRefund}
@@ -884,8 +968,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                   />
                 </View>
                 <View
-                  style={{ flex: 1, opacity: selectedIsCash || !hasCardPayments || needsPaymentSelection ? 0.3 : 1 }}
-                  pointerEvents={selectedIsCash || !hasCardPayments || needsPaymentSelection ? "none" : "auto"}
+                  style={{ flex: 1, opacity: selectedIsCash || selectedIsCredit || !hasCardPayments || needsPaymentSelection ? 0.3 : 1 }}
+                  pointerEvents={selectedIsCash || selectedIsCredit || !hasCardPayments || needsPaymentSelection ? "none" : "auto"}
                 >
                   <CardRefund
                     selectedPayment={selectedIsCard ? sSelectedPayments[0] : null}
@@ -936,10 +1020,46 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     payments={sTransactions}
                     selectedPayments={sSelectedPayments}
                     onSelectPayment={handleSelectPayment}
+                    creditsApplied={getAllAppliedCredits(sOriginalSale).filter((c) => c.type === "credit")}
+                    selectedCredits={sSelectedCredits}
+                    onSelectCredit={handleSelectCredit}
                     disabled={sRefundComplete}
                   />
 
-                  {/* ── Refund Notes ──────────────────────────── */}
+                  {/* ── Credit Refund Button ──────────────────── */}
+                  {selectedIsCredit && !sRefundComplete && (
+                    <View style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
+                      <TouchableOpacity
+                        onPress={handleCreditRefund}
+                        style={{
+                          backgroundColor: "rgb(103, 124, 231)",
+                          borderRadius: 8,
+                          paddingVertical: 12,
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontWeight: Fonts.weight.textHeavy,
+                            color: "white",
+                            letterSpacing: 0.5,
+                          }}
+                        >
+                          REAPPLY TO CUSTOMER ACCOUNT
+                        </Text>
+                        <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", marginTop: 3 }}>
+                          {formatCurrencyDisp(sSelectedCredits.reduce((sum, c) => {
+                            let refunded = (c.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+                            return sum + (c.amount - refunded);
+                          }, 0))} back to store credit
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+
+                  {/* ── Refund Notes ──────────��───────────────── */}
                   <View style={{ padding: 10 }}>
                     <Text
                       style={{

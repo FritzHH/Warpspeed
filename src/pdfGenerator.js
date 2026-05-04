@@ -230,7 +230,10 @@ export function generateSaleReceiptPDF(data, labels) {
     doc.text(L.customer + ": " + custName, leftX, y);
     y += 11;
   }
-  if (data.customerContact) {
+  if (data.customerCell) {
+    doc.text("Account Phone: " + (data.customerContact || data.customerCell), leftX, y);
+    y += 11;
+  } else if (data.customerContact) {
     doc.text(L.contact + ": " + data.customerContact, leftX, y);
     y += 11;
   }
@@ -534,10 +537,10 @@ export function generateCreditReceiptPDF(data) {
   y += 14;
 
   if (data.barcode || data.id) {
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.text(data.barcode || data.id, centerX, y, { align: "center" });
-    y += 10;
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("Credit ID: " + (data.barcode || data.id), centerX, y, { align: "center" });
+    y += 12;
   }
 
   doc.setFontSize(8);
@@ -553,8 +556,8 @@ export function generateCreditReceiptPDF(data) {
     doc.text("Customer: " + custName, leftX, y);
     y += 11;
   }
-  if (data.customerContact) {
-    doc.text("Contact: " + data.customerContact, leftX, y);
+  if (data.customerCell) {
+    doc.text("Account Phone: " + (data.customerContact || data.customerCell), leftX, y);
     y += 11;
   }
   if (data.startedBy) {
@@ -622,10 +625,10 @@ export function generateGiftCardReceiptPDF(data) {
   y += 14;
 
   if (data.barcode || data.id) {
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.text(data.barcode || data.id, centerX, y, { align: "center" });
-    y += 10;
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("Gift Card ID: " + (data.barcode || data.id), centerX, y, { align: "center" });
+    y += 12;
   }
 
   doc.setFontSize(8);
@@ -641,8 +644,8 @@ export function generateGiftCardReceiptPDF(data) {
     doc.text("Customer: " + custName, leftX, y);
     y += 11;
   }
-  if (data.customerContact) {
-    doc.text("Contact: " + data.customerContact, leftX, y);
+  if (data.customerCell) {
+    doc.text("Account Phone: " + (data.customerContact || data.customerCell), leftX, y);
     y += 11;
   }
   if (data.startedBy) {

@@ -538,10 +538,10 @@ export function NewCheckoutModalScreen() {
     let allCreds = creds || sCredits;
     saleToPersist.creditsApplied = allCreds
       .filter((c) => c.type === "credit")
-      .map((c) => ({ id: c.id, amount: c.amount, type: c.type }));
+      .map((c) => ({ id: c.id, amount: c.amount, type: c.type, ownerPhone: c._ownerPhone || c.ownerPhone || "", remainingBalance: c._remainingBalance != null ? c._remainingBalance : (c.remainingBalance ?? 0), appliedMillis: c._appliedMillis || c.appliedMillis || Date.now() }));
     saleToPersist.depositsApplied = allCreds
       .filter((c) => c.type !== "credit")
-      .map((c) => ({ id: c.id, amount: c.amount, type: c.type, transactionId: c.transactionId || "" }));
+      .map((c) => ({ id: c.id, amount: c.amount, type: c.type, transactionId: c.transactionId || "", ownerPhone: c._ownerPhone || c.ownerPhone || "", remainingBalance: c._remainingBalance != null ? c._remainingBalance : (c.remainingBalance ?? 0), appliedMillis: c._appliedMillis || c.appliedMillis || Date.now() }));
     let existingIDs = saleToPersist.transactionIDs || [];
     let currentIDs = (txns || sTransactions).map((t) => t.id);
     saleToPersist.transactionIDs = [...new Set([...existingIDs, ...currentIDs])];
@@ -732,6 +732,9 @@ export function NewCheckoutModalScreen() {
         _method: deposit.method || "cash",
         _millis: deposit.millis || 0,
         _depositSaleID: deposit.saleID || "",
+        _ownerPhone: zCustomer?.customerCell || "",
+        _remainingBalance: deposit.amountCents - appliedAmount,
+        _appliedMillis: Date.now(),
       };
 
       newCredits.push(credit);
@@ -804,6 +807,9 @@ export function NewCheckoutModalScreen() {
       _method: deposit.method || "cash",
       _millis: deposit.millis || 0,
       _depositSaleID: deposit.saleID || "",
+      _ownerPhone: zCustomer?.customerCell || "",
+      _remainingBalance: deposit.amountCents - appliedAmount,
+      _appliedMillis: Date.now(),
     };
 
     // Reserve deposit/credit on customer (not consumed until sale completes)

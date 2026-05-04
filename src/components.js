@@ -3212,11 +3212,13 @@ export const TextInput_ = ({
   onBlur,
   onContentSizeChange,
   capitalize = false,
+  inputRef: externalInputRef,
   ...props
 }) => {
   const [localValue, setLocalValue] = useState(value || "");
   const debounceRef = useRef(null);
-  const inputRef = useRef(null);
+  const internalRef = useRef(null);
+  const inputRef = externalInputRef || internalRef;
   const [inputHeight, setInputHeight] = useState(undefined);
 
   // Sync local state when value prop changes from external sources

@@ -86,6 +86,15 @@ export const RefundTotals = memo(function RefundTotals({
         />
       )}
 
+      {(originalSale?.creditsApplied || []).length > 0 && (
+        <TotalRow
+          label="STORE CREDIT (non-refundable)"
+          value={`-${formatCurrencyDisp((originalSale.creditsApplied || []).reduce((s, c) => s + (c.amount || 0), 0))}`}
+          color={C.lightText}
+          fontSize={11}
+        />
+      )}
+
       <TotalRow
         label="MAX REFUND REMAINING"
         value={maxRefundAllowed}

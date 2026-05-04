@@ -421,6 +421,9 @@ export const CREDIT_APPLIED_PROTO = {
   transactionId: "",
   amount: 0,
   type: "",           // "deposit" | "giftcard" | "credit"
+  ownerPhone: "",
+  remainingBalance: 0,
+  appliedMillis: 0,
 };
 
 export const ITEM_SALE_PROTO = {

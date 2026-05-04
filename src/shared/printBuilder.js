@@ -535,23 +535,56 @@ var printBuilder = {
     receipt.tax = sale.salesTax != null ? sale.salesTax : (receipt.tax || 0);
     receipt.barcode = sale.id;
     receipt.receiptType = RECEIPT_TYPES.sales;
-    receipt.payments = (payments || []).map(function (p) {
+    // Build unified payments[]: cash/card/check transactions + credits/deposits/gift cards
+    var allPayments = (payments || []).map(function (p) {
       var type = p.method === "cash" ? "Cash" : p.method === "check" ? "Check" : "Card";
       return Object.assign({}, p, { paymentType: type });
     });
+
+    var custPhone = customer?.customerCell || customer?.cell || customer?.phone || "";
+    (credits || []).forEach(function (c) {
+      var method, paymentType;
+      if (c.type === "credit") { method = "credit"; paymentType = "Credit"; }
+      else if (c.type === "giftcard") { method = "gift_card"; paymentType = "Gift Card"; }
+      else { method = "deposit"; paymentType = "Deposit"; }
+
+      var creditSalesTax = 0;
+      if (sale.total > 0 && sale.salesTax > 0) {
+        creditSalesTax = Math.round(sale.salesTax * ((c.amount || 0) / sale.total));
+      }
+
+      allPayments.push({
+        id: c.id,
+        method: method,
+        paymentType: paymentType,
+        amountCaptured: c.amount || 0,
+        millis: c._appliedMillis || c.appliedMillis || c._millis || c.millis || Date.now(),
+        salesTax: creditSalesTax,
+        accountID: c.id,
+        accountPhone: c._ownerPhone || c.ownerPhone || custPhone,
+        remainingBalance: c._remainingBalance != null ? c._remainingBalance : (c.remainingBalance != null ? c.remainingBalance : 0),
+      });
+    });
+
+    receipt.payments = allPayments;
+    receipt.transactionIDs = allPayments.map(function (p) { return p.id; });
+
+    delete receipt.depositsApplied;
+    delete receipt.creditsApplied;
+
     receipt.paymentMethod = (function () {
       var types = [];
-      var hasCard = false, hasCash = false, hasCheck = false, hasCredit = false;
-      (payments || []).forEach(function (p) {
-        if (p.method === "cash") hasCash = true;
-        else if (p.method === "check") hasCheck = true;
-        else hasCard = true;
+      var has = {};
+      allPayments.forEach(function (p) {
+        if (p.method === "cash") has.cash = true;
+        else if (p.method === "check") has.check = true;
+        else if (p.method === "card") has.card = true;
+        else has.stored = true;
       });
-      if ((credits || []).length > 0) hasCredit = true;
-      if (hasCash) types.push("Cash");
-      if (hasCard) types.push("Card");
-      if (hasCheck) types.push("Check");
-      if (hasCredit) types.push("Credit/Deposit");
+      if (has.cash) types.push("Cash");
+      if (has.card) types.push("Card");
+      if (has.check) types.push("Check");
+      if (has.stored) types.push("Credit/Deposit");
       return types.join(" / ") || "None";
     })();
     receipt.popCashRegister = (payments || []).some(function (p) {
@@ -565,9 +598,6 @@ var printBuilder = {
     });
     receipt.cashChangeGiven = cashChange;
     receipt.cashChangeGivenDisplay = cashChange ? "$" + (cashChange / 100).toFixed(2) : "";
-    receipt.depositsApplied = (credits || []).map(function (c) {
-      return { id: c.id, amount: c.amount, type: c.type, depositType: c.type };
-    });
     var txDate = workorder?.finishedOnMillis ? new Date(Number(workorder.finishedOnMillis)) : new Date();
     receipt.transactionDateTime = txDate.toLocaleDateString() + "  " + txDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 

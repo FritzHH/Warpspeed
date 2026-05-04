@@ -5,7 +5,7 @@ import {
   TouchableOpacity,
   ScrollView,
 } from "react-native-web";
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import {
   gray,
   formatCurrencyDisp,
@@ -63,7 +63,8 @@ const CanvasButtonCard = ({
   let h = btn.h || DEFAULT_BTN_H;
 
   function handleMouseDown(e) {
-    if (!sEditMode || sIsEditing) return;
+    if (!sEditMode) return;
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
     e.preventDefault();
     didDragRef.current = false;
     let container = containerRef.current;
@@ -181,7 +182,7 @@ const CanvasButtonCard = ({
 
       {/* Label */}
       {sEditMode && sIsEditing ? (
-        <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+        <div onClick={(e) => e.stopPropagation()}>
           <TextInput_
             style={{
               fontSize: btn.fontSize || 11,
@@ -234,6 +235,37 @@ const StandButtonsCanvasEditor = ({
   const [sSelectedWorkorderID, _setSelectedWorkorderID] = useState(null);
   const [sShowWODropdown, _setShowWODropdown] = useState(false);
   const canvasRef = useRef(null);
+  const arrowKeyRef = useRef({ sEditMode: false, sSelectedBtnId: null, buttons: [], settingsChange: null });
+
+  arrowKeyRef.current.sEditMode = sEditMode;
+  arrowKeyRef.current.sSelectedBtnId = sSelectedBtnId;
+  arrowKeyRef.current.buttons = zSettingsObj?.intakeQuickButtons || [];
+  arrowKeyRef.current.settingsChange = handleSettingsFieldChange;
+
+  useEffect(() => {
+    function handleKeyDown(e) {
+      let { sEditMode, sSelectedBtnId, buttons, settingsChange } = arrowKeyRef.current;
+      if (!sEditMode || !sSelectedBtnId) return;
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      let dx = 0, dy = 0;
+      if (e.key === "ArrowLeft") dx = -SNAP;
+      else if (e.key === "ArrowRight") dx = SNAP;
+      else if (e.key === "ArrowUp") dy = -SNAP;
+      else if (e.key === "ArrowDown") dy = SNAP;
+      else return;
+      e.preventDefault();
+      let btn = buttons.find((b) => b.id === sSelectedBtnId);
+      if (!btn) return;
+      let container = canvasRef.current;
+      let maxX = container ? container.getBoundingClientRect().width - (btn.w || DEFAULT_BTN_W) : Infinity;
+      let maxY = container ? container.getBoundingClientRect().height - (btn.h || DEFAULT_BTN_H) : Infinity;
+      let newX = Math.max(0, Math.min((btn.x || 0) + dx, maxX));
+      let newY = Math.max(0, Math.min((btn.y || 0) + dy, maxY));
+      settingsChange("intakeQuickButtons", buttons.map((b) => b.id === sSelectedBtnId ? { ...b, x: snapTo(newX), y: snapTo(newY) } : b));
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const zWorkorders = useOpenWorkordersStore((state) => state.workorders);
   const zInventory = useInventoryStore((state) => state.inventoryArr);

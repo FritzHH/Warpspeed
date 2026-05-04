@@ -93,8 +93,11 @@ const QuickItemCanvasCard = ({
   invItem,
   sEditMode,
   isSelected,
+  labelMode,
   onSelect,
   onPositionChange,
+  onMultiDragStart,
+  onMultiDrag,
   onResize,
   onPress,
   onDoubleClickPress,
@@ -158,6 +161,10 @@ const QuickItemCanvasCard = ({
 
   function handleMouseDown(e) {
     if (!sEditMode) return;
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+    if (document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA")) {
+      document.activeElement.blur();
+    }
     e.preventDefault();
     didDragRef.current = false;
     let container = containerRef.current;
@@ -172,6 +179,7 @@ const QuickItemCanvasCard = ({
       rectW: rect.width,
       rectH: rect.height,
     };
+    if (isSelected && onMultiDragStart) onMultiDragStart();
     _setDragging(true);
 
     function handleMouseMove(ev) {
@@ -182,11 +190,15 @@ const QuickItemCanvasCard = ({
       if (Math.abs(dx) > 3 || Math.abs(dy) > 3) didDragRef.current = true;
       let dxPct = (dx / rectW) * 100;
       let dyPct = (dy / rectH) * 100;
-      let newX = snapTo(startX + dxPct);
-      let newY = snapTo(startY + dyPct);
-      newX = Math.max(0, Math.min(newX, 100 - w));
-      newY = Math.max(0, Math.min(newY, 100 - h));
-      onPositionChange(itemObj.inventoryItemID, newX, newY);
+      if (isSelected && onMultiDrag) {
+        onMultiDrag(snapTo(dxPct), snapTo(dyPct));
+      } else {
+        let newX = snapTo(startX + dxPct);
+        let newY = snapTo(startY + dyPct);
+        newX = Math.max(0, Math.min(newX, 100 - w));
+        newY = Math.max(0, Math.min(newY, 100 - h));
+        onPositionChange(itemObj.inventoryItemID, newX, newY);
+      }
     }
 
     function handleMouseUp() {
@@ -321,7 +333,7 @@ const QuickItemCanvasCard = ({
       }}
     >
       {/* Formal name helper - above card in edit mode */}
-      {sEditMode && invItem?.formalName && (
+      {sEditMode && invItem?.formalName && (labelMode === "all" || (labelMode === "active" && isSelected)) && (
         <div
           style={{
             position: "absolute",
@@ -373,11 +385,12 @@ const QuickItemCanvasCard = ({
       ))}
 
       {sEditMode ? (
-        <div onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()} style={{ width: "90%", flex: 1, display: "flex", alignItems: "center", overflow: "hidden" }}>
+        <div onClick={(e) => e.stopPropagation()} style={{ width: "86%", display: "flex", alignItems: "center", overflow: "hidden" }}>
           <TextInput_
             value={invItem?.informalName || ""}
             placeholder={defaultName}
             placeholderTextColor={gray(0.4)}
+            onFocus={() => { if (!isSelected) onSelect(itemObj.inventoryItemID); }}
             onChangeText={(val) => {
               if (onLabelChange) onLabelChange(itemObj.inventoryItemID, val);
             }}
@@ -567,11 +580,53 @@ const QuickItemCanvas = React.forwardRef(({
     _setEditMode(true);
     if (onForceEditConsumed) onForceEditConsumed();
   }
-  const [sSelectedItemId, _setSelectedItemId] = useState(null);
+  const [sSelectedItemIds, _setSelectedItemIds] = useState([]);
   const [sPaintStyle, _setPaintStyle] = useState(null);
+  const [sLabelMode, _setLabelMode] = useState("active");
+  const [sSelectionRect, _setSelectionRect] = useState(null);
   const canvasRef = useRef(null);
   const dbSaveTimerRef = useRef(null);
   const migratedRef = useRef(false);
+  const selectionStartRef = useRef(null);
+  const arrowKeyRef = useRef({});
+  arrowKeyRef.current = { sEditMode, sSelectedItemIds, buttonObj, zQuickItemButtons };
+
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") return;
+      let { sEditMode, sSelectedItemIds, buttonObj, zQuickItemButtons } = arrowKeyRef.current;
+      if (!sEditMode || sSelectedItemIds.length === 0) return;
+      let dx = 0, dy = 0;
+      if (e.key === "ArrowLeft") dx = -SNAP_PCT;
+      else if (e.key === "ArrowRight") dx = SNAP_PCT;
+      else if (e.key === "ArrowUp") dy = -SNAP_PCT;
+      else if (e.key === "ArrowDown") dy = SNAP_PCT;
+      else return;
+      e.preventDefault();
+      let items = (buttonObj.items || []).map(normalizeItemEntry);
+      let selectedSet = new Set(sSelectedItemIds);
+      let updatedItems = items.map((it) => {
+        if (!selectedSet.has(it.inventoryItemID)) return it;
+        let w = it.w || QB_DEFAULT_W;
+        let h = it.h || QB_DEFAULT_H;
+        let newX = Math.max(0, Math.min((it.x || 0) + dx, 100 - w));
+        let newY = Math.max(0, Math.min((it.y || 0) + dy, 100 - h));
+        return { ...it, x: snapTo(newX), y: snapTo(newY) };
+      });
+      let updatedButtons = (zQuickItemButtons || []).map((b) =>
+        b.id === buttonObj.id ? { ...b, items: updatedItems } : b
+      );
+      useSettingsStore.getState().setField("quickItemButtons", updatedButtons, false);
+      if (dbSaveTimerRef.current) clearTimeout(dbSaveTimerRef.current);
+      dbSaveTimerRef.current = setTimeout(() => {
+        dbSaveSettingsField("quickItemButtons", useSettingsStore.getState().settings?.quickItemButtons);
+      }, 500);
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  let sSelectedItemId = sSelectedItemIds.length === 1 ? sSelectedItemIds[0] : null;
 
   function notifyParent(editMode, selectedId) {
     onEditStateChange?.(editMode, selectedId);
@@ -618,6 +673,34 @@ const QuickItemCanvas = React.forwardRef(({
     }, 500);
   }
 
+  const multiDragStartRef = useRef(null);
+
+  function handleMultiDragStart() {
+    multiDragStartRef.current = {};
+    let selectedSet = new Set(sSelectedItemIds);
+    rawItems.forEach((it) => {
+      if (selectedSet.has(it.inventoryItemID)) {
+        multiDragStartRef.current[it.inventoryItemID] = { x: it.x || 0, y: it.y || 0 };
+      }
+    });
+  }
+
+  function handleMultiDrag(dxPct, dyPct) {
+    if (!multiDragStartRef.current) return;
+    let selectedSet = new Set(sSelectedItemIds);
+    let updatedItems = rawItems.map((it) => {
+      if (!selectedSet.has(it.inventoryItemID)) return it;
+      let start = multiDragStartRef.current[it.inventoryItemID];
+      if (!start) return it;
+      let w = it.w || QB_DEFAULT_W;
+      let h = it.h || QB_DEFAULT_H;
+      let newX = Math.max(0, Math.min(snapTo(start.x + dxPct), 100 - w));
+      let newY = Math.max(0, Math.min(snapTo(start.y + dyPct), 100 - h));
+      return { ...it, x: newX, y: newY };
+    });
+    saveItems(updatedItems);
+  }
+
   function handlePositionChange(invItemID, x, y) {
     saveItems(rawItems.map((it) => it.inventoryItemID === invItemID ? { ...it, x, y } : it));
   }
@@ -641,8 +724,8 @@ const QuickItemCanvas = React.forwardRef(({
   }
 
   function handleDeleteItem(invItemID) {
-    if (sSelectedItemId === invItemID) {
-      _setSelectedItemId(null);
+    if (sSelectedItemIds.includes(invItemID)) {
+      _setSelectedItemIds(sSelectedItemIds.filter((id) => id !== invItemID));
       notifyParent(sEditMode, null);
     }
     saveItems(rawItems.filter((it) => it.inventoryItemID !== invItemID));
@@ -690,11 +773,61 @@ const QuickItemCanvas = React.forwardRef(({
     }));
   }
 
+  function handleCanvasMouseDown(e) {
+    if (!sEditMode) return;
+    if (e.target !== canvasRef.current) return;
+    e.preventDefault();
+    _setSelectedItemIds([]);
+    notifyParent(sEditMode, null);
+    let rect = canvasRef.current.getBoundingClientRect();
+    let startXPct = ((e.clientX - rect.left) / rect.width) * 100;
+    let startYPct = ((e.clientY - rect.top) / rect.height) * 100;
+    selectionStartRef.current = { startXPct, startYPct, rectW: rect.width, rectH: rect.height, rect };
+
+    function handleMouseMove(ev) {
+      if (!selectionStartRef.current) return;
+      let { startXPct: sx, startYPct: sy, rect: r } = selectionStartRef.current;
+      let curXPct = ((ev.clientX - r.left) / r.width) * 100;
+      let curYPct = ((ev.clientY - r.top) / r.height) * 100;
+      let x = Math.min(sx, curXPct);
+      let y = Math.min(sy, curYPct);
+      let w = Math.abs(curXPct - sx);
+      let h = Math.abs(curYPct - sy);
+      _setSelectionRect({ x, y, w, h });
+    }
+
+    function handleMouseUp(ev) {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      if (!selectionStartRef.current) return;
+      let { startXPct: sx, startYPct: sy, rect: r } = selectionStartRef.current;
+      let curXPct = ((ev.clientX - r.left) / r.width) * 100;
+      let curYPct = ((ev.clientY - r.top) / r.height) * 100;
+      let selX = Math.min(sx, curXPct);
+      let selY = Math.min(sy, curYPct);
+      let selW = Math.abs(curXPct - sx);
+      let selH = Math.abs(curYPct - sy);
+      selectionStartRef.current = null;
+      _setSelectionRect(null);
+      if (selW < 1 && selH < 1) return;
+      let selected = rawItems.filter((it) => {
+        let ix = it.x || 0, iy = it.y || 0;
+        let iw = it.w || QB_DEFAULT_W, ih = it.h || QB_DEFAULT_H;
+        return ix + iw > selX && ix < selX + selW && iy + ih > selY && iy < selY + selH;
+      }).map((it) => it.inventoryItemID);
+      if (selected.length > 0) _setSelectedItemIds(selected);
+    }
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  }
+
   return (
     <View style={{ flex: 1 }}>
       {/* Canvas */}
       <div
         ref={canvasRef}
+        onMouseDown={handleCanvasMouseDown}
         style={{
           flex: 1,
           position: "relative",
@@ -704,6 +837,7 @@ const QuickItemCanvas = React.forwardRef(({
           ...(sEditMode ? {
             backgroundImage: `radial-gradient(circle, ${gray(0.12)} 1px, transparent 1px)`,
             backgroundSize: `${SNAP_PCT}% ${SNAP_PCT}%`,
+            ...(sPaintStyle ? { backgroundColor: lightenRGBByPercent(C.red, 70) } : {}),
           } : {}),
         }}
       >
@@ -715,14 +849,17 @@ const QuickItemCanvas = React.forwardRef(({
               itemObj={itemObj}
               invItem={invItem}
               sEditMode={sEditMode}
-              isSelected={sSelectedItemId === itemObj.inventoryItemID}
+              isSelected={sSelectedItemIds.includes(itemObj.inventoryItemID)}
+              labelMode={sLabelMode}
               isInWorkorder={!!(zWorkorderLines || []).find((l) => l.inventoryItem?.id === itemObj.inventoryItemID)}
               onSelect={(id) => {
-                if (sPaintStyle && id !== sSelectedItemId) { handlePasteStyle(id); return; }
-                _setSelectedItemId(id); notifyParent(sEditMode, id);
+                if (sPaintStyle && !sSelectedItemIds.includes(id)) { handlePasteStyle(id); return; }
+                _setSelectedItemIds([id]); notifyParent(sEditMode, id);
               }}
               containerRef={canvasRef}
               onPositionChange={handlePositionChange}
+              onMultiDragStart={sSelectedItemIds.length > 1 ? handleMultiDragStart : null}
+              onMultiDrag={sSelectedItemIds.length > 1 ? handleMultiDrag : null}
               onResize={handleResize}
               onPress={() => invItem && onItemPress(invItem)}
               onDoubleClickPress={(e) => invItem && onItemDoubleClick && onItemDoubleClick(invItem, e)}
@@ -730,13 +867,13 @@ const QuickItemCanvas = React.forwardRef(({
               onRightClick={(id) => {
                 if (sEditMode) {
                   _setEditMode(false);
-                  _setSelectedItemId(null);
+                  _setSelectedItemIds([]);
                   _setPaintStyle(null);
                   notifyParent(false, null);
                   dbSaveSettingsField("quickItemButtons", useSettingsStore.getState().settings?.quickItemButtons);
                 } else {
                   _setEditMode(true);
-                  _setSelectedItemId(id);
+                  _setSelectedItemIds([id]);
                   notifyParent(true, id);
                 }
               }}
@@ -771,7 +908,7 @@ const QuickItemCanvas = React.forwardRef(({
                 <Image_ icon={ICONS.trash} size={10} />
               </div>
               <div
-                onClick={handleCopyStyle}
+                onClick={() => sPaintStyle ? _setPaintStyle(null) : handleCopyStyle()}
                 style={{
                   position: "absolute",
                   left: `calc(${(sel.x || 0) + (sel.w || DEFAULT_ITEM_W)}% - 8px)`,
@@ -792,6 +929,30 @@ const QuickItemCanvas = React.forwardRef(({
             </>
           );
         })()}
+        {/* Label mode toggle */}
+        {sEditMode && (
+          <div
+            onClick={() => _setLabelMode(sLabelMode === "none" ? "active" : sLabelMode === "active" ? "all" : "none")}
+            style={{
+              position: "absolute",
+              top: 4,
+              left: 4,
+              fontSize: 12,
+              fontWeight: "600",
+              backgroundColor: C.orange,
+              color: "white",
+              borderRadius: 4,
+              paddingTop: 2,
+              paddingBottom: 2,
+              paddingLeft: 6,
+              paddingRight: 6,
+              cursor: "pointer",
+              zIndex: 12,
+            }}
+          >
+            {sLabelMode === "none" ? "Labels: Off" : sLabelMode === "active" ? "Labels: Active" : "Labels: All"}
+          </div>
+        )}
         {/* Paint mode indicator */}
         {sEditMode && sPaintStyle && (
           <div
@@ -800,8 +961,9 @@ const QuickItemCanvas = React.forwardRef(({
               position: "absolute",
               top: 4,
               right: 4,
-              fontSize: 11,
-              backgroundColor: C.blue,
+              fontSize: 12,
+              fontWeight: "600",
+              backgroundColor: C.orange,
               color: "white",
               borderRadius: 4,
               paddingTop: 2,
@@ -814,6 +976,26 @@ const QuickItemCanvas = React.forwardRef(({
           >
             Paint Mode (click to exit)
           </div>
+        )}
+
+        {/* Rubber-band selection rectangle */}
+        {sSelectionRect && (
+          <div
+            style={{
+              position: "absolute",
+              left: sSelectionRect.x + "%",
+              top: sSelectionRect.y + "%",
+              width: sSelectionRect.w + "%",
+              height: sSelectionRect.h + "%",
+              backgroundColor: "rgba(59,130,246,0.1)",
+              borderWidth: 1,
+              borderStyle: "solid",
+              borderColor: C.blue,
+              pointerEvents: "none",
+              zIndex: 20,
+              boxSizing: "border-box",
+            }}
+          />
         )}
 
         {rawItems.length === 0 && (

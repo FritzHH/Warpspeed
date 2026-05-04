@@ -118,7 +118,7 @@ const WaitTimeIndicator = React.memo(function WaitTimeIndicator({ workorder }) {
         justifyContent: "flex-end",
         height: "100%",
         width: 100,
-        paddingRight: 2,
+        paddingRight: 4,
         backgroundColor: C.buttonLightGreen,
         borderWidth: 1,
         borderColor: C.buttonLightGreenOutline,
@@ -254,6 +254,7 @@ export function WorkordersComponent({}) {
     return score;
   }
 
+  const searchInputRef = useRef(null);
   const enterTimerRef = useRef(null);
   const exitTimerRef = useRef(null);
   const preHoverItemsTabRef = useRef(null);
@@ -503,11 +504,13 @@ export function WorkordersComponent({}) {
             iconSize={20}
             onPress={() => {
               _setSearchTerm("");
+              searchInputRef.current?.focus();
             }}
             useColorGradient={false}
             disabled={!sSearchTerm}
           />
           <TextInput_
+            inputRef={searchInputRef}
             style={{
               borderBottomWidth: 1,
               borderBottomColor: gray(0.2),

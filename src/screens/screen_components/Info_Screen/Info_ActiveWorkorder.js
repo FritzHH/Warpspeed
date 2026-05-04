@@ -1539,10 +1539,15 @@ export const ActiveWorkorderComponent = ({}) => {
               {(() => {
                 let estimateLabel = calculateWaitEstimateLabel(zOpenWorkorder, useSettingsStore.getState().getSettings());
                 let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
+                let estimateColor = gray(0.5);
+                if (isMissing) estimateColor = C.red;
+                else if (/overdue/i.test(estimateLabel) || /today/i.test(estimateLabel)) estimateColor = C.red;
+                else if (/tomorrow/i.test(estimateLabel)) estimateColor = C.green;
+                else if (estimateLabel) estimateColor = C.blue;
                 return estimateLabel ? (
                   <Text
                     style={{
-                      color: isMissing ? C.red : gray(0.5),
+                      color: estimateColor,
                       fontSize: 13,
                       fontStyle: "italic",
                       backgroundColor: sWaitTimeBlink && isMissing ? "rgba(255, 255, 0, 0.35)" : "transparent",

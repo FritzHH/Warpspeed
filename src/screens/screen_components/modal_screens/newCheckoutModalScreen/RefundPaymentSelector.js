@@ -15,6 +15,110 @@ function formatTransactionDate(millis) {
   return d.format(fmt) + day + suffix + (d.year() !== dayjs().year() ? ", " + d.year() : "");
 }
 
+const CreditSelectRow = memo(function CreditSelectRow({ credit, isSelected, onSelect, isDisabled }) {
+  let amountRefunded = (credit.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+  let available = credit.amount - amountRefunded;
+  let fullyRefunded = available <= 0;
+
+  return (
+    <TouchableOpacity
+      onPress={() => {
+        if (!isDisabled && !fullyRefunded) {
+          dlog(DCAT.BUTTON, "selectCredit", "RefundPaymentSelector", { creditId: credit.id, amount: credit.amount });
+          onSelect(credit);
+        }
+      }}
+      style={{
+        flexDirection: "row",
+        alignItems: "center",
+        paddingVertical: 8,
+        paddingHorizontal: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: gray(0.05),
+        backgroundColor: isSelected ? "rgb(237, 232, 252)" : fullyRefunded ? gray(0.04) : "transparent",
+        borderRadius: 4,
+        opacity: fullyRefunded || isDisabled ? 0.4 : 1,
+      }}
+    >
+      <View
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: 3,
+          borderWidth: 2,
+          borderColor: isSelected ? "rgb(103, 124, 231)" : gray(0.2),
+          backgroundColor: isSelected ? "rgb(103, 124, 231)" : "transparent",
+          marginRight: 10,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        {isSelected && (
+          <Text style={{ color: "white", fontSize: 11, fontWeight: "700", marginTop: -1 }}>
+            ✓
+          </Text>
+        )}
+      </View>
+
+      <View style={{ flex: 1 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+          <View
+            style={{
+              backgroundColor: "rgb(103, 124, 231)",
+              borderRadius: 3,
+              paddingHorizontal: 5,
+              paddingVertical: 1,
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 9,
+                fontWeight: Fonts.weight.textHeavy,
+                color: "white",
+              }}
+            >
+              CREDIT
+            </Text>
+          </View>
+          <Text
+            style={{
+              fontSize: 13,
+              fontWeight: Fonts.weight.textHeavy,
+              color: C.text,
+            }}
+          >
+            {formatCurrencyDisp(credit.amount)}
+          </Text>
+        </View>
+
+        {credit._note && (
+          <Text style={{ fontSize: 11, color: C.lightText, marginTop: 2 }}>
+            {credit._note}
+          </Text>
+        )}
+
+        {amountRefunded > 0 && !fullyRefunded && (
+          <Text style={{ fontSize: 10, color: C.lightred, marginTop: 2 }}>
+            Previously refunded: {formatCurrencyDisp(amountRefunded)}
+          </Text>
+        )}
+
+        {!fullyRefunded && (
+          <Text style={{ fontSize: 10, color: C.green, marginTop: 1 }}>
+            Available: {formatCurrencyDisp(available)}
+          </Text>
+        )}
+
+        {fullyRefunded && (
+          <Text style={{ fontSize: 10, color: C.lightred, fontStyle: "italic", marginTop: 2 }}>
+            Fully refunded
+          </Text>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 const PaymentSelectRow = memo(function PaymentSelectRow({ payment, isSelected, onSelect, isDisabled }) {
   let isCash = payment.method === "cash";
   let isCheck = payment.method === "check";
@@ -166,8 +270,13 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
   payments = [],
   selectedPayments = [],
   onSelectPayment,
+  creditsApplied = [],
+  selectedCredits = [],
+  onSelectCredit,
   disabled = false,
 }) {
+  let hasCreditsSelected = selectedCredits.length > 0;
+  let hasPaymentsSelected = selectedPayments.length > 0;
   return (
     <View style={{ padding: 10 }}>
       <Text
@@ -201,7 +310,7 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
           let isLsCard = !paymentIsCash && payment._importSource === "lightspeed";
 
           // Disable logic
-          let rowDisabled = disabled;
+          let rowDisabled = disabled || hasCreditsSelected;
           if (!rowDisabled && selectedPayments.length > 0 && !isSelected) {
             let selFirst = selectedPayments[0];
             let selIsCashLike = selFirst.method === "cash" || selFirst.method === "check" || (selFirst._importSource === "lightspeed");
@@ -224,6 +333,35 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
             />
           );
         })}
+
+        {/* Store Credits */}
+        {creditsApplied.length > 0 && (
+          <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: gray(0.1), paddingTop: 6 }}>
+            <Text
+              style={{
+                fontSize: 11,
+                fontWeight: Fonts.weight.textHeavy,
+                color: C.lightText,
+                marginBottom: 4,
+              }}
+            >
+              STORE CREDITS
+            </Text>
+            {creditsApplied.map((credit, idx) => {
+              let isSelected = selectedCredits.some((c) => c.id === credit.id);
+              let rowDisabled = disabled || hasPaymentsSelected;
+              return (
+                <CreditSelectRow
+                  key={credit.id || "cr" + idx}
+                  credit={credit}
+                  isSelected={isSelected}
+                  onSelect={onSelectCredit}
+                  isDisabled={rowDisabled}
+                />
+              );
+            })}
+          </View>
+        )}
 
         {/* Show previous refunds summary from transaction refunds arrays */}
         {(() => {

@@ -170,10 +170,13 @@ export function recomputeSaleAmounts(sale, transactions, credits) {
   let creds = credits || getAllAppliedCredits(sale);
   let txnTotal = txns.reduce((sum, t) => sum + (t.amountCaptured || 0), 0);
   let creditTotal = creds.reduce((sum, c) => sum + (c.amount || 0), 0);
+  let creditRefundedTotal = (sale?.creditsApplied || []).reduce((sum, c) =>
+    sum + (c.refunds || []).reduce((s, r) => s + (r.amount || 0), 0), 0
+  );
   let totalRefunded = txns.reduce((sum, t) =>
     sum + (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0), 0
   );
-  sale.amountCaptured = txnTotal + creditTotal - totalRefunded;
+  sale.amountCaptured = txnTotal + (creditTotal - creditRefundedTotal) - totalRefunded;
   sale.paymentComplete = sale.amountCaptured >= (sale.total || 0) && (sale.total || 0) > 0;
   return sale;
 }

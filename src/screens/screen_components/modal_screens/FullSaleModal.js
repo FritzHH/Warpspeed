@@ -79,6 +79,7 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
   const [sWorkorders, _setWorkorders] = useState([]);
   const [sLoadingWorkorders, _setLoadingWorkorders] = useState(false);
   const [sError, _setError] = useState("");
+  const [sCreditDetail, _sCreditDetail] = useState(null);
 
   // Fetch sale on mount — required because sale data is not in any local store
   useEffect(() => {
@@ -334,7 +335,7 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                   {/* Amount info */}
                   <View style={{ marginBottom: 8 }}>
                     <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-                      <Text style={{ fontSize: 13, color: gray(0.45) }}>Amount Paid</Text>
+                      <Text style={{ fontSize: 13, color: gray(0.45) }}>Original Amount</Text>
                       <Text style={{ fontSize: 14, fontWeight: "600", color: C.green }}>
                         {"$" + formatCurrencyDisp(sSale.amountCaptured + totalRefunded)}
                       </Text>
@@ -347,14 +348,12 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                         </Text>
                       </View>
                     )}
-                    {!sSale.paymentComplete && (
-                      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-                        <Text style={{ fontSize: 13, color: gray(0.45) }}>Remaining</Text>
-                        <Text style={{ fontSize: 14, fontWeight: "600", color: C.lightred }}>
-                          {"$" + formatCurrencyDisp((sSale.total || 0) - (sSale.amountCaptured || 0))}
-                        </Text>
-                      </View>
-                    )}
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
+                      <Text style={{ fontSize: 13, color: gray(0.45) }}>Refundable</Text>
+                      <Text style={{ fontSize: 14, fontWeight: "600", color: totalRefunded > 0 ? C.orange : C.green }}>
+                        {"$" + formatCurrencyDisp(sSale.amountCaptured)}
+                      </Text>
+                    </View>
                   </View>
 
                   {/* Customer info */}
@@ -477,8 +476,9 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                     <View>
                       <SectionHeader text={"CREDITS / DEPOSITS (" + credits.length + ")"} />
                       {credits.map((c, idx) => (
-                        <View
+                        <TouchableOpacity
                           key={c.id || idx}
+                          onPress={() => _sCreditDetail(c)}
                           style={{
                             marginBottom: 4,
                             borderRadius: 6,
@@ -496,7 +496,12 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                               {"$" + formatCurrencyDisp(c.amount)}
                             </Text>
                           </View>
-                        </View>
+                          {!!c.id && (
+                            <Text style={{ fontSize: 10, color: gray(0.35), marginTop: 2 }}>
+                              {"ID: " + c.id}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
                       ))}
                     </View>
                   )}
@@ -567,8 +572,116 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
           </TouchableWithoutFeedback>
         </View>
       </TouchableWithoutFeedback>
+      {!!sCreditDetail && (
+        <CreditDetailModal credit={sCreditDetail} onClose={() => _sCreditDetail(null)} />
+      )}
     </View>,
     document.body
+  );
+};
+
+// ─── Credit / Deposit Detail Modal ──────────────────────
+
+const CreditDetailModal = ({ credit, onClose }) => {
+  const c = credit;
+  const typeLabel = capitalizeFirstLetterOfString(c.type || "deposit");
+  const isGiftCard = c.type === "giftcard";
+  const badgeColor = isGiftCard || c.type === "credit" ? C.orange : C.blue;
+
+  return (
+    <TouchableWithoutFeedback onPress={onClose}>
+      <View
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "rgba(0,0,0,0.4)",
+          justifyContent: "center",
+          alignItems: "center",
+          zIndex: 10001,
+        }}
+      >
+        <TouchableWithoutFeedback>
+          <View
+            style={{
+              width: "35%",
+              maxWidth: 420,
+              backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
+              borderRadius: 8,
+              ...SHADOW_RADIUS_PROTO,
+              shadowColor: C.green,
+              overflow: "hidden",
+            }}
+          >
+            {/* Header */}
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+                paddingHorizontal: 20,
+                paddingVertical: 12,
+                borderBottomWidth: 1,
+                borderBottomColor: gray(0.1),
+                backgroundColor: C.backgroundWhite,
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View
+                  style={{
+                    backgroundColor: lightenRGBByPercent(badgeColor, 60),
+                    paddingHorizontal: 14,
+                    paddingVertical: 4,
+                    borderRadius: 10,
+                  }}
+                >
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: badgeColor }}>
+                    {typeLabel.toUpperCase()}
+                  </Text>
+                </View>
+              </View>
+              <Button_
+                text="Close"
+                icon={ICONS.close1}
+                iconSize={14}
+                onPress={onClose}
+                buttonStyle={{ paddingHorizontal: 16, height: 32 }}
+                textStyle={{ color: gray(0.5), fontSize: 12 }}
+              />
+            </View>
+
+            {/* Body */}
+            <View style={{ padding: 20 }}>
+              <SectionHeader text="DETAILS" />
+              <DetailRow label="Type" value={typeLabel} />
+              <DetailRow label="ID" value={c.id || "—"} />
+              {!!c.transactionId && <DetailRow label="Txn ID" value={c.transactionId} />}
+              <View style={{ marginTop: 12 }}>
+                <SectionHeader text="AMOUNT" />
+                <View
+                  style={{
+                    borderRadius: 7,
+                    borderWidth: 1,
+                    borderColor: C.buttonLightGreenOutline,
+                    backgroundColor: C.listItemWhite,
+                    padding: 12,
+                  }}
+                >
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 15, color: gray(0.45), fontWeight: "600" }}>Amount Applied</Text>
+                    <Text style={{ fontSize: 17, fontWeight: "700", color: C.text }}>
+                      {"$" + formatCurrencyDisp(c.amount || 0)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </View>
+    </TouchableWithoutFeedback>
   );
 };
 

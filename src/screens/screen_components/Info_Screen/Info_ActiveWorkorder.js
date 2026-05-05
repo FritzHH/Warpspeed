@@ -7,6 +7,7 @@ import {
   formatCurrencyDisp,
   formatMillisForDisplay,
   formatPhoneWithDashes,
+  formatPhoneWithParens,
   createNewWorkorder,
   generateEAN13Barcode,
   gray,
@@ -727,7 +728,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   style={{ marginRight: 5 }}
                 />
                 <Text style={{ color: C.text, fontSize: 12 }}>
-                  {formatPhoneWithDashes(zCustomer?.customerCell || zOpenWorkorder?.customerCell)}
+                  {formatPhoneWithParens(zCustomer?.customerCell || zOpenWorkorder?.customerCell)}
                 </Text>
               </View>
             )}
@@ -745,8 +746,8 @@ export const ActiveWorkorderComponent = ({}) => {
                   style={{ marginRight: 7 }}
                 />
                 <Text style={{ color: C.text, fontSize: 12 }}>
-                  {/* {formatPhoneWithDashes(zCustomer.customerLandline)} */}
-                  {formatPhoneWithDashes(2343234323)}
+                  {/* {formatPhoneWithParens(zCustomer.customerLandline)} */}
+                  {formatPhoneWithParens(2343234323)}
                 </Text>
               </View>
             )}

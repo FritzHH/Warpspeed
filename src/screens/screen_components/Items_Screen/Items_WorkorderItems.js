@@ -1139,6 +1139,7 @@ export const LineItemComponent = ({
                   </View>
                   {hasIntake && (
                     <View style={{ flexDirection: "row", alignItems: "flex-start", width: "100%" }}>
+                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "orange", marginTop: 8, marginLeft: 4, marginRight: 3 }} />
                       <TextInput_
                         multiline={true}
                         numberOfLines={5}
@@ -1159,6 +1160,7 @@ export const LineItemComponent = ({
                   )}
                   {showReceiptNote && (
                     <View style={{ flexDirection: "row", alignItems: "flex-start", width: "100%" }}>
+                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "green", marginTop: 7, marginLeft: 4, marginRight: 3 }} />
                       <TextInput_
                         capitalize
                         multiline={true}

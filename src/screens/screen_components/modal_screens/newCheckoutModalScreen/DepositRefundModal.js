@@ -2,13 +2,13 @@
 import { View, Text } from "react-native-web";
 import { useState, memo } from "react";
 import { cloneDeep } from "lodash";
-import { ScreenModal, Button_, SmallLoadingIndicator, SHADOW_RADIUS_PROTO } from "../../../../components";
+import { ScreenModal, Button_, CheckBox_, SmallLoadingIndicator, SHADOW_RADIUS_PROTO } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
-import { useCurrentCustomerStore, useSettingsStore } from "../../../../stores";
-import { formatCurrencyDisp, formatMillisForDisplay, gray, lightenRGBByPercent, log, generateEAN13Barcode } from "../../../../utils";
+import { useCurrentCustomerStore, useSettingsStore, useLoginStore, useAlertScreenStore } from "../../../../stores";
+import { formatCurrencyDisp, formatMillisForDisplay, gray, lightenRGBByPercent, log, generateEAN13Barcode, localStorageWrapper, findTemplateByType, printBuilder } from "../../../../utils";
 import { readTransaction, writeCashRefund, newCheckoutProcessStripeRefund } from "./newCheckoutFirebaseCalls";
-import { buildRefundObject } from "./newCheckoutUtils";
-import { dbSaveCustomer } from "../../../../db_calls_wrapper";
+import { buildRefundObject, sendRefundReceipt } from "./newCheckoutUtils";
+import { dbSaveCustomer, dbSavePrintObj } from "../../../../db_calls_wrapper";
 
 export const DepositRefundModal = memo(function DepositRefundModal({ visible, deposit, customer, onClose, onCustomerUpdated }) {
   const [sTransaction, _setTransaction] = useState(null);
@@ -18,6 +18,12 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
   const [sProcessing, _setProcessing] = useState(false);
   const [sErrorMessage, _setErrorMessage] = useState("");
   const [sInitialized, _setInitialized] = useState(false);
+  const [sPrint, _setPrint] = useState(true);
+  const [sSMS, _setSMS] = useState(false);
+  const [sEmail, _setEmail] = useState(false);
+
+  let hasPhone = !!customer?.phone || !!customer?.customerCell;
+  let hasEmail = !!customer?.email;
 
   let isGiftCard = deposit?.type === "giftcard";
   let label = isGiftCard ? "Gift Card" : "Deposit";
@@ -62,12 +68,13 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
     _setErrorMessage("");
 
     try {
+      let updatedTxn;
       if (isCash) {
-        let txn = cloneDeep(sTransaction);
-        let refundObj = buildRefundObject(refundAmount, txn.id, "cash", [], "", 0, "");
-        await writeCashRefund(txn.id, refundObj);
-        txn.refunds = [...(txn.refunds || []), refundObj];
-        _setTransaction(txn);
+        updatedTxn = cloneDeep(sTransaction);
+        let refundObj = buildRefundObject(refundAmount, updatedTxn.id, "cash", [], "", 0, "");
+        await writeCashRefund(updatedTxn.id, refundObj);
+        updatedTxn.refunds = [...(updatedTxn.refunds || []), refundObj];
+        _setTransaction(updatedTxn);
       } else {
         // Card refund via Stripe
         let { tenantID, storeID } = useSettingsStore.getState().getSettings();
@@ -93,7 +100,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
           return;
         }
 
-        let updatedTxn = cloneDeep(sTransaction);
+        updatedTxn = cloneDeep(sTransaction);
         if (result.data?.refundObj) {
           updatedTxn.refunds = [...(updatedTxn.refunds || []), result.data.refundObj];
         }
@@ -102,6 +109,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
 
       _setRefundComplete(true);
       removeDepositFromCustomer();
+      sendReceipts(updatedTxn);
     } catch (error) {
       log("Deposit refund error:", error);
       _setErrorMessage(error?.message || "Refund processing failed");
@@ -119,6 +127,44 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
     if (onCustomerUpdated) onCustomerUpdated(updatedCustomer);
   }
 
+  function sendReceipts(txnOverride) {
+    if (!sPrint && !sSMS && !sEmail) return;
+    let settings = useSettingsStore.getState().getSettings();
+    let currentUser = useLoginStore.getState().getCurrentUser();
+    let _ctx = { currentUser, settings };
+
+    let latestTxn = txnOverride || sTransaction;
+    let latestRefund = (latestTxn?.refunds || []).at(-1);
+    if (!latestRefund) return;
+
+    let refundReceipt = printBuilder.refund(
+      latestRefund,
+      { id: latestTxn.id, total: refundAmount, subtotal: refundAmount, salesTax: 0 },
+      customer,
+      { workorderLines: [], taxFree: false },
+      settings?.salesTaxPercent || 0,
+      _ctx
+    );
+
+    if (sPrint) {
+      let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
+      if (printerID) dbSavePrintObj(refundReceipt, printerID);
+    }
+
+    if (sSMS || sEmail) {
+      let customerForReceipt = {
+        first: customer?.first || "",
+        last: customer?.last || "",
+        customerCell: customer?.phone || customer?.customerCell || "",
+        email: customer?.email || "",
+        id: customer?.id || "",
+      };
+      let smsTemplate = sSMS ? findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt") : null;
+      let emailTemplate = sEmail ? findTemplateByType(settings?.emailTemplates, "saleReceipt") : null;
+      sendRefundReceipt(refundReceipt, customerForReceipt, settings, smsTemplate, emailTemplate);
+    }
+  }
+
   // ─── Close ──────────────────────────────────────────────
   function handleClose() {
     _setTransaction(null);
@@ -128,6 +174,9 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
     _setProcessing(false);
     _setErrorMessage("");
     _setInitialized(false);
+    _setPrint(true);
+    _setSMS(false);
+    _setEmail(false);
     if (onClose) onClose();
   }
 
@@ -164,23 +213,11 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
           >
             <View>
               <Text style={{ fontSize: 14, fontWeight: Fonts.weight.textHeavy, color: C.text }}>
-                {label} Refund
+                {label} Details
               </Text>
               {deposit?.note ? (
                 <Text style={{ fontSize: 11, color: gray(0.5), marginTop: 2 }}>{deposit.note}</Text>
               ) : null}
-            </View>
-            <View
-              style={{
-                backgroundColor: C.lightred,
-                borderRadius: 6,
-                paddingHorizontal: 10,
-                paddingVertical: 3,
-              }}
-            >
-              <Text style={{ fontSize: 11, fontWeight: Fonts.weight.textHeavy, color: "white", letterSpacing: 0.5 }}>
-                REFUND
-              </Text>
             </View>
           </View>
 
@@ -254,6 +291,53 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                 </View>
               </View>
 
+              {/* Receipt Options */}
+              <View
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  marginBottom: 12,
+                  paddingHorizontal: 2,
+                }}
+              >
+                <CheckBox_
+                  text="Print"
+                  isChecked={sPrint}
+                  onCheck={() => _setPrint(!sPrint)}
+                  textStyle={{ fontSize: 11, color: C.text }}
+                  buttonStyle={{ marginRight: 10 }}
+                />
+                <CheckBox_
+                  text="SMS"
+                  isChecked={sSMS}
+                  enabled={hasPhone}
+                  onCheck={() => _setSMS(!sSMS)}
+                  textStyle={{ fontSize: 11, color: hasPhone ? C.text : gray(0.3) }}
+                  buttonStyle={{ marginRight: 10 }}
+                />
+                <CheckBox_
+                  text="Email"
+                  isChecked={sEmail}
+                  enabled={hasEmail}
+                  onCheck={() => _setEmail(!sEmail)}
+                  textStyle={{ fontSize: 11, color: hasEmail ? C.text : gray(0.3) }}
+                  buttonStyle={{ marginRight: 12 }}
+                />
+                <Button_
+                  text="Print Receipt"
+                  onPress={sendReceipts}
+                  enabled={(sPrint || sSMS || sEmail) && !sProcessing}
+                  colorGradientArr={COLOR_GRADIENTS.blue}
+                  textStyle={{ fontSize: 11, color: C.textWhite, fontWeight: Fonts.weight.textHeavy }}
+                  buttonStyle={{
+                    height: 28,
+                    paddingHorizontal: 12,
+                    borderRadius: 6,
+                    opacity: (sPrint || sSMS || sEmail) && !sProcessing ? 1 : 0.3,
+                  }}
+                />
+              </View>
+
               {/* Fully Refunded Message */}
               {fullyRefunded && !sRefundComplete && (
                 <View style={{ padding: 20, alignItems: "center" }}>
@@ -310,7 +394,20 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                   {/* Refund Button */}
                   <Button_
                     text={sProcessing ? "PROCESSING..." : `REFUND FULL ${isGiftCard ? "GIFT CARD" : "DEPOSIT"}`}
-                    onPress={handleFullRefund}
+                    onPress={() => {
+                      useAlertScreenStore.getState().setValues({
+                        title: "Confirm Refund",
+                        message: "Refund $" + formatCurrencyDisp(refundAmount) + " " + (isCard ? "to card" : "in cash") + "? This cannot be undone.",
+                        btn1Text: "REFUND",
+                        btn2Text: "CANCEL",
+                        handleBtn1Press: () => {
+                          useAlertScreenStore.getState().setShowAlert(false);
+                          handleFullRefund();
+                        },
+                        handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                        showAlert: true,
+                      });
+                    }}
                     enabled={!sProcessing}
                     colorGradientArr={COLOR_GRADIENTS.yellow}
                     textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}

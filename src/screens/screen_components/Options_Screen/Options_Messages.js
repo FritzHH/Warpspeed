@@ -63,7 +63,7 @@ import {
 } from "../../../stores";
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
-import { dbUploadPDFAndSendSMS, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond, dbToggleSMSForwarding, dbGetCustomer, dbSaveMessageTranslation } from "../../../db_calls_wrapper";
+import { dbSendReceipt, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond, dbToggleSMSForwarding, dbGetCustomer, dbSaveMessageTranslation } from "../../../db_calls_wrapper";
 import { translateText } from "../../../db_calls";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { TransformWrapper, TransformComponent, useTransformEffect } from "react-zoom-pan-pinch";
@@ -492,57 +492,83 @@ export function MessagesComponent({}) {
       .replace(/\{storePhone\}/g, ((p) => p.length === 10 ? "(" + p.slice(0, 3) + ") " + p.slice(3, 6) + "-" + p.slice(6) : p)(zSettings?.storeInfo?.phone || ""))
       .replace(/\{supportEmail\}/g, zSettings?.storeInfo?.supportEmail || "");
   }
-  async function handleSendWorkorderTicket(canRespondVal, forwardOverride) {
+  function handleSendWorkorderTicket(canRespondVal, forwardOverride) {
     if (!zWorkorderObj || !zCustomer?.customerCell) return;
-    useLoginStore.getState().requireLogin(async () => {
+    useLoginStore.getState().requireLogin(() => {
       let { tenantID, storeID } = useSettingsStore.getState().getSettings();
       const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: zSettings };
       let receiptData = printBuilder.workorder(zWorkorderObj, zCustomer, zSettings?.salesTaxPercent, _ctx);
-      let { generateWorkorderTicketPDF } = await import("../../../pdfGenerator");
-      let base64 = generateWorkorderTicketPDF(receiptData);
       let storagePath = build_db_path.cloudStorage.workorderTicketPDF(zWorkorderObj.id, tenantID, storeID);
       let messageTemplate = zSettings?.workorderTicketMessage || "Hi {firstName}, here is your workorder ticket: {link}";
-      let message = resolveTemplate(messageTemplate);
       let messageID = crypto.randomUUID();
       let canRespondBool = canRespondVal ? true : null;
       let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
-      let result = await dbUploadPDFAndSendSMS({
-        base64,
+
+      let totalAmount = "";
+      try {
+        let totals = calculateRunningTotals(zWorkorderObj, zSettings?.salesTaxPercent, [], false, !!zWorkorderObj.taxFree);
+        totalAmount = "$" + (totals.finalTotal / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      } catch (e) {
+        totalAmount = "$0.00";
+      }
+      let lineItems = "";
+      try {
+        lineItems = (zWorkorderObj?.workorderLines || [])
+          .map((line) => {
+            let name = line.inventoryItem?.informalName || line.inventoryItem?.formalName || "";
+            return line.qty + "x " + name;
+          })
+          .join(", ");
+      } catch (e) {}
+      let storeHoursText = "";
+      try { storeHoursText = formatStoreHours(zSettings?.storeHours); } catch (e) {}
+      let storePhone = ((p) => p.length === 10 ? "(" + p.slice(0, 3) + ") " + p.slice(3, 6) + "-" + p.slice(6) : p)(zSettings?.storeInfo?.phone || "");
+
+      dbSendReceipt({
+        receiptType: "workorder",
+        receiptData,
         storagePath,
-        message,
-        phoneNumber: zCustomer.customerCell,
+        sendSMS: true,
+        sendEmail: false,
+        customerEmail: "",
+        customerCell: zCustomer.customerCell,
         customerID: zCustomer.id,
-        messageID,
+        templateVars: {
+          firstName: capitalizeFirstLetterOfString(zCustomer?.first) || "",
+          lastName: capitalizeFirstLetterOfString(zCustomer?.last) || "",
+          brand: zWorkorderObj?.brand || "",
+          description: zWorkorderObj?.description || "",
+          totalAmount,
+          lineItems,
+          partOrdered: zWorkorderObj?.partOrdered || "",
+          partSource: zWorkorderObj?.partSource || "",
+          storeHours: storeHoursText,
+          storePhone,
+          supportEmail: zSettings?.storeInfo?.supportEmail || "",
+        },
+        smsMessageID: messageID,
         canRespond: canRespondBool,
         forwardTo,
       });
-      if (result && result.success) {
-        useCustMessagesStore.getState().setOutgoingMessage({
-          id: messageID,
-          message: message.replace(/\{link\}/g, "[PDF link]"),
-          phoneNumber: zCustomer.customerCell,
-          customerID: zCustomer.id,
-          millis: new Date().getTime(),
-          type: "outgoing",
-          status: "sent",
-          canRespond: canRespondBool,
-          senderUserObj: useLoginStore.getState().getCurrentUser(),
-        });
-      } else {
-        useAlertScreenStore.getState().setValues({
-          title: "Workorder Send Failed",
-          message: result?.error || "Failed to upload and send workorder ticket",
-          btn1Text: "OK",
-          handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-          showAlert: true,
-          canExitOnOuterClick: true,
-        });
-      }
+
+      let displayMessage = resolveTemplate(messageTemplate).replace(/\{link\}/g, "[PDF link]");
+      useCustMessagesStore.getState().setOutgoingMessage({
+        id: messageID,
+        message: displayMessage,
+        phoneNumber: zCustomer.customerCell,
+        customerID: zCustomer.id,
+        millis: new Date().getTime(),
+        type: "outgoing",
+        status: "sent",
+        canRespond: canRespondBool,
+        senderUserObj: useLoginStore.getState().getCurrentUser(),
+      });
     });
   }
 
-  async function handleSendSMSPayment() {
-    if (!zWorkorderObj || !zCustomer?.customerCell) return;
+  async function handleSendSMSPayment(hubPhone) {
+    let sendPhone = hubPhone || (sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell);
+    if (!zWorkorderObj || !sendPhone) return;
     if (!zWorkorderObj.workorderLines || zWorkorderObj.workorderLines.length === 0) {
       useAlertScreenStore.getState().setValues({
         title: "No Line Items",
@@ -565,17 +591,6 @@ export function MessagesComponent({}) {
       });
       return;
     }
-    if (zWorkorderObj.activeSaleID) {
-      useAlertScreenStore.getState().setValues({
-        title: "Active Sale In Progress",
-        message: "This workorder has an active sale. Complete or cancel the sale before sending a payment link.",
-        btn1Text: "OK",
-        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-        showAlert: true,
-        canExitOnOuterClick: true,
-      });
-      return;
-    }
     useLoginStore.getState().requireLogin(async () => {
       let amountDue = 0;
       let activeSale = zWorkorderObj.activeSaleID
@@ -588,18 +603,33 @@ export function MessagesComponent({}) {
         amountDue = totals.finalTotal;
       }
       let displayAmount = "$" + (amountDue / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      let customerObj = useCurrentCustomerStore.getState().getCustomer();
+      let custEmail = customerObj?.email || "";
+      let hasPhone = sendPhone.length === 10;
+      let hasEmail = custEmail && custEmail.includes("@");
+      let channel = hasPhone && hasEmail ? "both" : (hasPhone ? "sms" : "email");
+
+      let sendTo = [];
+      if (hasPhone) sendTo.push(formatPhoneWithDashes(sendPhone));
+      if (hasEmail) sendTo.push(custEmail);
+      let recipientName = zCustomer?.first || "customer";
+
       useAlertScreenStore.getState().setValues({
-        title: "Send SMS Payment",
-        message: "Send a payment link for " + displayAmount + " to " + zCustomer.first + " at " + zCustomer.customerCell + "?",
+        title: "Send Payment Link",
+        message: "Send a payment link for " + displayAmount + " to " + recipientName + " at " + sendTo.join(" & ") + "?",
         btn1Text: "Send",
         btn2Text: "Cancel",
         handleBtn1Press: async () => {
           useAlertScreenStore.getState().resetAll();
-          let result = await dbCreateTextToPayInvoice(zWorkorderObj.id, "sms");
+          let opts = {};
+          if (!zWorkorderObj.customerID) opts.phone = sendPhone;
+          if (hasEmail && !zWorkorderObj.customerID) opts.email = custEmail;
+          let result = await dbCreateTextToPayInvoice(zWorkorderObj.id, channel, opts);
           if (result && result.success) {
             useAlertScreenStore.getState().setValues({
               title: "Payment Link Sent",
-              message: "Payment link sent to " + zCustomer.first + ".",
+              message: "Payment link sent to " + recipientName + ".",
               btn1Text: "OK",
               handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
               showAlert: true,
@@ -1045,6 +1075,7 @@ export function MessagesComponent({}) {
                 onShowPhoneEntry={() => { _setHubSelectedPhone(""); _setHubNewPhone(""); }}
                 onOpenWorkorder={handleHubOpenWorkorder}
                 onOpenWorkorderKeepHub={handleHubOpenWorkorderKeepHub}
+                onSendPaymentLink={!hasCustomer ? handleSendSMSPayment : null}
                 hasMatchingWorkorder={!hasCustomer && !!zAllWorkorders.find(w => w.customerCell === (sHubHoverPhone || sHubSelectedPhone))}
                 matchingWorkorders={zAllWorkorders.filter(w => w.customerCell === (sHubHoverPhone || sHubSelectedPhone))}
                 exitHubButton={null}
@@ -1348,7 +1379,7 @@ export function MessagesComponent({}) {
                   buttonTextStyle={{ color: "white" }}
                   openUpward={true}
                 />
-                <Tooltip text="Variables" position="top">
+                <Tooltip text="Variables" position="top" hideOnPress>
                   <DropdownMenu
                     dataArr={TEXT_TEMPLATE_VARIABLES.map((v) => ({ label: v.label, variable: v.variable }))}
                     onSelect={(item) => handleInsertVariable(resolveTemplate(item.variable))}
@@ -1358,20 +1389,20 @@ export function MessagesComponent({}) {
                     openUpward={true}
                   />
                 </Tooltip>
-                <Tooltip text="Send Info" position="top">
+                <Tooltip text="Send Info" position="top" hideOnPress>
                   <DropdownMenu
                     dataArr={(() => {
                       let items = [
                         { label: "Send Intake Ticket", key: "workorder" },
                       ];
-                      let paymentError = zWorkorderObj?.paymentComplete ? "Already paid" : (!zWorkorderObj?.workorderLines?.length ? "No line items" : (zWorkorderObj?.activeSaleID ? "Active sale in progress" : ""));
+                      let paymentError = zWorkorderObj?.paymentComplete ? "Already paid" : (!zWorkorderObj?.workorderLines?.length ? "No line items" : "");
                       if (paymentError) {
-                        items.push({ label: "Send Payment Link", key: "payment", textColor: C.text, strikethrough: true });
+                        items.push({ label: "Send Payment Link", key: "payment", textColor: C.text, strikethrough: true, subtitle: paymentError });
                       } else {
                         items.push({ label: "Send Payment Link", key: "payment" });
                       }
                       if (!zWorkorderObj?.media?.length) {
-                        items.push({ label: "Send Media", key: "media", textColor: C.text, strikethrough: true });
+                        items.push({ label: "Send Media", key: "media", textColor: C.text, strikethrough: true, subtitle: "No media attached" });
                       } else {
                         items.push({ label: "Send Media", key: "media" });
                       }
@@ -1389,7 +1420,7 @@ export function MessagesComponent({}) {
                   />
                 </Tooltip>
                 {hasCustomer && !sCustomPhoneMode ? (
-                  <Tooltip text="Messages Hub" position="top">
+                  <Tooltip text="Messages Hub" position="top" hideOnPress>
                     <TouchableOpacity
                       onPress={handleEnterHubMode}
                       style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
@@ -1492,7 +1523,7 @@ function ThreadCard({ thread, isSelected, isHovered, activeWO, onPress, onHoverI
   );
 }
 
-function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, onOpenWorkorder, onOpenWorkorderKeepHub, hasMatchingWorkorder, matchingWorkorders = [], exitHubButton }) {
+function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, onOpenWorkorder, onOpenWorkorderKeepHub, onSendPaymentLink, hasMatchingWorkorder, matchingWorkorders = [], exitHubButton }) {
   const [sWoDropdown, _setWoDropdown] = useState(null);
   // Initialize from cache synchronously to avoid layout flash on hover
   const [sMessages, _setMessages] = useState(() => {
@@ -2199,6 +2230,16 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
                   ? <SmallLoadingIndicator />
                   : <Image_ icon={ICONS.uploadCamera} size={35} />
                 }
+              </TouchableOpacity>
+            </Tooltip>
+          )}
+          {onSendPaymentLink && (
+            <Tooltip text="Send Payment Link" position="top" hideOnPress>
+              <TouchableOpacity
+                onPress={() => onSendPaymentLink(phone)}
+                style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+              >
+                <Image_ icon={ICONS.paperPlane} size={35} />
               </TouchableOpacity>
             </Tooltip>
           )}

@@ -50,6 +50,8 @@ export const RefundTotals = memo(function RefundTotals({
   salesTaxPercent,
   hasItemSelection = false,
   refundComplete = false,
+  lastRefundAmount = 0,
+  customerFirst = "",
 }) {
   let grandTotalRefund = hasItemSelection ? itemRefundTotal : selectedPaymentsTotal;
 
@@ -214,6 +216,18 @@ export const RefundTotals = memo(function RefundTotals({
           >
             REFUND COMPLETE
           </Text>
+          {lastRefundAmount > 0 && (
+            <Text
+              style={{
+                fontSize: 15,
+                fontWeight: Fonts.weight.textHeavy,
+                color: C.text,
+                marginTop: 6,
+              }}
+            >
+              {"Return " + formatCurrencyDisp(lastRefundAmount, true) + " to " + (customerFirst ? customerFirst.charAt(0).toUpperCase() + customerFirst.slice(1).toLowerCase() : "customer")}
+            </Text>
+          )}
         </View>
       )}
     </View>

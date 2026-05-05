@@ -1,8 +1,8 @@
 /* eslint-disable */
-import { View, Text, ScrollView, TouchableOpacity, TextInput } from "react-native-web";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { useState, memo, useMemo } from "react";
 import { cloneDeep } from "lodash";
-import { ScreenModal, SHADOW_RADIUS_PROTO, Image_, Tooltip } from "../../../../components";
+import { ScreenModal, SHADOW_RADIUS_PROTO, Image_, Tooltip, DropdownMenu, TextInput_ } from "../../../../components";
 import { C, Fonts, ICONS } from "../../../../styles";
 import {
   useSettingsStore,
@@ -46,6 +46,7 @@ import {
   readTransactions,
 } from "./newCheckoutFirebaseCalls";
 
+import { CUSTOMER_LANGUAGES, RECEIPT_TYPES } from "../../../../data";
 import { dlog, DCAT } from "./checkoutDebugLog";
 import { CashRefund } from "./CashRefund";
 import { CardRefund } from "./CardRefund";
@@ -70,6 +71,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   const [sCreditCustomAmountDisp, _setCreditCustomAmountDisp] = useState("");
   const [sRefundNote, _setRefundNote] = useState("");
   const [sRefundComplete, _setRefundComplete] = useState(false);
+  const [sLastRefundAmount, _setLastRefundAmount] = useState(0);
   const [sLoading, _setLoading] = useState(false);
   const [sLoadMessage, _setLoadMessage] = useState("");
   const [sInitialized, _setInitialized] = useState(false);
@@ -77,6 +79,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   const [sCardRefundProcessing, _setCardRefundProcessing] = useState(false);
   const [sLastRefundReceipt, _setLastRefundReceipt] = useState(null);
   const [sShowSendReceiptModal, _sSetShowSendReceiptModal] = useState(false);
+  const [sReceiptLanguage, _setReceiptLanguage] = useState("english");
+  const [sShowPopConfirm, _setShowPopConfirm] = useState(false);
 
   // ─── Derived Values ───────────────────────────────────────
   let refundLimits = calculateRefundLimits(sOriginalSale, { cardFeeRefund: zCardFeeRefund }, sTransactions);
@@ -448,6 +452,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     _setCreditReturnMode("account");
     _setCreditCustomAmount(0);
     _setCreditCustomAmountDisp("");
+    _setLastRefundAmount(refundAmount);
     _setRefundComplete(true);
 
     useCurrentCustomerStore.getState().setCustomer(customer, false);
@@ -613,6 +618,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
     _setOriginalSale(sale);
     _setTransactions(updatedTxns);
+    _setLastRefundAmount(amount);
     _setRefundComplete(true);
     _setSelectedItems([]);
     _setSelectedPayments([]);
@@ -810,6 +816,14 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     }
   }
 
+  function handlePopRegister() {
+    dlog(DCAT.BUTTON, "handlePopRegister", "RefundModal", {});
+    let printObj = { id: crypto.randomUUID(), receiptType: RECEIPT_TYPES.register };
+    dbSavePrintObj(printObj, localStorageWrapper.getItem("selectedPrinterID") || "");
+    _setShowPopConfirm(true);
+    setTimeout(() => _setShowPopConfirm(false), 1000);
+  }
+
   // ─── Close Modal ──────────────────────────────────────────
   function handleClose() {
     dlog(DCAT.BUTTON, "close_refund_modal", "RefundModal", { saleID: sOriginalSale?.id, refundComplete: sRefundComplete });
@@ -820,8 +834,11 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     _setSelectedPayments([]);
     _setRefundNote("");
     _setRefundComplete(false);
+    _setLastRefundAmount(0);
     _setLastRefundReceipt(null);
     _sSetShowSendReceiptModal(false);
+    _setReceiptLanguage("english");
+    _setShowPopConfirm(false);
     _setIsActiveSale(false);
     _setLoading(false);
     _setLoadMessage("");
@@ -1044,6 +1061,8 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     salesTaxPercent={zSalesTaxPercent}
                     hasItemSelection={hasItemSelection}
                     refundComplete={sRefundComplete}
+                    lastRefundAmount={sLastRefundAmount}
+                    customerFirst={sWorkordersInSale[0]?.customerFirst || ""}
                   />
 
                   <RefundPaymentSelector
@@ -1128,7 +1147,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                           marginTop: 4,
                         }}
                       >
-                        <TextInput
+                        <TextInput_
                           style={{
                             fontSize: 15,
                             color: C.text,
@@ -1137,10 +1156,11 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                             outlineStyle: "none",
                           }}
                           value={sRefundNote}
-                          onChangeText={(val) => _setRefundNote(val.length === 1 ? val.toUpperCase() : val)}
+                          onChangeText={_setRefundNote}
                           placeholder={reasonMissing ? "Refund reason required (min 10 characters)" : "Reason for refund..."}
                           placeholderTextColor={reasonMissing ? C.red : gray(0.3)}
                           multiline
+                          capitalize
                         />
                       </View>
                     )}
@@ -1183,8 +1203,23 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
                 </ScrollView>
 
-                <View style={{ flexDirection: "row", justifyContent: sRefundComplete ? "space-evenly" : "center", alignItems: "center", paddingVertical: 8, borderTopWidth: 1, borderTopColor: gray(0.1) }}>
-                  {sRefundComplete && (
+                <View style={{ flexDirection: "row", justifyContent: "space-evenly", alignItems: "center", paddingVertical: 8, borderTopWidth: 1, borderTopColor: gray(0.1) }}>
+                  <View style={{ flexDirection: "column", alignItems: "center" }}>
+                    <Text style={{ fontSize: 12, color: gray(0.5) }}>Receipt text</Text>
+                    <DropdownMenu
+                      dataArr={Object.keys(CUSTOMER_LANGUAGES).map((key) => ({ label: CUSTOMER_LANGUAGES[key], key }))}
+                      selectedIdx={Object.keys(CUSTOMER_LANGUAGES).indexOf(sReceiptLanguage || "english")}
+                      useSelectedAsButtonTitle={true}
+                      onSelect={(item) => { dlog(DCAT.DROPDOWN, "receiptLanguageSelect", "RefundModal", { language: item?.key }); _setReceiptLanguage(item.key); }}
+                      buttonStyle={{ marginLeft: 5, paddingHorizontal: 2, paddingVertical: 3 }}
+                      buttonTextStyle={{ fontSize: 12 }}
+                      buttonIcon={null}
+                      buttonIconSize={0}
+                      modalCoordX={80}
+                      openUpward={true}
+                    />
+                  </View>
+                  {sRefundComplete ? (
                     <Tooltip text="Reprint receipt" position="top">
                       <TouchableOpacity
                         onPress={() => {
@@ -1199,8 +1234,12 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                         <Image_ icon={ICONS.print} size={35} />
                       </TouchableOpacity>
                     </Tooltip>
+                  ) : (
+                    <View style={{ alignItems: "center", justifyContent: "center", padding: 6, opacity: 0.3 }}>
+                      <Image_ icon={ICONS.print} size={35} />
+                    </View>
                   )}
-                  {sRefundComplete && (
+                  {sRefundComplete ? (
                     <Tooltip text="Send receipt" position="top">
                       <TouchableOpacity
                         onPress={handleSendRefundReceipt}
@@ -1209,7 +1248,19 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                         <Image_ icon={ICONS.paperPlane} size={35} />
                       </TouchableOpacity>
                     </Tooltip>
+                  ) : (
+                    <View style={{ alignItems: "center", justifyContent: "center", padding: 6, opacity: 0.3 }}>
+                      <Image_ icon={ICONS.paperPlane} size={35} />
+                    </View>
                   )}
+                  <Tooltip text="Pop register" position="top">
+                    <TouchableOpacity
+                      onPress={handlePopRegister}
+                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                    >
+                      <Image_ icon={ICONS.openCashRegister} size={30} />
+                    </TouchableOpacity>
+                  </Tooltip>
                   <Tooltip text="Close" position="top">
                     <TouchableOpacity
                       onPress={handleClose}
@@ -1291,6 +1342,36 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
             onSend={handleSendRefundReceiptFromModal}
             onClose={() => _sSetShowSendReceiptModal(false)}
           />
+
+          {sShowPopConfirm && (
+            <View
+              style={{
+                position: "absolute",
+                top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: "rgba(0, 0, 0, 0.35)",
+                justifyContent: "center",
+                alignItems: "center",
+                borderRadius: 6,
+                zIndex: 100,
+              }}
+            >
+              <View
+                style={{
+                  backgroundColor: C.backgroundWhite,
+                  borderRadius: 6,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingVertical: 30,
+                  paddingHorizontal: 40,
+                }}
+              >
+                <Image_ icon={ICONS.openCashRegister} size={60} />
+                <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, marginTop: 12 }}>
+                  Register Opened
+                </Text>
+              </View>
+            </View>
+          )}
         </View>
       )}
     />

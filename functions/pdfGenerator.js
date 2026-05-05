@@ -1,12 +1,22 @@
 /* eslint-disable */
-import { jsPDF } from "jspdf";
-import { formatWorkorderNumber } from "./utils";
+const { jsPDF } = require("jspdf");
+
+function formatWorkorderNumber(woNum) {
+  if (!woNum || typeof woNum !== "string") return woNum || "";
+  if (woNum.startsWith("W") && !woNum.startsWith("WO") && woNum.length >= 10) {
+    return "W-" + woNum.slice(1, 6) + "-" + woNum.slice(6);
+  }
+  if (woNum.startsWith("WO") && woNum.length >= 7) {
+    return woNum.slice(0, 2) + "-" + woNum.slice(2, 6) + "-" + woNum.slice(6);
+  }
+  return woNum;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Default label sets (exported so receiptTranslator can read the keys)
 ////////////////////////////////////////////////////////////////////////////////
 
-export const DEFAULT_SALE_LABELS = {
+const DEFAULT_SALE_LABELS = {
   title: "SALES RECEIPT",
   subtotal: "Subtotal",
   discount: "Discount",
@@ -24,7 +34,7 @@ export const DEFAULT_SALE_LABELS = {
   tendered: "Tendered",
   change: "Change",
   amountPaid: "Amount Paid",
-  notesHeader: "Notes for our customer:",
+  notesHeader: "Service Notes",
   customer: "Customer",
   contact: "Contact",
   woNumber: "WO #",
@@ -109,7 +119,6 @@ function addLineItems(doc, lines, y, leftX, rightX, margin, includeReceiptNotes,
   let priceX = rightX - 45;
   let nameMaxWidth = qtyX - leftX - 8;
 
-  // Column headers
   doc.setFontSize(8);
   doc.setFont("helvetica", "bold");
   doc.text(L.itemHeader, leftX, y);
@@ -143,7 +152,6 @@ function addLineItems(doc, lines, y, leftX, rightX, margin, includeReceiptNotes,
 
     y += Math.max(nameHeight, 12);
 
-    // Discount info
     if (line.discountName && (line.discountSavings || 0) > 0) {
       doc.setFontSize(7);
       doc.setTextColor(100, 100, 100);
@@ -152,7 +160,6 @@ function addLineItems(doc, lines, y, leftX, rightX, margin, includeReceiptNotes,
       y += 10;
     }
 
-    // Receipt notes
     if (includeReceiptNotes && line.receiptNotes) {
       doc.setFontSize(7);
       doc.setTextColor(80, 80, 80);
@@ -176,9 +183,9 @@ function addLineItems(doc, lines, y, leftX, rightX, margin, includeReceiptNotes,
 // Sale Receipt PDF
 ////////////////////////////////////////////////////////////////////////////////
 
-export function generateSaleReceiptPDF(data, labels) {
+function generateSaleReceiptPDF(data, labels) {
   let L = { ...DEFAULT_SALE_LABELS, ...(labels || {}) };
-  let pageWidth = 226; // ~80mm in pt
+  let pageWidth = 226;
   let margin = 10;
   let contentWidth = pageWidth - margin * 2;
   let centerX = pageWidth / 2;
@@ -188,10 +195,8 @@ export function generateSaleReceiptPDF(data, labels) {
   let doc = new jsPDF({ unit: "pt", format: [pageWidth, 800] });
   let y = margin + 10;
 
-  // Shop header
   y = addShopHeader(doc, y, data, centerX);
 
-  // Barcode ID
   if (data.barcode) {
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
@@ -201,14 +206,12 @@ export function generateSaleReceiptPDF(data, labels) {
 
   y = addDivider(doc, y, leftX, rightX);
 
-  // Receipt type
   y += 10;
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
   doc.text(L.title, centerX, y, { align: "center" });
   y += 14;
 
-  // Transaction date/time — directly below title
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   if (data.transactionDateTime) {
@@ -222,7 +225,6 @@ export function generateSaleReceiptPDF(data, labels) {
   }
   y += 6;
 
-  // Customer info
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   let custName = [(data.first || ""), (data.last || "")].filter(Boolean).join(" ");
@@ -238,7 +240,6 @@ export function generateSaleReceiptPDF(data, labels) {
     y += 11;
   }
 
-  // Workorder #
   if (data.workorderNumber) {
     doc.text(L.woNumber + ": " + formatWorkorderNumber(data.workorderNumber), leftX, y);
     y += 11;
@@ -247,16 +248,13 @@ export function generateSaleReceiptPDF(data, labels) {
   y += 4;
   y = addDivider(doc, y, leftX, rightX);
 
-  // Line items
-  y = addLineItems(doc, data.workorderLines, y, leftX, rightX, margin, false, L);
+  y = addLineItems(doc, data.workorderLines, y, leftX, rightX, margin, true, L);
   y = addDivider(doc, y, leftX, rightX);
 
-  // Totals
   y = addTotals(doc, y, data, leftX, rightX, L);
   y += 4;
   y = addDivider(doc, y, leftX, rightX);
 
-  // Payments
   let payments = data.payments || [];
   if (payments.length > 0) {
     doc.setFontSize(9);
@@ -287,7 +285,6 @@ export function generateSaleReceiptPDF(data, labels) {
     });
     y += 4;
 
-    // Amount paid summary
     if (data.amountCaptured > 0) {
       doc.setFontSize(9);
       doc.setFont("helvetica", "bold");
@@ -298,51 +295,14 @@ export function generateSaleReceiptPDF(data, labels) {
     y = addDivider(doc, y, leftX, rightX);
   }
 
-  // Notes section — receipt notes from line items, then customer notes
-  let receiptNoteLines = (data.workorderLines || []).filter((l) => l.receiptNotes);
   let customerNotes = data.customerNotes || [];
-  if (receiptNoteLines.length > 0 || customerNotes.length > 0) {
+  if (customerNotes.length > 0) {
     y = checkPageBreak(doc, y, 30, margin);
     doc.setFontSize(9);
     doc.setFont("helvetica", "bold");
     doc.text(L.notesHeader, leftX, y);
     y += 13;
 
-    // Receipt notes grouped by item
-    receiptNoteLines.forEach((line) => {
-      y = checkPageBreak(doc, y, 20, margin);
-      let itemName = (line.itemName || L.itemHeader) + ":";
-      doc.setFontSize(8);
-
-      // Item name — bold underline, wraps on its own line(s)
-      doc.setFont("helvetica", "bolditalic");
-      let nameWrapped = doc.splitTextToSize(itemName, contentWidth);
-      nameWrapped.forEach((nl, i) => {
-        if (i > 0) { y += 9; y = checkPageBreak(doc, y, 10, margin); }
-        doc.text(nl, leftX, y);
-        let nlWidth = doc.getTextWidth(nl);
-        doc.setLineWidth(0.4);
-        doc.setDrawColor(0);
-        doc.line(leftX, y + 1.5, leftX + nlWidth, y + 1.5);
-      });
-      y += 10;
-
-      // Receipt note — normal font, indented
-      doc.setFont("helvetica", "normal");
-      let noteWrapped = doc.splitTextToSize(line.receiptNotes, contentWidth - 8);
-      noteWrapped.forEach((nl, i) => {
-        if (i > 0) { y += 9; y = checkPageBreak(doc, y, 10, margin); }
-        doc.text(nl, leftX + 4, y);
-      });
-      y += 11;
-    });
-
-    // Whitespace between receipt notes and customer notes
-    if (receiptNoteLines.length > 0 && customerNotes.length > 0) {
-      y += 6;
-    }
-
-    // Customer notes
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
     customerNotes.forEach((note) => {
@@ -362,7 +322,6 @@ export function generateSaleReceiptPDF(data, labels) {
     y = addDivider(doc, y, leftX, rightX);
   }
 
-  // Tax-free / labor-only disclaimer
   if (data.taxFree) {
     y = checkPageBreak(doc, y, 20, margin);
     doc.setFontSize(7);
@@ -378,7 +337,6 @@ export function generateSaleReceiptPDF(data, labels) {
     y += 6;
   }
 
-  // Thank you blurb
   if (data.thankYouBlurb) {
     y = checkPageBreak(doc, y, 40, margin);
     doc.setFontSize(7);
@@ -391,7 +349,6 @@ export function generateSaleReceiptPDF(data, labels) {
     y += 6;
   }
 
-  // Return base64 for Cloud Storage upload
   return doc.output("datauristring").split(",")[1];
 }
 
@@ -399,7 +356,7 @@ export function generateSaleReceiptPDF(data, labels) {
 // Refund Receipt PDF
 ////////////////////////////////////////////////////////////////////////////////
 
-export function generateRefundReceiptPDF(data) {
+function generateRefundReceiptPDF(data) {
   let pageWidth = 226;
   let margin = 10;
   let contentWidth = pageWidth - margin * 2;
@@ -410,18 +367,15 @@ export function generateRefundReceiptPDF(data) {
   let doc = new jsPDF({ unit: "pt", format: [pageWidth, 800] });
   let y = margin + 10;
 
-  // Shop header
   y = addShopHeader(doc, y, data, centerX);
   y = addDivider(doc, y, leftX, rightX);
 
-  // Title
   y += 10;
   doc.setFontSize(12);
   doc.setFont("helvetica", "bold");
   doc.text("REFUND RECEIPT", centerX, y, { align: "center" });
   y += 14;
 
-  // Refund ID
   if (data.barcode || data.id) {
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
@@ -429,7 +383,6 @@ export function generateRefundReceiptPDF(data) {
     y += 10;
   }
 
-  // Date/time
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   if (data.millis || data.startedOnMillis) {
@@ -440,7 +393,6 @@ export function generateRefundReceiptPDF(data) {
   }
   y += 6;
 
-  // Customer info
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   let custName = [(data.customerFirstName || ""), (data.customerLastName || "")].filter(Boolean).join(" ");
@@ -460,14 +412,12 @@ export function generateRefundReceiptPDF(data) {
   y += 4;
   y = addDivider(doc, y, leftX, rightX);
 
-  // Refund type badge
   doc.setFontSize(9);
   doc.setFont("helvetica", "bold");
   let typeLabel = (data.refundType || "").toUpperCase() || "REFUND";
   doc.text(typeLabel + " REFUND", leftX, y);
   y += 14;
 
-  // Line items (item-based refund)
   if (data.workorderLines && data.workorderLines.length > 0) {
     y = addLineItems(doc, data.workorderLines, y, leftX, rightX, margin, false, DEFAULT_SALE_LABELS);
     y = addDivider(doc, y, leftX, rightX);
@@ -476,13 +426,11 @@ export function generateRefundReceiptPDF(data) {
     y = addDivider(doc, y, leftX, rightX);
   }
 
-  // Refund amount (bold, prominent)
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   doc.text("Refund Amount: $" + formatCents(data.refundAmount || data.total || 0), leftX, y);
   y += 16;
 
-  // Refund notes
   if (data.refundNotes) {
     doc.setFontSize(8);
     doc.setFont("helvetica", "normal");
@@ -496,7 +444,6 @@ export function generateRefundReceiptPDF(data) {
 
   y = addDivider(doc, y, leftX, rightX);
 
-  // Thank you blurb
   if (data.thankYouBlurb) {
     y = checkPageBreak(doc, y, 40, margin);
     doc.setFontSize(7);
@@ -516,7 +463,7 @@ export function generateRefundReceiptPDF(data) {
 // Credit Receipt PDF
 ////////////////////////////////////////////////////////////////////////////////
 
-export function generateCreditReceiptPDF(data) {
+function generateCreditReceiptPDF(data) {
   let pageWidth = 226;
   let margin = 10;
   let contentWidth = pageWidth - margin * 2;
@@ -604,7 +551,7 @@ export function generateCreditReceiptPDF(data) {
 // Gift Card Receipt PDF
 ////////////////////////////////////////////////////////////////////////////////
 
-export function generateGiftCardReceiptPDF(data) {
+function generateGiftCardReceiptPDF(data) {
   let pageWidth = 226;
   let margin = 10;
   let contentWidth = pageWidth - margin * 2;
@@ -692,7 +639,7 @@ export function generateGiftCardReceiptPDF(data) {
 // Workorder Ticket PDF
 ////////////////////////////////////////////////////////////////////////////////
 
-export function generateWorkorderTicketPDF(data) {
+function generateWorkorderTicketPDF(data) {
   let pageWidth = 340;
   let margin = 14;
   let leftX = margin;
@@ -703,10 +650,8 @@ export function generateWorkorderTicketPDF(data) {
   let doc = new jsPDF({ unit: "pt", format: [pageWidth, 900] });
   let y = margin + 10;
 
-  // Shop header
   y = addShopHeader(doc, y, data, centerX);
 
-  // Barcode ID
   if (data.barcode) {
     doc.setFontSize(7);
     doc.setFont("helvetica", "normal");
@@ -716,25 +661,20 @@ export function generateWorkorderTicketPDF(data) {
 
   y = addDivider(doc, y, leftX, rightX);
 
-  // Title
   y += 10;
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
-  let ticketTitle = data.receiptType === "Intake" ? "INTAKE TICKET" : "WORKORDER TICKET";
+  let ticketTitle = data.receiptType === "Intake" ? "INTAKE/ESTIMATE TICKET" : "WORKORDER TICKET";
   doc.text(ticketTitle, centerX, y, { align: "center" });
   y += 18;
 
-  // Workorder info
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   if (data.workorderNumber) { doc.text("WO #: " + formatWorkorderNumber(data.workorderNumber), leftX, y); y += 12; }
   if (data.startedOnMillis) { doc.text("Date: " + new Date(Number(data.startedOnMillis)).toLocaleDateString(), leftX, y); y += 12; }
-  if (data.status) { doc.text("Status: " + data.status, leftX, y); y += 12; }
-  if (data.startedBy) { doc.text("By: " + data.startedBy, leftX, y); y += 12; }
 
   y += 4;
 
-  // Customer info
   let custName = [(data.first || ""), (data.last || "")].filter(Boolean).join(" ");
   if (custName) {
     doc.setFont("helvetica", "bold");
@@ -750,7 +690,6 @@ export function generateWorkorderTicketPDF(data) {
 
   y += 4;
 
-  // Bike info
   let bikeInfo = [data.brand, data.description].filter(Boolean).join(" ");
   if (bikeInfo) {
     doc.setFont("helvetica", "bold");
@@ -784,23 +723,20 @@ export function generateWorkorderTicketPDF(data) {
   y += 4;
   y = addDivider(doc, y, leftX, rightX);
 
-  // Line items (with receiptNotes, NO intakeNotes)
   y = addLineItems(doc, data.workorderLines, y, leftX, rightX, margin, true);
   y = addDivider(doc, y, leftX, rightX);
 
-  // Totals
   y = addTotals(doc, y, data, leftX, rightX);
 
   y += 6;
   y = addDivider(doc, y, leftX, rightX);
 
-  // Customer notes (NOT internalNotes)
   let customerNotes = data.customerNotes;
   if (customerNotes && customerNotes.length > 0) {
     y = checkPageBreak(doc, y, 30, margin);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text("Notes", leftX, y);
+    doc.text("Service Notes", leftX, y);
     y += 14;
 
     doc.setFontSize(8);
@@ -821,7 +757,6 @@ export function generateWorkorderTicketPDF(data) {
     y = addDivider(doc, y, leftX, rightX);
   }
 
-  // Intake blurb disclaimer
   if (data.intakeBlurb) {
     y = checkPageBreak(doc, y, 40, margin);
     doc.setFontSize(7);
@@ -836,6 +771,28 @@ export function generateWorkorderTicketPDF(data) {
     y += 8;
   }
 
-  // Return base64 for Cloud Storage upload
+  if (data.receiptType === "Intake") {
+    y = checkPageBreak(doc, y, 20, margin);
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "bolditalic");
+    doc.setTextColor(100, 100, 100);
+    let disclaimerLines = doc.splitTextToSize("** Some items may have placeholder values, the final price may not exactly match the placeholder value", contentWidth);
+    disclaimerLines.forEach((line) => {
+      doc.text(line, centerX, y, { align: "center" });
+      y += 9;
+    });
+    doc.setTextColor(0);
+    y += 8;
+  }
+
   return doc.output("datauristring").split(",")[1];
 }
+
+module.exports = {
+  generateSaleReceiptPDF,
+  generateRefundReceiptPDF,
+  generateCreditReceiptPDF,
+  generateGiftCardReceiptPDF,
+  generateWorkorderTicketPDF,
+  DEFAULT_SALE_LABELS,
+};

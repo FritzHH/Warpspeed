@@ -153,6 +153,7 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
     const wo = sWorkorders[0] || {};
     const creds = [...(sSale.creditsApplied || []), ...(sSale.depositsApplied || [])];
     let toPrint = printBuilder.sale(sSale, sTransactions, customer, wo, _settings?.salesTaxPercent, _ctx, creds);
+    toPrint.popCashRegister = false;
     log("DEV — sale receipt:", toPrint);
     dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
   }

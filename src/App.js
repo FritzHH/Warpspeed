@@ -11,7 +11,6 @@ import { BikeStandScreen } from "./screens/BikeStandScreen";
 import { PhoneScreen } from "./screens/PhoneScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { DatabaseViewerScreen } from "./screens/DatabaseViewerScreen";
-import { CustomerWorkorderScreen } from "./screens/CustomerWorkorderScreen";
 import {
   onAuthStateChange,
   loadTenantAndSettings,
@@ -19,7 +18,7 @@ import {
 } from "./db_calls_wrapper";
 import { log, gray } from "./utils";
 import { View } from "react-native-web";
-import { useLayoutStore } from "./stores";
+import { useLayoutStore, useSettingsStore } from "./stores";
 import { ROUTES } from "./routes";
 import { topUpPool } from "./idPool";
 import { BUILD_VERSION } from "./buildVersion";
@@ -157,7 +156,6 @@ function BikeStandScreenWrapper() {
 function App() {
   const [user, setUser] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [sessionError, setSessionError] = useState("");
   const setIsMobile = useLayoutStore((state) => state.setIsMobile);
   const setDeviceType = useLayoutStore((state) => state.setDeviceType);
 
@@ -198,11 +196,14 @@ function App() {
   }, [setIsMobile, setDeviceType]);
 
   useEffect(() => {
+    let initialLoad = true;
     const unsubscribe = onAuthStateChange(async (firebaseUser) => {
-      if (firebaseUser) {
+      if (firebaseUser && initialLoad) {
         try {
-          await loadTenantAndSettings(firebaseUser.uid);
-          topUpPool(); // Pre-fetch IDs for workorders, sales, transactions
+          const tokenResult = await firebaseUser.getIdTokenResult();
+          const { tenantID, storeID } = tokenResult.claims;
+          await loadTenantAndSettings(tenantID, storeID);
+          topUpPool();
           setUser({
             uid: firebaseUser.uid,
             email: firebaseUser.email,
@@ -211,13 +212,13 @@ function App() {
           });
         } catch (error) {
           console.error("Failed to load tenant/settings:", error);
-          setSessionError("Your session has expired. Please sign in again.");
           await dbLogout();
           setUser(null);
         }
-      } else {
+      } else if (!firebaseUser) {
         setUser(null);
       }
+      initialLoad = false;
       setIsLoading(false);
     });
 
@@ -258,7 +259,7 @@ function App() {
             user ? (
               <DeviceAwareRedirect />
             ) : (
-              <LoginScreen sessionError={sessionError} onClearError={() => setSessionError("")} />
+              <LoginScreen setUser={setUser} />
             )
           }
         />
@@ -284,9 +285,6 @@ function App() {
 
         {/* Public route - Translation Display */}
         <Route path={ROUTES.translate} element={<TranslateScreen />} />
-
-        {/* Public route - Customer Workorder View */}
-        <Route path={ROUTES.customerWorkorder} element={<CustomerWorkorderScreen />} />
 
         {/* Protected route - Intake Screen */}
         <Route

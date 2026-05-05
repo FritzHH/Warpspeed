@@ -351,16 +351,19 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
               <View
                 style={{
                   marginTop: 25,
-                  flexDirection: "column",
+                  flexDirection: "row",
+                  justifyContent: "center",
                   alignItems: "center",
                   marginBottom: 25,
                   width: "100%",
+                  paddingHorizontal: 20,
+                  gap: 20,
                 }}
               >
                 <Button_
                   colorGradientArr={zButton1Text ? COLOR_GRADIENTS.green : []}
                   text={zButton1Text}
-                  buttonStyle={{ marginBottom: 12, paddingVertical: 4 }}
+                  buttonStyle={{ paddingVertical: 4, flex: 1 }}
                   textStyle={{ color: C.textWhite, fontWeight: "600" }}
                   onPress={handleButton1Press}
                   iconSize={zIcon1Size || 60}
@@ -370,7 +373,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
                   <Button_
                     colorGradientArr={zButton2Text ? COLOR_GRADIENTS.blue : []}
                     text={zButton2Text}
-                    buttonStyle={{ marginBottom: 12, paddingVertical: 4 }}
+                    buttonStyle={{ paddingVertical: 4, flex: 1 }}
                     textStyle={zButton2Text ? { color: C.textWhite, fontWeight: "600" } : {}}
                     onPress={handleButton2Press}
                     iconSize={zIcon2Size || 60}
@@ -383,7 +386,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
                       zButton3Text ? COLOR_GRADIENTS.purple : []
                     }
                     text={zButton3Text}
-                    buttonStyle={{ marginBottom: 12, paddingVertical: 4 }}
+                    buttonStyle={{ paddingVertical: 4, flex: 1 }}
                     textStyle={zButton3Text ? { color: C.textWhite, fontWeight: "600" } : {}}
                     onPress={handleButton3Press}
                     iconSize={zIcon3Size || 60}
@@ -844,12 +847,16 @@ export const DropdownMenu = ({
             }
 
             return (
-              <Button_
-                mouseOverOptions={mouseOverOptions}
-                buttonStyle={{
+              <TouchableOpacity
+                onPress={(e) => {
+                  e?.stopPropagation?.();
+                  _setModalVisible(false);
+                  onSelect(item, idx);
+                }}
+                style={{
                   padding: 10,
-                  height: 40,
-                  // width: 130,
+                  minHeight: 40,
+                  justifyContent: "center",
                   borderRadius: 0,
                   backgroundColor:
                     getBackgroundColor(item.backgroundColor, idx) ||
@@ -868,18 +875,15 @@ export const DropdownMenu = ({
                       : null,
                   ...itemStyle,
                 }}
-                textStyle={{
+              >
+                <Text style={{
+                  fontSize: 13,
                   ...itemTextStyle,
                   color: item.textColor || C.text,
                   ...(item.strikethrough ? { textDecorationLine: "line-through" } : {}),
-                }}
-                text={item.label || item}
-                onPress={(e) => {
-                  e?.stopPropagation?.();
-                  _setModalVisible(false);
-                  onSelect(item, idx);
-                }}
-              />
+                }}>{item.label || item}</Text>
+                {item.subtitle ? <Text style={{ fontSize: 10, color: gray(0.5), marginTop: 2 }}>{item.subtitle}</Text> : null}
+              </TouchableOpacity>
             );
           }}
         />
@@ -3331,6 +3335,7 @@ export const Tooltip = ({
   alert,
   offsetX = 0,
   offsetY = 0,
+  hideOnPress = false,
 }) => {
   const [sRect, _setRect] = useState(null);
   const GAP = 6;
@@ -3343,6 +3348,10 @@ export const Tooltip = ({
 
   function handleMouseLeave() {
     _setRect(null);
+  }
+
+  function handleMouseDown() {
+    if (hideOnPress) _setRect(null);
   }
 
   function getPortalStyle() {
@@ -3366,6 +3375,7 @@ export const Tooltip = ({
       style={style}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onMouseDown={handleMouseDown}
     >
       {children}
       {!!sRect && ReactDOM.createPortal(
@@ -3437,7 +3447,7 @@ export const Pressable_ = ({
   );
 };
 
-const StatusPickerRow = ({ status, idx, total, onPress }) => {
+const StatusPickerRow = ({ status, idx, total, onPress, itemHeight = 40, itemTextStyle }) => {
   const [sHovered, _setHovered] = useState(false);
   return (
     <TouchableOpacity
@@ -3445,7 +3455,7 @@ const StatusPickerRow = ({ status, idx, total, onPress }) => {
       onMouseEnter={() => _setHovered(true)}
       onMouseLeave={() => _setHovered(false)}
       style={{
-        height: 40,
+        height: itemHeight,
         justifyContent: "center",
         paddingHorizontal: 10,
         backgroundColor: status.backgroundColor || C.listItemWhite,
@@ -3459,6 +3469,7 @@ const StatusPickerRow = ({ status, idx, total, onPress }) => {
           color: status.textColor || C.text,
           fontSize: 13,
           fontWeight: "500",
+          ...itemTextStyle,
         }}
         numberOfLines={1}
       >
@@ -3494,6 +3505,8 @@ export const StatusPickerModal = ({
   modalCoordY = 30,
   menuWidth,
   centered = false,
+  itemHeight = 40,
+  itemTextStyle,
 }) => {
   const [sVisible, _setVisible] = useState(false);
   const [sAnimation, _setAnimation] = useState("fade");
@@ -3513,7 +3526,7 @@ export const StatusPickerModal = ({
   }, [ref]);
 
   const MENU_WIDTH = menuWidth || 320;
-  const ITEM_HEIGHT = 40;
+  const ITEM_HEIGHT = itemHeight;
   const VIEWPORT_PADDING = 10;
   const anchorLeft = centered ? (window.innerWidth - MENU_WIDTH) / 2 : sCoords.x + modalCoordX;
   const buttonCenterY = sCoords.y + (sCoords.height || 25) / 2;
@@ -3603,6 +3616,8 @@ export const StatusPickerModal = ({
                       status={status}
                       idx={idx}
                       total={statuses.length}
+                      itemHeight={itemHeight}
+                      itemTextStyle={itemTextStyle}
                       onPress={() => {
                         onSelect(status);
                         _setVisible(false);
@@ -3628,13 +3643,15 @@ export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inline
   const [sSendEmail, _sSetSendEmail] = useState(false);
 
   let isCredit = sDepositType === CUSTOMER_DEPOST_TYPES.credit;
-  let isGiftCard = sDepositType === CUSTOMER_DEPOST_TYPES.giftcard;
+  // let isGiftCard = sDepositType === CUSTOMER_DEPOST_TYPES.giftcard;
+  let isGiftCard = false;
   let creditReady = isCredit && sDepositAmountCents >= 100 && sDepositNote.trim().length > 3;
   let depositReady = (!isCredit && !isGiftCard) && sDepositAmountCents > 0;
-  let giftCardReady = isGiftCard && sDepositAmountCents > 0;
+  // let giftCardReady = isGiftCard && sDepositAmountCents > 0;
+  let giftCardReady = false;
   let hasPhone = !!(customer?.customerCell || customer?.cell);
   let hasEmail = !!customer?.email;
-  let showSendReceipt = (isCredit || isGiftCard) && (hasPhone || hasEmail);
+  let showSendReceipt = (isCredit /* || isGiftCard */) && (hasPhone || hasEmail);
 
   function resetAndClose() {
     _sSetDepositAmount("");
@@ -3690,12 +3707,12 @@ export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inline
             textStyle={{ fontSize: 14 }}
             buttonStyle={{ marginRight: 20 }}
           />
-          <CheckBox_
+          {/* <CheckBox_
             text="Gift Card"
             isChecked={sDepositType === CUSTOMER_DEPOST_TYPES.giftcard}
             onCheck={() => _sSetDepositType(CUSTOMER_DEPOST_TYPES.giftcard)}
             textStyle={{ fontSize: 14 }}
-          />
+          /> */}
         </View>
 
       {isCredit && (
@@ -3806,16 +3823,16 @@ export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inline
               if (isCredit) {
                 if (!creditReady) return;
                 handleCreditConfirm();
-              } else if (isGiftCard) {
-                if (!giftCardReady) return;
-                onPay({
-                  type: sDepositType,
-                  amountCents: sDepositAmountCents,
-                  note: sDepositNote,
-                  sendSMS: sSendSMS,
-                  sendEmail: sSendEmail,
-                });
-                resetAndClose();
+              // } else if (isGiftCard) {
+              //   if (!giftCardReady) return;
+              //   onPay({
+              //     type: sDepositType,
+              //     amountCents: sDepositAmountCents,
+              //     note: sDepositNote,
+              //     sendSMS: sSendSMS,
+              //     sendEmail: sSendEmail,
+              //   });
+              //   resetAndClose();
               } else {
                 if (!depositReady) return;
                 onPay({

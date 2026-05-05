@@ -70,7 +70,7 @@ import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
-import { APP_USER, INTAKE_QUICK_BUTTON_PROTO, NOTE_HELPER_PROTO, NOTE_HELPER_ITEM_PROTO, QUICK_CUSTOMER_NOTE_PROTO, QUICK_CUSTOMER_NOTE_ITEM_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../../data";
+import { APP_USER, COLORS, INTAKE_QUICK_BUTTON_PROTO, NOTE_HELPER_PROTO, NOTE_HELPER_ITEM_PROTO, QUICK_CUSTOMER_NOTE_PROTO, QUICK_CUSTOMER_NOTE_ITEM_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
@@ -621,14 +621,14 @@ export function Dashboard_Admin({}) {
             </Text>
           {sExpand === TAB_NAMES.payments && (
             <>
-              <PrintersComponent
-                zSettingsObj={zSettingsObj}
-                handleSettingsFieldChange={handleSettingsFieldChange}
-              />
               <PaymentProcessingComponent
                 zSettingsObj={zSettingsObj}
                 handleSettingsFieldChange={handleSettingsFieldChange}
                 liveReaders={zLiveReaders}
+              />
+              <PrintersComponent
+                zSettingsObj={zSettingsObj}
+                handleSettingsFieldChange={handleSettingsFieldChange}
               />
             </>
           )}
@@ -1034,7 +1034,7 @@ function CardReaderManager({ liveReaders = [], savedReaders = [], onSaveReaders 
                   onPress={() => handleDeleteReader(reader)}
                   style={{ padding: 6, marginLeft: 4 }}
                 >
-                  <Image_ source={ICONS.trash} style={{ width: 12, height: 12, opacity: 0.4 }} />
+                  <Image_ icon={ICONS.trash} size={14} />
                 </TouchableOpacity>
               </View>
             );
@@ -3368,6 +3368,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
 
   if (!zSettingsObj) return null;
   return (
+    <>
     <BoxContainerOuterComponent style={{ marginBottom: 20 }}>
       <BoxContainerInnerComponent
         style={{ width: "100%", alignItems: "center", paddingVertical: 20 }}
@@ -4061,53 +4062,19 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
         </View>
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
-  );
-};
-
-const PaymentProcessingComponent = ({
-  zSettingsObj,
-  handleSettingsFieldChange,
-  liveReaders: zLiveReaders = [],
-}) => {
-  // const [sExpand, _setExpand] = useState();
-
-  return (
-    <BoxContainerOuterComponent>
+    <BoxContainerOuterComponent style={{ marginTop: 20 }}>
       <BoxContainerInnerComponent>
+        <View style={{ width: "100%", marginBottom: 10 }}>
+          <Text style={{ fontSize: 12, color: gray(0.6) }}>PAYMENT & TAX</Text>
+        </View>
         <CheckBox_
           isChecked={zSettingsObj?.acceptChecks}
           textStyle={{ fontSize: 15 }}
-          buttonStyle={{
-            backgroundColor: "transparent",
-          }}
+          buttonStyle={{ backgroundColor: "transparent" }}
           text={"Accepts checks"}
           onCheck={() =>
-            handleSettingsFieldChange(
-              "acceptChecks",
-              !zSettingsObj?.acceptChecks
-            )
+            handleSettingsFieldChange("acceptChecks", !zSettingsObj?.acceptChecks)
           }
-        />
-        <CheckBox_
-          isChecked={zSettingsObj?.autoConnectToCardReader}
-          textStyle={{ fontSize: 15 }}
-          buttonStyle={{
-            marginVertical: 10,
-            backgroundColor: "transparent",
-          }}
-          text={"Auto connect to card reader"}
-          onCheck={() =>
-            handleSettingsFieldChange(
-              "autoConnectToCardReader",
-              !zSettingsObj?.autoConnectToCardReader
-            )
-          }
-        />
-        {/**card reader list — auto-discovered from Stripe */}
-        <CardReaderManager
-          liveReaders={zLiveReaders}
-          savedReaders={zSettingsObj?.cardReaders || []}
-          onSaveReaders={(arr) => handleSettingsFieldChange("cardReaders", arr)}
         />
         <View
           style={{
@@ -4115,7 +4082,7 @@ const PaymentProcessingComponent = ({
             flexDirection: "row",
             justifyContent: "flex-end",
             alignItems: "center",
-            marginTop: 20,
+            marginTop: 15,
           }}
         >
           <Text style={{ marginRight: 20 }}>State Sales Tax:</Text>
@@ -4134,7 +4101,6 @@ const PaymentProcessingComponent = ({
             }}
             value={zSettingsObj?.salesTaxPercent || ""}
             onChangeText={(val) => {
-              const regex = new RegExp(".", "g");
               let containsDecimalAlready = val.split(".").length > 2;
               if (checkInputForNumbersOnly(val) && !containsDecimalAlready) {
                 handleSettingsFieldChange("salesTaxPercent", val);
@@ -4143,6 +4109,42 @@ const PaymentProcessingComponent = ({
           />
           <Text>%</Text>
         </View>
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+    </>
+  );
+};
+
+const PaymentProcessingComponent = ({
+  zSettingsObj,
+  handleSettingsFieldChange,
+  liveReaders: zLiveReaders = [],
+}) => {
+  // const [sExpand, _setExpand] = useState();
+
+  return (
+    <BoxContainerOuterComponent>
+      <BoxContainerInnerComponent>
+        <CheckBox_
+          isChecked={zSettingsObj?.autoConnectToCardReader}
+          textStyle={{ fontSize: 15 }}
+          buttonStyle={{
+            backgroundColor: "transparent",
+          }}
+          text={"Auto connect to card reader"}
+          onCheck={() =>
+            handleSettingsFieldChange(
+              "autoConnectToCardReader",
+              !zSettingsObj?.autoConnectToCardReader
+            )
+          }
+        />
+        {/**card reader list — auto-discovered from Stripe */}
+        <CardReaderManager
+          liveReaders={zLiveReaders}
+          savedReaders={zSettingsObj?.cardReaders || []}
+          onSaveReaders={(arr) => handleSettingsFieldChange("cardReaders", arr)}
+        />
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );
@@ -6032,17 +6034,16 @@ const TEMPLATE_EMOJIS = [
 
 const TEXT_TEMPLATE_VARIABLES = [
   { label: "First Name", variable: "{firstName}" },
-  { label: "Last Name", variable: "{lastName}" },
   { label: "Brand", variable: "{brand}" },
-  { label: "Description", variable: "{description}" },
-  { label: "Total Amount", variable: "{totalAmount}" },
-  { label: "Line Items", variable: "{lineItems}" },
-  { label: "Part Ordered", variable: "{partOrdered}" },
-  { label: "Part Source", variable: "{partSource}" },
-  { label: "Store Hours", variable: "{storeHours}" },
   { label: "Store Phone", variable: "{storePhone}" },
   { label: "Support Email", variable: "{supportEmail}" },
 ];
+
+const TEXT_TEMPLATE_TYPE_VARIABLES = {
+  saleReceipt: [{ label: "Sale Receipt Link", variable: "{salesReceipt}" }],
+  refundReceipt: [{ label: "Refund Receipt Link", variable: "{refundReceipt}" }],
+  intakeReceipt: [{ label: "Intake Receipt Link", variable: "{intakeReceipt}" }],
+};
 
 const OrderingComponent = () => {
   return (
@@ -8459,105 +8460,6 @@ const ImportComponent = () => {
           </TouchableOpacity>
           <TouchableOpacity
             onPress={async () => {
-              try {
-                const settings = useSettingsStore.getState().getSettings();
-                const { tenantID, storeID } = settings;
-                const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-
-                const workorder = SPOOF_WORKORDER;
-                const customer = {
-                  first: workorder.customerFirst,
-                  last: workorder.customerLast,
-                  customerCell: workorder.customerCell,
-                  customerLandline: workorder.customerLandline,
-                  email: workorder.customerEmail,
-                  contactRestriction: workorder.customerContactRestriction,
-                };
-
-                const totals = calculateRunningTotals(workorder, settings?.salesTaxPercent, [], false, !!workorder.taxFree);
-                const fakeSale = {
-                  id: generateEAN13Barcode(),
-                  millis: Date.now(),
-                  subtotal: totals.runningSubtotal,
-                  discount: totals.runningDiscount,
-                  tax: totals.runningTax,
-                  total: totals.finalTotal,
-                  amountCaptured: totals.finalTotal,
-                  transactions: [],
-                  refunds: [],
-                  workorderID: workorder.id,
-                };
-                const cardAmount = Math.round(totals.finalTotal * 0.6);
-                const cashAmount = totals.finalTotal - cardAmount;
-                const fakeCardPayment = {
-                  amountCaptured: cardAmount,
-                  amountTendered: cardAmount,
-                  type: "payment",
-                  method: "card",
-                  last4: "4242",
-                  cardType: "Visa",
-                  brand: "visa",
-                  paymentMethod: "card_present",
-                  authorizationCode: "A83F72",
-                };
-                const fakeCashPayment = {
-                  amountCaptured: cashAmount,
-                  amountTendered: cashAmount + 500,
-                  type: "payment",
-                  method: "cash",
-                };
-
-                const receiptData = printBuilder.sale(fakeSale, [fakeCardPayment, fakeCashPayment], customer, workorder, settings?.salesTaxPercent, _ctx);
-                log("SPOOF SALE RECEIPT", JSON.stringify(receiptData, null, 2));
-
-                dbSavePrintObj(receiptData, localStorageWrapper.getItem("selectedPrinterID") || "");
-
-                const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
-                const base64 = generateSaleReceiptPDF(receiptData);
-                const storagePath = build_db_path.cloudStorage.saleReceiptPDF(fakeSale.id, tenantID, storeID);
-                const { uploadStringToStorage } = await import("../../../../db_calls");
-                const uploadResult = await uploadStringToStorage(base64, storagePath, "base64");
-                if (uploadResult?.downloadURL) {
-                  log("Spoof sale PDF uploaded:", uploadResult.downloadURL);
-                  window.open(uploadResult.downloadURL, "_blank");
-                } else {
-                  useAlertScreenStore.getState().setValues({
-                    title: "Spoof Sale Receipt",
-                    message: "Sent to printer. PDF upload may have failed.",
-                    btn1Text: "OK",
-                    handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
-                    canExitOnOuterClick: true,
-                  });
-                }
-              } catch (e) {
-                log("Spoof sale receipt error:", e);
-                useAlertScreenStore.getState().setValues({
-                  title: "Error",
-                  message: e.message,
-                  btn1Text: "OK",
-                  handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
-                  canExitOnOuterClick: true,
-                });
-              }
-            }}
-            style={{
-              paddingVertical: 10,
-              paddingHorizontal: 14,
-              borderRadius: 10,
-              borderWidth: 2,
-              borderColor: C.purple,
-              backgroundColor: C.listItemWhite,
-              alignItems: "center",
-              justifyContent: "center",
-              marginTop: 10,
-            }}
-          >
-            <Text style={{ fontSize: 13, color: C.purple, fontWeight: "700" }}>
-              Spoof Sale Receipt
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={async () => {
               const WO_IDS = ["1000000000245", "1000000000252"];
               try {
                 const settings = useSettingsStore.getState().getSettings();
@@ -8646,6 +8548,17 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
   const textInputRefs = useRef({});
 
   let savedTemplates = zSettingsObj?.smsTemplates || zSettingsObj?.textTemplates || [];
+  let hasMergedSms = useRef(false);
+  if (!hasMergedSms.current && savedTemplates.length > 0) {
+    let defaultTyped = (SETTINGS_OBJ.smsTemplates || []).filter((t) => t.type);
+    let missing = defaultTyped.filter((d) => !savedTemplates.find((s) => s.type === d.type));
+    if (missing.length > 0) {
+      let merged = [...savedTemplates, ...missing];
+      handleSettingsFieldChange("smsTemplates", merged);
+      savedTemplates = merged;
+    }
+    hasMergedSms.current = true;
+  }
   let templates = [...sUnsavedTemplates, ...savedTemplates].sort((a, b) => (b.type ? 1 : 0) - (a.type ? 1 : 0));
 
   // Backward compat helpers
@@ -8751,20 +8664,18 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
         style={{ width: "100%", alignItems: "center" }}
       >
         {/* Add button */}
-        <View style={{ width: "100%", alignItems: "flex-start" }}>
-          <BoxButton1 onPress={handleAddTemplate} />
+        <View style={{ width: "100%", alignItems: "center" }}>
+          <BoxButton1 onPress={handleAddTemplate} label="Add Template" colorGradientArr={COLOR_GRADIENTS.blue} textStyle={{ color: "white" }} style={{ paddingHorizontal: 12, paddingVertical: 6 }} />
         </View>
 
         {/* Templates list */}
         <View style={{ marginTop: 10, width: "100%" }}>
-          <FlatList
-            data={templates}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item: templateObj }) => {
+          {templates.map((templateObj) => {
               let isSelected = sSelectedTemplateId === templateObj.id;
 
               return (
                 <View
+                  key={templateObj.id}
                   style={{
                     width: "100%",
                     marginBottom: 15,
@@ -8777,35 +8688,41 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                     backgroundColor: C.backgroundListWhite,
                   }}
                 >
-                  {/* Row: template name + delete button */}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      marginBottom: 8,
-                    }}
-                  >
+                  {/* Header row: template name + order + show in chat + delete */}
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
                     <TextInput_
                       debounceMs={500}
-                      onChangeText={(val) =>
-                        handleFieldChange(templateObj, "label", val)
-                      }
+                      onChangeText={(val) => handleFieldChange(templateObj, "label", val)}
                       onFocus={() => _setSelectedTemplateId(templateObj.id)}
                       placeholder="Template name..."
                       placeholderTextColor={gray(0.3)}
-                      style={{
-                        flex: 1,
-                        borderColor: C.buttonLightGreenOutline,
-                        borderWidth: 1,
-                        borderRadius: 5,
-                        padding: 5,
-                        color: C.text,
-                        outlineWidth: 0,
-                        fontWeight: "500",
-                        fontSize: 14,
-                      }}
+                      style={{ flex: 1, borderColor: C.buttonLightGreenOutline, borderWidth: 1, borderRadius: 5, padding: 5, color: C.text, outlineWidth: 0, fontWeight: "500", fontSize: 14 }}
                       value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "label") ?? getLabel(templateObj)) : getLabel(templateObj)}
                     />
+                    <View style={{ flexDirection: "row", alignItems: "center", marginLeft: 10 }}>
+                      <Text style={{ fontSize: 12, color: gray(0.5), marginRight: 4 }}>Order</Text>
+                      <DropdownMenu
+                        dataArr={(() => {
+                          let usedOrders = new Set(savedTemplates.filter(t => t.id !== templateObj.id && t.order > 0).map(t => t.order));
+                          let available = [{ label: "---", value: 0 }];
+                          for (let i = 1; i <= savedTemplates.length; i++) {
+                            if (!usedOrders.has(i)) available.push({ label: String(i), value: i });
+                          }
+                          return available;
+                        })()}
+                        onSelect={(item) => handleFieldChange(templateObj, "order", item.value)}
+                        buttonText={templateObj.order > 0 ? String(templateObj.order) : "---"}
+                        buttonStyle={{ paddingVertical: 3, paddingHorizontal: 6, minWidth: 40 }}
+                        buttonTextStyle={{ fontSize: 12 }}
+                      />
+                    </View>
+                    <View style={{ marginLeft: 10 }}>
+                      <CheckBox_
+                        text="Chat"
+                        isChecked={templateObj.showInChat !== false}
+                        onCheck={() => handleFieldChange(templateObj, "showInChat", templateObj.showInChat === false)}
+                      />
+                    </View>
                     {!templateObj.type && (
                       <Tooltip text="Delete template" position="top">
                         <BoxButton1
@@ -8816,32 +8733,6 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                         />
                       </Tooltip>
                     )}
-                  </View>
-
-                  {/* Order + Show in Chat row */}
-                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                    <Text style={{ fontSize: 13, color: gray(0.5), marginRight: 6 }}>Order</Text>
-                    <DropdownMenu
-                      dataArr={(() => {
-                        let usedOrders = new Set(savedTemplates.filter(t => t.id !== templateObj.id && t.order > 0).map(t => t.order));
-                        let available = [{ label: "---", value: 0 }];
-                        for (let i = 1; i <= savedTemplates.length; i++) {
-                          if (!usedOrders.has(i)) available.push({ label: String(i), value: i });
-                        }
-                        return available;
-                      })()}
-                      onSelect={(item) => handleFieldChange(templateObj, "order", item.value)}
-                      buttonText={templateObj.order > 0 ? String(templateObj.order) : "---"}
-                      buttonStyle={{ paddingVertical: 4, paddingHorizontal: 8, minWidth: 50 }}
-                      buttonTextStyle={{ fontSize: 13 }}
-                    />
-                    <View style={{ marginLeft: 20 }}>
-                      <CheckBox_
-                        text="Show in Chat"
-                        isChecked={templateObj.showInChat !== false}
-                        onCheck={() => handleFieldChange(templateObj, "showInChat", templateObj.showInChat === false)}
-                      />
-                    </View>
                   </View>
 
                   {/* Message body */}
@@ -8886,14 +8777,15 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                     value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "content") ?? getContent(templateObj)) : getContent(templateObj)}
                   />
 
-                  {/* Variable buttons + emoji picker - shown when template is selected */}
-                  {isSelected && (
+                  {/* Variable buttons + emoji picker - always rendered to avoid layout shift */}
                     <View
                       style={{
                         flexDirection: "row",
                         flexWrap: "wrap",
                         marginTop: 8,
                         alignItems: "center",
+                        opacity: isSelected ? 1 : 0,
+                        pointerEvents: isSelected ? "auto" : "none",
                       }}
                     >
                       <TouchableOpacity
@@ -8911,7 +8803,7 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                       >
                         <Text style={{ fontSize: 14 }}>{"😊"}</Text>
                       </TouchableOpacity>
-                      {TEXT_TEMPLATE_VARIABLES.map((v) => (
+                      {[...TEXT_TEMPLATE_VARIABLES, ...(TEXT_TEMPLATE_TYPE_VARIABLES[templateObj.type] || [])].map((v) => (
                         <TouchableOpacity
                           key={v.variable}
                           onPress={() =>
@@ -8934,7 +8826,6 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                         </TouchableOpacity>
                       ))}
                     </View>
-                  )}
 
                   {/* Save button - only for new unsaved templates */}
                   {isNewTemplate(templateObj.id) && (
@@ -8952,8 +8843,7 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                   )}
                 </View>
               );
-            }}
-          />
+            })}
         </View>
 
         {/* Emoji picker modal — portaled to body to avoid z-index issues */}
@@ -8989,26 +8879,22 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
   );
 };
 
-const EMAIL_TEMPLATE_VARIABLES = [
+const GREETING_VARIABLES = [
+  { label: "Store Logo", variable: "{storeLogo}" },
+];
+
+const FOOTER_VARIABLES = [
+  { label: "Store Logo", variable: "{storeLogo}" },
+  { label: "Hours", variable: "{storeHours}" },
+  { label: "Support Email", variable: "{supportEmail}" },
+  { label: "Phone", variable: "{storePhone}" },
+];
+
+const MESSAGE_VARIABLES = [
   { label: "First Name", variable: "{firstName}" },
   { label: "Last Name", variable: "{lastName}" },
-  { label: "Customer Email", variable: "{customerEmail}" },
   { label: "Brand", variable: "{brand}" },
-  { label: "Description", variable: "{description}" },
   { label: "Total Amount", variable: "{totalAmount}" },
-  { label: "Line Items", variable: "{lineItems}" },
-  { label: "Customer Notes", variable: "{customerNotes}" },
-  { label: "Store Name", variable: "{storeName}" },
-  { label: "Store Address", variable: "{storeAddress}" },
-  { label: "Store Hours", variable: "{storeHours}" },
-  { label: "Store Phone", variable: "{storePhone}" },
-  { label: "Employee Name", variable: "{employeeName}" },
-  { label: "Pay Period", variable: "{payPeriod}" },
-  { label: "Daily Breakdown", variable: "{dailyBreakdown}" },
-  { label: "Total Hours", variable: "{totalHours}" },
-  { label: "Pay Rate", variable: "{payRate}" },
-  { label: "Total Pay", variable: "{totalPay}" },
-  { label: "Support Email", variable: "{supportEmail}" },
 ];
 
 const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
@@ -9016,16 +8902,30 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
   const [sLocalEdits, _setLocalEdits] = useState({});
   const [sNewTemplateIds, _setNewTemplateIds] = useState([]);
   const [sUnsavedTemplates, _setUnsavedTemplates] = useState([]);
-  const [sEmojiModalTemplateId, _setEmojiModalTemplateId] = useState(null);
-  const cursorPositionRefs = useRef({});
-  const textInputRefs = useRef({});
+  const [sEmojiModalRefKey, _setEmojiModalRefKey] = useState(null);
+  const cursorRefs = useRef({});
+  const inputRefs = useRef({});
 
   let savedTemplates = zSettingsObj?.emailTemplates || [];
+  let hasMergedEmail = useRef(false);
+  if (!hasMergedEmail.current && savedTemplates.length > 0) {
+    let defaultTyped = (SETTINGS_OBJ.emailTemplates || []).filter((t) => t.type);
+    let missing = defaultTyped.filter((d) => !savedTemplates.find((s) => s.type === d.type));
+    if (missing.length > 0) {
+      let merged = [...savedTemplates, ...missing];
+      handleSettingsFieldChange("emailTemplates", merged);
+      savedTemplates = merged;
+    }
+    hasMergedEmail.current = true;
+  }
   let templates = [...sUnsavedTemplates, ...savedTemplates].sort((a, b) => (b.type ? 1 : 0) - (a.type ? 1 : 0));
+  let greeting = zSettingsObj?.emailGreeting ?? "";
+  let footer = zSettingsObj?.emailFooter ?? "";
+  let greetingAlign = zSettingsObj?.emailGreetingAlign || "center";
+  let footerAlign = zSettingsObj?.emailFooterAlign || "center";
 
-  // Backward compat helpers
   function getLabel(t) { return t.label || t.name || ""; }
-  function getContent(t) { return t.content || t.body || ""; }
+  function getMessage(t) { return t.message || t.content || t.body || ""; }
 
   function getLocalValue(templateId, field) {
     let key = templateId + "_" + field;
@@ -9036,12 +8936,23 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
     return sNewTemplateIds.indexOf(templateId) !== -1;
   }
 
+  function insertVarAtCursor(refKey, currentVal, varStr, onUpdate) {
+    let pos = cursorRefs.current[refKey] ?? (currentVal || "").length;
+    let before = (currentVal || "").slice(0, pos);
+    let after = (currentVal || "").slice(pos);
+    onUpdate(before + varStr + after);
+    cursorRefs.current[refKey] = pos + varStr.length;
+    inputRefs.current[refKey]?.focus();
+  }
+
   function handleAddTemplate() {
     let newTemplate = {
       id: crypto.randomUUID(),
       label: "",
       subject: "",
-      content: "",
+      message: "",
+      action: "",
+      actionColorObj: { textColor: "white", backgroundColor: "green", label: "Green" },
       type: "",
     };
     _setUnsavedTemplates([newTemplate, ...sUnsavedTemplates]);
@@ -9054,7 +8965,9 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
       id: templateObj.id,
       label: getLocalValue(templateObj.id, "label") ?? getLabel(templateObj),
       subject: getLocalValue(templateObj.id, "subject") ?? templateObj.subject,
-      content: getLocalValue(templateObj.id, "content") ?? getContent(templateObj),
+      message: getLocalValue(templateObj.id, "message") ?? getMessage(templateObj),
+      action: getLocalValue(templateObj.id, "action") ?? (templateObj.action || ""),
+      actionColorObj: templateObj.actionColorObj || { textColor: "white", backgroundColor: "green", label: "Green" },
       type: templateObj.type || "",
     };
     let arr = [finalTemplate, ...savedTemplates];
@@ -9064,7 +8977,8 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
     let newEdits = { ...sLocalEdits };
     delete newEdits[templateObj.id + "_label"];
     delete newEdits[templateObj.id + "_subject"];
-    delete newEdits[templateObj.id + "_content"];
+    delete newEdits[templateObj.id + "_message"];
+    delete newEdits[templateObj.id + "_action"];
     _setLocalEdits(newEdits);
   }
 
@@ -9080,7 +8994,8 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
     let newEdits = { ...sLocalEdits };
     delete newEdits[templateObj.id + "_label"];
     delete newEdits[templateObj.id + "_subject"];
-    delete newEdits[templateObj.id + "_content"];
+    delete newEdits[templateObj.id + "_message"];
+    delete newEdits[templateObj.id + "_action"];
     _setLocalEdits(newEdits);
   }
 
@@ -9089,249 +9004,364 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
       _setLocalEdits({ ...sLocalEdits, [templateObj.id + "_" + field]: val });
     } else {
       let arr = savedTemplates.map((t) => {
-        if (t.id === templateObj.id) return { ...t, [field]: val };
+        if (t.id === templateObj.id) {
+          let updated = { ...t, [field]: val };
+          if (field === "message") { delete updated.content; delete updated.body; }
+          return updated;
+        }
         return t;
       });
       handleSettingsFieldChange("emailTemplates", arr);
     }
   }
 
-  function handleInsertVariable(templateObj, variableStr) {
-    let currentContent = isNewTemplate(templateObj.id)
-      ? (getLocalValue(templateObj.id, "content") ?? getContent(templateObj))
-      : getContent(templateObj);
-    let cursorPos =
-      cursorPositionRefs.current[templateObj.id] ?? currentContent.length;
-    let before = currentContent.slice(0, cursorPos);
-    let after = currentContent.slice(cursorPos);
-    let newContent = before + variableStr + after;
-
-    if (isNewTemplate(templateObj.id)) {
-      _setLocalEdits({ ...sLocalEdits, [templateObj.id + "_content"]: newContent });
-    } else {
-      let arr = savedTemplates.map((t) => {
-        if (t.id === templateObj.id) return { ...t, content: newContent };
-        return t;
-      });
-      handleSettingsFieldChange("emailTemplates", arr);
-    }
-    cursorPositionRefs.current[templateObj.id] =
-      cursorPos + variableStr.length;
-    textInputRefs.current[templateObj.id]?.focus();
+  function handleInsertMessageVar(templateObj, varStr) {
+    let refKey = templateObj.id + "_message";
+    let currentVal = isNewTemplate(templateObj.id)
+      ? (getLocalValue(templateObj.id, "message") ?? getMessage(templateObj))
+      : getMessage(templateObj);
+    insertVarAtCursor(refKey, currentVal, varStr, (newVal) => {
+      if (isNewTemplate(templateObj.id)) {
+        _setLocalEdits({ ...sLocalEdits, [refKey]: newVal });
+      } else {
+        let arr = savedTemplates.map((t) => {
+          if (t.id === templateObj.id) { let u = { ...t, message: newVal }; delete u.content; delete u.body; return u; }
+          return t;
+        });
+        handleSettingsFieldChange("emailTemplates", arr);
+      }
+    });
   }
+
+  let varBtnStyle = {
+    backgroundColor: C.buttonLightGreen,
+    borderWidth: 1,
+    borderColor: C.buttonLightGreenOutline,
+    borderRadius: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 5,
+    marginBottom: 5,
+  };
+
+  let inputStyle = {
+    borderColor: C.buttonLightGreenOutline,
+    borderWidth: 1,
+    borderRadius: 5,
+    padding: 5,
+    color: C.text,
+    outlineWidth: 0,
+    fontSize: 14,
+  };
+
+  function renderAlignToggle(currentAlign, onAlignChange) {
+    let btnBase = { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 5, borderWidth: 1 };
+    return (
+      <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
+        <Text style={{ fontSize: 12, color: gray(0.5), marginRight: 8 }}>Align:</Text>
+        <TouchableOpacity
+          onPress={() => onAlignChange("center")}
+          style={{ ...btnBase, backgroundColor: currentAlign === "center" ? C.green : "transparent", borderColor: currentAlign === "center" ? C.green : gray(0.3), marginRight: 6 }}
+        >
+          <Text style={{ fontSize: 12, color: currentAlign === "center" ? "white" : C.text }}>Center</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          onPress={() => onAlignChange("left")}
+          style={{ ...btnBase, backgroundColor: currentAlign === "left" ? C.green : "transparent", borderColor: currentAlign === "left" ? C.green : gray(0.3) }}
+        >
+          <Text style={{ fontSize: 12, color: currentAlign === "left" ? "white" : C.text }}>Left</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  let logoUrl = zSettingsObj?.storeInfo?.storeLogo || "";
+  let logoWidth = zSettingsObj?.emailLogoWidth || 180;
+
+  function renderColorPicker(selectedColorObj, onColorSelect) {
+    return (
+      <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginTop: 4 }}>
+        <Text style={{ fontSize: 12, color: gray(0.5), marginRight: 8 }}>Button Color:</Text>
+        {COLORS.map((c) => {
+          let isActive = selectedColorObj?.label === c.label;
+          return (
+            <TouchableOpacity
+              key={c.label}
+              onPress={() => onColorSelect(c)}
+              style={{
+                width: 26,
+                height: 26,
+                borderRadius: 13,
+                backgroundColor: c.backgroundColor,
+                borderWidth: isActive ? 3 : 1,
+                borderColor: isActive ? C.green : gray(0.4),
+                marginRight: 4,
+                marginBottom: 4,
+              }}
+            />
+          );
+        })}
+      </View>
+    );
+  }
+
+  let greetingColorObj = zSettingsObj?.emailGreetingColorObj || { textColor: "white", backgroundColor: "#2E7D32", label: "Green" };
+  let greetingBg = greetingColorObj.backgroundColor;
+  let greetingTextColor = greetingColorObj.textColor;
+  let greetingHasLogo = (greeting || "").includes("{storeLogo}");
+  let greetingDisplayText = (greeting || "").replace(/\{storeLogo\}\n?/g, "").replace(/\n?\{storeLogo\}/g, "");
+  let footerHasLogo = (footer || "").includes("{storeLogo}");
+  let footerDisplayText = (footer || "").replace(/\{storeLogo\}\n?/g, "").replace(/\n?\{storeLogo\}/g, "");
 
   return (
     <BoxContainerOuterComponent>
-      <BoxContainerInnerComponent
-        style={{ width: "100%", alignItems: "center" }}
-      >
-        {/* Add button */}
-        <View style={{ width: "100%", alignItems: "flex-start" }}>
-          <BoxButton1 onPress={handleAddTemplate} />
+      <BoxContainerInnerComponent style={{ width: "100%", alignItems: "center" }}>
+
+        {/* ===== SHARED GREETING ===== */}
+        <View style={{ width: "100%", marginBottom: 20 }}>
+          <Text style={{ fontSize: 12, fontWeight: "600", color: "#2E7D32", marginBottom: 6 }}>GREETING (shared)</Text>
+          <View style={{ backgroundColor: greetingBg, borderRadius: 8, overflow: "hidden" }}>
+            {greetingHasLogo && logoUrl ? (
+              <View style={{ alignItems: "center", paddingTop: 20, paddingBottom: 6 }}>
+                <Image_ icon={{ uri: logoUrl }} resizeMode="contain" style={{ width: logoWidth, height: logoWidth * 0.5 }} />
+                <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6 }}>
+                  <TouchableOpacity
+                    onPress={() => handleSettingsFieldChange("emailLogoWidth", Math.max(60, logoWidth - 20))}
+                    style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.25)", justifyContent: "center", alignItems: "center", marginRight: 6 }}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: greetingTextColor, lineHeight: 16 }}>-</Text>
+                  </TouchableOpacity>
+                  <Text style={{ fontSize: 11, color: greetingTextColor, opacity: 0.7 }}>{logoWidth}px</Text>
+                  <TouchableOpacity
+                    onPress={() => handleSettingsFieldChange("emailLogoWidth", Math.min(400, logoWidth + 20))}
+                    style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.25)", justifyContent: "center", alignItems: "center", marginLeft: 6 }}
+                  >
+                    <Text style={{ fontSize: 14, fontWeight: "700", color: greetingTextColor, lineHeight: 16 }}>+</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : null}
+            <TextInput_
+              ref={(el) => {
+                if (el) {
+                  inputRefs.current["greeting"] = el;
+                  setTimeout(() => { if (el.style) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }, 0);
+                }
+              }}
+              debounceMs={500}
+              multiline={true}
+              onChangeText={(val) => handleSettingsFieldChange("emailGreeting", greetingHasLogo ? "{storeLogo}\n" + val : val)}
+              onSelectionChange={(e) => { cursorRefs.current["greeting"] = e.nativeEvent.selection.start; }}
+              onContentSizeChange={(e) => { let el = e?.target || e?.nativeEvent?.target; if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
+              placeholder="Email greeting..."
+              placeholderTextColor={greetingTextColor === "white" ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.3)"}
+              value={greetingDisplayText}
+              style={{ backgroundColor: greetingBg, color: greetingTextColor, fontSize: 20, fontWeight: "700", padding: 20, paddingTop: greetingHasLogo && logoUrl ? 10 : 20, minHeight: 60, textAlignVertical: "top", overflow: "hidden", outlineWidth: 0, borderWidth: 0, borderRadius: 0, textAlign: greetingAlign === "left" ? "left" : "center" }}
+            />
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, justifyContent: "space-between", flexWrap: "wrap" }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", flex: 1 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (greetingHasLogo) {
+                    handleSettingsFieldChange("emailGreeting", (greeting || "").replace(/\{storeLogo\}\n?/g, "").replace(/\n?\{storeLogo\}/g, ""));
+                  } else {
+                    handleSettingsFieldChange("emailGreeting", "{storeLogo}\n" + (greeting || ""));
+                  }
+                }}
+                style={{ ...varBtnStyle, backgroundColor: greetingHasLogo ? "#d4edda" : varBtnStyle.backgroundColor, borderColor: greetingHasLogo ? C.green : varBtnStyle.borderColor }}
+              >
+                <Text style={{ fontSize: 12, color: greetingHasLogo ? C.green : C.text, fontWeight: greetingHasLogo ? "600" : "400" }}>{greetingHasLogo ? "Store Logo \u2713" : "Store Logo"}</Text>
+              </TouchableOpacity>
+              {COLORS.map((c) => {
+                let isActive = greetingColorObj?.label === c.label;
+                return (
+                  <TouchableOpacity
+                    key={c.label}
+                    onPress={() => handleSettingsFieldChange("emailGreetingColorObj", c)}
+                    style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: c.backgroundColor, borderWidth: isActive ? 3 : 1, borderColor: isActive ? C.green : gray(0.4), marginRight: 4, marginBottom: 4 }}
+                  />
+                );
+              })}
+            </View>
+            {renderAlignToggle(greetingAlign, (val) => handleSettingsFieldChange("emailGreetingAlign", val))}
+          </View>
         </View>
 
-        {/* Templates list */}
-        <View style={{ marginTop: 10, width: "100%" }}>
-          <FlatList
-            data={templates}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item: templateObj }) => {
+        {/* ===== SHARED FOOTER ===== */}
+        <View style={{ width: "100%", marginBottom: 20 }}>
+          <Text style={{ fontSize: 12, fontWeight: "600", color: gray(0.5), marginBottom: 6 }}>FOOTER (shared)</Text>
+          <View style={{ backgroundColor: "#F5F5F5", borderRadius: 8, overflow: "hidden", borderWidth: 1, borderColor: "#E0E0E0" }}>
+            {footerHasLogo && logoUrl ? (
+              <View style={{ alignItems: "center", paddingTop: 16, paddingBottom: 4 }}>
+                <Image_ icon={{ uri: logoUrl }} resizeMode="contain" style={{ width: logoWidth, height: logoWidth * 0.5 }} />
+              </View>
+            ) : null}
+            <TextInput_
+              ref={(el) => {
+                if (el) {
+                  inputRefs.current["footer"] = el;
+                  setTimeout(() => { if (el.style) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }, 0);
+                }
+              }}
+              debounceMs={500}
+              multiline={true}
+              onChangeText={(val) => handleSettingsFieldChange("emailFooter", footerHasLogo ? "{storeLogo}\n" + val : val)}
+              onSelectionChange={(e) => { cursorRefs.current["footer"] = e.nativeEvent.selection.start; }}
+              onContentSizeChange={(e) => { let el = e?.target || e?.nativeEvent?.target; if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
+              placeholder="Email footer..."
+              placeholderTextColor={gray(0.45)}
+              value={footerDisplayText}
+              style={{ backgroundColor: "#F5F5F5", color: "#888888", fontSize: 13, lineHeight: 21, padding: 20, paddingTop: footerHasLogo && logoUrl ? 8 : 20, minHeight: 60, textAlignVertical: "top", overflow: "hidden", outlineWidth: 0, borderWidth: 0, borderRadius: 0, textAlign: footerAlign === "left" ? "left" : "center" }}
+            />
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, justifyContent: "space-between" }}>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center", flex: 1 }}>
+              <TouchableOpacity
+                onPress={() => {
+                  if (footerHasLogo) {
+                    handleSettingsFieldChange("emailFooter", (footer || "").replace(/\{storeLogo\}\n?/g, "").replace(/\n?\{storeLogo\}/g, ""));
+                  } else {
+                    handleSettingsFieldChange("emailFooter", "{storeLogo}\n" + (footer || ""));
+                  }
+                }}
+                style={{ ...varBtnStyle, backgroundColor: footerHasLogo ? "#d4edda" : varBtnStyle.backgroundColor, borderColor: footerHasLogo ? C.green : varBtnStyle.borderColor }}
+              >
+                <Text style={{ fontSize: 12, color: footerHasLogo ? C.green : C.text, fontWeight: footerHasLogo ? "600" : "400" }}>{footerHasLogo ? "Store Logo \u2713" : "Store Logo"}</Text>
+              </TouchableOpacity>
+              {FOOTER_VARIABLES.filter((v) => v.variable !== "{storeLogo}").map((v) => (
+                <TouchableOpacity key={v.variable} onPress={() => insertVarAtCursor("footer", footerDisplayText, v.variable, (val) => handleSettingsFieldChange("emailFooter", footerHasLogo ? "{storeLogo}\n" + val : val))} style={varBtnStyle}>
+                  <Text style={{ fontSize: 12, color: C.text }}>{v.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {renderAlignToggle(footerAlign, (val) => handleSettingsFieldChange("emailFooterAlign", val))}
+          </View>
+        </View>
+
+        {/* ===== ADD TEMPLATE BUTTON ===== */}
+        <View style={{ width: "100%", alignItems: "center", marginBottom: 10 }}>
+          <BoxButton1 onPress={handleAddTemplate} label="Add Template" colorGradientArr={COLOR_GRADIENTS.blue} textStyle={{ color: "white" }} style={{ paddingHorizontal: 12, paddingVertical: 6 }} />
+        </View>
+
+        {/* ===== TEMPLATES LIST ===== */}
+        <View style={{ width: "100%" }}>
+          {templates.map((templateObj) => {
               let isSelected = sSelectedTemplateId === templateObj.id;
+              let actionColorObj = templateObj.actionColorObj || { textColor: "white", backgroundColor: "green", label: "Green" };
+              let messageVal = isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "message") ?? getMessage(templateObj)) : getMessage(templateObj);
+              let actionVal = isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "action") ?? (templateObj.action || "")) : (templateObj.action || "");
+              let ticketLabel = templateObj.type === "saleReceipt" ? "Sale Receipt" : templateObj.type === "intakeReceipt" ? "Intake / Estimate" : templateObj.type === "creditReceipt" ? "Credit Receipt" : templateObj.type === "giftCardReceipt" ? "Gift Card Receipt" : "";
 
               return (
-                <View
-                  style={{
-                    width: "100%",
-                    marginBottom: 15,
-                    borderWidth: 1,
-                    borderColor: isSelected
-                      ? C.green
-                      : C.buttonLightGreenOutline,
-                    borderRadius: 10,
-                    padding: 10,
-                    backgroundColor: C.backgroundListWhite,
-                  }}
-                >
-                  {/* Row: template name + type dropdown + delete button */}
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      marginBottom: 8,
-                    }}
-                  >
+                <View key={templateObj.id} style={{ width: "100%", marginBottom: 20, borderWidth: 1, borderColor: isSelected ? C.green : C.buttonLightGreenOutline, borderRadius: 10, overflow: "hidden", backgroundColor: C.backgroundListWhite }}>
+
+                  {/* Header row: template name + delete */}
+                  <View style={{ flexDirection: "row", alignItems: "center", padding: 10, paddingBottom: 8 }}>
                     <TextInput_
                       debounceMs={500}
-                      onChangeText={(val) =>
-                        handleFieldChange(templateObj, "label", val)
-                      }
+                      onChangeText={(val) => handleFieldChange(templateObj, "label", val)}
                       onFocus={() => _setSelectedTemplateId(templateObj.id)}
                       placeholder="Template name..."
                       placeholderTextColor={gray(0.3)}
-                      style={{
-                        flex: 1,
-                        borderColor: C.buttonLightGreenOutline,
-                        borderWidth: 1,
-                        borderRadius: 5,
-                        padding: 5,
-                        color: C.text,
-                        outlineWidth: 0,
-                        fontWeight: "500",
-                        fontSize: 14,
-                      }}
+                      style={{ ...inputStyle, flex: 1, fontWeight: "500" }}
                       value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "label") ?? getLabel(templateObj)) : getLabel(templateObj)}
                     />
                     {!templateObj.type && (
                       <Tooltip text="Delete template" position="top">
-                        <BoxButton1
-                          onPress={() => handleDeleteTemplate(templateObj)}
-                          style={{ marginLeft: 8 }}
-                          iconSize={15}
-                          icon={ICONS.trash}
-                        />
+                        <BoxButton1 onPress={() => handleDeleteTemplate(templateObj)} style={{ marginLeft: 8 }} iconSize={15} icon={ICONS.trash} />
                       </Tooltip>
                     )}
                   </View>
 
-                  {/* Subject line */}
-                  <TextInput_
-                    debounceMs={500}
-                    onChangeText={(val) =>
-                      handleFieldChange(templateObj, "subject", val)
-                    }
-                    onFocus={() => _setSelectedTemplateId(templateObj.id)}
-                    placeholder="Email subject..."
-                    placeholderTextColor={gray(0.3)}
-                    style={{
-                      borderColor: C.buttonLightGreenOutline,
-                      borderWidth: 1,
-                      borderRadius: 5,
-                      padding: 5,
-                      color: C.text,
-                      outlineWidth: 0,
-                      fontSize: 14,
-                      marginBottom: 8,
-                    }}
-                    value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "subject") ?? templateObj.subject) : templateObj.subject}
-                  />
+                  {/* Subject */}
+                  <View style={{ paddingHorizontal: 10, paddingBottom: 8 }}>
+                    <TextInput_
+                      debounceMs={500}
+                      onChangeText={(val) => handleFieldChange(templateObj, "subject", val)}
+                      onFocus={() => _setSelectedTemplateId(templateObj.id)}
+                      placeholder="Email subject..."
+                      placeholderTextColor={gray(0.3)}
+                      style={{ ...inputStyle }}
+                      value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "subject") ?? templateObj.subject) : templateObj.subject}
+                    />
+                  </View>
 
-                  {/* Email body */}
+                  {/* Message - styled like email body */}
                   <TextInput_
                     ref={(el) => {
                       if (el) {
-                        textInputRefs.current[templateObj.id] = el;
+                        inputRefs.current[templateObj.id + "_message"] = el;
                         setTimeout(() => { if (el.style) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }, 0);
                       }
                     }}
                     debounceMs={500}
                     multiline={true}
-                    onChangeText={(val) =>
-                      handleFieldChange(templateObj, "content", val)
-                    }
+                    onChangeText={(val) => handleFieldChange(templateObj, "message", val)}
                     onFocus={() => _setSelectedTemplateId(templateObj.id)}
-                    onSelectionChange={(event) => {
-                      let { start } = event.nativeEvent.selection;
-                      cursorPositionRefs.current[templateObj.id] = start;
-                    }}
-                    onContentSizeChange={(event) => {
-                      let el = event?.target || event?.nativeEvent?.target;
-                      if (el) {
-                        el.style.height = "auto";
-                        el.style.height = el.scrollHeight + "px";
-                      }
-                    }}
-                    placeholder="Email body (HTML supported)..."
+                    onSelectionChange={(e) => { cursorRefs.current[templateObj.id + "_message"] = e.nativeEvent.selection.start; }}
+                    onContentSizeChange={(e) => { let el = e?.target || e?.nativeEvent?.target; if (el) { el.style.height = "auto"; el.style.height = el.scrollHeight + "px"; } }}
+                    placeholder="Email message..."
                     placeholderTextColor={gray(0.3)}
-                    style={{
-                      borderColor: C.buttonLightGreenOutline,
-                      borderWidth: 1,
-                      borderRadius: 5,
-                      padding: 8,
-                      color: C.text,
-                      outlineWidth: 0,
-                      fontSize: 14,
-                      minHeight: 120,
-                      textAlignVertical: "top",
-                      overflow: "hidden",
-                    }}
-                    value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "content") ?? getContent(templateObj)) : getContent(templateObj)}
+                    style={{ backgroundColor: "#ffffff", color: "#333333", fontSize: 15, lineHeight: 25, padding: 20, minHeight: 100, textAlignVertical: "top", overflow: "hidden", outlineWidth: 0, borderWidth: 0, borderTopWidth: 1, borderBottomWidth: 1, borderColor: "#E0E0E0" }}
+                    value={messageVal}
                   />
 
-                  {/* Variable buttons + emoji picker - shown when template is selected */}
-                  {isSelected && (
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        flexWrap: "wrap",
-                        marginTop: 8,
-                        alignItems: "center",
-                      }}
-                    >
-                      <TouchableOpacity
-                        onPress={() => _setEmojiModalTemplateId(templateObj.id)}
-                        style={{
-                          backgroundColor: C.buttonLightGreen,
-                          borderWidth: 1,
-                          borderColor: C.buttonLightGreenOutline,
-                          borderRadius: 5,
-                          paddingHorizontal: 8,
-                          paddingVertical: 4,
-                          marginRight: 5,
-                          marginBottom: 5,
-                        }}
-                      >
-                        <Text style={{ fontSize: 14 }}>{"😊"}</Text>
+                  {/* Variable buttons + emoji */}
+                  <View style={{ flexDirection: "row", flexWrap: "wrap", marginTop: 6, alignItems: "center", paddingHorizontal: 10, opacity: isSelected ? 1 : 0, pointerEvents: isSelected ? "auto" : "none" }}>
+                    <TouchableOpacity onPress={() => _setEmojiModalRefKey(templateObj.id + "_message")} style={varBtnStyle}>
+                      <Text style={{ fontSize: 14 }}>{"😊"}</Text>
+                    </TouchableOpacity>
+                    {MESSAGE_VARIABLES.map((v) => (
+                      <TouchableOpacity key={v.variable} onPress={() => handleInsertMessageVar(templateObj, v.variable)} style={varBtnStyle}>
+                        <Text style={{ fontSize: 12, color: C.text }}>{v.label}</Text>
                       </TouchableOpacity>
-                      {EMAIL_TEMPLATE_VARIABLES.map((v) => (
-                        <TouchableOpacity
-                          key={v.variable}
-                          onPress={() =>
-                            handleInsertVariable(templateObj, v.variable)
-                          }
-                          style={{
-                            backgroundColor: C.buttonLightGreen,
-                            borderWidth: 1,
-                            borderColor: C.buttonLightGreenOutline,
-                            borderRadius: 5,
-                            paddingHorizontal: 8,
-                            paddingVertical: 4,
-                            marginRight: 5,
-                            marginBottom: 5,
-                          }}
-                        >
-                          <Text style={{ fontSize: 12, color: C.text }}>
-                            {v.label}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  )}
+                    ))}
+                  </View>
 
-                  {/* Save button - only for new unsaved templates */}
-                  {isNewTemplate(templateObj.id) && (
-                    <Button_
-                      colorGradientArr={COLOR_GRADIENTS.greenblue}
-                      text="SAVE"
-                      onPress={() => handleSaveNewTemplate(templateObj)}
-                      textStyle={{ color: C.textWhite, fontSize: 13 }}
-                      buttonStyle={{
-                        alignSelf: "flex-end",
-                        marginTop: 8,
-                        width: 100,
-                      }}
+                  {/* Action button section - styled like email CTA area */}
+                  <View style={{ backgroundColor: "#E8F5E9", padding: 16, marginTop: 8, alignItems: "center" }}>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: gray(0.45), marginBottom: 6, alignSelf: "flex-start" }}>ACTION BUTTON {ticketLabel ? " - links to " + ticketLabel : " (optional)"}</Text>
+                    <TextInput_
+                      debounceMs={500}
+                      onChangeText={(val) => handleFieldChange(templateObj, "action", val)}
+                      onFocus={() => _setSelectedTemplateId(templateObj.id)}
+                      placeholder='Button label (e.g. "View Receipt")...'
+                      placeholderTextColor={gray(0.4)}
+                      style={{ ...inputStyle, borderColor: "#C8E6C9", backgroundColor: "#ffffff", width: "100%", textAlign: "center" }}
+                      value={actionVal}
                     />
+                    {!!actionVal.trim() && (
+                      <View style={{ marginTop: 10, alignItems: "center", width: "100%" }}>
+                        <View style={{ backgroundColor: actionColorObj.backgroundColor, borderRadius: 6, paddingVertical: 14, paddingHorizontal: 36 }}>
+                          <Text style={{ color: actionColorObj.textColor, fontSize: 15, fontWeight: "600", letterSpacing: 0.3 }}>{actionVal}</Text>
+                        </View>
+                        {renderColorPicker(actionColorObj, (c) => handleFieldChange(templateObj, "actionColorObj", c))}
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Save button for new templates */}
+                  {isNewTemplate(templateObj.id) && (
+                    <View style={{ padding: 10 }}>
+                      <Button_
+                        colorGradientArr={COLOR_GRADIENTS.greenblue}
+                        text="SAVE"
+                        onPress={() => handleSaveNewTemplate(templateObj)}
+                        textStyle={{ color: C.textWhite, fontSize: 13 }}
+                        buttonStyle={{ alignSelf: "flex-end", width: 100 }}
+                      />
+                    </View>
                   )}
                 </View>
               );
-            }}
-          />
+            })}
         </View>
 
         {/* Emoji picker modal */}
-        {/* Emoji picker modal — portaled to body to avoid z-index issues */}
-        {!!sEmojiModalTemplateId && createPortal(
+        {!!sEmojiModalRefKey && createPortal(
           <View style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", zIndex: 9999 }}>
-            <TouchableWithoutFeedback onPress={() => _setEmojiModalTemplateId(null)}>
+            <TouchableWithoutFeedback onPress={() => _setEmojiModalRefKey(null)}>
               <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
             </TouchableWithoutFeedback>
             <View style={{ backgroundColor: C.backgroundWhite, borderRadius: 12, padding: 15, width: 320 }}>
@@ -9341,9 +9371,13 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
                   <TouchableOpacity
                     key={e.id}
                     onPress={() => {
-                      let tObj = templates.find((t) => t.id === sEmojiModalTemplateId);
-                      if (tObj) handleInsertVariable(tObj, e.id);
-                      _setEmojiModalTemplateId(null);
+                      let refKey = sEmojiModalRefKey;
+                      let parts = refKey.split("_message");
+                      if (parts.length === 2) {
+                        let tObj = templates.find((t) => t.id === parts[0]);
+                        if (tObj) handleInsertMessageVar(tObj, e.id);
+                      }
+                      _setEmojiModalRefKey(null);
                     }}
                     style={{ width: 48, height: 48, justifyContent: "center", alignItems: "center", borderRadius: 8 }}
                   >

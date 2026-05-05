@@ -32,6 +32,8 @@ import {
   uploadFileToStorage,
   storageDelete,
   uploadPDFAndSendSMS,
+  generateReceiptPDF,
+  sendReceipt,
   rehydrateFromArchiveCallable,
   manualArchiveAndCleanupCallable,
   createTextToPayInvoiceCallable,
@@ -613,20 +615,6 @@ export async function dbSaveOpenWorkorder(workorder, workorderID = null, isFirst
     const path = buildWorkorderPath(tenantID, storeID, id);
 
     await firestoreWrite(path, workorderToSave);
-
-    // Auto-create customer PIN doc for the customer-facing workorder screen (only on first save)
-    if (workorderToSave.customerPin && isFirstSave) {
-      const pinPath = `workorder-pins/${workorderToSave.customerPin}`;
-      firestoreWrite(pinPath, {
-        pin: workorderToSave.customerPin,
-        workorderID: id,
-        tenantID,
-        storeID,
-        customerID: workorderToSave.customerID || "",
-        createdAt: Date.now(),
-        createdBy: workorderToSave.startedBy || "",
-      }).catch(() => {}); // fire-and-forget
-    }
 
     return {
       success: true,
@@ -1525,17 +1513,7 @@ export async function dbGetTenantById(id) {
       return null;
     }
 
-    // Build collection path: email_users
-    const collectionPath = DB_NODES.FIRESTORE.EMAIL_USERS;
-
-    // Query by id field
-    const whereClauses = [{ field: "id", operator: "==", value: id }];
-
-    const results = await firestoreQuery(collectionPath, whereClauses);
-
-    // Should return exactly one result
-    const tenant = results && results.length > 0 ? results[0] : null;
-
+    const tenant = await firestoreRead(`${DB_NODES.FIRESTORE.EMAIL_USERS}/${id}`);
     return tenant;
   } catch (error) {
     log("Error retrieving tenant by id:", error);
@@ -2402,47 +2380,33 @@ const TENANT_CACHE_KEY = "warpspeed_tenant";
 
 /**
  * Load tenant info and settings for a Firebase user.
- * Uses localStorage cache for instant restore on persisted sessions,
- * falls back to Firestore query on cache miss.
- * @param {string} uid - Firebase Auth user UID
+ * @param {string} tenantID - Tenant ID (from claims or cache)
+ * @param {string} storeID - Store ID (from claims or cache)
+ * @param {Object} [preloadedSettings] - Settings already fetched server-side (skips Firestore read)
  * @returns {Promise<Object>} { tenantID, storeID, settings }
  */
-export async function loadTenantAndSettings(uid) {
-  // 1. Try Zustand persisted settings first (instant from localStorage)
-  const cached = localStorageWrapper.getItem(TENANT_CACHE_KEY);
-  if (cached?.tenantID && cached?.storeID) {
-    const persisted = useSettingsStore.getState().settings;
-    if (persisted?.tenantID === cached.tenantID && persisted?.storeID === cached.storeID) {
-      // Settings already rehydrated from Zustand persist — skip network call
-      return { tenantID: cached.tenantID, storeID: cached.storeID, settings: persisted };
-    }
-    // Zustand cache miss — fetch from Firestore
-    const settings = await dbGetSettings(cached.tenantID, cached.storeID);
-    if (settings) {
-      useSettingsStore.getState().setSettings(settings, false, false);
-      return { tenantID: cached.tenantID, storeID: cached.storeID, settings };
-    }
-  }
-
-  // 2. Cache miss or stale — fetch tenant from Firestore
-  const tenant = await dbGetTenantById(uid);
-  if (!tenant?.tenantID || !tenant?.storeID) {
+export async function loadTenantAndSettings(tenantID, storeID, preloadedSettings) {
+  if (!tenantID || !storeID) {
     throw new Error("User is not associated with any tenant/store");
   }
 
-  const settings = await dbGetSettings(tenant.tenantID, tenant.storeID);
+  // 1. Try Zustand persisted settings first (instant)
+  const persisted = useSettingsStore.getState().settings;
+  if (persisted?.tenantID === tenantID && persisted?.storeID === storeID) {
+    return { tenantID, storeID, settings: persisted };
+  }
+
+  // 2. Use preloaded settings if available, otherwise fetch from Firestore
+  const settings = preloadedSettings || await dbGetSettings(tenantID, storeID);
   if (!settings) {
     throw new Error("Settings not found for tenant/store");
   }
 
-  // 3. Cache for next restore & populate store
-  localStorageWrapper.setItem(TENANT_CACHE_KEY, {
-    tenantID: tenant.tenantID,
-    storeID: tenant.storeID,
-  });
+  // 3. Cache & populate store
+  localStorageWrapper.setItem(TENANT_CACHE_KEY, { tenantID, storeID });
   useSettingsStore.getState().setSettings(settings, false, false);
 
-  return { tenantID: tenant.tenantID, storeID: tenant.storeID, settings };
+  return { tenantID, storeID, settings };
 }
 
 /**
@@ -2472,14 +2436,11 @@ export async function dbLoginUser(email, password, options = {}) {
       throw new Error("Login failed - no user data returned");
     }
 
-    try {
-      await loginAppUserCallable({ email, password });
-    } catch (claimsErr) {
-      log("Claims callable error (non-fatal):", claimsErr);
-    }
+    const callableResult = await loginAppUserCallable({ email, password });
+    const { tenantID, storeID, settings } = callableResult.data;
+
     await user.getIdToken(true);
-    let tokenResult = await user.getIdTokenResult();
-    log("Token claims after refresh:", tokenResult.claims);
+    log("Token claims after refresh:", (await user.getIdTokenResult()).claims);
 
     return {
       success: true,
@@ -2489,7 +2450,9 @@ export async function dbLoginUser(email, password, options = {}) {
         emailVerified: user.emailVerified,
         displayName: user.displayName,
       },
-      auth: userCredential,
+      tenantID,
+      storeID,
+      settings,
     };
   } catch (error) {
     const logPrefix = isAutoLogin ? "Auto-login" : "Login";
@@ -3395,20 +3358,34 @@ export async function dbUploadPDFAndSendSMS({ base64, storagePath, message, phon
   }
 }
 
-/**
- * Emergency rehydration — restores Firestore collections from Cloud Storage archives.
- * @param {string[]} collections - Array of collection names to restore
- * @returns {Promise<Object>} { success, results: { collectionName: { success, docCount } } }
- */
-export async function dbCreateTextToPayInvoice(workorderID, channel = "sms") {
+export async function dbGenerateReceiptPDF(params) {
   const { tenantID, storeID } = getTenantAndStore();
   try {
-    const result = await createTextToPayInvoiceCallable({
-      workorderID,
-      channel,
-      tenantID,
-      storeID,
-    });
+    let result = await generateReceiptPDF({ ...params, tenantID, storeID });
+    return result;
+  } catch (error) {
+    log("Error in dbGenerateReceiptPDF:", error);
+    return { success: false, error: error.message || "Failed to generate receipt PDF" };
+  }
+}
+
+export async function dbSendReceipt(params) {
+  const { tenantID, storeID } = getTenantAndStore();
+  try {
+    return await sendReceipt({ ...params, tenantID, storeID });
+  } catch (error) {
+    log("Error in dbSendReceipt:", error);
+    return { success: false, error: error.message || "Failed to send receipt" };
+  }
+}
+
+export async function dbCreateTextToPayInvoice(workorderID, channel = "sms", { phone, email } = {}) {
+  const { tenantID, storeID } = getTenantAndStore();
+  try {
+    const payload = { workorderID, channel, tenantID, storeID };
+    if (phone) payload.phone = phone;
+    if (email) payload.email = email;
+    const result = await createTextToPayInvoiceCallable(payload);
     return result.data;
   } catch (error) {
     log("Error in dbCreateTextToPayInvoice:", error);

@@ -610,6 +610,15 @@ var printBuilder = {
     // Transaction-only flag — when true, receipt covers a single payment only
     receipt.transactionOnly = false;
 
+    // Partial payment fields (skip deposit/credit issuance receipts)
+    if (!sale.isDepositSale) {
+      var totalPaid = 0;
+      allPayments.forEach(function (p) { totalPaid += (p.amountCaptured || 0); });
+      var amountOwed = Math.max(0, (sale.total || 0) - totalPaid);
+      receipt.partialPayment = amountOwed > 0;
+      if (amountOwed > 0) receipt.amountOwedCents = amountOwed;
+    }
+
     return receipt;
   },
   transaction: function (txn, context) {
@@ -690,7 +699,8 @@ var printBuilder = {
     var currentUser = _ctx.currentUser || {};
 
     var receipt = Object.assign({}, RECEIPT_PROTO);
-    receipt.receiptType = "Credit";
+    receipt.receiptType = RECEIPT_TYPES.sales;
+    receipt.depositType = "credit";
     receipt.id = creditObj.id || "";
     receipt.barcode = creditObj.id || "";
     receipt.shopName = _settings.storeInfo?.displayName || SHOP_NAME;
@@ -699,8 +709,6 @@ var printBuilder = {
 
     receipt.first = capitalizeFirstLetterOfString((customer?.first || "").trim());
     receipt.last = capitalizeFirstLetterOfString((customer?.last || "").trim());
-    receipt.customerFirstName = receipt.first;
-    receipt.customerLastName = receipt.last;
     receipt.customerCell = customer?.customerCell || customer?.cell || customer?.phone || "";
     receipt.customerEmail = customer?.email || "";
     receipt.customerContact = formatPhoneForDisplay(receipt.customerCell) || receipt.customerEmail;
@@ -709,42 +717,75 @@ var printBuilder = {
     var userLastInitial = (currentUser?.last || "").trim().charAt(0).toUpperCase();
     receipt.startedBy = userFirst + (userLastInitial ? " " + userLastInitial + "." : "");
 
-    receipt.creditAmount = creditObj.amountCents || 0;
-    receipt.creditNote = creditObj.text || creditObj.note || "";
+    receipt.depositAmountCents = creditObj.amountCents || 0;
+    if (creditObj.text || creditObj.note) receipt.depositNote = creditObj.text || creditObj.note;
+
+    receipt.payments = [];
+    receipt.popCashRegister = false;
 
     var txDate = new Date(Number(creditObj.millis) || Date.now());
     receipt.transactionDateTime = txDate.toLocaleDateString() + "  " + txDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
     return receipt;
   },
-  giftcard: function (giftcardObj, customer, context) {
+  giftcard: function (giftcardObj, payer, recipient, payments, context) {
     var _ctx = context || {};
     var _settings = _ctx.settings || {};
     var currentUser = _ctx.currentUser || {};
 
     var receipt = Object.assign({}, RECEIPT_PROTO);
     receipt.receiptType = "GiftCard";
-    receipt.id = giftcardObj.id || "";
-    receipt.barcode = giftcardObj.id || "";
+    receipt.id = giftcardObj.id;
+    receipt.barcode = giftcardObj.id;
     receipt.shopName = _settings.storeInfo?.displayName || SHOP_NAME;
     receipt.shopContactBlurb = _settings.shopContactBlurb || SHOP_CONTACT_BLURB;
     receipt.thankYouBlurb = _settings.thankYouBlurb || THANK_YOU_BLURB;
-
-    receipt.first = capitalizeFirstLetterOfString((customer?.first || "").trim());
-    receipt.last = capitalizeFirstLetterOfString((customer?.last || "").trim());
-    receipt.customerFirstName = receipt.first;
-    receipt.customerLastName = receipt.last;
-    receipt.customerCell = customer?.customerCell || customer?.cell || customer?.phone || "";
-    receipt.customerEmail = customer?.email || "";
-    receipt.customerContact = formatPhoneForDisplay(receipt.customerCell) || receipt.customerEmail;
+    receipt.salesTaxPercent = _settings.salesTaxPercent || 0;
+    receipt.taxFree = !!giftcardObj.taxFree;
 
     var userFirst = capitalizeFirstLetterOfString((currentUser?.first || "").trim());
     var userLastInitial = (currentUser?.last || "").trim().charAt(0).toUpperCase();
     receipt.startedBy = userFirst + (userLastInitial ? " " + userLastInitial + "." : "");
 
-    receipt.giftCardAmount = giftcardObj.amountCents || 0;
-    receipt.giftCardNote = giftcardObj.note || "";
+    // Payer (buyer)
+    var payerFirst = capitalizeFirstLetterOfString((payer?.first || "").trim());
+    var payerLast = capitalizeFirstLetterOfString((payer?.last || "").trim());
+    var payerPhone = payer?.customerCell || payer?.cell || payer?.phone || "";
+    receipt.payerFirstName = payerFirst;
+    receipt.payerLastName = payerLast;
+    receipt.payerContact = formatPhoneForDisplay(payerPhone) || payer?.email || "";
 
+    // Recipient
+    var recipFirst = capitalizeFirstLetterOfString((recipient?.first || "").trim());
+    var recipLast = capitalizeFirstLetterOfString((recipient?.last || "").trim());
+    var recipPhone = recipient?.customerCell || recipient?.cell || recipient?.phone || "";
+    receipt.recipientFirstName = recipFirst;
+    receipt.recipientLastName = recipLast;
+    receipt.recipientContact = formatPhoneForDisplay(recipPhone) || recipient?.email || "";
+    receipt.recipientAccountID = recipient?.accountID || recipient?.id || "";
+
+    // Amount and note
+    receipt.giftCardAmountCents = giftcardObj.amountCents || 0;
+    if (giftcardObj.note) receipt.giftCardNote = giftcardObj.note;
+
+    // Payments
+    var allPayments = (payments || []).map(function (p) {
+      var type = p.method === "cash" ? "Cash" : p.method === "check" ? "Check" : "Card";
+      return Object.assign({}, p, { paymentType: type });
+    });
+    receipt.payments = allPayments;
+
+    // Cash register + change
+    receipt.popCashRegister = allPayments.some(function (p) { return p.method === "cash"; });
+    var cashChange = 0;
+    allPayments.forEach(function (p) {
+      if (p.method === "cash" && p.amountTendered > p.amountCaptured) {
+        cashChange += p.amountTendered - p.amountCaptured;
+      }
+    });
+    if (cashChange) receipt.cashChangeGivenDisplay = "$" + (cashChange / 100).toFixed(2);
+
+    // Timestamp
     var txDate = new Date(Number(giftcardObj.millis) || Date.now());
     receipt.transactionDateTime = txDate.toLocaleDateString() + "  " + txDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 

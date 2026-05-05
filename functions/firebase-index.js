@@ -17,6 +17,20 @@ const fetch = require("node-fetch");
 const sharp = require("sharp");
 const twilio = require("twilio");
 const { printBuilder: sharedPrintBuilder } = require("./shared/printBuilder");
+const {
+  generateSaleReceiptPDF,
+  generateRefundReceiptPDF,
+  generateCreditReceiptPDF,
+  generateGiftCardReceiptPDF,
+  generateWorkorderTicketPDF,
+} = require("./pdfGenerator");
+const {
+  findTemplateByType,
+  applyVars,
+  buildEmailFromTemplate,
+  getTemplateType,
+  getDefaultSMSMessage,
+} = require("./communicationUtils");
 
 // Firebase Admin SDK - initialize once at module load (don't delete/recreate)
 let DB = null;
@@ -200,15 +214,9 @@ function setCorsHeaders(res, req) {
   res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
-const MAX_SESSION_SECONDS = 12 * 3600; // 12-hour max session
-
 function requireCallableAuth(request) {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Authentication required.");
-  }
-  const authTime = request.auth.token?.auth_time;
-  if (authTime && (Math.floor(Date.now() / 1000) - authTime) > MAX_SESSION_SECONDS) {
-    throw new HttpsError("unauthenticated", "Session expired. Please log in again.");
   }
   return request.auth;
 }
@@ -237,10 +245,6 @@ async function requireHTTPAuth(req, res) {
   try {
     const token = authHeader.split("Bearer ")[1];
     const decodedToken = await admin.auth().verifyIdToken(token);
-    if (decodedToken.auth_time && (Math.floor(Date.now() / 1000) - decodedToken.auth_time) > MAX_SESSION_SECONDS) {
-      res.status(401).json({ success: false, message: "Session expired. Please log in again." });
-      return null;
-    }
     return decodedToken;
   } catch (error) {
     res.status(401).json({ success: false, message: "Invalid or expired token." });
@@ -1679,1052 +1683,6 @@ function ftpReader() {
   // );
   //   }
 }
-
-/**
- * Login function for app users
- * Authenticates user with email/password and returns user and tenant information
- */
-exports.loginAppUser = onRequest({ cors: true }, async (req, res) => {
-  setCorsHeaders(res, req);
-  log("Incoming login request", req.body);
-
-  // Input validation
-  const { email, password } = req.body.data;
-
-  if (!email || typeof email !== "string" || !email.includes("@")) {
-    return res.status(400).json({
-      success: false,
-      message: "Valid email address is required.",
-    });
-  }
-
-  if (!password || typeof password !== "string" || password.length < 6) {
-    return res.status(400).json({
-      success: false,
-      message: "Password must be at least 6 characters long.",
-    });
-  }
-
-  try {
-    // Authenticate user with Firebase Auth
-    const userRecord = await admin.auth().getUserByEmail(email);
-
-    // Verify the user exists and is not disabled
-    if (userRecord.disabled) {
-      return res.status(403).json({
-        success: false,
-        message: "❌ User account has been disabled.",
-      });
-    }
-
-    // Get user ID for Firestore lookup
-    const userID = userRecord.uid;
-
-    // Look up user in the global email_users index for quick tenant retrieval
-    let emailUsersSnap = await DB.collection("email_users").where("id", "==", userID).limit(1).get();
-
-    if (emailUsersSnap.empty) {
-      // Fallback: try document ID = uid
-      const directDoc = await DB.collection("email_users").doc(userID).get();
-      if (!directDoc.exists) {
-        return res.status(404).json({
-          success: false,
-          message: "❌ User not found in system.",
-        });
-      }
-      emailUsersSnap = { empty: false, docs: [directDoc] };
-    }
-
-    const userIndexData = emailUsersSnap.docs[0].data();
-    const tenantID = userIndexData.tenantID;
-    const storeID = userIndexData.storeID;
-
-    if (!tenantID) {
-      return res.status(404).json({
-        success: false,
-        message: "❌ User is not associated with any tenant.",
-      });
-    }
-
-    if (!storeID) {
-      return res.status(404).json({
-        success: false,
-        message: "❌ User is not associated with any store.",
-      });
-    }
-
-    // Retrieve user details from tenant/store-specific collection
-    const userRef = DB.collection("tenants")
-      .doc(tenantID)
-      .collection("stores")
-      .doc(storeID)
-      .collection("users")
-      .doc(userID);
-    const userDoc = await userRef.get();
-
-    if (!userDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        message: "❌ User details not found in tenant system.",
-      });
-    }
-
-    const userData = userDoc.data();
-
-    // Retrieve tenant information
-    const tenantRef = DB.collection("tenants").doc(tenantID);
-    const tenantDoc = await tenantRef.get();
-
-    if (!tenantDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        message: "❌ Tenant information not found.",
-      });
-    }
-
-    const tenantData = tenantDoc.data();
-
-    // Update last login timestamp
-    await userRef.update({
-      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
-      loginCount: admin.firestore.FieldValue.increment(1),
-    });
-
-    log("User login successful", {
-      userID,
-      email,
-      tenantID,
-      storeID,
-      displayName: userData.displayName,
-    });
-
-    return res.status(200).json({
-      success: true,
-      message: `✅ Login successful for ${email} (Tenant: ${tenantID}, Store: ${storeID})`,
-      user: {
-        id: userID,
-        email: userData.email,
-        displayName: userData.displayName,
-        tenantID: tenantID,
-        storeID: storeID,
-        permissions: userData.permissions,
-        status: userData.status,
-        lastLogin: userData.lastLogin,
-        createdAt: userData.createdAt,
-        metadata: userData.metadata,
-      },
-      tenant: {
-        id: tenantID,
-        name: tenantData.name,
-        status: tenantData.status,
-        settings: tenantData.settings,
-        userCount: tenantData.userCount,
-        createdAt: tenantData.createdAt,
-        subscription: tenantData.subscription,
-      },
-      auth: {
-        uid: userID,
-        email: email,
-        emailVerified: userRecord.emailVerified,
-        disabled: userRecord.disabled,
-      },
-    });
-  } catch (error) {
-    log("Error during login", error);
-
-    let message;
-    let statusCode = 500;
-
-    if (error.code === "auth/user-not-found") {
-      message = "❌ No account found with this email address.";
-      statusCode = 404;
-    } else if (error.code === "auth/wrong-password") {
-      message = "❌ Incorrect password.";
-      statusCode = 401;
-    } else if (error.code === "auth/invalid-email") {
-      message = "❌ Invalid email address format.";
-      statusCode = 400;
-    } else if (error.code === "auth/user-disabled") {
-      message = "❌ This account has been disabled.";
-      statusCode = 403;
-    } else if (error.code === "auth/too-many-requests") {
-      message = "❌ Too many failed login attempts. Please try again later.";
-      statusCode = 429;
-    } else if (error.code === "permission-denied") {
-      message = "❌ Insufficient permissions to access user data.";
-      statusCode = 403;
-    } else if (error.code === "not-found") {
-      message = "❌ User or tenant not found.";
-      statusCode = 404;
-    } else {
-      message = `❗ Unexpected error: ${error.message}`;
-    }
-
-    return res.status(statusCode).json({
-      success: false,
-      message,
-      error: {
-        code: error.code || "unknown",
-        message: error.message,
-      },
-    });
-  }
-});
-
-/**
- * Create a new app user under a tenant
- * Creates user in Firebase Auth and stores data in Firestore
- */
-exports.createAppUser = onRequest({ cors: true }, async (req, res) => {
-  setCorsHeaders(res, req);
-  const decodedToken = await requireHTTPAuth(req, res);
-  if (!decodedToken) return;
-  log("Incoming create app user request", req.body);
-
-  // Input validation
-  const { email, password, tenantID, storeID, permissions } = req.body.data;
-
-  if (!email || typeof email !== "string" || !email.includes("@")) {
-    return res.status(400).json({
-      success: false,
-      message: "Valid email address is required.",
-    });
-  }
-
-  if (!password || typeof password !== "string" || password.length < 6) {
-    return res.status(400).json({
-      success: false,
-      message: "Password must be at least 6 characters long.",
-    });
-  }
-
-  if (!tenantID || typeof tenantID !== "string") {
-    return res.status(400).json({
-      success: false,
-      message: "Tenant ID is required.",
-    });
-  }
-
-  if (!storeID || typeof storeID !== "string") {
-    return res.status(400).json({
-      success: false,
-      message: "Store ID is required.",
-    });
-  }
-
-  try {
-    // Check if tenant exists
-    const tenantRef = DB.collection("tenants").doc(tenantID);
-    const tenantDoc = await tenantRef.get();
-
-    if (!tenantDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        message: "Tenant not found.",
-      });
-    }
-
-    // Check if user already exists with this email
-    const existingUserQuery = await DB.collection("tenants")
-      .doc(tenantID)
-      .collection("stores")
-      .doc(storeID)
-      .collection("users")
-      .where("email", "==", email)
-      .get();
-
-    if (!existingUserQuery.empty) {
-      return res.status(409).json({
-        success: false,
-        message: "User with this email already exists in this tenant.",
-      });
-    }
-
-    // Create Firebase Auth user
-    const userRecord = await admin.auth().createUser({
-      email: email,
-      password: password,
-      displayName: email, // Use email as display name
-      emailVerified: false, // Require email verification
-    });
-
-    // Generate unique user ID
-    const userID = userRecord.uid;
-
-    // Create user document in Firestore under tenant
-    const userData = {
-      id: userID,
-      email: email,
-      displayName: email,
-      tenantID: tenantID,
-      permissions: permissions || {
-        level: 1, // Default permission level
-        canCreateUsers: false,
-        canManageInventory: false,
-        canProcessPayments: false,
-        canViewReports: false,
-      },
-      status: "active",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      createdBy: req.body.createdBy || "system", // Track who created this user
-      lastLogin: null,
-      emailVerified: false,
-      // Additional user metadata
-      metadata: {
-        timezone: req.body.timezone || "America/New_York",
-        language: req.body.language || "en",
-        department: req.body.department || null,
-        role: req.body.role || "user",
-      },
-    };
-
-    // Store user in Firestore under tenant/tenantID/stores/storeID/users/userID
-    await DB.collection("tenants")
-      .doc(tenantID)
-      .collection("stores")
-      .doc(storeID)
-      .collection("users")
-      .doc(userID)
-      .set(userData);
-
-    // Create user index entry for quick tenant/store lookup
-    await DB.collection("email_users").doc(userID).set({
-      id: userID,
-      email: email,
-      tenantID: tenantID,
-      storeID: storeID,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: "active",
-    });
-
-    // Update tenant's user count
-    await tenantRef.update({
-      userCount: admin.firestore.FieldValue.increment(1),
-      lastUserCreated: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    log("App user created successfully", {
-      userID,
-      email,
-      tenantID,
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: `✅ User ${email} created successfully for tenant ${tenantID}.`,
-      user: {
-        id: userID,
-        email: email,
-        displayName: email,
-        tenantID: tenantID,
-        storeID: storeID,
-        permissions: userData.permissions,
-        status: "active",
-        createdAt: userData.createdAt,
-      },
-    });
-  } catch (error) {
-    log("Error creating app user", error);
-
-    let message;
-    let statusCode = 500;
-
-    if (error.code === "auth/email-already-exists") {
-      message = "❌ User with this email already exists in Firebase Auth.";
-      statusCode = 409;
-    } else if (error.code === "auth/invalid-email") {
-      message = "❌ Invalid email address format.";
-      statusCode = 400;
-    } else if (error.code === "auth/weak-password") {
-      message = "❌ Password is too weak. Please use a stronger password.";
-      statusCode = 400;
-    } else if (error.code === "auth/operation-not-allowed") {
-      message = "❌ Email/password accounts are not enabled.";
-      statusCode = 403;
-    } else if (error.code === "permission-denied") {
-      message = "❌ Insufficient permissions to create user.";
-      statusCode = 403;
-    } else if (error.code === "not-found") {
-      message = "❌ Tenant not found.";
-      statusCode = 404;
-    } else {
-      message = `❗ Unexpected error: ${error.message}`;
-    }
-
-    return res.status(statusCode).json({
-      success: false,
-      message,
-      error: {
-        code: error.code || "unknown",
-        message: error.message,
-      },
-    });
-  }
-});
-
-/**
- * Create a new store subunit under a tenant
- * Creates store with initial SETTINGS_OBJ data
- */
-exports.createStore = onRequest({ cors: true }, async (req, res) => {
-  setCorsHeaders(res, req);
-  const decodedToken = await requireHTTPAuth(req, res);
-  if (!decodedToken) return;
-
-  // return res.status(200).send("complete");
-  // Handle preflight requests
-
-  log("Incoming create store request", req.body);
-  // return res.status(200).send("sup bro");
-
-  // Input validation
-  const { tenantID, storeID, storeName, createdBy } = req.body.data;
-
-  if (!tenantID || typeof tenantID !== "string") {
-    return res.status(400).json({
-      success: false,
-      message: "Tenant ID is required.",
-    });
-  }
-
-  if (!storeID || typeof storeID !== "string") {
-    return res.status(400).json({
-      success: false,
-      message: "Store ID is required.",
-    });
-  }
-
-  if (!storeName || typeof storeName !== "string") {
-    return res.status(400).json({
-      success: false,
-      message: "Store name is required.",
-    });
-  }
-
-  try {
-    // Check if tenant exists
-    const tenantRef = DB.collection("tenants").doc(tenantID);
-    const tenantDoc = await tenantRef.get();
-
-    if (!tenantDoc.exists) {
-      return res.status(404).json({
-        success: false,
-        message: "Tenant not found.",
-      });
-    }
-
-    // Check if store already exists
-    const storeRef = DB.collection("tenants")
-      .doc(tenantID)
-      .collection("stores")
-      .doc(storeID);
-    const storeDoc = await storeRef.get();
-
-    if (storeDoc.exists) {
-      return res.status(409).json({
-        success: false,
-        message: "Store with this ID already exists in this tenant.",
-      });
-    }
-
-    // Create initial SETTINGS_OBJ data
-    const initialSettings = {
-      // Basic store information
-      storeID: storeID,
-      storeName: storeName,
-      tenantID: tenantID,
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      createdBy: createdBy || "system",
-      status: "active",
-
-      // Default statuses
-      statuses: [
-        {
-          id: "1334453",
-          textColor: "white",
-          backgroundColor: "orange",
-          altTextColor: "dimgray",
-          label: "Order Part for Customer",
-          removable: true,
-        },
-        {
-          id: "kerj3krj",
-          altTextColor: "dimgray",
-          textColor: "white",
-          backgroundColor: "orange",
-          label: "Part Ordered",
-          removable: true,
-        },
-        {
-          id: "ek3rkeng",
-          textColor: "white",
-          backgroundColor: "blue",
-          altTextColor: "gray",
-          label: "Messaging Customer",
-          removable: true,
-        },
-      ],
-
-      // Default quick item buttons
-      quickItemButtons: [
-        {
-          id: "38trrneg",
-          name: "Tune-Up",
-          items: [],
-          buttons: [],
-        },
-        {
-          id: "38trrdfdneg",
-          name: "Tube",
-          items: [],
-          buttons: [],
-        },
-        { id: "38trrsdfneg", name: "Tire", items: [], buttons: [] },
-        { id: "38trdfdrneg", name: "Tube & Tire", items: [], buttons: [] },
-        { id: "38trdfadrneg", name: "Brakes", items: [], buttons: [] },
-        {
-          id: "38tradfdrneg",
-          name: "Cable",
-          items: [],
-          buttons: [],
-        },
-        {
-          id: "38trrnebfdgdg",
-          name: "Shifting",
-          items: [],
-          buttons: [],
-        },
-        { id: "38trrnadfvceg", name: "Drivetrain", items: [], buttons: [] },
-        { id: "38trsadgdvdrneg", name: "Spoke", items: [], buttons: [] },
-        { id: "38trerfedgbdrneg", name: "Cleaning", items: [], buttons: [] },
-        { id: "38trrfrdggdneg", name: "Scooter", items: [], buttons: [] },
-        { id: "bnfdeqw", name: "Pickup/Delivery", items: [], buttons: [] },
-        { id: "34trhrg", name: "Diagnostics", items: [], buttons: [] },
-        { id: "labor", name: "$Labor", items: [], buttons: [] },
-        { id: "part", name: "$Part", items: [], buttons: [] },
-      ],
-
-      // Default bike brands
-      bikeBrands: [
-        "Trek",
-        "Specialized",
-        "Sun",
-        "Marin",
-        "Cannondale",
-        "Jamis",
-      ],
-      bikeBrandsName: "Bikes",
-      bikeOptionalBrands: [
-        "Euphree",
-        "Lectric",
-        "Hiboy",
-        "Ridstar",
-        "Velowave",
-      ],
-      bikeOptionalBrandsName: "E-bikes",
-
-      // Default discounts
-      discounts: [
-        {
-          id: "1333k",
-          name: "50% Off Item",
-          value: "50",
-          type: "percent",
-        },
-        {
-          id: "193j3k",
-          name: "10% Off Item",
-          value: "10",
-          type: "percent",
-        },
-        {
-          id: "394393",
-          name: "20% Off Item",
-          value: "20",
-          type: "percent",
-        },
-        {
-          id: "394393d",
-          name: "30% Off Item",
-          value: "30",
-          type: "percent",
-        },
-        {
-          id: "3943933",
-          name: "40% Off Item",
-          value: "40",
-          type: "percent",
-        },
-        {
-          id: "394393343",
-          name: "50% Off Item",
-          value: "50",
-          type: "percent",
-        },
-        {
-          id: "3k3nh",
-          name: "2-bike purchase, $100 Off Each Bike",
-          value: "10000",
-          type: "dollar",
-        },
-        {
-          id: "343gfg",
-          name: "$10 Off",
-          value: "1000",
-          type: "dollar",
-        },
-      ],
-
-      // Default wait times
-      waitTimes: [
-        {
-          id: "34j3kj3dfdfgfkj3",
-          label: "Waiting",
-          maxWaitTimeDays: 0,
-        },
-        {
-          id: "34jngfedde3kj3kj3",
-          label: "Today",
-          maxWaitTimeDays: 0,
-        },
-        {
-          id: "34j3kjdww3kj3",
-          label: "Tomorrow",
-          maxWaitTimeDays: 1,
-        },
-        {
-          id: "34j3kj3",
-          label: "1-2 Days",
-          maxWaitTimeDays: 2,
-        },
-        {
-          id: "34j3kj33",
-          label: "2-3 Days",
-          maxWaitTimeDays: 3,
-        },
-        {
-          id: "34j3kj3kj3",
-          label: "3-5 Days",
-          maxWaitTimeDays: 5,
-        },
-        {
-          id: "34j3kj33kj3n",
-          label: "1 Week",
-          maxWaitTimeDays: 7,
-        },
-        {
-          id: "34j3kj3,rkjk",
-          label: "1-2 Weeks",
-          maxWaitTimeDays: 14,
-        },
-        {
-          id: "34j3kj3vnkd",
-          label: "No Estimate",
-        },
-      ],
-
-      // Default store hours
-      storeHours: {
-        standard: [
-          {
-            name: "Monday",
-            id: "dkfjdkfn",
-            open: "10:00 AM",
-            close: "6:00 PM",
-            isOpen: true,
-          },
-          {
-            name: "Tuesday",
-            id: "dkfjdkf3r3n",
-            open: "10:00 AM",
-            close: "6:00 PM",
-            isOpen: true,
-          },
-          {
-            name: "Wednesday",
-            id: "dkfjdkfdkfjdkn",
-            open: "10:00 AM",
-            close: "6:00 PM",
-            isOpen: true,
-          },
-          {
-            name: "Thursday",
-            id: "dkfjdkf3r3n3",
-            open: "10:00 AM",
-            close: "6:00 PM",
-            isOpen: true,
-          },
-          {
-            name: "Friday",
-            id: "dkfjdkf3r3n4",
-            open: "10:00 AM",
-            close: "6:00 PM",
-            isOpen: true,
-          },
-          {
-            name: "Saturday",
-            id: "dkfjdkf3r3n5",
-            open: "10:00 AM",
-            close: "4:00 PM",
-            isOpen: true,
-          },
-          {
-            name: "Sunday",
-            id: "dkfjdkf3r3n6",
-            open: "Closed",
-            close: "Closed",
-            isOpen: false,
-          },
-        ],
-      },
-
-      // Default shop information
-      shopContactBlurb:
-        "Store Contact Information\nAddress\nPhone\nEmail\nWebsite",
-      shopName: storeName,
-      thankYouBlurb:
-        "Thank you for visiting! We value your business and satisfaction with our services. Please call or email anytime, we look forward to seeing you again.",
-
-      // Default user settings
-      users: [],
-      punchClockArr: [],
-
-      // Default inventory and workorder settings
-      inventory: [],
-      openWorkorders: [],
-      closedWorkorders: [],
-      sales: [],
-      customers: [],
-
-      // Default system settings
-      systemSettings: {
-        taxRate: 6.5,
-        currency: "USD",
-        timezone: "America/New_York",
-        dateFormat: "MM/DD/YYYY",
-        timeFormat: "12h",
-      },
-    };
-
-    // Create store document in Firestore
-    await storeRef.set(initialSettings);
-
-    // Update tenant's store count
-    await tenantRef.update({
-      storeCount: admin.firestore.FieldValue.increment(1),
-      lastStoreCreated: admin.firestore.FieldValue.serverTimestamp(),
-    });
-
-    log("Store created successfully", {
-      tenantID,
-      storeID,
-      storeName,
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: `✅ Store ${storeName} created successfully for tenant ${tenantID}.`,
-      store: {
-        id: storeID,
-        name: storeName,
-        tenantID: tenantID,
-        status: "active",
-        createdAt: initialSettings.createdAt,
-        settings: initialSettings,
-      },
-    });
-  } catch (error) {
-    log("Error creating store", error);
-
-    let message;
-    let statusCode = 500;
-
-    if (error.code === "permission-denied") {
-      message = "❌ Insufficient permissions to create store.";
-      statusCode = 403;
-    } else if (error.code === "not-found") {
-      message = "❌ Tenant not found.";
-      statusCode = 404;
-    } else if (error.code === "already-exists") {
-      message = "❌ Store with this ID already exists.";
-      statusCode = 409;
-    } else {
-      message = `❗ Unexpected error: ${error.message}`;
-    }
-
-    return res.status(statusCode).json({
-      success: false,
-      message,
-      error: {
-        code: error.code || "unknown",
-        message: error.message,
-      },
-    });
-  }
-});
-
-/**
- * Create a new tenant with primary and secondary contacts
- * Creates Firebase Auth accounts for both emails
- */
-exports.createTenant = onRequest({ cors: true }, async (req, res) => {
-  setCorsHeaders(res, req);
-  const decodedToken = await requireHTTPAuth(req, res);
-  if (!decodedToken) return;
-  res.set(
-    "Access-Control-Allow-Headers",
-    "Content-Type, Authorization, X-Requested-With"
-  );
-  res.set("Access-Control-Allow-Credentials", "true");
-
-  // Handle preflight requests
-  if (req.method === "OPTIONS") {
-    log("Handling preflight request for createTenant");
-    return res.status(200).end();
-  }
-
-  log("Incoming create tenant request", req.body);
-  // return res.status(200).json({ message: "sup bro how u doin" });
-  // Input validation
-  const {
-    tenantDisplayName,
-    primaryEmail,
-    secondaryEmail,
-    phoneNumber,
-    contactFirstName,
-    contactLastName,
-  } = req.body.data;
-  log(tenantDisplayName + primaryEmail);
-  if (!tenantDisplayName || typeof tenantDisplayName !== "string") {
-    return res.status(400).json({
-      success: false,
-      message: "Tenant display name is required.",
-    });
-  }
-
-  if (
-    !primaryEmail ||
-    typeof primaryEmail !== "string" ||
-    !primaryEmail.includes("@")
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: "Valid primary email is required.",
-    });
-  }
-
-  if (
-    !secondaryEmail ||
-    typeof secondaryEmail !== "string" ||
-    !secondaryEmail.includes("@")
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: "Valid secondary email is required.",
-    });
-  }
-
-  if (
-    !phoneNumber ||
-    typeof phoneNumber !== "string" ||
-    phoneNumber.length !== 10 ||
-    !/^\d{10}$/.test(phoneNumber)
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: "Valid 10-digit phone number is required.",
-    });
-  }
-
-  if (!contactFirstName || typeof contactFirstName !== "string") {
-    return res.status(400).json({
-      success: false,
-      message: "Contact first name is required.",
-    });
-  }
-
-  if (!contactLastName || typeof contactLastName !== "string") {
-    return res.status(400).json({
-      success: false,
-      message: "Contact last name is required.",
-    });
-  }
-
-  try {
-    // Generate unique tenant ID (12-digit random number)
-    let tenantID = "1234";
-
-    // Ensure tenant ID is unique
-    let tenantRef = db.collection("tenants").doc(tenantID);
-    let tenantDoc = await tenantRef.get();
-
-    while (tenantDoc.exists) {
-      tenantID = generateTenantID();
-      tenantRef = db.collection("tenants").doc(tenantID);
-      tenantDoc = await tenantRef.get();
-    }
-
-    // Check if primary email already exists
-    try {
-      await admin.auth().getUserByEmail(primaryEmail);
-      return res.status(409).json({
-        success: false,
-        message: "Primary email already exists in the system.",
-      });
-    } catch (error) {
-      // User doesn't exist, which is what we want
-      if (error.code !== "auth/user-not-found") {
-        throw error;
-      }
-    }
-
-    // Check if secondary email already exists
-    try {
-      await admin.auth().getUserByEmail(secondaryEmail);
-      return res.status(409).json({
-        success: false,
-        message: "Secondary email already exists in the system.",
-      });
-    } catch (error) {
-      // User doesn't exist, which is what we want
-      if (error.code !== "auth/user-not-found") {
-        throw error;
-      }
-    }
-
-    // Create Firebase Auth accounts for both emails
-    const primaryUserRecord = await admin.auth().createUser({
-      email: primaryEmail,
-      displayName: `${contactFirstName} ${contactLastName}`,
-      emailVerified: false,
-      disabled: false,
-    });
-
-    const secondaryUserRecord = await admin.auth().createUser({
-      email: secondaryEmail,
-      displayName: `${contactFirstName} ${contactLastName}`,
-      emailVerified: false,
-      disabled: false,
-    });
-
-    // Send password reset emails to both users
-    const primaryPasswordResetLink = await admin
-      .auth()
-      .generatePasswordResetLink(primaryEmail);
-    const secondaryPasswordResetLink = await admin
-      .auth()
-      .generatePasswordResetLink(secondaryEmail);
-
-    // Create tenant document
-    const tenantData = {
-      id: tenantID,
-      displayName: tenantDisplayName,
-      primaryEmail: primaryEmail,
-      secondaryEmail: secondaryEmail,
-      phoneNumber: phoneNumber,
-      contactFirstName: contactFirstName,
-      contactLastName: contactLastName,
-      primaryUserID: primaryUserRecord.uid,
-      secondaryUserID: secondaryUserRecord.uid,
-      status: "active",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      createdBy: "system",
-      userCount: 0,
-      storeCount: 0,
-      subscription: {
-        plan: "trial",
-        status: "active",
-        startDate: admin.firestore.FieldValue.serverTimestamp(),
-        trialEndDate: admin.firestore.FieldValue.serverTimestamp(),
-      },
-      settings: {
-        timezone: "America/New_York",
-        currency: "USD",
-        dateFormat: "MM/DD/YYYY",
-        timeFormat: "12h",
-      },
-    };
-
-    // Store tenant document in Firestore
-    await tenantRef.set(tenantData);
-
-    // Create user index entries for quick lookup
-    await db.collection("email_users").doc(primaryUserRecord.uid).set({
-      id: primaryUserRecord.uid,
-      email: primaryEmail,
-      tenantID: tenantID,
-      role: "primary_contact",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: "active",
-    });
-
-    await db.collection("email_users").doc(secondaryUserRecord.uid).set({
-      id: secondaryUserRecord.uid,
-      email: secondaryEmail,
-      tenantID: tenantID,
-      role: "secondary_contact",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      status: "active",
-    });
-
-    log("Tenant created successfully", {
-      tenantID,
-      tenantDisplayName,
-      primaryEmail,
-      secondaryEmail,
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: `✅ Tenant ${tenantDisplayName} created successfully.`,
-      tenant: {
-        id: tenantID,
-        displayName: tenantDisplayName,
-        primaryEmail: primaryEmail,
-        secondaryEmail: secondaryEmail,
-        phoneNumber: phoneNumber,
-        contactFirstName: contactFirstName,
-        contactLastName: contactLastName,
-        status: "active",
-        createdAt: tenantData.createdAt,
-      },
-      auth: {
-        primaryUserID: primaryUserRecord.uid,
-        secondaryUserID: secondaryUserRecord.uid,
-        primaryPasswordResetLink: primaryPasswordResetLink,
-        secondaryPasswordResetLink: secondaryPasswordResetLink,
-      },
-    });
-  } catch (error) {
-    log("Error creating tenant", error);
-
-    let message;
-    let statusCode = 500;
-
-    if (error.code === "permission-denied") {
-      message = "❌ Insufficient permissions to create tenant.";
-      statusCode = 403;
-    } else if (error.code === "auth/email-already-exists") {
-      message = "❌ One or both emails already exist in the system.";
-      statusCode = 409;
-    } else if (error.code === "auth/invalid-email") {
-      message = "❌ Invalid email address format.";
-      statusCode = 400;
-    } else {
-      message = `❗ Unexpected error: ${error.message}`;
-    }
-
-    return res.status(statusCode).json({
-      success: false,
-      message,
-      error: {
-        code: error.code || "unknown",
-        message: error.message,
-      },
-    });
-  }
-});
-
 function ean13CheckDigit(first12) {
   let sum = 0;
   for (let i = 0; i < 12; i++) sum += parseInt(first12[i]) * (i % 2 === 0 ? 1 : 3);
@@ -3011,30 +1969,19 @@ exports.cancelServerDrivenStripePaymentCallable = onCall(
 exports.loginAppUserCallable = onCall(
   { secrets: [firebaseServiceAccountKey] },
   async (request) => {
-    log("Incoming login callable request", request.data);
-    requireCallableAuth(request);
+    log("Incoming login callable request");
+    const auth = requireCallableAuth(request);
 
     // Initialize Firestore with service account
     const db = await getDB(firebaseServiceAccountKey);
 
-    const { email, password } = request.data;
-
-    if (!email || typeof email !== "string" || !email.includes("@")) {
-      throw new HttpsError(
-        "invalid-argument",
-        "Valid email address is required."
-      );
-    }
-
-    if (!password || typeof password !== "string" || password.length < 6) {
-      throw new HttpsError(
-        "invalid-argument",
-        "Password must be at least 6 characters long."
-      );
+    const email = auth.token.email;
+    if (!email) {
+      throw new HttpsError("invalid-argument", "Auth token missing email.");
     }
 
     try {
-      // Authenticate user with Firebase Auth
+      // Look up user by their authenticated email
       const userRecord = await admin.auth().getUserByEmail(email);
 
       if (userRecord.disabled) {
@@ -3090,7 +2037,13 @@ exports.loginAppUserCallable = onCall(
         log("Claims already current", { userID, tenantID, storeID });
       }
 
-      return { success: true, tenantID, storeID };
+      // Read settings server-side (Admin SDK bypasses rules)
+      const settingsDoc = await db.collection("tenants").doc(tenantID)
+        .collection("stores").doc(storeID)
+        .collection("settings").doc("settings").get();
+      const settings = settingsDoc.exists ? settingsDoc.data() : null;
+
+      return { success: true, tenantID, storeID, settings };
     } catch (error) {
       log("Error during login", error);
 
@@ -3443,265 +2396,6 @@ exports.createStoreCallable = onCall(
     }
   }
 );
-
-/**
- * Callable version of createTenant
- */
-exports.createTenantCallable = onCall(
-  { secrets: [firebaseServiceAccountKey] },
-  async (request) => {
-    log("Incoming create tenant callable request", request.data);
-    requireCallableAuth(request);
-
-    // Initialize Firestore with service account
-    const db = await getDB(firebaseServiceAccountKey);
-
-    const {
-      tenantDisplayName,
-      primaryEmail,
-      secondaryEmail,
-      phoneNumber,
-      contactFirstName,
-      contactLastName,
-    } = request.data;
-
-    if (!tenantDisplayName || typeof tenantDisplayName !== "string") {
-      throw new HttpsError(
-        "invalid-argument",
-        "Tenant display name is required."
-      );
-    }
-
-    if (
-      !primaryEmail ||
-      typeof primaryEmail !== "string" ||
-      !primaryEmail.includes("@")
-    ) {
-      throw new HttpsError(
-        "invalid-argument",
-        "Valid primary email is required."
-      );
-    }
-
-    if (
-      !secondaryEmail ||
-      typeof secondaryEmail !== "string" ||
-      !secondaryEmail.includes("@")
-    ) {
-      throw new HttpsError(
-        "invalid-argument",
-        "Valid secondary email is required."
-      );
-    }
-
-    if (
-      !phoneNumber ||
-      typeof phoneNumber !== "string" ||
-      phoneNumber.length !== 10 ||
-      !/^\d{10}$/.test(phoneNumber)
-    ) {
-      throw new HttpsError(
-        "invalid-argument",
-        "Valid 10-digit phone number is required."
-      );
-    }
-
-    if (!contactFirstName || typeof contactFirstName !== "string") {
-      throw new HttpsError(
-        "invalid-argument",
-        "Contact first name is required."
-      );
-    }
-
-    if (!contactLastName || typeof contactLastName !== "string") {
-      throw new HttpsError(
-        "invalid-argument",
-        "Contact last name is required."
-      );
-    }
-
-    try {
-      // Generate unique tenant ID
-      let tenantID = "1234";
-
-      // Ensure tenant ID is unique
-      let tenantRef = db.collection("tenants").doc(tenantID);
-      let tenantDoc = await tenantRef.get();
-
-      while (tenantDoc.exists) {
-        tenantID = generateTenantID();
-        tenantRef = db.collection("tenants").doc(tenantID);
-        tenantDoc = await tenantRef.get();
-      }
-
-      // Check if primary email already exists
-      try {
-        await admin.auth().getUserByEmail(primaryEmail);
-        throw new HttpsError(
-          "already-exists",
-          "Primary email already exists in the system."
-        );
-      } catch (error) {
-        if (error.code !== "auth/user-not-found") {
-          throw error;
-        }
-      }
-
-      // Check if secondary email already exists
-      try {
-        await admin.auth().getUserByEmail(secondaryEmail);
-        throw new HttpsError(
-          "already-exists",
-          "Secondary email already exists in the system."
-        );
-      } catch (error) {
-        if (error.code !== "auth/user-not-found") {
-          throw error;
-        }
-      }
-
-      // Create Firebase Auth accounts for both emails
-      const primaryUserRecord = await admin.auth().createUser({
-        email: primaryEmail,
-        displayName: `${contactFirstName} ${contactLastName}`,
-        emailVerified: false,
-        disabled: false,
-      });
-
-      const secondaryUserRecord = await admin.auth().createUser({
-        email: secondaryEmail,
-        displayName: `${contactFirstName} ${contactLastName}`,
-        emailVerified: false,
-        disabled: false,
-      });
-
-      // Send password reset emails to both users
-      const primaryPasswordResetLink = await admin
-        .auth()
-        .generatePasswordResetLink(primaryEmail);
-      const secondaryPasswordResetLink = await admin
-        .auth()
-        .generatePasswordResetLink(secondaryEmail);
-
-      // Create tenant document
-      const tenantData = {
-        id: tenantID,
-        displayName: tenantDisplayName,
-        primaryEmail: primaryEmail,
-        secondaryEmail: secondaryEmail,
-        phoneNumber: phoneNumber,
-        contactFirstName: contactFirstName,
-        contactLastName: contactLastName,
-        primaryUserID: primaryUserRecord.uid,
-        secondaryUserID: secondaryUserRecord.uid,
-        status: "active",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        createdBy: "system",
-        userCount: 0,
-        storeCount: 0,
-        subscription: {
-          plan: "trial",
-          status: "active",
-          startDate: admin.firestore.FieldValue.serverTimestamp(),
-          trialEndDate: admin.firestore.FieldValue.serverTimestamp(),
-        },
-        settings: {
-          timezone: "America/New_York",
-          currency: "USD",
-          dateFormat: "MM/DD/YYYY",
-          timeFormat: "12h",
-        },
-      };
-
-      // Store tenant document in Firestore
-      await tenantRef.set(tenantData);
-
-      // Set custom claims for tenant isolation (no storeID yet - assigned later)
-      await setUserCustomClaims(primaryUserRecord.uid, tenantID, null);
-      await setUserCustomClaims(secondaryUserRecord.uid, tenantID, null);
-
-      // Create user index entries for quick lookup
-      await db.collection("email_users").doc(primaryUserRecord.uid).set({
-        id: primaryUserRecord.uid,
-        email: primaryEmail,
-        tenantID: tenantID,
-        role: "primary_contact",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        status: "active",
-      });
-
-      await db.collection("email_users").doc(secondaryUserRecord.uid).set({
-        id: secondaryUserRecord.uid,
-        email: secondaryEmail,
-        tenantID: tenantID,
-        role: "secondary_contact",
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        status: "active",
-      });
-
-      log("Tenant created successfully", {
-        tenantID,
-        tenantDisplayName,
-        primaryEmail,
-        secondaryEmail,
-      });
-
-      return {
-        success: true,
-        message: `✅ Tenant ${tenantDisplayName} created successfully.`,
-        data: {
-          tenant: {
-            id: tenantID,
-            displayName: tenantDisplayName,
-            primaryEmail: primaryEmail,
-            secondaryEmail: secondaryEmail,
-            phoneNumber: phoneNumber,
-            contactFirstName: contactFirstName,
-            contactLastName: contactLastName,
-            status: "active",
-            createdAt: tenantData.createdAt,
-          },
-          auth: {
-            primaryUserID: primaryUserRecord.uid,
-            secondaryUserID: secondaryUserRecord.uid,
-            primaryPasswordResetLink: primaryPasswordResetLink,
-            secondaryPasswordResetLink: secondaryPasswordResetLink,
-          },
-        },
-      };
-    } catch (error) {
-      log("Error creating tenant", error);
-
-      if (error.code === "permission-denied") {
-        throw new HttpsError(
-          "permission-denied",
-          "❌ Insufficient permissions to create tenant."
-        );
-      } else if (error.code === "auth/email-already-exists") {
-        throw new HttpsError(
-          "already-exists",
-          "❌ One or both emails already exist in the system."
-        );
-      } else if (error.code === "auth/invalid-email") {
-        throw new HttpsError(
-          "invalid-argument",
-          "❌ Invalid email address format."
-        );
-      } else {
-        throw new HttpsError(
-          "internal",
-          `❗ Unexpected error: ${error.message}`
-        );
-      }
-    }
-  }
-);
-
-// Helper function for generating tenant ID
-function generateTenantID() {
-  const bytes = require("crypto").randomBytes(6);
-  return Array.from(bytes).map(b => b % 10).join("") + String(Date.now()).slice(-6);
-}
 
 // ═══════════════════════════════════════════════════════════════
 // NEW CHECKOUT SYSTEM — Cloud Functions
@@ -5766,6 +4460,496 @@ exports.uploadPDFAndSendSMSCallable = onCall(
 );
 
 // ============================================================================
+// Generate Receipt PDF, Upload to Storage, Optionally Send SMS
+// ============================================================================
+exports.generateReceiptPDFCallable = onCall(
+  {
+    secrets: [
+      twilioSecretKey,
+      twilioSecretAccountNumber,
+      firebaseServiceAccountKey,
+      gmailAppPassword,
+    ],
+  },
+  async (request) => {
+    log("Incoming generateReceiptPDF request");
+    requireCallableAuth(request);
+
+    try {
+      const db = await getDB(firebaseServiceAccountKey);
+
+      const {
+        receiptType,
+        receiptData,
+        pdfLabels,
+        storagePath,
+        tenantID,
+        storeID,
+        sms: smsParams,
+        email: emailParams,
+      } = request.data;
+
+      if (tenantID && storeID) requireTenantMatch(request, tenantID, storeID);
+
+      if (!receiptData || typeof receiptData !== "object") {
+        throw new HttpsError("invalid-argument", "receiptData is required");
+      }
+      if (!storagePath || typeof storagePath !== "string") {
+        throw new HttpsError("invalid-argument", "storagePath is required");
+      }
+      if (!tenantID || typeof tenantID !== "string") {
+        throw new HttpsError("invalid-argument", "tenantID is required");
+      }
+      if (!storeID || typeof storeID !== "string") {
+        throw new HttpsError("invalid-argument", "storeID is required");
+      }
+
+      let base64;
+      switch (receiptType) {
+        case "sale":
+          base64 = generateSaleReceiptPDF(receiptData, pdfLabels || undefined);
+          break;
+        case "refund":
+          base64 = generateRefundReceiptPDF(receiptData);
+          break;
+        case "credit":
+          base64 = generateCreditReceiptPDF(receiptData);
+          break;
+        case "giftcard":
+          base64 = generateGiftCardReceiptPDF(receiptData);
+          break;
+        case "workorder":
+        case "intake":
+          base64 = generateWorkorderTicketPDF(receiptData);
+          break;
+        default:
+          throw new HttpsError("invalid-argument", "Unknown receiptType: " + receiptType);
+      }
+
+      const bucket = admin.storage().bucket("warpspeed-bonitabikes.firebasestorage.app");
+      const file = bucket.file(storagePath);
+      await file.save(Buffer.from(base64, "base64"), {
+        contentType: "application/pdf",
+        metadata: { contentType: "application/pdf" },
+      });
+      await file.makePublic();
+      const receiptURL = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+
+      log("Receipt PDF generated and uploaded", { receiptType, storagePath, receiptURL });
+
+      if (smsParams && smsParams.message && smsParams.phoneNumber) {
+        const cleanPhoneNumber = smsParams.phoneNumber.replace(/\D/g, "");
+        if (cleanPhoneNumber.length === 10) {
+          const finalMessage = smsParams.message.replace(/\{link\}/g, receiptURL);
+          const fromNumber = smsParams.fromNumber || "+12393171234";
+
+          if (!twilioClient) {
+            try {
+              twilioClient = require("twilio")(
+                twilioSecretAccountNumber.value(),
+                twilioSecretKey.value()
+              );
+            } catch (twilioInitError) {
+              log("Error initializing Twilio client in generateReceiptPDF", twilioInitError);
+              throw new HttpsError("internal", "Failed to initialize SMS service");
+            }
+          }
+
+          const messageID = smsParams.messageID || null;
+          const customerID = smsParams.customerID || "";
+          const canRespond = smsParams.canRespond || null;
+          const forwardToParam = smsParams.forwardTo || null;
+
+          const pdfCallbackParams = messageID ? `?tenantID=${tenantID}&storeID=${storeID}&phone=${cleanPhoneNumber}&messageID=${messageID}` : "";
+          const twilioResponse = await twilioClient.messages.create({
+            body: finalMessage.trim(),
+            to: `+1${cleanPhoneNumber}`,
+            from: fromNumber,
+            ...(messageID ? { statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback${pdfCallbackParams}` } : {}),
+          });
+
+          log("Receipt SMS sent", { messageSid: twilioResponse.sid, status: twilioResponse.status });
+
+          if (messageID) {
+            try {
+              const conversationRef = db
+                .collection("tenants").doc(tenantID)
+                .collection("stores").doc(storeID)
+                .collection("sms-messages").doc(cleanPhoneNumber);
+
+              const parentDoc = await conversationRef.get();
+              let currentForwardTo = parentDoc.exists ? (parentDoc.data().forwardTo || {}) : {};
+
+              if (forwardToParam && forwardToParam.userID) {
+                if (forwardToParam.enable && forwardToParam.phone) {
+                  currentForwardTo[forwardToParam.userID] = { phone: forwardToParam.phone, first: forwardToParam.first || "" };
+                } else if (!forwardToParam.enable) {
+                  delete currentForwardTo[forwardToParam.userID];
+                }
+              }
+
+              const messageRef = conversationRef.collection("messages").doc(messageID);
+              await messageRef.set({
+                id: messageID,
+                customerID: customerID,
+                message: finalMessage.trim(),
+                phoneNumber: cleanPhoneNumber,
+                messageSid: twilioResponse.sid,
+                status: twilioResponse.status,
+                fromNumber: fromNumber,
+                tenantID: tenantID,
+                storeID: storeID,
+                type: "outgoing",
+                millis: Date.now(),
+                canRespond: canRespond,
+              });
+
+              await conversationRef.set({
+                lastMessage: finalMessage.trim(),
+                lastMillis: Date.now(),
+                lastType: "outgoing",
+                lastOutgoingMessageID: messageID,
+                lastOutgoingMessageStatus: twilioResponse.status || "queued",
+                lastOutgoingMillis: Date.now(),
+                canRespond: canRespond || false,
+                forwardTo: currentForwardTo,
+                threadStatus: "open",
+              }, { merge: true });
+            } catch (firestoreError) {
+              log("Error storing outgoing message in Firestore (generateReceiptPDF)", firestoreError.message);
+            }
+          }
+        }
+      }
+
+      if (emailParams && emailParams.to && emailParams.html) {
+        try {
+          const emailSubject = (emailParams.subject || "").replace(/\{link\}/g, receiptURL);
+          const emailHtml = emailParams.html.replace(/\{link\}/g, receiptURL);
+
+          const transporter = nodemailer.createTransport({
+            service: "gmail",
+            auth: {
+              user: "support@bonitabikes.com",
+              pass: gmailAppPassword.value(),
+            },
+          });
+
+          await transporter.sendMail({
+            from: '"Bonita Bikes" <support@bonitabikes.com>',
+            to: emailParams.to,
+            subject: emailSubject,
+            html: emailHtml,
+          });
+
+          log("Receipt email sent", { to: emailParams.to });
+        } catch (emailError) {
+          log("Error sending receipt email in generateReceiptPDF", emailError.message);
+        }
+      }
+
+      return {
+        success: true,
+        receiptURL: receiptURL,
+      };
+    } catch (error) {
+      log("Error in generateReceiptPDFCallable", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", "Failed to generate receipt PDF: " + (error.message || "Unknown error"));
+    }
+  }
+);
+
+// ============================================================================
+// Send Receipt (PDF + SMS + Email) - Fire-and-forget
+// ============================================================================
+exports.sendReceiptCallable = onCall(
+  {
+    secrets: [
+      twilioSecretKey,
+      twilioSecretAccountNumber,
+      firebaseServiceAccountKey,
+      gmailAppPassword,
+      googleTranslateApiKey,
+    ],
+  },
+  async (request) => {
+    log("Incoming sendReceipt request");
+    requireCallableAuth(request);
+
+    try {
+      const db = await getDB(firebaseServiceAccountKey);
+
+      const {
+        receiptType,
+        receiptData,
+        pdfLabels,
+        storagePath,
+        tenantID,
+        storeID,
+        sendSMS,
+        sendEmail,
+        customerEmail,
+        customerCell,
+        customerID,
+        templateVars,
+        smsMessageID,
+        canRespond,
+        forwardTo: forwardToParam,
+        langCode,
+        updateWorkorderField,
+      } = request.data;
+
+      if (tenantID && storeID) requireTenantMatch(request, tenantID, storeID);
+
+      if (!receiptData || typeof receiptData !== "object") {
+        throw new HttpsError("invalid-argument", "receiptData is required");
+      }
+      if (!storagePath || typeof storagePath !== "string") {
+        throw new HttpsError("invalid-argument", "storagePath is required");
+      }
+      if (!tenantID || typeof tenantID !== "string") {
+        throw new HttpsError("invalid-argument", "tenantID is required");
+      }
+      if (!storeID || typeof storeID !== "string") {
+        throw new HttpsError("invalid-argument", "storeID is required");
+      }
+
+      // Step 1: Read settings
+      const settingsDoc = await db
+        .collection("tenants").doc(tenantID)
+        .collection("stores").doc(storeID)
+        .collection("settings").doc("settings")
+        .get();
+      const settings = settingsDoc.exists ? settingsDoc.data() : {};
+
+      // Step 2: Generate PDF
+      let base64;
+      switch (receiptType) {
+        case "sale":
+          base64 = generateSaleReceiptPDF(receiptData, pdfLabels || undefined);
+          break;
+        case "refund":
+          base64 = generateRefundReceiptPDF(receiptData);
+          break;
+        case "credit":
+          base64 = generateCreditReceiptPDF(receiptData);
+          break;
+        case "giftcard":
+          base64 = generateGiftCardReceiptPDF(receiptData);
+          break;
+        case "workorder":
+        case "intake":
+          base64 = generateWorkorderTicketPDF(receiptData);
+          break;
+        default:
+          throw new HttpsError("invalid-argument", "Unknown receiptType: " + receiptType);
+      }
+
+      // Step 3: Upload to Cloud Storage
+      const bucket = admin.storage().bucket("warpspeed-bonitabikes.firebasestorage.app");
+      const file = bucket.file(storagePath);
+      await file.save(Buffer.from(base64, "base64"), {
+        contentType: "application/pdf",
+        metadata: { contentType: "application/pdf" },
+      });
+      await file.makePublic();
+      const receiptURL = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+
+      log("Receipt PDF uploaded", { receiptType, storagePath });
+
+      // Step 4: SMS
+      if (sendSMS && customerCell) {
+        try {
+          const cleanPhoneNumber = customerCell.replace(/\D/g, "");
+          if (cleanPhoneNumber.length === 10) {
+            let smsMessage = null;
+            const templateType = getTemplateType(receiptType);
+
+            if (receiptType === "workorder") {
+              smsMessage = settings.workorderTicketMessage || "Hi {firstName}, here is your workorder ticket: {link}";
+            } else {
+              const smsTemplate = findTemplateByType(settings.smsTemplates || settings.textTemplates, templateType);
+              if (smsTemplate) {
+                smsMessage = smsTemplate.content || smsTemplate.message || smsTemplate.body || "";
+              } else {
+                smsMessage = getDefaultSMSMessage(receiptType);
+              }
+            }
+
+            if (smsMessage) {
+              smsMessage = applyVars(smsMessage, templateVars || {});
+              let hasReceiptVar = smsMessage.includes("{salesReceipt}") || smsMessage.includes("{intakeReceipt}") || smsMessage.includes("{refundReceipt}");
+              smsMessage = smsMessage.replace(/\{salesReceipt\}/g, receiptURL).replace(/\{intakeReceipt\}/g, receiptURL).replace(/\{refundReceipt\}/g, receiptURL);
+              if (!hasReceiptVar && !smsMessage.includes("{link}")) smsMessage += " {link}";
+              smsMessage = smsMessage.replace(/\{link\}/g, receiptURL);
+
+              if (langCode && receiptType === "sale") {
+                try {
+                  const { Translate } = require("@google-cloud/translate").v2;
+                  const translate = new Translate({ key: googleTranslateApiKey.value() });
+                  const [translated] = await translate.translate(smsMessage, { to: langCode });
+                  if (translated) smsMessage = translated;
+                } catch (translateErr) {
+                  log("SMS translation failed, sending in English", translateErr.message);
+                }
+              }
+
+              if (!twilioClient) {
+                try {
+                  twilioClient = require("twilio")(
+                    twilioSecretAccountNumber.value(),
+                    twilioSecretKey.value()
+                  );
+                } catch (twilioInitError) {
+                  log("Error initializing Twilio client in sendReceipt", twilioInitError);
+                }
+              }
+
+              if (twilioClient) {
+                const messageID = smsMessageID || null;
+                const fromNumber = "+12393171234";
+                const pdfCallbackParams = messageID ? `?tenantID=${tenantID}&storeID=${storeID}&phone=${cleanPhoneNumber}&messageID=${messageID}` : "";
+
+                const twilioResponse = await twilioClient.messages.create({
+                  body: smsMessage.trim(),
+                  to: `+1${cleanPhoneNumber}`,
+                  from: fromNumber,
+                  ...(messageID ? { statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback${pdfCallbackParams}` } : {}),
+                });
+
+                log("Receipt SMS sent", { messageSid: twilioResponse.sid });
+
+                if (messageID) {
+                  try {
+                    const conversationRef = db
+                      .collection("tenants").doc(tenantID)
+                      .collection("stores").doc(storeID)
+                      .collection("sms-messages").doc(cleanPhoneNumber);
+
+                    const parentDoc = await conversationRef.get();
+                    let currentForwardTo = parentDoc.exists ? (parentDoc.data().forwardTo || {}) : {};
+
+                    if (forwardToParam && forwardToParam.userID) {
+                      if (forwardToParam.enable && forwardToParam.phone) {
+                        currentForwardTo[forwardToParam.userID] = { phone: forwardToParam.phone, first: forwardToParam.first || "" };
+                      } else if (!forwardToParam.enable) {
+                        delete currentForwardTo[forwardToParam.userID];
+                      }
+                    }
+
+                    const messageRef = conversationRef.collection("messages").doc(messageID);
+                    await messageRef.set({
+                      id: messageID,
+                      customerID: customerID || "",
+                      message: smsMessage.trim(),
+                      phoneNumber: cleanPhoneNumber,
+                      messageSid: twilioResponse.sid,
+                      status: twilioResponse.status,
+                      fromNumber: fromNumber,
+                      tenantID: tenantID,
+                      storeID: storeID,
+                      type: "outgoing",
+                      millis: Date.now(),
+                      canRespond: canRespond || null,
+                    });
+
+                    await conversationRef.set({
+                      lastMessage: smsMessage.trim(),
+                      lastMillis: Date.now(),
+                      lastType: "outgoing",
+                      lastOutgoingMessageID: messageID,
+                      lastOutgoingMessageStatus: twilioResponse.status || "queued",
+                      lastOutgoingMillis: Date.now(),
+                      canRespond: canRespond || false,
+                      forwardTo: currentForwardTo,
+                      threadStatus: "open",
+                    }, { merge: true });
+                  } catch (firestoreError) {
+                    log("Error storing outgoing message in Firestore (sendReceipt)", firestoreError.message);
+                  }
+                }
+              }
+            }
+          }
+        } catch (smsError) {
+          log("SMS sending failed in sendReceipt", smsError.message);
+        }
+      }
+
+      // Step 5: Email
+      if (sendEmail && customerEmail && receiptType !== "workorder") {
+        try {
+          const templateType = getTemplateType(receiptType);
+          const emailTemplate = findTemplateByType(settings.emailTemplates, templateType);
+
+          if (emailTemplate) {
+            const vars = { ...(templateVars || {}), link: receiptURL };
+            let { subject, html } = buildEmailFromTemplate(emailTemplate, settings, vars, receiptURL);
+
+            if (langCode && receiptType === "sale") {
+              try {
+                const { Translate } = require("@google-cloud/translate").v2;
+                const translate = new Translate({ key: googleTranslateApiKey.value() });
+                const [translatedArr] = await translate.translate([subject, html], { to: langCode });
+                if (translatedArr && translatedArr.length === 2) {
+                  subject = translatedArr[0];
+                  html = translatedArr[1];
+                }
+              } catch (translateErr) {
+                log("Email translation failed, sending in English", translateErr.message);
+              }
+            }
+
+            const transporter = nodemailer.createTransport({
+              service: "gmail",
+              auth: {
+                user: "support@bonitabikes.com",
+                pass: gmailAppPassword.value(),
+              },
+            });
+
+            await transporter.sendMail({
+              from: '"Bonita Bikes" <support@bonitabikes.com>',
+              to: customerEmail,
+              subject: subject,
+              html: html,
+            });
+
+            log("Receipt email sent", { to: customerEmail });
+          }
+        } catch (emailError) {
+          log("Email sending failed in sendReceipt", emailError.message);
+        }
+      }
+
+      // Step 6: Post-processing
+      if (updateWorkorderField && updateWorkorderField.workorderID && updateWorkorderField.field) {
+        try {
+          await db
+            .collection("tenants").doc(tenantID)
+            .collection("stores").doc(storeID)
+            .collection("open-workorders").doc(updateWorkorderField.workorderID)
+            .set({ [updateWorkorderField.field]: receiptURL }, { merge: true });
+          log("Updated workorder field", { workorderID: updateWorkorderField.workorderID, field: updateWorkorderField.field });
+        } catch (woError) {
+          log("Error updating workorder field in sendReceipt", woError.message);
+        }
+      }
+
+      return {
+        success: true,
+        receiptURL: receiptURL,
+      };
+    } catch (error) {
+      log("Error in sendReceiptCallable", error);
+      if (error instanceof HttpsError) throw error;
+      throw new HttpsError("internal", "Failed to send receipt: " + (error.message || "Unknown error"));
+    }
+  }
+);
+
+// ============================================================================
 // Google Cloud Translation
 // ============================================================================
 exports.translateTextCallable = onCall(
@@ -5927,11 +5111,15 @@ const ARCHIVE_COLLECTIONS = [
 ];
 
 /**
- * Archive all documents in a collection to Cloud Storage as a JSON file.
+ * Archive all documents in ARCHIVE_COLLECTIONS to Cloud Storage as JSON files.
+ * @param {string} fileName - file name for the archive (e.g. "latest" or a timestamp)
+ * @param {string} [subFolder] - optional subfolder under archives/ (e.g. "hourly")
  * Returns { success, docCount, error? } for each collection.
  */
-async function archiveTenantStore(db, bucket, tenantID, storeID) {
+async function archiveTenantStore(db, bucket, tenantID, storeID, fileName = "latest", subFolder = "") {
   const results = {};
+  const logPrefix = subFolder ? subFolder + "Backup" : "nightlyArchive";
+  const folderSegment = subFolder ? subFolder + "/" : "";
 
   for (const collectionName of ARCHIVE_COLLECTIONS) {
     try {
@@ -5949,7 +5137,7 @@ async function archiveTenantStore(db, bucket, tenantID, storeID) {
       }));
 
       const jsonString = JSON.stringify(docs);
-      const storagePath = `${tenantID}/${storeID}/archives/${collectionName}/latest.json`;
+      const storagePath = `${tenantID}/${storeID}/archives/${folderSegment}${collectionName}/${fileName}.json`;
       const file = bucket.file(storagePath);
 
       await file.save(jsonString, {
@@ -5967,12 +5155,12 @@ async function archiveTenantStore(db, bucket, tenantID, storeID) {
 
       results[collectionName] = { success: true, docCount: docs.length };
       log(
-        "nightlyArchive: Archived " + collectionName,
+        logPrefix + ": Archived " + collectionName,
         { tenantID, storeID, docCount: docs.length, path: storagePath }
       );
     } catch (err) {
       log(
-        "nightlyArchive: Error archiving " + collectionName + " for " + tenantID + "/" + storeID,
+        logPrefix + ": Error archiving " + collectionName + " for " + tenantID + "/" + storeID,
         err.message
       );
       results[collectionName] = { success: false, docCount: 0, error: err.message };
@@ -6058,295 +5246,6 @@ async function cleanupOldMedia(db, bucket, tenantID, storeID) {
     return { success: false, workordersProcessed: 0, mediaFilesDeleted: 0, error: err.message };
   }
 }
-
-
-// ============================================================================
-// Customer-Facing Workorder Screen
-// ============================================================================
-
-const LANGUAGE_MAP = { English: "en", Spanish: "es", French: "fr", Creole: "ht" };
-
-const CUSTOMER_WO_UI_LABELS = {
-  yourWorkorder: "Your Workorder",
-  status: "Status",
-  estimatedReady: "Estimated ready",
-  brand: "Brand",
-  model: "Model",
-  description: "Description",
-  colors: "Colors",
-  items: "Items",
-  notes: "Notes",
-  media: "Photos & Videos",
-  subtotal: "Subtotal",
-  discount: "Discount",
-  tax: "Tax",
-  total: "Total",
-  amountPaid: "Amount Paid",
-  balanceDue: "Balance Due",
-  partsOnOrder: "Parts on Order",
-  estDelivery: "Est. Delivery",
-  uploadPhotos: "Upload Photos",
-  greeting: "Here's your workorder",
-  waitTime: "Wait Time",
-  notFound: "This workorder could not be found.",
-};
-
-exports.getCustomerWorkorder = onRequest(
-  {
-    cors: true,
-    secrets: [firebaseServiceAccountKey, googleTranslateApiKey],
-  },
-  async (req, res) => {
-    try {
-      const pin = req.query.pin || req.body?.pin;
-      if (!pin || typeof pin !== "string" || pin.length < 3) {
-        return res.status(400).json({ success: false, error: "Invalid PIN" });
-      }
-
-      const db = await getDB(firebaseServiceAccountKey);
-
-      // Look up PIN
-      const pinSnap = await db.collection("workorder-pins").doc(pin).get();
-      if (!pinSnap.exists) {
-        return res.status(404).json({ success: false, error: "Link not found or expired" });
-      }
-      const pinDoc = pinSnap.data();
-      const { tenantID, storeID, workorderID } = pinDoc;
-
-      // Fetch settings + try open-workorders first
-      const [openWoSnap, settingsSnap] = await Promise.all([
-        db.collection("tenants").doc(tenantID)
-          .collection("stores").doc(storeID)
-          .collection("open-workorders").doc(workorderID)
-          .get(),
-        db.collection("tenants").doc(tenantID)
-          .collection("stores").doc(storeID)
-          .collection("settings").doc("settings")
-          .get(),
-      ]);
-
-      let workorder = null;
-      let isCompleted = false;
-
-      if (openWoSnap.exists) {
-        workorder = openWoSnap.data();
-      } else {
-        // Try completed-workorders
-        const closedWoSnap = await db.collection("tenants").doc(tenantID)
-          .collection("stores").doc(storeID)
-          .collection("completed-workorders").doc(workorderID)
-          .get();
-        if (closedWoSnap.exists) {
-          workorder = closedWoSnap.data();
-          isCompleted = true;
-        }
-      }
-
-      if (!workorder) {
-        return res.status(404).json({ success: false, error: "Workorder not found" });
-      }
-
-      const settings = settingsSnap.exists ? settingsSnap.data() : {};
-
-      // Fetch customer using workorder's customerID (may differ from pin doc if updated later)
-      const custID = workorder.customerID || pinDoc.customerID || "";
-      let customer = {};
-      if (custID) {
-        const custSnap = await db.collection("tenants").doc(tenantID)
-          .collection("stores").doc(storeID)
-          .collection("customers").doc(custID)
-          .get();
-        if (custSnap.exists) customer = custSnap.data();
-      }
-      const statuses = settings.statuses || [];
-
-      // Resolve status
-      const statusObj = statuses.find((s) => s.id === workorder.status) || {
-        label: workorder.status || "Unknown",
-        textColor: "black",
-        backgroundColor: "whitesmoke",
-      };
-
-      // Build items (names + qty only, no internal pricing)
-      const items = (workorder.workorderLines || []).map((line) => ({
-        name: line.inventoryItem?.formalName || line.inventoryItem?.informalName || "Item",
-        qty: Number(line.qty) || 1,
-      }));
-
-      // Calculate totals
-      const totals = calculateWorkorderTotal(workorder, settings);
-      const formatCents = (c) => "$" + (c / 100).toFixed(2);
-
-      // Build media array (thumbnails + full URLs, strip internal fields)
-      const media = (workorder.media || []).map((m) => ({
-        id: m.id,
-        thumbnailUrl: m.thumbnailUrl || m.url,
-        url: m.url,
-        type: m.type || "image",
-        filename: m.filename || "",
-      }));
-
-      // Derive amountPaid from active sale or completed sale
-      let paidCents = 0;
-      const saleID = workorder.activeSaleID || workorder.saleID || "";
-      if (saleID) {
-        const salePaths = [
-          `tenants/${tenantID}/stores/${storeID}/active-sales/${saleID}`,
-          `tenants/${tenantID}/stores/${storeID}/completed-sales/${saleID}`,
-        ];
-        for (const salePath of salePaths) {
-          const saleSnap = await db.doc(salePath).get();
-          if (saleSnap.exists) {
-            const saleData = saleSnap.data();
-            paidCents = (saleData.amountCaptured || 0) - (saleData.amountRefunded || 0);
-            break;
-          }
-        }
-      }
-
-      // Build response
-      const payload = {
-        storeName: settings?.storeInfo?.displayName || "",
-        storePhone: settings?.storeInfo?.phone || "",
-        workorderNumber: workorder.workorderNumber || "",
-        brand: workorder.brand || "",
-        model: workorder.model || "",
-        description: workorder.description || "",
-        color1: workorder.color1 || null,
-        color2: workorder.color2 || null,
-        status: {
-          label: statusObj.label || "",
-          backgroundColor: statusObj.backgroundColor || "whitesmoke",
-          textColor: statusObj.textColor || "black",
-        },
-        waitTime: workorder.waitTime?.label || "",
-        waitTimeEstimateLabel: workorder.waitTimeEstimateLabel || "",
-        startedOnMillis: workorder.startedOnMillis || null,
-        partOrdered: workorder.partOrdered || "",
-        partEstimatedDelivery: workorder.partEstimatedDelivery || "",
-        items,
-        customerNotes: workorder.customerNotes || [],
-        showPricing: !!settings.showCustomerPricing,
-        subtotal: formatCents(totals.subtotal),
-        discount: formatCents(totals.discount),
-        tax: formatCents(totals.tax),
-        total: formatCents(totals.total),
-        amountPaid: formatCents(paidCents),
-        balanceDue: formatCents(totals.total - paidCents),
-        media,
-        customerFirst: customer.first || workorder.customerFirst || "",
-        customerLanguage: customer.language || "English",
-        pin,
-        isCompleted,
-        translations: null,
-      };
-
-      // Translate UI labels if customer language is not English
-      const langCode = LANGUAGE_MAP[payload.customerLanguage];
-      if (langCode && langCode !== "en") {
-        try {
-          const labelKeys = Object.keys(CUSTOMER_WO_UI_LABELS);
-          const labelValues = Object.values(CUSTOMER_WO_UI_LABELS);
-          // Also translate the status label
-          const textsToTranslate = [...labelValues, payload.status.label];
-
-          const { Translate } = require("@google-cloud/translate").v2;
-          const translate = new Translate({ key: googleTranslateApiKey.value() });
-          const [translated] = await translate.translate(textsToTranslate, { to: langCode, from: "en" });
-
-          const translations = {};
-          labelKeys.forEach((key, i) => {
-            translations[key] = translated[i];
-          });
-          translations.statusLabel = translated[translated.length - 1];
-          payload.translations = translations;
-        } catch (transErr) {
-          log("getCustomerWorkorder: translation error (non-fatal)", transErr.message);
-          // Continue without translations
-        }
-      }
-
-      return res.status(200).json({ success: true, data: payload });
-    } catch (error) {
-      log("getCustomerWorkorder: error", error);
-      return res.status(500).json({ success: false, error: "Internal server error" });
-    }
-  }
-);
-
-exports.customerUploadWorkorderMedia = onRequest(
-  {
-    cors: true,
-    secrets: [firebaseServiceAccountKey],
-  },
-  async (req, res) => {
-    try {
-      const { pin, fileBase64, fileName, contentType } = req.body || {};
-
-      if (!pin || !fileBase64 || !fileName) {
-        return res.status(400).json({ success: false, error: "Missing required fields: pin, fileBase64, fileName" });
-      }
-
-      const db = await getDB(firebaseServiceAccountKey);
-
-      // Validate PIN
-      const pinSnap = await db.collection("workorder-pins").doc(pin).get();
-      if (!pinSnap.exists) {
-        return res.status(404).json({ success: false, error: "Link not found or expired" });
-      }
-      const pinDoc = pinSnap.data();
-      const { tenantID, storeID, workorderID } = pinDoc;
-
-      // Decode base64
-      const buffer = Buffer.from(fileBase64, "base64");
-      const fileSizeBytes = buffer.length;
-
-      // Upload to Cloud Storage
-      const bucket = admin.storage().bucket();
-      const timestamp = Date.now();
-      const mediaID = "cm_" + crypto.randomUUID() + "_" + timestamp;
-      const storagePath = `${tenantID}/${storeID}/workorders/${workorderID}/attachments/media/${timestamp}_${fileName}`;
-      const file = bucket.file(storagePath);
-
-      await file.save(buffer, {
-        metadata: { contentType: contentType || "image/jpeg" },
-      });
-      await file.makePublic();
-
-      const url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
-
-      // Build media item
-      const mediaItem = {
-        id: mediaID,
-        url,
-        storagePath,
-        thumbnailUrl: url,
-        thumbnailStoragePath: "",
-        type: (contentType || "").startsWith("video") ? "video" : "image",
-        filename: fileName,
-        fileSize: fileSizeBytes,
-        originalFilename: fileName,
-        originalFileSize: fileSizeBytes,
-        uploadedAt: timestamp,
-        uploadedBy: "customer",
-      };
-
-      // Update workorder media array
-      await db.collection("tenants").doc(tenantID)
-        .collection("stores").doc(storeID)
-        .collection("open-workorders").doc(workorderID)
-        .update({
-          media: FieldValue.arrayUnion(mediaItem),
-        });
-
-      return res.status(200).json({ success: true, data: { mediaItem } });
-    } catch (error) {
-      log("customerUploadWorkorderMedia: error", error);
-      return res.status(500).json({ success: false, error: "Internal server error" });
-    }
-  }
-);
-
 /**
  * Nightly scheduled function — runs at 1:00 AM Eastern every day.
  * Archives 4 Firestore collections to Cloud Storage and cleans up old media.
@@ -6442,6 +5341,90 @@ exports.nightlyArchiveAndCleanup = onSchedule(
 );
 
 /**
+ * Hourly scheduled backup — runs at the top of every hour.
+ * Archives all ARCHIVE_COLLECTIONS to timestamped Cloud Storage JSON files.
+ * Auto-deletes backups older than 7 days.
+ * Temporary: remove once bugs are ironed out.
+ */
+exports.hourlyBackup = onSchedule(
+  {
+    schedule: "0 * * * *",
+    timeZone: "America/New_York",
+    secrets: [firebaseServiceAccountKey],
+    timeoutSeconds: 540,
+    memory: "1GiB",
+  },
+  async (event) => {
+    log("hourlyBackup: Starting hourly backup run");
+
+    const db = await getDB(firebaseServiceAccountKey);
+    const bucket = admin
+      .storage()
+      .bucket("warpspeed-bonitabikes.firebasestorage.app");
+
+    const now = new Date();
+    const timestamp = now.toISOString().replace(/[:.]/g, "-");
+    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+    let tenantsSnapshot;
+    try {
+      tenantsSnapshot = await db.collection("tenants").get();
+    } catch (err) {
+      log("hourlyBackup: Failed to enumerate tenants", err.message);
+      return;
+    }
+
+    if (tenantsSnapshot.empty) {
+      log("hourlyBackup: No tenants found, exiting");
+      return;
+    }
+
+    for (const tenantDoc of tenantsSnapshot.docs) {
+      const tenantID = tenantDoc.id;
+      let storesSnapshot;
+
+      try {
+        storesSnapshot = await db
+          .collection("tenants")
+          .doc(tenantID)
+          .collection("stores")
+          .get();
+      } catch (err) {
+        log("hourlyBackup: Error fetching stores for tenant " + tenantID, err.message);
+        continue;
+      }
+
+      for (const storeDoc of storesSnapshot.docs) {
+        const storeID = storeDoc.id;
+
+        await archiveTenantStore(db, bucket, tenantID, storeID, timestamp, "hourly");
+
+        // Cleanup: delete hourly backups older than 7 days
+        try {
+          for (const collectionName of ARCHIVE_COLLECTIONS) {
+            const prefix = `${tenantID}/${storeID}/archives/hourly/${collectionName}/`;
+            const [files] = await bucket.getFiles({ prefix });
+
+            for (const file of files) {
+              const meta = file.metadata;
+              const archivedAt = meta?.metadata?.archivedAt;
+              if (archivedAt && Date.now() - new Date(archivedAt).getTime() > SEVEN_DAYS_MS) {
+                await file.delete();
+                log("hourlyBackup: Deleted old backup", file.name);
+              }
+            }
+          }
+        } catch (err) {
+          log("hourlyBackup: Error cleaning old backups for " + tenantID + "/" + storeID, err.message);
+        }
+      }
+    }
+
+    log("hourlyBackup: Hourly backup run complete");
+  }
+);
+
+/**
  * Manual trigger for the nightly archive process.
  * Runs the same archive + cleanup as the scheduled function.
  */
@@ -6511,7 +5494,7 @@ exports.rehydrateFromArchive = onCall(
   async (request) => {
     log("rehydrateFromArchive: Request received", request.data);
 
-    const { tenantID, storeID, collections } = request.data;
+    const { tenantID, storeID, collections, hourlyTimestamp } = request.data;
     requireTenantMatch(request, tenantID, storeID);
 
     if (!tenantID || typeof tenantID !== "string") {
@@ -6531,6 +5514,9 @@ exports.rehydrateFromArchive = onCall(
       }
     }
 
+    const source = hourlyTimestamp ? "hourly" : "nightly";
+    log("rehydrateFromArchive: Source = " + source, { hourlyTimestamp });
+
     const db = await getDB(firebaseServiceAccountKey);
 
     const bucket = admin
@@ -6541,7 +5527,9 @@ exports.rehydrateFromArchive = onCall(
 
     for (const collectionName of collections) {
       try {
-        const storagePath = `${tenantID}/${storeID}/archives/${collectionName}/latest.json`;
+        const storagePath = hourlyTimestamp
+          ? `${tenantID}/${storeID}/archives/hourly/${collectionName}/${hourlyTimestamp}.json`
+          : `${tenantID}/${storeID}/archives/${collectionName}/latest.json`;
         const file = bucket.file(storagePath);
 
         const [exists] = await file.exists();
@@ -6633,6 +5621,7 @@ exports.rehydrateFromArchive = onCall(
           millis: now,
           date: dateStr,
           type: "rehydration",
+          source: hourlyTimestamp ? "hourly-" + hourlyTimestamp : "nightly-latest",
           collections: results,
         });
     } catch (err) {
@@ -6640,6 +5629,57 @@ exports.rehydrateFromArchive = onCall(
     }
 
     return { success: true, results };
+  }
+);
+
+/**
+ * Lists available hourly backup timestamps for a tenant/store.
+ * Returns a sorted array of { timestamp, archivedAt, docCounts }.
+ */
+exports.listHourlyBackupsCallable = onCall(
+  {
+    secrets: [firebaseServiceAccountKey],
+    timeoutSeconds: 60,
+    memory: "256MiB",
+  },
+  async (request) => {
+    const { tenantID, storeID } = request.data || {};
+    requireTenantMatch(request, tenantID, storeID);
+
+    if (!tenantID || !storeID) {
+      throw new HttpsError("invalid-argument", "tenantID and storeID are required");
+    }
+
+    const bucket = admin
+      .storage()
+      .bucket("warpspeed-bonitabikes.firebasestorage.app");
+
+    const backupMap = {};
+
+    for (const collectionName of ARCHIVE_COLLECTIONS) {
+      const prefix = `${tenantID}/${storeID}/archives/hourly/${collectionName}/`;
+      const [files] = await bucket.getFiles({ prefix });
+
+      for (const file of files) {
+        const fileName = file.name.split("/").pop().replace(".json", "");
+        const meta = file.metadata?.metadata || {};
+
+        if (!backupMap[fileName]) {
+          backupMap[fileName] = {
+            timestamp: fileName,
+            archivedAt: meta.archivedAt || null,
+            docCounts: {},
+          };
+        }
+        backupMap[fileName].docCounts[collectionName] = Number(meta.docCount) || 0;
+      }
+    }
+
+    const backups = Object.values(backupMap).sort(
+      (a, b) => (b.archivedAt || "").localeCompare(a.archivedAt || "")
+    );
+
+    return { success: true, backups };
   }
 );
 
@@ -6755,7 +5795,7 @@ async function completeSaleServerSide({
   db, sale, saleID, tenantID, storeID, customerID,
   workorderIDs, payment, charge, settings, customer,
   logPrefix, twilioClientRef, twilioSecretAccountNumber, twilioSecretKey,
-  gmailAppPassword, channel,
+  gmailAppPassword, channel, directPhone,
 }) {
   // Compute proportional salesTax for this payment (sale.total/salesTax already set from active sale)
   if (sale.total > 0 && sale.salesTax > 0) {
@@ -6985,7 +6025,7 @@ async function completeSaleServerSide({
   const storeName = settings?.storeInfo?.displayName || "Bonita Bikes";
   const receiptUrl = charge?.receipt_url || "";
   const amountDisplay = (sale.total / 100).toFixed(2);
-  const cleanPhone = (customer?.customerCell || customer?.cell || primaryWO?.customerCell || "").replace(/\D/g, "");
+  const cleanPhone = (directPhone || customer?.customerCell || customer?.cell || primaryWO?.customerCell || "").replace(/\D/g, "");
   const customerEmail = customer?.email || "";
 
   // SMS: Terminal uses autoSMSSalesReceipt setting; LinkToPay uses channel
@@ -7155,7 +6195,7 @@ exports.createTextToPayInvoice = onCall(
     requireCallableAuth(request);
 
     try {
-      const { workorderID, channel, tenantID, storeID } = request.data;
+      const { workorderID, channel, tenantID, storeID, phone: directPhone, email: directEmail } = request.data;
 
       // ── Validate input ──
       if (!workorderID || typeof workorderID !== "string") {
@@ -7191,10 +6231,6 @@ exports.createTextToPayInvoice = onCall(
       if (workorder.paymentComplete) {
         throw new HttpsError("failed-precondition", "Workorder is already paid");
       }
-      if (workorder.activeSaleID) {
-        throw new HttpsError("failed-precondition", "Workorder already has an active sale in progress");
-      }
-
       // ── Fetch settings ──
       const settingsSnap = await db
         .collection("tenants").doc(tenantID)
@@ -7216,20 +6252,35 @@ exports.createTextToPayInvoice = onCall(
         if (custSnap.exists) customer = custSnap.data();
       }
 
-      const cleanPhone = (customer.customerCell || customer.cell || "").replace(/\D/g, "");
-      const customerEmail = customer.email || "";
+      const cleanPhone = directPhone ? directPhone.replace(/\D/g, "") : (customer.customerCell || customer.cell || "").replace(/\D/g, "");
+      const customerEmail = directEmail || customer.email || "";
 
       // Validate channel against available contact info
       if ((channel === "sms" || channel === "both") && cleanPhone.length !== 10) {
-        throw new HttpsError("failed-precondition", "Customer has no valid phone number for SMS");
+        throw new HttpsError("failed-precondition", "No valid phone number for SMS");
       }
       if ((channel === "email" || channel === "both") && (!customerEmail || !customerEmail.includes("@"))) {
-        throw new HttpsError("failed-precondition", "Customer has no valid email address");
+        throw new HttpsError("failed-precondition", "No valid email address");
       }
 
       // ── Calculate totals ──
       const totals = calculateWorkorderTotal(workorder, settings);
-      const amountToCharge = totals.total - (workorder.amountPaid || 0);
+      let amountToCharge = totals.total - (workorder.amountPaid || 0);
+
+      // If active sale exists, calculate remaining from the sale's captured amount
+      let existingSaleID = null;
+      if (workorder.activeSaleID) {
+        const existingSaleSnap = await db
+          .collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("active-sales").doc(workorder.activeSaleID)
+          .get();
+        if (existingSaleSnap.exists) {
+          const existingSale = existingSaleSnap.data();
+          amountToCharge = (existingSale.total || 0) - (existingSale.amountCaptured || 0);
+          existingSaleID = workorder.activeSaleID;
+        }
+      }
 
       if (amountToCharge <= 0) {
         throw new HttpsError("failed-precondition", "Workorder balance is already paid");
@@ -7238,44 +6289,47 @@ exports.createTextToPayInvoice = onCall(
         throw new HttpsError("failed-precondition", "Amount must be at least $0.50 for card payment");
       }
 
-      // ── Create sale object ──
-      const saleID = await _generateId(db, "sales");
-      const sale = {
-        id: saleID,
-        millis: Date.now(),
-        subtotal: totals.subtotal,
-        discount: totals.discount > 0 ? totals.discount : null,
-        salesTax: totals.tax,
-        cardFee: totals.cardFee,
-        cardFeePercent: totals.cardFeePercent,
-        salesTaxPercent: totals.salesTaxPercent,
-        total: totals.total,
-        amountCaptured: 0,
-        amountRefunded: 0,
-        paymentComplete: false,
-        workorderIDs: [workorderID],
-        payments: [],
-        refunds: [],
-        status: "pending_remote_payment",
-        textToPay: true,
-        checkoutSessionID: "",
-        customerID: customerID || "",
-        channel,
-      };
+      // ── Create or reuse sale object ──
+      let saleID;
+      if (existingSaleID) {
+        saleID = existingSaleID;
+      } else {
+        saleID = await _generateId(db, "sales");
+        const sale = {
+          id: saleID,
+          millis: Date.now(),
+          subtotal: totals.subtotal,
+          discount: totals.discount > 0 ? totals.discount : null,
+          salesTax: totals.tax,
+          cardFee: totals.cardFee,
+          cardFeePercent: totals.cardFeePercent,
+          salesTaxPercent: totals.salesTaxPercent,
+          total: totals.total,
+          amountCaptured: 0,
+          amountRefunded: 0,
+          paymentComplete: false,
+          workorderIDs: [workorderID],
+          payments: [],
+          refunds: [],
+          status: "pending_remote_payment",
+          textToPay: true,
+          checkoutSessionID: "",
+          customerID: customerID || "",
+          channel,
+        };
 
-      // Save active sale
-      await db
-        .collection("tenants").doc(tenantID)
-        .collection("stores").doc(storeID)
-        .collection("active-sales").doc(saleID)
-        .set(sale);
+        await db
+          .collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("active-sales").doc(saleID)
+          .set(sale);
 
-      // Update workorder with activeSaleID
-      await db
-        .collection("tenants").doc(tenantID)
-        .collection("stores").doc(storeID)
-        .collection("open-workorders").doc(workorderID)
-        .update({ activeSaleID: saleID });
+        await db
+          .collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("open-workorders").doc(workorderID)
+          .update({ activeSaleID: saleID });
+      }
 
       // ── Create Stripe Checkout Session ──
       const session = await stripeClient.checkout.sessions.create({
@@ -7300,6 +6354,7 @@ exports.createTextToPayInvoice = onCall(
           workorderID,
           customerID: customerID || "",
           channel,
+          phone: cleanPhone || "",
         },
         expires_at: Math.floor(Date.now() / 1000) + 86400, // 24 hours
         success_url: "https://warpspeed-bonitabikes.web.app/payment-success",
@@ -7325,7 +6380,7 @@ exports.createTextToPayInvoice = onCall(
           );
         }
 
-        const smsBody = `${storeName} has sent you a payment request for $${amountDisplay}. Pay securely here: ${session.url}`;
+        const smsBody = `💳 ${storeName} has sent you a payment request for $${amountDisplay}. Pay securely here: ${session.url}`;
 
         await twilioClient.messages.create({
           body: smsBody,
@@ -7367,7 +6422,7 @@ exports.createTextToPayInvoice = onCall(
 
         const htmlBody = `
           <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
-            <p>${storeName} has sent you a payment request for <strong>$${amountDisplay}</strong>.</p>
+            <p>💳 ${storeName} has sent you a payment request for <strong>$${amountDisplay}</strong>.</p>
             <p style="margin: 24px 0;">
               <a href="${session.url}" style="display: inline-block; padding: 14px 28px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: bold;">Pay Now</a>
             </p>
@@ -7442,7 +6497,7 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
 
       const db = await getDB(firebaseServiceAccountKey);
       const session = event.data.object;
-      const { tenantID, storeID, saleID, workorderID, customerID, channel, transactionID } =
+      const { tenantID, storeID, saleID, workorderID, customerID, channel, transactionID, phone: metadataPhone } =
         session.metadata || {};
 
       if (!tenantID || !storeID || !saleID || !workorderID) {
@@ -7573,6 +6628,7 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
           twilioClientRef: twilioClient,
           twilioSecretAccountNumber, twilioSecretKey, gmailAppPassword,
           channel,
+          directPhone: metadataPhone,
         });
 
         log("stripeCheckoutWebhook_LinkToPay: sale completed successfully", { saleID, workorderID });
@@ -7585,29 +6641,36 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
       if (event.type === "checkout.session.expired") {
         log("stripeCheckoutWebhook_LinkToPay: processing expired session", { saleID, workorderID });
 
-        // Delete active sale (if it still exists)
-        try {
-          await db
-            .collection("tenants").doc(tenantID)
-            .collection("stores").doc(storeID)
-            .collection("active-sales").doc(saleID)
-            .delete();
-        } catch (delErr) {
-          log("stripeCheckoutWebhook_LinkToPay: error deleting expired active sale", delErr.message);
-        }
+        // Check if the sale has existing payments (partial payment scenario)
+        const saleRef = db.collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("active-sales").doc(saleID);
+        const expSaleSnap = await saleRef.get();
+        const hasExistingPayments = expSaleSnap.exists && (expSaleSnap.data().amountCaptured || 0) > 0;
 
-        // Clear workorder's activeSaleID (if workorder still open)
-        try {
-          const woRef = db
-            .collection("tenants").doc(tenantID)
-            .collection("stores").doc(storeID)
-            .collection("open-workorders").doc(workorderID);
-          const woSnap = await woRef.get();
-          if (woSnap.exists) {
-            await woRef.update({ activeSaleID: "" });
+        if (hasExistingPayments) {
+          // Sale has partial payments — just clear the checkout session, keep the sale
+          await saleRef.update({ checkoutSessionID: "" });
+          log("stripeCheckoutWebhook_LinkToPay: cleared expired session from active sale (partial payment exists)", { saleID });
+        } else {
+          // No payments — delete active sale and clear workorder reference
+          try {
+            await saleRef.delete();
+          } catch (delErr) {
+            log("stripeCheckoutWebhook_LinkToPay: error deleting expired active sale", delErr.message);
           }
-        } catch (woErr) {
-          log("stripeCheckoutWebhook_LinkToPay: error clearing workorder activeSaleID", woErr.message);
+          try {
+            const woRef = db
+              .collection("tenants").doc(tenantID)
+              .collection("stores").doc(storeID)
+              .collection("open-workorders").doc(workorderID);
+            const woSnap = await woRef.get();
+            if (woSnap.exists) {
+              await woRef.update({ activeSaleID: "" });
+            }
+          } catch (woErr) {
+            log("stripeCheckoutWebhook_LinkToPay: error clearing workorder activeSaleID", woErr.message);
+          }
         }
 
         // Inject expiration message into SMS queue
@@ -7624,7 +6687,7 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
               if (custSnap.exists) customer = custSnap.data();
             }
 
-            const cleanPhone = (customer.customerCell || customer.cell || "").replace(/\D/g, "");
+            const cleanPhone = (metadataPhone || customer.customerCell || customer.cell || "").replace(/\D/g, "");
             if (cleanPhone.length === 10) {
               // Fetch settings for store name
               const settingsSnap = await db
@@ -7838,56 +6901,4 @@ exports.migrateCustomerPhone = onCall(
   }
 );
 
-// ═══════════════════════════════════════════════════════════════
-// ONE-TIME MIGRATION: Backfill Custom Claims for existing users
-// Run once via Firebase console or client, then remove/disable
-// ═══════════════════════════════════════════════════════════════
-
-exports.backfillCustomClaims = onCall(
-  {
-    secrets: [firebaseServiceAccountKey],
-    timeoutSeconds: 540,
-    memory: "512MiB",
-  },
-  async (request) => {
-    requireCallableAuth(request);
-
-    const db = await getDB(firebaseServiceAccountKey);
-
-    const usersSnapshot = await db.collection("email_users").get();
-    let updated = 0;
-    let skipped = 0;
-    let errors = 0;
-
-    for (const doc of usersSnapshot.docs) {
-      const data = doc.data();
-      const uid = data.id || doc.id;
-      const { tenantID, storeID } = data;
-
-      if (!tenantID) {
-        skipped++;
-        continue;
-      }
-
-      try {
-        const userRecord = await admin.auth().getUser(uid);
-        const claims = userRecord.customClaims || {};
-
-        if (claims.tenantID === tenantID && claims.storeID === (storeID || undefined)) {
-          skipped++;
-          continue;
-        }
-
-        await setUserCustomClaims(uid, tenantID, storeID || null);
-        updated++;
-      } catch (err) {
-        log("backfillCustomClaims: error for user", { uid, error: err.message });
-        errors++;
-      }
-    }
-
-    log("backfillCustomClaims: complete", { updated, skipped, errors });
-    return { success: true, updated, skipped, errors };
-  }
-);
 

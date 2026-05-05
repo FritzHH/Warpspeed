@@ -583,6 +583,8 @@ const sendSMSCallable = httpsCallable(functions, "sendSMS");
 const sendSMSEnhancedCallable = httpsCallable(functions, "sendSMSEnhanced");
 const sendEmailCallable = httpsCallable(functions, "sendEmailCallable");
 const uploadPDFAndSendSMSCallableRef = httpsCallable(functions, "uploadPDFAndSendSMSCallable");
+const generateReceiptPDFCallableRef = httpsCallable(functions, "generateReceiptPDFCallable");
+const sendReceiptCallableRef = httpsCallable(functions, "sendReceiptCallable");
 const translateTextCallableRef = httpsCallable(functions, "translateTextCallable");
 
 export const processServerDrivenStripePaymentCallable = httpsCallable(
@@ -612,10 +614,6 @@ export const createAppUserCallable = httpsCallable(
 export const createStoreCallable = httpsCallable(
   functions,
   "createStoreCallable"
-);
-export const createTenantCallable = httpsCallable(
-  functions,
-  "createTenantCallable"
 );
 export const lightspeedInitiateAuthCallable = httpsCallable(
   functions,
@@ -733,6 +731,34 @@ export function uploadPDFAndSendSMS(data) {
         success: false,
         error: error.message || "Failed to upload PDF and send SMS",
         code: error.code || "UNKNOWN_ERROR",
+      };
+    });
+}
+
+export function generateReceiptPDF(data) {
+  return generateReceiptPDFCallableRef(data)
+    .then((result) => {
+      return { success: true, data: result.data };
+    })
+    .catch((error) => {
+      log("Error in generateReceiptPDF", error);
+      return {
+        success: false,
+        error: error.message || "Failed to generate receipt PDF",
+      };
+    });
+}
+
+export function sendReceipt(data) {
+  return sendReceiptCallableRef(data)
+    .then((result) => {
+      return { success: true, data: result.data };
+    })
+    .catch((error) => {
+      log("Error in sendReceipt", error);
+      return {
+        success: false,
+        error: error.message || "Failed to send receipt",
       };
     });
 }

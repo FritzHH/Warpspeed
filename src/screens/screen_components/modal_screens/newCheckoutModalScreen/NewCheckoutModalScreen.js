@@ -47,7 +47,6 @@ import {
   getAllAppliedCredits,
 } from "./newCheckoutUtils";
 import { translateSalesReceipt } from "../../../../shared/receiptTranslator";
-import { generateSaleReceiptPDF } from "../../../../pdfGenerator";
 import {
   newCheckoutSaveWorkorder,
   newCheckoutCompleteWorkorder,
@@ -1137,8 +1136,8 @@ export function NewCheckoutModalScreen() {
     // SMS/Email — template-driven
     const smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
     const emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
-    const smsContent = smsTemplate?.content || smsTemplate?.message || "";
-    const emailContent = emailTemplate?.content || emailTemplate?.body || "";
+    const smsContent = smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "";
+    const emailContent = emailTemplate?.message || emailTemplate?.content || emailTemplate?.body || "";
     let emptyParts = [];
     if (settings?.autoSMSSalesReceipt && customerInfo.phone && !smsContent.trim()) emptyParts.push("SMS");
     if (settings?.autoEmailSalesReceipt && (zCustomer?.email) && !emailContent.trim()) emptyParts.push("email");
@@ -1290,8 +1289,8 @@ export function NewCheckoutModalScreen() {
     const smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
     const emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
 
-    const smsContent = smsTemplate?.content || smsTemplate?.message || "";
-    const emailContent = emailTemplate?.content || emailTemplate?.body || "";
+    const smsContent = smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "";
+    const emailContent = emailTemplate?.message || emailTemplate?.content || emailTemplate?.body || "";
     let emptyParts = [];
     if (settings?.autoSMSSalesReceipt && customerForReceipt.customerCell && !smsContent.trim()) emptyParts.push("SMS");
     if (settings?.autoEmailSalesReceipt && customerForReceipt.email && !emailContent.trim()) emptyParts.push("email");
@@ -1360,8 +1359,8 @@ export function NewCheckoutModalScreen() {
 
       const smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
       const emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
-      const smsContent = smsTemplate?.content || smsTemplate?.message || "";
-      const emailContent = emailTemplate?.content || emailTemplate?.body || "";
+      const smsContent = smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "";
+      const emailContent = emailTemplate?.message || emailTemplate?.content || emailTemplate?.body || "";
 
       let emptyParts = [];
       if (settings?.autoSMSSalesReceipt && customerForReceipt.customerCell && !smsContent.trim()) emptyParts.push("SMS");
@@ -1384,12 +1383,6 @@ export function NewCheckoutModalScreen() {
       }
     }
 
-    function handlePrintPaperOnly() {
-      let { saleReceipt, settings, printerID } = buildPartialReceipt();
-      saleReceipt.popCashRegister = false;
-      dbSavePrintObj(saleReceipt, printerID);
-    }
-
     useAlertScreenStore.getState().setValues({
       showAlert: true,
       fullScreen: true,
@@ -1403,14 +1396,9 @@ export function NewCheckoutModalScreen() {
       handleBtn1Press: () => {
         resetAndClose();
       },
-      btn2Text: "Print Receipts",
+      btn2Text: "Print Receipt",
       handleBtn2Press: () => {
         handlePrintReceipts();
-        resetAndClose();
-      },
-      btn3Text: "Print Paper Only",
-      handleBtn3Press: () => {
-        handlePrintPaperOnly();
         resetAndClose();
       },
       useCancelButton: true,
@@ -1591,8 +1579,8 @@ export function NewCheckoutModalScreen() {
       : { first: zCustomer?.first || "", last: zCustomer?.last || "", customerCell: zCustomer?.customerCell || "", email: zCustomer?.email || "", id: zCustomer?.id || "" };
 
     if (customerForReceipt.customerCell || customerForReceipt.email) {
-      let smsContent = smsTemplate?.content || smsTemplate?.message || "";
-      let emailContent = emailTemplate?.content || emailTemplate?.body || "";
+      let smsContent = smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "";
+      let emailContent = emailTemplate?.message || emailTemplate?.content || emailTemplate?.body || "";
       let canSMS = customerForReceipt.customerCell && smsContent.trim();
       let canEmail = customerForReceipt.email && emailContent.trim();
       if (canSMS || canEmail) {
@@ -1612,8 +1600,8 @@ export function NewCheckoutModalScreen() {
     let settings = useSettingsStore.getState().getSettings();
     let smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
     let emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
-    let smsContent = smsTemplate?.content || smsTemplate?.message || "";
-    let emailContent = emailTemplate?.content || emailTemplate?.body || "";
+    let smsContent = smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "";
+    let emailContent = emailTemplate?.message || emailTemplate?.content || emailTemplate?.body || "";
 
     const primaryWO = sCombinedWorkorders[0];
     let customerForReceipt = {
@@ -2229,8 +2217,8 @@ export function NewCheckoutModalScreen() {
                     openUpward={true}
                   />
                 </View>
-                {saleComplete && (
-                  <Tooltip text="Reprint receipt" position="top">
+                {(saleComplete || hasRealPayments) && (
+                  <Tooltip text={saleComplete ? "Reprint receipt" : "Print partial payment receipt"} position="top">
                     <TouchableOpacity
                       onPress={handleReprint}
                       style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
@@ -2239,16 +2227,20 @@ export function NewCheckoutModalScreen() {
                     </TouchableOpacity>
                   </Tooltip>
                 )}
-                {saleComplete && (
-                  <Tooltip text="Send receipt" position="top">
-                    <TouchableOpacity
-                      onPress={handleSendSaleReceipt}
-                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                    >
-                      <Image_ icon={ICONS.paperPlane} size={35} />
-                    </TouchableOpacity>
-                  </Tooltip>
-                )}
+                {(saleComplete || hasRealPayments) && (() => {
+                  let hasContact = !!(zCustomer?.customerCell || zCustomer?.email || zOpenWorkorder?.customerCell || zOpenWorkorder?.customerEmail);
+                  if (!hasContact) return null;
+                  return (
+                    <Tooltip text={saleComplete ? "Send receipt" : "Send partial payment receipt"} position="top">
+                      <TouchableOpacity
+                        onPress={handleSendSaleReceipt}
+                        style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                      >
+                        <Image_ icon={ICONS.paperPlane} size={35} />
+                      </TouchableOpacity>
+                    </Tooltip>
+                  );
+                })()}
                 <Tooltip text={hasRealPayments && !saleComplete ? "Close with partial payment" : saleComplete ? "Close" : isStandalone ? "Cancel sale" : "Close checkout"} position="top">
                   <TouchableOpacity
                     onPress={hasRealPayments && !saleComplete ? handlePartialPayment : closeModal}
@@ -2262,7 +2254,7 @@ export function NewCheckoutModalScreen() {
                     onPress={handlePopRegister}
                     style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
                   >
-                    <Image_ icon={ICONS.openCashRegister} size={30} />
+                    <Image_ icon={ICONS.openCashRegister} size={35} />
                   </TouchableOpacity>
                 </Tooltip>
 

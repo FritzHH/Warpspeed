@@ -14,7 +14,6 @@ export const ROUTES = {
   stand: "/stand",
   phone: "/phone",
   dbViewer: "/db-viewer",
-  customerWorkorder: "/wo/:pin",
   mobile: {
     home: "/",
     workorders: "/workorders",

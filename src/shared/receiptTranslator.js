@@ -8,7 +8,7 @@
 
 import { translateText } from "../db_calls";
 import { printBuilder } from "./printBuilder";
-import { DEFAULT_SALE_LABELS, generateSaleReceiptPDF } from "../pdfGenerator";
+import { DEFAULT_SALE_LABELS } from "../pdfGenerator";
 
 // ── Helpers ──
 
@@ -142,29 +142,3 @@ export async function translateSalesReceipt(receiptObj, targetLanguage) {
   return { translatedReceipt: translatedReceipt, pdfLabels: pdfLabels };
 }
 
-/**
- * Build a Spanish sales receipt: translated print server object + translated PDF.
- *
- * @param {object} sale - Sale object
- * @param {Array} payments - Payments array
- * @param {object} customer - Customer object
- * @param {object} workorder - Workorder object
- * @param {number} salesTaxPercent - Sales tax rate
- * @param {object} [context] - { currentUser, settings }
- * @returns {Promise<{ receipt: object, pdfBase64: string }>}
- */
-export async function generateSpanishSalesReceipt(sale, payments, customer, workorder, salesTaxPercent, context, credits) {
-  // 1. Build English receipt
-  var receipt = printBuilder.sale(sale, payments, customer, workorder, salesTaxPercent, context, credits);
-
-  // 2. Translate
-  var translated = await translateSalesReceipt(receipt, "es");
-
-  // 3. Generate Spanish PDF
-  var pdfBase64 = generateSaleReceiptPDF(translated.translatedReceipt, translated.pdfLabels);
-
-  return {
-    receipt: translated.translatedReceipt,
-    pdfBase64: pdfBase64,
-  };
-}

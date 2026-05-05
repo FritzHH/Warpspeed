@@ -19,7 +19,6 @@ import {
   resolveStatus,
   calculateWaitEstimateLabel,
   findTemplateByType,
-
   scheduleAutoText,
   localStorageWrapper,
 } from "../../../utils";
@@ -70,7 +69,7 @@ import {
 } from "../../../stores";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
-import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS, startNewWorkorder } from "../../../db_calls_wrapper";
+import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbSendReceipt, startNewWorkorder } from "../../../db_calls_wrapper";
 
 // --- Dimming when field has text (easy to adjust) ---
 const FILLED_DROPDOWN_OPACITY = 0.3;                          // dropdown button opacity when text present
@@ -494,7 +493,7 @@ export const ActiveWorkorderComponent = ({}) => {
     const shouldEmail = zCustomer.email;
 
     const smsContent = smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "";
-    const emailContent = emailTemplate?.content || emailTemplate?.body || "";
+    const emailContent = emailTemplate?.message || emailTemplate?.content || emailTemplate?.body || "";
     let emptyParts = [];
     if (shouldSMS && !smsContent.trim()) emptyParts.push("SMS");
     if (shouldEmail && !emailContent.trim()) emptyParts.push("email");
@@ -524,76 +523,39 @@ export const ActiveWorkorderComponent = ({}) => {
     });
 
     const { tenantID, storeID } = useSettingsStore.getState().getSettings();
-    const firstName = customer?.first || "Customer";
-    const storeName = settings?.storeInfo?.displayName || "our store";
-    const brand = workorder?.brand || "";
-    const description = workorder?.description || "";
-
-    function applyVars(template, v) {
-      let result = template;
-      for (const [key, val] of Object.entries(v)) {
-        result = result.replace(new RegExp("\\{" + key + "\\}", "g"), val || "");
-      }
-      return result;
-    }
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+    const receiptData = printBuilder.intake(workorder, customer, settings?.salesTaxPercent, _ctx);
+    const storagePath = build_db_path.cloudStorage.intakeReceiptPDF(workorder.id, tenantID, storeID);
 
     let results = [];
     let errors = [];
 
-    let receiptURL = "";
     try {
-      const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-      const receiptData = printBuilder.intake(workorder, customer, settings?.salesTaxPercent, _ctx);
-      const { generateWorkorderTicketPDF } = await import("../../../pdfGenerator");
-      const base64 = generateWorkorderTicketPDF(receiptData);
-      const storagePath = build_db_path.cloudStorage.intakeReceiptPDF(workorder.id, tenantID, storeID);
-
-      if (smsTemplate && customer.customerCell) {
-        const vars = { firstName, storeName, brand, description, link: "{link}" };
-        const msg = applyVars(smsTemplate.content || smsTemplate.message || smsTemplate.text || "", vars);
-        try {
-          const result = await dbUploadPDFAndSendSMS({
-            base64,
-            storagePath,
-            message: msg,
-            phoneNumber: customer.customerCell,
-            customerID: workorder?.customerID || "",
-            messageID: crypto.randomUUID(),
-          });
-          if (result?.data?.url) receiptURL = result.data.url;
-          results.push("SMS sent to " + customer.customerCell);
-        } catch (smsErr) {
-          errors.push("SMS failed: " + (smsErr?.message || String(smsErr)));
-        }
-      } else {
-        const { uploadStringToStorage } = await import("../../../db_calls");
-        try {
-          const uploadResult = await uploadStringToStorage(base64, storagePath, "base64");
-          if (uploadResult?.downloadURL) receiptURL = uploadResult.downloadURL;
-        } catch (uploadErr) {
-          errors.push("PDF upload failed: " + (uploadErr?.message || String(uploadErr)));
-        }
+      const result = await dbSendReceipt({
+        receiptType: "intake",
+        receiptData,
+        storagePath,
+        sendSMS: !!(smsTemplate && customer.customerCell),
+        sendEmail: !!(emailTemplate && customer.email),
+        customerEmail: customer.email || "",
+        customerCell: customer.customerCell || "",
+        customerID: workorder?.customerID || "",
+        templateVars: {
+          firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
+          storeName: settings?.storeInfo?.displayName || "our store",
+          brand: workorder?.brand || "",
+          description: workorder?.description || "",
+        },
+        smsMessageID: crypto.randomUUID(),
+        updateWorkorderField: { workorderID: workorder.id, field: "intakeReceiptURL" },
+      });
+      if (result?.data?.receiptURL) {
+        useOpenWorkordersStore.getState().setField("intakeReceiptURL", result.data.receiptURL, workorder.id);
       }
+      if (smsTemplate && customer.customerCell) results.push("SMS sent to " + customer.customerCell);
+      if (emailTemplate && customer.email) results.push("Email sent to " + customer.email);
     } catch (e) {
-      errors.push("PDF generation failed: " + (e?.message || String(e)));
-    }
-
-    if (emailTemplate && customer.email) {
-      const linkHtml = receiptURL
-        ? "<a href='" + receiptURL + "' style='display:inline-block;padding:12px 24px;background-color:#4CAF50;color:white;text-decoration:none;border-radius:6px;font-size:14px'>View Receipt</a>"
-        : "";
-      const receiptLink = receiptURL
-        ? "<p style='margin:24px 0'>" + linkHtml + "</p>"
-        : "";
-      const vars = { firstName, storeName, brand, description, link: linkHtml || receiptURL, receiptLink };
-      const subject = applyVars(emailTemplate.subject || "", vars);
-      const html = applyVars(emailTemplate.content || emailTemplate.body || "", vars);
-      try {
-        await dbSendEmail(customer.email, subject, html);
-        results.push("Email sent to " + customer.email);
-      } catch (emailErr) {
-        errors.push("Email failed: " + (emailErr?.message || String(emailErr)));
-      }
+      errors.push("Receipt sending failed: " + (e?.message || String(e)));
     }
 
     if (errors.length > 0) {
@@ -1855,7 +1817,7 @@ export const ActiveWorkorderComponent = ({}) => {
           paddingHorizontal: 3,
         }}
       >
-        <Tooltip text="New workorder / customer lookup" position="right">
+        <Tooltip text="New workorder / customer lookup" position="top" offsetX={63}>
           <Button_
             icon={ICONS.bicycle}
             iconSize={50}

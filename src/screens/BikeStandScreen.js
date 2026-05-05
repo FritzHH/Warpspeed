@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
+import { View, Text, ScrollView, TouchableOpacity, Modal } from "react-native-web";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { cloneDeep } from "lodash";
@@ -36,8 +36,8 @@ import {
   log,
   printBuilder,
   localStorageWrapper,
-  findTemplateByType,
   replaceOrAddToArr,
+  findTemplateByType,
 } from "../utils";
 import {
   WORKORDER_ITEM_PROTO,
@@ -74,13 +74,12 @@ import {
   dbUploadWorkorderMedia,
   startNewWorkorder,
   dbSavePrintObj,
-  dbUploadPDFAndSendSMS,
-  dbSendEmail,
+  dbSendReceipt,
 } from "../db_calls_wrapper";
 import { WorkorderMediaModal } from "./screen_components/modal_screens/WorkorderMediaModal";
 import { InventorySearchModal } from "./screen_components/modal_screens/InventorySearchModal";
 import { StandKeypad } from "../shared/StandKeypad";
-import { MILLIS_IN_DAY, DISCOUNT_TYPES, FACE_DESCRIPTOR_CONFIDENCE_DISTANCE } from "../constants";
+import { MILLIS_IN_DAY, DISCOUNT_TYPES, FACE_DESCRIPTOR_CONFIDENCE_DISTANCE, build_db_path } from "../constants";
 import { openCacheDB, clearStaleCache, loadModelCached } from "../faceDetection";
 import warningIcon from "../assets/warning.png";
 import plusIcon from "../assets/plus.png";
@@ -130,6 +129,10 @@ export function BikeStandScreen() {
   const [sDiscountCardID, _setDiscountCardID] = useState(null);
   const [sShowInventoryModal, _setShowInventoryModal] = useState(false);
   const [sShowWorkorderList, _setShowWorkorderList] = useState(false);
+  const [sShowStandSettings, _setShowStandSettings] = useState(false);
+  const [sShowFooterMenu, _setShowFooterMenu] = useState(false);
+  const [sFooterMenuCoords, _setFooterMenuCoords] = useState({ x: 0, y: 0 });
+  const [sBypassFaceRecognition, _setBypassFaceRecognition] = useState(() => localStorageWrapper.getItem("standBypassFaceRecognition") === "true");
   const longPressTimerRef = useRef(null);
 
   // Quick button panel state (mirrors Options_Inventory)
@@ -166,12 +169,20 @@ export function BikeStandScreen() {
     let v = localStorageWrapper.getItem("standNoteHelperFontAdj");
     return v != null ? Number(v) : 0;
   });
-  const [sSubMenuWidthAdj, _setSubMenuWidthAdj] = useState(() => {
+  const [sSubMenuWidthAdj] = useState(() => {
     let v = localStorageWrapper.getItem("standSubMenuWidthAdj");
     return v != null ? Number(v) : 0;
   });
   const [sSubMenuHeightAdj, _setSubMenuHeightAdj] = useState(() => {
     let v = localStorageWrapper.getItem("standSubMenuHeightAdj");
+    return v != null ? Number(v) : 0;
+  });
+  const [sNavFontAdj, _setNavFontAdj] = useState(() => {
+    let v = localStorageWrapper.getItem("standNavFontAdj");
+    return v != null ? Number(v) : 0;
+  });
+  const [sNavPaddingAdj, _setNavPaddingAdj] = useState(() => {
+    let v = localStorageWrapper.getItem("standNavPaddingAdj");
     return v != null ? Number(v) : 0;
   });
   const [sSubMenuEditMode, _setSubMenuEditMode] = useState(false);
@@ -664,11 +675,11 @@ export function BikeStandScreen() {
     if (!selectedWorkorder) return;
     if (fieldName === "waitDays") {
       let days = val === "" ? "" : Number(val);
-      let waitObj = {
-        ...CUSTOM_WAIT_TIME,
-        label: val === "" ? "" : val + (days === 1 ? " Day" : " Days"),
-        maxWaitTimeDays: days,
-      };
+      let allWaits = (zSettings.waitTimes || []).filter((w) => w.maxWaitTimeDays > 0);
+      let match = days ? allWaits.reduce((best, w) => (!best || Math.abs(w.maxWaitTimeDays - days) < Math.abs(best.maxWaitTimeDays - days)) ? w : best, null) : null;
+      let waitObj = match
+        ? { ...match, maxWaitTimeDays: days }
+        : { ...CUSTOM_WAIT_TIME, label: val === "" ? "" : val + (days === 1 ? " Day" : " Days"), maxWaitTimeDays: days };
       useOpenWorkordersStore.getState().setField("waitTime", waitObj, selectedWorkorder.id);
     } else if (fieldName === "color1" || fieldName === "color2") {
       setBikeColor(val, fieldName);
@@ -691,6 +702,9 @@ export function BikeStandScreen() {
       val = "";
     } else if (key === "\u232B") {
       val = val.slice(0, -1);
+    } else if (key === "ENTER") {
+      if (sDetailField === "waitDays") return;
+      val = val + "\n";
     } else if (key === " ") {
       if (sDetailField === "waitDays") return;
       val = val + " ";
@@ -711,6 +725,10 @@ export function BikeStandScreen() {
   // Printer helpers
   let printersObj = zSettings?.printers || {};
   let receiptPrinters = Object.values(printersObj).filter((p) => p.type === "receipt");
+  if (!sSelectedPrinterID && receiptPrinters.length > 0) {
+    let firstOnline = receiptPrinters.find((p) => p.active === true) || receiptPrinters[0];
+    handleSelectPrinter(firstOnline.id);
+  }
   let selectedPrinter = receiptPrinters.find((p) => p.id === sSelectedPrinterID);
   let selectedPrinterLabel = selectedPrinter?.label || "";
   let selectedPrinterOffline = selectedPrinter && selectedPrinter.active !== true;
@@ -736,60 +754,69 @@ export function BikeStandScreen() {
     dbSavePrintObj(toPrint, sSelectedPrinterID);
   }
 
-  async function handleIntakeElectronic() {
+  function handleIntakeElectronic() {
     if (!selectedWorkorder || (!customerCell && !customerEmail)) return;
     let _settings = useSettingsStore.getState().getSettings();
+    let smsTemplate = findTemplateByType(_settings?.smsTemplates || _settings?.textTemplates, "intakeReceipt");
+    let emailTemplate = findTemplateByType(_settings?.emailTemplates, "intakeReceipt");
+    let canSMS = !!(smsTemplate && customerCell);
+    let canEmail = !!(emailTemplate && customerEmail);
+    if (!canSMS && !canEmail) return;
+    let { tenantID, storeID } = _settings;
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
     let receiptData = printBuilder.intake(selectedWorkorder, pendingCust || {}, _settings?.salesTaxPercent, _ctx);
-    let { generateWorkorderTicketPDF } = await import("../pdfGenerator");
-    let base64 = generateWorkorderTicketPDF(receiptData);
-    if (customerCell) {
-      let smsTemplate = findTemplateByType(_settings?.smsTemplates || _settings?.textTemplates, "intakeReceipt");
-      if (smsTemplate?.body) {
-        await dbUploadPDFAndSendSMS({
-          base64,
-          message: smsTemplate.body,
-          phoneNumber: removeDashesFromPhone(customerCell),
-          customerID: selectedWorkorder.customerID || "",
-          messageID: selectedWorkorder.id + "_intake",
-          canRespond: false,
-        });
-      }
-    }
-    if (customerEmail) {
-      let emailTemplate = findTemplateByType(_settings?.emailTemplates, "intakeReceipt");
-      if (emailTemplate?.body) {
-        await dbSendEmail(customerEmail, emailTemplate.subject || "Intake Receipt", emailTemplate.body);
-      }
-    }
+    let storagePath = build_db_path.cloudStorage.intakeReceiptPDF(selectedWorkorder.id, tenantID, storeID);
+
+    dbSendReceipt({
+      receiptType: "intake",
+      receiptData,
+      storagePath,
+      sendSMS: canSMS,
+      sendEmail: canEmail,
+      customerEmail: customerEmail || "",
+      customerCell: removeDashesFromPhone(customerCell) || "",
+      customerID: selectedWorkorder.customerID || "",
+      templateVars: {
+        firstName: capitalizeFirstLetterOfString((pendingCust?.first || "Customer").trim()),
+        storeName: _settings?.storeInfo?.displayName || "our store",
+        brand: selectedWorkorder.brand || "",
+        description: selectedWorkorder.model || selectedWorkorder.description || "",
+      },
+      smsMessageID: selectedWorkorder.id + "_intake",
+      updateWorkorderField: { workorderID: selectedWorkorder.id, field: "intakeReceiptURL" },
+    });
   }
 
-  async function handleWorkorderElectronic() {
+  function handleWorkorderElectronic() {
     if (!selectedWorkorder || (!customerCell && !customerEmail)) return;
     let _settings = useSettingsStore.getState().getSettings();
+    let smsTemplate = findTemplateByType(_settings?.smsTemplates || _settings?.textTemplates, "intakeReceipt");
+    let emailTemplate = findTemplateByType(_settings?.emailTemplates, "intakeReceipt");
+    let canSMS = !!(smsTemplate && customerCell);
+    let canEmail = !!(emailTemplate && customerEmail);
+    if (!canSMS && !canEmail) return;
+    let { tenantID, storeID } = _settings;
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
     let receiptData = printBuilder.workorder(selectedWorkorder, pendingCust || {}, _settings?.salesTaxPercent, _ctx);
-    let { generateWorkorderTicketPDF } = await import("../pdfGenerator");
-    let base64 = generateWorkorderTicketPDF(receiptData);
-    if (customerCell) {
-      let smsTemplate = findTemplateByType(_settings?.smsTemplates || _settings?.textTemplates, "intakeReceipt");
-      if (smsTemplate?.body) {
-        await dbUploadPDFAndSendSMS({
-          base64,
-          message: smsTemplate.body,
-          phoneNumber: removeDashesFromPhone(customerCell),
-          customerID: selectedWorkorder.customerID || "",
-          messageID: selectedWorkorder.id + "_workorder",
-          canRespond: false,
-        });
-      }
-    }
-    if (customerEmail) {
-      let emailTemplate = findTemplateByType(_settings?.emailTemplates, "intakeReceipt");
-      if (emailTemplate?.body) {
-        await dbSendEmail(customerEmail, emailTemplate.subject || "Workorder Receipt", emailTemplate.body);
-      }
-    }
+    let storagePath = build_db_path.cloudStorage.intakeReceiptPDF(selectedWorkorder.id, tenantID, storeID);
+
+    dbSendReceipt({
+      receiptType: "workorder",
+      receiptData,
+      storagePath,
+      sendSMS: canSMS,
+      sendEmail: canEmail,
+      customerEmail: customerEmail || "",
+      customerCell: removeDashesFromPhone(customerCell) || "",
+      customerID: selectedWorkorder.customerID || "",
+      templateVars: {
+        firstName: capitalizeFirstLetterOfString((pendingCust?.first || "Customer").trim()),
+        storeName: _settings?.storeInfo?.displayName || "our store",
+        brand: selectedWorkorder.brand || "",
+        description: selectedWorkorder.model || selectedWorkorder.description || "",
+      },
+      smsMessageID: selectedWorkorder.id + "_workorder",
+    });
   }
 
   //////////////////////////////////////////////////////////////////////////////
@@ -802,10 +829,7 @@ export function BikeStandScreen() {
   }
 
   async function startFaceLogin() {
-    // Face recognition disabled — go straight to PIN
-    _setShowPinModal(true);
-    return;
-    if (!modelsLoadedRef.current) {
+    if (true || sBypassFaceRecognition || !modelsLoadedRef.current) {
       _setShowPinModal(true);
       return;
     }
@@ -822,53 +846,75 @@ export function BikeStandScreen() {
         }
       }, 50);
 
-      let secondsLeft = 5;
-      countdownRef.current = setInterval(() => {
-        secondsLeft--;
-        _setFaceCountdown(secondsLeft);
-        if (secondsLeft <= 0) {
+      // Countdown via rAF - immune to main-thread blocking
+      let countdownStart = Date.now();
+      let lastDisplayed = 5;
+      function tickCountdown() {
+        if (faceIntervalRef.current === null) return;
+        let elapsed = (Date.now() - countdownStart) / 1000;
+        let remaining = Math.ceil(5 - elapsed);
+        if (remaining < 0) remaining = 0;
+        if (remaining !== lastDisplayed) {
+          lastDisplayed = remaining;
+          _setFaceCountdown(remaining);
+        }
+        if (remaining <= 0) {
           stopFaceLogin();
           _setShowFaceModal(false);
           _setShowPinModal(true);
+          return;
         }
-      }, 1000);
+        countdownRef.current = requestAnimationFrame(tickCountdown);
+      }
+      countdownRef.current = requestAnimationFrame(tickCountdown);
 
-      faceIntervalRef.current = setInterval(async () => {
-        if (!faceVideoRef.current || faceVideoRef.current.readyState < 2) return;
-        let detection = await faceapi
-          .detectSingleFace(faceVideoRef.current, new faceapi.TinyFaceDetectorOptions())
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-        if (!detection) return;
-        let descriptor = detection.descriptor;
-        let users = useSettingsStore.getState().settings?.users || [];
-        for (let user of users) {
-          if (!user.faceDescriptor) continue;
-          try {
-            let distance = faceapi.euclideanDistance(Object.values(user.faceDescriptor), descriptor);
-            if (distance < FACE_DESCRIPTOR_CONFIDENCE_DISTANCE) {
-              stopFaceLogin();
-              _setShowFaceModal(false);
-              localStorageWrapper.setItem("standDevPin", user.pin);
-              useLoginStore.getState().setCurrentUser(user);
-              useLoginStore.setState({ lastActionMillis: Infinity });
-              if (pendingActionRef.current) {
-                pendingActionRef.current();
-                pendingActionRef.current = null;
+      // Sequential detection loop - one detection at a time, no overlap
+      faceIntervalRef.current = true;
+      async function detectLoop() {
+        while (faceIntervalRef.current) {
+          if (faceVideoRef.current && faceVideoRef.current.readyState >= 2) {
+            try {
+              let detection = await faceapi
+                .detectSingleFace(faceVideoRef.current, new faceapi.TinyFaceDetectorOptions())
+                .withFaceLandmarks()
+                .withFaceDescriptor();
+              if (detection && faceIntervalRef.current) {
+                let descriptor = detection.descriptor;
+                let users = useSettingsStore.getState().settings?.users || [];
+                for (let user of users) {
+                  if (!user.faceDescriptor) continue;
+                  try {
+                    let distance = faceapi.euclideanDistance(Object.values(user.faceDescriptor), descriptor);
+                    if (distance < FACE_DESCRIPTOR_CONFIDENCE_DISTANCE) {
+                      stopFaceLogin();
+                      _setShowFaceModal(false);
+                      localStorageWrapper.setItem("standDevPin", user.pin);
+                      useLoginStore.getState().setCurrentUser(user);
+                      useLoginStore.setState({ lastActionMillis: Infinity });
+                      if (pendingActionRef.current) {
+                        pendingActionRef.current();
+                        pendingActionRef.current = null;
+                      }
+                      return;
+                    }
+                  } catch (e) {}
+                }
               }
-              return;
-            }
-          } catch (e) {}
+            } catch (e) {}
+          }
+          // Brief yield between detections to let UI breathe
+          await new Promise((r) => setTimeout(r, 100));
         }
-      }, 500);
+      }
+      detectLoop();
     } catch (e) {
       _setShowPinModal(true);
     }
   }
 
   function stopFaceLogin() {
-    clearInterval(faceIntervalRef.current);
-    clearInterval(countdownRef.current);
+    faceIntervalRef.current = null;
+    cancelAnimationFrame(countdownRef.current);
     if (faceStreamRef.current) {
       faceStreamRef.current.getTracks().forEach((t) => t.stop());
       faceStreamRef.current = null;
@@ -983,6 +1029,80 @@ export function BikeStandScreen() {
         />
       )}
 
+      {/* Stand settings modal */}
+      {sShowStandSettings && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0, left: 0, right: 0, bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.5)",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 9999,
+          }}
+        >
+          <View
+            style={{
+              width: "70%",
+              maxWidth: 500,
+              backgroundColor: "white",
+              borderRadius: 14,
+              overflow: "hidden",
+            }}
+          >
+            <View
+              onClick={() => _setShowStandSettings(false)}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingHorizontal: 20,
+                paddingVertical: 18,
+                borderBottomWidth: 1,
+                borderBottomColor: gray(0.1),
+                cursor: "pointer",
+              }}
+            >
+              <Text style={{ fontSize: 22, fontWeight: "600", color: C.text }}>Stand Settings</Text>
+              <Text style={{ flex: 1, fontSize: 18, fontStyle: "italic", color: gray(0.35), textAlign: "center" }}>Tap to close</Text>
+            </View>
+            <View style={{ paddingHorizontal: 20, paddingVertical: 20 }}>
+              <Text style={{ fontSize: 14, fontWeight: "600", color: gray(0.4), marginBottom: 12, letterSpacing: 1 }}>LOGIN</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  let next = !sBypassFaceRecognition;
+                  _setBypassFaceRecognition(next);
+                  localStorageWrapper.setItem("standBypassFaceRecognition", String(next));
+                }}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  gap: 12,
+                  paddingVertical: 12,
+                  paddingHorizontal: 14,
+                  borderRadius: 10,
+                  borderWidth: 2,
+                  borderColor: C.buttonLightGreenOutline,
+                  backgroundColor: C.listItemWhite,
+                }}
+              >
+                <CheckBox_
+                  isChecked={sBypassFaceRecognition}
+                  onCheck={() => {
+                    let next = !sBypassFaceRecognition;
+                    _setBypassFaceRecognition(next);
+                    localStorageWrapper.setItem("standBypassFaceRecognition", String(next));
+                  }}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "500", color: C.text }}>Bypass facial recognition</Text>
+                  <Text style={{ fontSize: 14, color: gray(0.45), marginTop: 2 }}>Skip face scan and go straight to PIN entry on this device</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      )}
+
       {/* Face recognition modal */}
       {sShowFaceModal && (
         <View
@@ -1014,6 +1134,22 @@ export function BikeStandScreen() {
             <Text style={{ fontSize: 52, fontWeight: "700", color: C.green, marginTop: 16 }}>
               {sFaceCountdown}
             </Text>
+            <TouchableOpacity
+              onPress={() => {
+                stopFaceLogin();
+                _setShowFaceModal(false);
+                _setShowPinModal(true);
+              }}
+              style={{
+                marginTop: 20,
+                paddingVertical: 12,
+                paddingHorizontal: 28,
+                borderRadius: 8,
+                backgroundColor: gray(0.15),
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: "600", color: C.text }}>Use PIN</Text>
+            </TouchableOpacity>
           </View>
           <video
             ref={faceVideoRef}
@@ -1082,7 +1218,7 @@ export function BikeStandScreen() {
                 );
               })}
             </View>
-            <StandKeypad mode="phone" onKeyPress={handleStandPinKeyPress} />
+            <StandKeypad mode="phone" onKeyPress={handleStandPinKeyPress} fontSizeAdj={7} paddingAdj={42} />
             <TouchableOpacity
               onPress={() => { _setShowPinModal(false); _setPin(""); pendingActionRef.current = null; }}
               style={{ marginTop: 16 }}
@@ -1103,7 +1239,7 @@ export function BikeStandScreen() {
               {/* Header row: customer info + status + show/hide toggle */}
               <View
                 onClick={() => { _setShowBikeDetails((p) => { if (p) _setDetailField(null); return !p; }); }}
-                style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingTop: 10, paddingBottom: 6, cursor: "pointer" }}
+                style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 12, paddingTop: 13, paddingBottom: 9, cursor: "pointer" }}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                   <Text style={{ fontSize: 18, fontWeight: "600", color: C.text }}>
@@ -1132,6 +1268,8 @@ export function BikeStandScreen() {
                       }}
                       modalCoordY={30}
                       buttonText={rs.label}
+                      itemHeight={69}
+                      itemTextStyle={{ fontSize: 23 }}
                     />
                   </View>
                 )}
@@ -1147,7 +1285,7 @@ export function BikeStandScreen() {
                     </Text>
                   ) : null}
                   <Image_ icon={ICONS.info} size={26} />
-                  <Text style={{ fontSize: 18, fontStyle: "italic", color: gray(0.35) }}>Tap for info</Text>
+                  <Text style={{ fontSize: 18, fontStyle: "italic", color: gray(0.35) }}>Tap for workorder info</Text>
                 </View>
               </View>
 
@@ -1386,8 +1524,11 @@ export function BikeStandScreen() {
                         onPress={() => {
                           let current = Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) || 0;
                           if (current <= 1) return;
+                          let newDays = current - 1;
                           let woID = selectedWorkorder.id;
-                          let waitObj = { ...(selectedWorkorder?.waitTime || {}), maxWaitTimeDays: current - 1 };
+                          let allWaits = (zSettings.waitTimes || []).filter((w) => w.maxWaitTimeDays > 0);
+                          let match = allWaits.reduce((best, w) => (!best || Math.abs(w.maxWaitTimeDays - newDays) < Math.abs(best.maxWaitTimeDays - newDays)) ? w : best, null);
+                          let waitObj = match ? { ...match, maxWaitTimeDays: newDays } : { ...(selectedWorkorder?.waitTime || {}), maxWaitTimeDays: newDays };
                           useOpenWorkordersStore.getState().setField("waitTime", waitObj, woID, false);
                           clearTimeout(waitDaysDebounceRef.current);
                           waitDaysDebounceRef.current = setTimeout(() => {
@@ -1403,8 +1544,11 @@ export function BikeStandScreen() {
                       <TouchableOpacity
                         onPress={() => {
                           let current = Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) || 0;
+                          let newDays = current + 1;
                           let woID = selectedWorkorder.id;
-                          let waitObj = { ...(selectedWorkorder?.waitTime || {}), maxWaitTimeDays: current + 1 };
+                          let allWaits = (zSettings.waitTimes || []).filter((w) => w.maxWaitTimeDays > 0);
+                          let match = allWaits.reduce((best, w) => (!best || Math.abs(w.maxWaitTimeDays - newDays) < Math.abs(best.maxWaitTimeDays - newDays)) ? w : best, null);
+                          let waitObj = match ? { ...match, maxWaitTimeDays: newDays } : { ...(selectedWorkorder?.waitTime || {}), maxWaitTimeDays: newDays };
                           useOpenWorkordersStore.getState().setField("waitTime", waitObj, woID, false);
                           clearTimeout(waitDaysDebounceRef.current);
                           waitDaysDebounceRef.current = setTimeout(() => {
@@ -1610,11 +1754,11 @@ export function BikeStandScreen() {
                       borderRadius: 5,
                       borderColor: C.buttonLightGreenOutline,
                       paddingHorizontal: 4,
-                      paddingVertical: 14,
+                      paddingVertical: 14 + sNavPaddingAdj,
                       backgroundColor: undefined,
                     }}
                     textStyle={{
-                      fontSize: 19,
+                      fontSize: 19 + sNavFontAdj,
                       fontWeight: 400,
                       textAlign: "center",
                       color: C.textWhite,
@@ -1639,12 +1783,12 @@ export function BikeStandScreen() {
                           borderRadius: 5,
                           borderColor: C.buttonLightGreenOutline,
                           paddingHorizontal: 4,
-                          paddingVertical: item.id === "common" ? 22 : (splitButtonLabel(item.name).split("\n").length > 1 || item.name.length > 17) ? 10 : 20,
+                          paddingVertical: (item.id === "common" ? 19 : (splitButtonLabel(item.name).split("\n").length > 1 || item.name.length > 17) ? 10 : 20) + sNavPaddingAdj,
                           backgroundColor: undefined,
                         }}
                         numLines={splitButtonLabel(item.name).split("\n").length > 1 ? splitButtonLabel(item.name).split("\n").length : (item.name.length > 17 ? 2 : 1)}
                         textStyle={{
-                          fontSize: getQuickButtonFontSize(item.name, 12),
+                          fontSize: getQuickButtonFontSize(item.name, 12) + sNavFontAdj,
                           fontWeight: 400,
                           textAlign: "center",
                           color: isActive ? "white" : C.textWhite,
@@ -1656,10 +1800,10 @@ export function BikeStandScreen() {
                 })}
               </ScrollView>
 
-              {/* Static bottom container: Print + New buttons */}
+              {/* Static bottom container: Print + Menu */}
               {hasWorkorderReady && (
-                <View style={{ paddingHorizontal: 6, paddingVertical: 6, borderTopWidth: 1, borderTopColor: gray(0.15) }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                <View style={{ position: "relative", paddingHorizontal: 10, paddingVertical: 14, borderTopWidth: 1, borderTopColor: gray(0.15) }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-around" }}>
                     {/* Print button — opens unified print modal */}
                     {selectedWorkorder && (
                       <TouchableOpacity
@@ -1667,50 +1811,80 @@ export function BikeStandScreen() {
                         style={{
                           alignItems: "center",
                           justifyContent: "center",
-                          paddingHorizontal: 4,
+                          paddingHorizontal: 6,
                         }}
                       >
-                        <Image_ icon={selectedPrinterOffline ? warningIcon : ICONS.print} size={28} />
+                        <Image_ icon={selectedPrinterOffline ? warningIcon : ICONS.print} size={48} />
                       </TouchableOpacity>
                     )}
 
-                    {/* Search workorders button */}
+                    {/* Menu button */}
                     <TouchableOpacity
-                      onPress={() => _setShowWorkorderList(true)}
+                      onPress={(e) => {
+                        let rect = e.currentTarget.getBoundingClientRect();
+                        _setFooterMenuCoords({ x: rect.left, y: rect.top });
+                        _setShowFooterMenu((p) => !p);
+                      }}
                       style={{
                         alignItems: "center",
                         justifyContent: "center",
-                        paddingHorizontal: 4,
+                        paddingHorizontal: 6,
                       }}
                     >
-                      <Image_ icon={ICONS.search} size={34} />
-                    </TouchableOpacity>
-
-                    {/* New workorder button */}
-                    <TouchableOpacity
-                      onPress={handleNewWorkorderPress}
-                      style={{
-                        alignItems: "center",
-                        justifyContent: "center",
-                        paddingHorizontal: 4,
-                      }}
-                    >
-                      <Image_ icon={plusIcon} size={30} />
-                    </TouchableOpacity>
-
-                    {/* Edit sub-menu sizing */}
-                    <TouchableOpacity
-                      onPress={() => _setSubMenuEditMode(!sSubMenuEditMode)}
-                      style={{
-                        alignItems: "center",
-                        justifyContent: "center",
-                        paddingHorizontal: 4,
-                        marginLeft: "auto",
-                      }}
-                    >
-                      <Image_ icon={ICONS.editPencil} size={24} />
+                      <Image_ icon={ICONS.listsAndOptions} size={48} />
                     </TouchableOpacity>
                   </View>
+
+                  {/* Footer action menu modal */}
+                  <Modal visible={sShowFooterMenu} transparent={true} animationType="fade" onRequestClose={() => _setShowFooterMenu(false)}>
+                    <TouchableOpacity activeOpacity={1} onPress={() => _setShowFooterMenu(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.3)" }}>
+                      <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={{
+                        position: "absolute",
+                        bottom: window.innerHeight - sFooterMenuCoords.y,
+                        left: sFooterMenuCoords.x,
+                        backgroundColor: "white",
+                        borderRadius: 10,
+                        borderWidth: 2,
+                        borderColor: C.buttonLightGreenOutline,
+                        shadowColor: "#000",
+                        shadowOffset: { width: 0, height: -2 },
+                        shadowOpacity: 0.2,
+                        shadowRadius: 8,
+                        elevation: 5,
+                        overflow: "hidden",
+                        minWidth: 320,
+                      }}>
+                        <TouchableOpacity
+                          onPress={() => { _setShowFooterMenu(false); _setShowWorkorderList(true); }}
+                          style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}
+                        >
+                          <Image_ icon={ICONS.search} size={36} />
+                          <Text style={{ fontSize: 30, fontWeight: "500", color: C.text }}>Find Workorder</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => { _setShowFooterMenu(false); handleNewWorkorderPress(); }}
+                          style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}
+                        >
+                          <Image_ icon={plusIcon} size={36} />
+                          <Text style={{ fontSize: 30, fontWeight: "500", color: C.text }}>New Workorder</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => { _setShowFooterMenu(false); _setSubMenuEditMode(!sSubMenuEditMode); }}
+                          style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}
+                        >
+                          <Image_ icon={ICONS.editPencil} size={36} />
+                          <Text style={{ fontSize: 30, fontWeight: "500", color: C.text }}>Edit Sizing</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => { _setShowFooterMenu(false); _setShowStandSettings(true); }}
+                          style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 16 }}
+                        >
+                          <Image_ icon={ICONS.settings} size={36} />
+                          <Text style={{ fontSize: 30, fontWeight: "500", color: C.text }}>Settings</Text>
+                        </TouchableOpacity>
+                      </TouchableOpacity>
+                    </TouchableOpacity>
+                  </Modal>
                 </View>
               )}
             </View>
@@ -1885,7 +2059,7 @@ export function BikeStandScreen() {
                             >
                               <div
                                 onClick={() => handleDiscountSelect(itemObj.inventoryItemID, null)}
-                                style={{ padding: "9px 10px", cursor: "pointer", fontSize: 19, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
+                                style={{ padding: "9px 10px", cursor: "pointer", fontSize: 24, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
                                 onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
                                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
                               >
@@ -1897,7 +2071,7 @@ export function BikeStandScreen() {
                                 <div
                                   key={d.name + "-" + dIdx}
                                   onClick={() => handleDiscountSelect(itemObj.inventoryItemID, d)}
-                                  style={{ padding: "9px 10px", cursor: "pointer", fontSize: 19, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
+                                  style={{ padding: "9px 10px", cursor: "pointer", fontSize: 24, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
                                   onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
                                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
                                 >
@@ -2080,41 +2254,52 @@ export function BikeStandScreen() {
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "center",
-                  paddingVertical: 8,
-                  paddingHorizontal: 10,
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
                   borderTopWidth: 1,
                   borderTopColor: gray(0.1),
                   backgroundColor: "rgba(255,255,255,0.65)",
-                  gap: 16,
+                  gap: 24,
                 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.5) }}>W</Text>
-                    <TouchableOpacity onPress={() => { let v = sSubMenuWidthAdj - 1; _setSubMenuWidthAdj(v); localStorageWrapper.setItem("standSubMenuWidthAdj", String(v)); }} style={{ width: 30, height: 30, borderRadius: 6, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>-</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={{ fontSize: 18, fontWeight: "600", color: gray(0.5) }}>H</Text>
+                    <TouchableOpacity onPress={() => { let v = sSubMenuHeightAdj - 1; _setSubMenuHeightAdj(v); localStorageWrapper.setItem("standSubMenuHeightAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>-</Text>
                     </TouchableOpacity>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: C.text, minWidth: 20, textAlign: "center" }}>{sSubMenuWidthAdj}</Text>
-                    <TouchableOpacity onPress={() => { let v = sSubMenuWidthAdj + 1; _setSubMenuWidthAdj(v); localStorageWrapper.setItem("standSubMenuWidthAdj", String(v)); }} style={{ width: 30, height: 30, borderRadius: 6, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>+</Text>
-                    </TouchableOpacity>
-                  </View>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.5) }}>H</Text>
-                    <TouchableOpacity onPress={() => { let v = sSubMenuHeightAdj - 1; _setSubMenuHeightAdj(v); localStorageWrapper.setItem("standSubMenuHeightAdj", String(v)); }} style={{ width: 30, height: 30, borderRadius: 6, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>-</Text>
-                    </TouchableOpacity>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: C.text, minWidth: 20, textAlign: "center" }}>{sSubMenuHeightAdj}</Text>
-                    <TouchableOpacity onPress={() => { let v = sSubMenuHeightAdj + 1; _setSubMenuHeightAdj(v); localStorageWrapper.setItem("standSubMenuHeightAdj", String(v)); }} style={{ width: 30, height: 30, borderRadius: 6, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>+</Text>
+                    <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, minWidth: 26, textAlign: "center" }}>{sSubMenuHeightAdj}</Text>
+                    <TouchableOpacity onPress={() => { let v = sSubMenuHeightAdj + 1; _setSubMenuHeightAdj(v); localStorageWrapper.setItem("standSubMenuHeightAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>+</Text>
                     </TouchableOpacity>
                   </View>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.5) }}>Font</Text>
-                    <TouchableOpacity onPress={() => { let v = sSubMenuFontAdj - 1; _setSubMenuFontAdj(v); localStorageWrapper.setItem("standSubMenuFontAdj", String(v)); }} style={{ width: 30, height: 30, borderRadius: 6, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>-</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={{ fontSize: 18, fontWeight: "600", color: gray(0.5) }}>Font</Text>
+                    <TouchableOpacity onPress={() => { let v = sSubMenuFontAdj - 1; _setSubMenuFontAdj(v); localStorageWrapper.setItem("standSubMenuFontAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>-</Text>
                     </TouchableOpacity>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: C.text, minWidth: 20, textAlign: "center" }}>{sSubMenuFontAdj}</Text>
-                    <TouchableOpacity onPress={() => { let v = sSubMenuFontAdj + 1; _setSubMenuFontAdj(v); localStorageWrapper.setItem("standSubMenuFontAdj", String(v)); }} style={{ width: 30, height: 30, borderRadius: 6, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>+</Text>
+                    <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, minWidth: 26, textAlign: "center" }}>{sSubMenuFontAdj}</Text>
+                    <TouchableOpacity onPress={() => { let v = sSubMenuFontAdj + 1; _setSubMenuFontAdj(v); localStorageWrapper.setItem("standSubMenuFontAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ width: 1, height: 28, backgroundColor: gray(0.2) }} />
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={{ fontSize: 18, fontWeight: "600", color: gray(0.5) }}>Nav</Text>
+                    <TouchableOpacity onPress={() => { let v = sNavFontAdj - 1; _setNavFontAdj(v); localStorageWrapper.setItem("standNavFontAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>-</Text>
+                    </TouchableOpacity>
+                    <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, minWidth: 26, textAlign: "center" }}>{sNavFontAdj}</Text>
+                    <TouchableOpacity onPress={() => { let v = sNavFontAdj + 1; _setNavFontAdj(v); localStorageWrapper.setItem("standNavFontAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>+</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Text style={{ fontSize: 18, fontWeight: "600", color: gray(0.5) }}>Pad</Text>
+                    <TouchableOpacity onPress={() => { let v = sNavPaddingAdj - 1; _setNavPaddingAdj(v); localStorageWrapper.setItem("standNavPaddingAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>-</Text>
+                    </TouchableOpacity>
+                    <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, minWidth: 26, textAlign: "center" }}>{sNavPaddingAdj}</Text>
+                    <TouchableOpacity onPress={() => { let v = sNavPaddingAdj + 1; _setNavPaddingAdj(v); localStorageWrapper.setItem("standNavPaddingAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
+                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>+</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -2125,45 +2310,45 @@ export function BikeStandScreen() {
                   flexDirection: "row",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  paddingVertical: 6,
-                  paddingHorizontal: 10,
+                  paddingVertical: 14,
+                  paddingHorizontal: 16,
                   borderTopWidth: 1,
                   borderTopColor: gray(0.1),
                   backgroundColor: "rgba(255,255,255,0.65)",
                   cursor: "pointer",
                 }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 20 }}>
                   <View style={{ alignItems: "center" }}>
-                    <Text style={{ fontSize: 12, color: gray(0.5) }}>Subtotal</Text>
-                    <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>{formatCurrencyDisp(totals.runningSubtotal, true)}</Text>
+                    <Text style={{ fontSize: 15, color: gray(0.5) }}>Subtotal</Text>
+                    <Text style={{ fontSize: 22, fontWeight: "600", color: C.text }}>{formatCurrencyDisp(totals.runningSubtotal, true)}</Text>
                   </View>
                   <View style={{ alignItems: "center" }}>
-                    <Text style={{ fontSize: 12, color: gray(0.5) }}>Discount</Text>
-                    <Text style={{ fontSize: 16, fontWeight: "600", color: C.red }}>-{formatCurrencyDisp(totals.runningDiscount, true)}</Text>
+                    <Text style={{ fontSize: 15, color: gray(0.5) }}>Discount</Text>
+                    <Text style={{ fontSize: 22, fontWeight: "600", color: C.red }}>-{formatCurrencyDisp(totals.runningDiscount, true)}</Text>
                   </View>
                   <View style={{ alignItems: "center" }}>
-                    <Text style={{ fontSize: 12, color: gray(0.5) }}>Tax</Text>
-                    <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>{formatCurrencyDisp(totals.runningTax, true)}</Text>
+                    <Text style={{ fontSize: 15, color: gray(0.5) }}>Tax</Text>
+                    <Text style={{ fontSize: 22, fontWeight: "600", color: C.text }}>{formatCurrencyDisp(totals.runningTax, true)}</Text>
                   </View>
                   <View style={{ alignItems: "center" }}>
-                    <Text style={{ fontSize: 15, color: gray(0.5) }}>Total</Text>
-                    <Text style={{ fontSize: 20, fontWeight: "700", color: C.text }}>{formatCurrencyDisp(totals.finalTotal, true)}</Text>
+                    <Text style={{ fontSize: 18, color: gray(0.5) }}>Total</Text>
+                    <Text style={{ fontSize: 28, fontWeight: "700", color: C.text }}>{formatCurrencyDisp(totals.finalTotal, true)}</Text>
                   </View>
                 </View>
                 {selectedWorkorder?.workorderLines?.length > 0 && (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6, marginRight: 10 }}>
-                    <Text style={{ fontSize: 22, fontStyle: "italic", color: gray(0.35) }}>Tap for items</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginRight: 10 }}>
+                    <Text style={{ fontSize: 26, fontStyle: "italic", color: gray(0.35) }}>Tap for items</Text>
                     <View style={{
                       backgroundColor: C.blue,
-                      borderRadius: 8,
-                      minWidth: 24,
-                      height: 24,
+                      borderRadius: 10,
+                      minWidth: 32,
+                      height: 32,
                       alignItems: "center",
                       justifyContent: "center",
-                      paddingHorizontal: 4,
+                      paddingHorizontal: 6,
                     }}>
-                      <Text style={{ fontSize: 17, fontWeight: "700", color: C.textWhite }}>
+                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.textWhite }}>
                         {selectedWorkorder.workorderLines.reduce((sum, ln) => sum + (ln.qty || 1), 0)}
                       </Text>
                     </View>
@@ -2176,26 +2361,23 @@ export function BikeStandScreen() {
 
           {/* Printer selection modal */}
           {sShowPrinterSelectModal && (
-            <View style={{
-              position: "absolute",
-              top: 0, left: 0, right: 0, bottom: 0,
-              backgroundColor: "rgba(0,0,0,0.5)",
-              justifyContent: "center",
-              alignItems: "center",
-            }}>
-              <View style={{
+            <View
+              onClick={() => _setShowPrinterSelectModal(false)}
+              style={{
+                position: "absolute",
+                top: 0, left: 0, right: 0, bottom: 0,
+                backgroundColor: "rgba(0,0,0,0.5)",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <View onClick={(e) => e.stopPropagation()} style={{
                 backgroundColor: C.listItemWhite,
                 borderRadius: 14,
                 width: "75%",
                 maxHeight: "85%",
                 overflow: "hidden",
               }}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: gray(0.15) }}>
-                  <Text style={{ fontSize: 20, fontWeight: "700", color: C.text }}>Print & Send</Text>
-                  <TouchableOpacity onPress={() => _setShowPrinterSelectModal(false)}>
-                    <Text style={{ fontSize: 22, fontWeight: "700", color: gray(0.4) }}>X</Text>
-                  </TouchableOpacity>
-                </View>
                 <ScrollView style={{ paddingHorizontal: 20, paddingVertical: 16 }}>
 
                   {/* Intake section */}
@@ -2212,80 +2394,49 @@ export function BikeStandScreen() {
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 15 }}>
                         <Button_
                           text="Print"
-                          onPress={() => { handleIntakePrint(); _setShowPrinterSelectModal(false); }}
+                          onPress={() => { handleIntakePrint(); }}
                           colorGradientArr={COLOR_GRADIENTS.green}
                           style={{ paddingVertical: 14, paddingHorizontal: 24 }}
-                          textStyle={{ fontSize: 16, fontWeight: "700" }}
+                          textStyle={{ fontSize: 23, fontWeight: "700" }}
                           enabled={!!sSelectedPrinterID && !selectedPrinterOffline}
                         />
                         {(customerCell || customerEmail) ? (
                           <Button_
                             text={customerCell && customerEmail ? "Text & Email" : customerCell ? "Text" : "Email"}
-                            onPress={() => { handleIntakeElectronic(); _setShowPrinterSelectModal(false); }}
+                            onPress={() => { handleIntakeElectronic(); }}
                             colorGradientArr={COLOR_GRADIENTS.blue}
                             style={{ paddingVertical: 14, paddingHorizontal: 24 }}
-                            textStyle={{ fontSize: 16, fontWeight: "700" }}
+                            textStyle={{ fontSize: 23, fontWeight: "700" }}
                           />
                         ) : null}
                       </View>
                       {(customerCell || customerEmail) ? (
                         <Button_
                           text="Both"
-                          onPress={() => { handleIntakePrint(); handleIntakeElectronic(); _setShowPrinterSelectModal(false); }}
+                          onPress={() => { handleIntakePrint(); handleIntakeElectronic(); }}
                           colorGradientArr={COLOR_GRADIENTS.purple}
                           style={{ paddingVertical: 14, paddingHorizontal: 24 }}
-                          textStyle={{ fontSize: 16, fontWeight: "700" }}
+                          textStyle={{ fontSize: 23, fontWeight: "700" }}
                           enabled={!!sSelectedPrinterID && !selectedPrinterOffline}
                         />
                       ) : null}
                     </View>
                   </View>
 
-                  {/* Workorder section */}
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: gray(0.5), marginBottom: 8, letterSpacing: 1 }}>WORKORDER</Text>
-                  <View style={{
-                    borderRadius: 10,
-                    borderWidth: 1,
-                    borderColor: C.buttonLightGreenOutline,
-                    backgroundColor: C.backgroundListWhite,
-                    padding: 14,
-                    marginBottom: 20,
-                  }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 15 }}>
-                        <Button_
-                          text="Print"
-                          onPress={() => { handleWorkorderPrint(); _setShowPrinterSelectModal(false); }}
-                          colorGradientArr={COLOR_GRADIENTS.green}
-                          style={{ paddingVertical: 14, paddingHorizontal: 24 }}
-                          textStyle={{ fontSize: 16, fontWeight: "700" }}
-                          enabled={!!sSelectedPrinterID && !selectedPrinterOffline}
-                        />
-                        {(customerCell || customerEmail) ? (
-                          <Button_
-                            text={customerCell && customerEmail ? "Text & Email" : customerCell ? "Text" : "Email"}
-                            onPress={() => { handleWorkorderElectronic(); _setShowPrinterSelectModal(false); }}
-                            colorGradientArr={COLOR_GRADIENTS.blue}
-                            style={{ paddingVertical: 14, paddingHorizontal: 24 }}
-                            textStyle={{ fontSize: 16, fontWeight: "700" }}
-                          />
-                        ) : null}
-                      </View>
-                      {(customerCell || customerEmail) ? (
-                        <Button_
-                          text="Both"
-                          onPress={() => { handleWorkorderPrint(); handleWorkorderElectronic(); _setShowPrinterSelectModal(false); }}
-                          colorGradientArr={COLOR_GRADIENTS.purple}
-                          style={{ paddingVertical: 14, paddingHorizontal: 24 }}
-                          textStyle={{ fontSize: 16, fontWeight: "700" }}
-                          enabled={!!sSelectedPrinterID && !selectedPrinterOffline}
-                        />
-                      ) : null}
-                    </View>
+                  {/* Print workorder button */}
+                  <View style={{ marginTop: 20, marginBottom: 40 }}>
+                    <Button_
+                      text="PRINT WORKORDER"
+                      onPress={() => { handleWorkorderPrint(); }}
+                      colorGradientArr={COLOR_GRADIENTS.yellow}
+                      buttonStyle={{ paddingVertical: 28, paddingHorizontal: 30 }}
+                      textStyle={{ fontSize: 22, fontWeight: "700", color: "white" }}
+                      enabled={!!sSelectedPrinterID && !selectedPrinterOffline}
+                    />
                   </View>
 
                   {/* Printer selection section */}
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: gray(0.5), marginBottom: 8, letterSpacing: 1 }}>PRINTER</Text>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: gray(0.5), marginTop: 30, marginBottom: 8, letterSpacing: 1 }}>AVAILABLE PRINTERS</Text>
                   {receiptPrinters.length === 0 ? (
                     <Text style={{ fontSize: 16, color: gray(0.5), paddingVertical: 20, textAlign: "center" }}>No receipt printers configured</Text>
                   ) : (
@@ -2309,10 +2460,7 @@ export function BikeStandScreen() {
                               <Text style={{ fontSize: 12, fontWeight: "700", color: C.red, backgroundColor: "yellow", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: "hidden", alignSelf: "flex-start" }}>Printer Offline</Text>
                             </View>
                           ) : null}
-                          <TouchableOpacity
-                            onPress={() => handleSelectPrinter(printer.id)}
-                            style={{ flexDirection: "row", alignItems: "center" }}
-                          >
+                          <View style={{ flexDirection: "row", alignItems: "center" }}>
                             <View style={{ flex: 1 }}>
                               <Text style={{ fontSize: 17, fontWeight: isSelected ? "700" : "normal", color: C.text }}>
                                 {printer.label || printer.printerName || printer.id}
@@ -2321,11 +2469,15 @@ export function BikeStandScreen() {
                                 <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 2 }}>{printer.printerName}</Text>
                               ) : null}
                             </View>
-                            {isSelected && (
-                              <Text style={{ fontSize: 18, color: C.green, fontWeight: "700" }}>{"\u2713"}</Text>
-                            )}
-                          </TouchableOpacity>
-                          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10, justifyContent: "flex-end" }}>
+                          </View>
+                          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, justifyContent: "space-between" }}>
+                            <CheckBox_
+                              isChecked={isSelected}
+                              text="Use this printer"
+                              textStyle={{ fontSize: 16 }}
+                              buttonStyle={{ backgroundColor: "transparent" }}
+                              onCheck={() => handleSelectPrinter(printer.id)}
+                            />
                             <Button_
                               text="Test Print"
                               onPress={() => {
@@ -2515,78 +2667,60 @@ export function BikeStandScreen() {
                   </View>
                 </ScrollView>
 
-                {/* Notes target label + toggle */}
+                {/* Notes target label + toggle + action buttons */}
                 <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 6, gap: 8 }}>
                   <TouchableOpacity
                     onPress={() => switchNotesTarget("intakeNotes")}
                     style={{
-                      paddingHorizontal: 12,
-                      paddingVertical: 5,
-                      borderRadius: 6,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                      paddingHorizontal: 24,
+                      paddingVertical: 10,
+                      borderRadius: 8,
                       backgroundColor: sNotesTarget === "intakeNotes" ? C.orange : gray(0.08),
                     }}
                   >
-                    <Text style={{ fontSize: 19, fontWeight: "600", color: sNotesTarget === "intakeNotes" ? C.textWhite : gray(0.5) }}>Intake</Text>
+                    <Image_ icon={ICONS.editPencil} size={24} />
+                    <Text style={{ fontSize: 26, fontWeight: "600", color: sNotesTarget === "intakeNotes" ? C.textWhite : gray(0.5) }}>Intake</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={() => switchNotesTarget("receiptNotes")}
                     style={{
-                      marginLeft: 10,
-                      paddingHorizontal: 12,
-                      paddingVertical: 5,
-                      borderRadius: 6,
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 8,
+                      paddingHorizontal: 24,
+                      paddingVertical: 10,
+                      borderRadius: 8,
                       backgroundColor: sNotesTarget === "receiptNotes" ? C.green : gray(0.08),
                     }}
                   >
-                    <Text style={{ fontSize: 19, fontWeight: "600", color: sNotesTarget === "receiptNotes" ? C.textWhite : gray(0.5) }}>Receipt</Text>
+                    <Image_ icon={ICONS.receipt} size={24} />
+                    <Text style={{ fontSize: 26, fontWeight: "600", color: sNotesTarget === "receiptNotes" ? C.textWhite : gray(0.5) }}>Receipt</Text>
                   </TouchableOpacity>
-                  <Text style={{ fontSize: 21, color: gray(0.4) }}>
+                  <Text style={{ fontSize: 26, color: gray(0.4) }}>
                     Adding to <Text style={{ color: sNotesTarget === "intakeNotes" ? C.orange : C.green }}>{sNotesTarget === "intakeNotes" ? "Intake" : "Receipt"}</Text> notes
                   </Text>
-                </View>
-                <View style={{ paddingHorizontal: 10, paddingBottom: 6 }}>
-                  <View style={{
-                    borderWidth: 2,
-                    borderColor: C.buttonLightGreenOutline,
-                    borderRadius: 8,
-                    backgroundColor: C.listItemWhite,
-                    paddingVertical: 6,
-                    paddingHorizontal: 10,
-                    minHeight: 44,
-                    maxHeight: 44,
-                  }}>
-                    <Text style={{ fontSize: 22, color: C.text }} numberOfLines={2}>
-                      {activeText}<Text style={{ color: C.blue }}>|</Text>
-                    </Text>
-                  </View>
-                </View>
 
-                {/* Keypad */}
-                <View style={{ paddingHorizontal: 10, paddingBottom: 6 }}>
-                  <StandKeypad mode="alpha" showNumberRow={true} onKeyPress={(key) => {
-                    if (key === "CLR") { activeSetText(""); return; }
-                    if (key === "\u232B") { activeSetText(activeText.slice(0, -1)); return; }
-                    let char = key === " " ? " " : key.toLowerCase();
-                    if (activeText.length === 0) char = key.toUpperCase();
-                    activeSetText(activeText + char);
-                  }} />
-                </View>
+                  <View style={{ flex: 1 }} />
 
-                {/* Action buttons: Discount, Split, Save */}
-                <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingBottom: 10, gap: 8 }}>
                   {/* Discount button */}
                   <View style={{ position: "relative" }}>
                     <TouchableOpacity
                       onPress={() => _setNotesDiscountOpen((p) => !p)}
                       style={{
-                        paddingVertical: 12,
-                        paddingHorizontal: 14,
-                        borderRadius: 8,
+                        flexDirection: "row",
                         alignItems: "center",
-                        justifyContent: "center",
+                        gap: 8,
+                        paddingVertical: 10,
+                        paddingHorizontal: 24,
+                        borderRadius: 8,
+                        backgroundColor: "rgb(103, 124, 231)",
                       }}
                     >
                       <Image_ icon={ICONS.dollarYellow} size={32} />
+                      <Text style={{ fontSize: 26, fontWeight: "600", color: C.textWhite }}>Discount</Text>
                     </TouchableOpacity>
                     {sNotesDiscountOpen && (() => {
                       let currentLine = (selectedWorkorder?.workorderLines || []).find((ln) => ln.id === sIntakeNotesLineID);
@@ -2597,7 +2731,7 @@ export function BikeStandScreen() {
                           style={{
                             position: "absolute",
                             bottom: "100%",
-                            left: 0,
+                            right: 0,
                             zIndex: 100,
                             backgroundColor: "white",
                             borderRadius: 6,
@@ -2610,7 +2744,7 @@ export function BikeStandScreen() {
                         >
                           <div
                             onClick={() => { handleDiscountSelect(invItemID, null); _setNotesDiscountOpen(false); }}
-                            style={{ padding: "9px 10px", cursor: "pointer", fontSize: 19, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
+                            style={{ padding: "9px 10px", cursor: "pointer", fontSize: 24, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
                           >
                             No Discount
                           </div>
@@ -2620,7 +2754,7 @@ export function BikeStandScreen() {
                             <div
                               key={d.name + "-" + dIdx}
                               onClick={() => { handleDiscountSelect(invItemID, d); _setNotesDiscountOpen(false); }}
-                              style={{ padding: "9px 10px", cursor: "pointer", fontSize: 19, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
+                              style={{ padding: "9px 10px", cursor: "pointer", fontSize: 24, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
                             >
                               {d.name}
                             </div>
@@ -2629,6 +2763,7 @@ export function BikeStandScreen() {
                       );
                     })()}
                   </View>
+
                   {/* Split button */}
                   {(() => {
                     let currentLine = (selectedWorkorder?.workorderLines || []).find((ln) => ln.id === sIntakeNotesLineID);
@@ -2654,19 +2789,54 @@ export function BikeStandScreen() {
                         }}
                         disabled={!canSplit}
                         style={{
-                          paddingVertical: 12,
-                          paddingHorizontal: 14,
-                          borderRadius: 8,
+                          flexDirection: "row",
                           alignItems: "center",
-                          justifyContent: "center",
+                          gap: 8,
+                          paddingVertical: 10,
+                          paddingHorizontal: 24,
+                          borderRadius: 8,
+                          backgroundColor: C.blue,
                           opacity: canSplit ? 1 : 0.4,
                         }}
                       >
                         <Image_ icon={ICONS.axe} size={32} />
+                        <Text style={{ fontSize: 26, fontWeight: "600", color: C.textWhite }}>Split</Text>
                       </TouchableOpacity>
                     );
                   })()}
-                  {/* Save button */}
+
+                </View>
+                <View style={{ paddingHorizontal: 10, paddingBottom: 6 }}>
+                  <View style={{
+                    borderWidth: 2,
+                    borderColor: C.buttonLightGreenOutline,
+                    borderRadius: 8,
+                    backgroundColor: C.listItemWhite,
+                    paddingVertical: 6,
+                    paddingHorizontal: 10,
+                    minHeight: 44,
+                    maxHeight: 44,
+                  }}>
+                    <Text style={{ fontSize: 22, color: C.text }} numberOfLines={2}>
+                      {activeText}<Text style={{ color: C.blue }}>|</Text>
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Keypad */}
+                <View style={{ paddingHorizontal: 10, paddingBottom: 6 }}>
+                  <StandKeypad mode="alpha" showNumberRow={true} onKeyPress={(key) => {
+                    if (key === "CLR") { activeSetText(""); return; }
+                    if (key === "\u232B") { activeSetText(activeText.slice(0, -1)); return; }
+                    if (key === "ENTER") { activeSetText(activeText + "\n"); return; }
+                    let char = key === " " ? " " : key.toLowerCase();
+                    if (activeText.length === 0) char = key.toUpperCase();
+                    activeSetText(activeText + char);
+                  }} />
+                </View>
+
+                {/* Save button */}
+                <View style={{ paddingHorizontal: 10, paddingBottom: 10 }}>
                   <TouchableOpacity
                     onPress={() => {
                       let updatedLines = (selectedWorkorder?.workorderLines || []).map((ln) =>
@@ -2676,16 +2846,16 @@ export function BikeStandScreen() {
                       _setIntakeNotesLineID(null);
                     }}
                     style={{
-                      flex: 1,
                       paddingVertical: 12,
                       borderRadius: 8,
                       backgroundColor: C.green,
                       alignItems: "center",
                     }}
                   >
-                    <Text style={{ fontSize: 18, fontWeight: "600", color: C.textWhite }}>Save</Text>
+                    <Text style={{ fontSize: 23, fontWeight: "600", color: C.textWhite }}>Save & Close</Text>
                   </TouchableOpacity>
                 </View>
+
               </div>
             </div>
             );
@@ -2890,23 +3060,7 @@ const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
           overflow: "hidden",
         }}
       >
-        {/* Header */}
-        <View style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          borderBottomWidth: 1,
-          borderBottomColor: gray(0.1),
-        }}>
-          <Text style={{ fontSize: 20, fontWeight: "600", color: C.text }}>Open Workorders</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={{ fontSize: 22, color: gray(0.5), fontWeight: "600", paddingHorizontal: 8 }}>{"\u2715"}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Tap to close */}
+        {/* Header — tap to close */}
         <View
           onClick={onClose}
           onTouchStart={(e) => { _swipeRef.current = e.touches[0].clientY; }}
@@ -2918,13 +3072,17 @@ const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
             }
           }}
           style={{
-            height: 15,
+            flexDirection: "row",
             alignItems: "center",
-            justifyContent: "center",
+            paddingHorizontal: 20,
+            paddingVertical: 22,
+            borderBottomWidth: 1,
+            borderBottomColor: gray(0.1),
             cursor: "pointer",
           }}
         >
-          <Text style={{ fontSize: 16, fontStyle: "italic", color: gray(0.35) }}>Tap to close</Text>
+          <Text style={{ fontSize: 22, fontWeight: "600", color: C.text }}>Open Workorders</Text>
+          <Text style={{ flex: 1, fontSize: 18, fontStyle: "italic", color: gray(0.35), textAlign: "center" }}>Tap to close</Text>
         </View>
 
         {/* Workorder list */}
@@ -3184,6 +3342,8 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
       handleSearchTextChange("");
     } else if (key === "\u232B") {
       handleSearchTextChange(sSearchText.slice(0, -1));
+    } else if (key === "ENTER") {
+      handleSearchTextChange(sSearchText + "\n");
     } else if (key === " ") {
       handleSearchTextChange(sSearchText + " ");
     } else {
@@ -3204,6 +3364,8 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
       val = "";
     } else if (key === "\u232B") {
       val = val.slice(0, -1);
+    } else if (key === "ENTER") {
+      val = val + "\n";
     } else if (key === " ") {
       val = val + " ";
     } else {
@@ -3516,6 +3678,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
 const StandCustomItemModal = ({ type, onSave, onClose }) => {
   const zDiscounts = useSettingsStore((s) => s.settings?.discounts);
   const zLaborRate = useSettingsStore((s) => s.settings?.laborRateByHour);
+  const zSettings = useSettingsStore((s) => s.settings) || {};
 
   const isLabor = type === "labor";
 
@@ -3528,6 +3691,7 @@ const StandCustomItemModal = ({ type, onSave, onClose }) => {
   const [sDiscountObj, _setDiscountObj] = useState(null);
   const [sPriceManuallySet, _setPriceManuallySet] = useState(false);
   const [sActiveField, _setActiveField] = useState("name"); // "name" | "minutes" | "price" | "intake" | "receipt"
+  const [sQuickNotesTarget, _setQuickNotesTarget] = useState(null); // null | "intakeNotes" | "receiptNotes"
 
   function handleKeyPress(key) {
     let field = sActiveField;
@@ -3538,11 +3702,12 @@ const StandCustomItemModal = ({ type, onSave, onClose }) => {
         setter("");
       } else if (key === "\u232B") {
         setter(getter.slice(0, -1));
+      } else if (key === "ENTER") {
+        setter(getter + "\n");
       } else if (key === " ") {
         setter(getter + " ");
       } else {
         let char = key.toLowerCase();
-        // Auto-cap first letter
         if (getter.length === 0) char = key.toUpperCase();
         setter(getter + char);
       }
@@ -3650,10 +3815,11 @@ const StandCustomItemModal = ({ type, onSave, onClose }) => {
     { key: "name", label: isLabor ? "Labor Description" : "Item Name", required: true },
   ];
   if (isLabor) {
-    fields.push({ key: "minutes", label: "Minutes", sublabel: zLaborRate ? "@ $" + usdTypeMask(zLaborRate, { withDollar: false }).display + "/hr" : "" });
+    fields.push({ key: "minutes-price", paired: true });
+  } else {
+    fields.push({ key: "price", label: "Price", required: true });
   }
   fields.push(
-    { key: "price", label: "Price", required: true },
     { key: "intake", label: "Intake Notes" },
     { key: "receipt", label: "Receipt Notes" },
   );
@@ -3698,28 +3864,89 @@ const StandCustomItemModal = ({ type, onSave, onClose }) => {
           overflow: "hidden",
         }}
       >
-        {/* Header */}
-        <div style={{
-          display: "flex",
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: 12,
-          borderBottom: "1px solid " + gray(0.1),
-        }}>
-          <Text style={{ fontSize: 18, fontWeight: "600", color: C.text }}>
+        {/* Header — tap to close */}
+        <div
+          onClick={onClose}
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "center",
+            padding: 16,
+            borderBottom: "1px solid " + gray(0.1),
+            cursor: "pointer",
+          }}
+        >
+          <Text style={{ fontSize: 22, fontWeight: "600", color: C.text }}>
             Add Custom {isLabor ? "Labor" : "Item"}
           </Text>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={{ fontSize: 20, color: gray(0.5), fontWeight: "600", paddingHorizontal: 8 }}>{"\u2715"}</Text>
-          </TouchableOpacity>
+          <Text style={{ flex: 1, fontSize: 18, fontStyle: "italic", color: gray(0.35), textAlign: "center" }}>Tap to close</Text>
         </div>
 
         {/* Fields */}
         <ScrollView style={{ flex: 1, paddingHorizontal: 12, paddingTop: 8 }}>
           {fields.map((field) => {
+            if (field.paired) {
+              let isMinActive = sActiveField === "minutes";
+              let isPriceActive = sActiveField === "price";
+              let minVal = getFieldValue("minutes");
+              let priceVal = getFieldValue("price");
+              return (
+                <div key="minutes-price" style={{ display: "flex", flexDirection: "row", gap: 6, marginBottom: 6 }}>
+                  <div
+                    onClick={() => _setActiveField("minutes")}
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: 10,
+                      borderRadius: 8,
+                      borderWidth: 2,
+                      borderStyle: "solid",
+                      borderColor: isMinActive ? C.blue : C.buttonLightGreenOutline,
+                      backgroundColor: isMinActive ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <View>
+                      <Text style={{ fontSize: 17, color: gray(0.5) }}>Minutes</Text>
+                      {zLaborRate ? <Text style={{ fontSize: 14, color: gray(0.4) }}>{"@ $" + usdTypeMask(zLaborRate, { withDollar: false }).display + "/hr"}</Text> : null}
+                    </View>
+                    <Text style={{ fontSize: 20, fontWeight: "500", color: minVal ? C.text : gray(0.3), flex: 1 }}>
+                      {minVal || ""}
+                      {isMinActive && <span style={{ color: C.blue }}>|</span>}
+                    </Text>
+                  </div>
+                  <div
+                    onClick={() => _setActiveField("price")}
+                    style={{
+                      flex: 1,
+                      display: "flex",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: 10,
+                      borderRadius: 8,
+                      borderWidth: 2,
+                      borderStyle: "solid",
+                      borderColor: isPriceActive ? C.blue : C.buttonLightGreenOutline,
+                      backgroundColor: isPriceActive ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <Text style={{ fontSize: 17, color: gray(0.5) }}>Price *</Text>
+                    <Text style={{ fontSize: 20, fontWeight: "500", color: priceVal ? C.text : gray(0.3), flex: 1 }}>
+                      {priceVal || "$0.00"}
+                      {isPriceActive && <span style={{ color: C.blue }}>|</span>}
+                    </Text>
+                  </div>
+                </div>
+              );
+            }
             let isActive = sActiveField === field.key;
             let val = getFieldValue(field.key);
+            let isNotes = field.key === "intake" || field.key === "receipt";
             return (
               <div
                 key={field.key}
@@ -3737,27 +3964,41 @@ const StandCustomItemModal = ({ type, onSave, onClose }) => {
                   borderColor: isActive ? C.blue : C.buttonLightGreenOutline,
                   backgroundColor: isActive ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
                   cursor: "pointer",
+                  maxWidth: field.key === "price" ? 300 : undefined,
                 }}
               >
-                <View style={{ width: 120 }}>
-                  <Text style={{ fontSize: 13, color: gray(0.5) }}>
+                <View style={{ width: 130 }}>
+                  <Text style={{ fontSize: 17, color: gray(0.5) }}>
                     {field.label}{field.required ? " *" : ""}
                   </Text>
                   {field.sublabel ? (
-                    <Text style={{ fontSize: 10, color: gray(0.4) }}>{field.sublabel}</Text>
+                    <Text style={{ fontSize: 14, color: gray(0.4) }}>{field.sublabel}</Text>
                   ) : null}
                 </View>
-                <Text style={{ fontSize: 16, fontWeight: "500", color: val ? getFieldColor(field.key) : gray(0.3), flex: 1 }}>
+                <Text style={{ fontSize: 20, fontWeight: "500", color: val ? getFieldColor(field.key) : gray(0.3), flex: 1 }}>
                   {val || (field.key === "price" ? "$0.00" : "")}
                   {isActive && <span style={{ color: C.blue }}>|</span>}
                 </Text>
+                {isNotes && (
+                  <TouchableOpacity
+                    onPress={(e) => { e.stopPropagation(); _setQuickNotesTarget(field.key === "intake" ? "intakeNotes" : "receiptNotes"); }}
+                    style={{
+                      paddingHorizontal: 12,
+                      paddingVertical: 8,
+                      borderRadius: 6,
+                      backgroundColor: C.blue,
+                    }}
+                  >
+                    <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>Quick Notes</Text>
+                  </TouchableOpacity>
+                )}
               </div>
             );
           })}
 
           {/* Discount selector */}
           <div style={{ marginTop: 4, marginBottom: 8 }}>
-            <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 4, paddingLeft: 2 }}>Discount</Text>
+            <Text style={{ fontSize: 21, color: gray(0.5), marginBottom: 4, paddingLeft: 2 }}>Discount</Text>
             <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
               <TouchableOpacity
                 onPress={() => _setDiscountObj(null)}
@@ -3770,7 +4011,7 @@ const StandCustomItemModal = ({ type, onSave, onClose }) => {
                   backgroundColor: !sDiscountObj ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
                 }}
               >
-                <Text style={{ fontSize: 13, color: !sDiscountObj ? C.blue : gray(0.5) }}>None</Text>
+                <Text style={{ fontSize: 22, color: !sDiscountObj ? C.blue : gray(0.5) }}>None</Text>
               </TouchableOpacity>
               {(zDiscounts || [])
                 .filter((d) => d.type !== "$" || Number(d.value) <= sPriceCents)
@@ -3789,20 +4030,20 @@ const StandCustomItemModal = ({ type, onSave, onClose }) => {
                         backgroundColor: isSelected ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
                       }}
                     >
-                      <Text style={{ fontSize: 13, color: isSelected ? C.blue : C.text }}>{d.name}</Text>
+                      <Text style={{ fontSize: 22, color: isSelected ? C.blue : C.text }}>{d.name}</Text>
                     </TouchableOpacity>
                   );
                 })}
             </View>
             {discountedCents !== null && (
               <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6, paddingLeft: 2 }}>
-                <Text style={{ fontSize: 14, color: gray(0.5), textDecorationLine: "line-through" }}>
+                <Text style={{ fontSize: 23, color: gray(0.5), textDecorationLine: "line-through" }}>
                   {"$" + usdTypeMask(sPriceCents, { withDollar: false }).display}
                 </Text>
-                <Text style={{ fontSize: 16, fontWeight: "600", color: C.green }}>
+                <Text style={{ fontSize: 25, fontWeight: "600", color: C.green }}>
                   {"$" + usdTypeMask(discountedCents, { withDollar: false }).display}
                 </Text>
-                <Text style={{ fontSize: 12, color: C.lightred }}>
+                <Text style={{ fontSize: 21, color: C.lightred }}>
                   {sDiscountObj.type === DISCOUNT_TYPES.percent
                     ? sDiscountObj.value + "% off"
                     : "$" + usdTypeMask(sDiscountObj.value, { withDollar: false }).display + " off"}
@@ -3814,7 +4055,7 @@ const StandCustomItemModal = ({ type, onSave, onClose }) => {
 
         {/* Keypad */}
         <div style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 8 }}>
-          <StandKeypad mode={keypadMode} onKeyPress={handleKeyPress} />
+          <StandKeypad mode={keypadMode} onKeyPress={handleKeyPress} fontSizeAdj={keypadMode === "phone" ? 28 : 0} paddingAdj={keypadMode === "phone" ? 42 : 0} />
         </div>
 
         {/* Save button */}
@@ -3830,11 +4071,27 @@ const StandCustomItemModal = ({ type, onSave, onClose }) => {
               opacity: canSave ? 1 : 0.4,
             }}
           >
-            <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>
+            <Text style={{ fontSize: 20, fontWeight: "600", color: "white" }}>
               Add {isLabor ? "Labor" : "Item"} to Workorder
             </Text>
           </TouchableOpacity>
         </div>
+
+        <NoteHelperDropdown
+          visible={!!sQuickNotesTarget}
+          onClose={() => _setQuickNotesTarget(null)}
+          workorderLine={{ intakeNotes: sIntakeNotes, receiptNotes: sReceiptNotes }}
+          onUpdateLine={(updatedLine) => {
+            _setIntakeNotes(updatedLine.intakeNotes || "");
+            _setReceiptNotes(updatedLine.receiptNotes || "");
+          }}
+          anchorPosition={{ x: 0, y: 0 }}
+          noteHelpers={zSettings.noteHelpers || []}
+          noteHelpersTarget={sQuickNotesTarget || "intakeNotes"}
+          centered={true}
+          fontSizeAdj={8}
+          chipPaddingVertAdj={8}
+        />
       </div>
     </div>
   );

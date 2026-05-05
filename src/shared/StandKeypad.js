@@ -84,6 +84,7 @@ export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, 
       ))}
       <div style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
         <KeyButton keyLabel=" " displayLabel="SPACE" onClick={onKeyPress} style={{ flex: 3, height: 78 + pAdj * 2, fontSize: 28 + fAdj }} />
+        <KeyButton keyLabel="ENTER" displayLabel="↵" onClick={onKeyPress} style={{ flex: 1, height: 78 + pAdj * 2, fontSize: 28 + fAdj }} />
         <KeyButton keyLabel="CLR" onClick={onKeyPress} style={{ flex: 1, height: 78 + pAdj * 2, fontSize: 18 + fAdj, color: gray(0.4) }} />
       </div>
     </div>

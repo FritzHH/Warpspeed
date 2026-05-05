@@ -659,7 +659,7 @@ export const Items_WorkorderItemsTab = ({}) => {
         />
       )}
 
-      {hasActiveSale && (
+      {hasActiveSale && (activeSale?.workorderIDs?.length || 0) > 1 && (
         <Animated.View
           style={{
             opacity: fadeAnim,
@@ -673,7 +673,7 @@ export const Items_WorkorderItemsTab = ({}) => {
           }}
         >
           <Text style={{ color: "black", fontSize: 12, fontWeight: "600" }}>
-            {((activeSale?.workorderIDs?.length || 0) > 1 ? "Combined Sale in Progress" : "Sale in Progress") + " - $" + formatCurrencyDisp((activeSale?.amountCaptured || 0) - (activeSale?.amountRefunded || 0)) + " Paid"}
+            {"Combined Sale in Progress - $" + formatCurrencyDisp((activeSale?.amountCaptured || 0) - (activeSale?.amountRefunded || 0)) + " Paid"}
           </Text>
         </Animated.View>
       )}
@@ -871,6 +871,7 @@ export const Items_WorkorderItemsTab = ({}) => {
                 paddingHorizontal: 14,
                 paddingVertical: 3,
                 alignItems: "center",
+                backgroundColor: hasPayments ? "rgba(255, 235, 59, 0.25)" : "transparent",
               }}
             >
               <View style={{ flexDirection: "row", alignItems: "center" }}>
@@ -1028,13 +1029,10 @@ export const LineItemComponent = ({
       )}
       <View
         style={{
-          flexDirection: "row",
+          flexDirection: "column",
           width: "100%",
-          alignItems: "center",
           backgroundColor: isInReplaceMode ? lightenRGBByPercent(C.orange, 75) : inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 80) : inventoryItem.customPart ? lightenRGBByPercent(C.green, 80) : C.backgroundListWhite,
           paddingVertical: 3,
-          paddingRight: 5,
-          paddingLeft: 4,
           marginVertical: isInReplaceMode ? 0 : 3,
           marginHorizontal: 8,
           borderColor: isInReplaceMode ? C.orange : C.listItemBorder,
@@ -1048,27 +1046,29 @@ export const LineItemComponent = ({
           borderLeftWidth: isInReplaceMode ? 2 : 3,
         }}
       >
+        {!!(workorderLine.discountObj?.name || workorderLine.discountObj?.discountName) && (
+          <View style={{ flexDirection: "row", justifyContent: "flex-end", paddingLeft: 5, paddingRight: 15 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: C.lightred, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, gap: 6 }}>
+              <Text style={{ color: "white", fontSize: 13 }}>
+                {workorderLine.discountObj.name || workorderLine.discountObj.discountName}
+              </Text>
+              {!!workorderLine.discountObj?.savings && (
+                <Text style={{ color: "white", fontSize: 13 }}>
+                  {"-$" + formatCurrencyDisp(workorderLine.discountObj.savings)}
+                </Text>
+              )}
+            </View>
+          </View>
+        )}
+        <View style={{ flexDirection: "row", width: "100%", alignItems: "center", paddingRight: 5, paddingLeft: 4 }}>
         <View
           style={{
             width: "60%",
             justifyContent: "center",
             flexDirection: "column",
-            // backgroundColor: "blue",
           }}
         >
           <View style={{ width: "100%" }}>
-            {!!(workorderLine.discountObj?.name || workorderLine.discountObj?.discountName) && (
-              <View style={{ alignSelf: "flex-end", flexDirection: "row", alignItems: "center", gap: 6 }}>
-                <Text style={{ color: C.lightred, fontSize: 14, marginRight: 5 }}>
-                  {workorderLine.discountObj.name || workorderLine.discountObj.discountName}
-                </Text>
-                {!!workorderLine.discountObj?.savings && (
-                  <Text style={{ color: C.lightred, fontSize: 14 }}>
-                    {"-$" + formatCurrencyDisp(workorderLine.discountObj.savings)}
-                  </Text>
-                )}
-              </View>
-            )}
             {(() => {
               const hasIntake = !!(workorderLine.intakeNotes || "").trim();
               const hasReceipt = !!(workorderLine.receiptNotes || "").trim();
@@ -1511,12 +1511,8 @@ export const LineItemComponent = ({
             </Modal>
           </View>
         </View>
+        </View>
       </View>
     </TouchableOpacity>
   );
-  // try {
-  //   return setComponent();
-  // } catch (e) {
-  //   log("Error returning LineItemComponent", e);
-  // }
 };

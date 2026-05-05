@@ -87,7 +87,7 @@ export const StandaloneSaleComponent = ({}) => {
       >
         <Text style={{ fontSize: 72, color: gray(0.08) }}>{"SALE"}</Text>
         <Button_
-          text={"Active Sales" + (standaloneSales.length > 0 ? ` (${standaloneSales.length})` : "")}
+          text={`Active Sales (${standaloneSales.length})`}
           enabled={standaloneSales.length > 0}
           onPress={() => _setShowActiveSalesModal(true)}
           colorGradientArr={standaloneSales.length > 0 ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
@@ -199,7 +199,7 @@ export const StandaloneSaleComponent = ({}) => {
           alignItems: "center",
         }}
       >
-        <Tooltip text="New workorder" position="top">
+        <Tooltip text="New workorder / customer lookup" position="top" offsetX={63}>
           <Button_
             onPress={() => {
               useTabNamesStore.getState().setItems({

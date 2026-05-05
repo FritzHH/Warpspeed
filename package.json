@@ -67,7 +67,6 @@
     "fun": "firebase deploy --only functions:initiatePaymentIntent",
     "dfun": "firebase deploy --only functions",
     "dprocess": "firebase deploy --only functions:processServerDrivenStripePayment",
-    "dhook": "firebase deploy --only functions:createTenant",
     "auth": "firebase login --reauth",
     "begin": "yarn build && serve -s build --ssl-cert cert.pem --ssl-key key.pem",
     "serveit": "serve -s build --ssl-cert cert.pem --ssl-key key.pem",

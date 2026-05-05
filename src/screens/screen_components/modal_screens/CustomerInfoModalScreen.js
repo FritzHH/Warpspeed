@@ -19,6 +19,9 @@ import {
   gray,
   lightenRGBByPercent,
   formatWorkorderNumber,
+  localStorageWrapper,
+  log,
+  printBuilder,
   removeDashesFromPhone,
   resolveStatus,
   usdTypeMask,
@@ -47,6 +50,7 @@ import {
   dbListenToNewMessages,
   dbCheckCellPhoneExists,
   dbMigrateCustomerPhone,
+  dbSavePrintObj,
 } from "../../../db_calls_wrapper";
 import { smsService } from "../../../data_service_modules";
 import { readActiveSale, readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
@@ -723,13 +727,12 @@ export const CustomerInfoScreenModalComponent = ({
               />
             )}
             {!isNewCustomer && (
-              <Tooltip text="Deposits, gift cards and credits" position="top">
+              <Tooltip text="Deposits, gift cards and credits" position="top" style={{ marginTop: 20 }}>
                 <Button_
                   onPress={() => _sSetShowDepositModal(true)}
                   colorGradientArr={COLOR_GRADIENTS.green}
                   icon={ICONS.greenDollar}
                   buttonStyle={{
-                    marginTop: 20,
                     height: 36,
                     width: "90%",
                   }}
@@ -742,14 +745,12 @@ export const CustomerInfoScreenModalComponent = ({
           </View>
           <View style={{}} />
           {!!button2Text && (
-            <Tooltip text="All edits auto-saved" position="top">
+            <Tooltip text="All edits auto-saved" position="top" style={{ marginTop: 20, marginBottom: 10 }}>
               <Button_
                 icon={ICONS.close1}
                 colorGradientArr={COLOR_GRADIENTS.blue}
                 onPress={handleButton2Press}
                 buttonStyle={{
-                  marginTop: 20,
-                  marginBottom: 10,
                   height: 40,
                   width: "90%",
                 }}
@@ -933,6 +934,7 @@ export const CustomerInfoScreenModalComponent = ({
         />
         <CreditEditModal
           credit={sEditingCredit}
+          customer={sCustomerInfo}
           onClose={() => _sSetEditingCredit(null)}
           onSave={(credit, newAmountCents) => {
             if (newAmountCents <= 0) {
@@ -1247,9 +1249,15 @@ const WorkordersList = ({ workorders, onSelect }) => {
   );
 };
 
-const CreditEditModal = ({ credit, onClose, onSave, onDelete }) => {
+const CreditEditModal = ({ credit, customer, onClose, onSave, onDelete }) => {
   const [sDisplay, _sSetDisplay] = useState("");
   const [sCents, _sSetCents] = useState(0);
+  const [sSendSMS, _sSetSendSMS] = useState(false);
+  const [sSendEmail, _sSetSendEmail] = useState(false);
+  const [sPrint, _sSetPrint] = useState(false);
+
+  let hasPhone = !!(customer?.customerCell);
+  let hasEmail = !!(customer?.email);
 
   useEffect(() => {
     if (credit) {
@@ -1275,9 +1283,26 @@ const CreditEditModal = ({ credit, onClose, onSave, onDelete }) => {
 
   function handleConfirm() {
     let finalCents = sCents;
-    // 0 < val < 1 dollar (i.e. < 100 cents but > 0) -> auto-change to $1.00
     if (finalCents > 0 && finalCents < 100) finalCents = 100;
     if (finalCents > credit.amountCents) finalCents = credit.amountCents;
+    if (sSendSMS || sSendEmail || sPrint) {
+      let settings = useSettingsStore.getState().getSettings();
+      let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+      if (sSendSMS || sSendEmail) {
+        let customerForReceipt = {
+          first: customer?.first || "",
+          last: customer?.last || "",
+          customerCell: customer?.customerCell || "",
+          email: customer?.email || "",
+          id: customer?.id || "",
+        };
+        sendCreditReceipt(credit, customerForReceipt, settings, sSendSMS, sSendEmail);
+      }
+      if (sPrint) {
+        let toPrint = printBuilder.credit(credit, customer, _ctx);
+        dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
+      }
+    }
     onSave(credit, finalCents);
   }
 
@@ -1351,9 +1376,38 @@ const CreditEditModal = ({ credit, onClose, onSave, onDelete }) => {
             }}
           />
         </View>
+        <View style={{ marginBottom: 14 }}>
+          <Text style={{ fontSize: 12, color: gray(0.45), fontWeight: "600", marginBottom: 6 }}>
+            Send Receipt
+          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <CheckBox_
+              text="SMS"
+              isChecked={sSendSMS}
+              onCheck={() => _sSetSendSMS(!sSendSMS)}
+              enabled={hasPhone}
+              textStyle={{ fontSize: 13, color: hasPhone ? C.text : gray(0.3) }}
+              buttonStyle={{ marginRight: 18 }}
+            />
+            <CheckBox_
+              text="Email"
+              isChecked={sSendEmail}
+              onCheck={() => _sSetSendEmail(!sSendEmail)}
+              enabled={hasEmail}
+              textStyle={{ fontSize: 13, color: hasEmail ? C.text : gray(0.3) }}
+              buttonStyle={{ marginRight: 18 }}
+            />
+            <CheckBox_
+              text="Print"
+              isChecked={sPrint}
+              onCheck={() => _sSetPrint(!sPrint)}
+              textStyle={{ fontSize: 13 }}
+            />
+          </View>
+        </View>
         <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
           <Button_
-            text="Delete Credit"
+            text="Delete"
             icon={ICONS.trash}
             iconSize={14}
             colorGradientArr={COLOR_GRADIENTS.red}
@@ -1369,7 +1423,7 @@ const CreditEditModal = ({ credit, onClose, onSave, onDelete }) => {
               onPress={onClose}
             />
             <Button_
-              text="Save"
+              text="Save & Print"
               colorGradientArr={COLOR_GRADIENTS.green}
               textStyle={{ color: C.textWhite, fontSize: 13 }}
               buttonStyle={{ height: 34, borderRadius: 5, paddingHorizontal: 20 }}

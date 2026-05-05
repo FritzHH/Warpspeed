@@ -2,11 +2,11 @@ import { cloneDeep } from "lodash";
 import {
   generateEAN13Barcode,
   calculateRunningTotals,
+  capitalizeFirstLetterOfString,
   formatCurrencyDisp,
-  findTemplateByType,
   log,
 } from "../../../../utils";
-import { dbSendSMS, dbSendEmail, dbUploadPDFAndSendSMS } from "../../../../db_calls_wrapper";
+import { dbSendSMS, dbSendReceipt } from "../../../../db_calls_wrapper";
 import { generatePrefixedEAN13 } from "../../../../utils";
 import { build_db_path } from "../../../../constants";
 import { useLoginStore, useSettingsStore } from "../../../../stores";
@@ -405,267 +405,118 @@ export function splitWorkorderLinesToSingleQty(workorders) {
 }
 
 // ─── Send sale receipt via SMS/email ──────────────────────────
-function applyVars(template, vars) {
-  let result = template;
-  for (const [key, val] of Object.entries(vars)) {
-    result = result.replace(new RegExp("\\{" + key + "\\}", "g"), val || "");
-  }
-  return result;
-}
 
-export async function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate, emailTemplate, translatedReceipt, translatedPdfLabels, langCode, transactions, credits) {
+export function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate, emailTemplate, translatedReceipt, translatedPdfLabels, langCode, transactions, credits) {
   dlog(DCAT.RECEIPT, "sendSaleReceipt_start", "CheckoutUtils", { saleId: sale?.id, hasCustomer: !!customer, hasSmsTemplate: !!smsTemplate, hasEmailTemplate: !!emailTemplate });
   if (!sale || !settings) return;
   const { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
-  const firstName = customer?.first || "Customer";
-  const storeName = settings?.storeInfo?.displayName || "our store";
-  const total = formatCurrencyDisp(sale.total, true);
-
-  // Generate PDF receipt and upload to Cloud Storage
-  let receiptURL = "";
-  try {
-    let base64;
-    if (translatedReceipt && translatedPdfLabels) {
-      // Use pre-translated receipt data and labels for Spanish PDF
-      const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
-      base64 = generateSaleReceiptPDF(translatedReceipt, translatedPdfLabels);
-    } else {
-      const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-      const receiptData = printBuilder.sale(sale, transactions || [], customer, workorder, settings?.salesTaxPercent, _ctx, credits);
-      const { generateSaleReceiptPDF } = await import("../../../../pdfGenerator");
-      base64 = generateSaleReceiptPDF(receiptData);
-    }
-    const storagePath = build_db_path.cloudStorage.saleReceiptPDF(sale.id, tenantID, storeID);
-
-    // SMS — upload PDF and send link in one call
-    if (smsTemplate && settings.autoSMSSalesReceipt && customer?.customerCell) {
-      const vars = { firstName, storeName, total, link: "{link}" };
-      let msg = applyVars(smsTemplate.content || smsTemplate.message || "", vars);
-      // Translate SMS message if non-English language
-      if (langCode && msg) {
-        try {
-          const { translateText } = await import("../../../../db_calls");
-          const result = await translateText({ text: msg, targetLanguage: langCode });
-          if (result?.data?.translatedText) msg = result.data.translatedText;
-        } catch (e) {
-          log("SMS translation failed, sending in English:", e);
-        }
-      }
-      const result = await dbUploadPDFAndSendSMS({
-        base64,
-        storagePath,
-        message: msg,
-        phoneNumber: customer.customerCell,
-        customerID: customer.id || "",
-        messageID: crypto.randomUUID(),
-      });
-      if (result?.data?.url) receiptURL = result.data.url;
-      dlog(DCAT.RECEIPT, "sendSaleReceipt_sms_sent", "CheckoutUtils", { saleId: sale?.id });
-      log("Sent sale receipt SMS to", customer.customerCell);
-    } else {
-      // No SMS but still upload PDF for email link
-      const { uploadStringToStorage } = await import("../../../../db_calls");
-      const uploadResult = await uploadStringToStorage(base64, storagePath, "base64");
-      if (uploadResult?.downloadURL) receiptURL = uploadResult.downloadURL;
-    }
-  } catch (e) {
-    dlog(DCAT.RECEIPT, "sendSaleReceipt_error", "CheckoutUtils", { message: e?.message });
-    log("Error generating/uploading sale receipt PDF:", e);
+  const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+  let receiptData, pdfLabels;
+  if (translatedReceipt && translatedPdfLabels) {
+    receiptData = translatedReceipt;
+    pdfLabels = translatedPdfLabels;
+  } else {
+    receiptData = printBuilder.sale(sale, transactions || [], customer, workorder, settings?.salesTaxPercent, _ctx, credits);
   }
 
-  // Email
-  if (emailTemplate && settings.autoEmailSalesReceipt && customer?.email) {
-    const vars = { firstName, storeName, total, link: receiptURL };
-    let subject = applyVars(emailTemplate.subject || "", vars);
-    const receiptLink = receiptURL
-      ? "<p style='margin:24px 0'><a href='" + receiptURL + "' style='display:inline-block;padding:12px 24px;background-color:#4CAF50;color:white;text-decoration:none;border-radius:6px;font-size:14px'>View Receipt</a></p>"
-      : "";
-    let html = applyVars(emailTemplate.content || emailTemplate.body || "", { ...vars, receiptLink });
-    // Translate email if non-English language
-    if (langCode) {
-      try {
-        const { translateText } = await import("../../../../db_calls");
-        const [subjectResult, bodyResult] = await Promise.all([
-          translateText({ text: subject, targetLanguage: langCode }),
-          translateText({ text: html, targetLanguage: langCode }),
-        ]);
-        if (subjectResult?.data?.translatedText) subject = subjectResult.data.translatedText;
-        if (bodyResult?.data?.translatedText) html = bodyResult.data.translatedText;
-      } catch (e) {
-        log("Email translation failed, sending in English:", e);
-      }
-    }
-    dbSendEmail(customer.email, subject, html);
-    dlog(DCAT.RECEIPT, "sendSaleReceipt_email_sent", "CheckoutUtils", { saleId: sale?.id });
-    log("Sent sale receipt email to", customer.email);
-  }
+  const storagePath = build_db_path.cloudStorage.saleReceiptPDF(sale.id, tenantID, storeID);
+  dbSendReceipt({
+    receiptType: "sale",
+    receiptData,
+    pdfLabels,
+    storagePath,
+    sendSMS: !!(smsTemplate && settings.autoSMSSalesReceipt && customer?.customerCell),
+    sendEmail: !!(emailTemplate && settings.autoEmailSalesReceipt && customer?.email),
+    customerEmail: customer?.email || "",
+    customerCell: customer?.customerCell || "",
+    customerID: customer?.id || "",
+    templateVars: {
+      firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
+      storeName: settings?.storeInfo?.displayName || "our store",
+      total: formatCurrencyDisp(sale.total, true),
+    },
+    smsMessageID: crypto.randomUUID(),
+    langCode: langCode || null,
+  });
 }
 
 // ─── Send Refund Receipt (SMS + Email) ────────────────────────
 
-export async function sendRefundReceipt(refundReceiptData, customer, settings, smsTemplate, emailTemplate) {
+export function sendRefundReceipt(refundReceiptData, customer, settings, smsTemplate, emailTemplate) {
   dlog(DCAT.RECEIPT, "sendRefundReceipt_start", "CheckoutUtils", { hasCustomer: !!customer });
   if (!refundReceiptData || !settings) return;
   const { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
-  const firstName = customer?.first || "Customer";
-  const storeName = settings?.storeInfo?.displayName || "our store";
-  const total = formatCurrencyDisp(refundReceiptData.refundAmount || 0, true);
-
-  let receiptURL = "";
-  try {
-    const { generateRefundReceiptPDF } = await import("../../../../pdfGenerator");
-    let base64 = generateRefundReceiptPDF(refundReceiptData);
-    const storagePath = build_db_path.cloudStorage.saleReceiptPDF(refundReceiptData.id, tenantID, storeID);
-
-    // SMS — upload PDF and send link
-    if (smsTemplate && settings.autoSMSSalesReceipt && customer?.customerCell) {
-      const vars = { firstName, storeName, total, link: "{link}" };
-      let msg = applyVars(smsTemplate.content || smsTemplate.message || "", vars);
-      const result = await dbUploadPDFAndSendSMS({
-        base64,
-        storagePath,
-        message: msg,
-        phoneNumber: customer.customerCell,
-        customerID: customer.id || "",
-        messageID: crypto.randomUUID(),
-      });
-      if (result?.data?.url) receiptURL = result.data.url;
-      log("Sent refund receipt SMS to", customer.customerCell);
-    } else {
-      // No SMS — still upload PDF for email link
-      const { uploadStringToStorage } = await import("../../../../db_calls");
-      const uploadResult = await uploadStringToStorage(base64, storagePath, "base64");
-      if (uploadResult?.downloadURL) receiptURL = uploadResult.downloadURL;
-    }
-  } catch (e) {
-    dlog(DCAT.RECEIPT, "sendRefundReceipt_error", "CheckoutUtils", { message: e?.message });
-    log("Error generating/uploading refund receipt PDF:", e);
-  }
-
-  // Email
-  if (emailTemplate && settings.autoEmailSalesReceipt && customer?.email) {
-    const vars = { firstName, storeName, total, link: receiptURL };
-    let subject = applyVars(emailTemplate.subject || "", vars);
-    const receiptLink = receiptURL
-      ? "<p style='margin:24px 0'><a href='" + receiptURL + "' style='display:inline-block;padding:12px 24px;background-color:#e53e3e;color:white;text-decoration:none;border-radius:6px;font-size:14px'>View Refund Receipt</a></p>"
-      : "";
-    let html = applyVars(emailTemplate.content || emailTemplate.body || "", { ...vars, receiptLink });
-    dbSendEmail(customer.email, subject, html);
-    log("Sent refund receipt email to", customer.email);
-  }
-  dlog(DCAT.RECEIPT, "sendRefundReceipt_complete", "CheckoutUtils", {});
+  const storagePath = build_db_path.cloudStorage.saleReceiptPDF(refundReceiptData.id, tenantID, storeID);
+  dbSendReceipt({
+    receiptType: "refund",
+    receiptData: refundReceiptData,
+    storagePath,
+    sendSMS: !!(smsTemplate && settings.autoSMSSalesReceipt && customer?.customerCell),
+    sendEmail: !!(emailTemplate && settings.autoEmailSalesReceipt && customer?.email),
+    customerEmail: customer?.email || "",
+    customerCell: customer?.customerCell || "",
+    customerID: customer?.id || "",
+    templateVars: {
+      firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
+      storeName: settings?.storeInfo?.displayName || "our store",
+      total: formatCurrencyDisp(refundReceiptData.refundAmount || 0, true),
+    },
+    smsMessageID: crypto.randomUUID(),
+  });
 }
 
 // ─── Send Credit Receipt (SMS + Email) ───────────────────────
 
-export async function sendCreditReceipt(creditObj, customer, settings, sendSMS, sendEmail) {
+export function sendCreditReceipt(creditObj, customer, settings, sendSMS, sendEmail) {
   if (!creditObj || !settings) return;
   const { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
-  const firstName = customer?.first || "Customer";
-  const storeName = settings?.storeInfo?.displayName || "our store";
-  const amount = formatCurrencyDisp(creditObj.amountCents || 0, true);
   const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
   const receiptData = printBuilder.credit(creditObj, customer, _ctx);
-
-  let receiptURL = "";
-  try {
-    const { generateCreditReceiptPDF } = await import("../../../../pdfGenerator");
-    let base64 = generateCreditReceiptPDF(receiptData);
-    const storagePath = build_db_path.cloudStorage.creditReceiptPDF(creditObj.id, tenantID, storeID);
-
-    const smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "creditReceipt");
-    if (sendSMS && customer?.customerCell && smsTemplate) {
-      const vars = { firstName, storeName, amount, link: "{link}" };
-      let msg = applyVars(smsTemplate.content || smsTemplate.message || "", vars);
-      const result = await dbUploadPDFAndSendSMS({
-        base64,
-        storagePath,
-        message: msg,
-        phoneNumber: customer.customerCell,
-        customerID: customer.id || "",
-        messageID: crypto.randomUUID(),
-      });
-      if (result?.data?.url) receiptURL = result.data.url;
-      log("Sent credit receipt SMS to", customer.customerCell);
-    } else {
-      const { uploadStringToStorage } = await import("../../../../db_calls");
-      const uploadResult = await uploadStringToStorage(base64, storagePath, "base64");
-      if (uploadResult?.downloadURL) receiptURL = uploadResult.downloadURL;
-    }
-  } catch (e) {
-    log("Error generating/uploading credit receipt PDF:", e);
-  }
-
-  if (sendEmail && customer?.email) {
-    const emailTemplate = findTemplateByType(settings?.emailTemplates, "creditReceipt");
-    if (emailTemplate) {
-      const vars = { firstName, storeName, amount, link: receiptURL };
-      let subject = applyVars(emailTemplate.subject || "", vars);
-      const receiptLink = receiptURL
-        ? "<p style='margin:24px 0'><a href='" + receiptURL + "' style='display:inline-block;padding:12px 24px;background-color:#4CAF50;color:white;text-decoration:none;border-radius:6px;font-size:14px'>View Credit Receipt</a></p>"
-        : "";
-      let html = applyVars(emailTemplate.content || emailTemplate.body || "", { ...vars, receiptLink });
-      dbSendEmail(customer.email, subject, html);
-      log("Sent credit receipt email to", customer.email);
-    }
-  }
+  const storagePath = build_db_path.cloudStorage.creditReceiptPDF(creditObj.id, tenantID, storeID);
+  dbSendReceipt({
+    receiptType: "credit",
+    receiptData,
+    storagePath,
+    sendSMS: !!(sendSMS && customer?.customerCell),
+    sendEmail: !!(sendEmail && customer?.email),
+    customerEmail: customer?.email || "",
+    customerCell: customer?.customerCell || "",
+    customerID: customer?.id || "",
+    templateVars: {
+      firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
+      storeName: settings?.storeInfo?.displayName || "our store",
+      amount: formatCurrencyDisp(creditObj.amountCents || 0, true),
+    },
+    smsMessageID: crypto.randomUUID(),
+  });
 }
 
 // ─── Send Gift Card Receipt (SMS + Email) ────────────────────
 
-export async function sendGiftCardReceipt(giftcardObj, customer, settings, sendSMS, sendEmail) {
+export function sendGiftCardReceipt(giftcardObj, customer, settings, sendSMS, sendEmail) {
   if (!giftcardObj || !settings) return;
   const { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
-  const firstName = customer?.first || "Customer";
-  const storeName = settings?.storeInfo?.displayName || "our store";
-  const amount = formatCurrencyDisp(giftcardObj.amountCents || 0, true);
   const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
   const receiptData = printBuilder.giftcard(giftcardObj, customer, _ctx);
-
-  let receiptURL = "";
-  try {
-    const { generateGiftCardReceiptPDF } = await import("../../../../pdfGenerator");
-    let base64 = generateGiftCardReceiptPDF(receiptData);
-    const storagePath = build_db_path.cloudStorage.giftCardReceiptPDF(giftcardObj.id, tenantID, storeID);
-
-    const smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "giftCardReceipt");
-    if (sendSMS && customer?.customerCell && smsTemplate) {
-      const vars = { firstName, storeName, amount, link: "{link}" };
-      let msg = applyVars(smsTemplate.content || smsTemplate.message || "", vars);
-      const result = await dbUploadPDFAndSendSMS({
-        base64,
-        storagePath,
-        message: msg,
-        phoneNumber: customer.customerCell,
-        customerID: customer.id || "",
-        messageID: crypto.randomUUID(),
-      });
-      if (result?.data?.url) receiptURL = result.data.url;
-      log("Sent gift card receipt SMS to", customer.customerCell);
-    } else {
-      const { uploadStringToStorage } = await import("../../../../db_calls");
-      const uploadResult = await uploadStringToStorage(base64, storagePath, "base64");
-      if (uploadResult?.downloadURL) receiptURL = uploadResult.downloadURL;
-    }
-  } catch (e) {
-    log("Error generating/uploading gift card receipt PDF:", e);
-  }
-
-  if (sendEmail && customer?.email) {
-    const emailTemplate = findTemplateByType(settings?.emailTemplates, "giftCardReceipt");
-    if (emailTemplate) {
-      const vars = { firstName, storeName, amount, link: receiptURL };
-      let subject = applyVars(emailTemplate.subject || "", vars);
-      const receiptLink = receiptURL
-        ? "<p style='margin:24px 0'><a href='" + receiptURL + "' style='display:inline-block;padding:12px 24px;background-color:#4CAF50;color:white;text-decoration:none;border-radius:6px;font-size:14px'>View Gift Card Receipt</a></p>"
-        : "";
-      let html = applyVars(emailTemplate.content || emailTemplate.body || "", { ...vars, receiptLink });
-      dbSendEmail(customer.email, subject, html);
-      log("Sent gift card receipt email to", customer.email);
-    }
-  }
+  const storagePath = build_db_path.cloudStorage.giftCardReceiptPDF(giftcardObj.id, tenantID, storeID);
+  dbSendReceipt({
+    receiptType: "giftcard",
+    receiptData,
+    storagePath,
+    sendSMS: !!(sendSMS && customer?.customerCell),
+    sendEmail: !!(sendEmail && customer?.email),
+    customerEmail: customer?.email || "",
+    customerCell: customer?.customerCell || "",
+    customerID: customer?.id || "",
+    templateVars: {
+      firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
+      storeName: settings?.storeInfo?.displayName || "our store",
+      amount: formatCurrencyDisp(giftcardObj.amountCents || 0, true),
+    },
+    smsMessageID: crypto.randomUUID(),
+  });
 }

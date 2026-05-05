@@ -1,0 +1,7 @@
+[debug] [2026-05-05T17:31:31.487Z] ----------------------------------------------------------------------
+[debug] [2026-05-05T17:31:31.491Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\hiebf\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js deploy
+[debug] [2026-05-05T17:31:31.491Z] CLI Version:   14.20.0
+[debug] [2026-05-05T17:31:31.491Z] Platform:      win32
+[debug] [2026-05-05T17:31:31.491Z] Node Version:  v22.14.0
+[debug] [2026-05-05T17:31:31.492Z] Time:          Tue May 05 2026 13:31:31 GMT-0400 (Eastern Daylight Time)
+[debug] [2026-05-05T17:31:31.492Z] ----------------------------------------------------------------------

@@ -1,9 +1,10 @@
 /* eslint-disable */
 import React, { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, Image, Alert } from "react-native-web";
+import { View, Text, TouchableOpacity, Image, Alert } from "react-native-web";
 import { C, Colors, Fonts } from "../styles";
-import { sendPasswordReset, dbLoginUser } from "../db_calls_wrapper";
+import { sendPasswordReset, dbLoginUser, dbLogout, loadTenantAndSettings } from "../db_calls_wrapper";
 import { gray } from "../utils";
+import { topUpPool } from "../idPool";
 
 const logo = require("../resources/default_app_logo_large.png");
 
@@ -12,11 +13,11 @@ const BRAND_BLUE = "#2B7CB5";
 const BRAND_YELLOW = "#D4B830";
 const BRAND_DARK_BLUE = "#1A5A8A";
 
-export function LoginScreen({ sessionError, onClearError }) {
+export function LoginScreen({ setUser }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(sessionError || "");
+  const [error, setError] = useState("");
   const [emailFocused, setEmailFocused] = useState(false);
   const [showPassword, setShowPassword] = useState(true);
   const [passwordFocused, setPasswordFocused] = useState(false);
@@ -29,15 +30,24 @@ export function LoginScreen({ sessionError, onClearError }) {
 
     setIsLoading(true);
     setError("");
-    if (onClearError) onClearError();
 
     try {
       const result = await dbLoginUser(email, password);
       if (!result.success) {
         setError(result.error ? getErrorMessage(result.error) : "Login failed. Please try again.");
+        return;
       }
+      await loadTenantAndSettings(result.tenantID, result.storeID, result.settings);
+      topUpPool();
+      setUser({
+        uid: result.user.uid,
+        email: result.user.email,
+        emailVerified: result.user.emailVerified,
+        displayName: result.user.displayName,
+      });
     } catch (error) {
       setError(getErrorMessage(error.message || error.code));
+      await dbLogout();
     } finally {
       setIsLoading(false);
     }
@@ -140,32 +150,28 @@ export function LoginScreen({ sessionError, onClearError }) {
             marginBottom: 4,
             marginLeft: 2,
           }}>EMAIL</Text>
-          <TextInput
-            style={{
-              width: "100%",
-              borderWidth: 2,
-              borderColor: emailBorder,
-              borderRadius: 10,
-              paddingVertical: 11,
-              paddingHorizontal: 14,
-              fontSize: 15,
-              backgroundColor: "#FAFBFC",
-              outlineWidth: 0,
-              outlineStyle: "none",
-              color: "#333",
-            }}
-            placeholder="you@example.com"
-            placeholderTextColor={gray(0.65)}
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
+          <input
+            type="email"
+            name="email"
+            id="email"
             autoComplete="email"
-            autoCorrect={false}
-            nativeID="email"
+            placeholder="you@example.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             onFocus={() => setEmailFocused(true)}
             onBlur={() => setEmailFocused(false)}
-            onSubmitEditing={() => {}}
+            style={{
+              width: "100%",
+              border: `2px solid ${emailBorder}`,
+              borderRadius: 10,
+              padding: "11px 14px",
+              fontSize: 15,
+              backgroundColor: "#FAFBFC",
+              outline: "none",
+              color: "#333",
+              boxSizing: "border-box",
+              fontFamily: "inherit",
+            }}
           />
         </View>
 
@@ -179,27 +185,26 @@ export function LoginScreen({ sessionError, onClearError }) {
             marginLeft: 2,
           }}>PASSWORD</Text>
           <View style={{ width: "100%", flexDirection: "row", alignItems: "center", borderWidth: 2, borderColor: passwordBorder, borderRadius: 10, backgroundColor: "#FAFBFC" }}>
-            <TextInput
-              style={{
-                flex: 1,
-                paddingVertical: 11,
-                paddingHorizontal: 14,
-                fontSize: 15,
-                outlineWidth: 0,
-                outlineStyle: "none",
-                color: "#333",
-                backgroundColor: "transparent",
-              }}
-              placeholder="Enter password"
-              placeholderTextColor={gray(0.65)}
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
+            <input
+              type={showPassword ? "text" : "password"}
+              name="password"
+              id="password"
               autoComplete="current-password"
-              nativeID="password"
+              placeholder="Enter password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
               onFocus={() => setPasswordFocused(true)}
               onBlur={() => setPasswordFocused(false)}
-              onSubmitEditing={handleSignIn}
+              style={{
+                flex: 1,
+                padding: "11px 14px",
+                fontSize: 15,
+                outline: "none",
+                color: "#333",
+                backgroundColor: "transparent",
+                border: "none",
+                fontFamily: "inherit",
+              }}
             />
             <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
               <Text style={{ fontSize: 16, color: gray(0.45), userSelect: "none" }}>{showPassword ? "\u{1F441}" : "\u{1F441}\u{200D}\u{1F5E8}"}</Text>

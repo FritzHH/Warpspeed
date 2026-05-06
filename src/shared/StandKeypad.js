@@ -51,6 +51,7 @@ export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, 
   const fAdj = fontSizeAdj;
   const pAdj = paddingAdj;
   const _actionColor = (key) => (key === "CLR" || key === "\u232B") ? { color: gray(0.4) } : {};
+  const _backspaceStyle = (key) => key === "\u232B" ? { flex: 3, maxWidth: 200, fontSize: 72 + fAdj } : {};
 
   if (mode === "phone") {
     return (
@@ -78,7 +79,7 @@ export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, 
       {QWERTY_ROWS.map((row, ri) => (
         <div key={ri} style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
           {row.map((key) => (
-            <KeyButton key={key} keyLabel={key} onClick={onKeyPress} style={{ flex: 1, height: 84 + pAdj * 2, maxWidth: 90 + pAdj * 2, fontSize: 28 + fAdj, ..._actionColor(key) }} />
+            <KeyButton key={key} keyLabel={key} onClick={onKeyPress} style={{ flex: 1, height: 84 + pAdj * 2, maxWidth: 90 + pAdj * 2, fontSize: 28 + fAdj, ..._actionColor(key), ..._backspaceStyle(key) }} />
           ))}
         </div>
       ))}

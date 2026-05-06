@@ -4870,7 +4870,6 @@ const WorkorderStatusesComponent = ({
                   initialColor={sModalBgColor}
                   onColorChange={(val) => {
                     _setModalBgColor(val.hex);
-                    _setModalTextColor(bestForegroundHex(val.hex));
                   }}
                 />
               </View>

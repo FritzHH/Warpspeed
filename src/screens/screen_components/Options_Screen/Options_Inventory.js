@@ -770,7 +770,7 @@ const QuickItemCanvas = React.forwardRef(({
     if (!sSelectedItemId) return;
     saveItems(rawItems.map((it) => {
       if (it.inventoryItemID !== sSelectedItemId) return it;
-      return { ...it, backgroundColor, textColor };
+      return { ...it, backgroundColor: backgroundColor || "", textColor: textColor || "#000000" };
     }));
   }
 
@@ -1134,9 +1134,7 @@ export function InventoryComponent({}) {
   function handleQuickButtonPress(buttonObj) {
     console.log("[Options_Inventory QB] handleQuickButtonPress button:", JSON.stringify(buttonObj, null, 2));
     console.log("[Options_Inventory QB] handleQuickButtonPress button.items count:", buttonObj.items?.length, "items:", JSON.stringify(buttonObj.items, null, 2));
-    _setCanvasEditMode(false);
     _setCanvasSelectedItemId(null);
-    quickCanvasRef.current?.clearPaintMode();
     // Intercept $LABOR and $ITEM buttons
     if (buttonObj.id === "labor" || buttonObj.id === "item") {
       const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
@@ -1730,7 +1728,7 @@ export function InventoryComponent({}) {
             width: "80%",
             paddingTop: 0,
             paddingLeft: 20,
-            paddingRight: 3,
+            paddingRight: 20,
           }}
         >
           {/** Section 1: Breadcrumbs + Back button (only when sub-menu is open) */}

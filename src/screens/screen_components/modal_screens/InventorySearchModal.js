@@ -13,7 +13,6 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
   const [sSearching, _setSearching] = useState(false);
   const [sCheckedIDs, _setCheckedIDs] = useState(new Set());
   const searchTimerRef = useRef(null);
-  const inputRef = useRef(null);
   const headerSwipeRef = useRef(null);
 
   function handleSearchTextChange(newText) {
@@ -104,27 +103,22 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: 12,
+            padding: 20,
             borderBottom: "1px solid " + gray(0.1),
             cursor: "pointer",
             gap: 8,
           }}
         >
           <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>Search Inventory</Text>
-          <Text style={{ fontSize: 18, fontStyle: "italic", color: gray(0.35) }}>Tap/swipe down to close</Text>
+          <Text style={{ fontSize: 36, fontStyle: "italic", color: gray(0.35) }}>Tap/swipe down to close</Text>
         </div>
 
         {/* Search display */}
         <div style={{ padding: 12, paddingBottom: 8 }}>
-          <input
-            ref={inputRef}
-            autoFocus
-            value={sSearchText}
-            onChange={(e) => handleSearchTextChange(e.target.value)}
-            placeholder="Search inventory..."
+          <div
             style={{
               width: "100%",
-              height: 44,
+              minHeight: 88,
               borderRadius: 8,
               borderWidth: 2,
               borderStyle: "solid",
@@ -132,13 +126,16 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
               backgroundColor: C.listItemWhite,
               paddingLeft: 12,
               paddingRight: 12,
-              fontSize: 20,
-              fontWeight: "500",
-              color: C.text,
-              outline: "none",
+              display: "flex",
+              alignItems: "center",
               boxSizing: "border-box",
             }}
-          />
+          >
+            <Text style={{ fontSize: 40, fontWeight: "500", color: sSearchText ? C.text : gray(0.4) }}>
+              {sSearchText || "Search inventory..."}
+              {sSearchText ? <Text style={{ color: C.blue }}>|</Text> : null}
+            </Text>
+          </div>
         </div>
 
         {/* Keypad */}
@@ -163,8 +160,8 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
                   display: "flex",
                   flexDirection: "row",
                   alignItems: "center",
-                  paddingTop: 9,
-                  paddingBottom: 9,
+                  paddingTop: 14,
+                  paddingBottom: 14,
                   paddingLeft: 10,
                   paddingRight: 10,
                   borderRadius: 0,
@@ -177,7 +174,7 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
                   <CheckBox_
                     isChecked={isChecked}
                     onCheck={() => toggleCheck(item.id)}
-                    size={20}
+                    size={40}
                   />
                 </div>
                 <TouchableOpacity
@@ -185,10 +182,10 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
                   style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
                 >
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 15, fontWeight: "600", color: C.text }} numberOfLines={1}>{name}</Text>
-                    {brand ? <Text style={{ fontSize: 12, color: gray(0.45) }} numberOfLines={1}>{brand}</Text> : null}
+                    <Text style={{ fontSize: 30, fontWeight: "600", color: C.text }} numberOfLines={1}>{name}</Text>
+                    {brand ? <Text style={{ fontSize: 24, color: gray(0.45) }} numberOfLines={1}>{brand}</Text> : null}
                   </View>
-                  <Text style={{ fontSize: 14, fontWeight: "600", color: C.green, marginLeft: 8 }}>
+                  <Text style={{ fontSize: 28, fontWeight: "600", color: C.green, marginLeft: 8 }}>
                     ${formatCurrencyDisp(price)}
                   </Text>
                 </TouchableOpacity>
@@ -206,13 +203,13 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
             <TouchableOpacity
               onPress={handleAddChecked}
               style={{
-                paddingVertical: 14,
+                paddingVertical: 24,
                 borderRadius: 8,
                 backgroundColor: C.green,
                 alignItems: "center",
               }}
             >
-              <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>
+              <Text style={{ fontSize: 24, fontWeight: "600", color: "white" }}>
                 Add {checkedCount} Item{checkedCount > 1 ? "s" : ""}
               </Text>
             </TouchableOpacity>

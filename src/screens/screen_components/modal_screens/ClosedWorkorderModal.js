@@ -83,43 +83,7 @@ const SaleCard = ({ sale, transactions = [], onRefund, onPress }) => {
         <Text style={{ fontSize: 12, color: gray(0.35) }}>
           {"Sale ID: " + sale.id}
         </Text>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <View
-            style={{
-              backgroundColor: sale.paymentComplete
-                ? lightenRGBByPercent(C.green, 70)
-                : lightenRGBByPercent(C.lightred, 60),
-              paddingHorizontal: 6,
-              paddingVertical: 1,
-              borderRadius: 8,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: "600",
-                color: sale.paymentComplete ? C.green : C.lightred,
-              }}
-            >
-              {sale.paymentComplete ? "Paid" : "Partial"}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={() => onRefund && onRefund(sale.id)}
-            disabled={totalRefunded >= sale.total}
-            style={{
-              marginLeft: 8,
-              borderWidth: 1,
-              borderColor: C.lightred,
-              borderRadius: 6,
-              paddingHorizontal: 8,
-              paddingVertical: 2,
-              opacity: totalRefunded >= sale.total ? 0.4 : 1,
-            }}
-          >
-            <Text style={{ fontSize: 10, fontWeight: "600", color: C.lightred }}>Refund</Text>
-          </TouchableOpacity>
-        </View>
+        <View style={{ flexDirection: "row", alignItems: "center" }} />
       </View>
 
       {!!sale.millis && (

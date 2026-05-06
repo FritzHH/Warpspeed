@@ -1,7 +1,6 @@
 /* eslint-disable */
 import { View, Text, ScrollView, TouchableOpacity, TextInput } from "react-native-web";
 import { useState, useEffect, useRef } from "react";
-import * as faceapi from "face-api.js";
 import { C, ICONS } from "../styles";
 import {
   useSettingsStore,
@@ -28,13 +27,13 @@ import {
   compressImage,
   log,
 } from "../utils";
-import { dbUploadWorkorderMedia, dbGetCustomer, dbSaveCustomer, dbListenToOpenWorkorders, dbListenToInventory } from "../db_calls_wrapper";
+import { dbUploadWorkorderMedia, dbGetCustomer, dbSaveCustomer, dbListenToOpenWorkorders, dbListenToInventory, dbListenToCurrentPunchClock } from "../db_calls_wrapper";
+import { authSignOut } from "../db_calls";
 import { Image_, AlertBox_, SmallLoadingIndicator, TextInput_, CheckBox_, DropdownMenu, StatusPickerModal } from "../components";
 import { StandKeypad } from "../shared/StandKeypad";
-import { FACE_DESCRIPTOR_CONFIDENCE_DISTANCE, MILLIS_IN_DAY, DISCOUNT_TYPES } from "../constants";
+import { MILLIS_IN_DAY, DISCOUNT_TYPES } from "../constants";
 import { COLORS, NONREMOVABLE_WAIT_TIMES, WORKORDER_ITEM_PROTO } from "../data";
-import { cloneDeep } from "lodash";
-import { openCacheDB, clearStaleCache, loadModelCached } from "../faceDetection";
+import { cloneDeep, throttle } from "lodash";
 import { workerSearchInventory } from "../inventorySearchManager";
 import { MobileMessagesScreen } from "./mobile/MobileMessagesScreen";
 
@@ -61,30 +60,29 @@ export function PhoneScreen() {
   const zSettings = useSettingsStore((state) => state.settings);
   const zStatuses = zSettings?.statuses;
   const zShowAlert = useAlertScreenStore((state) => state.showAlert);
+  const zCurrentUser = useLoginStore((state) => state.currentUser);
+  const zPunchClock = useLoginStore((state) => state.punchClock);
 
   const [sActiveModal, _setActiveModal] = useState(null);
   const [sSelectedWorkorderID, _setSelectedWorkorderID] = useState(null);
   const [sPin, _setPin] = useState("");
   const [sPinError, _setPinError] = useState("");
   const [sSearch, _setSearch] = useState("");
-  const [sFaceCountdown, _setFaceCountdown] = useState(5);
 
-  // "face" = scanning, "pin" = keypad, null = logged in
   const [sLoginPhase, _setLoginPhase] = useState(() => {
     let storedUserID = localStorage.getItem(LOCAL_STORAGE_KEY);
-    if (!storedUserID) return "face";
+    if (!storedUserID) return "pin";
     let users = useSettingsStore.getState().settings?.users || [];
     let user = users.find((u) => u.id === storedUserID);
-    if (!user) return "face";
+    if (!user) return "pin";
     useLoginStore.getState().setCurrentUser(user);
     useLoginStore.getState().setLastActionMillis();
     return null;
   });
 
-  const faceVideoRef = useRef(null);
-  const faceStreamRef = useRef(null);
-  const faceIntervalRef = useRef(null);
-  const countdownRef = useRef(null);
+  const throttledSetLastAction = useRef(throttle(() => {
+    useLoginStore.getState().setLastActionMillis();
+  }, 1000)).current;
 
   useEffect(() => {
     let unsub = dbListenToOpenWorkorders((data) => {
@@ -93,97 +91,15 @@ export function PhoneScreen() {
     let unsubInv = dbListenToInventory((data) => {
       useInventoryStore.getState().setItems(data);
     });
+    let unsubPunch = dbListenToCurrentPunchClock((data) => {
+      useLoginStore.getState().setPunchClock(data);
+    });
     return () => {
       if (typeof unsub === "function") unsub();
       if (typeof unsubInv === "function") unsubInv();
+      if (typeof unsubPunch === "function") unsubPunch();
     };
   }, []);
-
-  // Face recognition login - runs when sLoginPhase is "face"
-  useEffect(() => {
-    if (sLoginPhase !== "face") return;
-    let cancelled = false;
-
-    async function runFaceLogin() {
-      // Load models
-      try {
-        let db = null;
-        try { db = await openCacheDB(); await clearStaleCache(db); } catch (e) {}
-        await Promise.all([
-          loadModelCached(faceapi.nets.tinyFaceDetector, "tiny_face_detector_model", db),
-          loadModelCached(faceapi.nets.faceLandmark68Net, "face_landmark_68_model", db),
-          loadModelCached(faceapi.nets.faceRecognitionNet, "face_recognition_model", db),
-        ]);
-        if (db) db.close();
-      } catch (e) {
-        log("Phone face model loading failed:", e);
-        if (!cancelled) _setLoginPhase("pin");
-        return;
-      }
-
-      // Get webcam
-      try {
-        let stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
-        faceStreamRef.current = stream;
-        setTimeout(() => {
-          if (faceVideoRef.current) faceVideoRef.current.srcObject = stream;
-        }, 50);
-      } catch (e) {
-        if (!cancelled) _setLoginPhase("pin");
-        return;
-      }
-
-      // Start countdown + detection
-      let secondsLeft = 5;
-      _setFaceCountdown(5);
-
-      countdownRef.current = setInterval(() => {
-        secondsLeft--;
-        _setFaceCountdown(secondsLeft);
-        if (secondsLeft <= 0) {
-          cleanup();
-          if (!cancelled) _setLoginPhase("pin");
-        }
-      }, 1000);
-
-      faceIntervalRef.current = setInterval(async () => {
-        if (!faceVideoRef.current || faceVideoRef.current.readyState < 2) return;
-        let detection = await faceapi
-          .detectSingleFace(faceVideoRef.current, new faceapi.TinyFaceDetectorOptions())
-          .withFaceLandmarks()
-          .withFaceDescriptor();
-        if (!detection) return;
-        let users = useSettingsStore.getState().settings?.users || [];
-        for (let user of users) {
-          if (!user.faceDescriptor) continue;
-          try {
-            let distance = faceapi.euclideanDistance(Object.values(user.faceDescriptor), detection.descriptor);
-            if (distance < FACE_DESCRIPTOR_CONFIDENCE_DISTANCE) {
-              cleanup();
-              localStorage.setItem(LOCAL_STORAGE_KEY, user.id);
-              useLoginStore.getState().setCurrentUser(user);
-              useLoginStore.getState().setLastActionMillis();
-              if (!cancelled) _setLoginPhase(null);
-              return;
-            }
-          } catch (e) {}
-        }
-      }, 500);
-    }
-
-    function cleanup() {
-      clearInterval(faceIntervalRef.current);
-      clearInterval(countdownRef.current);
-      if (faceStreamRef.current) {
-        faceStreamRef.current.getTracks().forEach((t) => t.stop());
-        faceStreamRef.current = null;
-      }
-    }
-
-    runFaceLogin();
-    return () => { cancelled = true; cleanup(); };
-  }, [sLoginPhase]);
 
   const selectedWorkorder = zWorkorders.find((w) => w.id === sSelectedWorkorderID) || null;
 
@@ -195,6 +111,30 @@ export function PhoneScreen() {
   function closeModal() {
     _setActiveModal(null);
     _setSelectedWorkorderID(null);
+  }
+
+  function handleToggleClock() {
+    let userId = zCurrentUser?.id;
+    if (!userId) return;
+    let now = Date.now();
+    let option = zPunchClock[userId] ? "out" : "in";
+    useLoginStore.getState().setCreateUserClock(userId, now, option);
+  }
+
+  function handleSwitchUser() {
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    useLoginStore.getState().setCurrentUser(null);
+    _setLoginPhase("pin");
+    _setActiveModal(null);
+    _setSelectedWorkorderID(null);
+    _setPin("");
+    _setPinError("");
+  }
+
+  function handleLogoutApp() {
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    useLoginStore.getState().setCurrentUser(null);
+    authSignOut();
   }
 
   function handlePinKeyPress(key) {
@@ -216,49 +156,6 @@ export function PhoneScreen() {
     useLoginStore.getState().setLastActionMillis();
     _setLoginPhase(null);
     _setPin("");
-  }
-
-  // Face scanning screen
-  if (sLoginPhase === "face") {
-    return (
-      <View style={{ width: "100%", height: "100%", backgroundColor: C.backgroundWhite }}>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 16,
-            paddingVertical: 12,
-            backgroundColor: C.buttonLightGreen,
-            borderBottomWidth: 1,
-            borderBottomColor: C.buttonLightGreenOutline,
-          }}
-        >
-          <Image_ icon={ICONS.gears1} size={24} style={{ marginRight: 8 }} />
-          <Text style={{ fontSize: 20, fontWeight: "600", color: C.text }}>
-            WARPSPEED
-          </Text>
-        </View>
-        <AlertBox_ showAlert={zShowAlert} />
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingHorizontal: 24 }}>
-          <SmallLoadingIndicator />
-          <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, marginTop: 12 }}>
-            Scanning face...
-          </Text>
-          <Text style={{ fontSize: 48, fontWeight: "700", color: C.green, marginTop: 16 }}>
-            {sFaceCountdown}
-          </Text>
-        </View>
-        <video
-          ref={faceVideoRef}
-          width={0}
-          height={0}
-          autoPlay
-          muted
-          onLoadedMetadata={(e) => e.target.play()}
-          style={{ position: "absolute", opacity: 0 }}
-        />
-      </View>
-    );
   }
 
   // Pin entry screen
@@ -312,24 +209,61 @@ export function PhoneScreen() {
     );
   }
 
+  let isClockedIn = zPunchClock[zCurrentUser?.id];
+
   return (
-    <View style={{ width: "100%", height: "100%", backgroundColor: C.backgroundWhite }}>
+    <View
+      onMouseMove={() => throttledSetLastAction()}
+      onTouchStart={() => throttledSetLastAction()}
+      style={{ width: "100%", height: "100%", backgroundColor: C.backgroundWhite }}
+    >
       {/* Header */}
       <View
         style={{
           flexDirection: "row",
           alignItems: "center",
+          justifyContent: "space-between",
           paddingHorizontal: 16,
-          paddingVertical: 12,
+          paddingVertical: 10,
           backgroundColor: C.buttonLightGreen,
           borderBottomWidth: 1,
           borderBottomColor: C.buttonLightGreenOutline,
         }}
       >
-        <Image_ icon={ICONS.gears1} size={24} style={{ marginRight: 8 }} />
-        <Text style={{ fontSize: 20, fontWeight: "600", color: C.text }}>
-          WARPSPEED
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          <Image_ icon={ICONS.gears1} size={24} style={{ marginRight: 8 }} />
+          <Text style={{ fontSize: 20, fontWeight: "600", color: C.text }}>
+            WARPSPEED
+          </Text>
+        </View>
+        <DropdownMenu
+          buttonIcon={isClockedIn ? ICONS.check : ICONS.redx}
+          buttonIconSize={13}
+          buttonText={
+            (zCurrentUser?.first || "") +
+            " " +
+            (zCurrentUser?.last?.length > 0 ? zCurrentUser.last[0] + "." : "")
+          }
+          buttonStyle={{
+            paddingHorizontal: 7,
+            paddingVertical: 2,
+            borderWidth: 1,
+            borderColor: C.buttonLightGreenOutline,
+            backgroundColor: C.buttonLightGreen,
+            borderRadius: 5,
+          }}
+          buttonTextStyle={{ fontSize: 13, color: C.text }}
+          dataArr={[
+            { label: isClockedIn ? "Clock Out" : "Clock In" },
+            { label: "Switch User" },
+            { label: "Log Out App" },
+          ]}
+          onSelect={(item) => {
+            if (item.label === "Clock In" || item.label === "Clock Out") handleToggleClock();
+            else if (item.label === "Switch User") handleSwitchUser();
+            else if (item.label === "Log Out App") handleLogoutApp();
+          }}
+        />
       </View>
 
       {/* Alert overlay */}
@@ -1075,6 +1009,8 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
             onSelect={handleStatusSelect}
             menuWidth={Math.round(window.innerWidth * 0.6)}
             centered={true}
+            itemHeight={44}
+            itemTextStyle={{ fontSize: 16 }}
             buttonStyle={{
               alignSelf: "flex-start",
               backgroundColor: rs.backgroundColor,
@@ -1298,6 +1234,8 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
                   <DropdownMenu
                     dataArr={COLORS}
                     itemSeparatorStyle={{ height: 0 }}
+                    itemTextStyle={{ fontSize: 17 }}
+                    itemStyle={{ paddingVertical: 2 }}
                     menuBorderColor="transparent"
                     centerMenuVertically={true}
                     centerMenuHorizontally={true}
@@ -1324,6 +1262,8 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
                   <DropdownMenu
                     dataArr={COLORS}
                     itemSeparatorStyle={{ height: 0 }}
+                    itemTextStyle={{ fontSize: 17 }}
+                    itemStyle={{ paddingVertical: 2 }}
                     menuBorderColor="transparent"
                     centerMenuVertically={true}
                     centerMenuHorizontally={true}

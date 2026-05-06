@@ -532,7 +532,7 @@ export const CustomerInfoScreenModalComponent = ({
                     style={{ marginLeft: 8, opacity: (sCustomerInfo.customerCell || "").replace(/\D/g, "").length === 10 ? 1 : 0.3 }}
                     title="Edit customer cell phone number"
                   >
-                    <Image_ source={ICONS.editPencil} style={{ width: 18, height: 18 }} />
+                    <Image_ icon={ICONS.editPencil} style={{ width: 18, height: 18 }} />
                   </TouchableOpacity>
                 )}
               </View>
@@ -562,7 +562,7 @@ export const CustomerInfoScreenModalComponent = ({
                     style={{ marginLeft: 8 }}
                     title="Save new phone number"
                   >
-                    <Image_ source={ICONS.check1} style={{ width: 18, height: 18 }} />
+                    <Image_ icon={ICONS.check1} style={{ width: 18, height: 18 }} />
                   </TouchableOpacity>
                 ) : null}
                 <TouchableOpacity
@@ -570,7 +570,7 @@ export const CustomerInfoScreenModalComponent = ({
                   style={{ marginLeft: 6 }}
                   title="Cancel"
                 >
-                  <Image_ source={ICONS.close1} style={{ width: 16, height: 16 }} />
+                  <Image_ icon={ICONS.close1} style={{ width: 16, height: 16 }} />
                 </TouchableOpacity>
               </View>
             ) : (
@@ -1594,7 +1594,7 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
           borderBottomColor: lightenRGBByPercent(C.buttonLightGreenOutline, 30),
         }}
       >
-        <Image_ source={ICONS.paperPlane} style={{ width: 18, height: 18, marginRight: 8, opacity: 0.7 }} />
+        <Image_ icon={ICONS.paperPlane} style={{ width: 18, height: 18, marginRight: 8, opacity: 0.7 }} />
         <Text style={{ fontSize: 14, fontWeight: "700", color: C.text, marginRight: 8 }}>
           Messages
         </Text>
@@ -1623,7 +1623,7 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
           contentContainerStyle={sMessages.length === 0 ? { flex: 1, justifyContent: "center", alignItems: "center" } : { paddingVertical: 10, paddingHorizontal: 12 }}
           ListEmptyComponent={
             <View style={{ alignItems: "center" }}>
-              <Image_ source={ICONS.paperPlane} style={{ width: 40, height: 40, opacity: 0.12, marginBottom: 10 }} />
+              <Image_ icon={ICONS.paperPlane} style={{ width: 40, height: 40, opacity: 0.12, marginBottom: 10 }} />
               <Text style={{ color: gray(0.5), fontSize: 13 }}>
                 No messages yet
               </Text>

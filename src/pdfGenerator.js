@@ -2,6 +2,8 @@
 import { jsPDF } from "jspdf";
 import { formatWorkorderNumber } from "./utils";
 
+const cap = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "";
+
 ////////////////////////////////////////////////////////////////////////////////
 // Default label sets (exported so receiptTranslator can read the keys)
 ////////////////////////////////////////////////////////////////////////////////
@@ -225,7 +227,7 @@ export function generateSaleReceiptPDF(data, labels) {
   // Customer info
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  let custName = [(data.first || ""), (data.last || "")].filter(Boolean).join(" ");
+  let custName = [cap(data.first), cap(data.last)].filter(Boolean).join(" ");
   if (custName) {
     doc.text(L.customer + ": " + custName, leftX, y);
     y += 11;
@@ -443,7 +445,7 @@ export function generateRefundReceiptPDF(data) {
   // Customer info
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  let custName = [(data.customerFirstName || ""), (data.customerLastName || "")].filter(Boolean).join(" ");
+  let custName = [cap(data.customerFirstName), cap(data.customerLastName)].filter(Boolean).join(" ");
   if (custName) {
     doc.text("Customer: " + custName, leftX, y);
     y += 11;
@@ -551,7 +553,7 @@ export function generateCreditReceiptPDF(data) {
   }
   y += 6;
 
-  let custName = [(data.first || data.customerFirstName || ""), (data.last || data.customerLastName || "")].filter(Boolean).join(" ");
+  let custName = [cap(data.first || data.customerFirstName), cap(data.last || data.customerLastName)].filter(Boolean).join(" ");
   if (custName) {
     doc.text("Customer: " + custName, leftX, y);
     y += 11;
@@ -639,7 +641,7 @@ export function generateGiftCardReceiptPDF(data) {
   }
   y += 6;
 
-  let custName = [(data.first || data.customerFirstName || ""), (data.last || data.customerLastName || "")].filter(Boolean).join(" ");
+  let custName = [cap(data.first || data.customerFirstName), cap(data.last || data.customerLastName)].filter(Boolean).join(" ");
   if (custName) {
     doc.text("Customer: " + custName, leftX, y);
     y += 11;
@@ -735,7 +737,7 @@ export function generateWorkorderTicketPDF(data) {
   y += 4;
 
   // Customer info
-  let custName = [(data.first || ""), (data.last || "")].filter(Boolean).join(" ");
+  let custName = [cap(data.first), cap(data.last)].filter(Boolean).join(" ");
   if (custName) {
     doc.setFont("helvetica", "bold");
     doc.text("Customer: ", leftX, y);

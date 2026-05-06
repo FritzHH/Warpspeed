@@ -1292,7 +1292,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   }
                 }
                 // Stamp finishedOnMillis when status is set to "Finished"
-                if (val.id === "33knktg") {
+                if (val.id === "finished") {
                   store.setField("finishedOnMillis", Date.now(), zOpenWorkorder.id);
                 }
                 // Finished SMS confirmation modal
@@ -1317,6 +1317,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       const finishedRule = { smsTemplateID: "finished_sms", emailTemplateID: "", delayMinutes: 0, delaySeconds: 0 };
                       const wo = store.getWorkorders().find((w) => w.id === zOpenWorkorder.id) || zOpenWorkorder;
                       scheduleAutoText(finishedRule, wo, zSettings);
+                      store.setField("contacted", true, zOpenWorkorder.id);
                       useAlertScreenStore.getState().setShowAlert(false);
                     },
                     btn2Text: "Don't Send",

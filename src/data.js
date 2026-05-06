@@ -197,6 +197,16 @@ export const NONREMOVABLE_STATUSES = [
     systemOwned: true,
     hidden: false,
   },
+  // {
+  //   id: "finished_paid_",
+  //   label: "Finished & Paid",
+  //   textColor: "white",
+  //   backgroundColor: "green",
+  //   removable: false,
+  //   requireWaitTime: false,
+  //   systemOwned: true,
+  //   hidden: false,
+  // },
 ];
 
 export const CONTACT_RESTRICTIONS = {
@@ -491,6 +501,7 @@ export const WORKORDER_PROTO = {
   status: "newly_created",
   taxFree: false,
   itemNotHere: false,
+  contacted: false,
   archived: false,
   media: [],
   customerPin: "",

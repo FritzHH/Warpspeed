@@ -295,22 +295,24 @@ const QuickButtonPickerModal = ({ itemID, quickButtons, onToggle, onClose }) => 
 
 const CurrencyField = ({ style, cents, onChangeText, placeholder }) => {
   const [sFocused, _setFocused] = useState(false);
-  const [sLocalVal, _setLocalVal] = useState("");
+  const [sLocalDisplay, _setLocalDisplay] = useState("");
 
   return (
     <TextInput
       style={style}
-      value={sFocused ? sLocalVal : formatCurrencyDisp(cents)}
+      value={sFocused ? sLocalDisplay : formatCurrencyDisp(cents)}
       placeholder={placeholder}
       placeholderTextColor={gray(0.35)}
       onFocus={() => {
         _setFocused(true);
-        _setLocalVal("");
+        _setLocalDisplay("");
       }}
       onBlur={() => _setFocused(false)}
       onChangeText={(v) => {
-        _setLocalVal(v);
-        onChangeText(v);
+        let digits = v.replace(/\D/g, "");
+        let { display } = usdTypeMask(digits);
+        _setLocalDisplay(display);
+        onChangeText(digits);
       }}
     />
   );

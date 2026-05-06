@@ -153,11 +153,10 @@ export const ColorPickerModal = ({
                   Background Color
                 </Text>
                 <ColorWheel
-                  key="bg"
+                  key={"bg-" + sBgColor}
                   initialColor={sBgColor}
                   onColorChange={(val) => {
                     _setBgColor(val.hex);
-                    _setTextColor(bestForegroundHex(val.hex));
                   }}
                 />
               </View>
@@ -166,7 +165,7 @@ export const ColorPickerModal = ({
                   Text Color
                 </Text>
                 <ColorWheel
-                  key="text"
+                  key={"text-" + sTextColor}
                   initialColor={sTextColor}
                   onColorChange={(val) => {
                     _setTextColor(val.hex);

@@ -26,6 +26,7 @@ import {
   useActiveSalesStore,
   useWorkorderPreviewStore,
   useCustMessagesStore,
+  useAlertScreenStore,
 } from "../../../stores";
 import { dbGetCustomer, dbGetCustomerMessages, dbListenToNewMessages } from "../../../db_calls_wrapper";
 
@@ -827,7 +828,27 @@ export function WorkordersComponent({}) {
                           )}
                         </Text>
                         <View style={{ width: 8 }} />
-                        <View
+                        <TouchableOpacity
+                          activeOpacity={workorder.status === "finished" ? 0.6 : 1}
+                          onPress={(e) => {
+                            if (workorder.status !== "finished") return;
+                            e.stopPropagation();
+                            useAlertScreenStore.getState().setValues({
+                              title: "Customer Contacted",
+                              message: "Has this customer been contacted?",
+                              btn1Text: "Yes",
+                              handleBtn1Press: () => {
+                                useOpenWorkordersStore.getState().setField("contacted", true, workorder.id);
+                                useAlertScreenStore.getState().setShowAlert(false);
+                              },
+                              btn2Text: "No",
+                              handleBtn2Press: () => {
+                                useOpenWorkordersStore.getState().setField("contacted", false, workorder.id);
+                                useAlertScreenStore.getState().setShowAlert(false);
+                              },
+                              canExitOnOuterClick: true,
+                            });
+                          }}
                           style={{
                             backgroundColor: rs.backgroundColor,
                             flexDirection: "row",
@@ -843,6 +864,11 @@ export function WorkordersComponent({}) {
                           {!!wipUser && (
                             <Text style={{ color: C.red, fontSize: 11, fontStyle: "italic", marginRight: 5 }}>{wipUser}</Text>
                           )}
+                          {workorder.status === "finished" && (
+                            <Text style={{ fontSize: 13, color: workorder.contacted ? "white" : C.red, marginRight: 4 }}>
+                              {workorder.contacted ? "\u2713" : "\u2717"}
+                            </Text>
+                          )}
                           <Text
                             style={{
                               color: rs.textColor,
@@ -852,7 +878,7 @@ export function WorkordersComponent({}) {
                           >
                             {rs.label}
                           </Text>
-                        </View>
+                        </TouchableOpacity>
                       </View>
                       <View
                         onMouseOver={() => onMouseEnter(workorder)}

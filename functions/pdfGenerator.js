@@ -1,6 +1,8 @@
 /* eslint-disable */
 const { jsPDF } = require("jspdf");
 
+const cap = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "";
+
 function formatWorkorderNumber(woNum) {
   if (!woNum || typeof woNum !== "string") return woNum || "";
   if (woNum.startsWith("W") && !woNum.startsWith("WO") && woNum.length >= 10) {
@@ -227,7 +229,7 @@ function generateSaleReceiptPDF(data, labels) {
 
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  let custName = [(data.first || ""), (data.last || "")].filter(Boolean).join(" ");
+  let custName = [cap(data.first), cap(data.last)].filter(Boolean).join(" ");
   if (custName) {
     doc.text(L.customer + ": " + custName, leftX, y);
     y += 11;
@@ -395,7 +397,7 @@ function generateRefundReceiptPDF(data) {
 
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  let custName = [(data.customerFirstName || ""), (data.customerLastName || "")].filter(Boolean).join(" ");
+  let custName = [cap(data.customerFirstName), cap(data.customerLastName)].filter(Boolean).join(" ");
   if (custName) {
     doc.text("Customer: " + custName, leftX, y);
     y += 11;
@@ -498,7 +500,7 @@ function generateCreditReceiptPDF(data) {
   }
   y += 6;
 
-  let custName = [(data.first || data.customerFirstName || ""), (data.last || data.customerLastName || "")].filter(Boolean).join(" ");
+  let custName = [cap(data.first || data.customerFirstName), cap(data.last || data.customerLastName)].filter(Boolean).join(" ");
   if (custName) {
     doc.text("Customer: " + custName, leftX, y);
     y += 11;
@@ -586,7 +588,7 @@ function generateGiftCardReceiptPDF(data) {
   }
   y += 6;
 
-  let custName = [(data.first || data.customerFirstName || ""), (data.last || data.customerLastName || "")].filter(Boolean).join(" ");
+  let custName = [cap(data.first || data.customerFirstName), cap(data.last || data.customerLastName)].filter(Boolean).join(" ");
   if (custName) {
     doc.text("Customer: " + custName, leftX, y);
     y += 11;
@@ -674,7 +676,7 @@ function generateWorkorderTicketPDF(data) {
 
   y += 4;
 
-  let custName = [(data.first || ""), (data.last || "")].filter(Boolean).join(" ");
+  let custName = [cap(data.first), cap(data.last)].filter(Boolean).join(" ");
   if (custName) {
     doc.setFont("helvetica", "bold");
     doc.text("Customer: ", leftX, y);

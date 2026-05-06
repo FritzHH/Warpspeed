@@ -865,7 +865,7 @@ export function WorkordersComponent({}) {
                             <Text style={{ color: C.red, fontSize: 11, fontStyle: "italic", marginRight: 5 }}>{wipUser}</Text>
                           )}
                           {workorder.status === "finished" && (
-                            <Text style={{ fontSize: 13, color: workorder.contacted ? "white" : C.red, marginRight: 4 }}>
+                            <Text style={{ fontSize: 13, color: workorder.contacted ? rs.textColor : C.red, marginRight: 4 }}>
                               {workorder.contacted ? "\u2713" : "\u2717"}
                             </Text>
                           )}

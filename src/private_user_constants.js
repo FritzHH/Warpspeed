@@ -15,7 +15,7 @@ export const SMS_URL =
   "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/sendSMS";
 
 // Stripe publishable key (client-side tokenization)
-export const STRIPE_PUBLISHABLE_KEY = "pk_test_51RRLB9QIJQpcXP9dFNqDeOHSo2gzvP6RvdEP0oWQ0jMyyGIrvIZqwEE6ZOJdSL8M8aAtqxjnNwFvjAq3D1ScrLQz005Zk6g3Cp";
+export const STRIPE_PUBLISHABLE_KEY = "pk_live_51RRLAyG8PZMnVdxF7LTXh3FhPbppqOVq6SrS6oXUfm8rqEt9oldBcSl4irJrow6K58VRReaktDVio5wFvS3tlt1Q00gWo17xTp";
 
 // Google Maps API key (enable Maps JavaScript API + Directions API in GCP console)
 export const GOOGLE_MAPS_API_KEY = "AIzaSyCUjRH7Yi9fNNDAUTyYzD-P-tUGGMvfPPM";

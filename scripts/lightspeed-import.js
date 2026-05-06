@@ -704,6 +704,8 @@ function mapWorkorders(
 
     // Timestamps
     const startedOnMillis = wo.timeIn ? new Date(wo.timeIn).getTime() : "";
+    const incomingHasFinished = rawLabel.includes("finished");
+    if (incomingHasFinished) status = statusMap["finished"] || status;
     const isFinished = statusLabel.includes("finished") || statusLabel === "done & paid" || statusLabel === "sales bonus";
     let finishedOnMillis = isFinished && wo.timeStamp ? new Date(wo.timeStamp).getTime() : "";
     if (isFinished && !finishedOnMillis) console.warn("[Migration] Finished WO " + woID + " missing timeStamp, finishedOnMillis is empty");
@@ -837,6 +839,7 @@ function mapWorkorders(
       color1,
       color2,
       status: status.id,
+      contacted: incomingHasFinished,
       taxFree: isTaxFree,
       taxFreeReceiptNote: isTaxFree ? (settings.taxFreeReceiptNote || "") : "",
       archived: wo.archived === "true",

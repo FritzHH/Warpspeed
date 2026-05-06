@@ -1410,7 +1410,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       }}
                       modalCoordX={100}
                       modalCoordY={40}
-                      buttonText={rs.label}
+                      buttonText={(zOpenWorkorder?.status === "finished" ? (zOpenWorkorder.contacted ? "\u2713 " : "\u2717 ") : "") + rs.label}
                     />
                   </View>
                   {isPickupDelivery && (

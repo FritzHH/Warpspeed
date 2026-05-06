@@ -1132,8 +1132,6 @@ export function InventoryComponent({}) {
   };
 
   function handleQuickButtonPress(buttonObj) {
-    console.log("[Options_Inventory QB] handleQuickButtonPress button:", JSON.stringify(buttonObj, null, 2));
-    console.log("[Options_Inventory QB] handleQuickButtonPress button.items count:", buttonObj.items?.length, "items:", JSON.stringify(buttonObj.items, null, 2));
     _setCanvasSelectedItemId(null);
     // Intercept $LABOR and $ITEM buttons
     if (buttonObj.id === "labor" || buttonObj.id === "item") {
@@ -1158,7 +1156,6 @@ export function InventoryComponent({}) {
       if (item) items.push(item);
       else console.log("[Options_Inventory QB] MISSING inventory item for entry:", JSON.stringify(entry), "resolved id:", id);
     });
-    console.log("[Options_Inventory QB] resolved", items.length, "of", buttonObj.items?.length, "items");
     let hasItems = items.length > 0;
 
     if (hasChildren) {

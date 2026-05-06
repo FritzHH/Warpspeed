@@ -1573,6 +1573,10 @@ const AppUserListComponent = ({
                           focused={sShowPinIndex === idx}
                           value={sShowPinIndex === idx ? userObj.pin : ""}
                           onChangeText={(value) => {
+                            let otherPins = (zSettingsObj?.users || []).filter((u) => u.id !== userObj.id).map((u) => u.pin);
+                            if (value && otherPins.includes(value)) {
+                              value = value.slice(0, -1);
+                            }
                             userObj.pin = value;
                             commitUserInfoChange(userObj);
                           }}

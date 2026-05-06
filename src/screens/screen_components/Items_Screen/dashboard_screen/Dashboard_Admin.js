@@ -1342,7 +1342,7 @@ const AppUserListComponent = ({
                   <View
                     style={{
                       marginRight: 5,
-                      width: "12%",
+                      width: "16%",
                     }}
                   >
                     {/* Row 1 - aligns with name row */}
@@ -1399,6 +1399,8 @@ const AppUserListComponent = ({
                     <View style={{ height: 25, justifyContent: "center", marginTop: 7 }}>
                       <Button_
                         text={"Enroll"}
+                        icon={userObj.faceDescriptor ? ICONS.check1 : ICONS.redx}
+                        iconSize={12}
                         onPress={() => {
                           _setFacialRecognitionModalUserObj(userObj);
                         }}
@@ -1423,7 +1425,7 @@ const AppUserListComponent = ({
                     style={{
                       justifyContent: "center",
                       marginTop: 2,
-                      width: "88%",
+                      width: "84%",
                     }}
                   >
                     <View

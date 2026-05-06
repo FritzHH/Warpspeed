@@ -101,12 +101,12 @@ function buildLightspeedEAN13(prefix2digit, lsID) {
   return digits12 + ((10 - (sum % 10)) % 10);
 }
 
-function buildWorkorderNumberFromId(ean13) {
+function buildMigratedWorkorderNumber(lsWorkorderID, dateStr) {
   const MONTHS = ["JAN","FEB","MAR","APR","MAY","JUN","JUL","AUG","SEP","OCT","NOV","DEC"];
-  const date = new Date();
+  const date = dateStr ? new Date(dateStr) : new Date();
   const month = MONTHS[date.getMonth()];
   const year = String(date.getFullYear()).slice(-2);
-  const digits = String(ean13).slice(0, 5);
+  const digits = String(lsWorkorderID).slice(-5).padStart(5, "0");
   return "W" + digits + month + year;
 }
 
@@ -820,7 +820,7 @@ function mapWorkorders(
       : false;
 
     const mappedWo = {
-      workorderNumber: buildWorkorderNumberFromId(ean13),
+      workorderNumber: buildMigratedWorkorderNumber(woID, wo.timeIn),
       id: ean13,
       lightspeed_id: woID,
       customerID: resolvedCustomerID || "",
@@ -1203,7 +1203,7 @@ function buildStandaloneWorkorders(sales, salesLinesCSVText, itemsCSVText, custo
     var customer = sale.customerID ? customerMap[sale.customerID] : null;
 
     var wo = {
-      workorderNumber: buildWorkorderNumberFromId(woID),
+      workorderNumber: buildMigratedWorkorderNumber(woID, sale.millis ? new Date(sale.millis).toISOString() : null),
       id: woID,
       lightspeed_id: "",
       customerID: sale.customerID || "",
@@ -1641,36 +1641,34 @@ async function main() {
   console.log("");
   console.log("  Collections:");
   console.log("    1. Statuses");
-  console.log("    2. Employees");
-  console.log("    3. Inventory");
-  console.log("    4. Customers");
-  console.log("    5. Workorders (open + completed)");
-  console.log("    6. Sales (completed + active)");
-  console.log("    7. Transactions");
-  console.log("    8. Punch history");
+  console.log("    2. Inventory");
+  console.log("    3. Customers");
+  console.log("    4. Workorders (open + completed)");
+  console.log("    5. Sales (completed + active)");
+  console.log("    6. Transactions");
+  console.log("    7. Punch history");
   console.log("");
-  console.log("  Type 'full' for all, or comma-separated numbers (e.g. 1,6,7)");
+  console.log("  Type 'full' for all, or comma-separated numbers (e.g. 1,5,6)");
   console.log("");
   var selectedSet = null;
   while (!selectedSet) {
     var input = (await askQuestion("  Selection: ")).trim().toLowerCase();
     if (input === "full") {
-      selectedSet = new Set([1, 2, 4, 5, 6, 7, 8]);
+      selectedSet = new Set([1, 3, 4, 5, 6, 7]);
     } else {
-      var nums = input.split(",").map(function (s) { return parseInt(s.trim(), 10); }).filter(function (n) { return n >= 1 && n <= 8; });
+      var nums = input.split(",").map(function (s) { return parseInt(s.trim(), 10); }).filter(function (n) { return n >= 1 && n <= 7; });
       if (nums.length > 0) selectedSet = new Set(nums);
     }
   }
-  var isFull = selectedSet.size >= 7 && !selectedSet.has(3);
+  var isFull = selectedSet.size >= 6 && !selectedSet.has(2);
   var selectedLabels = [];
   if (selectedSet.has(1)) selectedLabels.push("statuses");
-  if (selectedSet.has(2)) selectedLabels.push("employees");
-  if (selectedSet.has(3)) selectedLabels.push("inventory");
-  if (selectedSet.has(4)) selectedLabels.push("customers");
-  if (selectedSet.has(5)) selectedLabels.push("workorders");
-  if (selectedSet.has(6)) selectedLabels.push("sales");
-  if (selectedSet.has(7)) selectedLabels.push("transactions");
-  if (selectedSet.has(8)) selectedLabels.push("punches");
+  if (selectedSet.has(2)) selectedLabels.push("inventory");
+  if (selectedSet.has(3)) selectedLabels.push("customers");
+  if (selectedSet.has(4)) selectedLabels.push("workorders");
+  if (selectedSet.has(5)) selectedLabels.push("sales");
+  if (selectedSet.has(6)) selectedLabels.push("transactions");
+  if (selectedSet.has(7)) selectedLabels.push("punches");
   console.log("\n  -> " + (isFull ? "Full" : "Partial") + " Migration: " + selectedLabels.join(", ") + "\n");
 
   const TOTAL_STAGES = 10;
@@ -1685,10 +1683,10 @@ async function main() {
 
   // -- STAGE 2: Clear existing collections --
   logStage(2, TOTAL_STAGES, "Clearing selected collections");
-  if (selectedSet.has(3)) await clearCollection(basePath + "/inventory", "inventory");
+  if (selectedSet.has(2)) await clearCollection(basePath + "/inventory", "inventory");
   // Customers, workorders, sales, and transactions are interdependent —
   // selecting any one clears and rewrites all four for data consistency
-  var hasDataGroup = selectedSet.has(4) || selectedSet.has(5) || selectedSet.has(6) || selectedSet.has(7);
+  var hasDataGroup = selectedSet.has(3) || selectedSet.has(4) || selectedSet.has(5) || selectedSet.has(6);
   if (hasDataGroup) {
     await clearCollection(basePath + "/customers", "customers");
     await clearCollection(basePath + "/open-workorders", "open workorders");
@@ -1697,7 +1695,7 @@ async function main() {
     await clearCollection(basePath + "/active-sales", "active sales");
     await clearCollection(basePath + "/transactions", "transactions");
   }
-  if (selectedSet.has(8)) await clearCollection(basePath + "/punches", "punches");
+  if (selectedSet.has(7)) await clearCollection(basePath + "/punches", "punches");
 
   // -- STAGE 3: Map statuses --
   logStage(3, TOTAL_STAGES, "Mapping statuses");
@@ -1756,23 +1754,38 @@ async function main() {
     logSuccess(standaloneWOs.length.toLocaleString() + " standalone sale workorders created (from salesLines)");
   }
 
-  // -- STAGE 8: Map employees + punch history --
-  logStage(8, TOTAL_STAGES, "Mapping employees + punch history");
-  let newUsers = [];
+  // -- STAGE 8: Map punch history (employees read from existing settings) --
+  logStage(8, TOTAL_STAGES, "Mapping punch history");
   let allPunches = [];
-  if (csv["employees.csv"]) {
-    const empResult = mapEmployees(csv["employees.csv"]);
-    newUsers = empResult.users;
-    logSuccess(newUsers.length + " employees mapped (skipped system accounts)");
-
-    if (csv["employeeHours.csv"]) {
-      allPunches = mapPunchHistory(csv["employeeHours.csv"], empResult.employeeIDMap);
-      logSuccess(allPunches.length.toLocaleString() + " punch records mapped");
-    } else {
-      logInfo("No employeeHours.csv - skipping punch history");
+  if (selectedSet.has(7) && csv["employeeHours.csv"]) {
+    // Read existing users from settings to build employeeIDMap
+    const settingsRef = db.doc(basePath + "/settings/settings");
+    const settingsDoc = await settingsRef.get();
+    const existingUsers = settingsDoc.exists ? (settingsDoc.data().users || []) : [];
+    const employeeIDMap = {};
+    for (var ui = 0; ui < existingUsers.length; ui++) {
+      var u = existingUsers[ui];
+      if (u.lightspeed_id) {
+        employeeIDMap[u.lightspeed_id] = u.id;
+      }
     }
-  } else {
-    logInfo("No employees.csv - skipping employee + punch mapping");
+    // DEV: only import punch history for Chase (7), Victor (14), Sean (15)
+    var PUNCH_ONLY_LS_IDS = ["7", "14", "15"];
+    var filteredMap = {};
+    for (var pi = 0; pi < PUNCH_ONLY_LS_IDS.length; pi++) {
+      var lsId = PUNCH_ONLY_LS_IDS[pi];
+      if (employeeIDMap[lsId]) filteredMap[lsId] = employeeIDMap[lsId];
+    }
+    var matchedCount = Object.keys(filteredMap).length;
+    if (matchedCount === 0) {
+      logInfo("No matching users found in settings for punch import (need lightspeed_id: " + PUNCH_ONLY_LS_IDS.join(", ") + ")");
+    } else {
+      logSuccess(matchedCount + " employees matched from settings");
+      allPunches = mapPunchHistory(csv["employeeHours.csv"], filteredMap);
+      logSuccess(allPunches.length.toLocaleString() + " punch records mapped");
+    }
+  } else if (selectedSet.has(7)) {
+    logInfo("No employeeHours.csv - skipping punch history");
   }
 
   const workorders = allWorkorders;
@@ -1808,30 +1821,13 @@ async function main() {
   // -- STAGE 9: Write to Firestore --
   logStage(9, TOTAL_STAGES, "Writing to Firestore");
 
-  if (selectedSet.has(1) || selectedSet.has(2)) {
+  if (selectedSet.has(1)) {
     const settingsRef = db.doc(basePath + "/settings/settings");
-    const settingsDoc = await settingsRef.get();
-    const existingSettings = settingsDoc.exists ? settingsDoc.data() : {};
-    var mergeObj = {};
-
-    if (selectedSet.has(1)) {
-      mergeObj.statuses = statuses;
-      logSuccess("Statuses ready (" + statuses.length + ")");
-    }
-
-    if (selectedSet.has(2)) {
-      var existingUsers = existingSettings.users || [];
-      // Keep non-imported users (e.g. Fritz), replace all imported ones
-      var keptUsers = existingUsers.filter(function (u) { return !u._importSource; });
-      mergeObj.users = keptUsers.concat(newUsers);
-      logSuccess("Employees ready (" + mergeObj.users.length + " users: " + keptUsers.length + " existing + " + newUsers.length + " imported)");
-    }
-
-    await settingsRef.set(mergeObj, { merge: true });
-    logSuccess("Settings updated");
+    await settingsRef.set({ statuses: statuses }, { merge: true });
+    logSuccess("Statuses written (" + statuses.length + ")");
   }
 
-  if (selectedSet.has(3)) await batchWrite(basePath + "/inventory", inventoryItems, "inventory");
+  if (selectedSet.has(2)) await batchWrite(basePath + "/inventory", inventoryItems, "inventory");
   if (hasDataGroup) {
     await batchWrite(basePath + "/customers", customers, "customers");
     await batchWrite(basePath + "/open-workorders", openWorkorders, "open workorders");
@@ -1840,7 +1836,7 @@ async function main() {
     await batchWrite(basePath + "/active-sales", activeSales, "active sales");
     await batchWrite(basePath + "/transactions", transactions, "transactions");
   }
-  if (selectedSet.has(8)) await batchWrite(basePath + "/punches", punches, "punch history");
+  if (selectedSet.has(7)) await batchWrite(basePath + "/punches", punches, "punch history");
 
   // -- STAGE 10: Summary --
   logStage(10, TOTAL_STAGES, "Summary");
@@ -1859,7 +1855,6 @@ async function main() {
   console.log("[" + timestamp() + "]   Completed sales:       " + completedSales.length.toLocaleString());
   console.log("[" + timestamp() + "]   Active sales:          " + activeSales.length.toLocaleString());
   console.log("[" + timestamp() + "]   Transactions:          " + transactions.length.toLocaleString());
-  console.log("[" + timestamp() + "]   Employees:             " + newUsers.length);
   console.log("[" + timestamp() + "]   Punch records:         " + punches.length.toLocaleString());
   console.log("[" + timestamp() + "]   Total time:            " + (minutes > 0 ? minutes + "m " : "") + seconds + "s");
   console.log("[" + timestamp() + "]   + " + modeLabel + " COMPLETE\n");

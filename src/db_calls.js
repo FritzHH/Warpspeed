@@ -75,6 +75,27 @@ const storage = getStorage(firebaseApp);
  */
 export async function firestoreWrite(path, data) {
   try {
+    let undefinedPaths = [];
+    (function scan(obj, prefix) {
+      if (obj == null || typeof obj !== "object") return;
+      (Array.isArray(obj) ? obj.forEach((v, i) => {
+        let fp = prefix + "[" + i + "]";
+        if (v === undefined) undefinedPaths.push(fp);
+        else if (typeof v === "object" && v !== null) scan(v, fp);
+      }) : Object.keys(obj).forEach((k) => {
+        let fp = prefix ? prefix + "." + k : k;
+        if (obj[k] === undefined) undefinedPaths.push(fp);
+        else if (typeof obj[k] === "object" && obj[k] !== null) scan(obj[k], fp);
+      }));
+    })(data, "");
+    if (undefinedPaths.length > 0) {
+      let msg = "firestoreWrite UNDEFINED ERROR (pre-flight)\n\n" +
+        "Path: " + path + "\n\n" +
+        "Undefined fields (" + undefinedPaths.length + "):\n" + undefinedPaths.join("\n") +
+        "\n\nStack:\n" + new Error().stack;
+      console.error(msg);
+      window.alert(msg);
+    }
     const docRef = doc(DB, ...path.split("/"));
     await setDoc(docRef, data);
     return {
@@ -84,6 +105,9 @@ export async function firestoreWrite(path, data) {
     };
   } catch (error) {
     log("Error in firestoreWrite:", error);
+    if (error.message && error.message.includes("undefined")) {
+      window.alert("firestoreWrite FIREBASE ERROR\n\nPath: " + path + "\n\n" + error.message);
+    }
     return {
       success: false,
       error: error.message,

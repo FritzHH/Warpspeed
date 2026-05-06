@@ -9,6 +9,7 @@ import {
   useAlertScreenStore,
   useLoginStore,
   useUploadProgressStore,
+  useInventoryStore,
 } from "../stores";
 import {
   resolveStatus,
@@ -27,7 +28,7 @@ import {
   compressImage,
   log,
 } from "../utils";
-import { dbUploadWorkorderMedia, dbGetCustomer, dbSaveCustomer, dbListenToOpenWorkorders } from "../db_calls_wrapper";
+import { dbUploadWorkorderMedia, dbGetCustomer, dbSaveCustomer, dbListenToOpenWorkorders, dbListenToInventory } from "../db_calls_wrapper";
 import { Image_, AlertBox_, SmallLoadingIndicator, TextInput_, CheckBox_, DropdownMenu, StatusPickerModal } from "../components";
 import { StandKeypad } from "../shared/StandKeypad";
 import { FACE_DESCRIPTOR_CONFIDENCE_DISTANCE, MILLIS_IN_DAY, DISCOUNT_TYPES } from "../constants";
@@ -89,7 +90,13 @@ export function PhoneScreen() {
     let unsub = dbListenToOpenWorkorders((data) => {
       useOpenWorkordersStore.getState().setOpenWorkorders(data);
     });
-    return () => { if (typeof unsub === "function") unsub(); };
+    let unsubInv = dbListenToInventory((data) => {
+      useInventoryStore.getState().setItems(data);
+    });
+    return () => {
+      if (typeof unsub === "function") unsub();
+      if (typeof unsubInv === "function") unsubInv();
+    };
   }, []);
 
   // Face recognition login - runs when sLoginPhase is "face"
@@ -525,19 +532,13 @@ function WorkorderCard({ workorder, zStatuses, zSettings, onPress }) {
                 <Image_ icon={ICONS.questionMark} size={16} />
               </View>
             ) : !!waitInfo.waitEndDay ? (
-              <View style={{ backgroundColor: C.buttonLightGreen, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, alignItems: "flex-end" }}>
-                {waitInfo.waitEndDay.includes("\n") ? (
-                  <View style={{ alignItems: "flex-end" }}>
-                    <Text style={{ color: waitInfo.textColor, fontSize: 10, fontStyle: "italic" }}>
-                      {capitalizeFirstLetterOfString(waitInfo.waitEndDay.split("\n")[0])}
-                    </Text>
-                    <Text style={{ color: waitInfo.textColor, fontSize: 12 }}>
-                      {waitInfo.waitEndDay.split("\n")[1]}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={{ color: waitInfo.textColor, fontSize: 12 }}>
-                    {capitalizeFirstLetterOfString(waitInfo.waitEndDay)}
+              <View style={{ backgroundColor: C.buttonLightGreen, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, flexDirection: "row", alignItems: "center" }}>
+                <Text style={{ color: waitInfo.textColor, fontSize: 12 }}>
+                  {capitalizeFirstLetterOfString(waitInfo.waitEndDay)}
+                </Text>
+                {!!waitInfo.pickupTimeStr && (
+                  <Text style={{ color: C.text, fontSize: 10, marginLeft: 4 }}>
+                    {waitInfo.pickupTimeStr}
                   </Text>
                 )}
               </View>
@@ -1958,9 +1959,42 @@ function sortWorkorders(inputArr) {
   return finalArr;
 }
 
+const MONTH_LABELS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAY_LABELS_SHORT = ["Sun","Mon","Tues","Wed","Thurs","Fri","Sat"];
+
+function formatPickupDeliveryTime(time) {
+  if (!time) return "";
+  let [h, m] = time.split(":");
+  h = Number(h);
+  let suffix = h >= 12 ? "pm" : "am";
+  h = h % 12 || 12;
+  return h + (m && m !== "00" ? ":" + m : "") + suffix;
+}
+
 function computeWaitInfo(workorder, settings) {
+  const isPickupDelivery = workorder.status === "pickup" || workorder.status === "delivery";
+  const pd = workorder.pickupDelivery;
+  if (isPickupDelivery) {
+    let result = { waitEndDay: "", textColor: C.text, isMissing: false, pickupTimeStr: "" };
+    if (pd?.month && pd?.day) {
+      const now = new Date();
+      const d = new Date(now.getFullYear(), Number(pd.month) - 1, Number(pd.day));
+      const isToday = Number(pd.month) === now.getMonth() + 1 && Number(pd.day) === now.getDate();
+      const tom = new Date(now);
+      tom.setDate(tom.getDate() + 1);
+      const isTomorrow = Number(pd.month) === tom.getMonth() + 1 && Number(pd.day) === tom.getDate();
+      result.textColor = isToday ? C.red : isTomorrow ? C.green : C.text;
+      result.waitEndDay = isToday ? "Today" : isTomorrow ? "Tomorrow"
+        : DAY_LABELS_SHORT[d.getDay()] + ", " + MONTH_LABELS_SHORT[Number(pd.month) - 1] + " " + pd.day;
+      result.pickupTimeStr = pd.startTime
+        ? formatPickupDeliveryTime(pd.startTime) + (pd.endTime ? "-" + formatPickupDeliveryTime(pd.endTime) : "")
+        : "";
+    }
+    return result;
+  }
+
   let label = calculateWaitEstimateLabel(workorder, settings);
-  let result = { waitEndDay: "", textColor: C.text, isMissing: false };
+  let result = { waitEndDay: "", textColor: C.text, isMissing: false, pickupTimeStr: "" };
   if (!label) return result;
   if (label === "Missing estimate") { result.isMissing = true; return result; }
   if (label === "No estimate") { result.waitEndDay = label; return result; }

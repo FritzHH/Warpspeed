@@ -19,7 +19,7 @@ export function LoginScreen({ setUser }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [emailFocused, setEmailFocused] = useState(false);
-  const [showPassword, setShowPassword] = useState(true);
+  const [showPassword, setShowPassword] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
 
   const handleSignIn = async () => {
@@ -236,31 +236,31 @@ export function LoginScreen({ setUser }) {
         )}
 
         {/* Sign In button */}
-        <TouchableOpacity
+        <button
+          type="submit"
+          disabled={isLoading}
           style={{
             width: "100%",
             backgroundColor: isLoading ? gray(0.6) : BRAND_BLUE,
             borderRadius: 10,
-            paddingVertical: 13,
-            alignItems: "center",
+            paddingTop: 13,
+            paddingBottom: 13,
+            border: "none",
+            cursor: isLoading ? "default" : "pointer",
             marginTop: 6,
-            shadowColor: BRAND_BLUE,
-            shadowOffset: { width: 0, height: 3 },
-            shadowOpacity: 0.3,
-            shadowRadius: 6,
+            boxShadow: `0px 3px 6px rgba(43, 124, 181, 0.3)`,
           }}
-          onPress={handleSignIn}
-          disabled={isLoading}
         >
           <Text style={{
             color: "#fff",
             fontSize: 16,
             fontWeight: "700",
             letterSpacing: 0.5,
+            textAlign: "center",
           }}>
             {isLoading ? "Signing In..." : "Sign In"}
           </Text>
-        </TouchableOpacity>
+        </button>
         </form>
 
         {/* Forgot password */}

@@ -647,8 +647,15 @@ const QuickItemCanvas = React.forwardRef(({
     clearPaintMode: () => _setPaintStyle(null),
   }));
 
-  // Normalize items (backward compat: string IDs -> objects)
-  let rawItems = (buttonObj.items || []).map(normalizeItemEntry);
+  // Normalize items (backward compat: string IDs -> objects) and clamp to visible canvas
+  let rawItems = (buttonObj.items || []).map(normalizeItemEntry).map((it) => {
+    let w = it.w || QB_DEFAULT_W;
+    let h = it.h || QB_DEFAULT_H;
+    let x = Math.max(0, Math.min(it.x || 0, 100 - w));
+    let y = Math.max(0, Math.min(it.y || 0, 100 - h));
+    if (x !== (it.x || 0) || y !== (it.y || 0)) return { ...it, x, y };
+    return it;
+  });
 
   // One-time migration: convert old pixel-based positions to percentages
   if (!migratedRef.current && !buttonObj._pctLayout && rawItems.length > 0) {
@@ -1125,7 +1132,8 @@ export function InventoryComponent({}) {
   };
 
   function handleQuickButtonPress(buttonObj) {
-    // console.log("[Options_Inventory QB] handleQuickButtonPress button:", JSON.stringify(buttonObj, null, 2));
+    console.log("[Options_Inventory QB] handleQuickButtonPress button:", JSON.stringify(buttonObj, null, 2));
+    console.log("[Options_Inventory QB] handleQuickButtonPress button.items count:", buttonObj.items?.length, "items:", JSON.stringify(buttonObj.items, null, 2));
     _setCanvasEditMode(false);
     _setCanvasSelectedItemId(null);
     quickCanvasRef.current?.clearPaintMode();
@@ -1150,7 +1158,9 @@ export function InventoryComponent({}) {
       let id = typeof entry === "string" ? entry : entry.inventoryItemID;
       let item = findInventoryItem(id);
       if (item) items.push(item);
+      else console.log("[Options_Inventory QB] MISSING inventory item for entry:", JSON.stringify(entry), "resolved id:", id);
     });
+    console.log("[Options_Inventory QB] resolved", items.length, "of", buttonObj.items?.length, "items");
     let hasItems = items.length > 0;
 
     if (hasChildren) {

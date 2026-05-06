@@ -4481,10 +4481,17 @@ const WorkorderStatusesComponent = ({
 
   function reorderStatuses(fromIdx, toIdx) {
     if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
-    let statuses = [...(zSettingsObj?.statuses || [])];
-    let [dragged] = statuses.splice(fromIdx, 1);
-    statuses.splice(toIdx, 0, dragged);
-    handleSettingsFieldChange("statuses", statuses);
+    let filtered = (zSettingsObj?.statuses || []).filter((s) => !s.systemOwned);
+    let draggedItem = filtered[fromIdx];
+    let targetItem = filtered[toIdx];
+    if (!draggedItem || !targetItem) return;
+    let full = [...(zSettingsObj?.statuses || [])];
+    let actualFrom = full.findIndex((s) => s.id === draggedItem.id);
+    let actualTo = full.findIndex((s) => s.id === targetItem.id);
+    if (actualFrom < 0 || actualTo < 0) return;
+    let [dragged] = full.splice(actualFrom, 1);
+    full.splice(actualTo, 0, dragged);
+    handleSettingsFieldChange("statuses", full);
   }
 
   let statuses = (zSettingsObj?.statuses || []).filter((s) => !s.systemOwned);
@@ -4574,14 +4581,12 @@ const WorkorderStatusesComponent = ({
                     _setDragOverIdx(idx);
                   }}
                   onDragEnd={() => {
+                    reorderStatuses(sDragIdx, sDragOverIdx);
                     _setDragIdx(null);
                     _setDragOverIdx(null);
                   }}
                   onDrop={(e) => {
                     e.preventDefault();
-                    reorderStatuses(sDragIdx, idx);
-                    _setDragIdx(null);
-                    _setDragOverIdx(null);
                   }}
                   style={{
                     display: "flex",
@@ -5322,7 +5327,8 @@ const QuickItemButtonsComponent = () => {
   }
 
   function drillIn(btn) {
-    // console.log("[Dashboard QB] drillIn button:", JSON.stringify(btn, null, 2));
+    console.log("[Dashboard QB] drillIn button:", JSON.stringify(btn, null, 2));
+    console.log("[Dashboard QB] drillIn button.items count:", btn.items?.length, "items:", JSON.stringify(btn.items, null, 2));
     _setMenuPath((prev) => [...prev, { id: btn.id, name: btn.name }]);
     _setCurrentParentID(btn.id);
   }

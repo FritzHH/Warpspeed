@@ -107,7 +107,84 @@ function computeWaitInfo(workorder) {
   return result;
 }
 
+const MONTH_LABELS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const DAY_LABELS_SHORT = ["Sun","Mon","Tues","Wed","Thurs","Fri","Sat"];
+
+function formatPickupDeliveryTime(time) {
+  if (!time) return "";
+  let [h, m] = time.split(":");
+  h = Number(h);
+  let suffix = h >= 12 ? "pm" : "am";
+  h = h % 12 || 12;
+  return h + (m && m !== "00" ? ":" + m : "") + suffix;
+}
+
 const WaitTimeIndicator = React.memo(function WaitTimeIndicator({ workorder }) {
+  const isPickupDelivery = workorder.status === "pickup" || workorder.status === "delivery";
+  const pd = workorder.pickupDelivery;
+
+  if (isPickupDelivery) {
+    const hasDate = pd?.month && pd?.day;
+    let dateStr = "";
+    let timeStr = "";
+    let isToday = false;
+    let isTomorrow = false;
+    if (hasDate) {
+      const now = new Date();
+      const d = new Date(now.getFullYear(), Number(pd.month) - 1, Number(pd.day));
+      isToday = Number(pd.month) === now.getMonth() + 1 && Number(pd.day) === now.getDate();
+      const tom = new Date(now);
+      tom.setDate(tom.getDate() + 1);
+      isTomorrow = Number(pd.month) === tom.getMonth() + 1 && Number(pd.day) === tom.getDate();
+      dateStr = DAY_LABELS_SHORT[d.getDay()] + ", " + MONTH_LABELS_SHORT[Number(pd.month) - 1] + " " + pd.day;
+      timeStr = pd.startTime
+        ? formatPickupDeliveryTime(pd.startTime) + (pd.endTime ? "-" + formatPickupDeliveryTime(pd.endTime) : "")
+        : "";
+    }
+    const textColor = isToday ? C.red : isTomorrow ? C.green : C.text;
+
+    return (
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          height: "100%",
+          width: 100,
+          paddingRight: 4,
+          backgroundColor: C.buttonLightGreen,
+          borderWidth: 1,
+          borderColor: C.buttonLightGreenOutline,
+          borderRadius: 5,
+          marginLeft: 5,
+        }}
+      >
+        <View style={{ flexDirection: "column", alignItems: "flex-end", justifyContent: "center" }}>
+          {hasDate ? (
+            <>
+              {isToday ? (
+                <Text style={{ color: textColor, fontSize: 13, textAlign: "right" }}>Today</Text>
+              ) : isTomorrow ? (
+                <Text style={{ color: textColor, fontSize: 13, textAlign: "right" }}>Tomorrow</Text>
+              ) : (
+                <Text style={{ color: textColor, fontSize: 12, textAlign: "right" }}>
+                  {dateStr}
+                </Text>
+              )}
+              {!!timeStr && (
+                <Text style={{ color: C.text, fontSize: 10, textAlign: "right" }}>
+                  {timeStr}
+                </Text>
+              )}
+            </>
+          ) : (
+            <Image_ source={ICONS.questionMark} style={{ width: 35, height: 35 }} />
+          )}
+        </View>
+      </View>
+    );
+  }
+
   const info = computeWaitInfo(workorder);
 
   return (

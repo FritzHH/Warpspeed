@@ -664,8 +664,7 @@ function generateWorkorderTicketPDF(data) {
   y += 10;
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
-  let ticketTitle = data.receiptType === "Intake" ? "INTAKE/ESTIMATE TICKET" : "WORKORDER TICKET";
-  doc.text(ticketTitle, centerX, y, { align: "center" });
+  doc.text("WORKORDER TICKET", centerX, y, { align: "center" });
   y += 18;
 
   doc.setFontSize(9);
@@ -698,25 +697,9 @@ function generateWorkorderTicketPDF(data) {
     doc.text(bikeInfo, leftX + 28, y);
     y += 12;
   }
-  if (data.description) {
-    doc.text("Description: " + data.description, leftX, y);
-    y += 12;
-  }
   let colors = [data.color1, data.color2].filter(Boolean).join(", ");
   if (colors) {
     doc.text("Colors: " + colors, leftX, y);
-    y += 12;
-  }
-  if (data.waitTime) {
-    doc.text("Estimate: " + data.waitTime, leftX, y);
-    y += 12;
-  }
-  if (data.waitTimeEstimateLabel) {
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text(data.waitTimeEstimateLabel, leftX, y);
-    doc.setTextColor(0);
-    doc.setFontSize(9);
     y += 12;
   }
 
@@ -755,34 +738,6 @@ function generateWorkorderTicketPDF(data) {
     });
     y += 4;
     y = addDivider(doc, y, leftX, rightX);
-  }
-
-  if (data.intakeBlurb) {
-    y = checkPageBreak(doc, y, 40, margin);
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "italic");
-    doc.setTextColor(100, 100, 100);
-    let blurbLines = doc.splitTextToSize(data.intakeBlurb, contentWidth);
-    blurbLines.forEach((line) => {
-      doc.text(line, centerX, y, { align: "center" });
-      y += 9;
-    });
-    doc.setTextColor(0);
-    y += 8;
-  }
-
-  if (data.receiptType === "Intake") {
-    y = checkPageBreak(doc, y, 20, margin);
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "bolditalic");
-    doc.setTextColor(100, 100, 100);
-    let disclaimerLines = doc.splitTextToSize("** Some items may have placeholder values, the final price may not exactly match the placeholder value", contentWidth);
-    disclaimerLines.forEach((line) => {
-      doc.text(line, centerX, y, { align: "center" });
-      y += 9;
-    });
-    doc.setTextColor(0);
-    y += 8;
   }
 
   return doc.output("datauristring").split(",")[1];

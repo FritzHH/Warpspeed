@@ -244,7 +244,7 @@ export function Notes_MainComponent() {
                 Click to add
               </Text>
             </TouchableOpacity_>
-            <TouchableOpacity_
+            {/* <TouchableOpacity_
               onPress={(e) => {
                 const nativeEvent = e.nativeEvent || e;
                 _setShowQuickNotes({ x: nativeEvent.pageX, y: nativeEvent.pageY });
@@ -259,7 +259,7 @@ export function Notes_MainComponent() {
               <Text style={{ fontSize: 14, color: gray(0.18) }}>
                 Quick notes
               </Text>
-            </TouchableOpacity_>
+            </TouchableOpacity_> */}
           </View>
 
           <View
@@ -509,14 +509,14 @@ export function Notes_MainComponent() {
           </View>
         </View>
       </View>
-      <CustomerQuickNotesDropdown
+      {/* <CustomerQuickNotesDropdown
         visible={!!sShowQuickNotes}
         anchorPosition={sShowQuickNotes}
         onClose={() => _setShowQuickNotes(null)}
         quickNotes={zCustomerQuickNotes}
         onToggleChip={handleQuickNoteToggle}
         activeChips={activeQuickChips}
-      />
+      /> */}
     </View>
   );
 }

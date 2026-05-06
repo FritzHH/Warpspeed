@@ -15,6 +15,7 @@ import {
   capitalizeFirstLetterOfString,
   calculateRunningTotals,
   dim,
+  findTemplateByType,
   formatDateTimeForReceipt,
   formatPhoneWithDashes,
   formatStoreHours,
@@ -494,37 +495,62 @@ export function MessagesComponent({}) {
   }
   function handleSendWorkorderTicket(canRespondVal, forwardOverride) {
     if (!zWorkorderObj || !zCustomer?.customerCell) return;
-    useLoginStore.getState().requireLogin(() => {
+    useLoginStore.getState().requireLogin(async () => {
+      let settings = zSettings;
       let { tenantID, storeID } = useSettingsStore.getState().getSettings();
-      const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: zSettings };
-      let receiptData = printBuilder.workorder(zWorkorderObj, zCustomer, zSettings?.salesTaxPercent, _ctx);
-      let storagePath = build_db_path.cloudStorage.workorderTicketPDF(zWorkorderObj.id, tenantID, storeID);
-      let messageTemplate = zSettings?.workorderTicketMessage || "Hi {firstName}, here is your workorder ticket: {link}";
+
+      let smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "intakeReceipt");
+      if (!(smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "").trim()) return;
+
+      const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+      let receiptData = printBuilder.intake(zWorkorderObj, zCustomer, settings?.salesTaxPercent, _ctx);
+      let storagePath = build_db_path.cloudStorage.intakeReceiptPDF(zWorkorderObj.id, tenantID, storeID);
       let messageID = crypto.randomUUID();
       let canRespondBool = canRespondVal ? true : null;
       let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
 
-      let totalAmount = "";
-      try {
-        let totals = calculateRunningTotals(zWorkorderObj, zSettings?.salesTaxPercent, [], false, !!zWorkorderObj.taxFree);
-        totalAmount = "$" + (totals.finalTotal / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-      } catch (e) {
-        totalAmount = "$0.00";
-      }
-      let lineItems = "";
-      try {
-        lineItems = (zWorkorderObj?.workorderLines || [])
-          .map((line) => {
-            let name = line.inventoryItem?.informalName || line.inventoryItem?.formalName || "";
-            return line.qty + "x " + name;
-          })
-          .join(", ");
-      } catch (e) {}
-      let storeHoursText = "";
-      try { storeHoursText = formatStoreHours(zSettings?.storeHours); } catch (e) {}
-      let storePhone = ((p) => p.length === 10 ? "(" + p.slice(0, 3) + ") " + p.slice(3, 6) + "-" + p.slice(6) : p)(zSettings?.storeInfo?.phone || "");
+      let result = await dbSendReceipt({
+        receiptType: "intake",
+        receiptData,
+        storagePath,
+        sendSMS: true,
+        sendEmail: false,
+        customerEmail: "",
+        customerCell: zCustomer.customerCell,
+        customerID: zWorkorderObj?.customerID || "",
+        templateVars: {
+          firstName: capitalizeFirstLetterOfString((zCustomer?.first || "Customer").trim()),
+          storeName: settings?.storeInfo?.displayName || "our store",
+          brand: zWorkorderObj?.brand || "",
+          description: zWorkorderObj?.description || "",
+        },
+        smsMessageID: messageID,
+        canRespond: canRespondBool,
+        forwardTo,
+        updateWorkorderField: { workorderID: zWorkorderObj.id, field: "intakeReceiptURL" },
+      });
 
-      dbSendReceipt({
+      if (result?.data?.receiptURL) {
+        useOpenWorkordersStore.getState().setField("intakeReceiptURL", result.data.receiptURL, zWorkorderObj.id);
+      }
+    });
+  }
+
+  function handleSendFinalizedTicket(canRespondVal, forwardOverride) {
+    if (!zWorkorderObj || !zCustomer?.customerCell) return;
+    if (!zWorkorderObj.workorderLines || zWorkorderObj.workorderLines.length === 0) return;
+    useLoginStore.getState().requireLogin(async () => {
+      let settings = zSettings;
+      let { tenantID, storeID } = useSettingsStore.getState().getSettings();
+
+      const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+      let receiptData = printBuilder.workorder(zWorkorderObj, zCustomer, settings?.salesTaxPercent, _ctx);
+      let storagePath = `${tenantID}/${storeID}/workorder-tickets/${zWorkorderObj.id}.pdf`;
+      let messageID = crypto.randomUUID();
+      let canRespondBool = canRespondVal ? true : null;
+      let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+
+      await dbSendReceipt({
         receiptType: "workorder",
         receiptData,
         storagePath,
@@ -532,36 +558,16 @@ export function MessagesComponent({}) {
         sendEmail: false,
         customerEmail: "",
         customerCell: zCustomer.customerCell,
-        customerID: zCustomer.id,
+        customerID: zWorkorderObj?.customerID || "",
         templateVars: {
-          firstName: capitalizeFirstLetterOfString(zCustomer?.first) || "",
-          lastName: capitalizeFirstLetterOfString(zCustomer?.last) || "",
+          firstName: capitalizeFirstLetterOfString((zCustomer?.first || "Customer").trim()),
+          storeName: settings?.storeInfo?.displayName || "our store",
           brand: zWorkorderObj?.brand || "",
           description: zWorkorderObj?.description || "",
-          totalAmount,
-          lineItems,
-          partOrdered: zWorkorderObj?.partOrdered || "",
-          partSource: zWorkorderObj?.partSource || "",
-          storeHours: storeHoursText,
-          storePhone,
-          supportEmail: zSettings?.storeInfo?.supportEmail || "",
         },
         smsMessageID: messageID,
         canRespond: canRespondBool,
         forwardTo,
-      });
-
-      let displayMessage = resolveTemplate(messageTemplate).replace(/\{link\}/g, "[PDF link]");
-      useCustMessagesStore.getState().setOutgoingMessage({
-        id: messageID,
-        message: displayMessage,
-        phoneNumber: zCustomer.customerCell,
-        customerID: zCustomer.id,
-        millis: new Date().getTime(),
-        type: "outgoing",
-        status: "sent",
-        canRespond: canRespondBool,
-        senderUserObj: useLoginStore.getState().getCurrentUser(),
       });
     });
   }
@@ -895,6 +901,15 @@ export function MessagesComponent({}) {
     userOverrodeCanRespondRef.current = true;
     _setCanRespond(!sCanRespond);
     await dbUpdateMessageCanRespond(phone, null, newCanRespond);
+    if (!newCanRespond) {
+      let currentUser = useLoginStore.getState().getCurrentUser();
+      if (currentUser?.id) {
+        let thread = zSmsThreads.find(t => t.phone === phone);
+        if (thread?.forwardTo?.[currentUser.id]) {
+          await dbToggleSMSForwarding(phone, currentUser.id, false, currentUser.phone, currentUser.first);
+        }
+      }
+    }
   }
 
   async function handleToggleForwardResponses() {
@@ -1275,6 +1290,7 @@ export function MessagesComponent({}) {
                   _setCanRespond(canRespond);
                   _setShowReplyModal(false);
                   if (pendingActionRef.current === "intake") { handleSendWorkorderTicket(canRespond); pendingActionRef.current = null; }
+                  else if (pendingActionRef.current === "finalized") { handleSendFinalizedTicket(canRespond); pendingActionRef.current = null; }
                   else if (pendingActionRef.current === "media") { sendMediaMessage(canRespond); }
                   else if (pendingActionRef.current === "audio") { handleSendAudio(canRespond); }
                   else { sendMessage(sNewMessage, "", canRespond); }
@@ -1393,7 +1409,8 @@ export function MessagesComponent({}) {
                   <DropdownMenu
                     dataArr={(() => {
                       let items = [
-                        { label: "Send Intake Ticket", key: "workorder" },
+                        { label: "Send intake/estimate ticket", key: "workorder" },
+                        { label: "Send finalized ticket", key: "finalized" },
                       ];
                       let paymentError = zWorkorderObj?.paymentComplete ? "Already paid" : (!zWorkorderObj?.workorderLines?.length ? "No line items" : "");
                       if (paymentError) {
@@ -1410,6 +1427,7 @@ export function MessagesComponent({}) {
                     })()}
                     onSelect={(item) => {
                       if (item.key === "workorder") { pendingActionRef.current = "intake"; _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); handleSendWorkorderTicket(sCanRespond); pendingActionRef.current = null; }); }
+                      else if (item.key === "finalized") { pendingActionRef.current = "finalized"; _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); handleSendFinalizedTicket(sCanRespond); pendingActionRef.current = null; }); }
                       else if (item.key === "payment") handleSendSMSPayment();
                       else if (item.key === "media") _setShowMediaPicker(true);
                     }}
@@ -1830,6 +1848,12 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     sMessagesRef.current = updated;
     _setMessages(updated);
     updateCache(updated, noMoreRef.current);
+    if (!newCanRespond) {
+      let currentUser = useLoginStore.getState().getCurrentUser();
+      if (currentUser?.id && thread?.forwardTo?.[currentUser.id]) {
+        await dbToggleSMSForwarding(phone, currentUser.id, false, currentUser.phone, currentUser.first);
+      }
+    }
   }
 
   async function handleHubToggleForward() {
@@ -2300,6 +2324,21 @@ const MESSAGE_TEXT_STYLE = {
   fontSize: 14,
 };
 
+const URL_REGEX = /(https?:\/\/[^\s]+)/;
+function LinkifiedText({ text, style }) {
+  let parts = text.split(URL_REGEX);
+  if (parts.length === 1) return <Text style={style}>{text}</Text>;
+  return (
+    <Text style={style}>
+      {parts.map((part, i) =>
+        URL_REGEX.test(part) ? (
+          <Text key={i} onPress={() => window.open(part, "_blank")} style={{ textDecorationLine: "underline" }}>{part}</Text>
+        ) : part
+      )}
+    </Text>
+  );
+}
+
 const INFO_TEXT_STYLE = {
   fontSize: 11,
   marginTop: 2,
@@ -2540,13 +2579,13 @@ const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom, autoTranslate
                   </>
                 ) : sTranslation.text ? (
                   <>
-                    <Text style={{ ...MESSAGE_TEXT_STYLE }}>{sTranslation.text}</Text>
+                    <LinkifiedText text={sTranslation.text} style={{ ...MESSAGE_TEXT_STYLE }} />
                     <Text style={{ fontSize: 12, color: gray(0.45), fontStyle: "italic", marginTop: 3 }}>
                       {"Original" + (fromLangLabel ? " (" + fromLangLabel + ")" : "") + ": " + msgObj.message}
                     </Text>
                   </>
                 ) : (
-                  <Text style={{ ...MESSAGE_TEXT_STYLE }}>{msgObj.message}</Text>
+                  <LinkifiedText text={msgObj.message} style={{ ...MESSAGE_TEXT_STYLE }} />
                 )}
               </View>
             </Tooltip>
@@ -2626,7 +2665,7 @@ const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing, thread, onToggl
               <MediaThumbnail url={msgObj.imageUrl} contentType="image/" />
             ) : null}
             {msgObj.message ? (
-              <Text style={{ ...MESSAGE_TEXT_STYLE, color: "white" }}>{msgObj.message}</Text>
+              <LinkifiedText text={msgObj.message} style={{ ...MESSAGE_TEXT_STYLE, color: "white" }} />
             ) : null}
             {msgObj.originalMessage ? (
               <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", fontStyle: "italic", marginTop: 3 }}>

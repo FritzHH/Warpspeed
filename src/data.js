@@ -1081,6 +1081,7 @@ export const SETTINGS_OBJ = {
     phone: "2393369177",
     supportEmail: "",
     officeEmail: "",
+    textingNumber: "",
     storeLogo: "",
   },
   receiptSetup: {

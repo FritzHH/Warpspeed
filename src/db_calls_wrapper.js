@@ -2766,6 +2766,9 @@ export async function dbSendSMS(
     }
 
     // Prepare SMS data object
+    let settings = useSettingsStore.getState().getSettings();
+    let textingNumber = settings?.storeInfo?.textingNumber?.replace(/\D/g, "") || "";
+    let fromNumber = textingNumber.length === 10 ? `+1${textingNumber}` : undefined;
     const smsData = {
       message: (message.message || "").trim(),
       phoneNumber: message.phoneNumber,
@@ -2779,6 +2782,7 @@ export async function dbSendSMS(
       forwardTo: message.forwardTo || null,
       customerFirst: message.customerFirst || "",
       customerLast: message.customerLast || "",
+      ...(fromNumber ? { fromNumber } : {}),
       ...(message.originalMessage ? { originalMessage: message.originalMessage } : {}),
       ...(message.translatedFrom ? { translatedFrom: message.translatedFrom } : {}),
       ...(message.translatedTo ? { translatedTo: message.translatedTo } : {}),

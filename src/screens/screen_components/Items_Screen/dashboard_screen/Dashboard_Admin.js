@@ -3653,6 +3653,47 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             flexDirection: "row",
             alignItems: "center",
             marginTop: 10,
+          }}
+        >
+          <Text
+            style={{
+              textAlign: "right",
+              fontColor: C.text,
+              width: "30%",
+            }}
+          >
+            Texting Number:
+          </Text>
+          <TextInput_
+            style={{
+              width: "50%",
+              marginLeft: 10,
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              padding: 3,
+              paddingRight: 7,
+              textAlign: "right",
+              outlineWidth: 0,
+            }}
+            debounceMs={500}
+            value={formatPhoneWithDashes(zSettingsObj?.storeInfo.textingNumber || "")}
+            onChangeText={(textingNumber) => {
+              handleSettingsFieldChange("storeInfo", {
+                ...zSettingsObj.storeInfo,
+                textingNumber,
+              });
+            }}
+          />
+          <View style={{ marginLeft: 7, width: 70 }} />
+        </View>
+
+        <View
+          style={{
+            width: "100%",
+            justifyContent: "flex-end",
+            flexDirection: "row",
+            alignItems: "center",
+            marginTop: 10,
 
             // backgroundColor: "green",
           }}
@@ -5275,6 +5316,7 @@ const QuickItemButtonsComponent = () => {
   }
 
   function drillIn(btn) {
+    // console.log("[Dashboard QB] drillIn button:", JSON.stringify(btn, null, 2));
     _setMenuPath((prev) => [...prev, { id: btn.id, name: btn.name }]);
     _setCurrentParentID(btn.id);
   }
@@ -5320,6 +5362,7 @@ const QuickItemButtonsComponent = () => {
   }
 
   function handleAddItemsToButton(itemIDs) {
+    // console.log("[Dashboard QB] handleAddItemsToButton itemIDs:", JSON.stringify(itemIDs));
     if (!sCurrentParentID) return;
     let updated = (zSettingsObj?.quickItemButtons || []).map((b) => {
       if (b.id !== sCurrentParentID) return b;
@@ -5330,6 +5373,7 @@ const QuickItemButtonsComponent = () => {
         .map((id, i) => ({ inventoryItemID: id, x: ((existingIDs.length + i) % 6) * (QB_DEFAULT_W + QB_SNAP_PCT), y: Math.floor((existingIDs.length + i) / 6) * (QB_DEFAULT_H + QB_SNAP_PCT), w: QB_DEFAULT_W, h: QB_DEFAULT_H, fontSize: 10 }));
       return { ...b, items: [...existing, ...newEntries] };
     });
+    // console.log("[Dashboard QB] handleAddItemsToButton updated button:", JSON.stringify(updated.find(b => b.id === sCurrentParentID), null, 2));
     useSettingsStore.getState().setField("quickItemButtons", updated);
   }
 

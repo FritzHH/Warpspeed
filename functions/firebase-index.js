@@ -32,6 +32,15 @@ const {
   getDefaultSMSMessage,
 } = require("./communicationUtils");
 
+// ═══════════════════════════════════════════════════════════════
+// PROJECT CONFIG
+// ═══════════════════════════════════════════════════════════════
+const PROJECT_ID = "warpspeed-bonitabikes";
+const RTDB_URL = `https://${PROJECT_ID}-default-rtdb.firebaseio.com`;
+const STORAGE_BUCKET = `${PROJECT_ID}.firebasestorage.app`;
+const FUNCTIONS_BASE_URL = `https://us-central1-${PROJECT_ID}.cloudfunctions.net`;
+const WEB_APP_URL = `https://${PROJECT_ID}.web.app`;
+
 // Firebase Admin SDK - initialize once at module load (don't delete/recreate)
 let DB = null;
 let adminInitialized = false;
@@ -53,14 +62,14 @@ async function getDB(serviceAccountSecret = null) {
 
         admin.initializeApp({
           credential: admin.credential.cert(serviceAccount),
-          databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com",
+          databaseURL: RTDB_URL,
         });
 
         log("✅ Firebase Admin initialized with service account from Secret Manager");
       } else {
         // Fallback to default credentials
         admin.initializeApp({
-          databaseURL: "https://warpspeed-bonitabikes-default-rtdb.firebaseio.com",
+          databaseURL: RTDB_URL,
         });
         log("⚠️ Firebase Admin initialized with default credentials");
       }
@@ -145,8 +154,6 @@ const SMS_PROTO = {
   id: "",
 };
 
-const CLOSED_THREAD_RESPONSE =
-  "Thank you for messaging Bonita Bikes. Due to staffing limitations, we cannot keep messaging open for all return responses. If you need to send a picture, for immediate service please call (239) 291-9396 and we can open the messaging service, or include the picture/video in an email to support@bonitabikes.com. Thank you and we'll chat soon!";
 
 async function compressImageServer(inputBuffer, contentType) {
   const compressibleTypes = ["image/jpeg", "image/png", "image/webp", "image/tiff", "image/avif"];
@@ -201,7 +208,7 @@ function log(one, two) {
 // ═══════════════════════════════════════════════════════════════
 
 const ALLOWED_ORIGINS = [
-  "https://warpspeed-bonitabikes.web.app",
+  WEB_APP_URL,
   "http://localhost:3000",
 ];
 
@@ -252,13 +259,26 @@ async function requireHTTPAuth(req, res) {
   }
 }
 
-function validateTwilioWebhook(request, authToken) {
+function validateTwilioWebhook(request, authToken, functionName) {
   const sig = request.headers["x-twilio-signature"];
-  if (!sig) return false;
-  const proto = request.headers["x-forwarded-proto"] || request.protocol;
-  const host = request.headers["x-forwarded-host"] || request.get("host");
-  const url = `${proto}://${host}${request.originalUrl}`;
-  return twilio.validateRequest(authToken, sig, url, request.body || {});
+  if (!sig) {
+    log("validateTwilioWebhook: no x-twilio-signature header found");
+    return false;
+  }
+  const url = `${FUNCTIONS_BASE_URL}/${functionName}`;
+  const body = request.body || {};
+  log("validateTwilioWebhook debug", {
+    url,
+    sig,
+    originalUrl: request.originalUrl,
+    contentType: request.headers["content-type"],
+    bodyKeys: Object.keys(body),
+    bodyType: typeof body,
+    authTokenLength: authToken ? authToken.length : 0,
+  });
+  const result = twilio.validateRequest(authToken.trim(), sig, url, body);
+  log("validateTwilioWebhook result", { result });
+  return result;
 }
 
 async function setUserCustomClaims(uid, tenantID, storeID) {
@@ -796,7 +816,7 @@ exports.sendSMSEnhanced = onCall(
         mediaUrls: mediaUrlsParam = [],
         canRespond: canRespondParam = false,
         forwardTo: forwardToParam = null,
-        fromNumber = "+12393171234", // Default from number
+        fromNumber,
         customerFirst = "",
         customerLast = "",
         originalMessage = "",
@@ -840,6 +860,10 @@ exports.sendSMSEnhanced = onCall(
         throw new HttpsError("invalid-argument", "Store ID is required");
       }
 
+      if (!fromNumber || typeof fromNumber !== "string") {
+        throw new HttpsError("failed-precondition", "No texting number configured in store settings");
+      }
+
       // Message length validation (SMS limit)
       if (message && message.length > 1600) {
         // Twilio SMS limit
@@ -868,7 +892,7 @@ exports.sendSMSEnhanced = onCall(
         ? mediaUrlsParam.map((m) => m.url || m)
         : imageUrl ? [imageUrl] : [];
       const callbackParams = messageID ? `?tenantID=${tenantID}&storeID=${storeID}&phone=${cleanPhoneNumber}&messageID=${messageID}` : "";
-      const statusCallbackUrl = messageID ? `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback${callbackParams}` : "";
+      const statusCallbackUrl = messageID ? `${FUNCTIONS_BASE_URL}/smsStatusCallback${callbackParams}` : "";
 
       let twilioResponse;
 
@@ -1077,7 +1101,7 @@ exports.smsStatusCallback = onRequest(
   { cors: true, secrets: [firebaseServiceAccountKey, twilioSecretKey] },
   async (request, response) => {
     try {
-      if (!validateTwilioWebhook(request, twilioSecretKey.value())) {
+      if (!validateTwilioWebhook(request, twilioSecretKey.value(), "smsStatusCallback")) {
         log("smsStatusCallback: invalid Twilio signature");
         return response.status(403).send("Forbidden");
       }
@@ -1179,7 +1203,7 @@ exports.incomingSMSEnhanced = onRequest(
       // STEP 1: VALIDATE TWILIO WEBHOOK & EXTRACT DATA
       // ============================================================================
 
-      if (!validateTwilioWebhook(request, twilioSecretKey.value())) {
+      if (!validateTwilioWebhook(request, twilioSecretKey.value(), "incomingSMSEnhanced")) {
         log("incomingSMSEnhanced: invalid Twilio signature");
         return response.status(403).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
       }
@@ -1312,6 +1336,7 @@ exports.incomingSMSEnhanced = onRequest(
       let canRespond = false;
       let threadStatus = "closed";
       let conversationData = {};
+      let storeSettings = {};
 
       try {
         // Fetch settings for timeout and blocklist
@@ -1320,7 +1345,7 @@ exports.incomingSMSEnhanced = onRequest(
           .collection("stores").doc(storeID)
           .collection("settings").doc("settings")
           .get();
-        const storeSettings = settingsDoc.exists ? settingsDoc.data() : {};
+        storeSettings = settingsDoc.exists ? settingsDoc.data() : {};
 
         // Check blocklist
         const blockedNumbers = storeSettings.smsBlockedNumbers || [];
@@ -1393,9 +1418,15 @@ exports.incomingSMSEnhanced = onRequest(
         }
 
         // Send auto-response using TwiML
+        let _si = storeSettings?.storeInfo || {};
+        let _closedPhone = (_si.phone || "").replace(/\D/g, "");
+        let _closedPhoneFmt = _closedPhone.length === 10 ? `(${_closedPhone.slice(0,3)}) ${_closedPhone.slice(3,6)}-${_closedPhone.slice(6)}` : "";
+        let _closedEmail = _si.supportEmail || "";
+        let _closedName = _si.displayName || "us";
+        let closedMsg = storeSettings?.smsClosedThreadMessage || `Thank you for messaging ${_closedName}. Due to staffing limitations, we cannot keep messaging open for all return responses.${_closedPhoneFmt ? ` For immediate service please call ${_closedPhoneFmt}.` : ""}${_closedEmail ? ` You can also email us at ${_closedEmail}.` : ""} Thank you and we'll chat soon!`;
         const twimlResponse = `<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-  <Message>${CLOSED_THREAD_RESPONSE}</Message>
+  <Message>${closedMsg}</Message>
 </Response>`;
 
         return response.status(200).type("text/xml").send(twimlResponse);
@@ -1430,7 +1461,7 @@ exports.incomingSMSEnhanced = onRequest(
       // Download media from Twilio and store in Cloud Storage
       if (numMedia > 0) {
         const mediaUrls = [];
-        const bucket = admin.storage().bucket("warpspeed-bonitabikes.firebasestorage.app");
+        const bucket = admin.storage().bucket(STORAGE_BUCKET);
         const accountSid = twilioSecretAccountNumber.value();
         const authToken = twilioSecretKey.value();
         const authHeader = "Basic " + Buffer.from(`${accountSid}:${authToken}`).toString("base64");
@@ -1541,7 +1572,7 @@ exports.incomingSMSEnhanced = onRequest(
           if (!twilioClient) {
             twilioClient = require("twilio")(
               twilioSecretAccountNumber.value(),
-              twilioSecretKey.value()
+              twilioSecretKey.value().trim()
             );
           }
 
@@ -1560,12 +1591,16 @@ exports.incomingSMSEnhanced = onRequest(
             }
           }
 
-          let forwardBody = `Reply from ${customerData.first || ""} ${customerData.last || ""}: ${forwardMessageText}`;
+          let fwdFirst = (customerData.first || "").charAt(0).toUpperCase() + (customerData.first || "").slice(1).toLowerCase();
+          let fwdLast = (customerData.last || "").charAt(0).toUpperCase() + (customerData.last || "").slice(1).toLowerCase();
+          let forwardBody = `💬 Reply from ${fwdFirst} ${fwdLast}: ${forwardMessageText}`;
           if (incomingMessageData.mediaUrls && incomingMessageData.mediaUrls.length > 0) {
             const mediaLinks = incomingMessageData.mediaUrls.map((m) => m.url).join("\n");
             forwardBody += `\n${mediaLinks}`;
           }
-          const fromNumber = twilioData.To || "+12393171234";
+          let _tnFwd = (storeSettings?.storeInfo?.textingNumber || "").replace(/\D/g, "");
+          const fromNumber = twilioData.To || (_tnFwd.length === 10 ? `+1${_tnFwd}` : "");
+          if (!fromNumber) { log("No from number for forwarding, skipping"); return; }
           await Promise.all(forwardEntries.map(async ([userID, userData]) => {
             try {
               if (!userData.phone) return;
@@ -2902,7 +2937,7 @@ exports.newCheckoutManualCardPaymentCallable = onCall(
 const LIGHTSPEED_OAUTH_URL = "https://cloud.lightspeedapp.com/auth/oauth/authorize";
 const LIGHTSPEED_TOKEN_URL = "https://cloud.lightspeedapp.com/auth/oauth/token";
 const LIGHTSPEED_API_BASE = "https://api.lightspeedapp.com/API/V3/Account";
-const LIGHTSPEED_CALLBACK_URL = "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/lightspeedOAuthCallback";
+const LIGHTSPEED_CALLBACK_URL = `${FUNCTIONS_BASE_URL}/lightspeedOAuthCallback`;
 
 // --- Lightspeed Helpers (internal) ---
 
@@ -3053,18 +3088,18 @@ function buildCSV(headers, rows) {
 }
 
 async function uploadCSVToStorage(csvString, storagePath) {
-  const bucket = admin.storage().bucket("warpspeed-bonitabikes.firebasestorage.app");
+  const bucket = admin.storage().bucket(STORAGE_BUCKET);
   const file = bucket.file(storagePath);
   await file.save(csvString, {
     contentType: "text/csv",
     metadata: { contentDisposition: `attachment; filename="${storagePath.split("/").pop()}"` },
   });
   await file.makePublic();
-  return `https://storage.googleapis.com/warpspeed-bonitabikes.firebasestorage.app/${storagePath}`;
+  return `https://storage.googleapis.com/${STORAGE_BUCKET}/${storagePath}`;
 }
 
 async function streamLightspeedCSVToStorage(accessToken, accountID, endpoint, params, headers, rowMapper, storagePath, lsLog) {
-  const bucket = admin.storage().bucket("warpspeed-bonitabikes.firebasestorage.app");
+  const bucket = admin.storage().bucket(STORAGE_BUCKET);
   const file = bucket.file(storagePath);
   const writeStream = file.createWriteStream({
     contentType: "text/csv",
@@ -3135,7 +3170,7 @@ async function streamLightspeedCSVToStorage(accessToken, accountID, endpoint, pa
   });
 
   await file.makePublic();
-  const url = `https://storage.googleapis.com/warpspeed-bonitabikes.firebasestorage.app/${storagePath}`;
+  const url = `https://storage.googleapis.com/${STORAGE_BUCKET}/${storagePath}`;
   return { url, totalRows };
 }
 
@@ -4238,16 +4273,22 @@ exports.sendEmailCallable = onCall(
 
       requireTenantMatch(request, tenantID, storeID);
 
+      const db = await getDB(firebaseServiceAccountKey);
+      const _emailSettingsDoc = await db.collection("tenants").doc(tenantID).collection("stores").doc(storeID).collection("settings").doc("settings").get();
+      const _emailSettings = _emailSettingsDoc.exists ? _emailSettingsDoc.data() : {};
+      const _sendFromEmail = _emailSettings?.storeInfo?.supportEmail || "";
+      const _sendFromName = _emailSettings?.storeInfo?.displayName || "";
+
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
-          user: "support@bonitabikes.com",
+          user: _sendFromEmail,
           pass: gmailAppPassword.value(),
         },
       });
 
       const mailOptions = {
-        from: '"Bonita Bikes" <support@bonitabikes.com>',
+        from: `"${_sendFromName}" <${_sendFromEmail}>`,
         to: to,
         subject: subject,
         html: htmlBody,
@@ -4314,10 +4355,18 @@ exports.uploadPDFAndSendSMSCallable = onCall(
         messageID,
         canRespond,
         forwardTo: forwardToParam = null,
-        fromNumber = "+12393171234",
+        fromNumber: fromNumberParam,
       } = request.data;
 
       if (tenantID && storeID) requireTenantMatch(request, tenantID, storeID);
+      let fromNumber = fromNumberParam;
+      if (!fromNumber && tenantID && storeID) {
+        const _settingsDoc = await db.collection("tenants").doc(tenantID).collection("stores").doc(storeID).collection("settings").doc("settings").get();
+        let _tn = (_settingsDoc.exists ? _settingsDoc.data()?.storeInfo?.textingNumber : "") || "";
+        _tn = _tn.replace(/\D/g, "");
+        fromNumber = _tn.length === 10 ? `+1${_tn}` : "";
+      }
+      if (!fromNumber) throw new HttpsError("failed-precondition", "No texting number configured in store settings");
 
       // Validate required fields
       if (!base64 || typeof base64 !== "string") {
@@ -4345,7 +4394,7 @@ exports.uploadPDFAndSendSMSCallable = onCall(
       }
 
       // Upload PDF to Cloud Storage
-      const bucket = admin.storage().bucket("warpspeed-bonitabikes.firebasestorage.app");
+      const bucket = admin.storage().bucket(STORAGE_BUCKET);
       const file = bucket.file(storagePath);
       await file.save(Buffer.from(base64, "base64"), {
         contentType: "application/pdf",
@@ -4378,7 +4427,7 @@ exports.uploadPDFAndSendSMSCallable = onCall(
         body: finalMessage.trim(),
         to: `+1${cleanPhoneNumber}`,
         from: fromNumber,
-        ...(messageID ? { statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback${pdfCallbackParams}` } : {}),
+        ...(messageID ? { statusCallback: `${FUNCTIONS_BASE_URL}/smsStatusCallback${pdfCallbackParams}` } : {}),
       });
 
       log("PDF SMS sent successfully", {
@@ -4526,7 +4575,7 @@ exports.generateReceiptPDFCallable = onCall(
           throw new HttpsError("invalid-argument", "Unknown receiptType: " + receiptType);
       }
 
-      const bucket = admin.storage().bucket("warpspeed-bonitabikes.firebasestorage.app");
+      const bucket = admin.storage().bucket(STORAGE_BUCKET);
       const file = bucket.file(storagePath);
       await file.save(Buffer.from(base64, "base64"), {
         contentType: "application/pdf",
@@ -4541,7 +4590,15 @@ exports.generateReceiptPDFCallable = onCall(
         const cleanPhoneNumber = smsParams.phoneNumber.replace(/\D/g, "");
         if (cleanPhoneNumber.length === 10) {
           const finalMessage = smsParams.message.replace(/\{link\}/g, receiptURL);
-          const fromNumber = smsParams.fromNumber || "+12393171234";
+          let _fromNum = smsParams.fromNumber;
+          if (!_fromNum && tenantID && storeID) {
+            const _sDoc = await db.collection("tenants").doc(tenantID).collection("stores").doc(storeID).collection("settings").doc("settings").get();
+            let _tn2 = (_sDoc.exists ? _sDoc.data()?.storeInfo?.textingNumber : "") || "";
+            _tn2 = _tn2.replace(/\D/g, "");
+            _fromNum = _tn2.length === 10 ? `+1${_tn2}` : "";
+          }
+          if (!_fromNum) throw new HttpsError("failed-precondition", "No texting number configured in store settings");
+          const fromNumber = _fromNum;
 
           if (!twilioClient) {
             try {
@@ -4565,7 +4622,7 @@ exports.generateReceiptPDFCallable = onCall(
             body: finalMessage.trim(),
             to: `+1${cleanPhoneNumber}`,
             from: fromNumber,
-            ...(messageID ? { statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback${pdfCallbackParams}` } : {}),
+            ...(messageID ? { statusCallback: `${FUNCTIONS_BASE_URL}/smsStatusCallback${pdfCallbackParams}` } : {}),
           });
 
           log("Receipt SMS sent", { messageSid: twilioResponse.sid, status: twilioResponse.status });
@@ -4626,17 +4683,21 @@ exports.generateReceiptPDFCallable = onCall(
         try {
           const emailSubject = (emailParams.subject || "").replace(/\{link\}/g, receiptURL);
           const emailHtml = emailParams.html.replace(/\{link\}/g, receiptURL);
+          const _eSettingsDoc = await db.collection("tenants").doc(tenantID).collection("stores").doc(storeID).collection("settings").doc("settings").get();
+          const _eSettings = _eSettingsDoc.exists ? _eSettingsDoc.data() : {};
+          const _eFromEmail = _eSettings?.storeInfo?.supportEmail || "";
+          const _eFromName = _eSettings?.storeInfo?.displayName || "";
 
           const transporter = nodemailer.createTransport({
             service: "gmail",
             auth: {
-              user: "support@bonitabikes.com",
+              user: _eFromEmail,
               pass: gmailAppPassword.value(),
             },
           });
 
           await transporter.sendMail({
-            from: '"Bonita Bikes" <support@bonitabikes.com>',
+            from: `"${_eFromName}" <${_eFromEmail}>`,
             to: emailParams.to,
             subject: emailSubject,
             html: emailHtml,
@@ -4747,7 +4808,7 @@ exports.sendReceiptCallable = onCall(
       }
 
       // Step 3: Upload to Cloud Storage
-      const bucket = admin.storage().bucket("warpspeed-bonitabikes.firebasestorage.app");
+      const bucket = admin.storage().bucket(STORAGE_BUCKET);
       const file = bucket.file(storagePath);
       await file.save(Buffer.from(base64, "base64"), {
         contentType: "application/pdf",
@@ -4778,7 +4839,13 @@ exports.sendReceiptCallable = onCall(
             }
 
             if (smsMessage) {
-              smsMessage = applyVars(smsMessage, templateVars || {});
+              let si = settings?.storeInfo || {};
+              let smsPhone = si.phone || "";
+              let formattedStorePhone = smsPhone.length === 10
+                ? "(" + smsPhone.slice(0, 3) + ") " + smsPhone.slice(3, 6) + "-" + smsPhone.slice(6)
+                : smsPhone;
+              let smsVars = { ...templateVars, storePhone: formattedStorePhone, storeName: si.displayName || si.name || templateVars?.storeName || "", supportEmail: si.supportEmail || "" };
+              smsMessage = applyVars(smsMessage, smsVars);
               let hasReceiptVar = smsMessage.includes("{salesReceipt}") || smsMessage.includes("{intakeReceipt}") || smsMessage.includes("{refundReceipt}");
               smsMessage = smsMessage.replace(/\{salesReceipt\}/g, receiptURL).replace(/\{intakeReceipt\}/g, receiptURL).replace(/\{refundReceipt\}/g, receiptURL);
               if (!hasReceiptVar && !smsMessage.includes("{link}")) smsMessage += " {link}";
@@ -4808,14 +4875,16 @@ exports.sendReceiptCallable = onCall(
 
               if (twilioClient) {
                 const messageID = smsMessageID || null;
-                const fromNumber = "+12393171234";
+                let _tn = (settings?.storeInfo?.textingNumber || "").replace(/\D/g, "");
+                if (_tn.length !== 10) throw new HttpsError("failed-precondition", "No texting number configured in store settings");
+                const fromNumber = `+1${_tn}`;
                 const pdfCallbackParams = messageID ? `?tenantID=${tenantID}&storeID=${storeID}&phone=${cleanPhoneNumber}&messageID=${messageID}` : "";
 
                 const twilioResponse = await twilioClient.messages.create({
                   body: smsMessage.trim(),
                   to: `+1${cleanPhoneNumber}`,
                   from: fromNumber,
-                  ...(messageID ? { statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback${pdfCallbackParams}` } : {}),
+                  ...(messageID ? { statusCallback: `${FUNCTIONS_BASE_URL}/smsStatusCallback${pdfCallbackParams}` } : {}),
                 });
 
                 log("Receipt SMS sent", { messageSid: twilioResponse.sid });
@@ -4901,16 +4970,18 @@ exports.sendReceiptCallable = onCall(
               }
             }
 
+            let _rFromEmail = settings?.storeInfo?.supportEmail || "";
+            let _rFromName = settings?.storeInfo?.displayName || "";
             const transporter = nodemailer.createTransport({
               service: "gmail",
               auth: {
-                user: "support@bonitabikes.com",
+                user: _rFromEmail,
                 pass: gmailAppPassword.value(),
               },
             });
 
             await transporter.sendMail({
-              from: '"Bonita Bikes" <support@bonitabikes.com>',
+              from: `"${_rFromName}" <${_rFromEmail}>`,
               to: customerEmail,
               subject: subject,
               html: html,
@@ -5265,7 +5336,7 @@ exports.nightlyArchiveAndCleanup = onSchedule(
     const db = await getDB(firebaseServiceAccountKey);
     const bucket = admin
       .storage()
-      .bucket("warpspeed-bonitabikes.firebasestorage.app");
+      .bucket(STORAGE_BUCKET);
 
     let tenantsSnapshot;
     try {
@@ -5360,7 +5431,7 @@ exports.hourlyBackup = onSchedule(
     const db = await getDB(firebaseServiceAccountKey);
     const bucket = admin
       .storage()
-      .bucket("warpspeed-bonitabikes.firebasestorage.app");
+      .bucket(STORAGE_BUCKET);
 
     const now = new Date();
     const timestamp = now.toISOString().replace(/[:.]/g, "-");
@@ -5447,7 +5518,7 @@ exports.manualArchiveAndCleanup = onCall(
 
     const bucket = admin
       .storage()
-      .bucket("warpspeed-bonitabikes.firebasestorage.app");
+      .bucket(STORAGE_BUCKET);
 
     try {
       const archiveResults = await archiveTenantStore(db, bucket, tenantID, storeID);
@@ -5521,7 +5592,7 @@ exports.rehydrateFromArchive = onCall(
 
     const bucket = admin
       .storage()
-      .bucket("warpspeed-bonitabikes.firebasestorage.app");
+      .bucket(STORAGE_BUCKET);
 
     const results = {};
 
@@ -5652,7 +5723,7 @@ exports.listHourlyBackupsCallable = onCall(
 
     const bucket = admin
       .storage()
-      .bucket("warpspeed-bonitabikes.firebasestorage.app");
+      .bucket(STORAGE_BUCKET);
 
     const backupMap = {};
 
@@ -6022,7 +6093,7 @@ async function completeSaleServerSide({
   }
 
   // ── Send receipt SMS ──
-  const storeName = settings?.storeInfo?.displayName || "Bonita Bikes";
+  const storeName = settings?.storeInfo?.displayName || "";
   const receiptUrl = charge?.receipt_url || "";
   const amountDisplay = (sale.total / 100).toFixed(2);
   const cleanPhone = (directPhone || customer?.customerCell || customer?.cell || primaryWO?.customerCell || "").replace(/\D/g, "");
@@ -6045,11 +6116,14 @@ async function completeSaleServerSide({
       const receiptMsg = `Payment of $${amountDisplay} received by ${storeName}. Thank you! View your receipt: ${receiptUrl}`;
       const receiptMsgID = crypto.randomUUID();
       const receiptCallbackParams = `?tenantID=${tenantID}&storeID=${storeID}&phone=${cleanPhone}&messageID=${receiptMsgID}`;
+      let _tnReceipt = (settings?.storeInfo?.textingNumber || "").replace(/\D/g, "");
+      if (_tnReceipt.length !== 10) throw new Error("No texting number configured in store settings");
+      let _fromReceipt = `+1${_tnReceipt}`;
       await _twilio.messages.create({
         body: receiptMsg,
         to: `+1${cleanPhone}`,
-        from: "+12393171234",
-        statusCallback: `https://us-central1-warpspeed-bonitabikes.cloudfunctions.net/smsStatusCallback${receiptCallbackParams}`,
+        from: _fromReceipt,
+        statusCallback: `${FUNCTIONS_BASE_URL}/smsStatusCallback${receiptCallbackParams}`,
       });
       const receiptConvRef = db.collection("tenants").doc(tenantID)
         .collection("stores").doc(storeID)
@@ -6089,15 +6163,16 @@ async function completeSaleServerSide({
 
   if (shouldEmail) {
     try {
+      let _csFromEmail = settings?.storeInfo?.supportEmail || "";
       const transporter = nodemailer.createTransport({
         service: "gmail",
         auth: {
-          user: "support@bonitabikes.com",
+          user: _csFromEmail,
           pass: gmailAppPassword.value(),
         },
       });
       await transporter.sendMail({
-        from: `"${storeName}" <support@bonitabikes.com>`,
+        from: `"${storeName}" <${_csFromEmail}>`,
         to: customerEmail,
         subject: `Payment Receipt from ${storeName} — $${amountDisplay}`,
         html: `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto"><p>Payment of <strong>$${amountDisplay}</strong> received by ${storeName}. Thank you!</p><p style="margin:24px 0"><a href="${receiptUrl}" style="display:inline-block;padding:12px 24px;background-color:#4CAF50;color:white;text-decoration:none;border-radius:6px;font-size:14px">View Receipt</a></p></div>`,
@@ -6113,17 +6188,18 @@ async function completeSaleServerSide({
     const officeEmail = settings?.storeInfo?.officeEmail || "";
     if (officeEmail && officeEmail.includes("@")) {
       try {
+        let _offFromEmail = settings?.storeInfo?.supportEmail || "";
         const transporter = nodemailer.createTransport({
           service: "gmail",
           auth: {
-            user: "support@bonitabikes.com",
+            user: _offFromEmail,
             pass: gmailAppPassword.value(),
           },
         });
         const custName = [customer?.first || primaryWO?.customerFirst || "", customer?.last || primaryWO?.customerLast || ""].filter(Boolean).join(" ") || "Unknown";
         const woID = primaryWO?.id || workorderIDs?.[0] || "";
         await transporter.sendMail({
-          from: `"${storeName}" <support@bonitabikes.com>`,
+          from: `"${storeName}" <${_offFromEmail}>`,
           to: officeEmail,
           subject: `Payment Received - $${amountDisplay} - ${custName} - ${woID}`,
           html: `<div style="font-family:Arial,sans-serif;max-width:500px;margin:0 auto"><p>A link-to-pay payment of <strong>$${amountDisplay}</strong> was received.</p><p><strong>Customer:</strong> ${custName}</p><p><strong>Workorder:</strong> ${woID}</p><p style="margin:24px 0"><a href="${receiptUrl}" style="display:inline-block;padding:12px 24px;background-color:#4CAF50;color:white;text-decoration:none;border-radius:6px;font-size:14px">View Payment</a></p></div>`,
@@ -6148,7 +6224,7 @@ async function completeSaleServerSide({
             customerID: customerID || "",
             message: confirmMsg,
             phoneNumber: cleanPhone,
-            fromNumber: "+12393171234",
+            fromNumber: _fromReceipt,
             tenantID,
             storeID,
             type: "outgoing",
@@ -6357,8 +6433,8 @@ exports.createTextToPayInvoice = onCall(
           phone: cleanPhone || "",
         },
         expires_at: Math.floor(Date.now() / 1000) + 86400, // 24 hours
-        success_url: "https://warpspeed-bonitabikes.web.app/payment-success",
-        cancel_url: "https://warpspeed-bonitabikes.web.app/payment-cancelled",
+        success_url: `${WEB_APP_URL}/payment-success`,
+        cancel_url: `${WEB_APP_URL}/payment-cancelled`,
       });
 
       // Update sale with checkout session ID
@@ -6367,6 +6443,57 @@ exports.createTextToPayInvoice = onCall(
         .collection("stores").doc(storeID)
         .collection("active-sales").doc(saleID)
         .update({ checkoutSessionID: session.id });
+
+      // ── Generate workorder ticket PDF ──
+      const pdfData = {
+        shopName: storeName,
+        shopContactBlurb: settings?.shopContactBlurb || "",
+        barcode: workorderID,
+        workorderNumber: workorder.workorderNumber || "",
+        startedOnMillis: workorder.startedOnMillis || "",
+        first: customer?.first || workorder.customerFirst || "",
+        last: customer?.last || workorder.customerLast || "",
+        customerContact: cleanPhone.length === 10
+          ? `(${cleanPhone.slice(0,3)}) ${cleanPhone.slice(3,6)}-${cleanPhone.slice(6)}`
+          : (customerEmail || ""),
+        brand: workorder.brand || "",
+        description: workorder.description || "",
+        color1: workorder.color1?.label || "",
+        color2: workorder.color2?.label || "",
+        workorderLines: (workorder.workorderLines || []).map((line) => {
+          const qty = Number(line.qty) || 1;
+          const price = Number(line.inventoryItem?.price) || 0;
+          return {
+            itemName: line.inventoryItem?.formalName || line.inventoryItem?.informalName || "",
+            qty,
+            price,
+            finalPrice: line.discountObj?.newPrice || price * qty,
+            discountName: line.discountObj?.name || "",
+            discountSavings: line.discountObj?.savings || 0,
+            receiptNotes: line.inventoryItem?.receiptNotes || "",
+          };
+        }),
+        subtotal: totals.subtotal,
+        discount: totals.discount,
+        tax: totals.tax,
+        cardFee: totals.cardFee,
+        cardFeePercent: totals.cardFeePercent,
+        total: totals.total,
+        customerNotes: workorder.customerNotes || [],
+      };
+
+      const pdfBase64 = generateWorkorderTicketPDF(pdfData);
+      const pdfPath = `${tenantID}/${storeID}/workorder-tickets/${workorderID}.pdf`;
+      const bucket = admin.storage().bucket(STORAGE_BUCKET);
+      const pdfFile = bucket.file(pdfPath);
+      await pdfFile.save(Buffer.from(pdfBase64, "base64"), {
+        contentType: "application/pdf",
+        metadata: { contentType: "application/pdf" },
+      });
+      await pdfFile.makePublic();
+      const ticketURL = `https://storage.googleapis.com/${bucket.name}/${pdfPath}`;
+
+      log("createTextToPayInvoice: workorder ticket PDF uploaded", { ticketURL });
 
       // ── Send payment link ──
       const amountDisplay = (amountToCharge / 100).toFixed(2);
@@ -6380,12 +6507,15 @@ exports.createTextToPayInvoice = onCall(
           );
         }
 
-        const smsBody = `💳 ${storeName} has sent you a payment request for $${amountDisplay}. Pay securely here: ${session.url}`;
+        const smsBody = `💳 ${storeName} has sent you a payment request for $${amountDisplay}. View ticket: ${ticketURL} Pay securely here: ${session.url}`;
+        let _tnPay = (settings?.storeInfo?.textingNumber || "").replace(/\D/g, "");
+        if (_tnPay.length !== 10) throw new HttpsError("failed-precondition", "No texting number configured in store settings");
+        let _fromPay = `+1${_tnPay}`;
 
         await twilioClient.messages.create({
           body: smsBody,
           to: `+1${cleanPhone}`,
-          from: "+12393171234",
+          from: _fromPay,
         });
 
         // Store in customer message queue
@@ -6412,10 +6542,11 @@ exports.createTextToPayInvoice = onCall(
 
       // Email
       if (channel === "email" || channel === "both") {
+        let _payFromEmail = settings?.storeInfo?.supportEmail || "";
         const transporter = nodemailer.createTransport({
           service: "gmail",
           auth: {
-            user: "support@bonitabikes.com",
+            user: _payFromEmail,
             pass: gmailAppPassword.value(),
           },
         });
@@ -6423,6 +6554,9 @@ exports.createTextToPayInvoice = onCall(
         const htmlBody = `
           <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto;">
             <p>💳 ${storeName} has sent you a payment request for <strong>$${amountDisplay}</strong>.</p>
+            <p style="margin: 16px 0;">
+              <a href="${ticketURL}" style="display: inline-block; padding: 10px 20px; background-color: #2196F3; color: white; text-decoration: none; border-radius: 6px; font-size: 14px;">View Ticket</a>
+            </p>
             <p style="margin: 24px 0;">
               <a href="${session.url}" style="display: inline-block; padding: 14px 28px; background-color: #4CAF50; color: white; text-decoration: none; border-radius: 6px; font-size: 16px; font-weight: bold;">Pay Now</a>
             </p>
@@ -6431,7 +6565,7 @@ exports.createTextToPayInvoice = onCall(
         `;
 
         await transporter.sendMail({
-          from: `"${storeName}" <support@bonitabikes.com>`,
+          from: `"${storeName}" <${_payFromEmail}>`,
           to: customerEmail,
           subject: `Payment Request from ${storeName} — $${amountDisplay}`,
           html: htmlBody,

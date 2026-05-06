@@ -14098,3 +14098,42 @@ id,method,amountCaptured,amountTendered,chargeID,paymentIntentID,last4,cardType,
 17859,cash,4295,4295,,,,,,,cash,,1777826039000
 17860,cash,8520,8520,,,,,,,cash,,1777826585000
 17861,card,4260,0,,,,,Credit Card,,stripe,,1777827854000
+17862,card,2500,0,,,,,Credit Card,,stripe,,1777904622000
+17864,card,30885,0,,,,,Credit Card,deposit,stripe,,1777907442000
+17865,card,3728,0,,,,,Debit Card,,stripe,,1777909055000
+17866,card,9635,0,,,,,Credit Card,,stripe,,1777909870000
+17867,card,533,0,,,,,Debit Card,,stripe,,1777910923000
+17868,card,3941,0,,,,,Credit Card,,stripe,,1777910985000
+17869,cash,1399,1399,,,,,,,cash,,1777911383000
+17870,card,10342,0,,,,,Debit Card,,stripe,,1777911587000
+17871,cash,2556,2556,,,,,,,cash,,1777911704000
+17872,card,3195,0,,,,,Credit Card,,stripe,,1777911959000
+17873,card,2432,0,,,,,Credit Card,,stripe,,1777913379000
+17875,cash,24768,24768,,,,,,,cash,,1777914825000
+17876,card,6929,0,,,,,Debit Card,,stripe,,1777915472000
+17877,card,7455,0,,,,,Debit Card,,stripe,,1777915662000
+17878,cash,2219,2219,,,,,,,cash,,1777917929000
+17879,card,2343,0,,,,,Credit Card,,stripe,,1777921206000
+17880,cash,9106,9106,,,,,,,cash,,1777921729000
+17881,card,10863,0,,,,,Credit Card,,stripe,,1777924829000
+17882,cash,5525,5525,,,,,,,cash,,1777925276000
+17883,card,19596,0,,,,,Credit Card,,stripe,,1777926207000
+17884,card,12514,0,,,,,Credit Card,,stripe,,1777926970000
+17885,card,14075,0,,,,,Credit Card,,stripe,,1777928239000
+17887,cash,7360,7360,,,,,,,cash,,1777929526000
+17888,card,454977,0,,,,,Credit Card,,stripe,,1777929561000
+17889,card,26625,0,,,,,Debit Card,,stripe,,1777989740000
+17890,cash,4260,4260,,,,,,,cash,,1777990164000
+17891,card,6390,0,,,,,Credit Card,,stripe,,1777990655000
+17892,card,2663,0,,,,,Debit Card,,stripe,,1777997917000
+17893,card,9990,0,,,,,Credit Card,,stripe,,1777999153000
+17894,cash,1000,1000,,,,,,,cash,,1777999929000
+17895,card,19540,0,,,,,Credit Card,,stripe,,1778001439000
+17896,card,2692,0,,,,,Credit Card,,stripe,,1778002600000
+17898,cash,3370,3370,,,,,,,cash,,1778004572000
+17901,card,5000,0,,,,,Credit Card,deposit,stripe,,1778005373000
+17905,card,13040,0,,,,,Credit Card,,stripe,,1778013759000
+17906,cash,7988,7988,,,,,,,cash,,1778016012000
+17907,card,5432,0,,,,,Debit Card,,stripe,,1778017026000
+17908,card,2663,0,,,,,Debit Card,,stripe,,1778018534000
+17909,card,1100,0,,,,,Debit Card,,stripe,,1778018557000

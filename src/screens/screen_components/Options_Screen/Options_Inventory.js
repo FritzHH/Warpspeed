@@ -644,6 +644,7 @@ const QuickItemCanvas = React.forwardRef(({
     resizeSelected: (axis, delta) => handleResizeSelected(axis, delta),
     fontSizeSelected: (delta) => handleFontSizeSelected(delta),
     setColorSelected: (bg, text) => handleSetColorSelected(bg, text),
+    clearPaintMode: () => _setPaintStyle(null),
   }));
 
   // Normalize items (backward compat: string IDs -> objects)
@@ -770,7 +771,7 @@ const QuickItemCanvas = React.forwardRef(({
     if (!sSelectedItemId) return;
     let sel = rawItems.find((it) => it.inventoryItemID === sSelectedItemId);
     if (!sel) return;
-    _setPaintStyle({ w: sel.w || DEFAULT_ITEM_W, h: sel.h || DEFAULT_ITEM_H, fontSize: sel.fontSize, backgroundColor: sel.backgroundColor, textColor: sel.textColor });
+    _setPaintStyle({ w: sel.w || DEFAULT_ITEM_W, h: sel.h || DEFAULT_ITEM_H, fontSize: sel.fontSize || 10, backgroundColor: sel.backgroundColor || null, textColor: sel.textColor || null });
   }
 
   function handlePasteStyle(targetId) {
@@ -1124,8 +1125,10 @@ export function InventoryComponent({}) {
   };
 
   function handleQuickButtonPress(buttonObj) {
+    // console.log("[Options_Inventory QB] handleQuickButtonPress button:", JSON.stringify(buttonObj, null, 2));
     _setCanvasEditMode(false);
     _setCanvasSelectedItemId(null);
+    quickCanvasRef.current?.clearPaintMode();
     // Intercept $LABOR and $ITEM buttons
     if (buttonObj.id === "labor" || buttonObj.id === "item") {
       const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
@@ -1716,7 +1719,7 @@ export function InventoryComponent({}) {
             height: "100%",
             width: "80%",
             paddingTop: 0,
-            paddingLeft: 3,
+            paddingLeft: 20,
             paddingRight: 3,
           }}
         >

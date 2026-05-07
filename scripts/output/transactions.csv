@@ -14137,3 +14137,17 @@ id,method,amountCaptured,amountTendered,chargeID,paymentIntentID,last4,cardType,
 17907,card,5432,0,,,,,Debit Card,,stripe,,1778017026000
 17908,card,2663,0,,,,,Debit Card,,stripe,,1778018534000
 17909,card,1100,0,,,,,Debit Card,,stripe,,1778018557000
+17911,cash,2876,2876,,,,,,,cash,,1778076101000
+17912,card,4887,0,,,,,Credit Card,,stripe,,1778078501000
+17913,cash,6390,6390,,,,,,,cash,,1778078554000
+17914,cash,6390,6390,,,,,,,cash,,1778081935000
+17915,card,3195,0,,,,,Credit Card,,stripe,,1778082246000
+17916,card,13782,0,,,,,Debit Card,,stripe,,1778083121000
+17917,card,4000,0,,,,,Debit Card,,stripe,,1778086555000
+17918,card,1100,0,,,,,Debit Card,,stripe,,1778090718000
+17919,card,6603,0,,,,,Credit Card,,stripe,,1778094814000
+17920,card,4000,0,,,,,Debit Card,,stripe,,1778097325000
+17921,card,6960,0,,,,,Credit Card,,stripe,,1778097702000
+17922,cash,11822,11822,,,,,,,cash,,1778097751000
+17923,card,3515,0,,,,,Credit Card,,stripe,,1778098568000
+17925,cash,3728,3728,,,,,,,cash,,1778099405000

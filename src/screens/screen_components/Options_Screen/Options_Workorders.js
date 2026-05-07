@@ -674,7 +674,7 @@ export function WorkordersComponent({}) {
                     width: "100%",
                     paddingLeft: 5,
                     paddingRight: 2,
-                    paddingVertical: 2,
+                    paddingVertical: 1,
                   }}
                 >
                   <View
@@ -708,7 +708,7 @@ export function WorkordersComponent({}) {
                         <Text
                           numberOfLines={1}
                           style={{
-                            fontSize: 15,
+                            fontSize: 14,
                             color: "dimgray",
                           }}
                         >
@@ -718,13 +718,13 @@ export function WorkordersComponent({}) {
                           let sale = workorder.activeSaleID ? zActiveSales.find((s) => s.id === workorder.activeSaleID) : null;
                           let paid = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
                           return paid > 0 ? (
-                            <Text style={{ fontSize: 14, color: C.green, marginLeft: 6, fontWeight: "500" }}>
+                            <Text style={{ fontSize: 12, color: C.green, marginLeft: 6, fontWeight: "500" }}>
                               {"Paid $" + formatCurrencyDisp(paid)}
                             </Text>
                           ) : null;
                         })()}
                         {!!workorder.activeSaleID && linkedSaleIDs.has(workorder.activeSaleID) && (
-                          <Text style={{ fontSize: 14, color: C.orange, marginLeft: 6, fontWeight: "500" }}>
+                          <Text style={{ fontSize: 12, color: C.orange, marginLeft: 6, fontWeight: "500" }}>
                             Combined Sale
                           </Text>
                         )}
@@ -732,7 +732,7 @@ export function WorkordersComponent({}) {
                       <View style={{ flexDirection: "row", alignItems: "center" }}>
                         <Text
                           style={{
-                            fontSize: 14,
+                            fontSize: 12,
                             fontWeight: 500,
                             color: C.text,
                           }}
@@ -751,7 +751,7 @@ export function WorkordersComponent({}) {
                         )}
                         <Text
                           style={{
-                            fontSize: 14,
+                            fontSize: 12,
                             color: C.text,
                           }}
                         >
@@ -767,7 +767,7 @@ export function WorkordersComponent({}) {
                               marginLeft: 8,
                             }}
                           >
-                            <Text style={{ color: "white", fontSize: 13, fontWeight: "600" }}>
+                            <Text style={{ color: "white", fontSize: 11, fontWeight: "600" }}>
                               {workorder.workorderLines.length}
                             </Text>
                           </View>
@@ -775,7 +775,7 @@ export function WorkordersComponent({}) {
                         {workorder.workorderLines?.length > 0 && (() => {
                           let totals = calculateRunningTotals(workorder, useSettingsStore.getState().getSettings()?.salesTaxPercent, [], false, !!workorder?.taxFree);
                           return totals.finalTotal > 0 ? (
-                            <Text style={{ color: "gray", fontSize: 13, fontWeight: "500", marginLeft: 6 }}>
+                            <Text style={{ color: "gray", fontSize: 11, fontWeight: "500", marginLeft: 6 }}>
                               {"$" + formatCurrencyDisp(totals.finalTotal)}
                             </Text>
                           ) : null;
@@ -790,7 +790,7 @@ export function WorkordersComponent({}) {
                               marginLeft: 8,
                             }}
                           >
-                            <Text style={{ color: "rgb(90, 75, 0)", fontSize: 11, fontWeight: "600" }}>
+                            <Text style={{ color: "rgb(90, 75, 0)", fontSize: 9, fontWeight: "600" }}>
                               Item not here
                             </Text>
                           </View>
@@ -814,7 +814,7 @@ export function WorkordersComponent({}) {
                           height: "100%",
                         }}
                       >
-                        <Text style={{ color: "dimgray", fontSize: 13 }}>
+                        <Text style={{ color: "dimgray", fontSize: 11 }}>
                           {(() => {
                             let d = new Date(workorder.startedOnMillis);
                             let h = d.getHours();
@@ -862,17 +862,17 @@ export function WorkordersComponent({}) {
                           }}
                         >
                           {!!wipUser && (
-                            <Text style={{ color: C.red, fontSize: 11, fontStyle: "italic", marginRight: 5 }}>{wipUser}</Text>
+                            <Text style={{ color: C.red, fontSize: 9, fontStyle: "italic", marginRight: 5 }}>{wipUser}</Text>
                           )}
                           {workorder.status === "finished" && (
-                            <Text style={{ fontSize: 13, color: workorder.contacted ? rs.textColor : C.red, marginRight: 4 }}>
+                            <Text style={{ fontSize: 11, color: workorder.contacted ? rs.textColor : C.red, marginRight: 4 }}>
                               {workorder.contacted ? "\u2713" : "\u2717"}
                             </Text>
                           )}
                           <Text
                             style={{
                               color: rs.textColor,
-                              fontSize: 13,
+                              fontSize: 11,
                               fontWeight: "normal",
                             }}
                           >
@@ -883,6 +883,7 @@ export function WorkordersComponent({}) {
                       <View
                         onMouseOver={() => onMouseEnter(workorder)}
                         onMouseLeave={() => onMouseExit()}
+                        style={{ alignSelf: "stretch" }}
                       >
                         <WaitTimeIndicator workorder={workorder} />
                       </View>

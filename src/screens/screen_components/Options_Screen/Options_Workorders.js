@@ -773,10 +773,10 @@ export function WorkordersComponent({}) {
                           </View>
                         )}
                         {workorder.workorderLines?.length > 0 && (() => {
-                          let totals = calculateRunningTotals(workorder);
-                          return totals.runningTotal > 0 ? (
+                          let totals = calculateRunningTotals(workorder, useSettingsStore.getState().getSettings()?.salesTaxPercent, [], false, !!workorder?.taxFree);
+                          return totals.finalTotal > 0 ? (
                             <Text style={{ color: "gray", fontSize: 13, fontWeight: "500", marginLeft: 6 }}>
-                              {"$" + formatCurrencyDisp(totals.runningTotal)}
+                              {"$" + formatCurrencyDisp(totals.finalTotal)}
                             </Text>
                           ) : null;
                         })()}

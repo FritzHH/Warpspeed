@@ -1054,7 +1054,7 @@ export function InventoryComponent({}) {
   const [sCurrentParentID, _setCurrentParentID] = useState(null);
   const [sMenuPath, _setMenuPath] = useState([]);
   const [sSelectedButtonID, _setSelectedButtonID] = useState(null);
-  const [sCustomItemModal, _setCustomItemModal] = useState(null); // "labor" | "item" | null
+  const [sCustomItemModal, _setCustomItemModal] = useState(null); // { type, anchorX, anchorY } | null
   const [sForceEditMode, _setForceEditMode] = useState(false);
   const [sCanvasEditMode, _setCanvasEditMode] = useState(false);
   const [sCanvasSelectedItemId, _setCanvasSelectedItemId] = useState(null);
@@ -1131,7 +1131,7 @@ export function InventoryComponent({}) {
     });
   };
 
-  function handleQuickButtonPress(buttonObj) {
+  function handleQuickButtonPress(buttonObj, e) {
     _setCanvasSelectedItemId(null);
     // Intercept $LABOR and $ITEM buttons
     if (buttonObj.id === "labor" || buttonObj.id === "item") {
@@ -1139,7 +1139,15 @@ export function InventoryComponent({}) {
       if (!openWorkorder) return;
       const statuses = useSettingsStore.getState().settings?.statuses;
       if (resolveStatus(openWorkorder.status, statuses)?.label?.toLowerCase() === "done & paid") return;
-      _setCustomItemModal(buttonObj.id);
+      let anchorX = 0, anchorY = 0;
+      if (e?.nativeEvent) {
+        anchorX = e.nativeEvent.pageX || e.nativeEvent.clientX || 0;
+        anchorY = e.nativeEvent.pageY || e.nativeEvent.clientY || 0;
+      } else if (e?.pageX != null) {
+        anchorX = e.pageX;
+        anchorY = e.pageY;
+      }
+      _setCustomItemModal({ type: buttonObj.id, anchorX, anchorY });
       return;
     }
 
@@ -1690,7 +1698,7 @@ export function InventoryComponent({}) {
                   }}
                 >
                   <Button_
-                    onPress={() => handleQuickButtonPress(item)}
+                    onPress={(e) => handleQuickButtonPress(item, e)}
                     enabled={(item.id === "labor" || item.id === "item") ? !!zOpenWorkorderID : true}
                     colorGradientArr={(item.id === "labor" || item.id === "item") && !zOpenWorkorderID ? COLOR_GRADIENTS.grey : isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "item" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
                     buttonStyle={{
@@ -1808,7 +1816,7 @@ export function InventoryComponent({}) {
                 return (
                   <Button_
                     key={btn.id}
-                    onPress={() => handleQuickButtonPress(btn)}
+                    onPress={(e) => handleQuickButtonPress(btn, e)}
                     colorGradientArr={isSelected ? ["rgb(240,200,40)", "rgb(240,200,40)"] : [C.green, C.green]}
                     buttonStyle={{
                       borderWidth: 1,
@@ -2029,7 +2037,9 @@ export function InventoryComponent({}) {
           visible={!!sCustomItemModal}
           onClose={() => _setCustomItemModal(null)}
           onSave={handleCustomItemSave}
-          type={sCustomItemModal}
+          type={sCustomItemModal?.type}
+          anchorX={sCustomItemModal?.anchorX || 0}
+          anchorY={sCustomItemModal?.anchorY || 0}
         />
         <NoteHelperDropdown
           visible={!!sNoteHelperDropdown}

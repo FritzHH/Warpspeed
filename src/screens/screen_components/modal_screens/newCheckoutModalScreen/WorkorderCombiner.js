@@ -305,26 +305,21 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                             </View>
                           )}
                           <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
+                            {(line.inventoryItem?.customPart || line.inventoryItem?.customLabor) && (
+                              <View style={{ backgroundColor: line.inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 55) : lightenRGBByPercent(C.green, 55), borderRadius: 15, paddingHorizontal: 7, paddingVertical: 3, marginRight: 5 }}>
+                                <Text style={{ fontSize: 12, fontWeight: "700", color: line.inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 15) : lightenRGBByPercent(C.green, 15) }}>{line.inventoryItem.customPart ? "ITEM" : line.inventoryItem.minutes ? line.inventoryItem.minutes + " MINS" : "LABOR"}</Text>
+                              </View>
+                            )}
                             <Text
                               style={{
                                 fontSize: 15,
                                 color: C.text,
                                 fontWeight: "400",
-                                // flex: 1,
+                                flex: 1,
                               }}
-
                               numberOfLines={2}
                             >
-                              {line.inventoryItem?.formalName ? (
-                                <>
-                                  {(line.inventoryItem.customPart || line.inventoryItem.customLabor) && (
-                                    <Text style={{ fontSize: 13, fontWeight: "600", textTransform: "lowercase" }}>
-                                      {line.inventoryItem.customPart ? "custom part - " : "custom labor - "}
-                                    </Text>
-                                  )}
-                                  {line.inventoryItem.formalName}
-                                </>
-                              ) : name}
+                              {line.inventoryItem?.formalName || name}
                             </Text>
                           </View>
                           {line.intakeNotes ? (

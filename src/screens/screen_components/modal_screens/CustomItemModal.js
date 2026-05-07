@@ -165,11 +165,16 @@ export const CustomItemModal = ({
   const canSave = sName.trim().length > 0 && sPriceCents > 0;
 
   const modalWidth = 420;
+  const modalHeight = 500;
   const margin = 10;
   const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
+  const vh = typeof window !== "undefined" ? window.innerHeight : 800;
   let left = anchorX - modalWidth / 2;
   if (left + modalWidth > vw - margin) left = vw - modalWidth - margin;
   if (left < margin) left = margin;
+  let top = anchorY + 5;
+  if (top + modalHeight > vh - margin) top = vh - modalHeight - margin;
+  if (top < margin) top = margin;
 
   return createPortal(
     <div
@@ -184,7 +189,7 @@ export const CustomItemModal = ({
         zIndex: 9999,
       }}
     >
-      <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: anchorY + 5, left }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top, left }}>
         <View
           style={{
             width: modalWidth,

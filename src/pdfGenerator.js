@@ -722,7 +722,8 @@ export function generateWorkorderTicketPDF(data) {
   y += 10;
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
-  let ticketTitle = data.receiptType === "Intake" ? "INTAKE TICKET" : "WORKORDER TICKET";
+  let isIntake = data.receiptType === "Intake";
+  let ticketTitle = isIntake ? "INTAKE/ESTIMATE TICKET" : "FINALIZED WORKORDER TICKET";
   doc.text(ticketTitle, centerX, y, { align: "center" });
   y += 18;
 
@@ -770,11 +771,11 @@ export function generateWorkorderTicketPDF(data) {
     doc.text("Colors: " + colors, leftX, y);
     y += 12;
   }
-  if (data.waitTime) {
+  if (isIntake && data.waitTime) {
     doc.text("Estimate: " + data.waitTime, leftX, y);
     y += 12;
   }
-  if (data.waitTimeEstimateLabel) {
+  if (isIntake && data.waitTimeEstimateLabel) {
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
     doc.text(data.waitTimeEstimateLabel, leftX, y);
@@ -824,9 +825,9 @@ export function generateWorkorderTicketPDF(data) {
   }
 
   // Intake blurb disclaimer
-  if (data.intakeBlurb) {
+  if (isIntake && data.intakeBlurb) {
     y = checkPageBreak(doc, y, 40, margin);
-    doc.setFontSize(7);
+    doc.setFontSize(10);
     doc.setFont("helvetica", "italic");
     doc.setTextColor(100, 100, 100);
     let blurbLines = doc.splitTextToSize(data.intakeBlurb, contentWidth);

@@ -8,7 +8,7 @@ import {
   localStorageWrapper,
   log,
 } from "../../utils";
-import { TabMenuButton, Image_, Button_ } from "../../components";
+import { TabMenuButton, Image_, Button_, Tooltip } from "../../components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../styles";
 import { TAB_NAMES } from "../../data";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
@@ -95,6 +95,7 @@ export const TabBar = ({
   const zCameraStatus = useLoginStore((state) => state.cameraStatus);
   const zCameraError = useLoginStore((state) => state.cameraError);
   const zPrinters = useSettingsStore((state) => state.settings?.printers);
+  const zUseFacialRecognition = useSettingsStore((state) => state.settings?.useFacialRecognition !== false);
   // local state /////////////////////////////////////////////////////////////////////////
   const [sIsOnline, _setIsOnline] = useState(true);
   const [sShowCameraPreview, _sSetShowCameraPreview] = useState(false);
@@ -136,27 +137,29 @@ export const TabBar = ({
           useLoginStore.getState().setLastActionMillis();
         }}
       >
-        <Button_
-          onPress={() => handleUserPress(zCurrentUser)}
-          icon={isClockedIn ? ICONS.check : ICONS.redx}
-          text={
-            zCurrentUser.first +
-            " " +
-            (zCurrentUser?.last?.length >= 0 ? zCurrentUser.last[0] : "") +
-            "."
-          }
-          textStyle={{ fontSize: 13, color: C.text }}
-          iconSize={13}
-          buttonStyle={{
-            paddingHorizontal: 7,
-            paddingVertical: 2,
-            marginRight: 5,
-            borderWidth: 1,
-            borderColor: C.buttonLightGreenOutline,
-            backgroundColor: C.buttonLightGreen,
-            borderRadius: 5,
-          }}
-        />
+        <Tooltip text="Press for user, right-click to log out" position="bottom" hideOnPress>
+          <Button_
+            onPress={() => handleUserPress(zCurrentUser)}
+            icon={isClockedIn ? ICONS.check : ICONS.redx}
+            text={
+              zCurrentUser.first +
+              " " +
+              (zCurrentUser?.last?.length >= 0 ? zCurrentUser.last[0] : "") +
+              "."
+            }
+            textStyle={{ fontSize: 13, color: C.text }}
+            iconSize={13}
+            buttonStyle={{
+              paddingHorizontal: 7,
+              paddingVertical: 2,
+              marginRight: 5,
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              backgroundColor: C.buttonLightGreen,
+              borderRadius: 5,
+            }}
+          />
+        </Tooltip>
       </View>
     );
   }
@@ -167,7 +170,7 @@ export const TabBar = ({
         onPress={() => useLoginStore.getState().setShowLoginScreen(true)}
         icon={ICONS.userControl}
         iconSize={13}
-        text="Login"
+        text="User"
         textStyle={{ fontSize: 13, color: C.text }}
         buttonStyle={{
           paddingHorizontal: 7,
@@ -202,6 +205,10 @@ export const TabBar = ({
   }
 
   function renderUserArea() {
+    if (!zUseFacialRecognition) {
+      return zCurrentUser ? <UserButton /> : <LoginButton />;
+    }
+
     // loading — spinner only
     if (zCameraStatus === "loading") {
       return <ActivityIndicator size={16} color={C.green} />;

@@ -2,7 +2,7 @@
 import { View, Text, ScrollView, Image, TouchableOpacity } from "react-native-web";
 import { useState, useRef, useEffect } from "react";
 import { cloneDeep } from "lodash";
-import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, CheckBox_, DropdownMenu, Tooltip, Image_, StaleBanner, TextInput_, LoadingIndicator } from "../../../../components";
+import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, CheckBox_, DropdownMenu, Tooltip, Image_, StaleBanner, TextInput_, LoadingIndicator, ReceiptSentOverlay } from "../../../../components";
 import { C, Fonts, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import {
   useCheckoutStore,
@@ -99,7 +99,9 @@ function broadcastSaleToDisplay(sale, combinedWOs, customerFirst, customerLast, 
       ? { name: line.discountObj.name, savings: line.discountObj.savings || 0, newPrice: line.discountObj.newPrice || 0 }
       : null,
   });
+  let _storeName = useSettingsStore.getState().getSettings()?.storeInfo?.displayName || "";
   broadcastToDisplay(DISPLAY_MSG_TYPES.SALE, {
+    storeName: _storeName,
     customerFirst: customerFirst || "",
     customerLast: customerLast || "",
     customerLanguage: customerLanguage || "",
@@ -266,6 +268,7 @@ export function NewCheckoutModalScreen() {
   const [sSplitDepositPayment, _setSplitDepositPayment] = useState(null);
   const [sExpandedCreditIds, _setExpandedCreditIds] = useState([]);
   const [sShowSendReceiptModal, _sSetShowSendReceiptModal] = useState(false);
+  const [sReceiptSentOverlay, _setReceiptSentOverlay] = useState(null);
   const [sTransactions, _setTransactions] = useState([]);   // real payments (cash/card)
   const [sCredits, _setCredits] = useState([]);              // applied credits/deposits/gift cards
   const [sAutoAppliedDeposits, _setAutoAppliedDeposits] = useState(false);
@@ -1262,7 +1265,7 @@ export function NewCheckoutModalScreen() {
 
     // Build the sale receipt — it computes popCashRegister and cashChangeGiven
     let woForReceipt = primaryWO || { workorderLines: [], taxFree: false };
-    let saleReceipt = printBuilder.sale(sale, sTransactions, customerForReceipt, woForReceipt, settings?.salesTaxPercent, _ctx, sCredits);
+    let saleReceipt = printBuilder.sale(sale, localTxns, customerForReceipt, woForReceipt, settings?.salesTaxPercent, _ctx, localCreds);
     log("Receipt object (sale complete):", JSON.stringify(saleReceipt, null, 2));
 
     // Translate receipt if non-English language is set
@@ -1307,7 +1310,7 @@ export function NewCheckoutModalScreen() {
     const canSMS = customerForReceipt.customerCell && smsContent.trim();
     const canEmail = customerForReceipt.email && emailContent.trim();
     if (canSMS || canEmail) {
-      sendSaleReceipt(sale, customerForReceipt, woForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels, langCode, sTransactions, sCredits);
+      sendSaleReceipt(sale, customerForReceipt, woForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels, langCode, localTxns, localCreds);
     }
   }
 
@@ -1588,6 +1591,7 @@ export function NewCheckoutModalScreen() {
         let woForReceipt = primaryWO || { workorderLines: [], taxFree: false };
         let receipt = printBuilder.sale(sSale, sTransactions, customerForReceipt, woForReceipt, settings?.salesTaxPercent, _ctx, sCredits);
         sendSaleReceipt(sSale, customerForReceipt, woForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, null, null, getTranslateCode(sReceiptLanguage), sTransactions, sCredits);
+        _setReceiptSentOverlay({ sentSMS: !!canSMS, sentEmail: !!canEmail });
       }
     } else {
       _sSetShowSendReceiptModal(true);
@@ -1617,6 +1621,7 @@ export function NewCheckoutModalScreen() {
     if (canSMS || canEmail) {
       let woForReceipt = primaryWO || { workorderLines: [], taxFree: false };
       await sendSaleReceipt(sSale, customerForReceipt, woForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, null, null, getTranslateCode(sReceiptLanguage), sTransactions, sCredits);
+      _setReceiptSentOverlay({ sentSMS: !!canSMS, sentEmail: !!canEmail });
     }
     _sSetShowSendReceiptModal(false);
   }
@@ -2419,6 +2424,7 @@ export function NewCheckoutModalScreen() {
               </View>
             </View>
           )}
+          <ReceiptSentOverlay visible={!!sReceiptSentOverlay} sentSMS={sReceiptSentOverlay?.sentSMS} sentEmail={sReceiptSentOverlay?.sentEmail} onDone={() => _setReceiptSentOverlay(null)} />
           {sNewItemModal && (
             <InventoryItemModalScreen
               key={sNewItemModal.id}

@@ -513,67 +513,47 @@ export const ActiveWorkorderComponent = ({}) => {
     sendIntakeReceipt(settings, zCustomer, zOpenWorkorder, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null);
   }
 
-  async function sendIntakeReceipt(settings, customer, workorder, smsTemplate, emailTemplate) {
+  function sendIntakeReceipt(settings, customer, workorder, smsTemplate, emailTemplate) {
+    let results = [];
+    if (smsTemplate && customer.customerCell) results.push("SMS sending to " + customer.customerCell);
+    if (emailTemplate && customer.email) results.push("Email sending to " + customer.email);
+
     useAlertScreenStore.getState().setValues({
-      title: "Sending ticket...",
-      message: "",
-      btn1Icon: ICONS.wheelGIF,
-      icon1Size: 40,
-      canExitOnOuterClick: false,
+      title: "Sending",
+      message: results.join("\n"),
+      canExitOnOuterClick: true,
     });
+    setTimeout(() => useAlertScreenStore.getState().setShowAlert(false), 1300);
 
     const { tenantID, storeID } = useSettingsStore.getState().getSettings();
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
     const receiptData = printBuilder.intake(workorder, customer, settings?.salesTaxPercent, _ctx);
     const storagePath = build_db_path.cloudStorage.intakeReceiptPDF(workorder.id, tenantID, storeID);
 
-    let results = [];
-    let errors = [];
-
-    try {
-      const result = await dbSendReceipt({
-        receiptType: "intake",
-        receiptData,
-        storagePath,
-        sendSMS: !!(smsTemplate && customer.customerCell),
-        sendEmail: !!(emailTemplate && customer.email),
-        customerEmail: customer.email || "",
-        customerCell: customer.customerCell || "",
-        customerID: workorder?.customerID || "",
-        templateVars: {
-          firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
-          storeName: settings?.storeInfo?.displayName || "our store",
-          brand: workorder?.brand || "",
-          description: workorder?.description || "",
-        },
-        smsMessageID: crypto.randomUUID(),
-        updateWorkorderField: { workorderID: workorder.id, field: "intakeReceiptURL" },
-      });
+    dbSendReceipt({
+      receiptType: "intake",
+      receiptData,
+      storagePath,
+      sendSMS: !!(smsTemplate && customer.customerCell),
+      sendEmail: !!(emailTemplate && customer.email),
+      customerEmail: customer.email || "",
+      customerCell: customer.customerCell || "",
+      customerID: workorder?.customerID || "",
+      templateVars: {
+        firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
+        storeName: settings?.storeInfo?.displayName || "our store",
+        brand: workorder?.brand || "",
+        description: workorder?.description || "",
+      },
+      smsMessageID: crypto.randomUUID(),
+      updateWorkorderField: { workorderID: workorder.id, field: "intakeReceiptURL" },
+    }).then((result) => {
       if (result?.data?.receiptURL) {
         useOpenWorkordersStore.getState().setField("intakeReceiptURL", result.data.receiptURL, workorder.id);
       }
-      if (smsTemplate && customer.customerCell) results.push("SMS sent to " + customer.customerCell);
-      if (emailTemplate && customer.email) results.push("Email sent to " + customer.email);
-    } catch (e) {
-      errors.push("Receipt sending failed: " + (e?.message || String(e)));
-    }
-
-    if (errors.length > 0) {
-      useAlertScreenStore.getState().setValues({
-        title: "Intake Receipt Errors",
-        message: (results.length > 0 ? results.join("\n") + "\n\n" : "") + errors.join("\n"),
-        btn1Text: "OK",
-        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
-        canExitOnOuterClick: true,
-      });
-    } else {
-      useAlertScreenStore.getState().setValues({
-        title: "Sent",
-        message: results.join("\n"),
-        canExitOnOuterClick: true,
-      });
-      setTimeout(() => useAlertScreenStore.getState().setShowAlert(false), 2000);
-    }
+    }).catch((e) => {
+      log("sendIntakeReceipt error:", e?.message || String(e));
+    });
   }
 
   return (

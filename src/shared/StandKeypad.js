@@ -33,10 +33,13 @@ const KEY_STYLE = {
   color: C.text,
 };
 
+let _touchFired = false;
 function KeyButton({ keyLabel, displayLabel, onClick, style }) {
   return (
     <div
-      onClick={() => onClick(keyLabel)}
+      onClick={() => { if (_touchFired) { _touchFired = false; return; } onClick(keyLabel); }}
+      onTouchStart={(e) => { _touchFired = true; e.currentTarget.style.backgroundColor = gray(0.1); onClick(keyLabel); }}
+      onTouchEnd={(e) => { e.currentTarget.style.backgroundColor = C.listItemWhite; }}
       onMouseDown={(e) => { e.currentTarget.style.backgroundColor = gray(0.1); }}
       onMouseUp={(e) => { e.currentTarget.style.backgroundColor = C.listItemWhite; }}
       onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = C.listItemWhite; }}

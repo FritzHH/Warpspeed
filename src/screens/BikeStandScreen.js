@@ -126,6 +126,7 @@ export function BikeStandScreen() {
   const [sShowPhoneSearch, _setShowPhoneSearch] = useState(false);
   const [sShowCustomerModal, _setShowCustomerModal] = useState(false);
   const [sShowNewWorkorderModal, _setShowNewWorkorderModal] = useState(false);
+  const [sShowBikeInfoModal, _setShowBikeInfoModal] = useState(false);
   const [sDiscountCardID, _setDiscountCardID] = useState(null);
   const [sShowInventoryModal, _setShowInventoryModal] = useState(false);
   const [sShowWorkorderList, _setShowWorkorderList] = useState(false);
@@ -854,6 +855,8 @@ export function BikeStandScreen() {
   //////////////////////////////////////////////////////////////////////////////
 
   function handleNewWorkorderPress() {
+    _setSelectedWorkorderID(null);
+    _setPendingCustomer(null);
     pendingActionRef.current = () => _setShowNewWorkorderModal(true);
     startFaceLogin();
   }
@@ -957,9 +960,13 @@ export function BikeStandScreen() {
     let newPin = sPin + key;
     _setPin(newPin);
     let users = zSettings?.users || [];
+    let pinLength = zSettings?.userPinStrength || 4;
     let userObj = users.find((u) => u.pin == newPin);
     if (!userObj) userObj = users.find((u) => u.alternatePin == newPin);
-    if (!userObj) return;
+    if (!userObj) {
+      if (newPin.length >= pinLength) setTimeout(() => _setPin(""), 400);
+      return;
+    }
     localStorageWrapper.setItem("standDevPin", newPin);
     useLoginStore.getState().setCurrentUser(userObj);
     useLoginStore.setState({ lastActionMillis: Infinity });
@@ -1010,14 +1017,401 @@ export function BikeStandScreen() {
       {/* New workorder modal */}
       {sShowNewWorkorderModal && (
         <NewWorkorderModal
-          onSelect={(customerOrStandalone) => {
-            _setPendingCustomer(customerOrStandalone);
-            _setShowBikeDetails(true);
+          onSelect={async (customerOrStandalone) => {
+            _setSelectedWorkorderID(null);
+            _setPendingCustomer(null);
             _setShowNewWorkorderModal(false);
+            let customer = customerOrStandalone === "standalone" ? undefined : customerOrStandalone;
+            let wo = await startNewWorkorder(customer);
+            _setSelectedWorkorderID(wo.id);
+            _setShowBikeInfoModal(true);
           }}
           onClose={() => _setShowNewWorkorderModal(false)}
         />
       )}
+
+      {/* Bike info modal — shown after customer/standalone selection */}
+      {sShowBikeInfoModal && selectedWorkorder && (() => {
+        let modalKeypadMode = sDetailField === "waitDays" ? "phone" : "alpha";
+        return (
+          <div
+            style={{
+              position: "absolute",
+              top: 0, left: 0, right: 0, bottom: 0,
+              backgroundColor: "rgba(0,0,0,0.4)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 9999,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "95%",
+                height: "95%",
+                backgroundColor: "rgba(255,255,255,0.97)",
+                borderRadius: 16,
+                display: "flex",
+                flexDirection: "column",
+                overflow: "hidden",
+              }}
+            >
+              {/* Header */}
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: gray(0.15) }}>
+                <View>
+                  <Text style={{ fontSize: 36, fontWeight: "700", color: C.text }}>
+                    {customerName || "Standalone Sale"}
+                  </Text>
+                  {customerCell ? (
+                    <Text style={{ fontSize: 28, color: gray(0.5), marginTop: 4 }}>{formatPhoneWithDashes(customerCell)}</Text>
+                  ) : null}
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    let woID = sSelectedWorkorderID;
+                    _setShowBikeInfoModal(false);
+                    _setDetailField(null);
+                    _setSelectedWorkorderID(null);
+                    _setPendingCustomer(null);
+                    if (woID) useOpenWorkordersStore.getState().removeWorkorder(woID, true);
+                  }}
+                  style={{
+                    backgroundColor: C.orange,
+                    borderRadius: 10,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    paddingVertical: 10,
+                    paddingHorizontal: 18,
+                    gap: 8,
+                  }}
+                >
+                  <Image_ icon={ICONS.close1} size={24} />
+                  <Text style={{ fontSize: 26, fontWeight: "600", color: C.textWhite }}>Cancel</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Fields */}
+              <ScrollView style={{ flex: 1, paddingHorizontal: 20, paddingTop: 16 }}>
+                {/* Brand row */}
+                <Text style={{ fontSize: 22, fontWeight: "600", color: gray(0.4), marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Brand</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20 }}>
+                  <TouchableOpacity onPress={() => activateDetailField("brand")} style={{ width: "50%" }}>
+                    <View pointerEvents="none">
+                      <TextInput_
+                        placeholder="Brand"
+                        editable={false}
+                        style={{
+                          width: "100%",
+                          borderWidth: sDetailField === "brand" ? 2 : 1,
+                          borderColor: sDetailField === "brand" ? C.blue : selectedWorkorder?.brand ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                          color: C.text,
+                          paddingVertical: 12,
+                          paddingHorizontal: 10,
+                          fontSize: 32,
+                          outlineStyle: "none",
+                          borderRadius: 8,
+                          fontWeight: (sDetailField === "brand" ? sDetailForm.brand : selectedWorkorder?.brand) ? "500" : null,
+                          backgroundColor: sDetailField === "brand" ? lightenRGBByPercent(C.blue, 85) : undefined,
+                        }}
+                        value={sDetailField === "brand" ? capitalizeFirstLetterOfString(sDetailForm.brand) : capitalizeFirstLetterOfString(selectedWorkorder?.brand)}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                  <View style={{ width: "50%", flexDirection: "row", paddingLeft: 8, justifyContent: "space-between", alignItems: "center" }}>
+                    <View style={{ width: "48%", height: "100%" }}>
+                      <DropdownMenu
+                        dataArr={zSettings.bikeBrands}
+                        enabled={true}
+                        onSelect={(item) => useOpenWorkordersStore.getState().setField("brand", item, selectedWorkorder.id)}
+                        buttonStyle={{ opacity: selectedWorkorder?.brand ? DROPDOWN_SELECTED_OPACITY : 1, paddingVertical: 12 }}
+                        buttonTextStyle={{ fontSize: 28 }}
+                        itemTextStyle={{ fontSize: 32 }}
+                        itemStyle={{ paddingVertical: 28, height: "auto" }}
+                        buttonText={zSettings.bikeBrandsName}
+                      />
+                    </View>
+                    <View style={{ width: "48%", height: "100%" }}>
+                      <DropdownMenu
+                        dataArr={zSettings.bikeOptionalBrands}
+                        enabled={true}
+                        onSelect={(item) => useOpenWorkordersStore.getState().setField("brand", item, selectedWorkorder.id)}
+                        buttonStyle={{ opacity: selectedWorkorder?.brand ? DROPDOWN_SELECTED_OPACITY : 1, paddingVertical: 12 }}
+                        buttonTextStyle={{ fontSize: 28 }}
+                        itemTextStyle={{ fontSize: 32 }}
+                        itemStyle={{ paddingVertical: 28, height: "auto" }}
+                        buttonText={zSettings.bikeOptionalBrandsName}
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                {/* Description row */}
+                <Text style={{ fontSize: 22, fontWeight: "600", color: gray(0.4), marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Model / Description</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20 }}>
+                  <TouchableOpacity onPress={() => activateDetailField("description")} style={{ width: "50%" }}>
+                    <View pointerEvents="none">
+                      <TextInput_
+                        placeholder="Model/Description"
+                        editable={false}
+                        style={{
+                          width: "100%",
+                          borderWidth: sDetailField === "description" ? 2 : 1,
+                          borderColor: sDetailField === "description" ? C.blue : selectedWorkorder?.description ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                          color: C.text,
+                          paddingVertical: 12,
+                          paddingHorizontal: 10,
+                          fontSize: 32,
+                          outlineStyle: "none",
+                          borderRadius: 8,
+                          fontWeight: (sDetailField === "description" ? sDetailForm.description : selectedWorkorder?.description) ? "500" : null,
+                          backgroundColor: sDetailField === "description" ? lightenRGBByPercent(C.blue, 85) : undefined,
+                        }}
+                        value={sDetailField === "description" ? capitalizeFirstLetterOfString(sDetailForm.description) : capitalizeFirstLetterOfString(selectedWorkorder?.description)}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                  <View style={{ width: "50%", paddingLeft: 8 }}>
+                    <DropdownMenu
+                      dataArr={zSettings.bikeDescriptions}
+                      enabled={true}
+                      onSelect={(item) => useOpenWorkordersStore.getState().setField("description", item, selectedWorkorder.id)}
+                      buttonStyle={{ opacity: selectedWorkorder?.description ? DROPDOWN_SELECTED_OPACITY : 1, paddingVertical: 12 }}
+                      buttonTextStyle={{ fontSize: 28 }}
+                      itemTextStyle={{ fontSize: 32 }}
+                      itemStyle={{ paddingVertical: 28, height: "auto" }}
+                      buttonText="Descriptions"
+                    />
+                  </View>
+                </View>
+
+                {/* Color row */}
+                <Text style={{ fontSize: 22, fontWeight: "600", color: gray(0.4), marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Colors</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20 }}>
+                  <View style={{ width: "50%", flexDirection: "row", alignItems: "center" }}>
+                    <TouchableOpacity onPress={() => activateDetailField("color1")} style={{ width: "48%" }}>
+                      <View pointerEvents="none">
+                        <TextInput_
+                          placeholder="Color 1"
+                          editable={false}
+                          style={{
+                            width: "100%",
+                            borderWidth: sDetailField === "color1" ? 2 : 1,
+                            borderColor: sDetailField === "color1" ? C.blue : selectedWorkorder?.color1?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                            paddingVertical: 12,
+                            paddingHorizontal: 10,
+                            fontSize: 32,
+                            outlineStyle: "none",
+                            borderRadius: 8,
+                            fontWeight: (sDetailField === "color1" ? sDetailForm.color1 : selectedWorkorder?.color1?.label) ? "500" : null,
+                            backgroundColor: sDetailField === "color1" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color1?.backgroundColor,
+                            color: selectedWorkorder?.color1?.textColor || C.text,
+                          }}
+                          value={sDetailField === "color1" ? capitalizeFirstLetterOfString(sDetailForm.color1) : capitalizeFirstLetterOfString(selectedWorkorder?.color1?.label)}
+                        />
+                      </View>
+                    </TouchableOpacity>
+                    <View style={{ width: "4%" }} />
+                    <TouchableOpacity onPress={() => activateDetailField("color2")} style={{ width: "48%" }}>
+                      <View pointerEvents="none">
+                        <TextInput_
+                          placeholder="Color 2"
+                          editable={false}
+                          style={{
+                            width: "100%",
+                            borderWidth: sDetailField === "color2" ? 2 : 1,
+                            borderColor: sDetailField === "color2" ? C.blue : selectedWorkorder?.color2?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                            paddingVertical: 12,
+                            paddingHorizontal: 10,
+                            fontSize: 32,
+                            outlineStyle: "none",
+                            borderRadius: 8,
+                            fontWeight: (sDetailField === "color2" ? sDetailForm.color2 : selectedWorkorder?.color2?.label) ? "500" : null,
+                            backgroundColor: sDetailField === "color2" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color2?.backgroundColor,
+                            color: selectedWorkorder?.color2?.textColor || C.text,
+                          }}
+                          value={sDetailField === "color2" ? capitalizeFirstLetterOfString(sDetailForm.color2) : capitalizeFirstLetterOfString(selectedWorkorder?.color2?.label)}
+                        />
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ width: "50%", flexDirection: "row", paddingLeft: 8, alignItems: "center", justifyContent: "space-between" }}>
+                    <View style={{ width: "48%", height: "100%", justifyContent: "center" }}>
+                      <DropdownMenu
+                        itemSeparatorStyle={{ height: 0 }}
+                        dataArr={COLORS}
+                        menuBorderColor="transparent"
+                        enabled={true}
+                        onSelect={(item) => useOpenWorkordersStore.getState().setField("color1", item, selectedWorkorder.id)}
+                        buttonStyle={{ opacity: selectedWorkorder?.color1?.label ? DROPDOWN_SELECTED_OPACITY : 1, paddingVertical: 12 }}
+                        buttonTextStyle={{ fontSize: 28 }}
+                        itemTextStyle={{ fontSize: 32 }}
+                        itemStyle={{ paddingVertical: 28, height: "auto" }}
+                        menuMaxHeight={window.innerHeight - 10}
+                        centerMenuVertically={true}
+                        buttonText="Color 1"
+                        modalCoordX={0}
+                      />
+                    </View>
+                    <View style={{ width: "48%", height: "100%", justifyContent: "center" }}>
+                      <DropdownMenu
+                        itemSeparatorStyle={{ height: 0 }}
+                        dataArr={COLORS}
+                        enabled={true}
+                        onSelect={(item) => useOpenWorkordersStore.getState().setField("color2", item, selectedWorkorder.id)}
+                        modalCoordX={0}
+                        buttonStyle={{ opacity: selectedWorkorder?.color2?.label ? DROPDOWN_SELECTED_OPACITY : 1, paddingVertical: 12 }}
+                        buttonTextStyle={{ fontSize: 28 }}
+                        itemTextStyle={{ fontSize: 32 }}
+                        itemStyle={{ paddingVertical: 28, height: "auto" }}
+                        menuMaxHeight={window.innerHeight - 10}
+                        centerMenuVertically={true}
+                        buttonText="Color 2"
+                      />
+                    </View>
+                  </View>
+                </View>
+
+                {/* Wait time row */}
+                <Text style={{ fontSize: 22, fontWeight: "600", color: gray(0.4), marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Wait Time</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20 }}>
+                  <View style={{ width: "50%", flexDirection: "row", alignItems: "center" }}>
+                    <Text style={{ color: gray(0.5), fontSize: 28, marginRight: 8 }}>Max wait days:</Text>
+                    <TouchableOpacity onPress={() => activateDetailField("waitDays")}>
+                      <View pointerEvents="none">
+                        <TextInput_
+                          placeholder="0"
+                          editable={false}
+                          style={{
+                            width: 70,
+                            borderWidth: sDetailField === "waitDays" ? 2 : 1,
+                            borderColor: sDetailField === "waitDays" ? C.blue : selectedWorkorder?.waitTime?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                            color: C.text,
+                            paddingVertical: 12,
+                            paddingHorizontal: 8,
+                            fontSize: 32,
+                            outlineStyle: "none",
+                            borderRadius: 8,
+                            textAlign: "center",
+                            fontWeight: (sDetailField === "waitDays" ? sDetailForm.waitDays : (selectedWorkorder?.waitTime?.maxWaitTimeDays != null && selectedWorkorder?.waitTime?.maxWaitTimeDays !== "")) ? "500" : null,
+                            backgroundColor: sDetailField === "waitDays" ? lightenRGBByPercent(C.blue, 85) : undefined,
+                          }}
+                          value={sDetailField === "waitDays" ? sDetailForm.waitDays : String(selectedWorkorder?.waitTime?.maxWaitTimeDays ?? "")}
+                        />
+                      </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        let current = Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) || 0;
+                        if (current <= 1) return;
+                        let newDays = current - 1;
+                        let woID = selectedWorkorder.id;
+                        let allWaits = (zSettings.waitTimes || []).filter((w) => w.maxWaitTimeDays > 0);
+                        let match = allWaits.reduce((best, w) => (!best || Math.abs(w.maxWaitTimeDays - newDays) < Math.abs(best.maxWaitTimeDays - newDays)) ? w : best, null);
+                        let waitObj = match ? { ...match, maxWaitTimeDays: newDays } : { ...(selectedWorkorder?.waitTime || {}), maxWaitTimeDays: newDays };
+                        useOpenWorkordersStore.getState().setField("waitTime", waitObj, woID, false);
+                        clearTimeout(waitDaysDebounceRef.current);
+                        waitDaysDebounceRef.current = setTimeout(() => {
+                          let wo = useOpenWorkordersStore.getState().getWorkorders().find((w) => w.id === woID);
+                          if (wo) useOpenWorkordersStore.getState().setField("waitTime", wo.waitTime, woID, true);
+                        }, 500);
+                      }}
+                      disabled={!selectedWorkorder?.waitTime?.maxWaitTimeDays || Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) <= 1}
+                      style={{ marginLeft: 10, opacity: (!selectedWorkorder?.waitTime?.maxWaitTimeDays || Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) <= 1) ? 0.3 : 1 }}
+                    >
+                      <Image_ icon={ICONS.minus} size={36} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => {
+                        let current = Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) || 0;
+                        let newDays = current + 1;
+                        let woID = selectedWorkorder.id;
+                        let allWaits = (zSettings.waitTimes || []).filter((w) => w.maxWaitTimeDays > 0);
+                        let match = allWaits.reduce((best, w) => (!best || Math.abs(w.maxWaitTimeDays - newDays) < Math.abs(best.maxWaitTimeDays - newDays)) ? w : best, null);
+                        let waitObj = match ? { ...match, maxWaitTimeDays: newDays } : { ...(selectedWorkorder?.waitTime || {}), maxWaitTimeDays: newDays };
+                        useOpenWorkordersStore.getState().setField("waitTime", waitObj, woID, false);
+                        clearTimeout(waitDaysDebounceRef.current);
+                        waitDaysDebounceRef.current = setTimeout(() => {
+                          let wo = useOpenWorkordersStore.getState().getWorkorders().find((w) => w.id === woID);
+                          if (wo) useOpenWorkordersStore.getState().setField("waitTime", wo.waitTime, woID, true);
+                        }, 500);
+                      }}
+                      style={{ marginLeft: 6 }}
+                    >
+                      <Image_ icon={ICONS.add} size={36} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={{ width: "50%", paddingLeft: 8 }}>
+                    <DropdownMenu
+                      modalCoordX={50}
+                      dataArr={zSettings.waitTimes}
+                      enabled={true}
+                      onSelect={(item) => {
+                        let isNonRemovable = NONREMOVABLE_WAIT_TIMES.some((nr) => nr.id === item.id);
+                        let waitObj = { ...item, removable: !isNonRemovable };
+                        useOpenWorkordersStore.getState().setField("waitTime", waitObj, selectedWorkorder.id);
+                      }}
+                      buttonStyle={{ opacity: selectedWorkorder?.waitTime?.label ? DROPDOWN_SELECTED_OPACITY : 1, paddingVertical: 12 }}
+                      buttonTextStyle={{ fontSize: 28 }}
+                      itemTextStyle={{ fontSize: 32 }}
+                      itemStyle={{ paddingVertical: 28, height: "auto" }}
+                      buttonText="Wait Times"
+                    />
+                  </View>
+                </View>
+
+                {/* Wait estimate label */}
+                {(() => {
+                  let estimateLabel = calculateWaitEstimateLabel(selectedWorkorder, zSettings);
+                  let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
+                  return estimateLabel ? (
+                    <Text style={{ color: isMissing ? C.red : gray(0.5), fontSize: 24, fontStyle: "italic", marginBottom: 12 }}>
+                      {estimateLabel}
+                    </Text>
+                  ) : null;
+                })()}
+
+                {/* On-screen keypad for detail fields */}
+                {sDetailField !== null && (
+                  <View style={{ marginTop: 8, marginBottom: 16 }}>
+                    <StandKeypad mode={modalKeypadMode} onKeyPress={handleDetailKeyPress} />
+                    <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 6, paddingHorizontal: 4 }}>
+                      <TouchableOpacity onPress={() => _setDetailField(null)} style={{ padding: 4 }}>
+                        <Image_ icon={ICONS.close1} size={36} />
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </ScrollView>
+
+              {/* Footer — Add Items button */}
+              {(() => {
+                let hasBrand = !!(selectedWorkorder?.brand);
+                return (
+                  <View style={{ paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1, borderTopColor: gray(0.15) }}>
+                    <TouchableOpacity
+                      onPress={() => { if (!hasBrand) return; _setShowBikeInfoModal(false); _setDetailField(null); }}
+                      activeOpacity={hasBrand ? 0.2 : 1}
+                      style={{
+                        backgroundColor: hasBrand ? C.green : gray(0.15),
+                        borderRadius: 12,
+                        flexDirection: "row",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        paddingVertical: 20,
+                        gap: 12,
+                      }}
+                    >
+                      <Image_ icon={ICONS.add} size={36} />
+                      <Text style={{ fontSize: 36, fontWeight: "700", color: hasBrand ? C.textWhite : gray(0.4) }}>Add Items</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })()}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Customer info view-only modal (portal) */}
       {sShowCustomerModal && sSelectedCustomer && (
@@ -1700,24 +2094,11 @@ export function BikeStandScreen() {
                 zIndex: 10,
               }}
             >
-              <View style={{ flexDirection: "column", gap: 24 }}>
-                <TouchableOpacity
-                  onPress={handleNewWorkorderPress}
-                  style={{
-                    backgroundColor: C.green,
-                    borderRadius: 12,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingVertical: 60,
-                    paddingHorizontal: 60,
-                    gap: 12,
-                  }}
-                >
-                  <Image_ icon={ICONS.gears1} size={69} />
-                  <Text style={{ fontSize: 32, fontWeight: "700", color: C.textWhite }}>New Workorder</Text>
-                </TouchableOpacity>
+              <View style={{ flexDirection: "column", gap: 24, alignItems: "center" }}>
                 <TouchableOpacity
                   onPress={() => {
+                    _setSelectedWorkorderID(null);
+                    _setPendingCustomer(null);
                     pendingActionRef.current = () => _setShowWorkorderList(true);
                     startFaceLogin();
                   }}
@@ -1733,6 +2114,21 @@ export function BikeStandScreen() {
                 >
                   <Image_ icon={ICONS.search} size={69} />
                   <Text style={{ fontSize: 32, fontWeight: "700", color: C.textWhite }}>Find Workorder</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleNewWorkorderPress}
+                  style={{
+                    backgroundColor: C.green,
+                    borderRadius: 12,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    paddingVertical: 120,
+                    paddingHorizontal: 120,
+                    gap: 24,
+                  }}
+                >
+                  <Image_ icon={ICONS.gears1} size={138} />
+                  <Text style={{ fontSize: 64, fontWeight: "700", color: C.textWhite }}>New Workorder</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -1896,7 +2292,7 @@ export function BikeStandScreen() {
                         minWidth: 320,
                       }}>
                         <TouchableOpacity
-                          onPress={() => { _setShowFooterMenu(false); _setShowWorkorderList(true); }}
+                          onPress={() => { _setShowFooterMenu(false); _setSelectedWorkorderID(null); _setPendingCustomer(null); _setShowWorkorderList(true); }}
                           style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}
                         >
                           <Image_ icon={ICONS.search} size={36} />
@@ -2663,7 +3059,7 @@ export function BikeStandScreen() {
               }}
             >
               <div
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); _setNotesDiscountOpen(false); }}
                 style={{
                   width: "95%",
                   height: "98%",

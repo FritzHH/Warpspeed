@@ -5,7 +5,6 @@ import * as faceapi from "face-api.js";
 import { localStorageWrapper, log } from "./utils";
 import {
   FACE_DESCRIPTOR_CONFIDENCE_DISTANCE,
-  FACIAL_RECOGNITION_INTERVAL_MILLIS,
   LOCAL_DB_KEYS,
   PAUSE_USER_CLOCK_IN_CHECK_MILLIS,
 } from "./constants";
@@ -15,6 +14,13 @@ import { C, COLOR_GRADIENTS } from "./styles";
 
 const MODEL_URL = "./models";
 const DEFAULT_LOGOUT_GRACE_SECONDS = 7;
+
+// Motion-gated recognition — fast pixel-diff check gates expensive face-api calls
+const MOTION_CHECK_MS = 150;
+const MOTION_PIXEL_DIFF = 30;
+const MOTION_PERCENT = 0.005;
+const MOTION_CANVAS_W = 160;
+const MOTION_CANVAS_H = 120;
 
 // IndexedDB cache for model weight shards ////////////////////////////////////
 const CACHE_DB_NAME = "faceapi-model-cache";
@@ -141,6 +147,10 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   const activeLoginTimeoutRef = useRef(zActiveLoginTimeout);
   const descriptorErrorsRef = useRef(new Set()); // track users with logged errors
   const lastMatchRef = useRef({ userId: null, timestamp: 0 }); // grace period tracking
+  const motionCanvasRef = useRef(null);
+  const prevFrameRef = useRef(null);
+  const motionActiveRef = useRef(false);
+  const recognitionLoopRunningRef = useRef(false);
 
   // local state ////////////////////////////////////////////////////////////
   const [sReady, _setReady] = useState(false);
@@ -213,58 +223,43 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
     };
   }, []);
 
-  // 3. Background recognition loop ////////////////////////////////////////
-  useEffect(() => {
-    if (!sReady) return;
-
-    _setStatus("Setup ready, enroll face now");
-    if (intervalRef.current) clearInterval(intervalRef.current);
-
-    intervalRef.current = setInterval(async () => {
-      // skip detection while clock-in prompt is showing
-      if (pauseRef.current) return;
-
-      // re-acquire stream if tracks died (e.g. after hibernate/sleep)
-      if (!isStreamAlive()) {
-        try {
-          await startVideo();
-          log("Webcam stream re-acquired after sleep/hibernate.");
-        } catch (e) {
-          return; // camera not available yet, try again next interval
-        }
-      }
-
-      const descriptor = await getFaceDescriptor();
-      const matchedUser = descriptor ? findMatchingUser(descriptor) : null;
-
-      if (matchedUser) {
-        // recognized — update last match and reset grace period
-        lastMatchRef.current = { userId: matchedUser.id, timestamp: Date.now() };
-        useLoginStore.getState().setCurrentUser(matchedUser);
-        useLoginStore.getState().setLastActionMillis();
-        useLoginStore.getState().setCameraStatus("matched");
-        useLoginStore.getState().runPostLoginFunction();
-        checkClockIn(matchedUser);
-      } else {
-        // no match or no face — check grace period before clearing
-        const { userId, timestamp } = lastMatchRef.current;
-        const graceMs = (activeLoginTimeoutRef.current || DEFAULT_LOGOUT_GRACE_SECONDS) * 1000;
-        if (userId && (Date.now() - timestamp < graceMs)) {
-          return; // still within grace period, keep current user
-        }
-        // grace period expired — clear user
-        lastMatchRef.current = { userId: null, timestamp: 0 };
-        useLoginStore.getState().setCurrentUser(null);
-        useLoginStore.getState().setCameraStatus("idle");
-      }
-    }, FACIAL_RECOGNITION_INTERVAL_MILLIS);
-
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, [sReady]);
-
   // helpers ////////////////////////////////////////////////////////////////
+
+  function detectMotion() {
+    const video = videoRef.current;
+    if (!video || video.readyState < 2) return false;
+
+    if (!motionCanvasRef.current) {
+      motionCanvasRef.current = document.createElement("canvas");
+      motionCanvasRef.current.width = MOTION_CANVAS_W;
+      motionCanvasRef.current.height = MOTION_CANVAS_H;
+    }
+
+    const ctx = motionCanvasRef.current.getContext("2d");
+    ctx.drawImage(video, 0, 0, MOTION_CANVAS_W, MOTION_CANVAS_H);
+    const currentPixels = ctx.getImageData(0, 0, MOTION_CANVAS_W, MOTION_CANVAS_H).data;
+
+    if (!prevFrameRef.current) {
+      prevFrameRef.current = currentPixels.slice();
+      return false;
+    }
+
+    const prev = prevFrameRef.current;
+    const totalPixels = MOTION_CANVAS_W * MOTION_CANVAS_H;
+    let changed = 0;
+
+    for (let i = 0; i < currentPixels.length; i += 4) {
+      const diff =
+        Math.abs(currentPixels[i] - prev[i]) +
+        Math.abs(currentPixels[i + 1] - prev[i + 1]) +
+        Math.abs(currentPixels[i + 2] - prev[i + 2]);
+      if (diff > MOTION_PIXEL_DIFF * 3) changed++;
+    }
+
+    prevFrameRef.current = currentPixels.slice();
+    const hasMotion = changed / totalPixels > MOTION_PERCENT;
+    return hasMotion;
+  }
 
   function isStreamAlive() {
     const stream = streamRef.current;
@@ -274,7 +269,6 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   }
 
   async function startVideo() {
-    // if video already has a live stream, just capture the ref
     if (videoRef.current?.srcObject && isStreamAlive()) {
       streamRef.current = videoRef.current.srcObject;
       return;
@@ -284,7 +278,6 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
       throw new Error("getUserMedia not supported");
     }
 
-    // stop any dead tracks before re-acquiring
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop());
     }
@@ -323,7 +316,6 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
           return user;
         }
       } catch (e) {
-        // log once per user per session to avoid spamming every 1.5s
         const key = user.id || user.first;
         if (!descriptorErrorsRef.current.has(key)) {
           descriptorErrorsRef.current.add(key);
@@ -335,19 +327,46 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
     return null;
   }
 
+  async function runRecognitionLoop() {
+    if (recognitionLoopRunningRef.current) return;
+    recognitionLoopRunningRef.current = true;
+
+    while (motionActiveRef.current && !pauseRef.current) {
+      const descriptor = await getFaceDescriptor();
+      const matchedUser = descriptor ? findMatchingUser(descriptor) : null;
+
+      if (matchedUser) {
+        lastMatchRef.current = { userId: matchedUser.id, timestamp: Date.now() };
+        useLoginStore.getState().setCurrentUser(matchedUser);
+        useLoginStore.getState().setLastActionMillis();
+        useLoginStore.getState().setCameraStatus("matched");
+        useLoginStore.getState().runPostLoginFunction();
+        checkClockIn(matchedUser);
+      } else {
+        const { userId, timestamp } = lastMatchRef.current;
+        const graceMs = (activeLoginTimeoutRef.current || DEFAULT_LOGOUT_GRACE_SECONDS) * 1000;
+        if (userId && (Date.now() - timestamp >= graceMs)) {
+          lastMatchRef.current = { userId: null, timestamp: 0 };
+          useLoginStore.getState().setCurrentUser(null);
+          useLoginStore.getState().setCameraStatus("idle");
+        }
+      }
+    }
+
+    recognitionLoopRunningRef.current = false;
+  }
+
   function checkClockIn(user) {
     const isClockedIn = punchClockRef.current[user.id];
     if (isClockedIn) return;
 
-    // read pause state fresh from localStorage (not from a stale closure)
     let clockPauseObj = localStorageWrapper.getItem(LOCAL_DB_KEYS.userClockCheckPauseObj) || {};
 
     const lastCheckMillis = clockPauseObj[user.id];
     if (lastCheckMillis && (Date.now() - lastCheckMillis < PAUSE_USER_CLOCK_IN_CHECK_MILLIS)) {
-      return; // still within pause window
+      return;
     }
 
-    // pause recognition while alert is showing to prevent duplicate prompts
     pauseRef.current = true;
 
     useAlertScreenStore.getState().setValues({
@@ -359,7 +378,6 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
         pauseRef.current = false;
       },
       handleBtn2Press: () => {
-        // re-read and update localStorage fresh inside the handler
         let freshPauseObj = localStorageWrapper.getItem(LOCAL_DB_KEYS.userClockCheckPauseObj) || {};
         freshPauseObj[user.id] = Date.now();
         localStorageWrapper.setItem(LOCAL_DB_KEYS.userClockCheckPauseObj, freshPauseObj);
@@ -368,6 +386,43 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
       showAlert: true,
     });
   }
+
+  // 3. Motion-gated background recognition loop ////////////////////////////
+  useEffect(() => {
+    if (!sReady) return;
+
+    _setStatus("Setup ready, enroll face now");
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
+    intervalRef.current = setInterval(() => {
+      if (!isStreamAlive()) {
+        startVideo().catch(() => {});
+        return;
+      }
+
+      const motionDetected = detectMotion();
+      motionActiveRef.current = motionDetected;
+
+      if (motionDetected) {
+        runRecognitionLoop();
+      } else {
+        const { userId, timestamp } = lastMatchRef.current;
+        if (userId) {
+          const graceMs = (activeLoginTimeoutRef.current || DEFAULT_LOGOUT_GRACE_SECONDS) * 1000;
+          if (Date.now() - timestamp >= graceMs) {
+            lastMatchRef.current = { userId: null, timestamp: 0 };
+            useLoginStore.getState().setCurrentUser(null);
+            useLoginStore.getState().setCameraStatus("idle");
+          }
+        }
+      }
+    }, MOTION_CHECK_MS);
+
+    return () => {
+      if (intervalRef.current) clearInterval(intervalRef.current);
+      motionActiveRef.current = false;
+    };
+  }, [sReady]);
 
   // enrollment /////////////////////////////////////////////////////////////
 

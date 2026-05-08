@@ -76,10 +76,25 @@ export function BaseScreen() {
   const zRunBackgroundRecognition = useLoginStore(
     (state) => state.runBackgroundRecognition
   );
+  const zUseFacialRecognition = useSettingsStore(
+    (state) => state.settings?.useFacialRecognition !== false
+  );
   const zShowAlert = useAlertScreenStore((state) => state.showAlert);
   const throttledSetLastAction = useRef(throttle(() => {
     useLoginStore.getState().setLastActionMillis();
   }, 1000)).current;
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      const store = useLoginStore.getState();
+      if (!store.currentUser || !store.lastActionMillis) return;
+      const timeout = useSettingsStore.getState().getSettings()?.activeLoginTimeoutSeconds || 60;
+      if ((Date.now() - store.lastActionMillis) / 1000 > timeout) {
+        store.setCurrentUser(null);
+      }
+    }, 1000);
+    return () => clearInterval(id);
+  }, []);
 
   // display window status — "closed" until display broadcasts otherwise
   const [sDisplayStatus, _setDisplayStatus] = useState(DISPLAY_STATUS.CLOSED);
@@ -208,7 +223,6 @@ export function BaseScreen() {
     const hasSecondary = localStorage.getItem("warpspeed_has_secondary_display") === "true";
 
     let unsub = onDisplayStatusMessage((msg) => {
-      console.log("[Dashboard] display status received:", msg.status);
       _setDisplayStatus(msg.status);
       if (msg.status === DISPLAY_STATUS.WINDOWED) {
         console.log("[Dashboard] WARNING: display is NOT in full-screen mode");
@@ -466,11 +480,10 @@ export function BaseScreen() {
           _setRefundSaleID("");
         }}
       />
-      <LoginModalScreen
-        modalVisible={zShowLoginScreen && !zLoginModalVisible}
-      />
-
-      {!!zRunBackgroundRecognition && <FaceDetectionClientComponent />}
+      {zShowLoginScreen && !zLoginModalVisible && (
+        <LoginModalScreen modalVisible={true} />
+      )}
+      {!!zRunBackgroundRecognition && zUseFacialRecognition && <FaceDetectionClientComponent />}
       {/* {!!(!zPauseAlertOnBaseComponent && zShowAlert) && <AlertBox_ />} */}
       <AlertBox_ showAlert={zShowAlert} />
       <View

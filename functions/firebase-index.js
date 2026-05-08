@@ -4828,7 +4828,7 @@ exports.sendReceiptCallable = onCall(
             const templateType = getTemplateType(receiptType);
 
             if (receiptType === "workorder") {
-              smsMessage = settings.workorderTicketMessage || "Hi {firstName}, here is your workorder ticket: {link}";
+              smsMessage = settings.workorderTicketMessage || "🔧 Hi {firstName}, here is your finalized workorder ticket! {link}";
             } else {
               const smsTemplate = findTemplateByType(settings.smsTemplates || settings.textTemplates, templateType);
               if (smsTemplate) {

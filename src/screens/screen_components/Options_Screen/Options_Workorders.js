@@ -36,7 +36,7 @@ const EMPTY_PENDING = [];
 
 function computeWaitInfo(workorder) {
   let label = calculateWaitEstimateLabel(workorder, useSettingsStore.getState().getSettings());
-  let result = { waitEndDay: "", textColor: C.text, isMissing: false };
+  let result = { waitEndDay: "", textColor: C.text, isMissing: false, isItalic: false };
 
   if (!label) return result;
 
@@ -54,11 +54,22 @@ function computeWaitInfo(workorder) {
 
   let lowerLabel = label.toLowerCase();
 
-  // Color rules
-  if (lowerLabel.includes("today") || lowerLabel.includes("overdue")) {
+  if (workorder.status === "finished") {
+    result.textColor = gray(0.4);
+  } else if (lowerLabel === "waiting" || lowerLabel === "today") {
+    result.waitEndDay = label;
     result.textColor = "red";
-  } else if (lowerLabel.includes("tomorrow")) {
-    result.textColor = C.green;
+    result.isItalic = true;
+    return result;
+  }
+
+  // Color rules
+  if (workorder.status !== "finished") {
+    if (lowerLabel.includes("today") || lowerLabel.includes("overdue")) {
+      result.textColor = "red";
+    } else if (lowerLabel.includes("tomorrow")) {
+      result.textColor = C.green;
+    }
   }
 
   // Overdue: split "Overdue X" into 2 lines
@@ -194,7 +205,7 @@ const WaitTimeIndicator = React.memo(function WaitTimeIndicator({ workorder }) {
         flexDirection: "row",
         alignItems: "center",
         justifyContent: "flex-end",
-        height: "100%",
+        height: "90%",
         width: 100,
         paddingRight: 4,
         backgroundColor: C.buttonLightGreen,
@@ -217,7 +228,7 @@ const WaitTimeIndicator = React.memo(function WaitTimeIndicator({ workorder }) {
             </Text>
           </>
         ) : !!info.waitEndDay ? (
-          <Text style={{ color: info.textColor, fontSize: 13, textAlign: "right" }}>
+          <Text style={{ color: info.textColor, fontSize: 13, textAlign: "right", fontStyle: info.isItalic ? "italic" : "normal" }}>
             {capitalizeFirstLetterOfString(info.waitEndDay)}
           </Text>
         ) : null}
@@ -462,8 +473,8 @@ export function WorkordersComponent({}) {
     useTabNamesStore.getState().setItems({
       infoTabName: TAB_NAMES.infoTab.workorder,
       itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-      optionsTabName: TAB_NAMES.optionsTab.inventory,
     });
+    useTabNamesStore.getState().setMessagesHubMode(false);
     useWorkorderPreviewStore.getState().setPreviewObj(null);
     // Background-fetch customer so it's ready when the customer info modal opens
     if (obj.customerID) {
@@ -516,15 +527,6 @@ export function WorkordersComponent({}) {
         return 0;
       });
     }
-
-    // Priority 1: Current user sent the last message on this workorder
-    finalArr.sort((a, b) => {
-      let aIsSender = a.lastSMSSenderUserID && a.lastSMSSenderUserID === currentUser?.id;
-      let bIsSender = b.lastSMSSenderUserID && b.lastSMSSenderUserID === currentUser?.id;
-      if (aIsSender && !bIsSender) return -1;
-      if (!aIsSender && bIsSender) return 1;
-      return 0;
-    });
 
     // Priority 0 (highest): Today's pickup/delivery at the very top, sorted by startTime
     const now = new Date();
@@ -659,7 +661,7 @@ export function WorkordersComponent({}) {
               >
                 <View
                   style={{
-                    marginBottom: 4,
+                    marginBottom: 2,
                     borderRadius: 7,
                     borderLeftWidth: 4,
                     borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
@@ -670,13 +672,13 @@ export function WorkordersComponent({}) {
                       : (zPendingWOIDs.includes(workorder.id) && sStatusBlink)
                         ? "rgba(255, 255, 0, 0.35)"
                         : C.listItemWhite,
-                    flexDirection: "column",
+                    flexDirection: "row",
                     width: "100%",
                     paddingLeft: 5,
-                    paddingRight: 2,
                     paddingVertical: 1,
                   }}
                 >
+                  <View style={{ flex: 1, flexDirection: "column" }}>
                   <View
                     style={{
                       flexDirection: "row",
@@ -880,13 +882,6 @@ export function WorkordersComponent({}) {
                           </Text>
                         </TouchableOpacity>
                       </View>
-                      <View
-                        onMouseOver={() => onMouseEnter(workorder)}
-                        onMouseLeave={() => onMouseExit()}
-                        style={{ alignSelf: "stretch" }}
-                      >
-                        <WaitTimeIndicator workorder={workorder} />
-                      </View>
                     </View>
                   </View>
 
@@ -971,6 +966,14 @@ export function WorkordersComponent({}) {
                       })()}
                     </View>
                   )}
+                  </View>
+                  <View
+                    onMouseOver={() => onMouseEnter(workorder)}
+                    onMouseLeave={() => onMouseExit()}
+                    style={{ alignSelf: "stretch", justifyContent: "center" }}
+                  >
+                    <WaitTimeIndicator workorder={workorder} />
+                  </View>
                 </View>
               </TouchableOpacity>
             </View>

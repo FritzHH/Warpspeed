@@ -242,7 +242,7 @@ function calculateWaitEstimateLabel(workorder, settings) {
   if (waitObj.label === "No Estimate") return "No estimate";
 
   var maxWaitDays = Number(waitObj.maxWaitTimeDays);
-  if (!maxWaitDays || maxWaitDays <= 0) return "";
+  if (!maxWaitDays || maxWaitDays <= 0) return waitObj.label || "";
 
   var startedOnMillis = Number(workorder.startedOnMillis);
   if (!startedOnMillis) return "";

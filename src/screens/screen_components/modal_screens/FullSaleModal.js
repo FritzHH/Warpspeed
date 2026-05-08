@@ -31,6 +31,7 @@ import {
   readTransactions,
   newCheckoutFetchWorkordersForSale,
 } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { ClosedWorkorderModal } from "./ClosedWorkorderModal";
 
 // ─── Helper components ──────────────────────────────────
 
@@ -80,6 +81,7 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
   const [sLoadingWorkorders, _setLoadingWorkorders] = useState(false);
   const [sError, _setError] = useState("");
   const [sCreditDetail, _sCreditDetail] = useState(null);
+  const [sSelectedWorkorder, _sSetSelectedWorkorder] = useState(null);
 
   // Fetch sale on mount — required because sale data is not in any local store
   useEffect(() => {
@@ -214,6 +216,13 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
   }
 
   // ── Full modal ──
+  if (sSelectedWorkorder) {
+    return <ClosedWorkorderModal
+      workorder={sSelectedWorkorder}
+      onClose={() => _sSetSelectedWorkorder(null)}
+    />;
+  }
+
   return ReactDOM.createPortal(
     <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000 }}>
       <TouchableWithoutFeedback onPress={onClose}>
@@ -298,6 +307,13 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                 <Text style={{ fontSize: 15, fontWeight: "700", color: C.blue, letterSpacing: 0.5, textAlign: "center" }}>
                   Sale View
                 </Text>
+                {(item.customerFirst || item.customerLast) && (
+                  <Text style={{ fontSize: 11, color: C.blue, marginTop: 2, textAlign: "center", opacity: 0.7 }}>
+                    {(capitalizeFirstLetterOfString(item.customerFirst || "") + " " + capitalizeFirstLetterOfString(item.customerLast || "")).trim()
+                      + (item.customerCell ? "  ·  " + formatPhoneWithDashes(item.customerCell) : "")
+                      + (item.customerEmail ? "  ·  " + item.customerEmail : "")}
+                  </Text>
+                )}
               </View>
 
               {/* ── Date Banner ── */}
@@ -385,7 +401,9 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                         </View>
                       ) : sWorkorders.length > 0 ? (
                         sWorkorders.map((wo) => (
-                          <WorkorderCard key={wo.id} workorder={wo} statuses={statuses} salesTaxPercent={salesTaxPercent} />
+                          <TouchableOpacity key={wo.id} onPress={() => _sSetSelectedWorkorder(wo)} activeOpacity={0.7}>
+                            <WorkorderCard workorder={wo} statuses={statuses} salesTaxPercent={salesTaxPercent} />
+                          </TouchableOpacity>
                         ))
                       ) : (
                         <Text style={{ fontSize: 12, color: gray(0.3), fontStyle: "italic" }}>

@@ -65,8 +65,9 @@ export function Notes_MainComponent() {
   const [sShowQuickNotes, _setShowQuickNotes] = useState(null);
 
   function formatUserShowName() {
+    const user = useLoginStore.getState().currentUser;
     return (
-      "(" + zCurrentUser.first.toString() + " " + zCurrentUser.last[0] + ")  "
+      "(" + user.first.toString() + " " + user.last[0] + ")  "
     );
   }
 
@@ -84,6 +85,17 @@ export function Notes_MainComponent() {
     return `${day} ${month}/${date}, ${hours}:${mins} ${ampm}`;
   }
 
+  function formatNoteDateShort(millis) {
+    if (!millis) return "";
+    const d = new Date(millis);
+    const days = ["Sun", "Mon", "Tues", "Wed", "Thurs", "Fri", "Sat"];
+    const rawHours = d.getHours();
+    const hours = rawHours % 12 || 12;
+    const mins = d.getMinutes().toString().padStart(2, "0");
+    const ap = rawHours >= 12 ? "P" : "A";
+    return `${days[d.getDay()]} ${hours}:${mins} ${ap}`;
+  }
+
   function outsideClicked(option) {
     useLoginStore.getState().requireLogin(() => {
       let notesArr;
@@ -99,7 +111,7 @@ export function Notes_MainComponent() {
       const newId = crypto.randomUUID();
       notesArr.unshift({
         name: formatUserShowName(),
-        userID: zCurrentUser.id,
+        userID: useLoginStore.getState().currentUser.id,
         value: "",
         id: newId,
         createdAt: Date.now(),
@@ -286,20 +298,20 @@ export function Notes_MainComponent() {
                       marginBottom: 3,
                     }}
                   >
-                    <View style={{ alignItems: "center", justifyContent: "center", flexDirection: "row", paddingTop: 2 }}>
-                      <Tooltip text="Delete note" position="right">
-                        <TouchableOpacity_
-                          onPress={() => { deleteItem(item, index, "customer"); _setEditingNoteId(null); }}
-                          style={{ padding: 2 }}
-                        >
-                          <Image_
-                            icon={ICONS.trash}
-                            size={14}
-                            style={{ opacity: 0.35, filter: "grayscale(100%)" }}
-                          />
-                        </TouchableOpacity_>
-                      </Tooltip>
-                      <Tooltip text={formatNoteDate(item.createdAt)} position="right">
+                    <View style={{ justifyContent: "center", flexDirection: "column", paddingTop: 2 }}>
+                      <View style={{ alignItems: "center", flexDirection: "row" }}>
+                        <Tooltip text="Delete note" position="right">
+                          <TouchableOpacity_
+                            onPress={() => { deleteItem(item, index, "customer"); _setEditingNoteId(null); }}
+                            style={{ padding: 2 }}
+                          >
+                            <Image_
+                              icon={ICONS.trash}
+                              size={14}
+                              style={{ opacity: 0.35, filter: "grayscale(100%)" }}
+                            />
+                          </TouchableOpacity_>
+                        </Tooltip>
                         <Text
                           style={{
                             color: gray(.4),
@@ -310,7 +322,10 @@ export function Notes_MainComponent() {
                         >
                           {item.name}
                         </Text>
-                      </Tooltip>
+                      </View>
+                      <Text style={{ color: gray(0.5), fontSize: 10, fontStyle: "italic", paddingLeft: 2 }}>
+                        {formatNoteDateShort(item.createdAt)}
+                      </Text>
                     </View>
                     {isEditing ? (
                       <TextInput_
@@ -439,20 +454,20 @@ export function Notes_MainComponent() {
                       marginBottom: 3,
                     }}
                   >
-                    <View style={{ alignItems: "center", justifyContent: "center", flexDirection: "row", paddingTop: 2 }}>
-                      <Tooltip text="Delete note" position="right">
-                        <TouchableOpacity_
-                          onPress={() => { deleteItem(item, index, "internal"); _setEditingNoteId(null); }}
-                          style={{ padding: 2 }}
-                        >
-                          <Image_
-                            icon={ICONS.trash}
-                            size={14}
-                            style={{ opacity: 0.35, filter: "grayscale(100%)" }}
-                          />
-                        </TouchableOpacity_>
-                      </Tooltip>
-                      <Tooltip text={formatNoteDate(item.createdAt)} position="right">
+                    <View style={{ justifyContent: "center", flexDirection: "column", paddingTop: 2 }}>
+                      <View style={{ alignItems: "center", flexDirection: "row" }}>
+                        <Tooltip text="Delete note" position="right">
+                          <TouchableOpacity_
+                            onPress={() => { deleteItem(item, index, "internal"); _setEditingNoteId(null); }}
+                            style={{ padding: 2 }}
+                          >
+                            <Image_
+                              icon={ICONS.trash}
+                              size={14}
+                              style={{ opacity: 0.35, filter: "grayscale(100%)" }}
+                            />
+                          </TouchableOpacity_>
+                        </Tooltip>
                         <Text
                           style={{
                             color: gray(.4),
@@ -462,7 +477,10 @@ export function Notes_MainComponent() {
                         >
                           {item.name}
                         </Text>
-                      </Tooltip>
+                      </View>
+                      <Text style={{ color: gray(0.5), fontSize: 10, fontStyle: "italic", paddingLeft: 2 }}>
+                        {formatNoteDateShort(item.createdAt)}
+                      </Text>
                     </View>
                     {isEditing ? (
                       <TextInput_

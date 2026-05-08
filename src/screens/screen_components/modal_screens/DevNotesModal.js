@@ -4,7 +4,7 @@ import ReactDOM from "react-dom";
 import { View, Text, TouchableOpacity, ScrollView } from "react-native-web";
 import { C, ICONS, Fonts, COLOR_GRADIENTS } from "../../../styles";
 import { Button_, TextInput_, Image_ } from "../../../components";
-import { useLoginStore, useAlertScreenStore } from "../../../stores";
+import { useLoginStore, useSettingsStore, useAlertScreenStore } from "../../../stores";
 import { PRIVILEDGE_LEVELS } from "../../../data";
 import { formatMillisForDisplay, gray } from "../../../utils";
 import {
@@ -13,6 +13,14 @@ import {
   firestoreUpdate,
   firestoreSubscribeCollection,
 } from "../../../db_calls";
+
+function getDevNotesPath(noteID) {
+  let settings = useSettingsStore.getState().getSettings();
+  let tenantID = settings?.tenantID;
+  let storeID = settings?.storeID;
+  let base = `tenants/${tenantID}/stores/${storeID}/dev_notes`;
+  return noteID ? base + "/" + noteID : base;
+}
 
 export const DevNotesModal = ({ visible, onClose }) => {
   const [sNotes, _sSetNotes] = useState([]);
@@ -23,7 +31,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
   // Real-time listener for dev_notes collection
   useEffect(() => {
     if (!visible) return;
-    const unsubscribe = firestoreSubscribeCollection("dev_notes", (docs) => {
+    const unsubscribe = firestoreSubscribeCollection(getDevNotesPath(), (docs) => {
       let sorted = (docs || []).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
       _sSetNotes(sorted);
     });
@@ -41,7 +49,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
     if (!text) return;
     let id = crypto.randomUUID();
     let now = Date.now();
-    await firestoreWrite("dev_notes/" + id, {
+    await firestoreWrite(getDevNotesPath(id), {
       id,
       text,
       userID: currentUser?.id || "",
@@ -52,17 +60,8 @@ export const DevNotesModal = ({ visible, onClose }) => {
     _sSetNewNoteText("");
   }
 
-  function handleDeleteNote(note) {
-    useAlertScreenStore.getState().setValues({
-      title: "Delete Note",
-      message: "Are you sure you want to delete this note?",
-      btn1Text: "Cancel",
-      btn2Text: "Delete",
-      handleBtn2Press: async () => {
-        await firestoreDelete("dev_notes/" + note.id);
-        useAlertScreenStore.getState().setShowAlert(false);
-      },
-    });
+  async function handleDeleteNote(note) {
+    await firestoreDelete(getDevNotesPath(note.id));
   }
 
   function handleStartEdit(note) {
@@ -73,7 +72,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
   async function handleSaveEdit(note) {
     let text = sEditText.trim();
     if (!text) return;
-    await firestoreUpdate("dev_notes/" + note.id, {
+    await firestoreUpdate(getDevNotesPath(note.id), {
       text,
       updatedAt: Date.now(),
     });
@@ -144,7 +143,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
             Dev Notes
           </Text>
           <TouchableOpacity onPress={onClose}>
-            <Image_ source={ICONS.close1} width={18} height={18} />
+            <Image_ icon={ICONS.close1} size={18} />
           </TouchableOpacity>
         </View>
 
@@ -159,7 +158,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
           <View style={{ flex: 1, marginRight: 10 }}>
             <TextInput_
               value={sNewNoteText}
-              onChangeText={(val) => _sSetNewNoteText(val)}
+              onChangeText={(val) => _sSetNewNoteText(val.charAt(0).toUpperCase() + val.slice(1))}
               debounceMs={0}
               placeholder="Write a note..."
               multiline={true}
@@ -288,22 +287,22 @@ export const DevNotesModal = ({ visible, onClose }) => {
                           ? "  (edited)"
                           : ""}
                       </Text>
-                      {canEditDelete && (
-                        <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        {canEditDelete && (
                           <TouchableOpacity
                             onPress={() => handleStartEdit(note)}
                             style={{ paddingHorizontal: 8 }}
                           >
-                            <Image_ source={ICONS.editPencil} width={16} height={16} />
+                            <Image_ icon={ICONS.editPencil} size={16} />
                           </TouchableOpacity>
-                          <TouchableOpacity
-                            onPress={() => handleDeleteNote(note)}
-                            style={{ paddingHorizontal: 8 }}
-                          >
-                            <Image_ source={ICONS.trash} width={16} height={16} />
-                          </TouchableOpacity>
-                        </View>
-                      )}
+                        )}
+                        <TouchableOpacity
+                          onPress={() => handleDeleteNote(note)}
+                          style={{ paddingHorizontal: 8 }}
+                        >
+                          <Image_ icon={ICONS.trash} size={16} />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
                 )}

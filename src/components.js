@@ -44,6 +44,27 @@ import { dbDeleteInventoryItem, dbSaveInventoryItem } from "./db_calls_wrapper";
 export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
 export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
 
+export function ReceiptSentOverlay({ visible, sentSMS, sentEmail, duration = 1300, onDone }) {
+  useEffect(() => {
+    if (!visible) return;
+    let t = setTimeout(() => { if (onDone) onDone(); }, duration);
+    return () => clearTimeout(t);
+  }, [visible]);
+  if (!visible) return null;
+  let parts = [];
+  if (sentSMS) parts.push("Text");
+  if (sentEmail) parts.push("Email");
+  let label = parts.join(" & ") + " Sent";
+  return (
+    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "rgba(0, 0, 0, 0.35)", justifyContent: "center", alignItems: "center", borderRadius: 6, zIndex: 100 }}>
+      <View style={{ backgroundColor: C.backgroundWhite, borderRadius: 6, alignItems: "center", justifyContent: "center", paddingVertical: 30, paddingHorizontal: 40 }}>
+        <Image source={ICONS.paperPlane} style={{ width: 50, height: 50, marginBottom: 12 }} />
+        <Text style={{ fontSize: 18, fontWeight: "600", color: C.text }}>{label}</Text>
+      </View>
+    </View>
+  );
+}
+
 export const StaleBanner = ({ text, style, textStyle }) => {
   const opacity = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -1197,7 +1218,7 @@ export const InventoryItemScreeenModalComponent = ({
             backgroundColor: "white",
           }}
         >
-          <LoginModalScreen modalVisible={zShowLoginScreen} />
+          {zShowLoginScreen && <LoginModalScreen modalVisible={true} />}
           <View
             style={{
               width: "100%",
@@ -1455,7 +1476,10 @@ export const LoginModalScreen = ({ modalVisible }) => {
 
     let userObj = zUsers?.find((u) => u.pin == input);
     if (!userObj) userObj = zUsers?.find((u) => u.alternatePin == input);
-    if (!userObj) return;
+    if (!userObj) {
+      if (input.length >= zPinStrength) _setPin("");
+      return;
+    }
 
     // Check privilege level if required
     if (zAdminPrivilege) {
@@ -1479,17 +1503,13 @@ export const LoginModalScreen = ({ modalVisible }) => {
     }
 
     // Success
-    _setSuccess(true);
     useLoginStore.getState().setCurrentUser(userObj);
     useLoginStore.getState().setLastActionMillis();
-    setTimeout(() => {
-      _setPin("");
-      _setError("");
-      _setSuccess(false);
-      useLoginStore.getState().setShowLoginScreen(false);
-      useLoginStore.getState().runPostLoginFunction();
-      promptClockInIfNeeded(userObj);
-    }, 400);
+    _setPin("");
+    _setError("");
+    useLoginStore.getState().setShowLoginScreen(false);
+    useLoginStore.getState().runPostLoginFunction();
+    promptClockInIfNeeded(userObj);
   }
 
   function promptClockInIfNeeded(userObj) {
@@ -1522,11 +1542,6 @@ export const LoginModalScreen = ({ modalVisible }) => {
 
   const pinInputRef = useRef(null);
 
-  useEffect(() => {
-    if (modalVisible && pinInputRef.current) {
-      setTimeout(() => pinInputRef.current.focus(), 50);
-    }
-  }, [modalVisible]);
 
   if (!modalVisible) return null;
 
@@ -1540,9 +1555,10 @@ export const LoginModalScreen = ({ modalVisible }) => {
         alignItems: "center",
         zIndex: 9999,
       }}
-      onClick={(e) => { if (e.target === e.currentTarget) handleClose(); }}
+      onClick={() => pinInputRef.current?.focus()}
     >
       <View
+        onClick={(e) => { e.stopPropagation(); pinInputRef.current?.focus(); }}
         style={{
           width: 360,
           backgroundColor: sSuccess ? C.green : C.backgroundWhite,
@@ -1557,9 +1573,6 @@ export const LoginModalScreen = ({ modalVisible }) => {
           <Text style={{ fontSize: 18, fontWeight: Fonts.weight.textHeavy, color: sSuccess ? "white" : C.text }}>
             {sSuccess ? "Welcome!" : zAdminPrivilege ? "Authorization Required" : "Login"}
           </Text>
-          <TouchableOpacity onPress={handleClose} style={{ padding: 4 }}>
-            <Image_ icon={ICONS.close1} size={16} />
-          </TouchableOpacity>
         </View>
 
         {/* Privilege badge */}
@@ -1619,7 +1632,7 @@ export const LoginModalScreen = ({ modalVisible }) => {
                 style={{
                   position: "absolute",
                   top: 0, left: 0, right: 0, bottom: 0,
-                  opacity: 0,
+                  caretColor: "transparent",
                   backgroundColor: "transparent",
                   color: "transparent",
                   borderWidth: 0,

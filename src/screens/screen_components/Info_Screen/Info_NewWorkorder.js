@@ -376,6 +376,7 @@ export function NewWorkorderComponent({}) {
     <View
       ref={containerRef}
       onClick={() => {
+        if (useLoginStore.getState().showLoginScreen) return;
         let input = phoneInputRef.current?.querySelector("input");
         if (input) input.focus();
       }}

@@ -1131,6 +1131,7 @@ export const SETTINGS_OBJ = {
   cardFeePercent: 3,
   cardFeeRefund: false,
   lockScreenWhenUserLogsOut: false,
+  useFacialRecognition: true,
   autoSMSSalesReceipt: true,
   autoEmailSalesReceipt: true,
   autoSMSIntakeReceipt: true,

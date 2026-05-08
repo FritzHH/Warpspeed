@@ -634,7 +634,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
           flexDirection: "column",
         }}
       >
-          <LoginModalScreen modalVisible={zShowLoginScreen} />
+          {zShowLoginScreen && <LoginModalScreen modalVisible={true} />}
 
           {/* HEADER */}
           <View

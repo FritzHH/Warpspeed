@@ -101,6 +101,7 @@ function autoCapitalize(val) {
   if (val.length > 10000) val = val.slice(0, 10000);
   val = val.replace(/(^|[.!?]\s+)([a-z])/g, (m, before, letter) => before + letter.toUpperCase());
   val = val.replace(/(^|\s)i(?=$|\s|[.,!?;:'])/g, (m, before) => before + "I");
+  val = val.replace(/(^|\s)I([a-z])/g, (m, before, after) => before + "i" + after);
   return val;
 }
 
@@ -495,7 +496,7 @@ export function MessagesComponent({}) {
   }
   function handleSendWorkorderTicket(canRespondVal, forwardOverride) {
     if (!zWorkorderObj || !zCustomer?.customerCell) return;
-    useLoginStore.getState().requireLogin(async () => {
+    useLoginStore.getState().requireLogin(() => {
       let settings = zSettings;
       let { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
@@ -509,7 +510,20 @@ export function MessagesComponent({}) {
       let canRespondBool = canRespondVal ? true : null;
       let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
 
-      let result = await dbSendReceipt({
+      useCustMessagesStore.getState().setOutgoingMessage({
+        ...SMS_PROTO,
+        id: messageID,
+        message: "Sending intake ticket...",
+        phoneNumber: zCustomer.customerCell,
+        customerID: zWorkorderObj?.customerID || "",
+        type: "outgoing",
+        millis: Date.now(),
+        status: "sending",
+        senderUserObj: useLoginStore.getState().getCurrentUser(),
+        sentByUser: useLoginStore.getState().getCurrentUser()?.id || "",
+      });
+
+      dbSendReceipt({
         receiptType: "intake",
         receiptData,
         storagePath,
@@ -528,11 +542,14 @@ export function MessagesComponent({}) {
         canRespond: canRespondBool,
         forwardTo,
         updateWorkorderField: { workorderID: zWorkorderObj.id, field: "intakeReceiptURL" },
+      }).then((result) => {
+        if (result?.data?.receiptURL) {
+          useOpenWorkordersStore.getState().setField("intakeReceiptURL", result.data.receiptURL, zWorkorderObj.id);
+        }
+        useCustMessagesStore.getState().updateMessageStatus(messageID, "sent", "");
+      }).catch(() => {
+        useCustMessagesStore.getState().updateMessageStatus(messageID, "failed", "Failed to send");
       });
-
-      if (result?.data?.receiptURL) {
-        useOpenWorkordersStore.getState().setField("intakeReceiptURL", result.data.receiptURL, zWorkorderObj.id);
-      }
     });
   }
 
@@ -626,31 +643,35 @@ export function MessagesComponent({}) {
         message: "Send a payment link for " + displayAmount + " to " + recipientName + " at " + sendTo.join(" & ") + "?",
         btn1Text: "Send",
         btn2Text: "Cancel",
-        handleBtn1Press: async () => {
+        handleBtn1Press: () => {
           useAlertScreenStore.getState().resetAll();
           let opts = {};
           if (!zWorkorderObj.customerID) opts.phone = sendPhone;
           if (hasEmail && !zWorkorderObj.customerID) opts.email = custEmail;
-          let result = await dbCreateTextToPayInvoice(zWorkorderObj.id, channel, opts);
-          if (result && result.success) {
-            useAlertScreenStore.getState().setValues({
-              title: "Payment Link Sent",
-              message: "Payment link sent to " + recipientName + ".",
-              btn1Text: "OK",
-              handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-              showAlert: true,
-              canExitOnOuterClick: true,
-            });
-          } else {
-            useAlertScreenStore.getState().setValues({
-              title: "Payment Link Failed",
-              message: result?.error || "Failed to send payment link",
-              btn1Text: "OK",
-              handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-              showAlert: true,
-              canExitOnOuterClick: true,
-            });
-          }
+
+          let messageID = crypto.randomUUID();
+          useCustMessagesStore.getState().setOutgoingMessage({
+            ...SMS_PROTO,
+            id: messageID,
+            message: "Sending payment link for " + displayAmount + "...",
+            phoneNumber: sendPhone,
+            customerID: zWorkorderObj?.customerID || "",
+            type: "outgoing",
+            millis: Date.now(),
+            status: "sending",
+            senderUserObj: useLoginStore.getState().getCurrentUser(),
+            sentByUser: useLoginStore.getState().getCurrentUser()?.id || "",
+          });
+
+          dbCreateTextToPayInvoice(zWorkorderObj.id, channel, opts).then((result) => {
+            if (result && result.success) {
+              useCustMessagesStore.getState().updateMessageStatus(messageID, "sent", "");
+            } else {
+              useCustMessagesStore.getState().updateMessageStatus(messageID, "failed", result?.error || "Failed to send payment link");
+            }
+          }).catch(() => {
+            useCustMessagesStore.getState().updateMessageStatus(messageID, "failed", "Failed to send payment link");
+          });
         },
         handleBtn2Press: () => useAlertScreenStore.getState().resetAll(),
         showAlert: true,

@@ -1059,12 +1059,15 @@ export function broadcastWorkorderToDisplay(wo) {
       : null,
   }));
 
-  let salesTaxPercent = useSettingsStore.getState().getSettings()?.salesTaxPercent || 0;
+  let _settings = useSettingsStore.getState().getSettings();
+  let salesTaxPercent = _settings?.salesTaxPercent || 0;
+  let _storeName = _settings?.storeInfo?.displayName || "";
 
   // Quick sales (no customer) broadcast as SALE/Checkout type
   if (!wo.customerID) {
     let totals = calculateRunningTotals(wo, salesTaxPercent, [], false, !!wo.taxFree);
     broadcastToDisplay(DISPLAY_MSG_TYPES.SALE, {
+      storeName: _storeName,
       customerFirst: wo.customerFirst || "",
       customerLast: wo.customerLast || "",
       customerLanguage: wo.customerLanguage || "",
@@ -1088,6 +1091,7 @@ export function broadcastWorkorderToDisplay(wo) {
 
   let totals = calculateRunningTotals(wo, salesTaxPercent, [], false, !!wo.taxFree);
   broadcastToDisplay(DISPLAY_MSG_TYPES.WORKORDER, {
+    storeName: _storeName,
     customerFirst: wo.customerFirst || "",
     customerLast: wo.customerLast || "",
     customerLanguage: wo.customerLanguage || "",
@@ -1121,6 +1125,7 @@ export function broadcastFullWorkorderToDisplay(wo) {
 
   let settings = useSettingsStore.getState().getSettings();
   let salesTaxPercent = settings?.salesTaxPercent || 0;
+  let _storeName = settings?.storeInfo?.displayName || "";
 
   let lines = (wo.workorderLines || []).map((line) => ({
     id: line.id,
@@ -1138,6 +1143,7 @@ export function broadcastFullWorkorderToDisplay(wo) {
   let totals = calculateRunningTotals(wo, salesTaxPercent, [], false, !!wo.taxFree);
 
   broadcastToDisplay(DISPLAY_MSG_TYPES.WORKORDER, {
+    storeName: _storeName,
     customerFirst: wo.customerFirst || "",
     customerLast: wo.customerLast || "",
     customerLanguage: wo.customerLanguage || "",

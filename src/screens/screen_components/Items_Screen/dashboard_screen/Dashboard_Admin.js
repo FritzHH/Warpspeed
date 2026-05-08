@@ -62,9 +62,11 @@ import {
   TimePicker_,
   TimeSpinner,
   Tooltip,
+  TouchableOpacity_,
+  Pressable_,
   StatusPickerModal,
 } from "../../../../components";
-import { cloneDeep, set, debounce } from "lodash";
+import { cloneDeep, set } from "lodash";
 import React, { Children, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
@@ -128,49 +130,34 @@ export function Dashboard_Admin({}) {
 
   //////////////////////////////////////////////////////////////////////////
 
-  // Per-field debounced DB saves (500ms). Store updates are immediate.
-  const debouncedDBSavesRef = useRef({});
-  function debouncedDBSave(fieldName, fieldValue) {
-    if (!debouncedDBSavesRef.current[fieldName]) {
-      debouncedDBSavesRef.current[fieldName] = debounce((val) => {
-        useSettingsStore.getState().setField(fieldName, val);
-      }, 500);
-    }
-    debouncedDBSavesRef.current[fieldName](fieldValue);
-  }
-
-  function cancelDebouncedDBSave(fieldName) {
-    if (debouncedDBSavesRef.current[fieldName]) {
-      debouncedDBSavesRef.current[fieldName].cancel();
-    }
-  }
-
-  function commitUserInfoChange(userObj, sNewUserObj) {
+  function commitUserInfoChange(userObj, isNewUser) {
+    const liveUsers = useSettingsStore.getState().settings.users;
     let userArr;
-    if (sNewUserObj) {
-      userArr = [userObj, ...zSettingsObj.users];
+    if (isNewUser) {
+      userArr = [userObj, ...liveUsers];
     } else {
-      userArr = zSettingsObj.users.map((o) => {
-        if (o.id === userObj.id) return userObj;
+      userArr = liveUsers.map((o) => {
+        if (o.id === userObj.id) {
+          return { ...userObj, faceDescriptor: o.faceDescriptor };
+        }
         return o;
       });
     }
-
-    useSettingsStore.getState().setField("users", userArr, false);
-    debouncedDBSave("users", userArr);
+    useSettingsStore.getState().setField("users", userArr);
   }
 
   function handleRemoveUserPress(userObj) {
-    cancelDebouncedDBSave("users");
-    let userArr = zSettingsObj.users.filter((o) => o.id != userObj.id);
+    const liveUsers = useSettingsStore.getState().settings.users;
+    let userArr = liveUsers.filter((o) => o.id != userObj.id);
     useSettingsStore.getState().setField("users", userArr);
   }
 
   function handleDescriptorCapture(userObj, desc) {
-    cancelDebouncedDBSave("users");
-    let userArr = zSettingsObj.users.map((o) => {
+    const liveUsers = useSettingsStore.getState().settings.users;
+    const plainDesc = desc ? Array.from(desc) : "";
+    let userArr = liveUsers.map((o) => {
       if (o.id === userObj.id) {
-        return { ...o, faceDescriptor: desc };
+        return { ...o, faceDescriptor: plainDesc };
       }
       return o;
     });
@@ -178,8 +165,7 @@ export function Dashboard_Admin({}) {
   }
 
   function handleSettingsFieldChange(fieldName, fieldValue) {
-    useSettingsStore.getState().setField(fieldName, fieldValue, false);
-    debouncedDBSave(fieldName, fieldValue);
+    useSettingsStore.getState().setField(fieldName, fieldValue);
   }
 
   //////////////////////////////////////////////////////////////////////////
@@ -846,6 +832,27 @@ function BoxButton1({
   );
 }
 
+function MoveArrows({ index, listLength, onMove }) {
+  return (
+    <View style={{ flexDirection: "row", alignItems: "center", marginLeft: 5 }}>
+      <TouchableOpacity
+        disabled={index === 0}
+        onPress={() => onMove(index, "up")}
+        style={{ padding: 4, opacity: index === 0 ? 0.25 : 1 }}
+      >
+        <Image_ icon={ICONS.upChevron} size={13} />
+      </TouchableOpacity>
+      <TouchableOpacity
+        disabled={index === listLength - 1}
+        onPress={() => onMove(index, "down")}
+        style={{ padding: 4, opacity: index === listLength - 1 ? 0.25 : 1 }}
+      >
+        <Image_ icon={ICONS.downChevron} size={13} />
+      </TouchableOpacity>
+    </View>
+  );
+}
+
 const LS_CARD_READER_KEY = "warpspeed_selected_card_reader";
 
 function CardReaderManager({ liveReaders = [], savedReaders = [], onSaveReaders }) {
@@ -1262,6 +1269,21 @@ const AppUserListComponent = ({
             }}
           />
         </View>
+        <View
+          style={{ width: "100%", justifyContent: "flex-end", marginTop: 10 }}
+        >
+          <CheckBox_
+            buttonStyle={{ justifyContent: "flex-end" }}
+            isChecked={zSettingsObj?.useFacialRecognition !== false}
+            text={"Enable facial recognition"}
+            onCheck={() => {
+              handleSettingsFieldChange(
+                "useFacialRecognition",
+                !zSettingsObj?.useFacialRecognition
+              );
+            }}
+          />
+        </View>
         {/* <View
             style={{
               flexDirection: "row",
@@ -1350,6 +1372,9 @@ const AppUserListComponent = ({
                       <TouchableOpacity
                         onPress={() => {
                           if (!canEditUsers) return;
+                          if (sEditUserIndex == null) {
+                            console.log(JSON.stringify(userObj, null, 2));
+                          }
                           _setEditUserIndex(sEditUserIndex != null ? null : idx);
                           _setShowPinIndex(null);
                           _setShowWageIndex(null);
@@ -1396,28 +1421,39 @@ const AppUserListComponent = ({
                       />
                     </View>
                     {/* Row 3 - Enroll button (aligns with PIN/wage/role row) */}
+                    {zSettingsObj?.useFacialRecognition !== false && (
                     <View style={{ height: 25, justifyContent: "center", marginTop: 7 }}>
-                      <Button_
-                        text={"Enroll"}
-                        icon={userObj.faceDescriptor ? ICONS.check1 : ICONS.redx}
-                        iconSize={12}
-                        onPress={() => {
-                          _setFacialRecognitionModalUserObj(userObj);
-                        }}
-                        enabled={editable}
-                        buttonStyle={{
-                          borderWidth: 1,
-                          borderColor: C.buttonLightGreenOutline,
-                          backgroundColor: C.buttonLightGreen,
-                          paddingVertical: 2,
-                          paddingHorizontal: 4,
-                          borderRadius: 5,
-                          width: "100%",
-                        }}
-                        mouseOverOptions={{ opacity: 0.7 }}
-                        textStyle={{ fontSize: 11, color: C.text, fontWeight: "600", numLines: 2, width: '100%', textAlign: "center" }}
-                      />
+                      <Tooltip text="Click to enroll user, right-click to remove" position="right">
+                        <Pressable_
+                          onPress={() => {
+                            if (!editable) return;
+                            _setFacialRecognitionModalUserObj(userObj);
+                          }}
+                          onRightPress={() => {
+                            if (!editable) return;
+                            userObj.faceDescriptor = "";
+                            commitUserInfoChange(userObj);
+                          }}
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderWidth: 1,
+                            borderColor: C.buttonLightGreenOutline,
+                            backgroundColor: C.buttonLightGreen,
+                            paddingVertical: 2,
+                            paddingHorizontal: 4,
+                            borderRadius: 5,
+                            width: "100%",
+                            opacity: editable ? 1 : 0.5,
+                          }}
+                        >
+                          <Image_ icon={userObj.faceDescriptor ? ICONS.check1 : ICONS.redx} size={12} />
+                          <Text style={{ fontSize: 11, color: C.text, fontWeight: "600", marginLeft: 4 }}>Enroll</Text>
+                        </Pressable_>
+                      </Tooltip>
                     </View>
+                    )}
                     {/* Row 4 - aligns with statuses row */}
                     <View style={{ marginTop: 7 }} />
                   </View>
@@ -1935,6 +1971,11 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     }}
                     value={brandName}
                   />
+                  <MoveArrows
+                    index={idx}
+                    listLength={(zSettingsObj?.bikeBrands || []).length}
+                    onMove={(i, dir) => handleSettingsFieldChange("bikeBrands", moveItemInArr(zSettingsObj.bikeBrands, i, dir))}
+                  />
                   <BoxButton1
                     onPress={() => {
                       let arr = zSettingsObj.bikeBrands.filter(
@@ -1942,7 +1983,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       );
                       handleSettingsFieldChange("bikeBrands", arr);
                     }}
-                    style={{ marginLeft: 15 }}
+                    style={{ marginLeft: 5 }}
                     iconSize={15}
                     icon={ICONS.trash}
                   />
@@ -2034,6 +2075,11 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     }}
                     value={brandName}
                   />
+                  <MoveArrows
+                    index={idx}
+                    listLength={(zSettingsObj?.bikeOptionalBrands || []).length}
+                    onMove={(i, dir) => handleSettingsFieldChange("bikeOptionalBrands", moveItemInArr(zSettingsObj.bikeOptionalBrands, i, dir))}
+                  />
                   <BoxButton1
                     onPress={() => {
                       let arr = zSettingsObj.bikeOptionalBrands.filter(
@@ -2041,7 +2087,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       );
                       handleSettingsFieldChange("bikeOptionalBrands", arr);
                     }}
-                    style={{ marginLeft: 15 }}
+                    style={{ marginLeft: 5 }}
                     iconSize={15}
                     icon={ICONS.trash}
                   />
@@ -2117,6 +2163,11 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     }}
                     value={brandName}
                   />
+                  <MoveArrows
+                    index={idx}
+                    listLength={(zSettingsObj?.bikeDescriptions || []).length}
+                    onMove={(i, dir) => handleSettingsFieldChange("bikeDescriptions", moveItemInArr(zSettingsObj.bikeDescriptions, i, dir))}
+                  />
                   <BoxButton1
                     onPress={() => {
                       let arr = zSettingsObj.bikeDescriptions.filter(
@@ -2124,7 +2175,7 @@ const BikeBrandsComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       );
                       handleSettingsFieldChange("bikeDescriptions", arr);
                     }}
-                    style={{ marginLeft: 15 }}
+                    style={{ marginLeft: 5 }}
                     iconSize={15}
                     icon={ICONS.trash}
                   />
@@ -2180,10 +2231,9 @@ const DiscountsComponent = ({
                 let discountsArr = zSettingsObj.discounts;
                 let discount = {};
                 discount.name = "";
-                discount.type = "Percent";
+                discount.type = DISCOUNT_TYPES.percent;
                 discount.value = "20";
                 discount.id = crypto.randomUUID();
-                discountsArr.push(discount);
                 discountsArr.push(discount);
                 handleSettingsFieldChange("discounts", discountsArr);
               }}
@@ -2223,35 +2273,87 @@ const DiscountsComponent = ({
                       borderWidth: 1,
                       borderRadius: 5,
                       padding: 5,
-                      width: "80%",
+                      width: "50%",
                       textAlign: "center",
                       color: C.text,
                       outlineWidth: 0,
-                      fontSize: 14,
-                      marginRight: 20,
+                      fontSize: 12,
+                      marginRight: 10,
                       backgroundColor: C.listItemWhite,
                     }}
                     value={item.name}
                   />
+                  <TextInput_
+                    debounceMs={500}
+                    onChangeText={(val) => {
+                      let raw = val.replace(/[^0-9]/g, "");
+                      if (raw === "") raw = "0";
+                      let num = Number(raw);
+                      let isPercent = item.type === DISCOUNT_TYPES.percent;
+                      if (isPercent) {
+                        if (num > 100) num = 100;
+                        if (num < 1) num = 1;
+                        raw = String(num);
+                      } else {
+                        if (num < 1) num = 1;
+                        raw = String(num * 100);
+                      }
+                      let discountsArr = zSettingsObj.discounts.map((o) => {
+                        if (o.id === item.id) return { ...o, value: raw };
+                        return o;
+                      });
+                      handleSettingsFieldChange("discounts", discountsArr);
+                    }}
+                    placeholder={"Value"}
+                    placeholderTextColor={gray(0.15)}
+                    style={{
+                      borderColor: C.buttonLightGreenOutline,
+                      borderWidth: 1,
+                      borderRadius: 5,
+                      padding: 5,
+                      width: "10%",
+                      textAlign: "center",
+                      color: C.text,
+                      outlineWidth: 0,
+                      fontSize: 12,
+                      marginRight: 10,
+                      backgroundColor: C.listItemWhite,
+                    }}
+                    value={item.type === DISCOUNT_TYPES.percent ? item.value : String(Math.round(Number(item.value || 0) / 100))}
+                  />
                   <View
                     style={{
-                      width: "20%",
+                      width: "40%",
                       flexDirection: "row",
                       alignItems: "center",
                     }}
                   >
-                    <DropdownComponent
-                      onSelect={(val) => {
+                    <TouchableOpacity
+                      onPress={() => {
+                        let newType = item.type === DISCOUNT_TYPES.percent ? DISCOUNT_TYPES.dollar : DISCOUNT_TYPES.percent;
                         let discountsArr = zSettingsObj.discounts.map((o) => {
-                          if (o.id === item.id) return { ...o, type: val };
+                          if (o.id === item.id) return { ...o, type: newType };
                           return o;
                         });
                         handleSettingsFieldChange("discounts", discountsArr);
                       }}
-                      textStyle={{ fontSize: 13 }}
-                      buttonStyle={{ width: 40 }}
-                      label={item.type}
-                      data={[DISCOUNT_TYPES.percent, DISCOUNT_TYPES.dollar]}
+                      style={{
+                        borderRadius: 5,
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        paddingHorizontal: 10,
+                        paddingVertical: 3,
+                        backgroundColor: C.listItemWhite,
+                      }}
+                    >
+                      <Text style={{ fontSize: 12, color: C.text, fontWeight: "600" }}>
+                        {item.type === DISCOUNT_TYPES.percent ? "%" : "$"}
+                      </Text>
+                    </TouchableOpacity>
+                    <MoveArrows
+                      index={idx}
+                      listLength={(zSettingsObj?.discounts || []).length}
+                      onMove={(i, dir) => handleSettingsFieldChange("discounts", moveItemInArr(zSettingsObj.discounts, i, dir))}
                     />
                     <BoxButton1
                       onPress={() => {
@@ -2260,7 +2362,7 @@ const DiscountsComponent = ({
                         );
                         handleSettingsFieldChange("discounts", arr);
                       }}
-                      style={{ marginLeft: 15 }}
+                      style={{ marginLeft: 5 }}
                       iconSize={15}
                       icon={ICONS.trash}
                     />
@@ -2345,14 +2447,12 @@ const WaitTimesComponent = ({
           </View>
           <View
             style={{
-              width: "20%",
+              width: "10%",
               alignItems: "center",
-              // backgroundColor: "green",
             }}
           >
             <Text
               style={{
-                // width: "100%",
                 fontColor: C.text,
                 textAlign: "center",
                 fontSize: 12,
@@ -2361,101 +2461,110 @@ const WaitTimesComponent = ({
               Max Wait Days
             </Text>
           </View>
-          <View style={{ width: "10%" }}></View>
+          <View style={{ width: "20%" }}></View>
         </View>
         <View style={{ marginTop: 10, width: "100%" }}>
-          <FlatList
-            data={[...(zSettingsObj?.waitTimes || [])].sort((a, b) => (Number(a.maxWaitTimeDays) || 0) - (Number(b.maxWaitTimeDays) || 0))}
-            style={{ width: "100%" }}
-            renderItem={(obj) => {
-              let idx = obj.index;
-              let item = obj.item;
-              return (
-                <View
-                  style={{
-                    alignItems: "center",
-                    width: "100%",
-                    flexDirection: "row",
-                    // justifyContent: "space-between",
-                    marginBottom: 10,
-                  }}
-                >
-                  <TextInput_
-                    debounceMs={500}
-                    onChangeText={(val) => {
-                      let arr = zSettingsObj.waitTimes.map((o) => {
-                        if (o.id === item.id) return { ...o, label: val };
-                        return o;
-                      });
-                      handleSettingsFieldChange("waitTimes", arr);
-                    }}
-                    placeholder={"Wait time label"}
-                    placeholderTextColor={gray(0.15)}
-                    style={{
-                      borderColor: C.buttonLightGreenOutline,
-                      borderWidth: 1,
-                      borderRadius: 5,
-                      padding: 5,
-                      width: "70%",
-                      textAlign: "center",
-                      color: C.text,
-                      outlineWidth: 0,
-                      fontSize: 13,
-                      marginRight: 20,
-                      backgroundColor: C.listItemWhite,
-                    }}
-                    value={item.label}
-                  />
-                  <TextInput_
-                    debounceMs={500}
-                    onChangeText={(val) => {
-                      let arr = zSettingsObj.waitTimes.map((o) => {
-                        if (o.id === item.id)
-                          return { ...o, maxWaitTimeDays: val };
-                        return o;
-                      });
-                      handleSettingsFieldChange("waitTimes", arr);
-                    }}
-                    placeholder={"Days"}
-                    placeholderTextColor={gray(0.15)}
-                    style={{
-                      borderColor: C.buttonLightGreenOutline,
-                      borderWidth: 1,
-                      borderRadius: 5,
-                      padding: 5,
-                      width: "20%",
-                      textAlign: "center",
-                      color: C.text,
-                      outlineWidth: 0,
-                      fontSize: 13,
-                      marginRight: 20,
-                      backgroundColor: C.listItemWhite,
-                    }}
-                    value={item.maxWaitTimeDays}
-                  />
-                  <View
-                    style={{
-                      width: "10%",
-                      flexDirection: "row",
-                      alignItems: "center",
-                    }}
-                  >
-                    <BoxButton1
-                      onPress={() => {
-                        let arr = zSettingsObj.waitTimes.filter(
-                          (o) => o.id !== item.id
-                        );
-                        handleSettingsFieldChange("waitTimes", arr);
+          {(() => {
+            let sortedWaitTimes = [...(zSettingsObj?.waitTimes || [])].sort((a, b) => (Number(a.maxWaitTimeDays) || 0) - (Number(b.maxWaitTimeDays) || 0));
+            return (
+              <FlatList
+                data={sortedWaitTimes}
+                style={{ width: "100%" }}
+                renderItem={(obj) => {
+                  let idx = obj.index;
+                  let item = obj.item;
+                  return (
+                    <View
+                      style={{
+                        alignItems: "center",
+                        width: "100%",
+                        flexDirection: "row",
+                        marginBottom: 10,
                       }}
-                      style={{ marginLeft: 15 }}
-                      iconSize={15}
-                      icon={ICONS.trash}
-                    />
-                  </View>
-                </View>
-              );
-            }}
-          />
+                    >
+                      <TextInput_
+                        debounceMs={500}
+                        onChangeText={(val) => {
+                          let arr = zSettingsObj.waitTimes.map((o) => {
+                            if (o.id === item.id) return { ...o, label: val };
+                            return o;
+                          });
+                          handleSettingsFieldChange("waitTimes", arr);
+                        }}
+                        placeholder={"Wait time label"}
+                        placeholderTextColor={gray(0.15)}
+                        style={{
+                          borderColor: C.buttonLightGreenOutline,
+                          borderWidth: 1,
+                          borderRadius: 5,
+                          padding: 5,
+                          width: "70%",
+                          textAlign: "center",
+                          color: C.text,
+                          outlineWidth: 0,
+                          fontSize: 13,
+                          marginRight: 20,
+                          backgroundColor: C.listItemWhite,
+                        }}
+                        value={item.label}
+                      />
+                      <TextInput_
+                        debounceMs={500}
+                        onChangeText={(val) => {
+                          let arr = zSettingsObj.waitTimes.map((o) => {
+                            if (o.id === item.id)
+                              return { ...o, maxWaitTimeDays: val };
+                            return o;
+                          });
+                          handleSettingsFieldChange("waitTimes", arr);
+                        }}
+                        placeholder={"Days"}
+                        placeholderTextColor={gray(0.15)}
+                        style={{
+                          borderColor: C.buttonLightGreenOutline,
+                          borderWidth: 1,
+                          borderRadius: 5,
+                          padding: 5,
+                          width: "10%",
+                          textAlign: "center",
+                          color: C.text,
+                          outlineWidth: 0,
+                          fontSize: 13,
+                          marginRight: 20,
+                          backgroundColor: C.listItemWhite,
+                        }}
+                        value={item.maxWaitTimeDays}
+                      />
+                      <View
+                        style={{
+                          width: "20%",
+                          flexDirection: "row",
+                          alignItems: "center",
+                        }}
+                      >
+                        <MoveArrows
+                          index={idx}
+                          listLength={sortedWaitTimes.length}
+                          onMove={(i, dir) => handleSettingsFieldChange("waitTimes", moveItemInArr(sortedWaitTimes, i, dir))}
+                        />
+                        <BoxButton1
+                          onPress={() => {
+                            let arr = zSettingsObj.waitTimes.filter(
+                              (o) => o.id !== item.id
+                            );
+                            handleSettingsFieldChange("waitTimes", arr);
+                          }}
+                          style={{ marginLeft: 5 }}
+                          iconSize={15}
+                          icon={ICONS.trash}
+                        />
+                      </View>
+                    </View>
+                  );
+                }}
+              />
+            );
+          })()}
         </View>
       </View>
     </BoxContainerInnerComponent>
@@ -2524,6 +2633,11 @@ const PartSourcesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     }}
                     value={partSourceName}
                   />
+                  <MoveArrows
+                    index={idx}
+                    listLength={(zSettingsObj?.partSources || []).length}
+                    onMove={(i, dir) => handleSettingsFieldChange("partSources", moveItemInArr(zSettingsObj.partSources, i, dir))}
+                  />
                   <BoxButton1
                     onPress={() => {
                       let arr = zSettingsObj.partSources.filter(
@@ -2531,7 +2645,7 @@ const PartSourcesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       );
                       handleSettingsFieldChange("partSources", arr);
                     }}
-                    style={{ marginLeft: 15 }}
+                    style={{ marginLeft: 5 }}
                     iconSize={15}
                     icon={ICONS.trash}
                   />

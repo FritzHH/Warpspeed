@@ -270,35 +270,48 @@ const TranslateModal = ({ visible, onClose }) => {
                   key={starter.id}
                   text={starter.label}
                   onPress={() => handleStarterPress(starter)}
-                  colorGradientArr={COLOR_GRADIENTS.lightBlue}
-                  buttonStyle={{ marginRight: 6, marginBottom: 4, paddingHorizontal: 10, paddingVertical: 4 }}
-                  textStyle={{ fontSize: 12 }}
+                  buttonStyle={{ marginRight: 6, marginBottom: 4, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: C.blue }}
+                  textStyle={{ fontSize: 12, color: C.textWhite }}
                 />
               ))}
             </View>
           )}
 
           {/* Input */}
-          <TextInput_
-            value={sInputText}
-            onChangeText={handleTextChange}
-            debounceMs={0}
-            placeholder={`Type in ${TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}...`}
-            multiline={true}
-            numberOfLines={10}
-            autoFocus={true}
-            autoCapitalize="sentences"
-            style={{
-              borderColor: C.buttonLightGreenOutline,
-              borderRadius: 10,
-              borderWidth: 2,
-              backgroundColor: C.listItemWhite,
-              paddingVertical: 10,
-              paddingHorizontal: 10,
-              fontSize: 16,
-              marginBottom: 14,
-            }}
-          />
+          <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 14 }}>
+            <TextInput_
+              value={sInputText}
+              onChangeText={handleTextChange}
+              debounceMs={0}
+              placeholder={`Type in ${TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}...`}
+              multiline={true}
+              numberOfLines={10}
+              autoFocus={true}
+              autoCapitalize="sentences"
+              style={{
+                flex: 1,
+                borderColor: C.buttonLightGreenOutline,
+                borderRadius: 10,
+                borderWidth: 2,
+                backgroundColor: C.listItemWhite,
+                paddingVertical: 10,
+                paddingHorizontal: 10,
+                fontSize: 16,
+              }}
+            />
+            {(sInputText.length > 0 || translatedText) && (
+              <TouchableOpacity
+                onPress={() => {
+                  _sSetInputText("");
+                  clearTranslation();
+                  resetInactivityTimer();
+                }}
+                style={{ marginLeft: 8, marginTop: 8, justifyContent: "center", alignItems: "center" }}
+              >
+                <Image_ icon={ICONS.reset1} size={22} />
+              </TouchableOpacity>
+            )}
+          </View>
 
           {/* Output */}
           <View

@@ -115,7 +115,7 @@ function searchInventory(query, items) {
     { key: "informalName", weight: 1.0 },
   ];
 
-  const ID_FIELDS = ["upc", "ean", "customSku", "manufacturerSku"];
+  const ID_FIELDS = ["id", "primaryBarcode"];
 
   function scoreTerm(term, fieldVal) {
     if (!fieldVal) return 0;
@@ -162,6 +162,22 @@ function searchInventory(query, items) {
     for (const key of ID_FIELDS) {
       const val = norm(item[key]);
       if (val && val === queryNoSpaces) return 0.95;
+    }
+    if (Array.isArray(item.barcodes)) {
+      for (const bc of item.barcodes) {
+        if (norm(bc) === queryNoSpaces) return 0.95;
+      }
+    }
+    if (/^\d{4,}$/.test(queryNoSpaces)) {
+      for (const key of ID_FIELDS) {
+        const val = norm(item[key]);
+        if (val && val.startsWith(queryNoSpaces)) return 0.9;
+      }
+      if (Array.isArray(item.barcodes)) {
+        for (const bc of item.barcodes) {
+          if (norm(bc).startsWith(queryNoSpaces)) return 0.9;
+        }
+      }
     }
 
     let totalScore = 0;

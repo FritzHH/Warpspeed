@@ -666,13 +666,17 @@ function generateWorkorderTicketPDF(data) {
   y += 10;
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
-  doc.text("WORKORDER TICKET", centerX, y, { align: "center" });
+  let isIntake = data.receiptType === "Intake";
+  let ticketTitle = isIntake ? "INTAKE/ESTIMATE TICKET" : "FINALIZED WORKORDER TICKET";
+  doc.text(ticketTitle, centerX, y, { align: "center" });
   y += 18;
 
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   if (data.workorderNumber) { doc.text("WO #: " + formatWorkorderNumber(data.workorderNumber), leftX, y); y += 12; }
   if (data.startedOnMillis) { doc.text("Date: " + new Date(Number(data.startedOnMillis)).toLocaleDateString(), leftX, y); y += 12; }
+  if (data.status) { doc.text("Status: " + data.status, leftX, y); y += 12; }
+  if (data.startedBy) { doc.text("By: " + data.startedBy, leftX, y); y += 12; }
 
   y += 4;
 
@@ -699,9 +703,25 @@ function generateWorkorderTicketPDF(data) {
     doc.text(bikeInfo, leftX + 28, y);
     y += 12;
   }
+  if (data.description) {
+    doc.text("Description: " + data.description, leftX, y);
+    y += 12;
+  }
   let colors = [data.color1, data.color2].filter(Boolean).join(", ");
   if (colors) {
     doc.text("Colors: " + colors, leftX, y);
+    y += 12;
+  }
+  if (isIntake && data.waitTime) {
+    doc.text("Estimate: " + data.waitTime, leftX, y);
+    y += 12;
+  }
+  if (isIntake && data.waitTimeEstimateLabel) {
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text(data.waitTimeEstimateLabel, leftX, y);
+    doc.setTextColor(0);
+    doc.setFontSize(9);
     y += 12;
   }
 
@@ -721,7 +741,7 @@ function generateWorkorderTicketPDF(data) {
     y = checkPageBreak(doc, y, 30, margin);
     doc.setFontSize(10);
     doc.setFont("helvetica", "bold");
-    doc.text("Service Notes", leftX, y);
+    doc.text("Notes", leftX, y);
     y += 14;
 
     doc.setFontSize(8);
@@ -740,6 +760,20 @@ function generateWorkorderTicketPDF(data) {
     });
     y += 4;
     y = addDivider(doc, y, leftX, rightX);
+  }
+
+  if (isIntake && data.intakeBlurb) {
+    y = checkPageBreak(doc, y, 40, margin);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(100, 100, 100);
+    let blurbLines = doc.splitTextToSize(data.intakeBlurb, contentWidth);
+    blurbLines.forEach((line) => {
+      doc.text(line, centerX, y, { align: "center" });
+      y += 9;
+    });
+    doc.setTextColor(0);
+    y += 8;
   }
 
   return doc.output("datauristring").split(",")[1];

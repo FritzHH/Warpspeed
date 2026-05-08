@@ -683,6 +683,7 @@ export function CustomerDisplayScreen() {
   document.title = "Customer Screen";
   const [sDisplayData, _setDisplayData] = useState(null);
   const [sType, _setType] = useState(null);
+  const [sStoreName, _setStoreName] = useState("");
   const [sTranslateText, _setTranslateText] = useState("");
   // "hidden" | "visible" | "exiting" — controls slide animation lifecycle
   const [sOverlayPhase, _setOverlayPhase] = useState("hidden");
@@ -697,6 +698,7 @@ export function CustomerDisplayScreen() {
         _setDisplayData(null);
         _setType(null);
       } else {
+        if (msg.payload?.storeName) _setStoreName(msg.payload.storeName);
         _setDisplayData(msg.payload);
         _setType(msg.type);
       }
@@ -860,6 +862,15 @@ export function CustomerDisplayScreen() {
         />
       )}
 
+      {/* Welcome header */}
+      {!sTranslateText && !!sStoreName && (
+        <View style={{ position: "absolute", top: 0, left: 0, right: 0, alignItems: "center", paddingTop: 40 }}>
+          <Text style={{ fontSize: 48, color: gray(0.2), fontWeight: Fonts.weight.textHeavy, textAlign: "center" }}>
+            {"Welcome to " + sStoreName}
+          </Text>
+        </View>
+      )}
+
       {/* Translation overlay */}
       {sTranslateText ? <TranslateDisplay text={sTranslateText} /> : null}
 
@@ -869,9 +880,9 @@ export function CustomerDisplayScreen() {
           key={sOverlayKey}
           style={{
             position: "absolute",
-            top: 15,
+            top: 50,
             right: 15,
-            bottom: 15,
+            bottom: 50,
             left: sIsTall ? "10%" : undefined,
             width: sIsTall ? undefined : "40%",
             minWidth: sIsTall ? undefined : 380,

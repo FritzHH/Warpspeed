@@ -16,11 +16,17 @@ const MODEL_URL = "./models";
 const DEFAULT_LOGOUT_GRACE_SECONDS = 7;
 
 // Motion-gated recognition — fast pixel-diff check gates expensive face-api calls
-const MOTION_CHECK_MS = 150;
+const TICK_INTERVAL_MS = 500;
 const MOTION_PIXEL_DIFF = 30;
 const MOTION_PERCENT = 0.005;
 const MOTION_CANVAS_W = 160;
 const MOTION_CANVAS_H = 120;
+
+// Recognition throttle timings
+const SCANNING_INTERVAL_MS = 500;
+const KEEPALIVE_INTERVAL_MS = 3000;
+const VERIFY_INTERVAL_MS = 1000;
+const VERIFY_MAX_ATTEMPTS = 3;
 
 // IndexedDB cache for model weight shards ////////////////////////////////////
 const CACHE_DB_NAME = "faceapi-model-cache";
@@ -149,8 +155,10 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   const lastMatchRef = useRef({ userId: null, timestamp: 0 }); // grace period tracking
   const motionCanvasRef = useRef(null);
   const prevFrameRef = useRef(null);
-  const motionActiveRef = useRef(false);
-  const recognitionLoopRunningRef = useRef(false);
+  const recognitionStateRef = useRef("idle"); // "idle" | "scanning" | "keepalive" | "verifying"
+  const lastRecognitionCheckRef = useRef(0);
+  const verifyAttemptsRef = useRef(0);
+  const recognitionRunningRef = useRef(false);
 
   // local state ////////////////////////////////////////////////////////////
   const [sReady, _setReady] = useState(false);
@@ -327,11 +335,12 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
     return null;
   }
 
-  async function runRecognitionLoop() {
-    if (recognitionLoopRunningRef.current) return;
-    recognitionLoopRunningRef.current = true;
+  async function runOneRecognitionCheck() {
+    if (recognitionRunningRef.current || pauseRef.current) return;
+    recognitionRunningRef.current = true;
+    lastRecognitionCheckRef.current = Date.now();
 
-    while (motionActiveRef.current && !pauseRef.current) {
+    try {
       const descriptor = await getFaceDescriptor();
       const matchedUser = descriptor ? findMatchingUser(descriptor) : null;
 
@@ -342,18 +351,57 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
         useLoginStore.getState().setCameraStatus("matched");
         useLoginStore.getState().runPostLoginFunction();
         checkClockIn(matchedUser);
+        recognitionStateRef.current = "keepalive";
+        verifyAttemptsRef.current = 0;
       } else {
-        const { userId, timestamp } = lastMatchRef.current;
-        const graceMs = (activeLoginTimeoutRef.current || DEFAULT_LOGOUT_GRACE_SECONDS) * 1000;
-        if (userId && (Date.now() - timestamp >= graceMs)) {
-          lastMatchRef.current = { userId: null, timestamp: 0 };
-          useLoginStore.getState().setCurrentUser(null);
-          useLoginStore.getState().setCameraStatus("idle");
-        }
+        handleMissedCheck();
       }
+    } finally {
+      recognitionRunningRef.current = false;
+    }
+  }
+
+  function handleMissedCheck() {
+    const state = recognitionStateRef.current;
+
+    if (state === "scanning") return;
+
+    if (state === "keepalive") {
+      recognitionStateRef.current = "verifying";
+      verifyAttemptsRef.current = 1;
+      return;
     }
 
-    recognitionLoopRunningRef.current = false;
+    if (state === "verifying") {
+      verifyAttemptsRef.current++;
+      if (verifyAttemptsRef.current >= VERIFY_MAX_ATTEMPTS) {
+        tryLogout();
+      }
+    }
+  }
+
+  function tryLogout() {
+    const { userId, timestamp } = lastMatchRef.current;
+    if (!userId) {
+      recognitionStateRef.current = "idle";
+      verifyAttemptsRef.current = 0;
+      return;
+    }
+
+    const graceMs = (activeLoginTimeoutRef.current || DEFAULT_LOGOUT_GRACE_SECONDS) * 1000;
+    const lastAction = useLoginStore.getState().getLastActionMillis();
+
+    if (Date.now() - timestamp >= graceMs && Date.now() - lastAction >= graceMs) {
+      lastMatchRef.current = { userId: null, timestamp: 0 };
+      useLoginStore.getState().setCurrentUser(null);
+      useLoginStore.getState().setCameraStatus("idle");
+      recognitionStateRef.current = "idle";
+      verifyAttemptsRef.current = 0;
+    } else {
+      // User still active via mouse/keyboard - keep checking face periodically
+      recognitionStateRef.current = "keepalive";
+      verifyAttemptsRef.current = 0;
+    }
   }
 
   function checkClockIn(user) {
@@ -387,7 +435,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
     });
   }
 
-  // 3. Motion-gated background recognition loop ////////////////////////////
+  // 3. State-machine recognition loop ///////////////////////////////////////
   useEffect(() => {
     if (!sReady) return;
 
@@ -401,26 +449,53 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
       }
 
       const motionDetected = detectMotion();
-      motionActiveRef.current = motionDetected;
+      const now = Date.now();
+      const elapsed = now - lastRecognitionCheckRef.current;
+      const state = recognitionStateRef.current;
 
-      if (motionDetected) {
-        runRecognitionLoop();
-      } else {
-        const { userId, timestamp } = lastMatchRef.current;
-        if (userId) {
-          const graceMs = (activeLoginTimeoutRef.current || DEFAULT_LOGOUT_GRACE_SECONDS) * 1000;
-          if (Date.now() - timestamp >= graceMs) {
-            lastMatchRef.current = { userId: null, timestamp: 0 };
-            useLoginStore.getState().setCurrentUser(null);
-            useLoginStore.getState().setCameraStatus("idle");
-          }
+      if (state === "idle") {
+        if (motionDetected) {
+          recognitionStateRef.current = "scanning";
         }
+        return;
       }
-    }, MOTION_CHECK_MS);
+
+      if (state === "scanning") {
+        if (elapsed >= SCANNING_INTERVAL_MS) {
+          runOneRecognitionCheck();
+        }
+        if (!motionDetected && !lastMatchRef.current.userId) {
+          recognitionStateRef.current = "idle";
+        }
+        return;
+      }
+
+      if (state === "keepalive") {
+        if (!lastMatchRef.current.userId) {
+          recognitionStateRef.current = "idle";
+          return;
+        }
+        if (elapsed >= KEEPALIVE_INTERVAL_MS) {
+          runOneRecognitionCheck();
+        }
+        return;
+      }
+
+      if (state === "verifying") {
+        if (!lastMatchRef.current.userId) {
+          recognitionStateRef.current = "idle";
+          verifyAttemptsRef.current = 0;
+          return;
+        }
+        if (elapsed >= VERIFY_INTERVAL_MS) {
+          runOneRecognitionCheck();
+        }
+        return;
+      }
+    }, TICK_INTERVAL_MS);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
-      motionActiveRef.current = false;
     };
   }, [sReady]);
 

@@ -502,7 +502,7 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
         subject = template.subject
           .replace(/\{employeeName\}/g, employeeName)
           .replace(/\{payPeriod\}/g, payPeriod);
-        body = template.body
+        body = template.message
           .replace(/\{employeeName\}/g, employeeName)
           .replace(/\{payPeriod\}/g, payPeriod)
           .replace(/\{dailyBreakdown\}/g, dailyLines.join("\n"))

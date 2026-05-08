@@ -621,6 +621,7 @@ export function Dashboard_Admin({}) {
           {sExpand === TAB_NAMES.users && (
             <AppUserListComponent
               handleRemoveUserPress={handleRemoveUserPress}
+              handleDescriptorCapture={handleDescriptorCapture}
               zSettingsObj={zSettingsObj}
               commitUserInfoChange={commitUserInfoChange}
               _setFacialRecognitionModalUserObj={
@@ -1121,6 +1122,7 @@ function DropdownComponent({
 const AppUserListComponent = ({
   zSettingsObj,
   commitUserInfoChange,
+  handleDescriptorCapture,
   _setFacialRecognitionModalUserObj,
   _setPunchClockUserObj,
   handleRemoveUserPress,
@@ -1431,8 +1433,7 @@ const AppUserListComponent = ({
                           }}
                           onRightPress={() => {
                             if (!editable) return;
-                            userObj.faceDescriptor = "";
-                            commitUserInfoChange(userObj);
+                            handleDescriptorCapture(userObj, "");
                           }}
                           style={{
                             flexDirection: "row",

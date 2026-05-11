@@ -481,9 +481,16 @@ export function MessagesComponent({}) {
     try {
       storeHoursText = formatStoreHours(zSettings?.storeHours);
     } catch (e) {}
+    let brandsText = "";
+    try {
+      let customerWOs = (zAllWorkorders || []).filter((wo) => wo.customerID && wo.customerID === zCustomer?.id);
+      let uniqueBrands = [...new Set(customerWOs.map((wo) => wo.brand).filter(Boolean))];
+      brandsText = uniqueBrands.join(" & ");
+    } catch (e) {}
     return templateMessage
       .replace(/\{firstName\}/g, capitalizeFirstLetterOfString(zCustomer?.first) || "")
       .replace(/\{lastName\}/g, capitalizeFirstLetterOfString(zCustomer?.last) || "")
+      .replace(/\{brands\}/g, brandsText)
       .replace(/\{brand\}/g, zWorkorderObj?.brand || "")
       .replace(/\{description\}/g, zWorkorderObj?.description || "")
       .replace(/\{totalAmount\}/g, totalAmount)
@@ -567,7 +574,20 @@ export function MessagesComponent({}) {
       let canRespondBool = canRespondVal ? true : null;
       let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
 
-      await dbSendReceipt({
+      useCustMessagesStore.getState().setOutgoingMessage({
+        ...SMS_PROTO,
+        id: messageID,
+        message: "Sending finalized ticket...",
+        phoneNumber: zCustomer.customerCell,
+        customerID: zWorkorderObj?.customerID || "",
+        type: "outgoing",
+        millis: Date.now(),
+        status: "sending",
+        senderUserObj: useLoginStore.getState().getCurrentUser(),
+        sentByUser: useLoginStore.getState().getCurrentUser()?.id || "",
+      });
+
+      dbSendReceipt({
         receiptType: "workorder",
         receiptData,
         storagePath,
@@ -585,6 +605,10 @@ export function MessagesComponent({}) {
         smsMessageID: messageID,
         canRespond: canRespondBool,
         forwardTo,
+      }).then(() => {
+        useCustMessagesStore.getState().updateMessageStatus(messageID, "sent", "");
+      }).catch(() => {
+        useCustMessagesStore.getState().updateMessageStatus(messageID, "failed", "Failed to send");
       });
     });
   }
@@ -940,6 +964,11 @@ export function MessagesComponent({}) {
     if (!currentUser?.id) return;
     let thread = zSmsThreads.find(t => t.phone === phone);
     let isCurrentlyForwarding = !!(thread?.forwardTo?.[currentUser.id]);
+    if (!isCurrentlyForwarding && !sCanRespond) {
+      userOverrodeCanRespondRef.current = true;
+      _setCanRespond(true);
+      await dbUpdateMessageCanRespond(phone, null, true);
+    }
     await dbToggleSMSForwarding(phone, currentUser.id, !isCurrentlyForwarding, currentUser.phone, currentUser.first);
   }
 
@@ -1882,6 +1911,18 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     let currentUser = useLoginStore.getState().getCurrentUser();
     if (!currentUser?.id) return;
     let isCurrentlyForwarding = !!(thread?.forwardTo?.[currentUser.id]);
+    if (!isCurrentlyForwarding && !sCanRespond) {
+      _setCanRespond(true);
+      let outgoing = sMessages.filter(m => m.type === "outgoing");
+      let last = [...outgoing].sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
+      if (last?.id) {
+        await dbUpdateMessageCanRespond(phone, last.id, true);
+        let updated = sMessages.map(m => m.id === last.id ? { ...m, canRespond: true } : m);
+        sMessagesRef.current = updated;
+        _setMessages(updated);
+        updateCache(updated, noMoreRef.current);
+      }
+    }
     await dbToggleSMSForwarding(phone, currentUser.id, !isCurrentlyForwarding, currentUser.phone, currentUser.first);
   }
 

@@ -11,6 +11,7 @@ import {
   generateEAN13Barcode,
 } from "../../../utils";
 import { INVENTORY_ITEM_PROTO, WORKORDER_ITEM_PROTO } from "../../../data";
+import { DISCOUNT_TYPES } from "../../../constants";
 
 import { useSettingsStore } from "../../../stores";
 import { cloneDeep } from "lodash";
@@ -396,7 +397,7 @@ export const CustomItemModal = ({
               enabled={sPriceCents > 0}
               isDiscountMenu={true}
               discountMaxCents={sPriceCents}
-              modalCoordY={-175}
+              openUpward={true}
               // modalCoordX={20}
               dataArr={[
                 { label: "No Discount" },

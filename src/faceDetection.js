@@ -155,7 +155,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   const lastMatchRef = useRef({ userId: null, timestamp: 0 }); // grace period tracking
   const motionCanvasRef = useRef(null);
   const prevFrameRef = useRef(null);
-  const recognitionStateRef = useRef("idle"); // "idle" | "scanning" | "keepalive" | "verifying"
+  const recognitionStateRef = useRef("scanning"); // "idle" | "scanning" | "keepalive" | "verifying"
   const lastRecognitionCheckRef = useRef(0);
   const verifyAttemptsRef = useRef(0);
   const recognitionRunningRef = useRef(false);

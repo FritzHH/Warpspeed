@@ -40,6 +40,12 @@ import {
   firestoreBatchWrite,
   firestoreBatchDelete,
   migrateCustomerPhoneCallable,
+  gmailInitiateAuth,
+  gmailSyncEmails,
+  gmailSendNewEmail,
+  gmailModifyLabels,
+  gmailGetAttachment,
+  gmailDisconnect,
 } from "./db_calls";
 import { removeUnusedFields, createNewWorkorder, buildWorkorderNumberFromId } from "./utils";
 import { useSettingsStore, useLoginStore, useOpenWorkordersStore, clearPersistedStores } from "./stores";
@@ -3459,4 +3465,180 @@ export async function startNewWorkorder(customer, { status } = {}) {
   return wo;
 }
 
+// ============================================================================
+// GMAIL EMAIL FUNCTIONS
+// ============================================================================
+
+function buildEmailsCollectionPath(tenantID, storeID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.EMAILS}`;
+}
+
+function buildEmailAuthCollectionPath(tenantID, storeID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.EMAIL_AUTH}`;
+}
+
+export function dbListenToEmails(onSnapshot) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: tenantID and storeID are not configured for dbListenToEmails");
+      return null;
+    }
+    if (!onSnapshot || typeof onSnapshot !== "function") {
+      log("Error: onSnapshot callback function is required for dbListenToEmails");
+      return null;
+    }
+    const collectionPath = buildEmailsCollectionPath(tenantID, storeID);
+    const unsubscribe = firestoreSubscribeCollection(collectionPath, (data, error) => {
+      if (error) {
+        log("Email listener error", { tenantID, storeID, error });
+        return;
+      }
+      onSnapshot(data);
+    });
+    return unsubscribe;
+  } catch (error) {
+    log("Error setting up email listener:", error);
+    return null;
+  }
+}
+
+export function dbListenToEmailAuth(onSnapshot) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: tenantID and storeID are not configured for dbListenToEmailAuth");
+      return null;
+    }
+    if (!onSnapshot || typeof onSnapshot !== "function") {
+      log("Error: onSnapshot callback function is required for dbListenToEmailAuth");
+      return null;
+    }
+    const collectionPath = buildEmailAuthCollectionPath(tenantID, storeID);
+    const unsubscribe = firestoreSubscribeCollection(collectionPath, (data, error) => {
+      if (error) {
+        log("Email auth listener error", { tenantID, storeID, error });
+        return;
+      }
+      onSnapshot(data);
+    });
+    return unsubscribe;
+  } catch (error) {
+    log("Error setting up email auth listener:", error);
+    return null;
+  }
+}
+
+export async function dbGmailInitiateAuth(accountKey) {
+  const { tenantID, storeID } = getTenantAndStore();
+  if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
+  return gmailInitiateAuth({ tenantID, storeID, accountKey });
+}
+
+export async function dbGmailSyncEmails(accountKey, fullSync = false) {
+  const { tenantID, storeID } = getTenantAndStore();
+  log("dbGmailSyncEmails called", { tenantID, storeID, accountKey, fullSync });
+  if (!tenantID || !storeID) {
+    log("dbGmailSyncEmails - missing tenant/store");
+    return { success: false, error: "Missing tenant/store" };
+  }
+  const result = await gmailSyncEmails({ tenantID, storeID, accountKey, fullSync });
+  log("dbGmailSyncEmails result", JSON.stringify(result));
+  return result;
+}
+
+export async function dbGmailSendEmail(emailData) {
+  const { tenantID, storeID } = getTenantAndStore();
+  if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
+  if (!emailData.to || emailData.to.length === 0) return { success: false, error: "Recipient required" };
+  if (!emailData.subject && !emailData.threadId) return { success: false, error: "Subject required for new emails" };
+  return gmailSendNewEmail({
+    tenantID,
+    storeID,
+    accountKey: emailData.accountKey || getEmailStoreState().activeAccountKey,
+    ...emailData,
+  });
+}
+
+export async function dbGmailModifyLabels(messageIds, addLabelIds, removeLabelIds) {
+  const { tenantID, storeID } = getTenantAndStore();
+  if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
+  const accountKey = getEmailStoreState().activeAccountKey;
+  return gmailModifyLabels({ tenantID, storeID, accountKey, messageIds, addLabelIds, removeLabelIds });
+}
+
+export async function dbGmailGetAttachment(messageId, attachmentId, filename) {
+  const { tenantID, storeID } = getTenantAndStore();
+  if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
+  const accountKey = getEmailStoreState().activeAccountKey;
+  return gmailGetAttachment({ tenantID, storeID, accountKey, messageId, attachmentId, filename });
+}
+
+export async function dbGmailDisconnect(accountKey) {
+  const { tenantID, storeID } = getTenantAndStore();
+  if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
+  return gmailDisconnect({ tenantID, storeID, accountKey });
+}
+
+
+function getEmailStoreState() {
+  const stores = require("./stores");
+  return stores.useEmailStore.getState();
+}
+
+// ============================================================================
+// TENANT SUBSCRIPTION
+// ============================================================================
+
+export function dbListenToSubscription(onChange) {
+  try {
+    const { tenantID } = getTenantAndStore();
+    if (!tenantID) {
+      log("Error: tenantID not configured for dbListenToSubscription");
+      return null;
+    }
+    if (!onChange || typeof onChange !== "function") {
+      log("Error: onChange callback required for dbListenToSubscription");
+      return null;
+    }
+    const path = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.SUBSCRIPTION}/${DB_NODES.FIRESTORE.SUBSCRIPTION}`;
+    const unsubscribe = firestoreSubscribe(path, (data, error) => {
+      if (error) {
+        log("Subscription listener error", { tenantID, error });
+        return;
+      }
+      onChange(data);
+    });
+    return unsubscribe;
+  } catch (error) {
+    log("Error setting up subscription listener:", error);
+    return null;
+  }
+}
+
+export async function dbSaveSubscription(subscription) {
+  try {
+    const { tenantID } = getTenantAndStore();
+    if (!tenantID) return { success: false, error: "Missing tenantID" };
+    const path = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.SUBSCRIPTION}/${DB_NODES.FIRESTORE.SUBSCRIPTION}`;
+    await firestoreWrite(path, subscription);
+    return { success: true };
+  } catch (error) {
+    log("Error saving subscription:", error);
+    return { success: false, error };
+  }
+}
+
+export async function dbSaveSubscriptionField(fieldName, fieldVal) {
+  try {
+    const { tenantID } = getTenantAndStore();
+    if (!tenantID) return { success: false, error: "Missing tenantID" };
+    const path = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.SUBSCRIPTION}/${DB_NODES.FIRESTORE.SUBSCRIPTION}`;
+    await firestoreUpdate(path, { [fieldName]: fieldVal });
+    return { success: true };
+  } catch (error) {
+    log("Error saving subscription field:", error);
+    return { success: false, error };
+  }
+}
 

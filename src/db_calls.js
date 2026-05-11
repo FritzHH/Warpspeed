@@ -611,6 +611,15 @@ const generateReceiptPDFCallableRef = httpsCallable(functions, "generateReceiptP
 const sendReceiptCallableRef = httpsCallable(functions, "sendReceiptCallable");
 const translateTextCallableRef = httpsCallable(functions, "translateTextCallable");
 
+// Gmail callable references
+const gmailInitiateAuthCallable = httpsCallable(functions, "gmailInitiateAuth");
+const gmailSyncEmailsCallable = httpsCallable(functions, "gmailSyncEmails");
+const gmailSendEmailCallable = httpsCallable(functions, "gmailSendEmail");
+const gmailModifyLabelsCallable = httpsCallable(functions, "gmailModifyLabels");
+const gmailGetAttachmentCallable = httpsCallable(functions, "gmailGetAttachment");
+const gmailDisconnectCallable = httpsCallable(functions, "gmailDisconnect");
+
+
 export const processServerDrivenStripePaymentCallable = httpsCallable(
   functions,
   "initiatePaymentIntentCallable"
@@ -870,6 +879,65 @@ export function translateText(translateData) {
       };
     });
 }
+
+// ============================================================================
+// GMAIL API FUNCTIONS
+// ============================================================================
+
+export function gmailInitiateAuth(data) {
+  return gmailInitiateAuthCallable(data)
+    .then((result) => ({ success: true, data: result.data }))
+    .catch((error) => {
+      log("Error initiating Gmail auth", error);
+      return { success: false, error: error.message || "Failed to initiate Gmail auth" };
+    });
+}
+
+export function gmailSyncEmails(data) {
+  return gmailSyncEmailsCallable(data)
+    .then((result) => ({ success: true, data: result.data }))
+    .catch((error) => {
+      log("Error syncing Gmail emails", error);
+      return { success: false, error: error.message || "Failed to sync emails" };
+    });
+}
+
+export function gmailSendNewEmail(data) {
+  return gmailSendEmailCallable(data)
+    .then((result) => ({ success: true, data: result.data }))
+    .catch((error) => {
+      log("Error sending Gmail email", error);
+      return { success: false, error: error.message || "Failed to send email" };
+    });
+}
+
+export function gmailModifyLabels(data) {
+  return gmailModifyLabelsCallable(data)
+    .then((result) => ({ success: true, data: result.data }))
+    .catch((error) => {
+      log("Error modifying Gmail labels", error);
+      return { success: false, error: error.message || "Failed to modify labels" };
+    });
+}
+
+export function gmailGetAttachment(data) {
+  return gmailGetAttachmentCallable(data)
+    .then((result) => ({ success: true, data: result.data }))
+    .catch((error) => {
+      log("Error getting Gmail attachment", error);
+      return { success: false, error: error.message || "Failed to get attachment" };
+    });
+}
+
+export function gmailDisconnect(data) {
+  return gmailDisconnectCallable(data)
+    .then((result) => ({ success: true, data: result.data }))
+    .catch((error) => {
+      log("Error disconnecting Gmail", error);
+      return { success: false, error: error.message || "Failed to disconnect Gmail" };
+    });
+}
+
 
 // old functions need to update to use callable
 

@@ -24,6 +24,7 @@ import { EmptyItemsComponent } from "../screen_components/Items_Screen/Items_Emp
 import { Items_ChangeLog } from "../screen_components/Items_Screen/Items_ChangeLog";
 import { Items_TicketSearchResults } from "../screen_components/Items_Screen/Items_TicketSearchResults";
 import { Items_WorkorderSearchList } from "../screen_components/Items_Screen/Items_WorkorderSearchList";
+import { Items_EmailView } from "../screen_components/Items_Screen/Items_EmailView";
 import { log, gray, lightenRGBByPercent } from "../../utils";
 import { useTranslation } from "../../useTranslation";
 import {
@@ -62,6 +63,8 @@ export const Items_Section = React.memo(({}) => {
         return <Items_TicketSearchResults />;
       case TAB_NAMES.itemsTab.workorderSearchResults:
         return <Items_WorkorderSearchList />;
+      case TAB_NAMES.itemsTab.emailView:
+        return <Items_EmailView />;
       case TAB_NAMES.itemsTab.empty:
         return <EmptyItemsComponent />;
       default:

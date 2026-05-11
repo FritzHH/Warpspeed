@@ -902,7 +902,7 @@ export const DropdownMenu = ({
                   ...itemTextStyle,
                   color: item.textColor || C.text,
                   ...(item.strikethrough ? { textDecorationLine: "line-through" } : {}),
-                }}>{item.label || item}</Text>
+                }}>{item.label != null ? item.label : item}</Text>
                 {item.subtitle ? <Text style={{ fontSize: 10, color: gray(0.5), marginTop: 2 }}>{item.subtitle}</Text> : null}
               </TouchableOpacity>
             );
@@ -1893,7 +1893,7 @@ export const PhoneNumberInput = ({
     const cleanText = text.replace(/\D/g, "").slice(0, maxLength);
 
     // Update cursor position to the end of the text
-    setCursorPosition(cleanText.length);
+    setCursorPosition(Math.min(cleanText.length, maxLength - 1));
 
     if (onChangeText) {
       onChangeText(cleanText);
@@ -1902,13 +1902,13 @@ export const PhoneNumberInput = ({
 
   const handleSelectionChange = (event) => {
     const { start } = event.nativeEvent.selection;
-    setCursorPosition(Math.min(start, digits.length));
+    setCursorPosition(Math.min(start, digits.length, maxLength - 1));
   };
 
   const handleFocus = () => {
     setIsFocused(true);
     // Set cursor to the end of current text or 0 if empty
-    setCursorPosition(digits.length);
+    setCursorPosition(Math.min(digits.length, maxLength - 1));
     if (onFocus) {
       onFocus();
     }
@@ -1969,6 +1969,10 @@ export const PhoneNumberInput = ({
       return; // Allow the key
     }
 
+    if (e.ctrlKey || e.metaKey) {
+      return; // Allow paste, copy, select-all, etc.
+    }
+
     e.preventDefault(); // Block other keys
   };
 
@@ -2011,7 +2015,6 @@ export const PhoneNumberInput = ({
           outline: "none",
         }}
         keyboardType="numeric"
-        maxLength={maxLength}
         {...props}
       />
     </Pressable>
@@ -4104,6 +4107,8 @@ export const NoteHelperDropdown = ({
     onUpdateLine({ ...workorderLine, [target]: parts.join(", ") });
   }
 
+  const filteredHelpers = noteHelpers.filter(cat => cat[sTarget] === true);
+
   const dropdownWidth = 580;
   let left;
   if (centered && typeof window !== "undefined") {
@@ -4195,7 +4200,7 @@ export const NoteHelperDropdown = ({
 
           <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
             <View style={{ flex: 1, paddingRight: 8 }}>
-              {noteHelpers.filter((_, i) => i % 2 === 0).map((category) => (
+              {filteredHelpers.filter((_, i) => i % 2 === 0).map((category) => (
                 <View key={category.id} style={{ marginBottom: 19 }}>
                   <Text
                     style={{
@@ -4245,7 +4250,7 @@ export const NoteHelperDropdown = ({
             </View>
             <View style={{ width: 1, backgroundColor: C.buttonLightGreenOutline, alignSelf: "stretch" }} />
             <View style={{ flex: 1, paddingLeft: 14 }}>
-              {noteHelpers.filter((_, i) => i % 2 === 1).map((category) => (
+              {filteredHelpers.filter((_, i) => i % 2 === 1).map((category) => (
                 <View key={category.id} style={{ marginBottom: 19 }}>
                     <Text
                       style={{

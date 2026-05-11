@@ -17,6 +17,7 @@ import {
   dbDeleteWorkorderMedia,
   dbSendEmail,
 } from "../../../db_calls_wrapper";
+import { broadcastToDisplay, DISPLAY_MSG_TYPES } from "../../../broadcastChannel";
 
 export const WorkorderMediaModal = ({
   visible,
@@ -42,6 +43,7 @@ export const WorkorderMediaModal = ({
   const [sSendText, _setSendText] = useState(!!onSendMedia);
   const [sPendingFiles, _setPendingFiles] = useState(null);
   const [sCompressConfirm, _setCompressConfirm] = useState(true);
+  const [sCastToDisplay, _setCastToDisplay] = useState(false);
   const fileInputRef = useRef(null);
 
   if (!visible) return null;
@@ -241,11 +243,40 @@ export const WorkorderMediaModal = ({
   const MODAL_WIDTH = isMobile ? "95%" : 600;
   const selectedCount = sSelectedIds.size;
 
+  function handleOpenFullView(item) {
+    _setFullView(item);
+    if (sCastToDisplay) {
+      broadcastToDisplay(DISPLAY_MSG_TYPES.MEDIA, { url: item.url, type: item.type });
+    }
+  }
+
+  function handleCloseFullView() {
+    _setFullView(null);
+    if (sCastToDisplay) {
+      broadcastToDisplay(DISPLAY_MSG_TYPES.CLEAR, null);
+    }
+  }
+
+  function handleFullViewNav(direction) {
+    let currentIndex = zMedia.findIndex((m) => m.id === sFullView.id);
+    let nextIndex = currentIndex + direction;
+    if (nextIndex < 0 || nextIndex >= zMedia.length) return;
+    let nextItem = zMedia[nextIndex];
+    _setFullView(nextItem);
+    if (sCastToDisplay) {
+      broadcastToDisplay(DISPLAY_MSG_TYPES.MEDIA, { url: nextItem.url, type: nextItem.type });
+    }
+  }
+
   // Full-size overlay
   if (sFullView) {
+    let currentIndex = zMedia.findIndex((m) => m.id === sFullView.id);
+    let hasPrev = currentIndex > 0;
+    let hasNext = currentIndex < zMedia.length - 1;
+
     return createPortal(
       <div
-        onClick={() => _setFullView(null)}
+        onClick={handleCloseFullView}
         style={{
           position: "fixed",
           top: 0,
@@ -262,14 +293,37 @@ export const WorkorderMediaModal = ({
         <div
           onClick={(e) => e.stopPropagation()}
           style={{
+            position: "relative",
             width: "90%",
             maxWidth: 800,
             maxHeight: "90%",
             display: "flex",
-            flexDirection: "column",
+            flexDirection: "row",
             alignItems: "center",
           }}
         >
+          {hasPrev && (
+            <div
+              onClick={() => handleFullViewNav(-1)}
+              style={{
+                position: "absolute",
+                left: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: "rgba(255,255,255,0.15)",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                cursor: "pointer",
+                zIndex: 1,
+              }}
+            >
+              <Image source={ICONS.caretLeft} style={{ width: 44, height: 44 }} />
+            </div>
+          )}
           {sFullView.type === "video" ? (
             <video
               src={sFullView.url}
@@ -291,6 +345,28 @@ export const WorkorderMediaModal = ({
               }}
               resizeMode="contain"
             />
+          )}
+          {hasNext && (
+            <div
+              onClick={() => handleFullViewNav(1)}
+              style={{
+                position: "absolute",
+                right: 8,
+                top: "50%",
+                transform: "translateY(-50%)",
+                width: 44,
+                height: 44,
+                borderRadius: 22,
+                backgroundColor: "rgba(255,255,255,0.15)",
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                cursor: "pointer",
+                zIndex: 1,
+              }}
+            >
+              <Image source={ICONS.caretRight} style={{ width: 44, height: 44 }} />
+            </div>
           )}
         </div>
       </div>,
@@ -349,6 +425,11 @@ export const WorkorderMediaModal = ({
             Workorder Media
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <CheckBox_
+              text="Cast images to customer screen"
+              isChecked={sCastToDisplay}
+              onCheck={() => _setCastToDisplay(!sCastToDisplay)}
+            />
             {/* Upload button in header */}
             {!isDonePaid && (
               <Button_
@@ -424,7 +505,7 @@ export const WorkorderMediaModal = ({
                     }}
                   >
                     <TouchableOpacity
-                      onPress={() => onSelect ? onSelect(item) : _setFullView(item)}
+                      onPress={() => onSelect ? onSelect(item) : handleOpenFullView(item)}
                       style={{ flex: 1 }}
                     >
                       {item.type === "video" ? (

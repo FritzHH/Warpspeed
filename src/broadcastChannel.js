@@ -5,6 +5,7 @@ const CHANNEL_NAME = "warpspeed-customer-display";
 export const DISPLAY_MSG_TYPES = {
   WORKORDER: "workorder",
   SALE: "sale",
+  MEDIA: "media",
   CLEAR: "clear",
 };
 

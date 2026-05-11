@@ -1064,10 +1064,10 @@ export function InventoryComponent({}) {
   const [sListPrintPickerID, _setListPrintPickerID] = useState(null);
   const [sListPrintSuccessID, _setListPrintSuccessID] = useState(null);
   const barcodeModalTimerRef = useRef(null);
+  const _searchTermRef = useRef("");
 
   // Note Helper dropdown state
   const zNoteHelpers = useSettingsStore((state) => state.settings?.noteHelpers);
-  const zNoteHelpersTarget = useSettingsStore((state) => state.settings?.noteHelpersTarget || "intakeNotes");
   const [sNoteHelperDropdown, _setNoteHelperDropdown] = useState(null); // { workorderLine, anchorPosition }
   const lastClickTimeRef = useRef(0);
   const lastClickItemRef = useRef(null);
@@ -1110,24 +1110,36 @@ export function InventoryComponent({}) {
   // Search function (now called by debounced TextInput_)
   const handleSearch = (searchTerm) => {
     _setSearchTerm(searchTerm || "");
+    _searchTermRef.current = searchTerm || "";
     if (!searchTerm || searchTerm.length === 0) {
       _setSearchResults([]);
       return;
     }
     if (searchTerm.length < 2) return;
     workerSearchInventory(searchTerm, (results) => {
-      _setSearchResults(results);
-      // Auto-open create modal when a 12 or 13-digit barcode is entered and not found
       if (barcodeModalTimerRef.current) clearTimeout(barcodeModalTimerRef.current);
-      if (/^\d{12,13}$/.test(searchTerm) && results.length === 0) {
+      // 12-13 digit barcode scan: short delay to allow 13th digit, then act
+      if (/^\d{12,13}$/.test(searchTerm)) {
         barcodeModalTimerRef.current = setTimeout(() => {
-          let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
-          let barcode = normalizeBarcode(searchTerm) || generateEAN13Barcode();
-          newItem.id = barcode;
-          newItem.primaryBarcode = barcode;
-          _setModalItem(newItem);
-        }, 1500);
+          const currentTerm = _searchTermRef.current;
+          if (currentTerm !== searchTerm) return;
+          const normalized = normalizeBarcode(searchTerm) || searchTerm;
+          const exactMatch = results.find((r) => r.id === searchTerm || r.id === normalized || r.primaryBarcode === searchTerm || r.primaryBarcode === normalized || (r.barcodes || []).includes(searchTerm) || (r.barcodes || []).includes(normalized));
+          if (exactMatch) {
+            inventoryItemSelected(exactMatch);
+          } else {
+            let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
+            let barcode = searchTerm || generateEAN13Barcode();
+            newItem.id = barcode;
+            newItem.primaryBarcode = barcode;
+            _setModalItem(newItem);
+          }
+          _setSearchTerm("");
+          _setSearchResults([]);
+        }, searchTerm.length === 13 ? 100 : 1500);
+        return;
       }
+      _setSearchResults(results);
     });
   };
 
@@ -2049,7 +2061,6 @@ export function InventoryComponent({}) {
           anchorX={sNoteHelperDropdown?.anchorX || 0}
           anchorY={sNoteHelperDropdown?.anchorY || 0}
           noteHelpers={zNoteHelpers || []}
-          noteHelpersTarget={zNoteHelpersTarget}
         />
         {sShowColorPickerModal && (
           <ColorPickerModal

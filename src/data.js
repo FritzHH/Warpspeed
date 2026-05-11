@@ -261,12 +261,14 @@ export const TAB_NAMES = {
     workorderSearchResults: "Workorder Search Results",
     preview: "Preview",
     empty: "Empty",
+    emailView: "Email View",
   },
   optionsTab: {
     // quickItems: "Quick Items",
     workorders: "Workorders",
     inventory: "Inventory",
     messages: "Messages",
+    email: "Email",
   },
 };
 
@@ -297,6 +299,7 @@ export const APP_USER = {
   preview: true,
   forwardSMS: false,
   statuses: [/*status id's go in here*/],
+  emailInboxes: [],
   pendingWorkorderIDs: [],
 };
 
@@ -1182,6 +1185,15 @@ export const SETTINGS_OBJ = {
       removable: false,
     },
     {
+      id: "finished_multiple_items_sms",
+      label: "Finished - Multiple Items",
+      content: "Hi {firstName}, your {brands} are ready for pickup! Your total is {totalAmount}. We're open {storeHours}. Call us at {storePhone} with any questions.",
+      type: "",
+      order: 0,
+      showInChat: true,
+      removable: false,
+    },
+    {
       id: "fkdnfdfd",
       label: "Part Ordered",
       content: "Hi {firstName}, we've ordered a part for your {brand} {description}. As soon as we get the part we will proceed with the requested service. Call us at {storePhone} with any questions.",
@@ -1248,7 +1260,29 @@ export const SETTINGS_OBJ = {
   emailFooterAlign: "center",
   emailLogoWidth: 180,
   emailGreetingColorObj: { textColor: "white", backgroundColor: "#2E7D32", label: "Green" },
+  emailSignature: { segments: [], imageUrl: "" },
+  emailAccounts: [],
   emailTemplates: [
+    {
+      id: "finished_email",
+      label: "Finished",
+      subject: "Your bike is ready! - {storeName}",
+      message: "Great news - your {brand} {description} is ready for pickup!\n\nItems completed:\n{lineItems}\n\n{customerNotes}\n\nTotal: {totalAmount}\n\nPlease note: we do not monitor this inbox during the day, so responses may be delayed. You are better off calling the shop directly at {storePhone}.",
+      action: "",
+      actionColorObj: { textColor: "white", backgroundColor: "green", label: "Green" },
+      type: "",
+      removable: false,
+    },
+    {
+      id: "finished_multiple_items_email",
+      label: "Finished - Multiple Items",
+      subject: "Your bikes are ready! - {storeName}",
+      message: "Great news - your {brands} are ready for pickup!\n\nTotal: {totalAmount}\n\nPlease note: we do not monitor this inbox during the day, so responses may be delayed. You are better off calling the shop directly at {storePhone}.",
+      action: "",
+      actionColorObj: { textColor: "white", backgroundColor: "green", label: "Green" },
+      type: "",
+      removable: false,
+    },
     {
       id: "default_workorder_complete",
       label: "Workorder Complete",
@@ -1429,6 +1463,29 @@ export const SETTINGS_OBJ = {
   nextSaleCounter: 1,
 };
 
+export const SUBSCRIPTION_PROTO = {
+  plan: "free",
+  features: {
+    texting: false,
+    email: false,
+    faceRecognition: false,
+    multiStore: false,
+    customBranding: false,
+  },
+  maxUsers: 3,
+  stripeSubscriptionID: "",
+  trialEndsAt: null,
+  expiresAt: null,
+  millisCreated: "",
+};
+
+export const SUBSCRIPTION_PLANS = {
+  free: "free",
+  basic: "basic",
+  pro: "pro",
+  enterprise: "enterprise",
+};
+
 export const SMS_TEMPLATE_PROTO = {
   id: "",
   label: "",
@@ -1471,6 +1528,8 @@ export const NOTE_HELPER_PROTO = {
   id: "",
   label: "",
   items: [],
+  intakeNotes: true,
+  receiptNotes: true,
 };
 
 export const NOTE_HELPER_ITEM_PROTO = {

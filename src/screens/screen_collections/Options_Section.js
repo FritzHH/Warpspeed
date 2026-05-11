@@ -17,11 +17,13 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { WorkordersComponent } from "../screen_components/Options_Screen/Options_Workorders";
 import { InventoryComponent } from "../screen_components/Options_Screen/Options_Inventory";
 import { MessagesComponent } from "../screen_components/Options_Screen/Options_Messages";
+import { EmailOptionsPanel } from "../screen_components/Options_Screen/Options_Email";
 import {
   useTabNamesStore,
   useLoginStore,
   useAlertScreenStore,
   useSettingsStore,
+  useEmailStore,
 } from "../../stores";
 import { INTERNET_CHECK_DELAY, LOCAL_DB_KEYS } from "../../constants";
 import { PayrollModal } from "../screen_components/modal_screens/PayrollModal";
@@ -51,6 +53,8 @@ export const Options_Section = React.memo(({}) => {
         return <InventoryComponent />;
       case TAB_NAMES.optionsTab.messages:
         return <MessagesComponent />;
+      case TAB_NAMES.optionsTab.email:
+        return <EmailOptionsPanel />;
       case TAB_NAMES.optionsTab.inventory:
         return <InventoryComponent />;
       case TAB_NAMES.optionsTab.workorders:
@@ -164,13 +168,19 @@ export const TabBar = ({
     );
   }
 
-  function LoginButton() {
+  function LoginButton({ showSpinner } = {}) {
     return (
       <Button_
         onPress={() => useLoginStore.getState().setShowLoginScreen(true)}
-        icon={ICONS.userControl}
+        icon={showSpinner ? null : ICONS.userControl}
         iconSize={13}
-        text="User"
+        TextComponent={showSpinner ? () => (
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <ActivityIndicator size={12} color={C.green} style={{ marginRight: 5 }} />
+            <Text style={{ fontSize: 13, color: C.text }}>User</Text>
+          </View>
+        ) : undefined}
+        text={showSpinner ? undefined : "User"}
         textStyle={{ fontSize: 13, color: C.text }}
         buttonStyle={{
           paddingHorizontal: 7,
@@ -209,9 +219,14 @@ export const TabBar = ({
       return zCurrentUser ? <UserButton /> : <LoginButton />;
     }
 
-    // loading — spinner only
-    if (zCameraStatus === "loading") {
-      return <ActivityIndicator size={16} color={C.green} />;
+    // loading or ready without a user — show login button with spinner icon
+    if (!zCurrentUser && (zCameraStatus === "loading" || zCameraStatus === "ready")) {
+      return (
+        <>
+          <LoginButton showSpinner />
+          {zCameraStatus === "ready" && <><View style={{ width: 5 }} /><CameraIcon /></>}
+        </>
+      );
     }
 
     // failed — show user or login button + camera icon (with error overlay)
@@ -224,11 +239,11 @@ export const TabBar = ({
       );
     }
 
-    // ready — camera started, searching for face
+    // ready with a user
     if (zCameraStatus === "ready") {
       return (
         <>
-          {zCurrentUser ? <UserButton /> : <ActivityIndicator size={16} color={C.green} />}
+          <UserButton />
           <View style={{ width: 5 }} />
           <CameraIcon />
         </>
@@ -270,6 +285,7 @@ export const TabBar = ({
           text={TAB_NAMES.optionsTab.messages}
           isSelected={zOptionsTabName === TAB_NAMES.optionsTab.messages}
         />
+        <EmailTabButton zOptionsTabName={zOptionsTabName} />
       </View>
       <View style={{ flexDirection: "row", alignItems: "center" }}>
         {renderUserArea()}
@@ -302,6 +318,49 @@ export const TabBar = ({
         visible={sShowCameraPreview}
         onClose={() => _sSetShowCameraPreview(false)}
       />
+    </View>
+  );
+};
+
+const EmailTabButton = ({ zOptionsTabName }) => {
+  const zUnreadCount = useEmailStore((state) => state.getTotalUnreadCount());
+  const currentUser = useLoginStore((state) => state.currentUser);
+  const userInboxes = currentUser?.emailInboxes || [];
+  const isSelected = zOptionsTabName === TAB_NAMES.optionsTab.email;
+
+  if (userInboxes.length === 0) return null;
+
+  return (
+    <View style={{ position: "relative" }}>
+      <TabMenuButton
+        onPress={() => {
+          useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.email);
+          useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.emailView);
+        }}
+        text={TAB_NAMES.optionsTab.email}
+        isSelected={isSelected}
+      />
+      {zUnreadCount > 0 && (
+        <View
+          style={{
+            position: "absolute",
+            top: -4,
+            right: -4,
+            backgroundColor: C.red,
+            borderRadius: 10,
+            minWidth: 18,
+            height: 18,
+            justifyContent: "center",
+            alignItems: "center",
+            paddingHorizontal: 4,
+            pointerEvents: "none",
+          }}
+        >
+          <Text style={{ color: C.textWhite, fontSize: 10, fontWeight: "700" }}>
+            {zUnreadCount > 99 ? "99+" : zUnreadCount}
+          </Text>
+        </View>
+      )}
     </View>
   );
 };
@@ -402,6 +461,11 @@ const UserClockModal = ({ user, handleExit, handleViewHistory }) => {
     }
     handleExit();
   }
+
+  useEffect(() => {
+    let timer = setTimeout(handleExit, 30000);
+    return () => clearTimeout(timer);
+  }, []);
 
   let thisWeekStart = getWeekStart(new Date());
   let nextWeekStart = dayjs(thisWeekStart).add(7, "day").format("YYYY-MM-DD");

@@ -2341,9 +2341,19 @@ export function resolveTemplateStandalone(templateStr, workorder, customer, sett
   let formattedPhone = storePhone.length === 10
     ? "(" + storePhone.slice(0, 3) + ") " + storePhone.slice(3, 6) + "-" + storePhone.slice(6)
     : storePhone;
+  let brandsText = "";
+  try {
+    let custID = customer?.id || workorder?.customerID || "";
+    if (custID) {
+      let allWOs = useOpenWorkordersStore.getState().workorders || [];
+      let uniqueBrands = [...new Set(allWOs.filter((wo) => wo.customerID === custID).map((wo) => wo.brand).filter(Boolean))];
+      brandsText = uniqueBrands.join(" & ");
+    }
+  } catch (e) {}
   return templateStr
     .replace(/\{firstName\}/g, capitalizeFirstLetterOfString(firstName) || "")
     .replace(/\{lastName\}/g, capitalizeFirstLetterOfString(lastName) || "")
+    .replace(/\{brands\}/g, brandsText)
     .replace(/\{brand\}/g, workorder?.brand || "")
     .replace(/\{description\}/g, workorder?.description || "")
     .replace(/\{totalAmount\}/g, totalAmount)

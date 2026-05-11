@@ -224,6 +224,9 @@ export const DB_NODES = {
     ACTIVE_SALES: "active-sales",
     TRANSACTIONS: "transactions",
     ARCHIVE_LOGS: "archive-logs",
+    EMAIL_AUTH: "email-auth",
+    EMAILS: "emails",
+    SUBSCRIPTION: "subscription",
   },
 
   // Realtime Database nodes

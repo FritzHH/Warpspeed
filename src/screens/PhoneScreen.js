@@ -217,124 +217,125 @@ export function PhoneScreen() {
       onTouchStart={() => throttledSetLastAction()}
       style={{ width: "100%", height: "100%", backgroundColor: C.backgroundWhite }}
     >
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: 16,
-          paddingVertical: 10,
-          backgroundColor: C.buttonLightGreen,
-          borderBottomWidth: 1,
-          borderBottomColor: C.buttonLightGreenOutline,
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Image_ icon={ICONS.gears1} size={24} style={{ marginRight: 8 }} />
-          <Text style={{ fontSize: 20, fontWeight: "600", color: C.text }}>
-            WARPSPEED
-          </Text>
-        </View>
-        <DropdownMenu
-          buttonIcon={isClockedIn ? ICONS.check : ICONS.redx}
-          buttonIconSize={13}
-          buttonText={
-            (zCurrentUser?.first || "") +
-            " " +
-            (zCurrentUser?.last?.length > 0 ? zCurrentUser.last[0] + "." : "")
-          }
-          buttonStyle={{
-            paddingHorizontal: 7,
-            paddingVertical: 2,
-            borderWidth: 1,
-            borderColor: C.buttonLightGreenOutline,
-            backgroundColor: C.buttonLightGreen,
-            borderRadius: 5,
-          }}
-          buttonTextStyle={{ fontSize: 13, color: C.text }}
-          dataArr={[
-            { label: isClockedIn ? "Clock Out" : "Clock In" },
-            { label: "Switch User" },
-            { label: "Log Out App" },
-          ]}
-          onSelect={(item) => {
-            if (item.label === "Clock In" || item.label === "Clock Out") handleToggleClock();
-            else if (item.label === "Switch User") handleSwitchUser();
-            else if (item.label === "Log Out App") handleLogoutApp();
-          }}
-        />
-      </View>
-
-      {/* Alert overlay */}
-      <AlertBox_ showAlert={zShowAlert} />
-
-      {/* Search Bar */}
-      <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingTop: 8, paddingBottom: 4 }}>
-        <View
-          style={{
-            flex: 1,
-            flexDirection: "row",
-            alignItems: "center",
-            borderWidth: 1,
-            borderColor: C.buttonLightGreenOutline,
-            borderRadius: 8,
-            backgroundColor: C.listItemWhite,
-            paddingHorizontal: 8,
-            height: 36,
-          }}
-        >
-          <Image_ icon={ICONS.search} size={16} style={{ marginRight: 6, opacity: 0.4 }} />
-          <TextInput
-            value={sSearch}
-            onChangeText={_setSearch}
-            placeholder="Search name, brand, description..."
-            placeholderTextColor={gray(0.6)}
-            style={{ flex: 1, fontSize: 14, color: C.text, outlineStyle: "none" }}
-          />
-          {!!sSearch && (
-            <TouchableOpacity onPress={() => _setSearch("")} style={{ padding: 4 }}>
-              <Image_ icon={ICONS.close1} size={14} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Workorder List */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 8 }}
-      >
-        {sortWorkorders(zWorkorders.filter((wo) => {
-          if (!wo.customerID) return false;
-          if (!sSearch.trim()) return true;
-          let q = sSearch.trim().toLowerCase();
-          let fields = [wo.customerFirst, wo.customerLast, wo.brand, wo.description];
-          return fields.some((f) => f && f.toLowerCase().includes(q));
-        })).map((workorder) => (
-          <WorkorderCard
-            key={workorder.id}
-            workorder={workorder}
-            zStatuses={zStatuses}
-            zSettings={zSettings}
-            onPress={() => openWorkorder(workorder)}
-          />
-        ))}
-
-        {zWorkorders.length === 0 && (
-          <View style={{ alignItems: "center", paddingVertical: 40 }}>
-            <Text style={{ fontSize: 16, color: gray(0.5) }}>No open workorders</Text>
-          </View>
-        )}
-      </ScrollView>
-
-      {/* Workorder Detail Modal */}
-      {sActiveModal === "workorderDetail" && selectedWorkorder && (
+      {sActiveModal === "workorderDetail" && selectedWorkorder ? (
         <WorkorderDetailModal
           workorder={selectedWorkorder}
           zSettings={zSettings}
           onClose={closeModal}
         />
+      ) : (
+        <>
+          {/* Header */}
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingHorizontal: 16,
+              paddingVertical: 10,
+              backgroundColor: C.buttonLightGreen,
+              borderBottomWidth: 1,
+              borderBottomColor: C.buttonLightGreenOutline,
+            }}
+          >
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Image_ icon={ICONS.gears1} size={24} style={{ marginRight: 8 }} />
+              <Text style={{ fontSize: 20, fontWeight: "600", color: C.text }}>
+                WARPSPEED
+              </Text>
+            </View>
+            <DropdownMenu
+              buttonIcon={isClockedIn ? ICONS.check : ICONS.redx}
+              buttonIconSize={13}
+              buttonText={
+                (zCurrentUser?.first || "") +
+                " " +
+                (zCurrentUser?.last?.length > 0 ? zCurrentUser.last[0] + "." : "")
+              }
+              buttonStyle={{
+                paddingHorizontal: 7,
+                paddingVertical: 2,
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                backgroundColor: C.buttonLightGreen,
+                borderRadius: 5,
+              }}
+              buttonTextStyle={{ fontSize: 13, color: C.text }}
+              dataArr={[
+                { label: isClockedIn ? "Clock Out" : "Clock In" },
+                { label: "Switch User" },
+                { label: "Log Out App" },
+              ]}
+              onSelect={(item) => {
+                if (item.label === "Clock In" || item.label === "Clock Out") handleToggleClock();
+                else if (item.label === "Switch User") handleSwitchUser();
+                else if (item.label === "Log Out App") handleLogoutApp();
+              }}
+            />
+          </View>
+
+          {/* Alert overlay */}
+          <AlertBox_ showAlert={zShowAlert} />
+
+          {/* Search Bar */}
+          <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingTop: 8, paddingBottom: 4 }}>
+            <View
+              style={{
+                flex: 1,
+                flexDirection: "row",
+                alignItems: "center",
+                borderWidth: 1,
+                borderColor: C.buttonLightGreenOutline,
+                borderRadius: 8,
+                backgroundColor: C.listItemWhite,
+                paddingHorizontal: 8,
+                height: 36,
+              }}
+            >
+              <Image_ icon={ICONS.search} size={16} style={{ marginRight: 6, opacity: 0.4 }} />
+              <TextInput
+                value={sSearch}
+                onChangeText={_setSearch}
+                placeholder="Search name, brand, description..."
+                placeholderTextColor={gray(0.6)}
+                style={{ flex: 1, fontSize: 14, color: C.text, outlineStyle: "none" }}
+              />
+              {!!sSearch && (
+                <TouchableOpacity onPress={() => _setSearch("")} style={{ padding: 4 }}>
+                  <Image_ icon={ICONS.close1} size={14} />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+
+          {/* Workorder List */}
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingHorizontal: 8, paddingBottom: 8 }}
+          >
+            {sortWorkorders(zWorkorders.filter((wo) => {
+              if (!wo.customerID) return false;
+              if (!sSearch.trim()) return true;
+              let q = sSearch.trim().toLowerCase();
+              let fields = [wo.customerFirst, wo.customerLast, wo.brand, wo.description];
+              return fields.some((f) => f && f.toLowerCase().includes(q));
+            })).map((workorder) => (
+              <WorkorderCard
+                key={workorder.id}
+                workorder={workorder}
+                zStatuses={zStatuses}
+                zSettings={zSettings}
+                onPress={() => openWorkorder(workorder)}
+              />
+            ))}
+
+            {zWorkorders.length === 0 && (
+              <View style={{ alignItems: "center", paddingVertical: 40 }}>
+                <Text style={{ fontSize: 16, color: gray(0.5) }}>No open workorders</Text>
+              </View>
+            )}
+          </ScrollView>
+        </>
       )}
     </View>
   );
@@ -346,7 +347,29 @@ export function PhoneScreen() {
 
 function WorkorderCard({ workorder, zStatuses, zSettings, onPress }) {
   let rs = resolveStatus(workorder.status, zStatuses);
-  let waitInfo = computeWaitInfo(workorder, zSettings);
+  const isPickupDelivery = workorder.status === "pickup" || workorder.status === "delivery";
+  let waitInfo;
+  if (isPickupDelivery) {
+    const pd = workorder.pickupDelivery;
+    const hasDate = pd?.month && pd?.day;
+    waitInfo = { waitEndDay: "", textColor: C.text, isMissing: !hasDate, isItalic: false, pickupTimeStr: "" };
+    if (hasDate) {
+      const now = new Date();
+      const d = new Date(now.getFullYear(), Number(pd.month) - 1, Number(pd.day));
+      const isToday = Number(pd.month) === now.getMonth() + 1 && Number(pd.day) === now.getDate();
+      const tom = new Date(now);
+      tom.setDate(tom.getDate() + 1);
+      const isTomorrow = Number(pd.month) === tom.getMonth() + 1 && Number(pd.day) === tom.getDate();
+      waitInfo.textColor = isToday ? C.red : isTomorrow ? C.green : C.text;
+      waitInfo.waitEndDay = isToday ? "Today" : isTomorrow ? "Tomorrow"
+        : DAY_LABELS_SHORT[d.getDay()] + ", " + MONTH_LABELS_SHORT[Number(pd.month) - 1] + " " + pd.day;
+      waitInfo.pickupTimeStr = pd.startTime
+        ? formatPickupDeliveryTime(pd.startTime) + (pd.endTime ? "-" + formatPickupDeliveryTime(pd.endTime) : "")
+        : "";
+    }
+  } else {
+    waitInfo = computeWaitInfo(workorder);
+  }
 
   // WIP user
   let wipUser = "";
@@ -465,9 +488,18 @@ function WorkorderCard({ workorder, zStatuses, zSettings, onPress }) {
               <View style={{ backgroundColor: C.buttonLightGreen, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2 }}>
                 <Image_ icon={ICONS.questionMark} size={16} />
               </View>
+            ) : !!waitInfo.waitEndDay && waitInfo.waitEndDay.includes("\n") ? (
+              <View style={{ backgroundColor: C.buttonLightGreen, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, alignItems: "flex-end" }}>
+                <Text style={{ color: waitInfo.textColor, fontSize: 11, fontStyle: "italic" }}>
+                  {capitalizeFirstLetterOfString(waitInfo.waitEndDay.split("\n")[0])}
+                </Text>
+                <Text style={{ color: waitInfo.textColor, fontSize: 12 }}>
+                  {waitInfo.waitEndDay.split("\n")[1]}
+                </Text>
+              </View>
             ) : !!waitInfo.waitEndDay ? (
               <View style={{ backgroundColor: C.buttonLightGreen, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 2, flexDirection: "row", alignItems: "center" }}>
-                <Text style={{ color: waitInfo.textColor, fontSize: 12 }}>
+                <Text style={{ color: waitInfo.textColor, fontSize: 12, fontStyle: waitInfo.isItalic ? "italic" : "normal" }}>
                   {capitalizeFirstLetterOfString(waitInfo.waitEndDay)}
                 </Text>
                 {!!waitInfo.pickupTimeStr && (
@@ -796,7 +828,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
 
   if (sShowMessages) {
     return (
-      <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: C.backgroundWhite }}>
+      <View style={{ flex: 1, backgroundColor: C.backgroundWhite }}>
         <MobileMessagesScreen workorderID={workorder.id} onBack={() => _setShowMessages(false)} />
       </View>
     );
@@ -805,11 +837,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
   return (
     <View
       style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
+        flex: 1,
         backgroundColor: C.backgroundWhite,
       }}
     >
@@ -1647,6 +1675,8 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
                         buttonIcon={ICONS.dollar}
                         buttonIconSize={22}
                         buttonStyle={{ backgroundColor: "transparent", borderWidth: 0, padding: 6 }}
+                        centerMenuVertically={true}
+                        centerMenuHorizontally={true}
                         dataArr={[{ label: "No Discount" }, ...(zDiscounts).map((o) => ({ label: o.name }))]}
                         onSelect={(selected) => {
                           if (selected.label === "No Discount") { clearLineDiscount(line); }
@@ -1868,14 +1898,6 @@ function sortWorkorders(inputArr) {
     });
   }
 
-  finalArr.sort((a, b) => {
-    let aIsSender = a.lastSMSSenderUserID && a.lastSMSSenderUserID === currentUser?.id;
-    let bIsSender = b.lastSMSSenderUserID && b.lastSMSSenderUserID === currentUser?.id;
-    if (aIsSender && !bIsSender) return -1;
-    if (!aIsSender && bIsSender) return 1;
-    return 0;
-  });
-
   const now = new Date();
   const todayMonth = now.getMonth() + 1;
   const todayDay = now.getDate();
@@ -1911,36 +1933,79 @@ function formatPickupDeliveryTime(time) {
   return h + (m && m !== "00" ? ":" + m : "") + suffix;
 }
 
-function computeWaitInfo(workorder, settings) {
-  const isPickupDelivery = workorder.status === "pickup" || workorder.status === "delivery";
-  const pd = workorder.pickupDelivery;
-  if (isPickupDelivery) {
-    let result = { waitEndDay: "", textColor: C.text, isMissing: false, pickupTimeStr: "" };
-    if (pd?.month && pd?.day) {
-      const now = new Date();
-      const d = new Date(now.getFullYear(), Number(pd.month) - 1, Number(pd.day));
-      const isToday = Number(pd.month) === now.getMonth() + 1 && Number(pd.day) === now.getDate();
-      const tom = new Date(now);
-      tom.setDate(tom.getDate() + 1);
-      const isTomorrow = Number(pd.month) === tom.getMonth() + 1 && Number(pd.day) === tom.getDate();
-      result.textColor = isToday ? C.red : isTomorrow ? C.green : C.text;
-      result.waitEndDay = isToday ? "Today" : isTomorrow ? "Tomorrow"
-        : DAY_LABELS_SHORT[d.getDay()] + ", " + MONTH_LABELS_SHORT[Number(pd.month) - 1] + " " + pd.day;
-      result.pickupTimeStr = pd.startTime
-        ? formatPickupDeliveryTime(pd.startTime) + (pd.endTime ? "-" + formatPickupDeliveryTime(pd.endTime) : "")
-        : "";
+function computeWaitInfo(workorder) {
+  let label = calculateWaitEstimateLabel(workorder, useSettingsStore.getState().getSettings());
+  let result = { waitEndDay: "", textColor: C.text, isMissing: false, isItalic: false };
+
+  if (!label) return result;
+
+  if (label === "Missing estimate") {
+    result.isMissing = true;
+    return result;
+  }
+
+  if (label === "No estimate") {
+    result.waitEndDay = label;
+    return result;
+  }
+
+  let lowerLabel = label.toLowerCase();
+
+  if (workorder.status === "finished") {
+    result.textColor = gray(0.4);
+  } else if (lowerLabel === "waiting" || lowerLabel === "today") {
+    result.waitEndDay = label;
+    result.textColor = "red";
+    result.isItalic = true;
+    return result;
+  }
+
+  if (workorder.status !== "finished") {
+    if (lowerLabel.includes("today") || lowerLabel.includes("overdue")) {
+      result.textColor = "red";
+    } else if (lowerLabel.includes("tomorrow")) {
+      result.textColor = C.green;
+    }
+  }
+
+  if (lowerLabel.startsWith("overdue ")) {
+    let afterOverdue = label.substring(8);
+    if (afterOverdue.toLowerCase() === "yesterday") afterOverdue = "Yesterday";
+    result.waitEndDay = "Overdue\n" + afterOverdue;
+    return result;
+  }
+
+  if (lowerLabel.includes("today")) {
+    let parts = label.split(/\s+(today)/i);
+    let prefix = parts[0]?.trim();
+    if (prefix) {
+      result.waitEndDay = prefix + "\nToday";
+    } else {
+      result.waitEndDay = "Today";
     }
     return result;
   }
 
-  let label = calculateWaitEstimateLabel(workorder, settings);
-  let result = { waitEndDay: "", textColor: C.text, isMissing: false, pickupTimeStr: "" };
-  if (!label) return result;
-  if (label === "Missing estimate") { result.isMissing = true; return result; }
-  if (label === "No estimate") { result.waitEndDay = label; return result; }
-  let lowerLabel = label.toLowerCase();
-  if (lowerLabel.includes("today") || lowerLabel.includes("overdue")) result.textColor = "red";
-  else if (lowerLabel.includes("tomorrow")) result.textColor = C.green;
+  if (lowerLabel.includes("tomorrow")) {
+    let parts = label.split(/\s+(tomorrow)/i);
+    let prefix = parts[0]?.trim();
+    if (prefix) {
+      result.waitEndDay = prefix + "\nTomorrow";
+    } else {
+      result.waitEndDay = "Tomorrow";
+    }
+    return result;
+  }
+
+  let dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  for (let day of dayNames) {
+    if (label.endsWith(day) && label.length > day.length) {
+      let prefix = label.slice(0, label.length - day.length).trim();
+      result.waitEndDay = prefix + "\n" + day;
+      return result;
+    }
+  }
+
   result.waitEndDay = label;
   return result;
 }

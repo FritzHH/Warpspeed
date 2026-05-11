@@ -15,7 +15,7 @@ import {
 import { TabMenuDivider as Divider, SmallLoadingIndicator, Image_, Button_, TextInput_, Tooltip, WebPageModal } from "../../../components";
 import { C, Colors, Fonts, ICONS } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { sortBy } from "lodash";
 import {
   useCurrentCustomerStore,
@@ -235,6 +235,378 @@ const WaitTimeIndicator = React.memo(function WaitTimeIndicator({ workorder }) {
       </View>
     </View>
   );
+});
+
+const WorkorderRowItem = React.memo(function WorkorderRowItem({
+  workorder, isSelected, isPreviewed, isPending, statusBlink, paidAmount, isLinkedSale, onSelect, onHoverEnter, onHoverExit
+}) {
+  const [sHovered, _sSetHovered] = useState(false);
+  const rs = resolveStatus(workorder.status, useSettingsStore.getState().settings?.statuses);
+  let wipUser = "";
+  if (workorder.status === "work_in_progress" && workorder.changeLog?.length) {
+    for (let i = workorder.changeLog.length - 1; i >= 0; i--) {
+      let entry = workorder.changeLog[i];
+      if (entry.field === "status" && entry.to === rs.label) { wipUser = entry.user || ""; break; }
+    }
+  }
+
+  return (
+    <View>
+      <TouchableOpacity
+        onPress={() => {
+          onSelect(workorder);
+          if (isPending) {
+            const uid = useLoginStore.getState().getCurrentUser()?.id;
+            const users = useSettingsStore.getState().getSettings()?.users || [];
+            const updatedUsers = users.map((u) => {
+              if (u.id !== uid) return u;
+              return { ...u, pendingWorkorderIDs: (u.pendingWorkorderIDs || []).filter((id) => id !== workorder.id) };
+            });
+            useSettingsStore.getState().setField("users", updatedUsers);
+          }
+        }}
+      >
+        <View
+          onMouseEnter={() => _sSetHovered(true)}
+          onMouseLeave={() => _sSetHovered(false)}
+          style={{
+            marginBottom: 2,
+            borderRadius: 7,
+            borderLeftWidth: 4,
+            borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
+            borderColor: C.buttonLightGreenOutline,
+            opacity: isPreviewed ? 0.6 : sHovered && !isSelected ? 0.6 : 1,
+            backgroundColor: isSelected
+              ? lightenRGBByPercent(C.lightred, 85)
+              : (isPending && statusBlink)
+                ? "rgba(255, 255, 0, 0.35)"
+                : workorder.status === "finished"
+                  ? lightenRGBByPercent(C.green, 85)
+                  : C.listItemWhite,
+            flexDirection: "row",
+            width: "100%",
+            paddingLeft: 5,
+            paddingVertical: 1,
+          }}
+        >
+          <View style={{ flex: 1, flexDirection: "column" }}>
+          <View
+            style={{
+              flexDirection: "row",
+              width: "100%",
+              justifyContent: "flex-start",
+              alignItems: "center",
+            }}
+          >
+            <View
+              style={{
+                marginVertical: 2,
+                flexDirection: "column",
+                width: "65%",
+                justifyContent: "center",
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                {workorder.hasNewSMS && (
+                  <View
+                    style={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: 4,
+                      backgroundColor: C.green,
+                      marginRight: 5,
+                    }}
+                  />
+                )}
+                <Text
+                  numberOfLines={1}
+                  style={{
+                    fontSize: 14,
+                    color: "dimgray",
+                  }}
+                >
+                  {capitalizeFirstLetterOfString(workorder.customerFirst) + " " + capitalizeFirstLetterOfString(workorder.customerLast)}
+                </Text>
+                {paidAmount > 0 && (
+                  <Text style={{ fontSize: 12, color: C.green, marginLeft: 6, fontWeight: "500" }}>
+                    {"Paid $" + formatCurrencyDisp(paidAmount)}
+                  </Text>
+                )}
+                {isLinkedSale && (
+                  <Text style={{ fontSize: 12, color: C.orange, marginLeft: 6, fontWeight: "500" }}>
+                    Combined Sale
+                  </Text>
+                )}
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                {!!workorder.color1?.backgroundColor && (
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: workorder.color1.backgroundColor, marginRight: 4 }} />
+                )}
+                {!!workorder.color2?.backgroundColor && (
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: workorder.color2.backgroundColor, marginRight: 4 }} />
+                )}
+                <Text
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 500,
+                    color: C.text,
+                  }}
+                >
+                  {capitalizeFirstLetterOfString(workorder.brand) || ""}
+                </Text>
+                {!!workorder.description && (
+                  <View
+                    style={{
+                      width: 7,
+                      height: 2,
+                      marginHorizontal: 5,
+                      backgroundColor: "lightgray",
+                    }}
+                  />
+                )}
+                <Text
+                  style={{
+                    fontSize: 12,
+                    color: C.text,
+                  }}
+                >
+                  {capitalizeFirstLetterOfString(workorder.description)}
+                </Text>
+                {workorder.workorderLines?.length > 0 && (
+                  <View
+                    style={{
+                      backgroundColor: "gray",
+                      borderRadius: 10,
+                      paddingHorizontal: 6,
+                      paddingVertical: 1,
+                      marginLeft: 8,
+                    }}
+                  >
+                    <Text style={{ color: "white", fontSize: 11, fontWeight: "600" }}>
+                      {workorder.workorderLines.length}
+                    </Text>
+                  </View>
+                )}
+                {workorder.workorderLines?.length > 0 && (() => {
+                  let totals = calculateRunningTotals(workorder, useSettingsStore.getState().getSettings()?.salesTaxPercent, [], false, !!workorder?.taxFree);
+                  let hasDiscount = totals.runningDiscount > 0;
+                  return totals.runningSubtotal > 0 ? (
+                    <View style={{ flexDirection: "row", alignItems: "center", marginLeft: 6 }}>
+                      {hasDiscount && (
+                        <Text style={{ color: "gray", fontSize: 11, fontWeight: "500", textDecorationLine: "line-through", marginRight: 4 }}>
+                          {"$" + formatCurrencyDisp(totals.runningSubtotal)}
+                        </Text>
+                      )}
+                      <Text style={{ color: "gray", fontSize: 11, fontWeight: "500" }}>
+                        {"$" + formatCurrencyDisp(totals.finalTotal)}
+                      </Text>
+                    </View>
+                  ) : null;
+                })()}
+                {!!workorder.itemNotHere && (
+                  <View
+                    style={{
+                      backgroundColor: "rgb(255, 243, 176)",
+                      borderRadius: 10,
+                      paddingHorizontal: 8,
+                      paddingVertical: 1,
+                      marginLeft: 8,
+                    }}
+                  >
+                    <Text style={{ color: "rgb(90, 75, 0)", fontSize: 9, fontWeight: "600" }}>
+                      Item not here
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            <View
+              style={{
+                width: "35%",
+                justifyContent: "flex-end",
+                alignItems: "center",
+                flexDirection: "row",
+                height: "100%",
+              }}
+            >
+              <View
+                style={{
+                  flexDirection: "column",
+                  alignItems: "flex-end",
+                  justifyContent: "space-between",
+                  height: "100%",
+                }}
+              >
+                <Text style={{ color: "dimgray", fontSize: 11 }}>
+                  {(() => {
+                    let d = new Date(workorder.startedOnMillis);
+                    let h = d.getHours();
+                    let m = d.getMinutes();
+                    h = h % 12 || 12;
+                    return h + ":" + (m < 10 ? "0" : "") + m + "  ";
+                  })()}
+                  {formatMillisForDisplay(
+                    workorder.startedOnMillis,
+                    new Date(workorder.startedOnMillis).getFullYear() !== new Date().getFullYear()
+                  )}
+                </Text>
+                <View style={{ width: 8 }} />
+                <TouchableOpacity
+                  activeOpacity={workorder.status === "finished" ? 0.6 : 1}
+                  onPress={(e) => {
+                    if (workorder.status !== "finished") return;
+                    e.stopPropagation();
+                    useAlertScreenStore.getState().setValues({
+                      title: "Customer Contacted",
+                      message: "Has this customer been contacted?",
+                      btn1Text: "Yes",
+                      handleBtn1Press: () => {
+                        useOpenWorkordersStore.getState().setField("contacted", true, workorder.id);
+                        useAlertScreenStore.getState().setShowAlert(false);
+                      },
+                      btn2Text: "No",
+                      handleBtn2Press: () => {
+                        useOpenWorkordersStore.getState().setField("contacted", false, workorder.id);
+                        useAlertScreenStore.getState().setShowAlert(false);
+                      },
+                      canExitOnOuterClick: true,
+                    });
+                  }}
+                  style={{
+                    backgroundColor: rs.backgroundColor,
+                    flexDirection: "row",
+                    paddingHorizontal: 11,
+                    paddingVertical: 2,
+                    alignItems: "center",
+                    borderRadius: 10,
+                    borderColor: "transparent",
+                    borderLeftColor: rs.textColor,
+                  }}
+                >
+                  {!!wipUser && (
+                    <Text style={{ color: C.red, fontSize: 9, fontStyle: "italic", marginRight: 5 }}>{wipUser}</Text>
+                  )}
+                  {workorder.status === "finished" && (
+                    <Text style={{ fontSize: 11, color: workorder.contacted ? rs.textColor : C.red, marginRight: 4 }}>
+                      {workorder.contacted ? "\u2713" : "\u2717"}
+                    </Text>
+                  )}
+                  <Text
+                    style={{
+                      color: rs.textColor,
+                      fontSize: 11,
+                      fontWeight: "normal",
+                    }}
+                  >
+                    {rs.label}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+
+          {/* Part ordered / source row */}
+          {!!(workorder.partOrdered || workorder.partSource || workorder.trackingNumber) && (
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                paddingTop: 2,
+                paddingBottom: 1,
+                marginTop: 2,
+              }}
+            >
+              {!!workorder.partOrdered && (
+                <Text
+                  numberOfLines={1}
+                  style={{ fontSize: 14, color: C.blue, fontWeight: "500" }}
+                >
+                  {capitalizeFirstLetterOfString(workorder.partOrdered)}
+                </Text>
+              )}
+              {!!(workorder.partOrdered && workorder.partSource) && (
+                <View
+                  style={{
+                    width: 5,
+                    height: 2,
+                    marginHorizontal: 5,
+                    backgroundColor: "lightgray",
+                  }}
+                />
+              )}
+              {!!workorder.partSource && (
+                <Text
+                  numberOfLines={1}
+                  style={{ fontSize: 14, color: C.orange }}
+                >
+                  {capitalizeFirstLetterOfString(workorder.partSource)}
+                </Text>
+              )}
+              {!!(workorder.partOrderedMillis && workorder.partOrderEstimateMillis && Math.round((workorder.partOrderEstimateMillis - workorder.partOrderedMillis) / NUM_MILLIS_IN_DAY) > 0) && (
+                <Text
+                  numberOfLines={1}
+                  style={{ fontSize: 12, color: "dimgray", marginLeft: 6 }}
+                >
+                  {formatMillisForDisplay(workorder.partOrderedMillis)}
+                  {" \u2192 " + formatMillisForDisplay(workorder.partOrderEstimateMillis)}
+                </Text>
+              )}
+              {!!workorder.trackingNumber && (() => {
+                const inputVal = workorder.trackingNumber.trim();
+                const isURL = /^https?:\/\/|^www\./i.test(inputVal);
+                if (isURL) {
+                  const openUrl = inputVal.startsWith("www.") ? "https://" + inputVal : inputVal;
+                  return (
+                    <View onContextMenu={(e) => { e.preventDefault(); navigator.clipboard.writeText(inputVal); }} style={{ marginLeft: 6 }}>
+                      <Tooltip text="Click to open website, right-click to copy link" position="top">
+                        <TouchableOpacity
+                          onPress={() => window.open(openUrl, "_blank")}
+                          style={{ paddingVertical: 1, paddingHorizontal: 8, borderRadius: 4, backgroundColor: lightenRGBByPercent(C.blue, 75) }}
+                        >
+                          <Text style={{ fontSize: 11, color: C.blue, fontWeight: "500" }}>Open Tracking</Text>
+                        </TouchableOpacity>
+                      </Tooltip>
+                    </View>
+                  );
+                }
+                return (
+                  <View onContextMenu={(e) => { e.preventDefault(); navigator.clipboard.writeText(inputVal); }} style={{ marginLeft: 6 }}>
+                    <Tooltip text="Click to open tracker, right-click to copy tracking number" position="top">
+                      <WebPageModal
+                        url={"https://parcelsapp.com/en/tracking/" + inputVal}
+                        title="Package Tracking"
+                        subtitle={inputVal}
+                        buttonLabel="Open Tracking"
+                        buttonStyle={{ paddingVertical: 1, paddingHorizontal: 8, borderRadius: 4, backgroundColor: lightenRGBByPercent(C.blue, 75) }}
+                        buttonTextStyle={{ fontSize: 11, color: C.blue, fontWeight: "500" }}
+                      />
+                    </Tooltip>
+                  </View>
+                );
+              })()}
+            </View>
+          )}
+          </View>
+          <View
+            onMouseOver={() => onHoverEnter(workorder)}
+            onMouseLeave={() => onHoverExit()}
+            style={{ alignSelf: "stretch", justifyContent: "center" }}
+          >
+            <WaitTimeIndicator workorder={workorder} />
+          </View>
+        </View>
+      </TouchableOpacity>
+    </View>
+  );
+}, (prev, next) => {
+  if (prev.workorder !== next.workorder) return false;
+  if (prev.isSelected !== next.isSelected) return false;
+  if (prev.isPreviewed !== next.isPreviewed) return false;
+  if (prev.isPending !== next.isPending) return false;
+  if (prev.paidAmount !== next.paidAmount) return false;
+  if (prev.isLinkedSale !== next.isLinkedSale) return false;
+  if (prev.isPending && prev.statusBlink !== next.statusBlink) return false;
+  return true;
 });
 
 export function WorkordersComponent({}) {
@@ -563,6 +935,12 @@ export function WorkordersComponent({}) {
     return scored.map((s) => s.wo);
   }
 
+  const sortedData = useMemo(() => {
+    const customerWorkorders = zOpenWorkorders.filter((wo) => !!wo.customerID);
+    if (sSearchTerm.trim()) return filterAndRankWorkorders(customerWorkorders);
+    return sortWorkorders(customerWorkorders);
+  }, [zOpenWorkorders, sSearchTerm]);
+
   return (
     <View
       style={{
@@ -616,8 +994,8 @@ export function WorkordersComponent({}) {
           height: "96%",
           backgroundColor: null,
         }}
-        data={sSearchTerm.trim() ? filterAndRankWorkorders(zOpenWorkorders.filter((wo) => !!wo.customerID)) : sortWorkorders(zOpenWorkorders.filter((wo) => !!wo.customerID))}
-        keyExtractor={(item, index) => index}
+        data={sortedData}
+        keyExtractor={(item) => item.id}
         ListEmptyComponent={() => (
           <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 30 }}>
             {!zWorkordersLoaded ? (
@@ -632,351 +1010,22 @@ export function WorkordersComponent({}) {
             )}
           </View>
         )}
-        renderItem={(item) => {
-          let workorder = item.item;
-          const rs = resolveStatus(workorder.status, useSettingsStore.getState().settings?.statuses);
-          let wipUser = "";
-          if (workorder.status === "work_in_progress" && workorder.changeLog?.length) {
-            for (let i = workorder.changeLog.length - 1; i >= 0; i--) {
-              let entry = workorder.changeLog[i];
-              if (entry.field === "status" && entry.to === rs.label) { wipUser = entry.user || ""; break; }
-            }
-          }
+        renderItem={({ item: workorder }) => {
+          let sale = workorder.activeSaleID ? zActiveSales.find((s) => s.id === workorder.activeSaleID) : null;
+          let paidAmount = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
           return (
-            <View>
-              <TouchableOpacity
-                onLongPress={() => deleteWorkorder(workorder)}
-                onPress={() => {
-                  workorderSelected(workorder);
-                  if (zPendingWOIDs.includes(workorder.id)) {
-                    const uid = useLoginStore.getState().getCurrentUser()?.id;
-                    const users = useSettingsStore.getState().getSettings()?.users || [];
-                    const updatedUsers = users.map((u) => {
-                      if (u.id !== uid) return u;
-                      return { ...u, pendingWorkorderIDs: (u.pendingWorkorderIDs || []).filter((id) => id !== workorder.id) };
-                    });
-                    useSettingsStore.getState().setField("users", updatedUsers);
-                  }
-                }}
-              >
-                <View
-                  style={{
-                    marginBottom: 2,
-                    borderRadius: 7,
-                    borderLeftWidth: 4,
-                    borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
-                    borderColor: C.buttonLightGreenOutline,
-                    opacity: workorder.id === zPreviewID ? 0.6 : 1,
-                    backgroundColor: workorder.id === zOpenWorkorderID
-                      ? lightenRGBByPercent(C.lightred, 85)
-                      : (zPendingWOIDs.includes(workorder.id) && sStatusBlink)
-                        ? "rgba(255, 255, 0, 0.35)"
-                        : C.listItemWhite,
-                    flexDirection: "row",
-                    width: "100%",
-                    paddingLeft: 5,
-                    paddingVertical: 1,
-                  }}
-                >
-                  <View style={{ flex: 1, flexDirection: "column" }}>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      width: "100%",
-                      justifyContent: "flex-start",
-                      alignItems: "center",
-                    }}
-                  >
-                    <View
-                      style={{
-                        marginVertical: 2,
-                        flexDirection: "column",
-                        width: "65%",
-                        justifyContent: "center",
-                      }}
-                    >
-                      <View style={{ flexDirection: "row", alignItems: "center" }}>
-                        {workorder.hasNewSMS && (
-                          <View
-                            style={{
-                              width: 8,
-                              height: 8,
-                              borderRadius: 4,
-                              backgroundColor: C.green,
-                              marginRight: 5,
-                            }}
-                          />
-                        )}
-                        <Text
-                          numberOfLines={1}
-                          style={{
-                            fontSize: 14,
-                            color: "dimgray",
-                          }}
-                        >
-                          {capitalizeFirstLetterOfString(workorder.customerFirst) + " " + capitalizeFirstLetterOfString(workorder.customerLast)}
-                        </Text>
-                        {(() => {
-                          let sale = workorder.activeSaleID ? zActiveSales.find((s) => s.id === workorder.activeSaleID) : null;
-                          let paid = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
-                          return paid > 0 ? (
-                            <Text style={{ fontSize: 12, color: C.green, marginLeft: 6, fontWeight: "500" }}>
-                              {"Paid $" + formatCurrencyDisp(paid)}
-                            </Text>
-                          ) : null;
-                        })()}
-                        {!!workorder.activeSaleID && linkedSaleIDs.has(workorder.activeSaleID) && (
-                          <Text style={{ fontSize: 12, color: C.orange, marginLeft: 6, fontWeight: "500" }}>
-                            Combined Sale
-                          </Text>
-                        )}
-                      </View>
-                      <View style={{ flexDirection: "row", alignItems: "center" }}>
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            fontWeight: 500,
-                            color: C.text,
-                          }}
-                        >
-                          {capitalizeFirstLetterOfString(workorder.brand) || ""}
-                        </Text>
-                        {!!workorder.description && (
-                          <View
-                            style={{
-                              width: 7,
-                              height: 2,
-                              marginHorizontal: 5,
-                              backgroundColor: "lightgray",
-                            }}
-                          />
-                        )}
-                        <Text
-                          style={{
-                            fontSize: 12,
-                            color: C.text,
-                          }}
-                        >
-                          {capitalizeFirstLetterOfString(workorder.description)}
-                        </Text>
-                        {workorder.workorderLines?.length > 0 && (
-                          <View
-                            style={{
-                              backgroundColor: "gray",
-                              borderRadius: 10,
-                              paddingHorizontal: 6,
-                              paddingVertical: 1,
-                              marginLeft: 8,
-                            }}
-                          >
-                            <Text style={{ color: "white", fontSize: 11, fontWeight: "600" }}>
-                              {workorder.workorderLines.length}
-                            </Text>
-                          </View>
-                        )}
-                        {workorder.workorderLines?.length > 0 && (() => {
-                          let totals = calculateRunningTotals(workorder, useSettingsStore.getState().getSettings()?.salesTaxPercent, [], false, !!workorder?.taxFree);
-                          return totals.finalTotal > 0 ? (
-                            <Text style={{ color: "gray", fontSize: 11, fontWeight: "500", marginLeft: 6 }}>
-                              {"$" + formatCurrencyDisp(totals.finalTotal)}
-                            </Text>
-                          ) : null;
-                        })()}
-                        {!!workorder.itemNotHere && (
-                          <View
-                            style={{
-                              backgroundColor: "rgb(255, 243, 176)",
-                              borderRadius: 10,
-                              paddingHorizontal: 8,
-                              paddingVertical: 1,
-                              marginLeft: 8,
-                            }}
-                          >
-                            <Text style={{ color: "rgb(90, 75, 0)", fontSize: 9, fontWeight: "600" }}>
-                              Item not here
-                            </Text>
-                          </View>
-                        )}
-                      </View>
-                    </View>
-                    <View
-                      style={{
-                        width: "35%",
-                        justifyContent: "flex-end",
-                        alignItems: "center",
-                        flexDirection: "row",
-                        height: "100%",
-                      }}
-                    >
-                      <View
-                        style={{
-                          flexDirection: "column",
-                          alignItems: "flex-end",
-                          justifyContent: "space-between",
-                          height: "100%",
-                        }}
-                      >
-                        <Text style={{ color: "dimgray", fontSize: 11 }}>
-                          {(() => {
-                            let d = new Date(workorder.startedOnMillis);
-                            let h = d.getHours();
-                            let m = d.getMinutes();
-                            h = h % 12 || 12;
-                            return h + ":" + (m < 10 ? "0" : "") + m + "  ";
-                          })()}
-                          {formatMillisForDisplay(
-                            workorder.startedOnMillis,
-                            new Date(workorder.startedOnMillis).getFullYear() !== new Date().getFullYear()
-                          )}
-                        </Text>
-                        <View style={{ width: 8 }} />
-                        <TouchableOpacity
-                          activeOpacity={workorder.status === "finished" ? 0.6 : 1}
-                          onPress={(e) => {
-                            if (workorder.status !== "finished") return;
-                            e.stopPropagation();
-                            useAlertScreenStore.getState().setValues({
-                              title: "Customer Contacted",
-                              message: "Has this customer been contacted?",
-                              btn1Text: "Yes",
-                              handleBtn1Press: () => {
-                                useOpenWorkordersStore.getState().setField("contacted", true, workorder.id);
-                                useAlertScreenStore.getState().setShowAlert(false);
-                              },
-                              btn2Text: "No",
-                              handleBtn2Press: () => {
-                                useOpenWorkordersStore.getState().setField("contacted", false, workorder.id);
-                                useAlertScreenStore.getState().setShowAlert(false);
-                              },
-                              canExitOnOuterClick: true,
-                            });
-                          }}
-                          style={{
-                            backgroundColor: rs.backgroundColor,
-                            flexDirection: "row",
-                            paddingHorizontal: 11,
-                            paddingVertical: 2,
-                            alignItems: "center",
-                            borderRadius: 10,
-                            borderColor: "transparent",
-
-                            borderLeftColor: rs.textColor,
-                          }}
-                        >
-                          {!!wipUser && (
-                            <Text style={{ color: C.red, fontSize: 9, fontStyle: "italic", marginRight: 5 }}>{wipUser}</Text>
-                          )}
-                          {workorder.status === "finished" && (
-                            <Text style={{ fontSize: 11, color: workorder.contacted ? rs.textColor : C.red, marginRight: 4 }}>
-                              {workorder.contacted ? "\u2713" : "\u2717"}
-                            </Text>
-                          )}
-                          <Text
-                            style={{
-                              color: rs.textColor,
-                              fontSize: 11,
-                              fontWeight: "normal",
-                            }}
-                          >
-                            {rs.label}
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-                    </View>
-                  </View>
-
-                  {/* Part ordered / source row */}
-                  {!!(workorder.partOrdered || workorder.partSource || workorder.trackingNumber) && (
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        paddingTop: 2,
-                        paddingBottom: 1,
-                        marginTop: 2,
-                      }}
-                    >
-                      {!!workorder.partOrdered && (
-                        <Text
-                          numberOfLines={1}
-                          style={{ fontSize: 14, color: C.blue, fontWeight: "500" }}
-                        >
-                          {capitalizeFirstLetterOfString(workorder.partOrdered)}
-                        </Text>
-                      )}
-                      {!!(workorder.partOrdered && workorder.partSource) && (
-                        <View
-                          style={{
-                            width: 5,
-                            height: 2,
-                            marginHorizontal: 5,
-                            backgroundColor: "lightgray",
-                          }}
-                        />
-                      )}
-                      {!!workorder.partSource && (
-                        <Text
-                          numberOfLines={1}
-                          style={{ fontSize: 14, color: C.orange }}
-                        >
-                          {capitalizeFirstLetterOfString(workorder.partSource)}
-                        </Text>
-                      )}
-                      {!!(workorder.partOrderedMillis && workorder.partOrderEstimateMillis && Math.round((workorder.partOrderEstimateMillis - workorder.partOrderedMillis) / NUM_MILLIS_IN_DAY) > 0) && (
-                        <Text
-                          numberOfLines={1}
-                          style={{ fontSize: 12, color: "dimgray", marginLeft: 6 }}
-                        >
-                          {formatMillisForDisplay(workorder.partOrderedMillis)}
-                          {" → " + formatMillisForDisplay(workorder.partOrderEstimateMillis)}
-                        </Text>
-                      )}
-                      {!!workorder.trackingNumber && (() => {
-                        const inputVal = workorder.trackingNumber.trim();
-                        const isURL = /^https?:\/\/|^www\./i.test(inputVal);
-                        if (isURL) {
-                          const openUrl = inputVal.startsWith("www.") ? "https://" + inputVal : inputVal;
-                          return (
-                            <View onContextMenu={(e) => { e.preventDefault(); navigator.clipboard.writeText(inputVal); }} style={{ marginLeft: 6 }}>
-                              <Tooltip text="Click to open website, right-click to copy link" position="top">
-                                <TouchableOpacity
-                                  onPress={() => window.open(openUrl, "_blank")}
-                                  style={{ paddingVertical: 1, paddingHorizontal: 8, borderRadius: 4, backgroundColor: lightenRGBByPercent(C.blue, 75) }}
-                                >
-                                  <Text style={{ fontSize: 11, color: C.blue, fontWeight: "500" }}>Open Tracking</Text>
-                                </TouchableOpacity>
-                              </Tooltip>
-                            </View>
-                          );
-                        }
-                        return (
-                          <View onContextMenu={(e) => { e.preventDefault(); navigator.clipboard.writeText(inputVal); }} style={{ marginLeft: 6 }}>
-                            <Tooltip text="Click to open tracker, right-click to copy tracking number" position="top">
-                              <WebPageModal
-                                url={"https://parcelsapp.com/en/tracking/" + inputVal}
-                                title="Package Tracking"
-                                subtitle={inputVal}
-                                buttonLabel="Open Tracking"
-                                buttonStyle={{ paddingVertical: 1, paddingHorizontal: 8, borderRadius: 4, backgroundColor: lightenRGBByPercent(C.blue, 75) }}
-                                buttonTextStyle={{ fontSize: 11, color: C.blue, fontWeight: "500" }}
-                              />
-                            </Tooltip>
-                          </View>
-                        );
-                      })()}
-                    </View>
-                  )}
-                  </View>
-                  <View
-                    onMouseOver={() => onMouseEnter(workorder)}
-                    onMouseLeave={() => onMouseExit()}
-                    style={{ alignSelf: "stretch", justifyContent: "center" }}
-                  >
-                    <WaitTimeIndicator workorder={workorder} />
-                  </View>
-                </View>
-              </TouchableOpacity>
-            </View>
+            <WorkorderRowItem
+              workorder={workorder}
+              isSelected={workorder.id === zOpenWorkorderID}
+              isPreviewed={workorder.id === zPreviewID}
+              isPending={zPendingWOIDs.includes(workorder.id)}
+              statusBlink={sStatusBlink}
+              paidAmount={paidAmount}
+              isLinkedSale={!!workorder.activeSaleID && linkedSaleIDs.has(workorder.activeSaleID)}
+              onSelect={workorderSelected}
+              onHoverEnter={onMouseEnter}
+              onHoverExit={onMouseExit}
+            />
           );
         }}
       />

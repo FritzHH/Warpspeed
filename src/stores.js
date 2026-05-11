@@ -985,12 +985,15 @@ export const useCustMessagesStore = create((set, get) => ({
     });
   },
   // Atomic merge with dedup (used by listener)
+  // Incoming messages replace existing ones with the same ID (e.g. placeholder → real message from Firestore)
   mergeMessages: (newMsgs) => {
     set((state) => {
-      let ids = new Set(state.messages.map(m => m.id));
-      let fresh = newMsgs.filter(m => !ids.has(m.id));
-      if (!fresh.length) return state;
-      let merged = [...state.messages, ...fresh].sort((a, b) => (a.millis || 0) - (b.millis || 0));
+      let incomingById = new Map(newMsgs.map(m => [m.id, m]));
+      let existingIds = new Set(state.messages.map(m => m.id));
+      let updated = state.messages.map(m => incomingById.get(m.id) || m);
+      let fresh = newMsgs.filter(m => !existingIds.has(m.id));
+      if (!fresh.length && !newMsgs.some(m => existingIds.has(m.id))) return state;
+      let merged = [...updated, ...fresh].sort((a, b) => (a.millis || 0) - (b.millis || 0));
       return { messages: merged };
     });
   },
@@ -1338,6 +1341,14 @@ export const useOpenWorkordersStore = create(
       placeholderReplaceLineID: null,
       _pendingCustomerLinks: {},
       _dirtyFields: {},
+      _sendStatuses: {},
+
+      getSendStatus: (workorderID) => get()._sendStatuses[workorderID] || null,
+      setSendStatus: (workorderID, status) => set({ _sendStatuses: { ...get()._sendStatuses, [workorderID]: status } }),
+      clearSendStatus: (workorderID) => {
+        let { [workorderID]: _, ...rest } = get()._sendStatuses;
+        set({ _sendStatuses: rest });
+      },
 
       getOpenWorkorder: () => {
         let id = get().openWorkorderID;
@@ -1625,6 +1636,219 @@ function removeItem(arr, item) {
   return arr.filter((o) => o.id !== item.id);
 }
 
+// ============================================================================
+// EMAIL STORE
+// ============================================================================
+
+export const useEmailStore = create(
+  persist(
+  (set, get) => ({
+  activeAccountKey: "support",
+  getActiveAccountKey: () => get().activeAccountKey,
+  setActiveAccountKey: (activeAccountKey) => set({ activeAccountKey }),
+
+  emailAuth: null,
+  getEmailAuth: () => get().emailAuth,
+  setEmailAuth: (emailAuth) => set({ emailAuth }),
+  setEmailAuthForAccount: (accountKey, data) => {
+    set((state) => ({
+      emailAuth: { ...state.emailAuth, [accountKey]: data },
+    }));
+  },
+
+  activeFolder: "INBOX",
+  getActiveFolder: () => get().activeFolder,
+  setActiveFolder: (activeFolder) => set({ activeFolder }),
+
+  emails: [],
+  getEmails: () => get().emails,
+  setEmails: (emails) => set({ emails }),
+
+  getFilteredEmails: () => {
+    const folder = get().activeFolder;
+    const accountKey = get().activeAccountKey;
+    let emails = get().emails.filter((e) => e.accountKey === accountKey);
+    switch (folder) {
+      case "INBOX":
+        return emails.filter((e) => e.labelIds?.includes("INBOX"));
+      case "SENT":
+        return emails.filter((e) => e.labelIds?.includes("SENT"));
+      case "TRASH":
+        return emails.filter((e) => e.labelIds?.includes("TRASH"));
+      case "SPAM":
+        return emails.filter((e) => e.labelIds?.includes("SPAM"));
+      case "DRAFT":
+        return emails.filter((e) => e.labelIds?.includes("DRAFT"));
+      case "ALL":
+        return emails;
+      default:
+        return emails.filter((e) => e.labelIds?.includes("INBOX"));
+    }
+  },
+
+  getThreadedEmails: () => {
+    const filtered = get().getFilteredEmails();
+    const threadMap = {};
+    filtered.forEach((email) => {
+      const tid = email.threadId || email.id;
+      if (!threadMap[tid]) {
+        threadMap[tid] = {
+          threadId: tid,
+          subject: email.subject,
+          from: email.from,
+          fromName: email.fromName,
+          snippet: email.snippet,
+          internalDate: email.internalDate,
+          isUnread: email.isUnread,
+          messageCount: 1,
+          latestMessage: email,
+        };
+      } else {
+        threadMap[tid].messageCount++;
+        if (email.isUnread) threadMap[tid].isUnread = true;
+        if (email.internalDate > threadMap[tid].internalDate) {
+          threadMap[tid].internalDate = email.internalDate;
+          threadMap[tid].snippet = email.snippet;
+          threadMap[tid].from = email.from;
+          threadMap[tid].fromName = email.fromName;
+          threadMap[tid].latestMessage = email;
+        }
+      }
+    });
+    return Object.values(threadMap).sort(
+      (a, b) => (b.internalDate || 0) - (a.internalDate || 0)
+    );
+  },
+
+  selectedThreadId: null,
+  getSelectedThreadId: () => get().selectedThreadId,
+  setSelectedThreadId: (selectedThreadId) => set({ selectedThreadId }),
+
+  getThreadMessages: () => {
+    const threadId = get().selectedThreadId;
+    if (!threadId) return [];
+    const accountKey = get().activeAccountKey;
+    return get()
+      .emails.filter(
+        (e) => e.threadId === threadId && e.accountKey === accountKey
+      )
+      .sort((a, b) => (a.internalDate || 0) - (b.internalDate || 0));
+  },
+
+  composeMode: null,
+  getComposeMode: () => get().composeMode,
+  setComposeMode: (composeMode) => set({ composeMode }),
+
+  composeDraft: {
+    to: [],
+    cc: [],
+    bcc: [],
+    subject: "",
+    bodyHtml: "",
+    bodyText: "",
+    threadId: null,
+    inReplyTo: "",
+    references: "",
+    attachments: [],
+  },
+  getComposeDraft: () => get().composeDraft,
+  setComposeDraft: (composeDraft) => set({ composeDraft }),
+  updateComposeDraft: (fields) =>
+    set((state) => ({
+      composeDraft: { ...state.composeDraft, ...fields },
+    })),
+  clearComposeDraft: () =>
+    set({
+      composeDraft: {
+        to: [],
+        cc: [],
+        bcc: [],
+        subject: "",
+        bodyHtml: "",
+        bodyText: "",
+        threadId: null,
+        inReplyTo: "",
+        references: "",
+        attachments: [],
+      },
+      composeMode: null,
+    }),
+
+  emailsLoading: false,
+  getEmailsLoading: () => get().emailsLoading,
+  setEmailsLoading: (emailsLoading) => set({ emailsLoading }),
+
+  sendingEmail: false,
+  getSendingEmail: () => get().sendingEmail,
+  setSendingEmail: (sendingEmail) => set({ sendingEmail }),
+
+  syncError: null,
+  getSyncError: () => get().syncError,
+  setSyncError: (syncError) => set({ syncError }),
+
+  _emailsUnsub: null,
+  setEmailsUnsub: (unsub) => {
+    let prev = get()._emailsUnsub;
+    if (prev) prev();
+    set({ _emailsUnsub: unsub });
+  },
+
+  _authUnsub: null,
+  setAuthUnsub: (unsub) => {
+    let prev = get()._authUnsub;
+    if (prev) prev();
+    set({ _authUnsub: unsub });
+  },
+
+  getTotalUnreadCount: () => {
+    const auth = get().emailAuth;
+    if (!auth) return 0;
+    let count = 0;
+    Object.values(auth).forEach((acct) => {
+      if (acct?.unreadCount) count += acct.unreadCount;
+    });
+    return count;
+  },
+
+  clearEmailStore: () => {
+    let prevEmails = get()._emailsUnsub;
+    if (prevEmails) prevEmails();
+    let prevAuth = get()._authUnsub;
+    if (prevAuth) prevAuth();
+    set({
+      emails: [],
+      emailAuth: null,
+      selectedThreadId: null,
+      composeMode: null,
+      emailsLoading: false,
+      sendingEmail: false,
+      syncError: null,
+      _emailsUnsub: null,
+      _authUnsub: null,
+    });
+  },
+}),
+    {
+      name: "warpspeed_email",
+      storage: idbStorage,
+      partialize: (state) => ({
+        emails: state.emails,
+        emailAuth: state.emailAuth,
+        activeAccountKey: state.activeAccountKey,
+        activeFolder: state.activeFolder,
+      }),
+      merge: (persisted, current) => ({ ...current, ...persisted }),
+    }
+  )
+);
+
+export const useSubscriptionStore = create((set, get) => ({
+  subscription: null,
+  getSubscription: () => get().subscription,
+  setSubscription: (subscription) => set({ subscription }),
+  hasFeature: (featureName) => get().subscription?.features?.[featureName] === true,
+}));
+
 // Clear all persisted Zustand stores (called on logout)
 export function clearPersistedStores() {
   useOpenWorkordersStore.persist.clearStorage();
@@ -1636,6 +1860,8 @@ export function clearPersistedStores() {
   useCustMessagesStore.getState()._threadsUnsub?.();
   useCustMessagesStore.getState().setSmsThreads([]);
   useCustMessagesStore.setState({ hubConversationCache: {} });
+  useEmailStore.persist.clearStorage();
+  useEmailStore.getState().clearEmailStore();
   // Clear IndexedDB hub cache (async, fire-and-forget)
   import("./hubMessageDB").then((hubDB) => hubDB.clearAll()).catch(() => {});
   clearIdPool();

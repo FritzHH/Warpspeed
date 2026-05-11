@@ -26,6 +26,8 @@ import {
   useCurrentCustomerStore,
   useActiveSalesStore,
   useCustMessagesStore,
+  useEmailStore,
+  useSubscriptionStore,
   broadcastWorkorderToDisplay,
 } from "../stores";
 import {
@@ -48,6 +50,9 @@ import {
   dbListenToActiveSales,
   dbGetCompletedSale,
   dbListenToActiveMessageThreads,
+  dbListenToEmails,
+  dbListenToEmailAuth,
+  dbListenToSubscription,
 } from "../db_calls_wrapper";
 import { SETTINGS_OBJ, TAB_NAMES, CUSTOMER_PROTO } from "../data";
 import { clog, log, recoverPendingAutoTexts, localStorageWrapper } from "../utils";
@@ -345,6 +350,10 @@ export function BaseScreen() {
       // log("inventory", data);
     });
 
+    dbListenToSubscription((data) => {
+      useSubscriptionStore.getState().setSubscription(data);
+    });
+
     let activeSalesRecoveryDone = false;
     dbListenToActiveSales((data) => {
       useActiveSalesStore.getState().setActiveSales(data);
@@ -353,6 +362,21 @@ export function BaseScreen() {
         recoverPendingActiveSales(data);
       }
     });
+
+    // Email listeners: cached emails + auth status (unread counts)
+    const emailUnsub = dbListenToEmails((data) => {
+      useEmailStore.getState().setEmails(data);
+    });
+    useEmailStore.getState().setEmailsUnsub(emailUnsub);
+
+    const emailAuthUnsub = dbListenToEmailAuth((docs) => {
+      const authMap = {};
+      docs.forEach((doc) => {
+        authMap[doc.id] = doc;
+      });
+      useEmailStore.getState().setEmailAuth(authMap);
+    });
+    useEmailStore.getState().setAuthUnsub(emailAuthUnsub);
 
     // SMS threads: load from IndexedDB FIRST, then start Firestore listener
     // (avoids race condition where listener fires against empty state)

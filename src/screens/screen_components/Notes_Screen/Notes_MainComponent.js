@@ -332,13 +332,19 @@ export function Notes_MainComponent() {
                         multiline={true}
                         numberOfLines={10}
                         capitalize={true}
+                        debounceMs={1000}
                         onChangeText={(val) =>
                           textChanged(val, index, "customer")
                         }
                         onBlur={() => _setEditingNoteId(null)}
+                        onFocus={(e) => {
+                          const el = e.target;
+                          el.selectionStart = el.selectionEnd = el.value.length;
+                        }}
                         style={{
                           padding: 2,
                           paddingLeft: 4,
+                          fontSize: 15,
                           lineHeight: 18,
                           outlineWidth: 0,
                           outlineStyle: "none",
@@ -347,7 +353,7 @@ export function Notes_MainComponent() {
                           color: C.text,
                         }}
                         autoFocus={true}
-                        value={capitalizeFirstLetterOfString(item.value)}
+                        value={item.value}
                       />
                     ) : (
                       <TouchableOpacity_
@@ -487,13 +493,19 @@ export function Notes_MainComponent() {
                         multiline={true}
                         numberOfLines={10}
                         capitalize={true}
+                        debounceMs={1000}
                         onChangeText={(val) =>
                           textChanged(val, index, "internal")
                         }
                         onBlur={() => _setEditingNoteId(null)}
+                        onFocus={(e) => {
+                          const el = e.target;
+                          el.selectionStart = el.selectionEnd = el.value.length;
+                        }}
                         style={{
                           padding: 2,
                           paddingLeft: 4,
+                          fontSize: 15,
                           lineHeight: 18,
                           outlineWidth: 0,
                           outlineStyle: "none",
@@ -502,7 +514,7 @@ export function Notes_MainComponent() {
                           color: C.text,
                         }}
                         autoFocus={true}
-                        value={capitalizeFirstLetterOfString(item.value)}
+                        value={item.value}
                       />
                     ) : (
                       <TouchableOpacity_

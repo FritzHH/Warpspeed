@@ -1,4 +1,5 @@
 /* eslint-disable */
+import { useRef } from "react";
 import { C } from "../styles";
 import { gray } from "../utils";
 
@@ -34,10 +35,10 @@ const KEY_STYLE = {
 };
 
 let _touchFired = false;
-function KeyButton({ keyLabel, displayLabel, onClick, style }) {
+function KeyButton({ keyLabel, displayLabel, onClick, style, mountTime }) {
   return (
     <div
-      onClick={() => { if (_touchFired) { _touchFired = false; return; } onClick(keyLabel); }}
+      onClick={() => { if (_touchFired) { _touchFired = false; return; } if (Date.now() - mountTime < 500) return; onClick(keyLabel); }}
       onTouchStart={(e) => { _touchFired = true; e.currentTarget.style.backgroundColor = gray(0.1); onClick(keyLabel); }}
       onTouchEnd={(e) => { e.currentTarget.style.backgroundColor = C.listItemWhite; }}
       onMouseDown={(e) => { e.currentTarget.style.backgroundColor = gray(0.1); }}
@@ -51,6 +52,8 @@ function KeyButton({ keyLabel, displayLabel, onClick, style }) {
 }
 
 export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, paddingAdj = 0 }) {
+  const mountTimeRef = useRef(Date.now());
+  const mt = mountTimeRef.current;
   const fAdj = fontSizeAdj;
   const pAdj = paddingAdj;
   const _actionColor = (key) => (key === "CLR" || key === "\u232B") ? { color: gray(0.4) } : {};
@@ -62,7 +65,7 @@ export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, 
         {PHONE_KEYS.map((row, ri) => (
           <div key={ri} style={{ display: "flex", flexDirection: "row", gap: 6, justifyContent: "center" }}>
             {row.map((key) => (
-              <KeyButton key={key} keyLabel={key} onClick={onKeyPress} style={{ width: 102 + pAdj * 2, height: 84 + pAdj * 2, fontSize: 28 + fAdj, ..._actionColor(key) }} />
+              <KeyButton key={key} keyLabel={key} onClick={onKeyPress} mountTime={mt} style={{ width: 102 + pAdj * 2, height: 84 + pAdj * 2, fontSize: 28 + fAdj, ..._actionColor(key) }} />
             ))}
           </div>
         ))}
@@ -75,21 +78,21 @@ export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, 
       {showNumberRow && (
         <div style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
           {NUMBER_ROW.map((key) => (
-            <KeyButton key={key} keyLabel={key} onClick={onKeyPress} style={{ flex: 1, height: 84 + pAdj * 2, maxWidth: 90 + pAdj * 2, fontSize: 28 + fAdj }} />
+            <KeyButton key={key} keyLabel={key} onClick={onKeyPress} mountTime={mt} style={{ flex: 1, height: 84 + pAdj * 2, maxWidth: 90 + pAdj * 2, fontSize: 28 + fAdj }} />
           ))}
         </div>
       )}
       {QWERTY_ROWS.map((row, ri) => (
         <div key={ri} style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
           {row.map((key) => (
-            <KeyButton key={key} keyLabel={key} onClick={onKeyPress} style={{ flex: 1, height: 84 + pAdj * 2, maxWidth: 90 + pAdj * 2, fontSize: 28 + fAdj, ..._actionColor(key), ..._backspaceStyle(key) }} />
+            <KeyButton key={key} keyLabel={key} onClick={onKeyPress} mountTime={mt} style={{ flex: 1, height: 84 + pAdj * 2, maxWidth: 90 + pAdj * 2, fontSize: 28 + fAdj, ..._actionColor(key), ..._backspaceStyle(key) }} />
           ))}
         </div>
       ))}
       <div style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
-        <KeyButton keyLabel=" " displayLabel="SPACE" onClick={onKeyPress} style={{ flex: 3, height: 78 + pAdj * 2, fontSize: 28 + fAdj }} />
-        <KeyButton keyLabel="ENTER" displayLabel="↵" onClick={onKeyPress} style={{ flex: 1, height: 78 + pAdj * 2, fontSize: 28 + fAdj }} />
-        <KeyButton keyLabel="CLR" onClick={onKeyPress} style={{ flex: 1, height: 78 + pAdj * 2, fontSize: 18 + fAdj, color: gray(0.4) }} />
+        <KeyButton keyLabel=" " displayLabel="SPACE" onClick={onKeyPress} mountTime={mt} style={{ flex: 3, height: 78 + pAdj * 2, fontSize: 28 + fAdj }} />
+        <KeyButton keyLabel="ENTER" displayLabel="↵" onClick={onKeyPress} mountTime={mt} style={{ flex: 1, height: 78 + pAdj * 2, fontSize: 28 + fAdj }} />
+        <KeyButton keyLabel="CLR" onClick={onKeyPress} mountTime={mt} style={{ flex: 1, height: 78 + pAdj * 2, fontSize: 18 + fAdj, color: gray(0.4) }} />
       </div>
     </div>
   );

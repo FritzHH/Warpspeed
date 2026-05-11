@@ -35,6 +35,8 @@ import {
   formatWorkorderNumber,
   intakeButtonsToRows,
   intakeRowsToFlat,
+  generate36CharUUID,
+  lightenRGBByPercent,
 } from "../../../../utils";
 import { workerSearchInventory } from "../../../../inventorySearchManager";
 import {
@@ -48,6 +50,7 @@ import {
   useStripePaymentStore,
   useMigrationStore,
   useCurrentCustomerStore,
+  useEmailStore,
 } from "../../../../stores";
 import {
   Button,
@@ -79,7 +82,7 @@ import { ColorWheel } from "../../../../ColorWheel";
 import { SalesReportsModal } from "../../modal_screens/SalesReports";
 import { PayrollModal } from "../../modal_screens/PayrollModal";
 import { ScheduleModal } from "../../modal_screens/ScheduleModal";
-import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection, dbSaveInventoryItem } from "../../../../db_calls_wrapper";
+import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection, dbSaveInventoryItem, dbGmailDisconnect, dbGmailInitiateAuth } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses, mapEmployees, mapPunchHistory, parseCSV } from "../../../../lightspeed_import";
 import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead, firestoreQuery, firestoreDelete, firestoreWrite, firestoreBatchWrite } from "../../../../db_calls";
 import { DB_NODES } from "../../../../constants";
@@ -102,7 +105,7 @@ const TAB_NAMES = {
   schedule: "Schedule",
   ordering: "Ordering",
   textTemplates: "Text Templates",
-  emailTemplates: "Email Templates",
+  emailTemplates: "Email Options",
   blockedNumbers: "Blocked Numbers",
   import: "Import",
   backup: "Backup & Recovery",
@@ -662,10 +665,20 @@ export function Dashboard_Admin({}) {
             />
           )}
           {sExpand === TAB_NAMES.emailTemplates && (
+            <>
+            <EmailInboxesComponent
+              zSettingsObj={zSettingsObj}
+              handleSettingsFieldChange={handleSettingsFieldChange}
+            />
+            <EmailSignatureComponent
+              zSettingsObj={zSettingsObj}
+              handleSettingsFieldChange={handleSettingsFieldChange}
+            />
             <EmailTemplatesComponent
               zSettingsObj={zSettingsObj}
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
+            </>
           )}
           {sExpand === TAB_NAMES.blockedNumbers && (
             <BlockedNumbersComponent
@@ -1383,7 +1396,7 @@ const AppUserListComponent = ({
                         }}
                         style={{ opacity: canEditUsers ? 1 : 0.3 }}
                       >
-                        <Image_ icon={editable ? ICONS.close1 : ICONS.editPencil} size={20} />
+                        <Image_ icon={editable ? ICONS.check1 : ICONS.editPencil} size={20} />
                       </TouchableOpacity>
                     </View>
                     {/* Row 2 - Clock In/Out button (aligns with phone/email row) */}
@@ -1830,6 +1843,93 @@ const AppUserListComponent = ({
                                 <Text
                                   style={{
                                     color: status.textColor,
+                                    fontSize: 14,
+                                    fontWeight: "700",
+                                  }}
+                                >
+                                  ×
+                                </Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        );
+                      })}
+                    </View>
+
+                    {/* ROW 5: Email Inboxes */}
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        alignItems: "center",
+                        marginTop: 7,
+                        flexWrap: "wrap",
+                        gap: 5,
+                      }}
+                    >
+                      {editable && (zSettingsObj?.emailAccounts || []).length > 0 && (
+                        <DropdownMenu
+                          dataArr={(zSettingsObj.emailAccounts || [])
+                            .filter((a) => !(userObj.emailInboxes || []).includes(a.accountKey))
+                            .map((a) => ({ label: a.displayName, value: a.accountKey }))}
+                          onSelect={(item) => {
+                            if (!item) return;
+                            let current = userObj.emailInboxes || [];
+                            if (current.includes(item.value)) return;
+                            userObj.emailInboxes = [...current, item.value];
+                            commitUserInfoChange(userObj);
+                          }}
+                          buttonText="+ Inbox"
+                          buttonStyle={{
+                            paddingHorizontal: 8,
+                            paddingVertical: 2,
+                            borderColor: C.buttonLightGreenOutline,
+                            borderRadius: 5,
+                            height: 25,
+                            borderWidth: 1,
+                            alignItems: "center",
+                            backgroundColor: C.buttonLightGreen,
+                          }}
+                          buttonTextStyle={{
+                            color: C.text,
+                            fontSize: 12,
+                          }}
+                        />
+                      )}
+                      {(userObj.emailInboxes || []).map((accountKey) => {
+                        let acct = (zSettingsObj.emailAccounts || []).find((a) => a.accountKey === accountKey);
+                        if (!acct) return null;
+                        return (
+                          <View
+                            key={accountKey}
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              backgroundColor: editable ? C.blue : gray(0.85),
+                              borderRadius: 4,
+                              paddingHorizontal: 6,
+                              paddingVertical: 2,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                color: editable ? C.textWhite : gray(0.5),
+                                fontSize: 12,
+                                fontWeight: "600",
+                              }}
+                            >
+                              {acct.displayName}
+                            </Text>
+                            {editable && (
+                              <TouchableOpacity
+                                onPress={() => {
+                                  userObj.emailInboxes = (userObj.emailInboxes || []).filter((k) => k !== accountKey);
+                                  commitUserInfoChange(userObj);
+                                }}
+                                style={{ marginLeft: 4 }}
+                              >
+                                <Text
+                                  style={{
+                                    color: C.textWhite,
                                     fontSize: 14,
                                     fontWeight: "700",
                                   }}
@@ -2666,7 +2766,6 @@ const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) 
   const [sEditorModal, _setEditorModal] = useState(null); // { category, isNew }
 
   const noteHelpers = zSettingsObj?.noteHelpers || [];
-  const noteHelpersTarget = zSettingsObj?.noteHelpersTarget || "intakeNotes";
 
   function reorderCategories(fromIdx, toIdx) {
     if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
@@ -2701,6 +2800,15 @@ const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) 
     handleSettingsFieldChange("noteHelpers", arr);
   }
 
+  function handleToggleCategoryField(catId, field) {
+    let arr = noteHelpers.map((c) => {
+      if (c.id !== catId) return c;
+      let current = c[field] === true;
+      return { ...c, [field]: !current };
+    });
+    handleSettingsFieldChange("noteHelpers", arr);
+  }
+
   return (
     <BoxContainerInnerComponent
       style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
@@ -2722,63 +2830,6 @@ const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) 
           <Tooltip text="Add category">
             <BoxButton1 onPress={handleAddCategory} />
           </Tooltip>
-        </View>
-
-        {/* Target radio */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            marginTop: 10,
-            gap: 20,
-          }}
-        >
-          <Text style={{ fontSize: 13, color: gray(0.5) }}>Notes appear in:</Text>
-          <TouchableOpacity
-            onPress={() => handleSettingsFieldChange("noteHelpersTarget", "intakeNotes")}
-            style={{ flexDirection: "row", alignItems: "center" }}
-          >
-            <View
-              style={{
-                width: 16,
-                height: 16,
-                borderRadius: 8,
-                borderWidth: 2,
-                borderColor: noteHelpersTarget === "intakeNotes" ? C.blue : gray(0.3),
-                alignItems: "center",
-                justifyContent: "center",
-                marginRight: 5,
-              }}
-            >
-              {noteHelpersTarget === "intakeNotes" && (
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.blue }} />
-              )}
-            </View>
-            <Text style={{ fontSize: 13, color: C.text }}>Intake Notes</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={() => handleSettingsFieldChange("noteHelpersTarget", "receiptNotes")}
-            style={{ flexDirection: "row", alignItems: "center" }}
-          >
-            <View
-              style={{
-                width: 16,
-                height: 16,
-                borderRadius: 8,
-                borderWidth: 2,
-                borderColor: noteHelpersTarget === "receiptNotes" ? C.blue : gray(0.3),
-                alignItems: "center",
-                justifyContent: "center",
-                marginRight: 5,
-              }}
-            >
-              {noteHelpersTarget === "receiptNotes" && (
-                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.blue }} />
-              )}
-            </View>
-            <Text style={{ fontSize: 13, color: C.text }}>Receipt Notes</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Category list */}
@@ -2824,6 +2875,32 @@ const NoteHelpersAdminComponent = ({ zSettingsObj, handleSettingsFieldChange }) 
                     <Image_ icon={ICONS.trash} size={15} />
                   </TouchableOpacity>
                 </Tooltip>
+              </View>
+              <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
+                <TouchableOpacity
+                  onPress={() => handleToggleCategoryField(cat.id, "intakeNotes")}
+                  style={{ flexDirection: "row", alignItems: "center" }}
+                >
+                  <View style={{
+                    width: 14, height: 14, borderRadius: 3, borderWidth: 2,
+                    borderColor: cat.intakeNotes ? C.blue : gray(0.3),
+                    backgroundColor: cat.intakeNotes ? C.blue : "transparent",
+                    marginRight: 4,
+                  }} />
+                  <Text style={{ fontSize: 12, color: gray(0.5) }}>Intake</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => handleToggleCategoryField(cat.id, "receiptNotes")}
+                  style={{ flexDirection: "row", alignItems: "center" }}
+                >
+                  <View style={{
+                    width: 14, height: 14, borderRadius: 3, borderWidth: 2,
+                    borderColor: cat.receiptNotes ? C.blue : gray(0.3),
+                    backgroundColor: cat.receiptNotes ? C.blue : "transparent",
+                    marginRight: 4,
+                  }} />
+                  <Text style={{ fontSize: 12, color: gray(0.5) }}>Receipt</Text>
+                </TouchableOpacity>
               </View>
               {(cat.items || []).length > 0 && (
                 <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4, marginTop: 6 }}>
@@ -2957,6 +3034,35 @@ const NoteHelperEditorModal = ({ visible, category, isNew, onClose, onSave, onDe
                     <Image_ icon={ICONS.trash} size={16} />
                   </TouchableOpacity>
                 )}
+              </View>
+
+              {/* Target checkboxes */}
+              <View style={{ flexDirection: "row", gap: 16, paddingHorizontal: 14, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: C.buttonLightGreenOutline }}>
+                <Text style={{ fontSize: 12, color: gray(0.5), marginRight: 4 }}>Appears in:</Text>
+                <TouchableOpacity
+                  onPress={() => _setCategory({ ...sCategory, intakeNotes: !sCategory.intakeNotes })}
+                  style={{ flexDirection: "row", alignItems: "center" }}
+                >
+                  <View style={{
+                    width: 15, height: 15, borderRadius: 3, borderWidth: 2,
+                    borderColor: sCategory.intakeNotes ? C.blue : gray(0.3),
+                    backgroundColor: sCategory.intakeNotes ? C.blue : "transparent",
+                    marginRight: 5,
+                  }} />
+                  <Text style={{ fontSize: 13, color: C.text }}>Intake Notes</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => _setCategory({ ...sCategory, receiptNotes: !sCategory.receiptNotes })}
+                  style={{ flexDirection: "row", alignItems: "center" }}
+                >
+                  <View style={{
+                    width: 15, height: 15, borderRadius: 3, borderWidth: 2,
+                    borderColor: sCategory.receiptNotes ? C.blue : gray(0.3),
+                    backgroundColor: sCategory.receiptNotes ? C.blue : "transparent",
+                    marginRight: 5,
+                  }} />
+                  <Text style={{ fontSize: 13, color: C.text }}>Receipt Notes</Text>
+                </TouchableOpacity>
               </View>
 
               {/* Items list */}
@@ -4945,83 +5051,120 @@ const WorkorderStatusesComponent = ({
               backgroundColor: C.backgroundListWhite,
               borderRadius: 10,
               padding: 30,
-              alignItems: "center",
-              maxWidth: 650,
+              maxWidth: 900,
               width: "90%",
+              maxHeight: "85%",
               borderWidth: 2,
               borderColor: C.buttonLightGreenOutline,
+              flexDirection: "row",
+              alignItems: "stretch",
             }}
           >
-            <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 20 }}>
-              Edit Status Colors
-            </Text>
-
-            {/* Live preview */}
-            <View
-              style={{
-                backgroundColor: sModalBgColor,
-                borderRadius: 5,
-                paddingVertical: 10,
-                paddingHorizontal: 30,
-                alignItems: "center",
-                justifyContent: "center",
-                minWidth: 200,
-                marginBottom: 25,
-              }}
-            >
-              <Text style={{ color: sModalTextColor, fontSize: 14, fontWeight: "500" }}>
-                {sColorModalItem.label}
+            {/* Status list sidebar */}
+            <View style={{ width: 180, marginRight: 0, paddingRight: 15 }}>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.45), marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                Copy From
               </Text>
+              <ScrollView style={{ flex: 1 }}>
+                {(zSettingsObj.statuses || []).filter((s) => !s.hidden && s.id !== sColorModalItem.id).map((status) => (
+                  <TouchableOpacity
+                    key={status.id}
+                    onPress={() => {
+                      _setModalBgColor(status.backgroundColor);
+                      _setModalTextColor(status.textColor);
+                    }}
+                    style={{
+                      backgroundColor: status.backgroundColor,
+                      borderRadius: 6,
+                      paddingVertical: 8,
+                      paddingHorizontal: 10,
+                      marginBottom: 6,
+                      borderWidth: 1,
+                      borderColor: gray(0.15),
+                    }}
+                  >
+                    <Text style={{ color: status.textColor, fontSize: 12, fontWeight: "500" }} numberOfLines={1}>
+                      {status.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
+            <View style={{ width: 1, backgroundColor: gray(0.15), marginHorizontal: 15 }} />
 
-            {/* Two color wheels side by side */}
-            <View style={{ flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 30 }}>
-              <View style={{ alignItems: "center" }}>
-                <Text style={{ fontSize: 13, color: C.text, marginBottom: 8, fontWeight: "500" }}>
-                  Background Color
-                </Text>
-                <ColorWheel
-                  key={"bg-" + sColorModalItem.id}
-                  initialColor={sModalBgColor}
-                  onColorChange={(val) => {
-                    _setModalBgColor(val.hex);
-                  }}
-                />
-              </View>
-              <View style={{ alignItems: "center" }}>
-                <Text style={{ fontSize: 13, color: C.text, marginBottom: 8, fontWeight: "500" }}>
-                  Text Color
-                </Text>
-                <ColorWheel
-                  key={"text-" + sColorModalItem.id}
-                  initialColor={sModalTextColor}
-                  onColorChange={(val) => {
-                    _setModalTextColor(val.hex);
-                  }}
-                />
-              </View>
-            </View>
+            {/* Main color picker area */}
+            <View style={{ flex: 1, alignItems: "center" }}>
+              <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 20 }}>
+                Edit Status Colors
+              </Text>
 
-            {/* Action buttons */}
-            <View style={{ flexDirection: "row", justifyContent: "center", marginTop: 25, gap: 15 }}>
-              <Button_
-                text="Save Changes"
-                colorGradientArr={COLOR_GRADIENTS.green}
-                onPress={() => {
-                  let newStatuses = zSettingsObj.statuses.map((o) => {
-                    if (o.id === sColorModalItem.id)
-                      return { ...o, backgroundColor: sModalBgColor, textColor: sModalTextColor };
-                    return o;
-                  });
-                  handleSettingsFieldChange("statuses", newStatuses);
-                  _setColorModalItem(null);
+              {/* Live preview */}
+              <View
+                style={{
+                  backgroundColor: sModalBgColor,
+                  borderRadius: 5,
+                  paddingVertical: 10,
+                  paddingHorizontal: 30,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  minWidth: 200,
+                  marginBottom: 25,
                 }}
-              />
-              <Button_
-                text="Exit (discard any changes)"
-                colorGradientArr={COLOR_GRADIENTS.grey}
-                onPress={() => _setColorModalItem(null)}
-              />
+              >
+                <Text style={{ color: sModalTextColor, fontSize: 14, fontWeight: "500" }}>
+                  {sColorModalItem.label}
+                </Text>
+              </View>
+
+              {/* Two color wheels side by side */}
+              <View style={{ flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 30 }}>
+                <View style={{ alignItems: "center" }}>
+                  <Text style={{ fontSize: 13, color: C.text, marginBottom: 8, fontWeight: "500" }}>
+                    Background Color
+                  </Text>
+                  <ColorWheel
+                    key={"bg-" + sModalBgColor}
+                    initialColor={sModalBgColor}
+                    onColorChange={(val) => {
+                      _setModalBgColor(val.hex);
+                    }}
+                  />
+                </View>
+                <View style={{ alignItems: "center" }}>
+                  <Text style={{ fontSize: 13, color: C.text, marginBottom: 8, fontWeight: "500" }}>
+                    Text Color
+                  </Text>
+                  <ColorWheel
+                    key={"text-" + sModalTextColor}
+                    initialColor={sModalTextColor}
+                    onColorChange={(val) => {
+                      _setModalTextColor(val.hex);
+                    }}
+                  />
+                </View>
+              </View>
+
+              {/* Action buttons */}
+              <View style={{ flexDirection: "row", justifyContent: "center", marginTop: 25, gap: 15 }}>
+                <Button_
+                  text="Save Changes"
+                  colorGradientArr={COLOR_GRADIENTS.green}
+                  onPress={() => {
+                    let newStatuses = zSettingsObj.statuses.map((o) => {
+                      if (o.id === sColorModalItem.id)
+                        return { ...o, backgroundColor: sModalBgColor, textColor: sModalTextColor };
+                      return o;
+                    });
+                    handleSettingsFieldChange("statuses", newStatuses);
+                    _setColorModalItem(null);
+                  }}
+                />
+                <Button_
+                  text="Exit (discard any changes)"
+                  colorGradientArr={COLOR_GRADIENTS.grey}
+                  onPress={() => _setColorModalItem(null)}
+                />
+              </View>
             </View>
           </View>
         </View>,
@@ -6205,6 +6348,7 @@ const TEMPLATE_EMOJIS = [
 const TEXT_TEMPLATE_VARIABLES = [
   { label: "First Name", variable: "{firstName}" },
   { label: "Brand", variable: "{brand}" },
+  { label: "Brands", variable: "{brands}" },
   { label: "Store Phone", variable: "{storePhone}" },
   { label: "Support Email", variable: "{supportEmail}" },
 ];
@@ -8722,8 +8866,11 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
   if (!hasMergedSms.current && savedTemplates.length > 0) {
     let defaultTyped = (SETTINGS_OBJ.smsTemplates || []).filter((t) => t.type);
     let missing = defaultTyped.filter((d) => !savedTemplates.find((s) => s.type === d.type));
-    if (missing.length > 0) {
-      let merged = [...savedTemplates, ...missing];
+    let defaultNonRemovable = (SETTINGS_OBJ.smsTemplates || []).filter((t) => t.removable === false && !t.type);
+    let missingByID = defaultNonRemovable.filter((d) => !savedTemplates.find((s) => s.id === d.id));
+    let allMissing = [...missing, ...missingByID];
+    if (allMissing.length > 0) {
+      let merged = [...savedTemplates, ...allMissing];
       handleSettingsFieldChange("smsTemplates", merged);
       savedTemplates = merged;
     }
@@ -8893,7 +9040,7 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                         onCheck={() => handleFieldChange(templateObj, "showInChat", templateObj.showInChat === false)}
                       />
                     </View>
-                    {!templateObj.type && (
+                    {!templateObj.type && templateObj.removable !== false && (
                       <Tooltip text="Delete template" position="top">
                         <BoxButton1
                           onPress={() => handleDeleteTemplate(templateObj)}
@@ -9064,6 +9211,7 @@ const MESSAGE_VARIABLES = [
   { label: "First Name", variable: "{firstName}" },
   { label: "Last Name", variable: "{lastName}" },
   { label: "Brand", variable: "{brand}" },
+  { label: "Brands", variable: "{brands}" },
   { label: "Total Amount", variable: "{totalAmount}" },
 ];
 
@@ -9081,8 +9229,11 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
   if (!hasMergedEmail.current && savedTemplates.length > 0) {
     let defaultTyped = (SETTINGS_OBJ.emailTemplates || []).filter((t) => t.type);
     let missing = defaultTyped.filter((d) => !savedTemplates.find((s) => s.type === d.type));
-    if (missing.length > 0) {
-      let merged = [...savedTemplates, ...missing];
+    let defaultNonRemovable = (SETTINGS_OBJ.emailTemplates || []).filter((t) => t.removable === false && !t.type);
+    let missingByID = defaultNonRemovable.filter((d) => !savedTemplates.find((s) => s.id === d.id));
+    let allMissing = [...missing, ...missingByID];
+    if (allMissing.length > 0) {
+      let merged = [...savedTemplates, ...allMissing];
       handleSettingsFieldChange("emailTemplates", merged);
       savedTemplates = merged;
     }
@@ -9437,7 +9588,7 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
                       style={{ ...inputStyle, flex: 1, fontWeight: "500" }}
                       value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "label") ?? getLabel(templateObj)) : getLabel(templateObj)}
                     />
-                    {!templateObj.type && (
+                    {!templateObj.type && templateObj.removable !== false && (
                       <Tooltip text="Delete template" position="top">
                         <BoxButton1 onPress={() => handleDeleteTemplate(templateObj)} style={{ marginLeft: 8 }} iconSize={15} icon={ICONS.trash} />
                       </Tooltip>
@@ -9564,6 +9715,1010 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
     </BoxContainerOuterComponent>
   );
 };
+
+////////////////////////////////////////////////////////////////////////////////
+
+const MAX_EMAIL_ACCOUNTS = 5;
+
+const EmailInboxesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
+  const [sAdding, _sSetAdding] = useState(false);
+  const [sEmail, _sSetEmail] = useState("");
+  const [sDisplayName, _sSetDisplayName] = useState("");
+  const [sEditingKey, _sSetEditingKey] = useState(null);
+  const [sEditDisplayName, _sSetEditDisplayName] = useState("");
+  const emailAccounts = zSettingsObj?.emailAccounts || [];
+  const zEmailAuth = useEmailStore((state) => state.getEmailAuth());
+
+  function handleAdd() {
+    if (!sEmail.trim() || !sDisplayName.trim()) return;
+    if (emailAccounts.length >= MAX_EMAIL_ACCOUNTS) return;
+    let newAccount = {
+      accountKey: generate36CharUUID(),
+      email: sEmail.trim().toLowerCase(),
+      displayName: sDisplayName.trim(),
+      appendUserName: false,
+      signature: { segments: [], imageUrl: "", fontFamily: "Arial", fontSize: 14, fontWeight: "400" },
+    };
+    let updated = [...emailAccounts, newAccount];
+    handleSettingsFieldChange("emailAccounts", updated);
+    _sSetEmail("");
+    _sSetDisplayName("");
+    _sSetAdding(false);
+  }
+
+  async function handleRemove(accountKey) {
+    let acct = emailAccounts.find((a) => a.accountKey === accountKey);
+    if (!acct) return;
+    useAlertScreenStore.getState().setValues({
+      title: "Remove Email Account",
+      message: `Remove "${acct.displayName}" (${acct.email})? This will disconnect the account and remove it from all users.`,
+      btn1Text: "REMOVE",
+      btn2Text: "CANCEL",
+      handleBtn1Press: async () => {
+        let isConnected = zEmailAuth?.[accountKey]?.status === "connected";
+        if (isConnected) {
+          await dbGmailDisconnect(accountKey);
+        }
+        let updated = emailAccounts.filter((a) => a.accountKey !== accountKey);
+        handleSettingsFieldChange("emailAccounts", updated);
+      },
+      handleBtn2Press: () => null,
+      showAlert: true,
+    });
+  }
+
+  async function handleAuthorize(accountKey) {
+    try {
+      let result = await dbGmailInitiateAuth(accountKey);
+      if (result.success && result.data?.authUrl) {
+        window.open(result.data.authUrl, "gmailAuth", "width=600,height=700,scrollbars=yes");
+      } else {
+        log("Gmail auth error", result.error);
+      }
+    } catch (e) {
+      log("Gmail auth error", e);
+    }
+  }
+
+  function handleSaveDisplayName(accountKey) {
+    if (!sEditDisplayName.trim()) return;
+    let updated = emailAccounts.map((a) =>
+      a.accountKey === accountKey ? { ...a, displayName: sEditDisplayName.trim() } : a
+    );
+    handleSettingsFieldChange("emailAccounts", updated);
+    _sSetEditingKey(null);
+    _sSetEditDisplayName("");
+  }
+
+  function handleMigrate() {
+    if (emailAccounts.length > 0) return;
+    let accounts = [];
+    if (zSettingsObj?.storeInfo?.supportEmail) {
+      accounts.push({
+        accountKey: "support",
+        email: zSettingsObj.storeInfo.supportEmail,
+        displayName: "Support",
+        signature: zSettingsObj.emailSignature ? { ...zSettingsObj.emailSignature } : { segments: [], imageUrl: "", fontFamily: "Arial", fontSize: 14, fontWeight: "400" },
+      });
+    }
+    if (zSettingsObj?.storeInfo?.officeEmail) {
+      accounts.push({
+        accountKey: "office",
+        email: zSettingsObj.storeInfo.officeEmail,
+        displayName: "Office",
+        signature: { segments: [], imageUrl: "", fontFamily: "Arial", fontSize: 14, fontWeight: "400" },
+      });
+    }
+    if (accounts.length > 0) {
+      handleSettingsFieldChange("emailAccounts", accounts);
+    }
+  }
+
+  return (
+    <BoxContainerOuterComponent style={{ marginTop: 20 }}>
+      <BoxContainerInnerComponent style={{ paddingVertical: 20 }}>
+        <View style={{ width: "100%", alignItems: "center" }}>
+          <Text style={{ fontSize: 16, fontWeight: Fonts.weight.textHeavy, color: C.text, marginBottom: 15 }}>
+            Email Inboxes
+          </Text>
+
+          {emailAccounts.map((acct) => {
+            let isConnected = zEmailAuth?.[acct.accountKey]?.status === "connected";
+            return (
+              <View
+                key={acct.accountKey}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  width: "100%",
+                  paddingVertical: 8,
+                  paddingHorizontal: 10,
+                  borderBottomWidth: 1,
+                  borderBottomColor: C.buttonLightGreenOutline,
+                }}
+              >
+                <View style={{ flex: 1, overflow: "hidden" }}>
+                  {sEditingKey === acct.accountKey ? (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <TextInput
+                        value={sEditDisplayName}
+                        onChange={(e) => _sSetEditDisplayName(e.target.value)}
+                        style={{
+                          flex: 1,
+                          fontSize: 14,
+                          fontWeight: Fonts.weight.textHeavy,
+                          color: C.text,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderWidth: 1,
+                          borderRadius: 5,
+                          paddingVertical: 2,
+                          paddingHorizontal: 6,
+                          backgroundColor: C.listItemWhite,
+                          outline: "none",
+                        }}
+                        autoFocus
+                        onKeyPress={(e) => { if (e.key === "Enter") handleSaveDisplayName(acct.accountKey); }}
+                      />
+                      <TouchableOpacity onPress={() => handleSaveDisplayName(acct.accountKey)} style={{ padding: 2 }}>
+                        <Text style={{ fontSize: 13, color: C.green, fontWeight: "700" }}>{"✓"}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => { _sSetEditingKey(null); _sSetEditDisplayName(""); }} style={{ padding: 2 }}>
+                        <Text style={{ fontSize: 13, color: gray(0.4), fontWeight: "700" }}>{"✕"}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                      <Text numberOfLines={1} style={{ fontSize: 14, fontWeight: Fonts.weight.textHeavy, color: C.text }}>
+                        {acct.displayName}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => { _sSetEditingKey(acct.accountKey); _sSetEditDisplayName(acct.displayName); }}
+                        style={{ padding: 2 }}
+                      >
+                        <Image_ icon={ICONS.editPencil} size={14} />
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                  <Text numberOfLines={1} style={{ fontSize: 12, color: gray(0.5) }}>{acct.email}</Text>
+                  <CheckBox_
+                    isChecked={!!acct.appendUserName}
+                    text="Append user name"
+                    onCheck={() => {
+                      let updated = emailAccounts.map((a) =>
+                        a.accountKey === acct.accountKey ? { ...a, appendUserName: !a.appendUserName } : a
+                      );
+                      handleSettingsFieldChange("emailAccounts", updated);
+                    }}
+                    buttonStyle={{ marginTop: 4 }}
+                    textStyle={{ fontSize: 11, color: gray(0.5) }}
+                  />
+                </View>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  {isConnected && (
+                    <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: C.green }} />
+                  )}
+                  {!isConnected && (
+                    <Button_
+                      text="Authorize"
+                      onPress={() => handleAuthorize(acct.accountKey)}
+                      colorGradientArr={COLOR_GRADIENTS.blue}
+                      style={{ paddingHorizontal: 10, paddingVertical: 4 }}
+                      textStyle={{ fontSize: 11 }}
+                    />
+                  )}
+                  <Button_
+                    text="Remove"
+                    onPress={() => handleRemove(acct.accountKey)}
+                    colorGradientArr={COLOR_GRADIENTS.grey}
+                    style={{ paddingHorizontal: 10, paddingVertical: 4 }}
+                    textStyle={{ fontSize: 11 }}
+                  />
+                </View>
+              </View>
+            );
+          })}
+
+          {sAdding && (
+            <View style={{ width: "100%", paddingHorizontal: 10, marginTop: 12 }}>
+              <TextInput_
+                placeholder="Email address"
+                value={sEmail}
+                onChangeText={_sSetEmail}
+                style={{ marginBottom: 8 }}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              <TextInput_
+                placeholder="Display name (e.g. Sales, Personal)"
+                value={sDisplayName}
+                onChangeText={_sSetDisplayName}
+                style={{ marginBottom: 8 }}
+              />
+              <View style={{ flexDirection: "row", gap: 8, justifyContent: "flex-end" }}>
+                <Button_
+                  text="Save"
+                  onPress={handleAdd}
+                  colorGradientArr={COLOR_GRADIENTS.green}
+                  style={{ paddingHorizontal: 16, paddingVertical: 6 }}
+                  textStyle={{ fontSize: 13 }}
+                  disabled={!sEmail.trim() || !sDisplayName.trim()}
+                />
+                <Button_
+                  text="Cancel"
+                  onPress={() => { _sSetAdding(false); _sSetEmail(""); _sSetDisplayName(""); }}
+                  colorGradientArr={COLOR_GRADIENTS.grey}
+                  style={{ paddingHorizontal: 16, paddingVertical: 6 }}
+                  textStyle={{ fontSize: 13 }}
+                />
+              </View>
+            </View>
+          )}
+
+          {!sAdding && (
+            <Button_
+              text={emailAccounts.length >= MAX_EMAIL_ACCOUNTS ? "Max 5 Accounts" : "+ Add Email Account"}
+              onPress={() => _sSetAdding(true)}
+              disabled={emailAccounts.length >= MAX_EMAIL_ACCOUNTS}
+              colorGradientArr={COLOR_GRADIENTS.blue}
+              style={{ marginTop: 20, paddingHorizontal: 20, paddingVertical: 8 }}
+              textStyle={{ fontSize: 13 }}
+            />
+          )}
+
+          {emailAccounts.length === 0 && (
+            <Button_
+              text="Migrate Existing Accounts"
+              onPress={handleMigrate}
+              colorGradientArr={COLOR_GRADIENTS.purple}
+              style={{ marginTop: 12, paddingHorizontal: 20, paddingVertical: 8 }}
+              textStyle={{ fontSize: 13 }}
+            />
+          )}
+        </View>
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+  );
+};
+
+////////////////////////////////////////////////////////////////////////////////
+
+const FONT_FAMILIES = [
+  "Arial",
+  "Helvetica",
+  "Times New Roman",
+  "Georgia",
+  "Courier New",
+  "Verdana",
+  "Tahoma",
+  "Trebuchet MS",
+  "Garamond",
+  "Palatino",
+];
+
+const FONT_WEIGHTS = [
+  { label: "Light", value: "300" },
+  { label: "Regular", value: "400" },
+  { label: "Medium", value: "500" },
+  { label: "Semi-Bold", value: "600" },
+  { label: "Bold", value: "700" },
+];
+
+const MAX_SIG_IMAGE_WIDTH = 300;
+const MAX_SIG_IMAGE_HEIGHT = 300;
+
+const EmailSignatureComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
+  const emailAccounts = zSettingsObj?.emailAccounts || [];
+  const [sSelectedAccountKey, _sSetSelectedAccountKey] = useState(emailAccounts[0]?.accountKey || "");
+
+  if (emailAccounts.length === 0) {
+    return (
+      <BoxContainerOuterComponent style={{ marginTop: 20, marginBottom: 20 }}>
+        <BoxContainerInnerComponent style={{ width: "100%", alignItems: "flex-start", paddingVertical: 20 }}>
+          <Text style={{ fontWeight: Fonts.weight.textHeavy, color: C.text, fontSize: 16, marginBottom: 10, alignSelf: "center" }}>
+            {"Email Signature"}
+          </Text>
+          <Text style={{ fontSize: 13, color: gray(0.5), textAlign: "center", alignSelf: "center" }}>
+            {"Add email accounts above to configure per-account signatures."}
+          </Text>
+        </BoxContainerInnerComponent>
+      </BoxContainerOuterComponent>
+    );
+  }
+
+  return (
+    <BoxContainerOuterComponent style={{ marginTop: 20, marginBottom: 20 }}>
+      <BoxContainerInnerComponent style={{ width: "100%", alignItems: "flex-start", paddingVertical: 20 }}>
+        <Text style={{ fontWeight: Fonts.weight.textHeavy, color: C.text, fontSize: 16, marginBottom: 15, alignSelf: "center" }}>
+          {"Email Signature"}
+        </Text>
+        <View style={{ flexDirection: "row", width: "100%", marginBottom: 15 }}>
+          {emailAccounts.map((acct) => (
+            <TouchableOpacity
+              key={acct.accountKey}
+              onPress={() => _sSetSelectedAccountKey(acct.accountKey)}
+              activeOpacity={0.8}
+              style={{
+                flex: 1,
+                alignItems: "center",
+                justifyContent: "center",
+                paddingVertical: 8,
+                backgroundColor: sSelectedAccountKey === acct.accountKey ? C.orange : lightenRGBByPercent(C.orange, 60),
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.textWhite }}>{acct.displayName}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <SignatureEditorInner
+          key={sSelectedAccountKey}
+          zSettingsObj={zSettingsObj}
+          handleSettingsFieldChange={handleSettingsFieldChange}
+          accountKey={sSelectedAccountKey}
+        />
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+  );
+};
+
+const SignatureEditorInner = ({ zSettingsObj, handleSettingsFieldChange, accountKey }) => {
+  const [sUploading, _sSetUploading] = useState(false);
+  const imageInputRef = useRef(null);
+  const editorRef = useRef(null);
+  const saveTimerRef = useRef(null);
+  const cursorPosRef = useRef(null);
+
+  const emailAccounts = zSettingsObj?.emailAccounts || [];
+  let selectedAccount = emailAccounts.find((a) => a.accountKey === accountKey);
+  let sig = selectedAccount?.signature || {};
+  let sigImageUrl = sig.imageUrl || "";
+
+  function saveSigField(updatedSig) {
+    let arr = [...emailAccounts];
+    let idx = arr.findIndex((a) => a.accountKey === accountKey);
+    if (idx < 0) return;
+    arr[idx] = { ...arr[idx], signature: updatedSig };
+    handleSettingsFieldChange("emailAccounts", arr);
+  }
+
+  const initSegments = () => {
+    return sig.segments || [];
+  };
+
+  const [sSegments, _sSetSegments] = useState(initSegments);
+  const [sActiveFontFamily, _sSetActiveFontFamily] = useState(sig.fontFamily || "Arial");
+  const [sActiveFontSize, _sSetActiveFontSize] = useState(sig.fontSize || 14);
+  const [sActiveFontWeight, _sSetActiveFontWeight] = useState(sig.fontWeight || "400");
+  const [sActiveItalic, _sSetActiveItalic] = useState(false);
+
+  const segmentsRef = useRef(sSegments);
+  segmentsRef.current = sSegments;
+
+  function saveSegments(newSegments) {
+    _sSetSegments(newSegments);
+    segmentsRef.current = newSegments;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(() => {
+      saveSigField({ ...sig, segments: newSegments });
+    }, 500);
+  }
+
+  function mergeAdjacentSegments(segs) {
+    if (segs.length <= 1) return segs;
+    let merged = [segs[0]];
+    for (let i = 1; i < segs.length; i++) {
+      let prev = merged[merged.length - 1];
+      let cur = segs[i];
+      if (prev.fontFamily === cur.fontFamily && prev.fontSize === cur.fontSize && prev.fontWeight === cur.fontWeight && (prev.fontStyle || "normal") === (cur.fontStyle || "normal")) {
+        merged[merged.length - 1] = { ...prev, text: prev.text + cur.text };
+      } else {
+        merged.push(cur);
+      }
+    }
+    return merged;
+  }
+
+  function getCursorOffset() {
+    let sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return null;
+    let range = sel.getRangeAt(0);
+    let editor = editorRef.current;
+    if (!editor || !editor.contains(range.startContainer)) return null;
+    let offset = 0;
+    let spans = editor.querySelectorAll("span[data-seg]");
+    for (let span of spans) {
+      if (span.contains(range.startContainer)) {
+        offset += range.startOffset;
+        return offset;
+      }
+      offset += span.textContent.length;
+    }
+    if (range.startContainer === editor) {
+      let childIdx = range.startOffset;
+      for (let i = 0; i < childIdx && i < spans.length; i++) {
+        offset += spans[i].textContent.length;
+      }
+      return offset;
+    }
+    return offset;
+  }
+
+  function setCursorOffset(offset) {
+    let editor = editorRef.current;
+    if (!editor) return;
+    let spans = editor.querySelectorAll("span[data-seg]");
+    let remaining = offset;
+    for (let span of spans) {
+      let len = span.textContent.length;
+      if (remaining <= len) {
+        let textNode = span.firstChild;
+        if (!textNode) {
+          textNode = document.createTextNode("");
+          span.appendChild(textNode);
+        }
+        let sel = window.getSelection();
+        let range = document.createRange();
+        range.setStart(textNode, Math.min(remaining, textNode.length));
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+        return;
+      }
+      remaining -= len;
+    }
+    let sel = window.getSelection();
+    let range = document.createRange();
+    range.selectNodeContents(editor);
+    range.collapse(false);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+
+  function segmentOffsetToGlobal(segIdx, localOffset) {
+    let offset = 0;
+    for (let i = 0; i < segIdx; i++) offset += segmentsRef.current[i].text.length;
+    return offset + localOffset;
+  }
+
+  function globalOffsetToSegment(globalOffset) {
+    let segs = segmentsRef.current;
+    let offset = 0;
+    for (let i = 0; i < segs.length; i++) {
+      if (globalOffset <= offset + segs[i].text.length) {
+        return { segIdx: i, localOffset: globalOffset - offset };
+      }
+      offset += segs[i].text.length;
+    }
+    return { segIdx: segs.length - 1, localOffset: segs.length > 0 ? segs[segs.length - 1].text.length : 0 };
+  }
+
+  function insertTextAt(globalOffset, str) {
+    let segs = [...segmentsRef.current];
+    let activeStyle = { fontFamily: sActiveFontFamily, fontSize: sActiveFontSize, fontWeight: sActiveFontWeight, fontStyle: sActiveItalic ? "italic" : "normal" };
+
+    if (segs.length === 0) {
+      saveSegments([{ text: str, ...activeStyle }]);
+      return;
+    }
+
+    let { segIdx, localOffset } = globalOffsetToSegment(globalOffset);
+    let seg = segs[segIdx];
+
+    if (seg.fontFamily === activeStyle.fontFamily && seg.fontSize === activeStyle.fontSize && seg.fontWeight === activeStyle.fontWeight && (seg.fontStyle || "normal") === activeStyle.fontStyle) {
+      segs[segIdx] = { ...seg, text: seg.text.slice(0, localOffset) + str + seg.text.slice(localOffset) };
+      saveSegments(mergeAdjacentSegments(segs));
+    } else {
+      let before = { ...seg, text: seg.text.slice(0, localOffset) };
+      let inserted = { text: str, ...activeStyle };
+      let after = { ...seg, text: seg.text.slice(localOffset) };
+      let replacement = [];
+      if (before.text) replacement.push(before);
+      replacement.push(inserted);
+      if (after.text) replacement.push(after);
+      segs.splice(segIdx, 1, ...replacement);
+      saveSegments(mergeAdjacentSegments(segs));
+    }
+  }
+
+  function deleteRange(startOffset, endOffset) {
+    let segs = [...segmentsRef.current];
+    if (segs.length === 0) return;
+    let totalLen = segs.reduce((sum, s) => sum + s.text.length, 0);
+    startOffset = Math.max(0, startOffset);
+    endOffset = Math.min(totalLen, endOffset);
+    if (startOffset >= endOffset) return;
+
+    let newSegs = [];
+    let offset = 0;
+    for (let seg of segs) {
+      let segStart = offset;
+      let segEnd = offset + seg.text.length;
+      if (segEnd <= startOffset || segStart >= endOffset) {
+        newSegs.push(seg);
+      } else {
+        let keepBefore = seg.text.slice(0, Math.max(0, startOffset - segStart));
+        let keepAfter = seg.text.slice(Math.max(0, endOffset - segStart));
+        let kept = keepBefore + keepAfter;
+        if (kept) newSegs.push({ ...seg, text: kept });
+      }
+      offset += seg.text.length;
+    }
+    saveSegments(mergeAdjacentSegments(newSegs));
+  }
+
+  function getSelectionRange() {
+    let sel = window.getSelection();
+    let editor = editorRef.current;
+    if (!sel || sel.isCollapsed || !editor || !editor.contains(sel.anchorNode)) return null;
+    let range = sel.getRangeAt(0);
+    let preStart = document.createRange();
+    preStart.selectNodeContents(editor);
+    preStart.setEnd(range.startContainer, range.startOffset);
+    let start = preStart.toString().length;
+    let preEnd = document.createRange();
+    preEnd.selectNodeContents(editor);
+    preEnd.setEnd(range.endContainer, range.endOffset);
+    let end = preEnd.toString().length;
+    if (start === end) return null;
+    return { start: Math.min(start, end), end: Math.max(start, end) };
+  }
+
+  function applyStyleToSelection(styleField, styleValue) {
+    let range = getSelectionRange();
+    if (!range) return false;
+    let { start, end } = range;
+    let segs = [...segmentsRef.current];
+    let newSegs = [];
+    let offset = 0;
+    for (let seg of segs) {
+      let segStart = offset;
+      let segEnd = offset + seg.text.length;
+      if (segEnd <= start || segStart >= end) {
+        newSegs.push(seg);
+      } else {
+        let overlapStart = Math.max(start, segStart) - segStart;
+        let overlapEnd = Math.min(end, segEnd) - segStart;
+        let before = seg.text.slice(0, overlapStart);
+        let middle = seg.text.slice(overlapStart, overlapEnd);
+        let after = seg.text.slice(overlapEnd);
+        if (before) newSegs.push({ ...seg, text: before });
+        if (middle) newSegs.push({ ...seg, text: middle, [styleField]: styleValue });
+        if (after) newSegs.push({ ...seg, text: after });
+      }
+      offset += seg.text.length;
+    }
+    saveSegments(mergeAdjacentSegments(newSegs));
+    return true;
+  }
+
+  function handleBeforeInput(e) {
+    e.preventDefault();
+    let cursorOffset = getCursorOffset();
+    if (cursorOffset === null) cursorOffset = segmentsRef.current.reduce((s, seg) => s + seg.text.length, 0);
+
+    let sel = window.getSelection();
+    let selStart = cursorOffset;
+    let selEnd = cursorOffset;
+    if (sel && !sel.isCollapsed) {
+      let range = sel.getRangeAt(0);
+      let preRange = document.createRange();
+      preRange.selectNodeContents(editorRef.current);
+      preRange.setEnd(range.startContainer, range.startOffset);
+      selStart = preRange.toString().length;
+      preRange.setEnd(range.endContainer, range.endOffset);
+      selEnd = preRange.toString().length;
+      selStart = Math.min(selStart, selEnd);
+      selEnd = Math.max(cursorOffset, selEnd);
+      if (selEnd === selStart) {
+        selEnd = selStart + sel.toString().length;
+      }
+    }
+
+    if (e.inputType === "insertText" || e.inputType === "insertFromPaste" || e.inputType === "insertFromDrop") {
+      let data = e.data || (e.dataTransfer && e.dataTransfer.getData("text/plain")) || "";
+      if (!data) return;
+      if (selStart !== selEnd) deleteRange(selStart, selEnd);
+      let insertAt = selStart;
+      insertTextAt(insertAt, data);
+      cursorPosRef.current = insertAt + data.length;
+    } else if (e.inputType === "deleteContentBackward") {
+      if (selStart !== selEnd) {
+        deleteRange(selStart, selEnd);
+        cursorPosRef.current = selStart;
+      } else if (selStart > 0) {
+        deleteRange(selStart - 1, selStart);
+        cursorPosRef.current = selStart - 1;
+      }
+    } else if (e.inputType === "deleteContentForward") {
+      let totalLen = segmentsRef.current.reduce((s, seg) => s + seg.text.length, 0);
+      if (selStart !== selEnd) {
+        deleteRange(selStart, selEnd);
+        cursorPosRef.current = selStart;
+      } else if (selStart < totalLen) {
+        deleteRange(selStart, selStart + 1);
+        cursorPosRef.current = selStart;
+      }
+    } else if (e.inputType === "insertLineBreak" || e.inputType === "insertParagraph") {
+      if (selStart !== selEnd) deleteRange(selStart, selEnd);
+      insertTextAt(selStart, "\n");
+      cursorPosRef.current = selStart + 1;
+    }
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      let cursorOffset = getCursorOffset() || 0;
+      let sel = window.getSelection();
+      let selStart = cursorOffset;
+      let selEnd = cursorOffset;
+      if (sel && !sel.isCollapsed) {
+        selEnd = selStart + sel.toString().length;
+      }
+      if (selStart !== selEnd) deleteRange(selStart, selEnd);
+      insertTextAt(selStart, "\n");
+      cursorPosRef.current = selStart + 1;
+    }
+  }
+
+  useEffect(() => {
+    if (cursorPosRef.current !== null) {
+      setCursorOffset(cursorPosRef.current);
+      cursorPosRef.current = null;
+    }
+  });
+
+  useEffect(() => {
+    let el = editorRef.current;
+    if (!el) return;
+    el.addEventListener("beforeinput", handleBeforeInput);
+    return () => { el.removeEventListener("beforeinput", handleBeforeInput); };
+  });
+
+  useEffect(() => {
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  }, []);
+
+  function updateSignature(field, value) {
+    saveSigField({ ...sig, [field]: value });
+  }
+
+  async function handleImageUpload(e) {
+    let file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      useAlertScreenStore.getState().setValues({
+        title: "Invalid File",
+        message: "Please select an image file.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+      e.target.value = "";
+      return;
+    }
+    _sSetUploading(true);
+    useAlertScreenStore.getState().setValues({
+      title: "Processing Image",
+      message: "Resizing and uploading...",
+      canExitOnOuterClick: false,
+    });
+    try {
+      let shrunk = await shrinkImage(file, MAX_SIG_IMAGE_WIDTH, MAX_SIG_IMAGE_HEIGHT);
+      let { storageUpload } = await import("../../../../db_calls");
+      let settings = useSettingsStore.getState().getSettings();
+      let url = await storageUpload(
+        `${settings.tenantID}/${settings.storeID}/email-signature-${accountKey}`,
+        shrunk,
+        { contentType: shrunk.type }
+      );
+      updateSignature("imageUrl", url);
+    } catch (err) {
+      log("Signature image upload error:", err);
+    }
+    useAlertScreenStore.getState().setShowAlert(false);
+    _sSetUploading(false);
+    e.target.value = "";
+  }
+
+  function handleRemoveImage() {
+    updateSignature("imageUrl", "");
+  }
+
+  let fontWeightLabel = FONT_WEIGHTS.find((w) => w.value === sActiveFontWeight)?.label || "Regular";
+  let fontFamilyIdx = FONT_FAMILIES.indexOf(sActiveFontFamily);
+  let fontWeightIdx = FONT_WEIGHTS.findIndex((w) => w.value === sActiveFontWeight);
+  let hasSegmentText = sSegments.some((s) => s.text.length > 0);
+
+  return (
+    <View style={{ width: "100%", alignItems: "flex-start" }}>
+        {/* Font controls row */}
+        <View style={{ flexDirection: "row", width: "100%", marginBottom: 10, alignItems: "center", gap: 10 }}>
+
+          {/* Font Family */}
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Text style={{ fontSize: 11, color: gray(0.4), fontWeight: "500", marginRight: 5 }}>{"Font"}</Text>
+            <DropdownMenu
+              dataArr={FONT_FAMILIES.map((f) => ({ label: f, value: f }))}
+              onSelect={(item) => { if (!applyStyleToSelection("fontFamily", item.value)) _sSetActiveFontFamily(item.value); }}
+              buttonText={sActiveFontFamily}
+              selectedIdx={fontFamilyIdx >= 0 ? fontFamilyIdx : 0}
+              buttonStyle={{
+                borderColor: C.buttonLightGreenOutline,
+                borderRadius: 6,
+                borderWidth: 1,
+                backgroundColor: C.listItemWhite,
+                paddingVertical: 4,
+                paddingHorizontal: 8,
+              }}
+              buttonTextStyle={{ fontSize: 11, color: C.text, fontWeight: "500" }}
+              menuMaxHeight={200}
+            />
+          </View>
+
+          {/* Font Size */}
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Text style={{ fontSize: 11, color: gray(0.4), fontWeight: "500", marginRight: 5 }}>{"Size"}</Text>
+            <View style={{ flexDirection: "row", alignItems: "center", borderColor: C.buttonLightGreenOutline, borderRadius: 6, borderWidth: 1, backgroundColor: C.listItemWhite, overflow: "hidden" }}>
+              <TouchableOpacity
+                onPress={() => { let newSize = sActiveFontSize - 1; if (newSize < 10) return; if (!applyStyleToSelection("fontSize", newSize)) _sSetActiveFontSize(newSize); }}
+                style={{ paddingVertical: 3, paddingHorizontal: 7, justifyContent: "center", alignItems: "center" }}
+              >
+                <Text style={{ fontSize: 13, color: C.text, fontWeight: "600" }}>{"-"}</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 11, color: C.text, fontWeight: "500", paddingHorizontal: 4, minWidth: 20, textAlign: "center" }}>{sActiveFontSize}</Text>
+              <TouchableOpacity
+                onPress={() => { let newSize = sActiveFontSize + 1; if (newSize > 24) return; if (!applyStyleToSelection("fontSize", newSize)) _sSetActiveFontSize(newSize); }}
+                style={{ paddingVertical: 3, paddingHorizontal: 7, justifyContent: "center", alignItems: "center" }}
+              >
+                <Text style={{ fontSize: 13, color: C.text, fontWeight: "600" }}>{"+"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Font Weight */}
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <Text style={{ fontSize: 11, color: gray(0.4), fontWeight: "500", marginRight: 5 }}>{"Weight"}</Text>
+            <DropdownMenu
+              dataArr={FONT_WEIGHTS.map((w) => ({ label: w.label, value: w.value }))}
+              onSelect={(item) => { if (!applyStyleToSelection("fontWeight", item.value)) _sSetActiveFontWeight(item.value); }}
+              buttonText={fontWeightLabel}
+              selectedIdx={fontWeightIdx >= 0 ? fontWeightIdx : 1}
+              buttonStyle={{
+                borderColor: C.buttonLightGreenOutline,
+                borderRadius: 6,
+                borderWidth: 1,
+                backgroundColor: C.listItemWhite,
+                paddingVertical: 4,
+                paddingHorizontal: 8,
+              }}
+              buttonTextStyle={{ fontSize: 11, color: C.text, fontWeight: "500" }}
+              menuMaxHeight={200}
+            />
+          </View>
+
+          {/* Italic */}
+          <TouchableOpacity
+            onPress={() => {
+              let newVal = sActiveItalic ? "normal" : "italic";
+              if (!applyStyleToSelection("fontStyle", newVal)) _sSetActiveItalic(!sActiveItalic);
+            }}
+            style={{
+              paddingVertical: 4,
+              paddingHorizontal: 8,
+              borderRadius: 6,
+              borderWidth: 1,
+              borderColor: sActiveItalic ? C.green : C.buttonLightGreenOutline,
+              backgroundColor: sActiveItalic ? C.green : C.listItemWhite,
+            }}
+          >
+            <Text style={{ fontSize: 11, fontStyle: "italic", fontWeight: "500", color: sActiveItalic ? "white" : C.text }}>{"Italic"}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Signature text editor */}
+        <Text style={{ fontSize: 13, color: gray(0.4), marginBottom: 5, fontWeight: "500" }}>{"Signature Text"}</Text>
+        <View style={{ width: "100%", marginBottom: 15, position: "relative" }}>
+          {sSegments.length === 0 && (
+            <div style={{
+              position: "absolute",
+              top: 10,
+              left: 10,
+              color: "gray",
+              pointerEvents: "none",
+              userSelect: "none",
+              fontSize: 14,
+            }}>
+              {"Enter your email signature..."}
+            </div>
+          )}
+          <div
+            ref={editorRef}
+            contentEditable={true}
+            suppressContentEditableWarning={true}
+            onKeyDown={handleKeyDown}
+            style={{
+              width: "100%",
+              minHeight: 80,
+              borderColor: C.buttonLightGreenOutline,
+              borderRadius: 10,
+              borderWidth: 2,
+              borderStyle: "solid",
+              backgroundColor: C.listItemWhite,
+              paddingTop: 10,
+              paddingBottom: 10,
+              paddingLeft: 10,
+              paddingRight: 10,
+              color: C.text,
+              outline: "none",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+              cursor: "text",
+            }}
+          >
+            {sSegments.map((seg, i) => (
+              <span
+                key={i}
+                data-seg={i}
+                style={{
+                  fontFamily: seg.fontFamily,
+                  fontSize: seg.fontSize,
+                  fontWeight: seg.fontWeight,
+                  fontStyle: seg.fontStyle || "normal",
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {seg.text}
+              </span>
+            ))}
+          </div>
+        </View>
+
+        {/* Image upload */}
+        <Text style={{ fontSize: 13, color: gray(0.4), marginBottom: 5, fontWeight: "500" }}>{"Signature Image"}</Text>
+        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 15, gap: 10 }}>
+          <input
+            ref={imageInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            style={{ display: "none" }}
+          />
+          <TouchableOpacity_
+            onPress={() => imageInputRef.current?.click()}
+            disabled={sUploading}
+            style={{ padding: 6, opacity: sUploading ? 0.4 : 1 }}
+          >
+            <Image_ icon={ICONS.uploadCamera} size={24} />
+          </TouchableOpacity_>
+          {!!sigImageUrl && (
+            <Tooltip text="Remove image">
+              <TouchableOpacity_ onPress={handleRemoveImage} style={{ padding: 6 }}>
+                <Image_ icon={ICONS.trash} size={20} />
+              </TouchableOpacity_>
+            </Tooltip>
+          )}
+          {!!sigImageUrl && (
+            <Tooltip text="Insert logo variable at cursor position">
+              <TouchableOpacity
+                onPress={() => {
+                  let cursorOffset = getCursorOffset();
+                  if (cursorOffset === null) cursorOffset = segmentsRef.current.reduce((s, seg) => s + seg.text.length, 0);
+                  insertTextAt(cursorOffset, "{logo}");
+                  cursorPosRef.current = cursorOffset + 6;
+                }}
+                style={{ paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
+              >
+                <Text style={{ fontSize: 11, color: C.text, fontWeight: "500" }}>{"{logo}"}</Text>
+              </TouchableOpacity>
+            </Tooltip>
+          )}
+        </View>
+
+        {/* Image preview with scale controls */}
+        {!!sigImageUrl && (
+          <View style={{ marginBottom: 15, flexDirection: "row", alignItems: "center", gap: 10 }}>
+            <img
+              src={sigImageUrl}
+              alt="Signature"
+              style={{ maxWidth: MAX_SIG_IMAGE_WIDTH * ((sig.imageScale || 100) / 100), maxHeight: MAX_SIG_IMAGE_HEIGHT * ((sig.imageScale || 100) / 100), objectFit: "contain", borderRadius: 4 }}
+            />
+            <View style={{ flexDirection: "column", gap: 4 }}>
+              {(sig.imageScale || 100) < 100 && (
+                <TouchableOpacity
+                  onPress={() => updateSignature("imageScale", Math.min(100, (sig.imageScale || 100) + 10))}
+                  style={{ paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite, alignItems: "center" }}
+                >
+                  <Text style={{ fontSize: 14, color: C.text, fontWeight: "600" }}>{"+"}</Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={() => updateSignature("imageScale", Math.max(10, (sig.imageScale || 100) - 10))}
+                disabled={(sig.imageScale || 100) <= 10}
+                style={{ paddingVertical: 4, paddingHorizontal: 8, borderRadius: 6, borderWidth: 1, borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite, alignItems: "center", opacity: (sig.imageScale || 100) <= 10 ? 0.3 : 1 }}
+              >
+                <Text style={{ fontSize: 14, color: C.text, fontWeight: "600" }}>{"-"}</Text>
+              </TouchableOpacity>
+              <Text style={{ fontSize: 11, color: gray(0.4), textAlign: "center" }}>{(sig.imageScale || 100) + "%"}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Live preview */}
+        <Text style={{ fontSize: 13, color: gray(0.4), marginBottom: 8, fontWeight: "500" }}>{"Preview"}</Text>
+        <View style={{
+          width: "100%",
+          borderWidth: 1,
+          borderColor: C.buttonLightGreenOutline,
+          borderRadius: 10,
+          backgroundColor: C.backgroundWhite,
+          padding: 15,
+        }}>
+          <View style={{ borderTopWidth: 1, borderTopColor: gray(0.15), paddingTop: 10 }}>
+            {hasSegmentText ? (
+              <View style={{ whiteSpace: "pre-wrap" }}>
+                {sSegments.map((seg, i) => {
+                  let parts = seg.text.split("{logo}");
+                  if (parts.length === 1) {
+                    return (
+                      <Text key={i} style={{ fontFamily: seg.fontFamily, fontSize: seg.fontSize, fontWeight: seg.fontWeight, fontStyle: seg.fontStyle || "normal", color: C.text }}>
+                        {seg.text}
+                      </Text>
+                    );
+                  }
+                  return parts.map((part, j) => (
+                    <React.Fragment key={i + "-" + j}>
+                      {part && <Text style={{ fontFamily: seg.fontFamily, fontSize: seg.fontSize, fontWeight: seg.fontWeight, fontStyle: seg.fontStyle || "normal", color: C.text }}>{part}</Text>}
+                      {j < parts.length - 1 && sigImageUrl && (
+                        <img
+                          src={sigImageUrl}
+                          alt="Logo"
+                          style={{ maxWidth: MAX_SIG_IMAGE_WIDTH * ((sig.imageScale || 100) / 100), maxHeight: MAX_SIG_IMAGE_HEIGHT * ((sig.imageScale || 100) / 100), objectFit: "contain", verticalAlign: "middle" }}
+                        />
+                      )}
+                    </React.Fragment>
+                  ));
+                })}
+              </View>
+            ) : (
+              !sigImageUrl && <Text style={{ fontSize: 13, color: gray(0.3), fontStyle: "italic" }}>{"No signature configured"}</Text>
+            )}
+          </View>
+        </View>
+
+    </View>
+  );
+};
+
+function shrinkImage(file, maxW, maxH) {
+  return new Promise((resolve, reject) => {
+    let img = new Image();
+    img.onload = () => {
+      let w = img.width;
+      let h = img.height;
+      if (w > maxW || h > maxH) {
+        let ratio = Math.min(maxW / w, maxH / h);
+        w = Math.round(w * ratio);
+        h = Math.round(h * ratio);
+      }
+      let canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      let ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) return reject(new Error("Canvas toBlob failed"));
+          let shrunkFile = new File([blob], file.name, { type: "image/png" });
+          resolve(shrunkFile);
+        },
+        "image/png",
+        0.9
+      );
+    };
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = URL.createObjectURL(file);
+  });
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 

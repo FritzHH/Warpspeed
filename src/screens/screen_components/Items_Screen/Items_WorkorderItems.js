@@ -136,7 +136,6 @@ export const Items_WorkorderItemsTab = ({}) => {
 
   // Note Helper dropdown state (lifted to parent so only one Modal exists)
   const zNoteHelpers = useSettingsStore((state) => state.settings?.noteHelpers);
-  const zNoteHelpersTarget = useSettingsStore((state) => state.settings?.noteHelpersTarget || "intakeNotes");
   const [sNoteHelperDropdown, _setNoteHelperDropdown] = useState(null); // { workorderLine, targetField, centered }
 
   // dev
@@ -810,13 +809,13 @@ export const Items_WorkorderItemsTab = ({}) => {
           }}
         />
         {sTotals.runningDiscount > 0 && (
-          <Text style={{ fontSize: 13, color: "gray" }}>
+          <Text style={{ fontSize: 13, color: C.green }}>
             {"DISCOUNT: "}
             <Text
               style={{
                 marginRight: 10,
                 fontWeight: 500,
-                color: C.text,
+                color: C.green,
                 fontSize: 14,
               }}
             >
@@ -949,7 +948,6 @@ export const Items_WorkorderItemsTab = ({}) => {
         anchorX={sNoteHelperDropdown?.anchorX || 0}
         anchorY={sNoteHelperDropdown?.anchorY || 0}
         noteHelpers={zNoteHelpers || []}
-        noteHelpersTarget={sNoteHelperDropdown?.targetField || zNoteHelpersTarget}
       />
     </View>
   );

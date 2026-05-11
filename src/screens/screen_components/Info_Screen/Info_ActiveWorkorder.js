@@ -271,7 +271,8 @@ export const ActiveWorkorderComponent = ({}) => {
     let statusObj = (zSettings?.statuses || []).find((s) => s.id === zOpenWorkorder?.status);
     let waitLabel = zOpenWorkorder?.waitTime?.label || "";
     let maxDays = zOpenWorkorder?.waitTime?.maxWaitTimeDays;
-    let needsBlink = statusObj?.requireWaitTime && (waitLabel.length <= 3 || maxDays === 0 || maxDays === "0");
+    let isPickupDelivery = zOpenWorkorder?.status === "pickup" || zOpenWorkorder?.status === "delivery";
+    let needsBlink = !isPickupDelivery && statusObj?.requireWaitTime && (waitLabel.length <= 3 || maxDays === 0 || maxDays === "0");
     if (!needsBlink) {
       _setWaitTimeBlink(false);
       return;
@@ -465,6 +466,7 @@ export const ActiveWorkorderComponent = ({}) => {
       _settings?.salesTaxPercent,
       _ctx
     );
+    console.log("PRINT PAYLOAD:", JSON.stringify(toPrint, null, 2));
     dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
   }
 
@@ -674,7 +676,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 </Text>
               </View>
             )}
-            {!zCustomer?.customerLandline.length > 0 && (
+            {zCustomer?.customerLandline?.length > 0 && (
               <View
                 style={{
                   flexDirection: "row",
@@ -688,8 +690,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   style={{ marginRight: 7 }}
                 />
                 <Text style={{ color: C.text, fontSize: 12 }}>
-                  {/* {formatPhoneWithParens(zCustomer.customerLandline)} */}
-                  {formatPhoneWithParens(2343234323)}
+                  {formatPhoneWithParens(zCustomer.customerLandline)}
                 </Text>
               </View>
             )}
@@ -896,7 +897,7 @@ export const ActiveWorkorderComponent = ({}) => {
             >
               <View ref={descInputRef} style={{ width: "45%", zIndex: 10 }}>
                 <TextInput_
-                  placeholder={"Model/Description"}
+                  placeholder={"Model / description"}
                   editable={!isDonePaid}
                   capitalize={true}
                   style={{
@@ -1283,18 +1284,24 @@ export const ActiveWorkorderComponent = ({}) => {
                   );
                   const hasOthers = otherWOs.length > 0;
                   const allOthersFinished = hasOthers && otherWOs.every((w) => w.status === "finished");
-                  let modalMessage = "Would you like to send a text to let the customer know their bike is ready for pickup?";
+                  let modalMessage = "Would you like to send a notification to let the customer know their bike is ready for pickup?";
                   if (hasOthers && !allOthersFinished) {
-                    modalMessage = "This customer has other bikes that are still being worked on. Would you like to send a text to let them know this bike is ready?";
+                    modalMessage = "This customer has other bikes that are still being worked on. Would you like to send a notification to let them know this bike is ready?";
                   } else if (allOthersFinished) {
-                    modalMessage = "All of this customer's bikes are now complete! Would you like to send a text to let them know everything is ready for pickup?";
+                    modalMessage = "All of this customer's bikes are now complete! Would you like to send a notification to let them know everything is ready for pickup?";
+                  }
+                  let smsID = "finished_sms";
+                  let emailID = "finished_email";
+                  if (allOthersFinished) {
+                    smsID = "finished_multiple_items_sms";
+                    emailID = "finished_multiple_items_email";
                   }
                   useAlertScreenStore.getState().setValues({
-                    title: "Send Finished Text?",
+                    title: "Send Finished Notification?",
                     message: modalMessage,
                     btn1Text: "Send",
                     handleBtn1Press: () => {
-                      const finishedRule = { smsTemplateID: "finished_sms", emailTemplateID: "", delayMinutes: 0, delaySeconds: 0 };
+                      const finishedRule = { smsTemplateID: smsID, emailTemplateID: emailID, delayMinutes: 0, delaySeconds: 0 };
                       const wo = store.getWorkorders().find((w) => w.id === zOpenWorkorder.id) || zOpenWorkorder;
                       scheduleAutoText(finishedRule, wo, zSettings);
                       store.setField("contacted", true, zOpenWorkorder.id);
@@ -1408,12 +1415,14 @@ export const ActiveWorkorderComponent = ({}) => {
               );
             })()}
             <View
+              pointerEvents={(zOpenWorkorder?.status === "pickup" || zOpenWorkorder?.status === "delivery") ? "none" : "auto"}
               style={{
                 flexDirection: "row",
                 justifyContent: "space-between",
                 width: "100%",
                 alignItems: "center",
                 marginTop: 11,
+                opacity: (zOpenWorkorder?.status === "pickup" || zOpenWorkorder?.status === "delivery") ? 0.35 : 1,
               }}
             >
               <Text style={{ color: gray(0.5), fontSize: 13, marginRight: 4 }}>
@@ -1499,6 +1508,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       borderRadius: 3,
                       paddingHorizontal: 4,
                       paddingVertical: 2,
+                      opacity: (zOpenWorkorder?.status === "pickup" || zOpenWorkorder?.status === "delivery") ? 0.35 : 1,
                     }}
                   >
                     {estimateLabel}

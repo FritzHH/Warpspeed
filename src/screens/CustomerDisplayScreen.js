@@ -803,8 +803,10 @@ export function CustomerDisplayScreen() {
     };
   }, []);
 
+  let isMedia = sType === DISPLAY_MSG_TYPES.MEDIA && sDisplayData;
   let hasOverlayData =
     !sTranslateText &&
+    !isMedia &&
     sDisplayData &&
     (sType === DISPLAY_MSG_TYPES.WORKORDER || sType === DISPLAY_MSG_TYPES.SALE);
   let shouldShowOverlay = hasOverlayData;
@@ -897,6 +899,44 @@ export function CustomerDisplayScreen() {
         </div>
       )}
 
+      {/* Media cast overlay */}
+      {isMedia && !sTranslateText && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0,0,0,0.92)",
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          {sDisplayData.type === "video" ? (
+            <video
+              src={sDisplayData.url}
+              controls
+              autoPlay
+              style={{
+                maxWidth: "90%",
+                maxHeight: "90%",
+                borderRadius: 8,
+              }}
+            />
+          ) : (
+            <Image
+              source={{ uri: sDisplayData.url }}
+              style={{
+                width: "90%",
+                height: "90%",
+                borderRadius: 8,
+              }}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      )}
 
     </View>
   );

@@ -285,10 +285,17 @@ export function NewCheckoutModalScreen() {
   let custFirst = zOpenWorkorder?.customerFirst || zCustomer?.first || "";
   let custLast = zOpenWorkorder?.customerLast || zCustomer?.last || "";
   let custLanguage = zOpenWorkorder?.customerLanguage || zCustomer?.language || "";
+  let isZeroTotal = (sSale?.total === 0) && !saleComplete;
   let hasRealPayments = sTransactions.some((t) => {
     let refunded = (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
     return (t.amountCaptured || 0) > refunded;
   }) || sCredits.length > 0;
+
+  useEffect(() => {
+    if (!saleComplete) return;
+    let timer = setTimeout(() => closeModal(), 15000);
+    return () => clearTimeout(timer);
+  }, [saleComplete]);
 
   // ─── Initialization ──────────────────────────────────────
   // Called once when the modal opens. We use a flag to avoid
@@ -988,6 +995,16 @@ export function NewCheckoutModalScreen() {
     persistSale(sale);
   }
 
+  function handleZeroTotalComplete() {
+    if (!sSale || saleComplete) return;
+    let sale = cloneDeep(sSale);
+    sale.paymentComplete = true;
+    sale.amountCaptured = 0;
+    sale.workorderIDs = sCombinedWorkorders.map((o) => o.id);
+    _setSale(sale);
+    handleSaleComplete(sale, sTransactions, sCredits);
+  }
+
   function handlePaymentCapture(payment) {
     dlog(DCAT.ACTION, "handlePaymentCapture", "CheckoutModal", { transactionID: payment?.id, method: payment?.method, amountCaptured: payment?.amountCaptured, saleID: sSale?.id, saleComplete: sSale?.paymentComplete });
     log("handlePaymentCapture called:", JSON.stringify(payment));
@@ -1018,8 +1035,8 @@ export function NewCheckoutModalScreen() {
     } else {
       updateWorkordersWithPaymentStatus(sale, payment, newTransactions);
 
-      // Pop register if cash payment has change due
-      if (payment.method === "cash" && payment.amountTendered > payment.amountCaptured) {
+      // Pop register on any cash payment
+      if (payment.method === "cash") {
         let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
         if (printerID) {
           dbSavePrintObj({ id: crypto.randomUUID(), receiptType: RECEIPT_TYPES.register }, printerID);
@@ -1750,17 +1767,29 @@ export function NewCheckoutModalScreen() {
                 justifyContent: "space-between",
               }}
             >
-              <CashPayment
-                amountLeftToPay={cashAmountLeftToPay}
-                onPaymentCapture={handlePaymentCapture}
-                acceptChecks={zSettings?.acceptChecks}
-                saleComplete={saleComplete}
-                onCashChange={handleCashChange}
-                hasReaders={onlineReaders.length > 0}
-                isVisible={zIsCheckingOut}
-                lockAmount={isDepositMode}
-                cardIsProcessing={cardIsProcessing}
-              />
+              {isZeroTotal ? (
+                <View style={{ height: "48%", justifyContent: "center", alignItems: "center", borderRadius: 15, ...SHADOW_RADIUS_PROTO, padding: 20 }}>
+                  <Text style={{ fontSize: 16, fontWeight: Fonts.weight.textHeavy, color: C.text, marginBottom: 20 }}>Total is $0.00</Text>
+                  <TouchableOpacity
+                    onPress={handleZeroTotalComplete}
+                    style={{ width: "80%", height: 50, backgroundColor: C.green, borderRadius: 8, justifyContent: "center", alignItems: "center" }}
+                  >
+                    <Text style={{ fontSize: 15, fontWeight: Fonts.weight.textHeavy, color: "white" }}>Complete Workorder</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <CashPayment
+                  amountLeftToPay={cashAmountLeftToPay}
+                  onPaymentCapture={handlePaymentCapture}
+                  acceptChecks={zSettings?.acceptChecks}
+                  saleComplete={saleComplete}
+                  onCashChange={handleCashChange}
+                  hasReaders={onlineReaders.length > 0}
+                  isVisible={zIsCheckingOut}
+                  lockAmount={isDepositMode}
+                  cardIsProcessing={cardIsProcessing}
+                />
+              )}
               {sCardMode === "manual" ? (
                 <CardPayment
                   amountLeftToPay={amountLeftToPay}

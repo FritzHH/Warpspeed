@@ -23,6 +23,7 @@ const {
   generateCreditReceiptPDF,
   generateGiftCardReceiptPDF,
   generateWorkorderTicketPDF,
+  generateTransactionReceiptPDF,
 } = require("./pdfGenerator");
 const {
   findTemplateByType,
@@ -267,7 +268,8 @@ function validateTwilioWebhook(request, authToken, functionName) {
     log("validateTwilioWebhook: no x-twilio-signature header found");
     return false;
   }
-  const url = `${FUNCTIONS_BASE_URL}/${functionName}`;
+  const queryString = request.originalUrl.includes('?') ? request.originalUrl.substring(request.originalUrl.indexOf('?')) : '';
+  const url = `${FUNCTIONS_BASE_URL}/${functionName}${queryString}`;
   const body = request.body || {};
   log("validateTwilioWebhook debug", {
     url,
@@ -4569,6 +4571,9 @@ exports.generateReceiptPDFCallable = onCall(
         case "giftcard":
           base64 = generateGiftCardReceiptPDF(receiptData);
           break;
+        case "transaction":
+          base64 = generateTransactionReceiptPDF(receiptData);
+          break;
         case "workorder":
         case "intake":
           base64 = generateWorkorderTicketPDF(receiptData);
@@ -4800,6 +4805,9 @@ exports.sendReceiptCallable = onCall(
           break;
         case "giftcard":
           base64 = generateGiftCardReceiptPDF(receiptData);
+          break;
+        case "transaction":
+          base64 = generateTransactionReceiptPDF(receiptData);
           break;
         case "workorder":
         case "intake":

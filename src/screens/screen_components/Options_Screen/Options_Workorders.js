@@ -268,7 +268,7 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
             opacity: isPreviewed ? 0.83 : sHovered && !isSelected ? 0.83 : 1,
             backgroundColor: isSelected
               ? lightenRGBByPercent(C.lightred, 85)
-              : workorder.status === "finished"
+              : workorder.status?.toLowerCase().includes("finished")
                 ? lightenRGBByPercent(C.green, 85)
                 : C.listItemWhite,
             flexDirection: "row",

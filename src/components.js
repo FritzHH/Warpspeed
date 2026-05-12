@@ -257,8 +257,15 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
   const zFullScreen = useAlertScreenStore((state) => state.fullScreen);
   let zUseCancelButton = useAlertScreenStore((state) => state.useCancelButton);
 
-  // Animation state ///////////////////////////////////////////////////////////
-  const [sAnimation, _setAnimation] = useState("fade");
+  const [sFadedIn, _setFadedIn] = useState(false);
+
+  useEffect(() => {
+    if (showAlert) {
+      requestAnimationFrame(() => _setFadedIn(true));
+    } else {
+      _setFadedIn(false);
+    }
+  }, [showAlert]);
 
   //////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////
@@ -287,158 +294,150 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
     }, 100);
   }
 
-  // Animation control //////////////////////////////////////////////////////////
-  useEffect(() => {
-    if (showAlert) {
-      _setAnimation("fade"); // Fade in when opening
-    } else {
-      _setAnimation("fade"); // Slide out when closing
-    }
-  }, [showAlert]);
-
   if ((!zButton2Handler && !zButton3Handler) || zUseCancelButton)
     zUseCancelButton = true;
 
-  // log(zButton1Text, zButton2Text);
-  return (
-    <TouchableWithoutFeedback
-      onPress={() => (zCanExitOnOuterClick ? useAlertScreenStore.getState().resetAll() : null)}
+  if (!showAlert) return null;
+
+  return ReactDOM.createPortal(
+    <View
+      onClick={() => (zCanExitOnOuterClick ? useAlertScreenStore.getState().resetAll() : null)}
+      style={{
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        zIndex: 9500,
+        backgroundColor: "rgba(0, 0, 0, 0.4)",
+        alignItems: "center",
+        justifyContent: "center",
+        opacity: sFadedIn ? 1 : 0,
+        transition: "opacity 150ms ease-in",
+      }}
     >
-      <Modal animationType={sAnimation} visible={showAlert} transparent>
         <View
+          onClick={(e) => e.stopPropagation()}
           style={{
-            backgroundColor: "rgba(0, 0, 0, 0.4)",
+            backgroundColor: C.backgroundWhite,
+            borderRadius: 15,
             alignItems: "center",
-            justifyContent: "center",
-            width: "100%",
-            height: "100%",
+            justifyContent: "space-around",
+            minWidth: "32%",
+            minHeight: "24%",
+            ...zAlertBoxStyle,
           }}
         >
-            <View
-              style={{
-                backgroundColor: C.backgroundWhite,
-                borderRadius: 15,
-                alignItems: "center",
-                justifyContent: "space-around",
-              minWidth: "32%",
-              minHeight: "24%",
-                ...zAlertBoxStyle,
-              }}
-            >
-              <View style={{ alignItems: "center", width: "100%" }}>
-                {!!zTitle && (
-                  <Text
-                    numberOfLines={3}
-                    style={{
-                      fontWeight: "500",
-                      marginTop: 25,
-                      color: Colors.darkText,
-                      fontSize: 25,
-                      color: "red",
-                      textAlign: "center",
-                    }}
-                  >
-                    {zTitle || "Alert:"}
-                  </Text>
-                )}
-
-                {!!zMessage && (
-                  <Text
-                    style={{
-                      textAlign: "center",
-                      width: "90%",
-                      marginTop: 10,
-                      color: Colors.darkText,
-                      fontSize: 18,
-                    }}
-                  >
-                    {zMessage}
-                  </Text>
-                )}
-                {!!zSubMessage && (
-                  <Text
-                    style={{
-                      marginTop: 20,
-                      width: "80%",
-                      textAlign: "center",
-                      color: Colors.darkText,
-                      fontSize: 16,
-                    }}
-                  >
-                    {zSubMessage}
-                  </Text>
-                )}
-              </View>
-              <View
+          <View style={{ alignItems: "center", width: "100%" }}>
+            {!!zTitle && (
+              <Text
+                numberOfLines={3}
                 style={{
+                  fontWeight: "500",
                   marginTop: 25,
-                  flexDirection: "row",
-                  justifyContent: "center",
-                  alignItems: "center",
-                  marginBottom: 25,
-                  width: "100%",
-                  paddingHorizontal: 20,
-                  gap: 20,
+                  color: Colors.darkText,
+                  fontSize: 25,
+                  color: "red",
+                  textAlign: "center",
                 }}
               >
-                <Button_
-                  colorGradientArr={zButton1Text ? COLOR_GRADIENTS.green : []}
-                  text={zButton1Text}
-                  buttonStyle={{ paddingVertical: 4, flex: 1 }}
-                  textStyle={{ color: C.textWhite, fontWeight: "600" }}
-                  onPress={handleButton1Press}
-                  iconSize={zIcon1Size || 60}
-                  icon={zButton1Icon || (zButton1Text ? null : ICONS.check1)}
-                />
-                {!!zButton2Handler && (
-                  <Button_
-                    colorGradientArr={zButton2Text ? COLOR_GRADIENTS.blue : []}
-                    text={zButton2Text}
-                    buttonStyle={{ paddingVertical: 4, flex: 1 }}
-                    textStyle={zButton2Text ? { color: C.textWhite, fontWeight: "600" } : {}}
-                    onPress={handleButton2Press}
-                    iconSize={zIcon2Size || 60}
-                    icon={zButton2Icon || (zButton2Text ? null : ICONS.close1)}
-                  />
-                )}
-                {!!zButton3Handler && (
-                  <Button_
-                    colorGradientArr={
-                      zButton3Text ? COLOR_GRADIENTS.purple : []
-                    }
-                    text={zButton3Text}
-                    buttonStyle={{ paddingVertical: 4, flex: 1 }}
-                    textStyle={zButton3Text ? { color: C.textWhite, fontWeight: "600" } : {}}
-                    onPress={handleButton3Press}
-                    iconSize={zIcon3Size || 60}
-                    icon={zButton3Icon || (zButton3Text ? null : ICONS.close1)}
-                  />
-                )}
-              </View>
-              <View style={{ width: "100%", justifyContent: "flex-end" }}>
-                {zUseCancelButton && (
-                  <Button_
-                    textStyle={{ color: gray(0.4) }}
-                    buttonStyle={{
-                      backgroundColor: gray(0.09),
-                      borderRadius: 0,
-                      borderBottomRightRadius: 15,
-                      borderBottomLeftRadius: 15,
-                    }}
-                    text={"CANCEL"}
-                    onPress={() => {
-                      useAlertScreenStore.getState().setShowAlert(false);
-                      setTimeout(() => {
-                        useAlertScreenStore.getState().resetAll();
-                      }, 100);
-                    }}
-                  />
-                )}
-            </View>
+                {zTitle || "Alert:"}
+              </Text>
+            )}
+
+            {!!zMessage && (
+              <Text
+                style={{
+                  textAlign: "center",
+                  width: "90%",
+                  marginTop: 10,
+                  color: Colors.darkText,
+                  fontSize: 18,
+                }}
+              >
+                {zMessage}
+              </Text>
+            )}
+            {!!zSubMessage && (
+              <Text
+                style={{
+                  marginTop: 20,
+                  width: "80%",
+                  textAlign: "center",
+                  color: Colors.darkText,
+                  fontSize: 16,
+                }}
+              >
+                {zSubMessage}
+              </Text>
+            )}
+          </View>
+          <View
+            style={{
+              marginTop: 25,
+              flexDirection: "row",
+              justifyContent: "center",
+              alignItems: "center",
+              marginBottom: 25,
+              width: "100%",
+              paddingHorizontal: 20,
+              gap: 20,
+            }}
+          >
+            <Button_
+              colorGradientArr={zButton1Text ? COLOR_GRADIENTS.green : []}
+              text={zButton1Text}
+              buttonStyle={{ paddingVertical: 4, flex: 1 }}
+              textStyle={{ color: C.textWhite, fontWeight: "600" }}
+              onPress={handleButton1Press}
+              iconSize={zIcon1Size || 60}
+              icon={zButton1Icon || (zButton1Text ? null : ICONS.check1)}
+            />
+            {!!zButton2Handler && (
+              <Button_
+                colorGradientArr={zButton2Text ? COLOR_GRADIENTS.blue : []}
+                text={zButton2Text}
+                buttonStyle={{ paddingVertical: 4, flex: 1 }}
+                textStyle={zButton2Text ? { color: C.textWhite, fontWeight: "600" } : {}}
+                onPress={handleButton2Press}
+                iconSize={zIcon2Size || 60}
+                icon={zButton2Icon || (zButton2Text ? null : ICONS.close1)}
+              />
+            )}
+            {!!zButton3Handler && (
+              <Button_
+                colorGradientArr={
+                  zButton3Text ? COLOR_GRADIENTS.purple : []
+                }
+                text={zButton3Text}
+                buttonStyle={{ paddingVertical: 4, flex: 1 }}
+                textStyle={zButton3Text ? { color: C.textWhite, fontWeight: "600" } : {}}
+                onPress={handleButton3Press}
+                iconSize={zIcon3Size || 60}
+                icon={zButton3Icon || (zButton3Text ? null : ICONS.close1)}
+              />
+            )}
+          </View>
+          <View style={{ width: "100%", justifyContent: "flex-end" }}>
+            {zUseCancelButton && (
+              <Button_
+                textStyle={{ color: gray(0.4) }}
+                buttonStyle={{
+                  backgroundColor: gray(0.09),
+                  borderRadius: 0,
+                  borderBottomRightRadius: 15,
+                  borderBottomLeftRadius: 15,
+                }}
+                text={"CANCEL"}
+                onPress={() => {
+                  useAlertScreenStore.getState().setShowAlert(false);
+                  setTimeout(() => {
+                    useAlertScreenStore.getState().resetAll();
+                  }, 100);
+                }}
+              />
+            )}
           </View>
         </View>
-      </Modal>
-    </TouchableWithoutFeedback>
+    </View>,
+    document.body
   );
 };
 
@@ -531,37 +530,24 @@ export const ScreenModal = ({
 }) => {
   const [sModalCoordinates, _setModalCoordinates] = useState(null);
   const [sInternalModalShow, _setInternalModalShow] = useState(false);
-  const [sAnimation, _setAnimation] = useState("fade");
+  const [sFadedIn, _setFadedIn] = useState(false);
 
-  //////////////////////////////////////////////////////////////
+  const isVisible = handleModalActionInternally ? sInternalModalShow : modalVisible;
+
   useEffect(() => {
-    const isVisible = handleModalActionInternally
-      ? sInternalModalShow
-      : modalVisible;
     if (isVisible) {
-      _setAnimation("fade"); // Fade in when opening
+      requestAnimationFrame(() => _setFadedIn(true));
     } else {
-      _setAnimation("fade"); // Slide out when closing
+      _setFadedIn(false);
     }
-  }, [modalVisible, sInternalModalShow]);
-
-  useEffect(() => {
-    // useLoginStore.getState().setModalVisible(true);
-    // return () => {
-    //   useLoginStore.getState().setModalVisible(false);
-    // };
-  });
-  // if (!openUpward && !centerMenuVertically && modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
+  }, [isVisible]);
 
   if (!showShadow) shadowStyle = SHADOW_RADIUS_NOTHING;
   if (!showOuterModal)
     outerModalStyle = { ...outerModalStyle, width: null, height: null };
 
-  // if (sMouseOver) shadowStyle = { ...SHADOW_RADIUS_PROTO };
-  /////////////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////////////
   if (mouseOverOptions.highlightColor) mouseOverOptions.enable = true;
-  let animation = "fade";
+
   return (
     <TouchableWithoutFeedback
       ref={ref}
@@ -601,50 +587,60 @@ export const ScreenModal = ({
           />
         )}
 
-        <Modal
-          animationType={sAnimation}
-          visible={
-            handleModalActionInternally ? sInternalModalShow : modalVisible
-          }
-          transparent
-        >
+        {isVisible && ReactDOM.createPortal(
           <View
+            onClick={() => {
+              _setInternalModalShow(false);
+              handleOuterClick();
+            }}
             style={{
-              width: "100%",
-              height: "100%",
-              backgroundColor: showOuterModal ? "rgba(0, 0, 0, 0.5)" : null,
-              justifyContent: "center",
-              alignItems: "center",
-              alignSelf: "center",
-              justifySelf: "center",
-              ...outerModalStyle,
-              position: sModalCoordinates ? "absolute" : null,
-              top: sModalCoordinates && !openUpward
-                ? centerMenuVertically && menuHeight
-                  ? Math.max(
-                      10,
-                      Math.min(
-                        sModalCoordinates.y +
-                          (sModalCoordinates.height || 30) / 2 -
-                          menuHeight / 2,
-                        window.innerHeight - menuHeight - 10
-                      )
-                    )
-                  : sModalCoordinates.y + modalCoordinateVars.y
-                : null,
-              bottom: sModalCoordinates && openUpward ? window.innerHeight - sModalCoordinates.y : null,
-              left: sModalCoordinates
-                ? centerMenuHorizontally
-                  ? 0
-                  : sModalCoordinates.x + modalCoordinateVars.x
-                : null,
-              right: sModalCoordinates && centerMenuHorizontally ? 0 : undefined,
-              ...(centerMenuHorizontally ? { alignItems: "center" } : {}),
+              position: "fixed",
+              top: 0, left: 0, right: 0, bottom: 0,
+              zIndex: 9000,
+              backgroundColor: showOuterModal ? "rgba(0, 0, 0, 0.5)" : "transparent",
+              opacity: sFadedIn ? 1 : 0,
+              transition: "opacity 150ms ease-in",
             }}
           >
-            {Component()}
-          </View>
-        </Modal>
+            <View
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                width: "100%",
+                height: "100%",
+                justifyContent: "center",
+                alignItems: "center",
+                alignSelf: "center",
+                justifySelf: "center",
+                ...outerModalStyle,
+                position: sModalCoordinates ? "absolute" : null,
+                top: sModalCoordinates && !openUpward
+                  ? centerMenuVertically && menuHeight
+                    ? Math.max(
+                        10,
+                        Math.min(
+                          sModalCoordinates.y +
+                            (sModalCoordinates.height || 30) / 2 -
+                            menuHeight / 2,
+                          window.innerHeight - menuHeight - 10
+                        )
+                      )
+                    : sModalCoordinates.y + modalCoordinateVars.y
+                  : null,
+                bottom: sModalCoordinates && openUpward ? window.innerHeight - sModalCoordinates.y : null,
+                left: sModalCoordinates
+                  ? centerMenuHorizontally
+                    ? 0
+                    : sModalCoordinates.x + modalCoordinateVars.x
+                  : null,
+                right: sModalCoordinates && centerMenuHorizontally ? 0 : undefined,
+                ...(centerMenuHorizontally ? { alignItems: "center" } : {}),
+              }}
+            >
+              {Component()}
+            </View>
+          </View>,
+          document.body
+        )}
       </View>
     </TouchableWithoutFeedback>
   );
@@ -3525,12 +3521,16 @@ export const StatusPickerModal = ({
   itemTextStyle,
 }) => {
   const [sVisible, _setVisible] = useState(false);
-  const [sAnimation, _setAnimation] = useState("fade");
+  const [sFadedIn, _setFadedIn] = useState(false);
   const [sCoords, _setCoords] = useState({ x: 0, y: 0, height: 0 });
   const ref = useRef();
 
   useEffect(() => {
-    _setAnimation("fade");
+    if (sVisible) {
+      requestAnimationFrame(() => _setFadedIn(true));
+    } else {
+      _setFadedIn(false);
+    }
   }, [sVisible]);
 
   useEffect(() => {
@@ -3596,56 +3596,54 @@ export const StatusPickerModal = ({
         </Text>
       </TouchableOpacity>
 
-      <Modal
-        animationType={sAnimation}
-        visible={sVisible}
-        transparent
-      >
-        <TouchableWithoutFeedback onPress={() => _setVisible(false)}>
+      {sVisible && ReactDOM.createPortal(
+        <View
+          onClick={() => _setVisible(false)}
+          style={{
+            position: "fixed",
+            top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 9000,
+            backgroundColor: "transparent",
+            opacity: sFadedIn ? 1 : 0,
+            transition: "opacity 150ms ease-in",
+          }}
+        >
           <View
+            onClick={(e) => e.stopPropagation()}
             style={{
-              width: "100%",
-              height: "100%",
-              backgroundColor: "transparent",
+              position: "absolute",
+              top: anchorTop,
+              left: anchorLeft,
+              width: MENU_WIDTH,
+              maxHeight,
+              borderRadius: 5,
+              overflow: "hidden",
+              backgroundColor: "#FFFFFF",
             }}
           >
-            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View
-                style={{
-                  position: "absolute",
-                  top: anchorTop,
-                  left: anchorLeft,
-                  width: MENU_WIDTH,
-                  maxHeight,
-                  borderRadius: 5,
-                  overflow: "hidden",
-                  backgroundColor: "#FFFFFF",
-                }}
-              >
-                <ScrollView
-                  style={{ maxHeight }}
-                  showsVerticalScrollIndicator={true}
-                >
-                  {statuses.map((status, idx) => (
-                    <StatusPickerRow
-                      key={status.id || idx}
-                      status={status}
-                      idx={idx}
-                      total={statuses.length}
-                      itemHeight={itemHeight}
-                      itemTextStyle={itemTextStyle}
-                      onPress={() => {
-                        onSelect(status);
-                        _setVisible(false);
-                      }}
-                    />
-                  ))}
-                </ScrollView>
-              </View>
-            </TouchableWithoutFeedback>
+            <ScrollView
+              style={{ maxHeight }}
+              showsVerticalScrollIndicator={true}
+            >
+              {statuses.map((status, idx) => (
+                <StatusPickerRow
+                  key={status.id || idx}
+                  status={status}
+                  idx={idx}
+                  total={statuses.length}
+                  itemHeight={itemHeight}
+                  itemTextStyle={itemTextStyle}
+                  onPress={() => {
+                    ReactDOM.flushSync(() => _setVisible(false));
+                    onSelect(status);
+                  }}
+                />
+              ))}
+            </ScrollView>
           </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+        </View>,
+        document.body
+      )}
     </View>
   );
 };

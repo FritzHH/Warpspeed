@@ -1254,94 +1254,96 @@ export const ActiveWorkorderComponent = ({}) => {
               const pd = zOpenWorkorder?.pickupDelivery || {};
 
               const handleStatusSelect = (val) => {
-                const store = useOpenWorkordersStore.getState();
-                store.setField("status", val.id, zOpenWorkorder.id);
-                // Auto-populate pickup/delivery defaults when first selected
-                if (val.id === "pickup" || val.id === "delivery") {
-                  const existing = zOpenWorkorder?.pickupDelivery;
-                  if (!existing?.month && !existing?.day) {
-                    const now = new Date();
-                    const tomorrow = new Date(now);
-                    tomorrow.setDate(tomorrow.getDate() + 1);
-                    store.setField("pickupDelivery", {
-                      month: String(tomorrow.getMonth() + 1),
-                      day: String(tomorrow.getDate()),
-                      startTime: "11:00",
-                      endTime: "15:00",
-                    }, zOpenWorkorder.id);
+                useLoginStore.getState().requireLogin(() => {
+                  const store = useOpenWorkordersStore.getState();
+                  store.setField("status", val.id, zOpenWorkorder.id);
+                  // Auto-populate pickup/delivery defaults when first selected
+                  if (val.id === "pickup" || val.id === "delivery") {
+                    const existing = zOpenWorkorder?.pickupDelivery;
+                    if (!existing?.month && !existing?.day) {
+                      const now = new Date();
+                      const tomorrow = new Date(now);
+                      tomorrow.setDate(tomorrow.getDate() + 1);
+                      store.setField("pickupDelivery", {
+                        month: String(tomorrow.getMonth() + 1),
+                        day: String(tomorrow.getDate()),
+                        startTime: "11:00",
+                        endTime: "15:00",
+                      }, zOpenWorkorder.id);
+                    }
                   }
-                }
-                // Stamp finishedOnMillis when status is set to "Finished"
-                if (val.id === "finished") {
-                  store.setField("finishedOnMillis", Date.now(), zOpenWorkorder.id);
-                }
-                // Finished SMS confirmation modal
-                if (val.id === "finished" && zOpenWorkorder.customerID) {
-                  const allWOs = store.getWorkorders();
-                  const otherWOs = allWOs.filter(
-                    (w) => w.customerID === zOpenWorkorder.customerID && w.id !== zOpenWorkorder.id
-                  );
-                  const hasOthers = otherWOs.length > 0;
-                  const allOthersFinished = hasOthers && otherWOs.every((w) => w.status === "finished");
-                  let modalMessage = "Would you like to send a notification to let the customer know their bike is ready for pickup?";
-                  if (hasOthers && !allOthersFinished) {
-                    modalMessage = "This customer has other bikes that are still being worked on. Would you like to send a notification to let them know this bike is ready?";
-                  } else if (allOthersFinished) {
-                    modalMessage = "All of this customer's bikes are now complete! Would you like to send a notification to let them know everything is ready for pickup?";
+                  // Stamp finishedOnMillis when status is set to "Finished"
+                  if (val.id === "finished") {
+                    store.setField("finishedOnMillis", Date.now(), zOpenWorkorder.id);
                   }
-                  let smsID = "finished_sms";
-                  let emailID = "finished_email";
-                  if (allOthersFinished) {
-                    smsID = "finished_multiple_items_sms";
-                    emailID = "finished_multiple_items_email";
+                  // Finished SMS confirmation modal
+                  if (val.id === "finished" && zOpenWorkorder.customerID) {
+                    const allWOs = store.getWorkorders();
+                    const otherWOs = allWOs.filter(
+                      (w) => w.customerID === zOpenWorkorder.customerID && w.id !== zOpenWorkorder.id
+                    );
+                    const hasOthers = otherWOs.length > 0;
+                    const allOthersFinished = hasOthers && otherWOs.every((w) => w.status === "finished");
+                    let modalMessage = "Would you like to send a notification to let the customer know their bike is ready for pickup?";
+                    if (hasOthers && !allOthersFinished) {
+                      modalMessage = "This customer has other bikes that are still being worked on. Would you like to send a notification to let them know this bike is ready?";
+                    } else if (allOthersFinished) {
+                      modalMessage = "All of this customer's bikes are now complete! Would you like to send a notification to let them know everything is ready for pickup?";
+                    }
+                    let smsID = "finished_sms";
+                    let emailID = "finished_email";
+                    if (allOthersFinished) {
+                      smsID = "finished_multiple_items_sms";
+                      emailID = "finished_multiple_items_email";
+                    }
+                    useAlertScreenStore.getState().setValues({
+                      title: "Send Finished Notification?",
+                      message: modalMessage,
+                      btn1Text: "Send",
+                      handleBtn1Press: () => {
+                        const finishedRule = { smsTemplateID: smsID, emailTemplateID: emailID, delayMinutes: 0, delaySeconds: 0 };
+                        const wo = store.getWorkorders().find((w) => w.id === zOpenWorkorder.id) || zOpenWorkorder;
+                        scheduleAutoText(finishedRule, wo, zSettings);
+                        store.setField("contacted", true, zOpenWorkorder.id);
+                        useAlertScreenStore.getState().setShowAlert(false);
+                      },
+                      btn2Text: "Don't Send",
+                      handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                      canExitOnOuterClick: true,
+                    });
                   }
-                  useAlertScreenStore.getState().setValues({
-                    title: "Send Finished Notification?",
-                    message: modalMessage,
-                    btn1Text: "Send",
-                    handleBtn1Press: () => {
-                      const finishedRule = { smsTemplateID: smsID, emailTemplateID: emailID, delayMinutes: 0, delaySeconds: 0 };
-                      const wo = store.getWorkorders().find((w) => w.id === zOpenWorkorder.id) || zOpenWorkorder;
-                      scheduleAutoText(finishedRule, wo, zSettings);
-                      store.setField("contacted", true, zOpenWorkorder.id);
-                      useAlertScreenStore.getState().setShowAlert(false);
-                    },
-                    btn2Text: "Don't Send",
-                    handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
-                    canExitOnOuterClick: true,
+                  // When "Part Ordered" status is selected, clear the "to be ordered" checkbox
+                  if (val.id === "part_ordered") {
+                    store.setField("partToBeOrdered", false, zOpenWorkorder.id);
+                  }
+                  // Auto-populate linked wait time if one is configured for this status
+                  const linked = zSettings?.waitTimeLinkedStatus?.[val.id];
+                  if (linked) {
+                    store.setField("waitTime", linked, zOpenWorkorder.id);
+                  }
+                  // Auto-text: check if this status has an auto-text rule
+                  const autoTextRules = zSettings?.statusAutoText || [];
+                  const rule = autoTextRules.find((r) => r.statusID === val.id);
+                  if (rule) {
+                    const wo = store.getWorkorders().find((w) => w.id === zOpenWorkorder.id) || zOpenWorkorder;
+                    scheduleAutoText(rule, wo, zSettings);
+                  }
+                  // Notify linked users: add this workorder to their pendingWorkorderIDs
+                  const woID = zOpenWorkorder.id;
+                  const users = zSettings?.users || [];
+                  const currentUserID = useLoginStore.getState().getCurrentUser()?.id;
+                  let usersChanged = false;
+                  const updatedUsers = users.map((u) => {
+                    if (!(u.statuses || []).includes(val.id)) return u;
+                    if ((u.pendingWorkorderIDs || []).includes(woID)) return u;
+                    if (u.id === currentUserID) return u;
+                    usersChanged = true;
+                    return { ...u, pendingWorkorderIDs: [...(u.pendingWorkorderIDs || []), woID] };
                   });
-                }
-                // When "Part Ordered" status is selected, clear the "to be ordered" checkbox
-                if (val.id === "part_ordered") {
-                  store.setField("partToBeOrdered", false, zOpenWorkorder.id);
-                }
-                // Auto-populate linked wait time if one is configured for this status
-                const linked = zSettings?.waitTimeLinkedStatus?.[val.id];
-                if (linked) {
-                  store.setField("waitTime", linked, zOpenWorkorder.id);
-                }
-                // Auto-text: check if this status has an auto-text rule
-                const autoTextRules = zSettings?.statusAutoText || [];
-                const rule = autoTextRules.find((r) => r.statusID === val.id);
-                if (rule) {
-                  const wo = store.getWorkorders().find((w) => w.id === zOpenWorkorder.id) || zOpenWorkorder;
-                  scheduleAutoText(rule, wo, zSettings);
-                }
-                // Notify linked users: add this workorder to their pendingWorkorderIDs
-                const woID = zOpenWorkorder.id;
-                const users = zSettings?.users || [];
-                const currentUserID = useLoginStore.getState().getCurrentUser()?.id;
-                let usersChanged = false;
-                const updatedUsers = users.map((u) => {
-                  if (!(u.statuses || []).includes(val.id)) return u;
-                  if ((u.pendingWorkorderIDs || []).includes(woID)) return u;
-                  if (u.id === currentUserID) return u;
-                  usersChanged = true;
-                  return { ...u, pendingWorkorderIDs: [...(u.pendingWorkorderIDs || []), woID] };
+                  if (usersChanged) {
+                    useSettingsStore.getState().setField("users", updatedUsers);
+                  }
                 });
-                if (usersChanged) {
-                  useSettingsStore.getState().setField("users", updatedUsers);
-                }
               };
 
               const updatePickupFields = (fields) => {

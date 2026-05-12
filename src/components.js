@@ -871,7 +871,7 @@ export const DropdownMenu = ({
               <TouchableOpacity
                 onPress={(e) => {
                   e?.stopPropagation?.();
-                  _setModalVisible(false);
+                  ReactDOM.flushSync(() => _setModalVisible(false));
                   onSelect(item, idx);
                 }}
                 style={{
@@ -1555,7 +1555,7 @@ export const LoginModalScreen = ({ modalVisible }) => {
         alignItems: "center",
         zIndex: 9999,
       }}
-      onClick={() => pinInputRef.current?.focus()}
+      onClick={handleClose}
     >
       <View
         onClick={(e) => { e.stopPropagation(); pinInputRef.current?.focus(); }}

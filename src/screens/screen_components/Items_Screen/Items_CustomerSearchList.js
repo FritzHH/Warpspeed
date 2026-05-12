@@ -24,6 +24,7 @@ import {
   useCustomerSearchStore,
   useLoginStore,
   useOpenWorkordersStore,
+  useRecentCustomersStore,
   useTabNamesStore,
 } from "../../../stores";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
@@ -68,6 +69,7 @@ export function CustomerSearchListComponent({}) {
 
   function handleCustomerSelected(customer) {
     useLoginStore.getState().requireLogin(async () => {
+      useRecentCustomersStore.getState().addRecentCustomer(customer);
       useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
       await startNewWorkorder(customer);
       useCurrentCustomerStore.getState().setCustomer(customer);
@@ -172,7 +174,10 @@ export function CustomerSearchListComponent({}) {
               >
                 <Tooltip text="Customer info">
                   <Button_
-                    onPress={() => _setCustomerInfo(customer)}
+                    onPress={() => {
+                      useRecentCustomersStore.getState().addRecentCustomer(customer);
+                      _setCustomerInfo(customer);
+                    }}
                     iconSize={25}
                     icon={ICONS.info2}
                   />

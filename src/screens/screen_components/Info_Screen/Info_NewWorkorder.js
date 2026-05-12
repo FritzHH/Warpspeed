@@ -71,9 +71,10 @@ export function NewWorkorderComponent({}) {
       const currentTab = useTabNamesStore.getState().itemsTabName;
       if (
         currentTab === TAB_NAMES.itemsTab.customerList ||
-        currentTab === TAB_NAMES.itemsTab.workorderSearchResults
+        currentTab === TAB_NAMES.itemsTab.workorderSearchResults ||
+        currentTab === TAB_NAMES.itemsTab.empty
       ) {
-        useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.empty);
+        useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.recentCustomers);
       }
     }
   }, [zCustomerSearchResults, zIsSearching, zWoSearchResults, zWoIsSearching]);

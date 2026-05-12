@@ -262,6 +262,7 @@ export const TAB_NAMES = {
     preview: "Preview",
     empty: "Empty",
     emailView: "Email View",
+    recentCustomers: "Recent Customers",
   },
   optionsTab: {
     // quickItems: "Quick Items",

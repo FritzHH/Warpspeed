@@ -9,6 +9,7 @@ import { formatCurrencyDisp, formatMillisForDisplay, gray, lightenRGBByPercent, 
 import { readTransaction, writeCashRefund, newCheckoutProcessStripeRefund } from "./newCheckoutFirebaseCalls";
 import { buildRefundObject, sendRefundReceipt } from "./newCheckoutUtils";
 import { dbSaveCustomer, dbSavePrintObj } from "../../../../db_calls_wrapper";
+import { RECEIPT_TYPES } from "../../../../data";
 
 export const DepositRefundModal = memo(function DepositRefundModal({ visible, deposit, customer, onClose, onCustomerUpdated }) {
   const [sTransaction, _setTransaction] = useState(null);
@@ -33,8 +34,10 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
   // Calculate transaction info
   let totalRefunded = (sTransaction?.refunds || []).reduce((sum, r) => sum + (r.amount || 0), 0);
   let available = sTransaction ? sTransaction.amountCaptured - totalRefunded : 0;
-  let isCard = sTransaction?.method === "card";
+  let isImportedCard = sTransaction?.method === "card" && !!sTransaction?._importSource;
+  let isCard = sTransaction?.method === "card" && !sTransaction?._importSource;
   let isCash = !isCard;
+  let isOriginallyCard = sTransaction?.method === "card";
   let fullyRefunded = sTransaction && available <= 0;
 
   // ─── Initialization ──────────────────────────────────────
@@ -266,21 +269,36 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                   <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
                     <View
                       style={{
-                        backgroundColor: isCard ? lightenRGBByPercent(C.blue, 70) : lightenRGBByPercent(C.green, 70),
+                        backgroundColor: isOriginallyCard ? lightenRGBByPercent(C.blue, 70) : lightenRGBByPercent(C.green, 70),
                         paddingHorizontal: 6,
                         paddingVertical: 1,
                         borderRadius: 4,
                         marginRight: 6,
                       }}
                     >
-                      <Text style={{ fontSize: 10, fontWeight: "600", color: isCard ? C.blue : C.green }}>
-                        {isCard ? "CARD" : "CASH"}
+                      <Text style={{ fontSize: 10, fontWeight: "600", color: isOriginallyCard ? C.blue : C.green }}>
+                        {isOriginallyCard ? "CARD" : "CASH"}
                       </Text>
                     </View>
-                    {isCard && sTransaction.last4 && (
+                    {isOriginallyCard && sTransaction.last4 && (
                       <Text style={{ fontSize: 12, color: gray(0.5) }}>
                         {sTransaction.cardIssuer !== "Unknown" ? sTransaction.cardIssuer : sTransaction.cardType} ****{sTransaction.last4}
                       </Text>
+                    )}
+                    {isImportedCard && (
+                      <View
+                        style={{
+                          backgroundColor: lightenRGBByPercent(C.blue, 60),
+                          paddingHorizontal: 5,
+                          paddingVertical: 1,
+                          borderRadius: 4,
+                          marginLeft: 6,
+                        }}
+                      >
+                        <Text style={{ fontSize: 9, fontWeight: "600", color: C.blue }}>
+                          {sTransaction._importSource}
+                        </Text>
+                      </View>
                     )}
                   </View>
                   <Text style={{ fontSize: 11, color: gray(0.4) }}>

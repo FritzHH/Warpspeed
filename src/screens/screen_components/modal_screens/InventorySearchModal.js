@@ -12,6 +12,7 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
   const [sSearchResults, _setSearchResults] = useState([]);
   const [sSearching, _setSearching] = useState(false);
   const [sCheckedIDs, _setCheckedIDs] = useState(new Set());
+  const [sKeypadMode, _setKeypadMode] = useState("alpha");
   const searchTimerRef = useRef(null);
   const headerSwipeRef = useRef(null);
 
@@ -140,7 +141,17 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
 
         {/* Keypad */}
         <div onMouseDown={(e) => e.preventDefault()} style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 8 }}>
-          <StandKeypad mode="alpha" onKeyPress={handleKeyPress} />
+          <StandKeypad
+            mode={sKeypadMode}
+            onKeyPress={handleKeyPress}
+            toggleLabel={sKeypadMode === "phone" ? "ABC" : "123"}
+            onToggle={() => {
+              let newMode = sKeypadMode === "phone" ? "alpha" : "phone";
+              _setKeypadMode(newMode);
+              _setSearchText("");
+              _setSearchResults([]);
+            }}
+          />
         </div>
 
         {/* Results */}

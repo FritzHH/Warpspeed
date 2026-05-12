@@ -250,6 +250,31 @@ export const useCustomerSearchStore = create((set, get) => ({
   reset: () => set({ searchResults: [], selectedItem: null, searchQuery: "", searchType: "phone", isSearching: false }),
 }));
 
+export const useRecentCustomersStore = create(
+  persist(
+    (set, get) => ({
+      recentCustomers: [],
+      getRecentCustomers: () => get().recentCustomers,
+      addRecentCustomer: (customer) => {
+        if (!customer?.id) return;
+        let recent = get().recentCustomers.filter((c) => c.id !== customer.id);
+        let slim = {
+          id: customer.id,
+          first: customer.first || "",
+          last: customer.last || "",
+          customerCell: customer.customerCell || "",
+        };
+        recent = [slim, ...recent].slice(0, 10);
+        set({ recentCustomers: recent });
+      },
+    }),
+    {
+      name: "warpspeed_recent_customers",
+      partialize: (s) => ({ recentCustomers: s.recentCustomers }),
+    }
+  )
+);
+
 export const useWorkorderSearchStore = create((set, get) => ({
   searchResults: [],
   isSearching: false,
@@ -1857,6 +1882,7 @@ export function clearPersistedStores() {
   useInventoryStore.persist.clearStorage();
   useSettingsStore.persist.clearStorage();
   useLoginStore.persist.clearStorage();
+  useRecentCustomersStore.persist.clearStorage();
   useCustMessagesStore.getState()._threadsUnsub?.();
   useCustMessagesStore.getState().setSmsThreads([]);
   useCustMessagesStore.setState({ hubConversationCache: {} });

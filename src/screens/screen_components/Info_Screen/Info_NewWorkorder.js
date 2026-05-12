@@ -261,10 +261,12 @@ export function NewWorkorderComponent({}) {
 
     if (rawText.length <= 2) {
       // do nothing, string too short to search
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
       _setTextInput(rawText);
       useCustomerSearchStore.getState().reset();
       return;
     } else if (isNumeric && rawText.length <= 3) {
+      if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
       // check to see if the last character is a '-' in the string before user edit
       let searchStr = [];
       if (sTextInput.length === 4) {
@@ -274,7 +276,7 @@ export function NewWorkorderComponent({}) {
         searchStr = rawText;
         _setTextInput(formatPhoneWithDashes(searchStr));
       }
-      if (rawText.length >= 5) searchFun([searchStr], ["phone"]);
+      useCustomerSearchStore.getState().reset();
       return;
     } else if (
       isNumeric &&

@@ -7,9 +7,10 @@ import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import { useCurrentCustomerStore, useSettingsStore, useLoginStore } from "../../../../stores";
 import { formatCurrencyDisp, formatMillisForDisplay, gray, lightenRGBByPercent, log, generateEAN13Barcode, localStorageWrapper, findTemplateByType, printBuilder } from "../../../../utils";
 import { readTransaction, writeCashRefund, newCheckoutProcessStripeRefund } from "./newCheckoutFirebaseCalls";
-import { buildRefundObject, sendRefundReceipt } from "./newCheckoutUtils";
-import { dbSaveCustomer, dbSavePrintObj } from "../../../../db_calls_wrapper";
+import { buildRefundObject } from "./newCheckoutUtils";
+import { dbSaveCustomer, dbSavePrintObj, dbSendReceipt } from "../../../../db_calls_wrapper";
 import { RECEIPT_TYPES } from "../../../../data";
+import { build_db_path } from "../../../../constants";
 
 export const DepositRefundModal = memo(function DepositRefundModal({ visible, deposit, customer, onClose, onCustomerUpdated }) {
   const [sTransaction, _setTransaction] = useState(null);
@@ -56,6 +57,10 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
         _setLoading(false);
         return;
       }
+      // DEV: simulate imported card transaction for testing — remove before deploy
+      txn._importSource = "lightspeed";
+      txn.method = "card";
+
       _setTransaction(txn);
       _setLoading(false);
       _setLoadMessage("");
@@ -112,8 +117,13 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
       }
 
       _setRefundComplete(true);
+
+      if (isCash) {
+        let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
+        if (printerID) dbSavePrintObj({ id: crypto.randomUUID(), receiptType: RECEIPT_TYPES.register }, printerID);
+      }
+
       removeDepositFromCustomer();
-      sendReceipts(updatedTxn);
     } catch (error) {
       log("Deposit refund error:", error);
       _setErrorMessage(error?.message || "Refund processing failed");
@@ -131,41 +141,49 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
     if (onCustomerUpdated) onCustomerUpdated(updatedCustomer);
   }
 
-  function sendReceipts(txnOverride) {
+  function handleSendDepositReceipt() {
     if (!sPrint && !sSMS && !sEmail) return;
+    if (!sTransaction) return;
+
     let settings = useSettingsStore.getState().getSettings();
     let currentUser = useLoginStore.getState().getCurrentUser();
     let _ctx = { currentUser, settings };
 
-    let latestTxn = txnOverride || sTransaction;
-    let latestRefund = (latestTxn?.refunds || []).at(-1);
-    if (!latestRefund) return;
-
-    let refundReceipt = printBuilder.refund(
-      latestRefund,
-      { id: latestTxn.id, total: refundAmount, subtotal: refundAmount, salesTax: 0 },
-      customer,
-      { workorderLines: [], taxFree: false },
-      settings?.salesTaxPercent || 0,
-      _ctx
-    );
+    let receipt = printBuilder.transaction(sTransaction, _ctx);
+    receipt.depositType = deposit?.type || "deposit";
+    receipt.depositNote = deposit?.note || "";
+    receipt.customerFirstName = customer?.first || "";
+    receipt.customerLastName = customer?.last || "";
+    receipt.customerCell = customer?.phone || customer?.customerCell || "";
+    receipt.customerEmail = customer?.email || "";
+    receipt.popCashRegister = false;
 
     if (sPrint) {
       let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
-      if (printerID) dbSavePrintObj(refundReceipt, printerID);
+      if (printerID) dbSavePrintObj(receipt, printerID);
     }
 
     if (sSMS || sEmail) {
-      let customerForReceipt = {
-        first: customer?.first || "",
-        last: customer?.last || "",
-        customerCell: customer?.phone || customer?.customerCell || "",
-        email: customer?.email || "",
-        id: customer?.id || "",
-      };
+      let { tenantID, storeID } = settings;
       let smsTemplate = sSMS ? findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt") : null;
       let emailTemplate = sEmail ? findTemplateByType(settings?.emailTemplates, "saleReceipt") : null;
-      sendRefundReceipt(refundReceipt, customerForReceipt, settings, smsTemplate, emailTemplate);
+      let storagePath = build_db_path.cloudStorage.saleReceiptPDF(sTransaction.id, tenantID, storeID);
+      dbSendReceipt({
+        receiptType: "transaction",
+        receiptData: receipt,
+        storagePath,
+        sendSMS: !!(smsTemplate && (customer?.phone || customer?.customerCell)),
+        sendEmail: !!(emailTemplate && customer?.email),
+        customerEmail: customer?.email || "",
+        customerCell: customer?.phone || customer?.customerCell || "",
+        customerID: customer?.id || "",
+        templateVars: {
+          firstName: (customer?.first || "Customer").trim(),
+          storeName: settings?.storeInfo?.displayName || "our store",
+          total: formatCurrencyDisp(sTransaction.amountCaptured, true),
+        },
+        smsMessageID: crypto.randomUUID(),
+      });
     }
   }
 
@@ -254,9 +272,6 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
               {/* Transaction Info Card */}
               <View
                 style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
                   borderWidth: 1,
                   borderColor: gray(0.1),
                   borderRadius: 8,
@@ -265,51 +280,70 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                   backgroundColor: "white",
                 }}
               >
-                <View>
-                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
-                    <View
-                      style={{
-                        backgroundColor: isOriginallyCard ? lightenRGBByPercent(C.blue, 70) : lightenRGBByPercent(C.green, 70),
-                        paddingHorizontal: 6,
-                        paddingVertical: 1,
-                        borderRadius: 4,
-                        marginRight: 6,
-                      }}
-                    >
-                      <Text style={{ fontSize: 10, fontWeight: "600", color: isOriginallyCard ? C.blue : C.green }}>
-                        {isOriginallyCard ? "CARD" : "CASH"}
-                      </Text>
-                    </View>
-                    {isOriginallyCard && sTransaction.last4 && (
-                      <Text style={{ fontSize: 12, color: gray(0.5) }}>
-                        {sTransaction.cardIssuer !== "Unknown" ? sTransaction.cardIssuer : sTransaction.cardType} ****{sTransaction.last4}
-                      </Text>
-                    )}
-                    {isImportedCard && (
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <View>
+                    <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
                       <View
                         style={{
-                          backgroundColor: lightenRGBByPercent(C.blue, 60),
-                          paddingHorizontal: 5,
+                          backgroundColor: isOriginallyCard ? lightenRGBByPercent(C.blue, 70) : lightenRGBByPercent(C.green, 70),
+                          paddingHorizontal: 6,
                           paddingVertical: 1,
                           borderRadius: 4,
-                          marginLeft: 6,
+                          marginRight: 6,
                         }}
                       >
-                        <Text style={{ fontSize: 9, fontWeight: "600", color: C.blue }}>
-                          {sTransaction._importSource}
+                        <Text style={{ fontSize: 10, fontWeight: "600", color: isOriginallyCard ? C.blue : C.green }}>
+                          {isOriginallyCard ? "CARD" : "CASH"}
                         </Text>
                       </View>
-                    )}
+                      {isOriginallyCard && sTransaction.last4 && (
+                        <Text style={{ fontSize: 12, color: gray(0.5) }}>
+                          {sTransaction.cardIssuer !== "Unknown" ? sTransaction.cardIssuer : sTransaction.cardType} ****{sTransaction.last4}
+                        </Text>
+                      )}
+                      {isImportedCard && (
+                        <View
+                          style={{
+                            backgroundColor: lightenRGBByPercent(C.blue, 60),
+                            paddingHorizontal: 5,
+                            paddingVertical: 1,
+                            borderRadius: 4,
+                            marginLeft: 6,
+                          }}
+                        >
+                          <Text style={{ fontSize: 9, fontWeight: "600", color: C.blue }}>
+                            {sTransaction._importSource}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={{ fontSize: 11, color: gray(0.4) }}>
+                      {formatMillisForDisplay(sTransaction.millis)}
+                    </Text>
                   </View>
-                  <Text style={{ fontSize: 11, color: gray(0.4) }}>
-                    {formatMillisForDisplay(sTransaction.millis)}
-                  </Text>
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>
+                      {"$" + formatCurrencyDisp(sTransaction.amountCaptured)}
+                    </Text>
+                  </View>
                 </View>
-                <View style={{ alignItems: "flex-end" }}>
-                  <Text style={{ fontSize: 16, fontWeight: "700", color: C.text }}>
-                    {"$" + formatCurrencyDisp(sTransaction.amountCaptured)}
-                  </Text>
-                </View>
+                {isImportedCard && (
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      backgroundColor: lightenRGBByPercent(C.orange, 75),
+                      borderRadius: 6,
+                      paddingHorizontal: 8,
+                      paddingVertical: 5,
+                      marginTop: 8,
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, color: C.orange, fontWeight: "500" }}>
+                      Imported card payment - refund will be issued as cash
+                    </Text>
+                  </View>
+                )}
               </View>
 
               {/* Receipt Options */}
@@ -345,8 +379,8 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                   buttonStyle={{ marginRight: 12 }}
                 />
                 <Button_
-                  text="Print Receipt"
-                  onPress={sendReceipts}
+                  text="Print/Send Deposit Receipt"
+                  onPress={handleSendDepositReceipt}
                   enabled={(sPrint || sSMS || sEmail) && !sProcessing}
                   colorGradientArr={COLOR_GRADIENTS.blue}
                   textStyle={{ fontSize: 11, color: C.textWhite, fontWeight: Fonts.weight.textHeavy }}
@@ -414,7 +448,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
 
                   {/* Refund Button */}
                   <Button_
-                    text={sProcessing ? "PROCESSING..." : `REFUND FULL ${isGiftCard ? "GIFT CARD" : "DEPOSIT"}`}
+                    text={sProcessing ? "PROCESSING..." : `REFUND FULL ${isGiftCard ? "GIFT CARD" : "DEPOSIT"}${isImportedCard ? " (CASH)" : ""}`}
                     onPress={() => _setShowConfirm(true)}
                     enabled={!sProcessing}
                     colorGradientArr={COLOR_GRADIENTS.yellow}

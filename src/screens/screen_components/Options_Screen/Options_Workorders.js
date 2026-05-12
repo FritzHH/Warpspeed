@@ -32,7 +32,6 @@ import { dbGetCustomer, dbGetCustomerMessages, dbListenToNewMessages } from "../
 
 
 const NUM_MILLIS_IN_DAY = 86400000; // millis in day
-const EMPTY_PENDING = [];
 
 function computeWaitInfo(workorder) {
   let label = calculateWaitEstimateLabel(workorder, useSettingsStore.getState().getSettings());
@@ -238,7 +237,7 @@ const WaitTimeIndicator = React.memo(function WaitTimeIndicator({ workorder }) {
 });
 
 const WorkorderRowItem = React.memo(function WorkorderRowItem({
-  workorder, isSelected, isPreviewed, isPending, statusBlink, paidAmount, isLinkedSale, onSelect, onHoverEnter, onHoverExit
+  workorder, isSelected, isPreviewed, paidAmount, isLinkedSale, onSelect, onHoverEnter, onHoverExit
 }) {
   const [sHovered, _sSetHovered] = useState(false);
   const rs = resolveStatus(workorder.status, useSettingsStore.getState().settings?.statuses);
@@ -255,15 +254,6 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
       <TouchableOpacity
         onPress={() => {
           onSelect(workorder);
-          if (isPending) {
-            const uid = useLoginStore.getState().getCurrentUser()?.id;
-            const users = useSettingsStore.getState().getSettings()?.users || [];
-            const updatedUsers = users.map((u) => {
-              if (u.id !== uid) return u;
-              return { ...u, pendingWorkorderIDs: (u.pendingWorkorderIDs || []).filter((id) => id !== workorder.id) };
-            });
-            useSettingsStore.getState().setField("users", updatedUsers);
-          }
         }}
       >
         <View
@@ -275,14 +265,12 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
             borderLeftWidth: 4,
             borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
             borderColor: C.buttonLightGreenOutline,
-            opacity: isPreviewed ? 0.6 : sHovered && !isSelected ? 0.6 : 1,
+            opacity: isPreviewed ? 0.83 : sHovered && !isSelected ? 0.83 : 1,
             backgroundColor: isSelected
               ? lightenRGBByPercent(C.lightred, 85)
-              : (isPending && statusBlink)
-                ? "rgba(255, 255, 0, 0.35)"
-                : workorder.status === "finished"
-                  ? lightenRGBByPercent(C.green, 85)
-                  : C.listItemWhite,
+              : workorder.status === "finished"
+                ? lightenRGBByPercent(C.green, 85)
+                : C.listItemWhite,
             flexDirection: "row",
             width: "100%",
             paddingLeft: 5,
@@ -644,10 +632,8 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
   if (prev.workorder !== next.workorder) return false;
   if (prev.isSelected !== next.isSelected) return false;
   if (prev.isPreviewed !== next.isPreviewed) return false;
-  if (prev.isPending !== next.isPending) return false;
   if (prev.paidAmount !== next.paidAmount) return false;
   if (prev.isLinkedSale !== next.isLinkedSale) return false;
-  if (prev.isPending && prev.statusBlink !== next.statusBlink) return false;
   return true;
 });
 
@@ -657,20 +643,8 @@ export function WorkordersComponent({}) {
   const zWorkordersLoaded = useOpenWorkordersStore((state) => state.workordersLoaded);
   const zOpenWorkorderID = useOpenWorkordersStore((state) => state.openWorkorderID);
   const zPreviewID = useOpenWorkordersStore((state) => state.workorderPreviewID);
-  const zCurrentUser = useLoginStore((state) => state.currentUser);
-  const zUsers = useSettingsStore((state) => state.settings?.users);
   const zActiveSales = useActiveSalesStore((state) => state.activeSales);
-  const zPendingWOIDs = (zUsers || []).find((u) => u.id === zCurrentUser?.id)?.pendingWorkorderIDs || EMPTY_PENDING;
-
   const [sSearchTerm, _setSearchTerm] = useState("");
-  const [sStatusBlink, _setStatusBlink] = useState(false);
-
-  useEffect(() => {
-    if (zPendingWOIDs.length === 0) { _setStatusBlink(false); return; }
-    _setStatusBlink(true);
-    const interval = setInterval(() => { _setStatusBlink((prev) => !prev); }, 500);
-    return () => clearInterval(interval);
-  }, [zPendingWOIDs.length]);
 
   // Rehydration: fetch fresh messages on reload (persisted ones show instantly while fetching)
   const hasRehydratedMsgsRef = useRef(false);
@@ -706,15 +680,6 @@ export function WorkordersComponent({}) {
       let wo = matches[0].wo;
       _setSearchTerm("");
       workorderSelected(wo);
-      if (zPendingWOIDs.includes(wo.id)) {
-        const uid = useLoginStore.getState().getCurrentUser()?.id;
-        const users = useSettingsStore.getState().getSettings()?.users || [];
-        const updatedUsers = users.map((u) => {
-          if (u.id !== uid) return u;
-          return { ...u, pendingWorkorderIDs: (u.pendingWorkorderIDs || []).filter((id) => id !== wo.id) };
-        });
-        useSettingsStore.getState().setField("users", updatedUsers);
-      }
     }
   }
 
@@ -1060,8 +1025,6 @@ export function WorkordersComponent({}) {
               workorder={workorder}
               isSelected={workorder.id === zOpenWorkorderID}
               isPreviewed={workorder.id === zPreviewID}
-              isPending={zPendingWOIDs.includes(workorder.id)}
-              statusBlink={sStatusBlink}
               paidAmount={paidAmount}
               isLinkedSale={!!workorder.activeSaleID && linkedSaleIDs.has(workorder.activeSaleID)}
               onSelect={workorderSelected}

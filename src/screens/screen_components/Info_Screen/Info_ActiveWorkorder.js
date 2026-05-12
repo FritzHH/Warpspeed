@@ -466,7 +466,6 @@ export const ActiveWorkorderComponent = ({}) => {
       _settings?.salesTaxPercent,
       _ctx
     );
-    console.log("PRINT PAYLOAD:", JSON.stringify(toPrint, null, 2));
     dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
   }
 

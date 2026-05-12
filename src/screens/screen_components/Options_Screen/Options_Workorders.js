@@ -12,7 +12,7 @@ import {
   resolveStatus,
   deepEqual,
 } from "../../../utils";
-import { TabMenuDivider as Divider, SmallLoadingIndicator, Image_, Button_, TextInput_, Tooltip, WebPageModal } from "../../../components";
+import { TabMenuDivider as Divider, SmallLoadingIndicator, Image_, Button_, TextInput_, Tooltip, WebPageModal, DropdownMenu } from "../../../components";
 import { C, Colors, Fonts, ICONS } from "../../../styles";
 import { TAB_NAMES } from "../../../data";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -451,56 +451,98 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
                   )}
                 </Text>
                 <View style={{ width: 8 }} />
-                <TouchableOpacity
-                  activeOpacity={workorder.status === "finished" ? 0.6 : 1}
-                  onPress={(e) => {
-                    if (workorder.status !== "finished") return;
-                    e.stopPropagation();
-                    useAlertScreenStore.getState().setValues({
-                      title: "Customer Contacted",
-                      message: "Has this customer been contacted?",
-                      btn1Text: "Yes",
-                      handleBtn1Press: () => {
-                        useOpenWorkordersStore.getState().setField("contacted", true, workorder.id);
-                        useAlertScreenStore.getState().setShowAlert(false);
-                      },
-                      btn2Text: "No",
-                      handleBtn2Press: () => {
-                        useOpenWorkordersStore.getState().setField("contacted", false, workorder.id);
-                        useAlertScreenStore.getState().setShowAlert(false);
-                      },
-                      canExitOnOuterClick: true,
-                    });
-                  }}
-                  style={{
-                    backgroundColor: rs.backgroundColor,
-                    flexDirection: "row",
-                    paddingHorizontal: 11,
-                    paddingVertical: 2,
-                    alignItems: "center",
-                    borderRadius: 10,
-                    borderColor: "transparent",
-                    borderLeftColor: rs.textColor,
-                  }}
-                >
-                  {!!wipUser && (
-                    <Text style={{ color: C.red, fontSize: 9, fontStyle: "italic", marginRight: 5 }}>{wipUser}</Text>
-                  )}
-                  {workorder.status === "finished" && (
-                    <Text style={{ fontSize: 11, color: workorder.contacted ? rs.textColor : C.red, marginRight: 4 }}>
-                      {workorder.contacted ? "\u2713" : "\u2717"}
-                    </Text>
-                  )}
-                  <Text
+                {workorder.status === "work_in_progress" ? (
+                  <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: rs.backgroundColor, borderRadius: 10, borderColor: "transparent", borderLeftColor: rs.textColor, paddingLeft: 11 }}>
+                    {!!wipUser && (
+                      <Text style={{ color: C.red, fontSize: 9, fontStyle: "italic", marginRight: 5 }}>{wipUser}</Text>
+                    )}
+                    <DropdownMenu
+                      enabled={true}
+                      dataArr={(useSettingsStore.getState().getSettings()?.users || []).map((u) => ({
+                        label: (u.first || "") + (u.last ? " " + u.last.charAt(0) + "." : ""),
+                      }))}
+                      onSelect={(item) => {
+                        let changeLog = [...(workorder.changeLog || [])];
+                        for (let i = changeLog.length - 1; i >= 0; i--) {
+                          if (changeLog[i].field === "status" && changeLog[i].to === rs.label) {
+                            changeLog[i] = { ...changeLog[i], user: item.label };
+                            break;
+                          }
+                        }
+                        useOpenWorkordersStore.getState().setWorkorder({ ...workorder, changeLog }, true);
+                      }}
+                      buttonText={rs.label}
+                      buttonStyle={{
+                        backgroundColor: "transparent",
+                        borderColor: "transparent",
+                        borderRadius: 0,
+                        paddingHorizontal: 11,
+                        paddingLeft: 0,
+                        paddingVertical: 2,
+                        borderWidth: 0,
+                      }}
+                      buttonTextStyle={{
+                        color: rs.textColor,
+                        fontSize: 11,
+                        fontWeight: "normal",
+                      }}
+                      buttonIcon={null}
+                      showButtonShadow={false}
+                      modalCoordX={-80}
+                      modalCoordY={25}
+                      menuMaxHeight={200}
+                      centerMenuVertically={true}
+                    />
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    activeOpacity={workorder.status === "finished" ? 0.6 : 1}
+                    onPress={(e) => {
+                      if (workorder.status !== "finished") return;
+                      e.stopPropagation();
+                      useAlertScreenStore.getState().setValues({
+                        title: "Customer Contacted",
+                        message: "Has this customer been contacted?",
+                        btn1Text: "Yes",
+                        handleBtn1Press: () => {
+                          useOpenWorkordersStore.getState().setField("contacted", true, workorder.id);
+                          useAlertScreenStore.getState().setShowAlert(false);
+                        },
+                        btn2Text: "No",
+                        handleBtn2Press: () => {
+                          useOpenWorkordersStore.getState().setField("contacted", false, workorder.id);
+                          useAlertScreenStore.getState().setShowAlert(false);
+                        },
+                        canExitOnOuterClick: true,
+                      });
+                    }}
                     style={{
-                      color: rs.textColor,
-                      fontSize: 11,
-                      fontWeight: "normal",
+                      backgroundColor: rs.backgroundColor,
+                      flexDirection: "row",
+                      paddingHorizontal: 11,
+                      paddingVertical: 2,
+                      alignItems: "center",
+                      borderRadius: 10,
+                      borderColor: "transparent",
+                      borderLeftColor: rs.textColor,
                     }}
                   >
-                    {rs.label}
-                  </Text>
-                </TouchableOpacity>
+                    {workorder.status === "finished" && (
+                      <Text style={{ fontSize: 11, color: workorder.contacted ? rs.textColor : C.red, marginRight: 4 }}>
+                        {workorder.contacted ? "\u2713" : "\u2717"}
+                      </Text>
+                    )}
+                    <Text
+                      style={{
+                        color: rs.textColor,
+                        fontSize: 11,
+                        fontWeight: "normal",
+                      }}
+                    >
+                      {rs.label}
+                    </Text>
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>

@@ -142,6 +142,7 @@ export function BikeStandScreen() {
   const [sShowCustomerModal, _setShowCustomerModal] = useState(false);
   const [sShowNewWorkorderModal, _setShowNewWorkorderModal] = useState(false);
   const [sShowBikeInfoModal, _setShowBikeInfoModal] = useState(false);
+  const [sDetailKeypadOverride, _setDetailKeypadOverride] = useState(null);
   const [sDiscountCardID, _setDiscountCardID] = useState(null);
   const [sShowInventoryModal, _setShowInventoryModal] = useState(false);
   const [sShowWorkorderList, _setShowWorkorderList] = useState(false);
@@ -754,6 +755,7 @@ export function BikeStandScreen() {
       waitDays: String(selectedWorkorder.waitTime?.maxWaitTimeDays ?? ""),
     });
     _setDetailField(fieldName);
+    _setDetailKeypadOverride(null);
   }
 
   function handleDetailNext() {
@@ -811,7 +813,7 @@ export function BikeStandScreen() {
     debouncedSaveDetail(sDetailField, val);
   }
 
-  let detailKeypadMode = sDetailField === "waitDays" ? "phone" : "alpha";
+  let detailKeypadMode = sDetailKeypadOverride || (sDetailField === "waitDays" ? "phone" : "alpha");
 
   // Printer helpers
   let printersObj = zSettings?.printers || {};
@@ -1169,7 +1171,7 @@ export function BikeStandScreen() {
 
       {/* Bike info modal — shown after customer/standalone selection */}
       {sShowBikeInfoModal && selectedWorkorder && (() => {
-        let modalKeypadMode = sDetailField === "waitDays" ? "phone" : "alpha";
+        let modalKeypadMode = sDetailKeypadOverride || (sDetailField === "waitDays" ? "phone" : "alpha");
         return (
           <div
             style={{
@@ -1211,6 +1213,8 @@ export function BikeStandScreen() {
                   buttonStyle={{
                     backgroundColor: rs.backgroundColor,
                     paddingHorizontal: 18,
+                    paddingVertical: 10,
+                    borderRadius: 12,
                   }}
                   buttonTextStyle={{
                     color: rs.textColor,
@@ -1579,7 +1583,12 @@ export function BikeStandScreen() {
                 {/* On-screen keypad for detail fields */}
                 {sDetailField !== null && (
                   <View style={{ marginTop: 8, marginBottom: 16 }}>
-                    <StandKeypad mode={modalKeypadMode} onKeyPress={handleDetailKeyPress} />
+                    <StandKeypad
+                      mode={modalKeypadMode}
+                      onKeyPress={handleDetailKeyPress}
+                      toggleLabel={modalKeypadMode === "phone" ? "ABC" : "123"}
+                      onToggle={() => _setDetailKeypadOverride(modalKeypadMode === "phone" ? "alpha" : "phone")}
+                    />
                     <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 6, paddingHorizontal: 4 }}>
                       <StandTouch onPress={() => _setDetailField(null)}>
                       <TouchableOpacity onPress={() => _setDetailField(null)} style={{ padding: 4 }}>
@@ -2309,7 +2318,12 @@ export function BikeStandScreen() {
                   {/* On-screen keypad for detail fields */}
                   {sDetailField !== null && (
                     <View style={{ marginTop: 8 }}>
-                      <StandKeypad mode={detailKeypadMode} onKeyPress={handleDetailKeyPress} />
+                      <StandKeypad
+                        mode={detailKeypadMode}
+                        onKeyPress={handleDetailKeyPress}
+                        toggleLabel={detailKeypadMode === "phone" ? "ABC" : "123"}
+                        onToggle={() => _setDetailKeypadOverride(detailKeypadMode === "phone" ? "alpha" : "phone")}
+                      />
                       <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 6, paddingHorizontal: 4 }}>
                         <StandTouch onPress={() => _setDetailField(null)}>
                         <TouchableOpacity
@@ -2762,7 +2776,7 @@ export function BikeStandScreen() {
                               clearTimeout(pulseTimerRef.current);
                               pulseTimerRef.current = setTimeout(() => _setPulseID(null), 160);
                             }
-                        }}>
+                        }} onLongPress={() => openNoteHelperForCanvasItem(invItem)} delayLongPress={150}>
                         <TouchableOpacity
                           key={itemObj.inventoryItemID}
                           activeOpacity={0.6}
@@ -2785,7 +2799,7 @@ export function BikeStandScreen() {
                           onLongPress={() => {
                             openNoteHelperForCanvasItem(invItem);
                           }}
-                          delayLongPress={125}
+                          delayLongPress={150}
                           style={{
                             position: "absolute",
                             left: (itemObj.x || 0) + "%",
@@ -3898,40 +3912,24 @@ export function BikeStandScreen() {
 
                 {/* Qty arrows + Close button */}
                 <View style={{ paddingHorizontal: 10, paddingBottom: 10, flexDirection: "row", alignItems: "stretch", gap: 8, position: "relative", zIndex: 60 }}>
-                  <StandTouch onPress={() => _setNotesQty((q) => Math.max(0, q - 1))}>
-                  <TouchableOpacity
-                    onPress={() => _setNotesQty((q) => Math.max(0, q - 1))}
-                    style={{
-                      paddingVertical: 32,
-                      paddingHorizontal: 20,
-                      borderRadius: 8,
-                      backgroundColor: sNotesQty <= 0 ? gray(0.85) : C.blue,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                    disabled={sNotesQty <= 0}
-                  >
-                    <Text style={{ fontSize: 30, fontWeight: "700", color: "white" }}>{"\u25BC"}</Text>
-                  </TouchableOpacity>
-                  </StandTouch>
-                  <Text style={{ fontSize: 32, fontWeight: "700", color: sNotesQty === 0 ? C.red : C.text, minWidth: 40, textAlign: "center" }}>{sNotesQty}</Text>
-                  <StandTouch onPress={() => _setNotesQty((q) => q + 1)}>
-                  <TouchableOpacity
-                    onPress={() => _setNotesQty((q) => q + 1)}
-                    style={{
-                      paddingVertical: 32,
-                      paddingHorizontal: 20,
-                      borderRadius: 8,
-                      backgroundColor: C.blue,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Text style={{ fontSize: 30, fontWeight: "700", color: "white" }}>{"\u25B2"}</Text>
-                  </TouchableOpacity>
-                  </StandTouch>
+                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+                    <Button_
+                      enabled={sNotesQty > 0}
+                      onPress={() => _setNotesQty((q) => Math.max(0, q - 1))}
+                      buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 3 }}
+                      icon={ICONS.downArrowOrange}
+                      iconSize={96}
+                    />
+                    <Text style={{ fontSize: 48, fontWeight: "700", color: sNotesQty === 0 ? C.red : C.text, minWidth: 60, textAlign: "center" }}>{sNotesQty}</Text>
+                    <Button_
+                      onPress={() => _setNotesQty((q) => q + 1)}
+                      buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 3 }}
+                      icon={ICONS.upArrowOrange}
+                      iconSize={96}
+                    />
+                  </View>
                   <View style={{ width: 20 }} />
-                  <StandTouch style={{ flex: 1 }} onPress={() => {
+                  <StandTouch style={{ flex: 1, display: "flex" }} onPress={() => {
                       if (sNotesQty <= 0) {
                         let updatedLines = (selectedWorkorder?.workorderLines || []).filter((ln) => ln.id !== sIntakeNotesLineID);
                         useOpenWorkordersStore.getState().setField("workorderLines", updatedLines, sSelectedWorkorderID, true);
@@ -3958,10 +3956,10 @@ export function BikeStandScreen() {
                     }}
                     style={{
                       flex: 1,
-                      paddingVertical: 32,
                       borderRadius: 8,
                       backgroundColor: sNotesQty <= 0 ? C.red : C.green,
                       alignItems: "center",
+                      justifyContent: "center",
                     }}
                   >
                     <Text style={{ fontSize: 28, fontWeight: "600", color: C.textWhite }}>

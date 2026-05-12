@@ -51,7 +51,7 @@ function KeyButton({ keyLabel, displayLabel, onClick, style, mountTime }) {
   );
 }
 
-export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, paddingAdj = 0 }) {
+export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, paddingAdj = 0, toggleLabel, onToggle }) {
   const mountTimeRef = useRef(Date.now());
   const mt = mountTimeRef.current;
   const fAdj = fontSizeAdj;
@@ -67,6 +67,15 @@ export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, 
             {row.map((key) => (
               <KeyButton key={key} keyLabel={key} onClick={onKeyPress} mountTime={mt} style={{ width: 102 + pAdj * 2, height: 84 + pAdj * 2, fontSize: 28 + fAdj, ..._actionColor(key) }} />
             ))}
+            {ri === PHONE_KEYS.length - 1 && toggleLabel && onToggle && (
+              <div
+                onClick={() => { if (_touchFired) { _touchFired = false; return; } onToggle(); }}
+                onTouchStart={() => { _touchFired = true; onToggle(); }}
+                style={{ ...KEY_STYLE, width: 102 + pAdj * 2, height: 84 + pAdj * 2, fontSize: 20 + fAdj, backgroundColor: C.blue, color: "white", borderColor: C.blue }}
+              >
+                {toggleLabel}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -91,6 +100,15 @@ export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, 
       ))}
       <div style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
         <KeyButton keyLabel=" " displayLabel="SPACE" onClick={onKeyPress} mountTime={mt} style={{ flex: 3, height: 78 + pAdj * 2, fontSize: 28 + fAdj }} />
+        {toggleLabel && onToggle && (
+          <div
+            onClick={() => { if (_touchFired) { _touchFired = false; return; } onToggle(); }}
+            onTouchStart={() => { _touchFired = true; onToggle(); }}
+            style={{ ...KEY_STYLE, flex: 1.3, height: 78 + pAdj * 2, fontSize: 20 + fAdj, backgroundColor: C.blue, color: "white", borderColor: C.blue }}
+          >
+            {toggleLabel}
+          </div>
+        )}
         <KeyButton keyLabel="ENTER" displayLabel="↵" onClick={onKeyPress} mountTime={mt} style={{ flex: 1, height: 78 + pAdj * 2, fontSize: 28 + fAdj }} />
         <KeyButton keyLabel="CLR" onClick={onKeyPress} mountTime={mt} style={{ flex: 1, height: 78 + pAdj * 2, fontSize: 18 + fAdj, color: gray(0.4) }} />
       </div>

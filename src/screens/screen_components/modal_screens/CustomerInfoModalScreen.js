@@ -6,6 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   TouchableWithoutFeedback,
+  Image,
 } from "react-native-web";
 import {
   calculateRunningTotals,
@@ -38,6 +39,7 @@ import {
   useWorkorderPreviewStore,
   useActiveSalesStore,
   useAlertScreenStore,
+  useCustMessagesStore,
 } from "../../../stores";
 import { CONTACT_RESTRICTIONS, CUSTOMER_CREDIT_PROTO, CUSTOMER_LANGUAGES, CUSTOMER_PROTO, SMS_PROTO, TAB_NAMES } from "../../../data";
 import { Button_, CheckBox_, DepositModal, DepositsList, DropdownMenu, Image_, SmallLoadingIndicator, TextInput_, Tooltip, TouchableOpacity_ } from "../../../components";
@@ -51,8 +53,11 @@ import {
   dbCheckCellPhoneExists,
   dbMigrateCustomerPhone,
   dbSavePrintObj,
+  dbUpdateMessageCanRespond,
+  dbToggleSMSForwarding,
 } from "../../../db_calls_wrapper";
 import { smsService } from "../../../data_service_modules";
+import { ReplyOptionsBar, scheduleAutoSend, clearAutoSend, buildForwardToPayload } from "../Options_Screen/ReplyOptionsBar";
 import { readActiveSale, readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { sendCreditReceipt } from "./newCheckoutModalScreen/newCheckoutUtils";
 import { ClosedWorkorderModal } from "./ClosedWorkorderModal";
@@ -1436,15 +1441,42 @@ const CreditEditModal = ({ credit, customer, onClose, onSave, onDelete }) => {
   );
 };
 
+function autoCapitalize(val) {
+  if (!val) return val;
+  if (val.length > 10000) val = val.slice(0, 10000);
+  val = val.replace(/(^|[.!?]\s+)([a-z])/g, (m, before, letter) => before + letter.toUpperCase());
+  val = val.replace(/(^|\s)i(?=$|\s|[.,!?;:'])/g, (m, before) => before + "I");
+  val = val.replace(/(\S?)(\s+)I([a-z])/g, (m, prev, space, after) => {
+    if (/[.!?]/.test(prev)) return m;
+    return prev + space + "i" + after;
+  });
+  return val;
+}
+
 const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, customerLast }) => {
   const [sMessages, _sSetMessages] = useState([]);
   const [sNewMessage, _sSetNewMessage] = useState("");
   const [sLoading, _sSetLoading] = useState(true);
   const [sSending, _sSending] = useState(false);
+  const [sShowReplyModal, _sSetShowReplyModal] = useState(false);
+  const [sForwardReplies, _sSetForwardReplies] = useState(false);
+  const zSmsThreads = useCustMessagesStore((state) => state.getSmsThreads());
+  let thread = zSmsThreads.find(t => t.phone === customerPhone);
+  const [sCanRespond, _sSetCanRespond] = useState(thread?.canRespond !== undefined ? !!thread.canRespond : true);
+  const lastThreadCanRespondRef = useRef(thread?.canRespond);
+  if (thread?.canRespond !== lastThreadCanRespondRef.current) {
+    lastThreadCanRespondRef.current = thread?.canRespond;
+    _sSetCanRespond(thread?.canRespond !== undefined ? !!thread.canRespond : true);
+  }
   const flatListRef = useRef(null);
   const unsubRef = useRef(null);
 
-  // Load messages and set up real-time listener
+  let outgoing = sMessages.filter(m => m.type === "outgoing");
+  let lastOutgoingID = outgoing.length > 0 ? [...outgoing].sort((a, b) => (b.millis || 0) - (a.millis || 0))[0]?.id : null;
+
+  let currentUser = useLoginStore.getState().getCurrentUser();
+  let hasActivePhone = !!currentUser?.phone;
+
   // (useEffect required: this is a new self-contained component that needs to fetch/subscribe on mount)
   useEffect(() => {
     if (!customerPhone || customerPhone.length !== 10) {
@@ -1479,7 +1511,6 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     };
   }, [customerPhone]);
 
-  // Auto-scroll to bottom when new messages arrive
   // (useEffect required: auto-scroll on messages change)
   useEffect(() => {
     if (sMessages.length > 0 && flatListRef.current) {
@@ -1489,24 +1520,37 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     }
   }, [sMessages.length]);
 
-  async function handleSend() {
+  function handlePressSend() {
+    let text = sNewMessage.trim();
+    if (!text || !customerPhone || customerPhone.length !== 10) return;
+    _sSetShowReplyModal(true);
+    scheduleAutoSend(() => {
+      _sSetShowReplyModal(false);
+      sendMessage(sCanRespond);
+    });
+  }
+
+  async function sendMessage(canRespondVal, forwardOverride) {
     let text = sNewMessage.trim();
     if (!text || !customerPhone || customerPhone.length !== 10) return;
     _sSetNewMessage("");
     _sSending(true);
     let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+    let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
+    let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
     let msg = { ...SMS_PROTO };
     msg.message = text;
     msg.phoneNumber = customerPhone;
     if (customerFirst) msg.customerFirst = customerFirst;
     if (customerLast) msg.customerLast = customerLast;
-    msg.canRespond = true;
+    msg.canRespond = useCanRespond ? true : null;
     msg.millis = Date.now();
     msg.customerID = customerID || "";
     msg.id = crypto.randomUUID();
     msg.type = "outgoing";
     msg.senderUserObj = zCurrentUserObj;
     msg.sentByUser = zCurrentUserObj.id;
+    if (forwardTo) msg.forwardTo = forwardTo;
     _sSetMessages((prev) => [...prev, { ...msg, status: "sending" }]);
     let result = await smsService.send(msg);
     _sSending(false);
@@ -1529,45 +1573,115 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     }
   }
 
+  async function handleToggleBlock() {
+    if (!customerPhone || customerPhone.length !== 10) return;
+    let newCanRespond = sCanRespond ? null : true;
+    _sSetCanRespond(!sCanRespond);
+    await dbUpdateMessageCanRespond(customerPhone, null, newCanRespond);
+    if (!newCanRespond) {
+      let user = useLoginStore.getState().getCurrentUser();
+      if (user?.id && thread?.forwardTo?.[user.id]) {
+        await dbToggleSMSForwarding(customerPhone, user.id, false, user.phone, user.first);
+      }
+    }
+  }
+
+  async function handleToggleForward() {
+    if (!customerPhone || customerPhone.length !== 10) return;
+    let user = useLoginStore.getState().getCurrentUser();
+    if (!user?.id) return;
+    let isCurrentlyForwarding = !!(thread?.forwardTo?.[user.id]);
+    if (!isCurrentlyForwarding && !sCanRespond) {
+      _sSetCanRespond(true);
+      await dbUpdateMessageCanRespond(customerPhone, null, true);
+    }
+    await dbToggleSMSForwarding(customerPhone, user.id, !isCurrentlyForwarding, user.phone, user.first);
+  }
+
+  function handleToggleForwardReplies() {
+    let user = useLoginStore.getState().getCurrentUser();
+    if (!user?.id) return;
+    if (!user?.phone) {
+      useAlertScreenStore.getState().setValues({
+        title: "No Phone Number",
+        message: "Your account needs a personal phone number to enable SMS forwarding. Ask an admin to add one.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+    let newVal = !sForwardReplies;
+    _sSetForwardReplies(newVal);
+    if (newVal) {
+      clearAutoSend();
+      _sSetCanRespond(true);
+      _sSetShowReplyModal(false);
+      sendMessage(true, true);
+    }
+  }
+
   const renderMessage = ({ item }) => {
     let isOutgoing = item.type === "outgoing";
+    let isLastOutgoing = isOutgoing && item.id === lastOutgoingID;
+    let currentUserID = useLoginStore.getState().getCurrentUser()?.id;
+    let isForwarding = !!(currentUserID && thread?.forwardTo?.[currentUserID]);
+    let isResponding = (thread?.canRespond !== undefined ? thread.canRespond : item.canRespond);
     return (
-      <View
-        style={{
-          alignSelf: isOutgoing ? "flex-end" : "flex-start",
-          maxWidth: "80%",
-          marginBottom: 8,
-          backgroundColor: isOutgoing ? C.blue : C.backgroundWhite,
-          borderRadius: isOutgoing ? 14 : 14,
-          borderBottomRightRadius: isOutgoing ? 4 : 14,
-          borderBottomLeftRadius: isOutgoing ? 14 : 4,
-          paddingVertical: 8,
-          paddingHorizontal: 12,
-          borderWidth: isOutgoing ? 0 : 1,
-          borderColor: isOutgoing ? "transparent" : lightenRGBByPercent(C.buttonLightGreenOutline, 30),
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 1 },
-          shadowOpacity: 0.06,
-          shadowRadius: 3,
-        }}
-      >
-        <Text style={{ color: isOutgoing ? C.textWhite : C.text, fontSize: 13, lineHeight: 18 }}>
-          {item.message}
-        </Text>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: isOutgoing ? "flex-end" : "flex-start", marginTop: 4 }}>
-          <Text style={{ color: isOutgoing ? "rgba(255,255,255,0.55)" : gray(0.55), fontSize: 10 }}>
-            {formatMillisForDisplay(item.millis)}
-          </Text>
-          {item.status === "sending" && (
-            <Text style={{ color: isOutgoing ? "rgba(255,255,255,0.55)" : gray(0.55), fontSize: 10, marginLeft: 6, fontStyle: "italic" }}>
-              Sending...
-            </Text>
+      <View style={{ alignSelf: isOutgoing ? "flex-end" : "flex-start", maxWidth: "80%", marginBottom: 8 }}>
+        <View
+          style={{
+            backgroundColor: isOutgoing ? C.blue : C.backgroundWhite,
+            borderRadius: 14,
+            borderBottomRightRadius: isOutgoing ? 4 : 14,
+            borderBottomLeftRadius: isOutgoing ? 14 : 4,
+            paddingVertical: 8,
+            paddingHorizontal: 12,
+            borderWidth: isOutgoing ? 0 : 1,
+            borderColor: isOutgoing ? "transparent" : lightenRGBByPercent(C.buttonLightGreenOutline, 30),
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 1 },
+            shadowOpacity: 0.06,
+            shadowRadius: 3,
+            flexDirection: "row",
+            alignItems: "flex-start",
+          }}
+        >
+          {isOutgoing && isLastOutgoing && (
+            <View style={{ flexDirection: "column", alignItems: "center", marginRight: 5, marginTop: 2 }}>
+              <Tooltip text={isResponding ? "Block responses from user" : "Allow responses"} position="top">
+                <TouchableOpacity onPress={handleToggleBlock} style={{ alignItems: "center", justifyContent: "center" }}>
+                  <Image source={isResponding ? ICONS.unblock : ICONS.blocked} style={{ width: 28, height: 28 }} />
+                </TouchableOpacity>
+              </Tooltip>
+              <Tooltip text={isForwarding ? "Stop forwarding replies to me" : "Forward replies to me"} position="top">
+                <TouchableOpacity onPress={handleToggleForward} style={{ alignItems: "center", justifyContent: "center", marginTop: 4 }}>
+                  <Image source={isForwarding ? ICONS.allowNotif : ICONS.blockNotif} style={{ width: 22, height: 22 }} />
+                </TouchableOpacity>
+              </Tooltip>
+            </View>
           )}
-          {item.status === "failed" && (
-            <Text style={{ color: C.lightred, fontSize: 10, marginLeft: 6, fontWeight: "600" }}>
-              Failed
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: isOutgoing ? C.textWhite : C.text, fontSize: 13, lineHeight: 18 }}>
+              {item.message}
             </Text>
-          )}
+            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: isOutgoing ? "flex-end" : "flex-start", marginTop: 4 }}>
+              <Text style={{ color: isOutgoing ? "rgba(255,255,255,0.55)" : gray(0.55), fontSize: 10 }}>
+                {formatMillisForDisplay(item.millis)}
+              </Text>
+              {item.status === "sending" && (
+                <Text style={{ color: isOutgoing ? "rgba(255,255,255,0.55)" : gray(0.55), fontSize: 10, marginLeft: 6, fontStyle: "italic" }}>
+                  Sending...
+                </Text>
+              )}
+              {item.status === "failed" && (
+                <Text style={{ color: C.lightred, fontSize: 10, marginLeft: 6, fontWeight: "600" }}>
+                  Failed
+                </Text>
+              )}
+            </View>
+          </View>
         </View>
       </View>
     );
@@ -1632,6 +1746,22 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
         />
       )}
 
+      {/* Reply options bar */}
+      <View style={{ paddingHorizontal: 10 }}>
+        <ReplyOptionsBar
+          visible={sShowReplyModal}
+          forwardReplies={sForwardReplies}
+          hasActivePhone={hasActivePhone}
+          onSelectCanRespond={(canRespond) => {
+            clearAutoSend();
+            _sSetCanRespond(canRespond);
+            _sSetShowReplyModal(false);
+            sendMessage(canRespond);
+          }}
+          onToggleForward={handleToggleForwardReplies}
+        />
+      </View>
+
       {/* Input area */}
       <View
         style={{
@@ -1645,13 +1775,13 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
       >
         <TextInput_
           value={sNewMessage}
-          onChangeText={_sSetNewMessage}
+          onChangeText={(val) => _sSetNewMessage(autoCapitalize(val))}
           debounceMs={0}
           placeholder="Type a message..."
           placeholderTextColor={gray(0.5)}
           multiline={true}
           numberOfLines={4}
-          onSubmitEditing={handleSend}
+          onSubmitEditing={handlePressSend}
           style={{
             flex: 1,
             minHeight: 34,
@@ -1672,7 +1802,7 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
           colorGradientArr={COLOR_GRADIENTS.blue}
           textStyle={{ color: C.textWhite, fontSize: 12, fontWeight: "600" }}
           buttonStyle={{ height: 34, paddingHorizontal: 14, borderRadius: 8, marginBottom: 1 }}
-          onPress={handleSend}
+          onPress={handlePressSend}
           enabled={!sSending && !!sNewMessage.trim()}
         />
       </View>

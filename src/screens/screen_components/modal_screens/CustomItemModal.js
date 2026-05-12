@@ -1,9 +1,9 @@
 /* eslint-disable */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { View, Text, TextInput, TouchableOpacity } from "react-native-web";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
-import { Button_, TextInput_, DropdownMenu } from "../../../components";
+import { Button_, TextInput_, Image_ } from "../../../components";
 import {
   usdTypeMask,
   applyDiscountToWorkorderItem,
@@ -39,6 +39,11 @@ export const CustomItemModal = ({
   const [sReceiptNotes, _setReceiptNotes] = useState("");
   const [sDiscountObj, _setDiscountObj] = useState(null);
   const [sPriceManuallySet, _setPriceManuallySet] = useState(false);
+  const [sDiscountDropdownOpen, _setDiscountDropdownOpen] = useState(false);
+  const [sCustomPctVal, _setCustomPctVal] = useState("");
+  const [sCustomDollarVal, _setCustomDollarVal] = useState("");
+  const [sCustomDollarCents, _setCustomDollarCents] = useState(0);
+  const discountBtnRef = useRef(null);
 
   // Populate fields when editing or when modal opens
   useEffect(() => {
@@ -54,6 +59,10 @@ export const CustomItemModal = ({
       _setReceiptNotes(existingLine.receiptNotes || "");
       _setDiscountObj(existingLine.discountObj || null);
       _setPriceManuallySet(true);
+      _setDiscountDropdownOpen(false);
+      _setCustomPctVal("");
+      _setCustomDollarVal("");
+      _setCustomDollarCents(0);
     } else {
       _setName("");
       _setPriceDisplay("");
@@ -63,6 +72,10 @@ export const CustomItemModal = ({
       _setReceiptNotes("");
       _setDiscountObj(null);
       _setPriceManuallySet(false);
+      _setDiscountDropdownOpen(false);
+      _setCustomPctVal("");
+      _setCustomDollarVal("");
+      _setCustomDollarCents(0);
     }
   }, [visible, existingLine]);
 
@@ -104,18 +117,30 @@ export const CustomItemModal = ({
     _setPriceCents(0);
   }
 
-  function handleDiscountSelect(item) {
-    if (item._customDiscount) {
-      _setDiscountObj(item._customDiscount);
-      return;
-    }
-    if (item.label === "No Discount") {
-      _setDiscountObj(null);
-      return;
-    }
-    const discount = zDiscounts.find((o) => o.name === item.label);
-    if (discount) _setDiscountObj(discount);
+  function handleDiscountSelect(discount) {
+    _setDiscountObj(discount);
+    _setDiscountDropdownOpen(false);
+    _setCustomPctVal("");
+    _setCustomDollarVal("");
+    _setCustomDollarCents(0);
   }
+
+  const getDropdownPosition = useCallback(() => {
+    if (!discountBtnRef.current) return { top: 0, left: 0 };
+    const rect = discountBtnRef.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const dropdownW = 260;
+    const presetCount = (zDiscounts || []).filter((o) => o.type !== "$" || Number(o.value) <= sPriceCents).length + 1;
+    const dropdownH = presetCount * 36 + 1 + 36 + 36 + 8;
+    let posLeft = rect.left;
+    let posTop = rect.bottom + 4;
+    if (posTop + dropdownH > vh - 10) posTop = rect.top - dropdownH - 4;
+    if (posTop < 10) posTop = 10;
+    if (posLeft + dropdownW > vw - 10) posLeft = vw - dropdownW - 10;
+    if (posLeft < 10) posLeft = 10;
+    return { top: posTop, left: posLeft, width: dropdownW };
+  }, [zDiscounts, sPriceCents]);
 
   function handleSave() {
     // Build the synthetic inventory item
@@ -382,29 +407,28 @@ export const CustomItemModal = ({
             <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 3 }}>
               Discount
             </Text>
-            <DropdownMenu
-              buttonText={sDiscountObj?.name || "No Discount"}
-              buttonStyle={{
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                borderRadius: 5,
-                backgroundColor: C.listItemWhite,
-              }}
-              buttonTextStyle={{
-                color: sDiscountObj ? C.lightred : gray(0.5),
-                fontSize: 14,
-              }}
-              enabled={sPriceCents > 0}
-              isDiscountMenu={true}
-              discountMaxCents={sPriceCents}
-              openUpward={true}
-              // modalCoordX={20}
-              dataArr={[
-                { label: "No Discount" },
-                ...(zDiscounts || []).filter((o) => o.type !== "$" || Number(o.value) <= sPriceCents).map((o) => ({ label: o.name })),
-              ]}
-              onSelect={handleDiscountSelect}
-            />
+            <div ref={discountBtnRef}>
+              <TouchableOpacity
+                onPress={() => { if (sPriceCents > 0) _setDiscountDropdownOpen(!sDiscountDropdownOpen); }}
+                style={{
+                  borderWidth: 1,
+                  borderColor: C.buttonLightGreenOutline,
+                  borderRadius: 5,
+                  backgroundColor: C.listItemWhite,
+                  paddingVertical: 8,
+                  paddingHorizontal: 10,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  opacity: sPriceCents > 0 ? 1 : 0.4,
+                }}
+              >
+                <Text style={{ color: sDiscountObj ? C.lightred : gray(0.5), fontSize: 14 }}>
+                  {sDiscountObj?.name || "No Discount"}
+                </Text>
+                <Text style={{ fontSize: 10, color: gray(0.4) }}>{sDiscountDropdownOpen ? "\u25B2" : "\u25BC"}</Text>
+              </TouchableOpacity>
+            </div>
           </View>
 
           {/* Discount preview */}
@@ -481,6 +505,129 @@ export const CustomItemModal = ({
           </View>
         </View>
       </div>
+      {sDiscountDropdownOpen && (() => {
+        const pos = getDropdownPosition();
+        const presetDiscounts = (zDiscounts || []).filter((o) => o.type !== "$" || Number(o.value) <= sPriceCents);
+        return (
+          <>
+            <div
+              onClick={(e) => { e.stopPropagation(); _setDiscountDropdownOpen(false); }}
+              style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000 }}
+            />
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                position: "fixed",
+                top: pos.top,
+                left: pos.left,
+                width: pos.width,
+                zIndex: 10001,
+                backgroundColor: "white",
+                borderRadius: 6,
+                borderWidth: 2,
+                borderStyle: "solid",
+                borderColor: gray(0.08),
+                boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+                maxHeight: 340,
+                overflowY: "auto",
+              }}
+            >
+              <div
+                onClick={() => handleDiscountSelect(null)}
+                style={{
+                  padding: 8,
+                  cursor: "pointer",
+                  fontSize: 13,
+                  color: C.text,
+                  backgroundColor: gray(0.036),
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.1); }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = gray(0.036); }}
+              >
+                No Discount
+              </div>
+              {presetDiscounts.map((o, idx) => (
+                <div
+                  key={o.name}
+                  onClick={() => handleDiscountSelect(o)}
+                  style={{
+                    padding: 8,
+                    cursor: "pointer",
+                    fontSize: 13,
+                    color: C.text,
+                    backgroundColor: idx % 2 === 0 ? "white" : gray(0.036),
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.1); }}
+                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = idx % 2 === 0 ? "white" : gray(0.036); }}
+                >
+                  {o.name}
+                </div>
+              ))}
+              <div style={{ height: 1, backgroundColor: gray(0.15) }} />
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", height: 36, paddingHorizontal: 6, backgroundColor: "rgb(198,218,240)" }}>
+                <Text style={{ fontSize: 13, color: gray(0.5), marginRight: 6 }}>Custom %</Text>
+                <TextInput
+                  value={sCustomPctVal}
+                  placeholder="0"
+                  placeholderTextColor={gray(0.3)}
+                  maxLength={3}
+                  onChangeText={(v) => {
+                    let cleaned = v.replace(/[^0-9]/g, "");
+                    if (Number(cleaned) > 100) cleaned = "100";
+                    _setCustomPctVal(cleaned);
+                  }}
+                  onSubmitEditing={() => {
+                    const num = Number(sCustomPctVal);
+                    if (!num) return;
+                    handleDiscountSelect({ id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
+                  }}
+                  style={{ width: 50, height: 28, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 4, paddingHorizontal: 6, fontSize: 13, color: C.text, textAlign: "center", outlineWidth: 0, backgroundColor: "white" }}
+                />
+                <TouchableOpacity
+                  onPress={() => {
+                    const num = Number(sCustomPctVal);
+                    if (!num) return;
+                    handleDiscountSelect({ id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
+                  }}
+                  style={{ marginLeft: 4, width: 24, height: 24, borderRadius: 4, backgroundColor: C.green, alignItems: "center", justifyContent: "center" }}
+                >
+                  <Image_ icon={ICONS.check1} size={14} />
+                </TouchableOpacity>
+              </View>
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", height: 36, paddingHorizontal: 6, backgroundColor: "rgb(198,218,240)" }}>
+                <Text style={{ fontSize: 13, color: gray(0.5), marginRight: 6 }}>Custom $</Text>
+                <TextInput
+                  value={sCustomDollarVal}
+                  placeholder="0.00"
+                  placeholderTextColor={gray(0.3)}
+                  onChangeText={(v) => {
+                    let result = usdTypeMask(v);
+                    if (sPriceCents && result.cents > sPriceCents) result = usdTypeMask(String(sPriceCents));
+                    _setCustomDollarVal(result.display);
+                    _setCustomDollarCents(result.cents);
+                  }}
+                  onSubmitEditing={() => {
+                    if (!sCustomDollarCents) return;
+                    const dollars = (sCustomDollarCents / 100).toFixed(2);
+                    handleDiscountSelect({ id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(sCustomDollarCents), type: DISCOUNT_TYPES.dollar, custom: true });
+                  }}
+                  style={{ width: 70, height: 28, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 4, paddingHorizontal: 6, fontSize: 13, color: C.text, textAlign: "center", outlineWidth: 0, backgroundColor: "white" }}
+                />
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!sCustomDollarCents) return;
+                    const dollars = (sCustomDollarCents / 100).toFixed(2);
+                    handleDiscountSelect({ id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(sCustomDollarCents), type: DISCOUNT_TYPES.dollar, custom: true });
+                  }}
+                  style={{ marginLeft: 4, width: 24, height: 24, borderRadius: 4, backgroundColor: C.green, alignItems: "center", justifyContent: "center" }}
+                >
+                  <Image_ icon={ICONS.check1} size={14} />
+                </TouchableOpacity>
+              </View>
+            </div>
+          </>
+        );
+      })()}
     </div>,
     document.body
   );

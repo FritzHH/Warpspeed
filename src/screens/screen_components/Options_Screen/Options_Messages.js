@@ -101,7 +101,10 @@ function autoCapitalize(val) {
   if (val.length > 10000) val = val.slice(0, 10000);
   val = val.replace(/(^|[.!?]\s+)([a-z])/g, (m, before, letter) => before + letter.toUpperCase());
   val = val.replace(/(^|\s)i(?=$|\s|[.,!?;:'])/g, (m, before) => before + "I");
-  val = val.replace(/(^|\s)I([a-z])/g, (m, before, after) => before + "i" + after);
+  val = val.replace(/(\S?)(\s+)I([a-z])/g, (m, prev, space, after) => {
+    if (/[.!?]/.test(prev)) return m;
+    return prev + space + "i" + after;
+  });
   return val;
 }
 
@@ -130,6 +133,10 @@ export function MessagesComponent({}) {
       if (currentUser?.id && zWorkorderObj.lastSMSSenderUserID === currentUser.id) {
         useOpenWorkordersStore.getState().setField("hasNewSMS", false, zWorkorderObj.id);
       }
+    }
+    if (zWorkorderObj?.customerCell) {
+      let thread = zSmsThreads.find(t => t.phone === zWorkorderObj.customerCell);
+      if (thread) _setReadThreadPhones(prev => ({ ...prev, [thread.phone]: thread.lastMillis }));
     }
   }, [zWorkorderObj?.hasNewSMS, zWorkorderObj?.id]);
 
@@ -184,6 +191,7 @@ export function MessagesComponent({}) {
     });
   }, []);
   const [sHubNewPhone, _setHubNewPhone] = useState("");
+  const [sReadThreadPhones, _setReadThreadPhones] = useState({});
   const [sHubSidebarCollapsed, _setHubSidebarCollapsed] = useState(false);
   const [sHubSidebarFullWidth, _setHubSidebarFullWidth] = useState(false);
   const [sHubHoverPhone, _setHubHoverPhone] = useState("");
@@ -899,6 +907,7 @@ export function MessagesComponent({}) {
   }
 
   function handleHubThreadClick(thread) {
+    _setReadThreadPhones(prev => ({ ...prev, [thread.phone]: thread.lastMillis }));
     _setHubSelectedPhone(prev => {
       if (prev === thread.phone) {
         _setHubHoverPhone("");
@@ -1111,11 +1120,13 @@ export function MessagesComponent({}) {
                 keyExtractor={(item) => item.phone}
                 renderItem={({ item }) => {
                   let activeWO = zAllWorkorders.find(wo => wo.customerCell === item.phone);
+                  let isUnread = item.lastType === "incoming" && sHubSelectedPhone !== item.phone && (!sReadThreadPhones[item.phone] || sReadThreadPhones[item.phone] < item.lastMillis);
                   return (
                     <ThreadCard
                       thread={item}
                       isSelected={sHubSelectedPhone === item.phone}
                       isHovered={sHubHoverPhone === item.phone}
+                      isUnread={isUnread}
                       activeWO={activeWO}
                       onPress={() => handleHubThreadClick(item)}
                       onHoverIn={() => { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = setTimeout(() => _setHubHoverPhone(item.phone), 150); }}
@@ -1195,6 +1206,16 @@ export function MessagesComponent({}) {
         justifyContent: "space-between",
       }}
     >
+      {zCustomer?.customerCell && !sCustomPhoneMode && (
+        <View style={{ width: "100%", paddingVertical: 4, paddingHorizontal: 6, flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ fontSize: 13, color: gray(0.4), fontStyle: "italic", textTransform: "capitalize" }}>
+            {((zCustomer.first || "") + " " + (zCustomer.last || "")).trim()}
+          </Text>
+          <Text style={{ fontSize: 13, color: gray(0.4), marginLeft: 8 }}>
+            {`(${zCustomer.customerCell.slice(0, 3)}) ${zCustomer.customerCell.slice(3, 6)}-${zCustomer.customerCell.slice(6)}`}
+          </Text>
+        </View>
+      )}
       <View
         style={{
           width: "100%",
@@ -1528,13 +1549,12 @@ export function MessagesComponent({}) {
   );
 }
 
-function ThreadCard({ thread, isSelected, isHovered, activeWO, onPress, onHoverIn, onHoverOut }) {
-  let isIncoming = thread.lastType === "incoming";
-  let bgColor = isIncoming ? "rgb(230,230,230)" : "rgb(0,122,255)";
-  if (isSelected) bgColor = isIncoming ? "rgb(215,215,215)" : "rgb(0,100,220)";
-  else if (isHovered) bgColor = isIncoming ? "rgb(220,220,220)" : "rgb(0,110,235)";
-  let textColor = isIncoming ? C.text : "white";
-  let subtextColor = isIncoming ? gray(0.35) : "rgba(255,255,255,0.7)";
+function ThreadCard({ thread, isSelected, isHovered, isUnread, activeWO, onPress, onHoverIn, onHoverOut }) {
+  let bgColor = isUnread ? "rgb(0,122,255)" : "transparent";
+  if (isSelected) bgColor = isUnread ? "rgb(0,100,220)" : gray(0.05);
+  else if (isHovered) bgColor = isUnread ? "rgb(0,110,235)" : gray(0.03);
+  let textColor = isUnread ? "white" : C.text;
+  let subtextColor = isUnread ? "rgba(255,255,255,0.7)" : gray(0.35);
   let formattedPhone = formatPhoneWithDashes(thread.phone);
   let customerName = activeWO
     ? (activeWO.customerFirst + " " + activeWO.customerLast).trim()
@@ -1555,12 +1575,12 @@ function ThreadCard({ thread, isSelected, isHovered, activeWO, onPress, onHoverI
   // Delivery status for last outgoing message
   let deliveryLabel = "";
   let deliveryColor = subtextColor;
-  if (!isIncoming && thread.lastOutgoingMessageStatus) {
+  if (thread.lastType !== "incoming" && thread.lastOutgoingMessageStatus) {
     let s = thread.lastOutgoingMessageStatus;
-    if (s === "delivered") { deliveryLabel = "Delivered"; deliveryColor = isIncoming ? C.green : "rgba(180,255,180,0.9)"; }
+    if (s === "delivered") { deliveryLabel = "Delivered"; deliveryColor = C.green; }
     else if (s === "sent") { deliveryLabel = "Sent"; deliveryColor = subtextColor; }
-    else if (s === "failed") { deliveryLabel = "Failed"; deliveryColor = isIncoming ? C.red : "rgb(255,180,180)"; }
-    else if (s === "undelivered") { deliveryLabel = "Not Delivered"; deliveryColor = isIncoming ? C.red : "rgb(255,180,180)"; }
+    else if (s === "failed") { deliveryLabel = "Failed"; deliveryColor = C.red; }
+    else if (s === "undelivered") { deliveryLabel = "Not Delivered"; deliveryColor = C.red; }
     else if (s === "queued" || s === "accepted" || s === "sending") { deliveryLabel = "Sending..."; }
   }
 
@@ -1573,7 +1593,7 @@ function ThreadCard({ thread, isSelected, isHovered, activeWO, onPress, onHoverI
             <Text style={{ fontSize: 14, fontWeight: Fonts.weight.textHeavy, color: textColor }}>{formattedPhone}</Text>
           </View>
           {customerName ? (
-            <Text style={{ fontSize: 12, color: isIncoming ? C.blue : "rgba(255,255,255,0.85)", marginTop: 2 }} numberOfLines={1}>{customerName}</Text>
+            <Text style={{ fontSize: 12, color: isUnread ? "rgba(255,255,255,0.85)" : C.blue, marginTop: 2 }} numberOfLines={1}>{customerName}</Text>
           ) : (
             <View style={{ height: 18, marginTop: 2 }} />
           )}
@@ -1585,7 +1605,7 @@ function ThreadCard({ thread, isSelected, isHovered, activeWO, onPress, onHoverI
         </View>
       </View>
       <View style={{ marginTop: 4 }}>
-        <Text numberOfLines={2} style={{ fontSize: 13, color: isIncoming ? gray(0.5) : "rgba(255,255,255,0.85)", flex: 1 }}>{preview}</Text>
+        <Text numberOfLines={2} style={{ fontSize: 13, color: isUnread ? "rgba(255,255,255,0.85)" : gray(0.5), flex: 1 }}>{preview}</Text>
       </View>
     </TouchableOpacity>
   );

@@ -4,7 +4,7 @@ import { useState, memo } from "react";
 import { cloneDeep } from "lodash";
 import { ScreenModal, Button_, CheckBox_, SmallLoadingIndicator, SHADOW_RADIUS_PROTO } from "../../../../components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
-import { useCurrentCustomerStore, useSettingsStore, useLoginStore, useAlertScreenStore } from "../../../../stores";
+import { useCurrentCustomerStore, useSettingsStore, useLoginStore } from "../../../../stores";
 import { formatCurrencyDisp, formatMillisForDisplay, gray, lightenRGBByPercent, log, generateEAN13Barcode, localStorageWrapper, findTemplateByType, printBuilder } from "../../../../utils";
 import { readTransaction, writeCashRefund, newCheckoutProcessStripeRefund } from "./newCheckoutFirebaseCalls";
 import { buildRefundObject, sendRefundReceipt } from "./newCheckoutUtils";
@@ -21,6 +21,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
   const [sPrint, _setPrint] = useState(true);
   const [sSMS, _setSMS] = useState(false);
   const [sEmail, _setEmail] = useState(false);
+  const [sShowConfirm, _setShowConfirm] = useState(false);
 
   let hasPhone = !!customer?.phone || !!customer?.customerCell;
   let hasEmail = !!customer?.email;
@@ -177,6 +178,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
     _setPrint(true);
     _setSMS(false);
     _setEmail(false);
+    _setShowConfirm(false);
     if (onClose) onClose();
   }
 
@@ -188,6 +190,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
       outerModalStyle={{ backgroundColor: "rgba(50,50,50,.65)" }}
       buttonVisible={false}
       Component={() => (
+        <>
         <View
           style={{
             flexDirection: "column",
@@ -394,20 +397,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                   {/* Refund Button */}
                   <Button_
                     text={sProcessing ? "PROCESSING..." : `REFUND FULL ${isGiftCard ? "GIFT CARD" : "DEPOSIT"}`}
-                    onPress={() => {
-                      useAlertScreenStore.getState().setValues({
-                        title: "Confirm Refund",
-                        message: "Refund $" + formatCurrencyDisp(refundAmount) + " " + (isCard ? "to card" : "in cash") + "? This cannot be undone.",
-                        btn1Text: "REFUND",
-                        btn2Text: "CANCEL",
-                        handleBtn1Press: () => {
-                          useAlertScreenStore.getState().setShowAlert(false);
-                          handleFullRefund();
-                        },
-                        handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
-                        showAlert: true,
-                      });
-                    }}
+                    onPress={() => _setShowConfirm(true)}
                     enabled={!sProcessing}
                     colorGradientArr={COLOR_GRADIENTS.yellow}
                     textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
@@ -448,6 +438,59 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
             </View>
           )}
         </View>
+        {sShowConfirm && (
+          <View
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 99999,
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: C.backgroundWhite,
+                borderRadius: 15,
+                alignItems: "center",
+                justifyContent: "space-around",
+                minWidth: "32%",
+                minHeight: "24%",
+              }}
+            >
+              <Text style={{ fontWeight: "500", marginTop: 25, fontSize: 25, color: "red", textAlign: "center" }}>
+                Confirm Refund
+              </Text>
+              <Text style={{ textAlign: "center", width: "90%", marginTop: 10, fontSize: 18, color: C.text }}>
+                {"Refund $" + formatCurrencyDisp(refundAmount) + " " + (isCard ? "to card" : "in cash") + "? This cannot be undone."}
+              </Text>
+              <View style={{ marginTop: 25, flexDirection: "row", justifyContent: "center", alignItems: "center", marginBottom: 25, width: "100%", paddingHorizontal: 20, gap: 20 }}>
+                <Button_
+                  colorGradientArr={COLOR_GRADIENTS.green}
+                  text="REFUND"
+                  buttonStyle={{ paddingVertical: 4, flex: 1 }}
+                  textStyle={{ color: C.textWhite, fontWeight: "600" }}
+                  onPress={() => {
+                    _setShowConfirm(false);
+                    handleFullRefund();
+                  }}
+                />
+                <Button_
+                  colorGradientArr={COLOR_GRADIENTS.blue}
+                  text="CANCEL"
+                  buttonStyle={{ paddingVertical: 4, flex: 1 }}
+                  textStyle={{ color: C.textWhite, fontWeight: "600" }}
+                  onPress={() => _setShowConfirm(false)}
+                />
+              </View>
+            </View>
+          </View>
+        )}
+        </>
       )}
     />
   );

@@ -161,6 +161,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
               onChangeText={(val) => _sSetNewNoteText(val.charAt(0).toUpperCase() + val.slice(1))}
               debounceMs={0}
               placeholder="Write a note..."
+              autoFocus={true}
               multiline={true}
               numberOfLines={3}
               blurOnSubmit={false}

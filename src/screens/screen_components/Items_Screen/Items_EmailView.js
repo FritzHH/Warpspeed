@@ -38,7 +38,7 @@ export function buildSignOffHtml(activeAccountKey) {
       let lastInitial = currentUser.last ? currentUser.last.charAt(0) + "." : "";
       let userName = (firstName + " " + lastInitial).trim();
       if (userName) {
-        html += `<br/><p style="margin:0;">Thanks,<br/><br/>-${userName}</p>`;
+        html += `<br/><br/><br/><p style="margin:0;">Thanks,<br/><br/>-${userName}</p>`;
       }
     }
   }
@@ -72,6 +72,7 @@ export const Items_EmailView = React.memo(() => {
   const zComposeMode = useEmailStore((state) => state.composeMode);
   const zEmails = useEmailStore((state) => state.emails);
   const zActiveAccountKey = useEmailStore((state) => state.activeAccountKey);
+  const zSendingEmail = useEmailStore((state) => state.sendingEmail);
 
   const zThreadMessages = useMemo(() => {
     if (!zSelectedThreadId) return [];
@@ -80,20 +81,45 @@ export const Items_EmailView = React.memo(() => {
       .sort((a, b) => (a.internalDate || 0) - (b.internalDate || 0));
   }, [zEmails, zSelectedThreadId, zActiveAccountKey]);
 
+  let content;
   if (zComposeMode) {
-    return <ComposeView />;
-  }
-
-  if (zSelectedThreadId && zThreadMessages.length > 0) {
-    return <ThreadView />;
+    content = <ComposeView />;
+  } else if (zSelectedThreadId && zThreadMessages.length > 0) {
+    content = <ThreadView />;
+  } else {
+    content = (
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
+        <Image_ icon={ICONS.paperPlane} size={64} style={{ opacity: 0.2, marginBottom: 16 }} />
+        <Text style={{ fontSize: 16, color: gray(0.5) }}>
+          Select an email to read, or compose a new message
+        </Text>
+      </View>
+    );
   }
 
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
-      <Image_ icon={ICONS.paperPlane} size={64} style={{ opacity: 0.2, marginBottom: 16 }} />
-      <Text style={{ fontSize: 16, color: gray(0.5) }}>
-        Select an email to read, or compose a new message
-      </Text>
+    <View style={{ flex: 1 }}>
+      {content}
+      {zSendingEmail && (
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(255,255,255,0.7)",
+            justifyContent: "center",
+            alignItems: "center",
+            zIndex: 999,
+          }}
+        >
+          <Image_ icon={ICONS.wheelGIF} size={80} />
+          <Text style={{ fontSize: 15, color: C.text, marginTop: 12, fontWeight: Fonts.weight.textHeavy }}>
+            Sending email...
+          </Text>
+        </View>
+      )}
     </View>
   );
 });
@@ -252,23 +278,27 @@ const ThreadView = React.memo(() => {
           alignItems: "center",
         }}
       >
-        <Button_
-          text="Reply"
-          onPress={handleReply}
-          colorGradientArr={COLOR_GRADIENTS.blue}
-          style={{ marginRight: 16, paddingHorizontal: 20 }}
-        />
-        <Button_
-          text="Reply All"
-          onPress={handleReplyAll}
-          colorGradientArr={COLOR_GRADIENTS.lightBlue}
-          style={{ marginRight: 16, paddingHorizontal: 16 }}
-        />
+        <View style={{ marginRight: 12 }}>
+          <Button_
+            text="Reply"
+            onPress={handleReply}
+            colorGradientArr={COLOR_GRADIENTS.blue}
+            buttonStyle={{ paddingHorizontal: 20 }}
+          />
+        </View>
+        <View style={{ marginRight: 12 }}>
+          <Button_
+            text="Reply All"
+            onPress={handleReplyAll}
+            colorGradientArr={COLOR_GRADIENTS.lightBlue}
+            buttonStyle={{ paddingHorizontal: 16 }}
+          />
+        </View>
         <Button_
           text="Forward"
           onPress={handleForward}
           colorGradientArr={COLOR_GRADIENTS.grey}
-          style={{ paddingHorizontal: 16 }}
+          buttonStyle={{ paddingHorizontal: 16 }}
         />
       </View>
     </View>
@@ -310,6 +340,12 @@ const MessageBubble = React.memo(({ message, isExpanded, onToggleExpand, isLast 
     if (!sShowImages) {
       html = html.replace(/<img[^>]*src=["']https?:\/\/[^"']*["'][^>]*>/gi, '<span style="color:#999;font-style:italic">[Image blocked]</span>');
     }
+    DOMPurify.addHook("afterSanitizeAttributes", (node) => {
+      if (node.tagName === "A") {
+        node.setAttribute("target", "_blank");
+        node.setAttribute("rel", "noopener noreferrer");
+      }
+    });
     sanitizedHtml = DOMPurify.sanitize(html, {
       ALLOWED_TAGS: [
         "p", "br", "div", "span", "a", "b", "strong", "i", "em", "u",
@@ -317,9 +353,10 @@ const MessageBubble = React.memo(({ message, isExpanded, onToggleExpand, isLast 
         "table", "thead", "tbody", "tr", "td", "th",
         "img", "blockquote", "pre", "code", "hr", "sub", "sup",
       ],
-      ALLOWED_ATTR: ["href", "src", "alt", "style", "class", "target", "width", "height"],
+      ALLOWED_ATTR: ["href", "src", "alt", "style", "class", "target", "rel", "width", "height"],
       ALLOW_DATA_ATTR: false,
     });
+    DOMPurify.removeHook("afterSanitizeAttributes");
   }
 
   return (
@@ -608,6 +645,15 @@ const ComposeView = React.memo(() => {
   const fileInputRef = useRef(null);
   const videoInputRef = useRef(null);
 
+  const quillCallbackRef = useCallback((node) => {
+    if (node) {
+      setTimeout(() => {
+        const editor = node.getEditor();
+        editor.setSelection(0, 0);
+      }, 50);
+    }
+  }, []);
+
   const myEmail = zSettings?.emailAccounts?.find((a) => a.accountKey === zActiveAccountKey)?.email || "";
 
   const modeLabel =
@@ -868,6 +914,7 @@ const ComposeView = React.memo(() => {
           }}
         >
           <ReactQuill
+            ref={quillCallbackRef}
             theme="snow"
             value={zComposeDraft.bodyHtml}
             onChange={handleBodyChange}

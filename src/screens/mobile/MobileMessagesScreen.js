@@ -28,7 +28,8 @@ import {
 import { dbListenToCustomerMessages, dbUpdateMessageCanRespond, dbCreateTextToPayInvoice } from "../../db_calls_wrapper";
 import { firestoreRead } from "../../db_calls";
 import { smsService } from "../../data_service_modules";
-import { buildForwardToPayload } from "../screen_components/Options_Screen/ReplyOptionsBar";
+import { ReplyOptionsBar, scheduleAutoSend, clearAutoSend, buildForwardToPayload } from "../screen_components/Options_Screen/ReplyOptionsBar";
+import { WorkorderMediaModal } from "../screen_components/modal_screens/WorkorderMediaModal";
 import { SMS_PROTO } from "../../data";
 
 export function MobileMessagesScreen({ workorderID, onBack }) {
@@ -48,6 +49,10 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
   const [sNotifyMe, _setNotifyMe] = useState(false);
   const [sActionsOpen, _setActionsOpen] = useState(false);
   const scrollRef = useRef(null);
+  const [sShowMediaPicker, _setShowMediaPicker] = useState(false);
+  const [sShowReplyModal, _setShowReplyModal] = useState(false);
+  const pendingMediaRef = useRef(null);
+  const pendingActionRef = useRef(null);
 
   const customerPhone = zWorkorder?.customerCell;
   const customerFirst = zWorkorder?.customerFirst || "";
@@ -130,6 +135,103 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
     let newVal = !sCanRespond;
     _setCanRespond(newVal);
     await dbUpdateMessageCanRespond(customerPhone, null, newVal);
+  }
+
+  function handleMediaPicked(mediaItem) {
+    _setShowMediaPicker(false);
+    if (!mediaItem || !mediaItem.url) return;
+    pendingMediaRef.current = [mediaItem];
+    pendingActionRef.current = "media";
+    _setShowReplyModal(true);
+    scheduleAutoSend(() => {
+      _setShowReplyModal(false);
+      sendMediaMessage(sCanRespond);
+      pendingActionRef.current = null;
+      pendingMediaRef.current = null;
+    });
+  }
+
+  function handleMediaMultiSelect(mediaItems) {
+    _setShowMediaPicker(false);
+    if (!mediaItems || !mediaItems.length) return;
+    pendingMediaRef.current = mediaItems;
+    pendingActionRef.current = "media";
+    _setShowReplyModal(true);
+    scheduleAutoSend(() => {
+      _setShowReplyModal(false);
+      sendMediaMessage(sCanRespond);
+      pendingActionRef.current = null;
+      pendingMediaRef.current = null;
+    });
+  }
+
+  async function sendMediaMessage(canRespondVal, forwardOverride) {
+    let mediaItems = pendingMediaRef.current;
+    if (!mediaItems || !mediaItems.length) return;
+    if (!customerPhone || customerPhone.replace(/\D/g, "").length !== 10) return;
+    let currentUser = useLoginStore.getState().getCurrentUser();
+    let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
+    let forwardTo = buildForwardToPayload(forwardOverride, sNotifyMe);
+    _setShowReplyModal(false);
+    let zSettings = useSettingsStore.getState().getSettings();
+    let storeName = zSettings?.storeInfo?.displayName || "Our store";
+    let hasImages = mediaItems.some((m) => m.type === "image");
+    let hasVideos = mediaItems.some((m) => m.type === "video");
+    let imageCount = mediaItems.filter((m) => m.type === "image").length;
+    let videoCount = mediaItems.filter((m) => m.type === "video").length;
+    let parts = [];
+    if (hasImages) parts.push(imageCount === 1 ? "a photo" : imageCount + " photos");
+    if (hasVideos) parts.push(videoCount === 1 ? "a video" : videoCount + " videos");
+    let mediaText = storeName + " has sent you " + parts.join(" and ");
+    let msg = { ...SMS_PROTO };
+    msg.message = mediaText;
+    msg.mediaUrls = mediaItems.map((m) => ({ url: m.url, thumbnailUrl: m.thumbnailUrl || "", contentType: m.type === "video" ? "video/mp4" : "image/jpeg" }));
+    msg.phoneNumber = customerPhone;
+    msg.canRespond = useCanRespond ? true : null;
+    msg.millis = new Date().getTime();
+    msg.customerID = customerID;
+    if (customerFirst) msg.customerFirst = customerFirst;
+    if (customerLast) msg.customerLast = customerLast;
+    msg.id = crypto.randomUUID();
+    msg.type = "outgoing";
+    msg.senderUserObj = currentUser;
+    msg.sentByUser = currentUser?.id;
+    if (forwardTo) msg.forwardTo = forwardTo;
+    let result = await smsService.send(msg);
+    if (result.success) {
+      let allWOs = useOpenWorkordersStore.getState().workorders;
+      allWOs.filter((wo) => wo.customerID === customerID).forEach((wo) => {
+        useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", currentUser?.id, wo.id);
+      });
+    }
+    if (!result.success) {
+      useAlertScreenStore.getState().setValues({
+        title: "Message Failed",
+        message: result.error || "Failed to send media",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+    }
+    pendingMediaRef.current = null;
+    pendingActionRef.current = null;
+  }
+
+  function handleToggleForward() {
+    let currentUser = useLoginStore.getState().getCurrentUser();
+    if (!currentUser?.phone) {
+      useAlertScreenStore.getState().setValues({
+        title: "No Phone Number",
+        message: "Your user profile does not have a phone number. Add one in settings to receive forwarded replies.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+    _setNotifyMe(!sNotifyMe);
   }
 
   function handleSendPaymentLink() {
@@ -337,6 +439,13 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
                 >
                   <Text style={{ fontSize: 14, color: C.text }}>Send invoice</Text>
                 </TouchableOpacity>
+                <View style={{ height: 1, backgroundColor: gray(0.85) }} />
+                <TouchableOpacity
+                  onPress={() => { _setActionsOpen(false); _setShowMediaPicker(true); }}
+                  style={{ paddingVertical: 12, paddingHorizontal: 14 }}
+                >
+                  <Text style={{ fontSize: 14, color: C.text }}>Send media</Text>
+                </TouchableOpacity>
               </View>
             ) : null}
           </View>
@@ -365,12 +474,25 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
             text="User can respond"
           />
         </View>
+        <ReplyOptionsBar
+          visible={sShowReplyModal}
+          forwardReplies={sNotifyMe}
+          hasActivePhone={!!useLoginStore.getState().getCurrentUser()?.phone}
+          onSelectCanRespond={(canRespond) => {
+            clearAutoSend();
+            _setCanRespond(canRespond);
+            _setShowReplyModal(false);
+            if (pendingActionRef.current === "media") { sendMediaMessage(canRespond); }
+          }}
+          onToggleForward={handleToggleForward}
+        />
         <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
           <TextInput
             value={sNewMessage}
             onChangeText={(val) => {
               if (val.length === 1) val = val.toUpperCase();
               _setNewMessage(val);
+              if (sShowReplyModal) { _setShowReplyModal(false); clearAutoSend(); }
             }}
             placeholder="Type a message..."
             autoCapitalize="sentences"
@@ -427,6 +549,16 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
         </View>
       </View>
       <AlertBox_ showAlert={zShowAlert} />
+      {sShowMediaPicker && woID && (
+        <WorkorderMediaModal
+          visible={true}
+          onClose={() => _setShowMediaPicker(false)}
+          workorderID={woID}
+          mode="view"
+          onSelect={handleMediaPicked}
+          onSendMedia={handleMediaMultiSelect}
+        />
+      )}
     </View>
   );
 }

@@ -792,7 +792,7 @@ export const DropdownMenu = ({
     buttonTextStyle = TEXT_STYLE;
   }
 
-  if (!buttonIcon) buttonIcon = ICONS.menu2;
+  if (buttonIcon === undefined) buttonIcon = ICONS.menu2;
   if (!buttonIconSize) buttonIconSize = 11;
 
   function getBackgroundColor(rgbString = "", index) {

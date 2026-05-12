@@ -588,7 +588,7 @@ var printBuilder = {
       return types.join(" / ") || "None";
     })();
     receipt.popCashRegister = (payments || []).some(function (p) {
-      return p.method === "cash" && p.amountTendered > p.amountCaptured;
+      return p.method === "cash";
     });
     var cashChange = 0;
     (payments || []).forEach(function (p) {

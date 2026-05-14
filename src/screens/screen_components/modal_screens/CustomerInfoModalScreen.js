@@ -1162,10 +1162,7 @@ const WorkorderCard = ({ workorder, statuses, taxPercent, zActiveSales, onSelect
         }}
       >
         <Text style={{ color: "dimgray", fontSize: 12 }}>
-          {formatMillisForDisplay(
-            workorder.startedOnMillis,
-            new Date(workorder.startedOnMillis).getFullYear() !== new Date().getFullYear()
-          )}
+          {formatMillisForDisplay(workorder.startedOnMillis, true)}
         </Text>
         {!!workorder.waitTime?.label && (
           <Text style={{ color: gray(0.4), fontSize: 11, fontStyle: "italic" }}>
@@ -1238,7 +1235,7 @@ const WorkordersList = ({ workorders, onSelect }) => {
   return (
     <View style={{ flex: 1, width: "100%" }}>
       <FlatList
-        data={workorders}
+        data={[...workorders].sort((a, b) => (b.startedOnMillis || 0) - (a.startedOnMillis || 0))}
         keyExtractor={(item) => item.id}
         renderItem={(obj) => (
           <WorkorderCard
@@ -1813,7 +1810,7 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
 const SalesList = ({ sales, transactionsMap = {}, onSelect }) => {
   return (
     <View style={{ width: "100%" }}>
-      {sales.map((sale) => {
+      {[...sales].sort((a, b) => (b.millis || 0) - (a.millis || 0)).map((sale) => {
         const txns = transactionsMap[sale.id] || [];
         const totalRefunded = txns.reduce((s, t) => s + (t.refunds || []).reduce((rs, r) => rs + (r.amount || 0), 0), 0);
         const hasRefunds = totalRefunded > 0;
@@ -1848,7 +1845,7 @@ const SalesList = ({ sales, transactionsMap = {}, onSelect }) => {
               }}
             >
               <Text style={{ color: "dimgray", fontSize: 12 }}>
-                {formatMillisForDisplay(sale.millis)}
+                {formatMillisForDisplay(sale.millis, true)}
               </Text>
               <View style={{ flexDirection: "row", alignItems: "center" }}>
                 {sale._isActiveSale && (

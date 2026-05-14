@@ -1080,14 +1080,12 @@ export const LineItemComponent = ({
                     <Tooltip text="Notes" position="top">
                       <TouchableOpacity
                         onPress={(e) => {
-                          console.log("[PENCIL] onPress fired", { hasEvent: !!e, nativeEvent: !!e?.nativeEvent, pageX: e?.nativeEvent?.pageX || e?.pageX, pageY: e?.nativeEvent?.pageY || e?.pageY, timestamp: Date.now() });
-                          const x = e?.nativeEvent?.pageX || e?.pageX || 0;
-                          const y = e?.nativeEvent?.pageY || e?.pageY || 0;
-                          console.log("[PENCIL] calling onOpenNoteHelper", { x, y, hasCallback: !!onOpenNoteHelper });
-                          onOpenNoteHelper?.(workorderLine, x, y);
+                          useLoginStore.getState().requireLogin(() => {
+                            const x = e?.nativeEvent?.pageX || e?.pageX || 0;
+                            const y = e?.nativeEvent?.pageY || e?.pageY || 0;
+                            onOpenNoteHelper?.(workorderLine, x, y);
+                          });
                         }}
-                        onPressIn={(e) => console.log("[PENCIL] onPressIn", Date.now())}
-                        onPressOut={(e) => console.log("[PENCIL] onPressOut", Date.now())}
                         style={{ marginRight: 4 }}
                       >
                         <Image source={ICONS.editPencil} style={{ width: 15, height: 15, opacity: 0.5 }} />
@@ -1146,6 +1144,7 @@ export const LineItemComponent = ({
                         capitalize={true}
                         editable={!isLocked}
                         style={{ outlineWidth: 0, color: "orange", flex: 1, paddingHorizontal: 3, fontSize: 16 }}
+                        onFocus={() => useLoginStore.getState().requireLogin(() => {})}
                         onChangeText={(val) => {
                           useLoginStore.getState().requireLogin(() => {
                             __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
@@ -1167,6 +1166,7 @@ export const LineItemComponent = ({
                         debounceMs={500}
                         editable={!isLocked}
                         style={{ outlineWidth: 0, color: "green", flex: 1, paddingHorizontal: 3, fontSize: 14 }}
+                        onFocus={() => useLoginStore.getState().requireLogin(() => {})}
                         onChangeText={(val) => {
                           useLoginStore.getState().requireLogin(() => {
                             __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });

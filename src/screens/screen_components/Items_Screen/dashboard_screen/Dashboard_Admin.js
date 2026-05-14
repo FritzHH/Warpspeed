@@ -1299,6 +1299,34 @@ const AppUserListComponent = ({
             }}
           />
         </View>
+        {zSettingsObj?.useFacialRecognition !== false && (
+          <View style={{ width: "100%", marginTop: 10, paddingHorizontal: 5 }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
+              <Text style={{ fontSize: 13, color: C.text, fontWeight: Fonts.weight.textRegular }}>
+                Match Sensitivity
+              </Text>
+              <Text style={{ fontSize: 13, color: C.text, fontWeight: Fonts.weight.textHeavy }}>
+                {(zSettingsObj?.faceRecognitionThreshold ?? 0.55).toFixed(2)}
+              </Text>
+            </View>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Text style={{ fontSize: 11, color: gray(0.5), marginRight: 8 }}>Strict</Text>
+              <input
+                type="range"
+                min="0.35"
+                max="0.65"
+                step="0.05"
+                value={zSettingsObj?.faceRecognitionThreshold ?? 0.55}
+                onChange={(e) => {
+                  handleSettingsFieldChange("faceRecognitionThreshold", parseFloat(e.target.value));
+                }}
+                style={{ flex: 1, cursor: "pointer" }}
+              />
+              <Text style={{ fontSize: 11, color: gray(0.5), marginLeft: 8 }}>Loose</Text>
+            </View>
+          </View>
+        )}
+        <View style={{ width: "100%", height: 1, backgroundColor: gray(0.2), marginVertical: 20 }} />
         {/* <View
             style={{
               flexDirection: "row",

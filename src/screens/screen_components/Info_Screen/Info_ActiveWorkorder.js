@@ -769,7 +769,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       }
                     }
                   }}
-                  onFocus={() => { _setBrandFocused(true); brandBackspaced.current = false; }}
+                  onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setBrandFocused(true); brandBackspaced.current = false; }}
                   onBlur={() => {
                     setTimeout(() => {
                       _setBrandFocused(false);
@@ -927,7 +927,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       }
                     }
                   }}
-                  onFocus={() => { _setDescFocused(true); descBackspaced.current = false; }}
+                  onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setDescFocused(true); descBackspaced.current = false; }}
                   onBlur={() => {
                     setTimeout(() => {
                       _setDescFocused(false);
@@ -1064,7 +1064,7 @@ export const ActiveWorkorderComponent = ({}) => {
                         }
                       }
                     }}
-                    onFocus={() => { _setColor1Focused(true); color1Backspaced.current = false; }}
+                    onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setColor1Focused(true); color1Backspaced.current = false; }}
                     onBlur={() => {
                       setTimeout(() => {
                         _setColor1Focused(false);
@@ -1143,7 +1143,7 @@ export const ActiveWorkorderComponent = ({}) => {
                         }
                       }
                     }}
-                    onFocus={() => { _setColor2Focused(true); color2Backspaced.current = false; }}
+                    onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setColor2Focused(true); color2Backspaced.current = false; }}
                     onBlur={() => {
                       setTimeout(() => {
                         _setColor2Focused(false);
@@ -1591,6 +1591,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   backgroundColor: C.backgroundWhite,
                 }}
                 value={capitalizeFirstLetterOfString(zOpenWorkorder?.partOrdered)}
+                onFocus={() => useLoginStore.getState().requireLogin(() => {})}
                 onChangeText={(val) => {
                   useOpenWorkordersStore.getState().setField("partOrdered", val, zOpenWorkorder.id);
                   useOpenWorkordersStore.getState().setField("partOrderedMillis", Date.now(), zOpenWorkorder.id);
@@ -1626,6 +1627,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   fontWeight: zOpenWorkorder?.partSource ? "500" : null,
                   backgroundColor: C.backgroundWhite,
                 }}
+                onFocus={() => useLoginStore.getState().requireLogin(() => {})}
                 onChangeText={(val) => {
                   useOpenWorkordersStore.getState().setField("partSource", val, zOpenWorkorder.id);
                   useOpenWorkordersStore.getState().setField("partOrderedMillis", Date.now(), zOpenWorkorder.id);

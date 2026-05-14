@@ -679,6 +679,8 @@ var printBuilder = {
       amountTendered: txn.amountTendered || 0,
       cardType: txn.cardType || "",
       last4: txn.last4 || "",
+      expMonth: txn.expMonth || "",
+      expYear: txn.expYear || "",
     }];
 
     // Refunds

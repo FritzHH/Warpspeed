@@ -27,7 +27,7 @@ import {
   compressImage,
   log,
 } from "../utils";
-import { dbUploadWorkorderMedia, dbGetCustomer, dbSaveCustomer, dbListenToOpenWorkorders, dbListenToInventory, dbListenToCurrentPunchClock } from "../db_calls_wrapper";
+import { dbUploadWorkorderMedia, dbGetCustomer, dbSaveCustomer, dbListenToOpenWorkorders, dbListenToInventory, dbListenToCurrentPunchClock, dbListenToSettings } from "../db_calls_wrapper";
 import { authSignOut } from "../db_calls";
 import { Image_, AlertBox_, SmallLoadingIndicator, TextInput_, CheckBox_, DropdownMenu, StatusPickerModal } from "../components";
 import { StandKeypad } from "../shared/StandKeypad";
@@ -94,10 +94,14 @@ export function PhoneScreen() {
     let unsubPunch = dbListenToCurrentPunchClock((data) => {
       useLoginStore.getState().setPunchClock(data);
     });
+    let unsubSettings = dbListenToSettings((data) => {
+      useSettingsStore.getState().setSettings(data, false, false);
+    });
     return () => {
       if (typeof unsub === "function") unsub();
       if (typeof unsubInv === "function") unsubInv();
       if (typeof unsubPunch === "function") unsubPunch();
+      if (typeof unsubSettings === "function") unsubSettings();
     };
   }, []);
 
@@ -298,11 +302,11 @@ export function PhoneScreen() {
                 onChangeText={_setSearch}
                 placeholder="Search name, brand, description..."
                 placeholderTextColor={gray(0.6)}
-                style={{ flex: 1, fontSize: 14, color: C.text, outlineStyle: "none" }}
+                style={{ flex: 1, fontSize: 16, color: C.text, outlineStyle: "none" }}
               />
               {!!sSearch && (
                 <TouchableOpacity onPress={() => _setSearch("")} style={{ padding: 4 }}>
-                  <Image_ icon={ICONS.close1} size={14} />
+                  <Image_ icon={ICONS.close1} size={20} />
                 </TouchableOpacity>
               )}
             </View>
@@ -553,6 +557,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
   const zShowAlert = useAlertScreenStore((s) => s.showAlert);
 
   const [sShowMessages, _setShowMessages] = useState(false);
+  const [sShowRecorder, _setShowRecorder] = useState(false);
   const [sCustomerOpen, _setCustomerOpen] = useState(true);
   const [sCustomerEditing, _setCustomerEditing] = useState(false);
   const [sCustomer, _setCustomer] = useState(null);
@@ -826,6 +831,11 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
     setTimeout(() => useUploadProgressStore.getState().setProgress(null), failed > 0 ? 5000 : 3000);
   }
 
+  function handleRecordingComplete(file) {
+    _setShowRecorder(false);
+    doUpload([file]);
+  }
+
   if (sShowMessages) {
     return (
       <View style={{ flex: 1, backgroundColor: C.backgroundWhite }}>
@@ -1084,19 +1094,34 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
                 </View>
               )}
             </View>
-            <TouchableOpacity
-              onPress={handleUploadPress}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                backgroundColor: C.blue,
-                borderRadius: 6,
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-              }}
-            >
-              <Text style={{ color: "white", fontSize: 15, fontWeight: "600" }}>+ Add</Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <TouchableOpacity
+                onPress={() => _setShowRecorder(true)}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: C.red,
+                  borderRadius: 6,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                }}
+              >
+                <Text style={{ color: "white", fontSize: 15, fontWeight: "600" }}>Record</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleUploadPress}
+                style={{
+                  flexDirection: "row",
+                  alignItems: "center",
+                  backgroundColor: C.blue,
+                  borderRadius: 6,
+                  paddingHorizontal: 12,
+                  paddingVertical: 6,
+                }}
+              >
+                <Text style={{ color: "white", fontSize: 15, fontWeight: "600" }}>+ Add</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Upload progress */}
@@ -1854,7 +1879,228 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
         </View>
       )}
 
+      {sShowRecorder && (
+        <VideoRecorder
+          onComplete={handleRecordingComplete}
+          onCancel={() => _setShowRecorder(false)}
+        />
+      )}
+
       <AlertBox_ showAlert={zShowAlert} />
+    </View>
+  );
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Video Recorder
+////////////////////////////////////////////////////////////////////////////////
+
+function VideoRecorder({ onComplete, onCancel }) {
+  const videoRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const streamRef = useRef(null);
+  const chunksRef = useRef([]);
+  const timerRef = useRef(null);
+  const previewUrlRef = useRef(null);
+  const initRef = useRef(false);
+
+  const [sPhase, _setPhase] = useState("starting");
+  const [sRecordedBlob, _setRecordedBlob] = useState(null);
+  const [sPreviewUrl, _setPreviewUrl] = useState(null);
+  const [sMimeType, _setMimeType] = useState("");
+  const [sSeconds, _setSeconds] = useState(0);
+  const [sError, _setError] = useState("");
+
+  const MAX_DURATION = 120;
+
+  if (!initRef.current) {
+    initRef.current = true;
+    initCamera();
+  }
+
+  async function initCamera() {
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        _setError("Camera not supported on this device");
+        _setPhase("error");
+        return;
+      }
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: true,
+      });
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      let mime = "";
+      if (MediaRecorder.isTypeSupported("video/mp4;codecs=h264")) mime = "video/mp4;codecs=h264";
+      else if (MediaRecorder.isTypeSupported("video/webm;codecs=vp8")) mime = "video/webm;codecs=vp8";
+      else if (MediaRecorder.isTypeSupported("video/webm")) mime = "video/webm";
+      _setMimeType(mime);
+      _setPhase("ready");
+    } catch (e) {
+      _setError("Camera access denied");
+      _setPhase("error");
+    }
+  }
+
+  function handleStartRecording() {
+    try {
+      chunksRef.current = [];
+      _setSeconds(0);
+      let options = { videoBitsPerSecond: 1500000 };
+      if (sMimeType) options.mimeType = sMimeType;
+      const recorder = new MediaRecorder(streamRef.current, options);
+      mediaRecorderRef.current = recorder;
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(chunksRef.current, { type: sMimeType || "video/webm" });
+        _setRecordedBlob(blob);
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        const url = URL.createObjectURL(blob);
+        previewUrlRef.current = url;
+        _setPreviewUrl(url);
+        _setPhase("preview");
+        clearInterval(timerRef.current);
+      };
+      recorder.start(1000);
+      _setPhase("recording");
+      timerRef.current = setInterval(() => {
+        _setSeconds((prev) => {
+          if (prev + 1 >= MAX_DURATION) {
+            recorder.stop();
+            return prev + 1;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+    } catch (e) {
+      _setError("Recording not supported on this device");
+      _setPhase("error");
+    }
+  }
+
+  function handleStopRecording() {
+    if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+    clearInterval(timerRef.current);
+  }
+
+  function handleReRecord() {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    previewUrlRef.current = null;
+    _setPreviewUrl(null);
+    _setRecordedBlob(null);
+    _setSeconds(0);
+    if (!streamRef.current?.active) {
+      _setPhase("starting");
+      initCamera();
+    } else {
+      _setPhase("ready");
+    }
+  }
+
+  function handleUse() {
+    const ext = sMimeType.includes("mp4") ? "mp4" : "webm";
+    const fileType = sMimeType.split(";")[0] || "video/webm";
+    const file = new File([sRecordedBlob], `recording.${ext}`, { type: fileType });
+    cleanup();
+    onComplete(file);
+  }
+
+  function handleCancel() {
+    cleanup();
+    onCancel();
+  }
+
+  function cleanup() {
+    if (mediaRecorderRef.current?.state === "recording") mediaRecorderRef.current.stop();
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    clearInterval(timerRef.current);
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+  }
+
+  function formatTime(sec) {
+    let m = Math.floor(sec / 60);
+    let s = sec % 60;
+    return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
+  }
+
+  return (
+    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, backgroundColor: "black", zIndex: 10 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingVertical: 12, position: "absolute", top: 0, left: 0, right: 0, zIndex: 2 }}>
+        <TouchableOpacity onPress={handleCancel} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center" }}>
+          <Text style={{ color: "white", fontSize: 20, fontWeight: "700" }}>{"\u2715"}</Text>
+        </TouchableOpacity>
+        {sPhase === "recording" && (
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: C.red, marginRight: 6 }} />
+            <Text style={{ color: "white", fontSize: 16, fontWeight: "600", fontVariant: ["tabular-nums"] }}>{formatTime(sSeconds)}</Text>
+          </View>
+        )}
+        {sPhase === "preview" && (
+          <Text style={{ color: "rgba(255,255,255,0.5)", fontSize: 14 }}>{formatTime(sSeconds)}</Text>
+        )}
+        <View style={{ width: 36 }} />
+      </View>
+
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        {sPhase === "error" ? (
+          <View style={{ alignItems: "center", paddingHorizontal: 32 }}>
+            <Text style={{ color: "white", fontSize: 16, textAlign: "center" }}>{sError}</Text>
+          </View>
+        ) : sPhase === "preview" && sPreviewUrl ? (
+          <video src={sPreviewUrl} controls autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+        ) : (
+          <>
+            <video
+              ref={(el) => { videoRef.current = el; if (el && streamRef.current) el.srcObject = streamRef.current; }}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            />
+            {sPhase === "starting" && (
+              <View style={{ position: "absolute", alignItems: "center" }}>
+                <SmallLoadingIndicator text="" color="white" />
+                <Text style={{ color: "white", fontSize: 14, marginTop: 8 }}>Starting camera...</Text>
+              </View>
+            )}
+          </>
+        )}
+      </View>
+
+      <View style={{ paddingVertical: 24, alignItems: "center", position: "absolute", bottom: 0, left: 0, right: 0 }}>
+        {sPhase === "ready" && (
+          <TouchableOpacity onPress={handleStartRecording} activeOpacity={0.7}>
+            <View style={{ width: 70, height: 70, borderRadius: 35, borderWidth: 4, borderColor: "white", alignItems: "center", justifyContent: "center" }}>
+              <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: C.red }} />
+            </View>
+          </TouchableOpacity>
+        )}
+        {sPhase === "recording" && (
+          <TouchableOpacity onPress={handleStopRecording} activeOpacity={0.7}>
+            <View style={{ width: 70, height: 70, borderRadius: 35, borderWidth: 4, borderColor: "white", alignItems: "center", justifyContent: "center" }}>
+              <View style={{ width: 28, height: 28, borderRadius: 6, backgroundColor: C.red }} />
+            </View>
+          </TouchableOpacity>
+        )}
+        {sPhase === "preview" && (
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <TouchableOpacity onPress={handleReRecord} activeOpacity={0.7} style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.2)", marginRight: 16 }}>
+              <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>Re-record</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={handleUse} activeOpacity={0.7} style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, backgroundColor: C.green }}>
+              <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>Use Video</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {sPhase === "error" && (
+          <TouchableOpacity onPress={handleCancel} activeOpacity={0.7} style={{ paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, backgroundColor: "rgba(255,255,255,0.2)" }}>
+            <Text style={{ color: "white", fontSize: 16, fontWeight: "600" }}>Go Back</Text>
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 }

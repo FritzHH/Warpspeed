@@ -22,13 +22,10 @@ Follow these steps before acting on any user request:
 
 **No new `useEffect` without permission.** You are not allowed to create a new `useEffect` under any circumstances without the user's explicit permission. You must explain why you need it first; the user will confirm before you add it. No exceptions unless otherwise stated by the user.
 
-**Use only react-native-web components.** You will use only react-native-web components (and project wrappers that use them) unless the user explicitly gives permission to use a standard React component or feature. No exceptions unless otherwise stated by the user.
-
 **Inline styling only.** Use inline styling only for both new and existing components; stay consistent with the rest of the app. Do not separate styles from the components (no separate StyleSheet files or style objects in other files). No exceptions unless otherwise stated by the user.
 
 **No CSS — flexbox only.** Do not use CSS classes, stylesheets, or CSS-in-JS. All layout must use flexbox properties inline. No exceptions unless otherwise stated by the user.
 
-**Percentage-based layouts.** Always use percentage values (e.g., `width: '50%'`, `height: '100%'`) for sizing and layout dimensions. If a percentage would cause issues due to a flex parent (e.g., the parent has no fixed size and the percentage resolves to zero), use `flex` values (e.g., `flex: 1`, `flex: 0.5`) instead. Do not mix `flex` and percentage sizing for sibling children within the same container - pick one approach per container. No exceptions unless otherwise stated by the user.
 
 **Standalone / solo sale = no customerID.** When the user refers to a "standalone sale" or "solo sale", that means a workorder with no `customerID` (`!workorder.customerID`). There are no special flags or fields — the absence of `customerID` is the sole indicator. Do not use or reference `isStandaloneSale` or any other flag.
 

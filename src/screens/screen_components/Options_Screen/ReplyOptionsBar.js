@@ -94,35 +94,31 @@ export function ReplyOptionsBar({ visible, forwardReplies, hasActivePhone, onSel
   }
 
   return (
-    <View style={{ width: '100%', justifyContent: "space-between", flexDirection: 'row', marginBottom: 4, backgroundColor: 'orange', padding: 10, borderRadius: 6 }}>
-      <View style={{ alignItems: 'flex-start' }}>
-        <Text style={{ color: 'dimgray' }}>Auto-sending in 10 seconds</Text>
+    <View style={{ width: '100%', marginBottom: 4, backgroundColor: 'orange', padding: 10, borderRadius: 6 }}>
+      <Text style={{ color: 'dimgray' }}>Auto-sending in 10 seconds</Text>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 10, flexWrap: "wrap" }}>
+        <Text style={{ fontSize: 15, color: 'dimgray', fontWeight: "500", marginRight: 10 }}>Can reply?</Text>
+        <TouchableOpacity_
+          onPress={() => onSelectCanRespond(true)}
+          style={{ padding: 10, marginRight: 6 }}
+          hoverOpacity={0.5}
+        >
+          <Image_ icon={ICONS.check} size={50} />
+        </TouchableOpacity_>
+        <TouchableOpacity_
+          onPress={() => onSelectCanRespond(false)}
+          style={{ padding: 10 }}
+          hoverOpacity={0.5}
+        >
+          <Image_ icon={ICONS.redx} size={50} />
+        </TouchableOpacity_>
       </View>
-      <View style={{ alignItems: 'flex-end' }}>
-        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 10 }}>
-          <Text style={{ fontSize: 15, color: 'dimgray', fontWeight: "500", marginRight: 10 }}>Can reply?</Text>
-          <TouchableOpacity_
-            onPress={() => onSelectCanRespond(true)}
-            style={{ padding: 10, marginRight: 6 }}
-            hoverOpacity={0.5}
-          >
-            <Image_ icon={ICONS.check} size={70} />
-          </TouchableOpacity_>
-          <TouchableOpacity_
-            onPress={() => onSelectCanRespond(false)}
-            style={{ padding: 10 }}
-            hoverOpacity={0.5}
-          >
-            <Image_ icon={ICONS.redx} size={70} />
-          </TouchableOpacity_>
+      <TouchableOpacity onPress={hasActivePhone ? onToggleForward : undefined} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 6, opacity: hasActivePhone ? 1 : 0.4 }}>
+        <View style={{ width: 22, height: 22, borderRadius: 4, backgroundColor: forwardReplies ? C.red : "transparent", borderWidth: 2, borderColor: forwardReplies ? C.red : gray(0.15), alignItems: "center", justifyContent: "center" }}>
+          {forwardReplies && <Text style={{ color: "white", fontSize: 14, fontWeight: "bold" }}>✓</Text>}
         </View>
-        <TouchableOpacity onPress={hasActivePhone ? onToggleForward : undefined} style={{ flexDirection: "row", alignItems: "center", opacity: hasActivePhone ? 1 : 0.4 }}>
-          <View style={{ width: 22, height: 22, borderRadius: 4, backgroundColor: forwardReplies ? C.red : "transparent", borderWidth: 2, borderColor: forwardReplies ? C.red : gray(0.15), alignItems: "center", justifyContent: "center" }}>
-            {forwardReplies && <Text style={{ color: "white", fontSize: 14, fontWeight: "bold" }}>✓</Text>}
-          </View>
-          <Text style={{ fontSize: 17, color: C.text, marginLeft: 8 }}>Forward replies to me</Text>
-        </TouchableOpacity>
-      </View>
+        <Text style={{ fontSize: 17, color: C.text, marginLeft: 8 }}>Forward replies</Text>
+      </TouchableOpacity>
     </View>
   );
 }

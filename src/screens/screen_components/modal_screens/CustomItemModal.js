@@ -79,6 +79,23 @@ export const CustomItemModal = ({
     }
   }, [visible, existingLine]);
 
+  const getDropdownPosition = useCallback(() => {
+    if (!discountBtnRef.current) return { top: 0, left: 0 };
+    const rect = discountBtnRef.current.getBoundingClientRect();
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const dropdownW = 260;
+    const presetCount = (zDiscounts || []).filter((o) => o.type !== "$" || Number(o.value) <= sPriceCents).length + 1;
+    const dropdownH = presetCount * 36 + 1 + 36 + 36 + 8;
+    let posLeft = rect.left;
+    let posTop = rect.bottom + 4;
+    if (posTop + dropdownH > vh - 10) posTop = rect.top - dropdownH - 4;
+    if (posTop < 10) posTop = 10;
+    if (posLeft + dropdownW > vw - 10) posLeft = vw - dropdownW - 10;
+    if (posLeft < 10) posLeft = 10;
+    return { top: posTop, left: posLeft, width: dropdownW };
+  }, [zDiscounts, sPriceCents]);
+
   if (!visible) return null;
 
   function handlePriceChange(raw) {
@@ -124,23 +141,6 @@ export const CustomItemModal = ({
     _setCustomDollarVal("");
     _setCustomDollarCents(0);
   }
-
-  const getDropdownPosition = useCallback(() => {
-    if (!discountBtnRef.current) return { top: 0, left: 0 };
-    const rect = discountBtnRef.current.getBoundingClientRect();
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const dropdownW = 260;
-    const presetCount = (zDiscounts || []).filter((o) => o.type !== "$" || Number(o.value) <= sPriceCents).length + 1;
-    const dropdownH = presetCount * 36 + 1 + 36 + 36 + 8;
-    let posLeft = rect.left;
-    let posTop = rect.bottom + 4;
-    if (posTop + dropdownH > vh - 10) posTop = rect.top - dropdownH - 4;
-    if (posTop < 10) posTop = 10;
-    if (posLeft + dropdownW > vw - 10) posLeft = vw - dropdownW - 10;
-    if (posLeft < 10) posLeft = 10;
-    return { top: posTop, left: posLeft, width: dropdownW };
-  }, [zDiscounts, sPriceCents]);
 
   function handleSave() {
     // Build the synthetic inventory item

@@ -1057,7 +1057,8 @@ export function BikeStandScreen() {
                   if (!user.faceDescriptor) continue;
                   try {
                     let distance = faceapi.euclideanDistance(Object.values(user.faceDescriptor), descriptor);
-                    if (distance < FACE_DESCRIPTOR_CONFIDENCE_DISTANCE) {
+                    const threshold = useSettingsStore.getState().settings?.faceRecognitionThreshold ?? FACE_DESCRIPTOR_CONFIDENCE_DISTANCE;
+                    if (distance < threshold) {
                       stopFaceLogin();
                       _setShowFaceModal(false);
                       localStorageWrapper.setItem("standDevPin", user.pin);
@@ -1181,7 +1182,7 @@ export function BikeStandScreen() {
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
-              zIndex: 9999,
+              zIndex: 8999,
             }}
           >
             <div
@@ -1299,6 +1300,9 @@ export function BikeStandScreen() {
                         itemTextStyle={{ fontSize: 32 }}
                         itemStyle={{ paddingVertical: 28, height: "auto" }}
                         buttonText={zSettings.bikeBrandsName}
+                        modalCoordX={0}
+                        centerMenuVertically={true}
+                        menuMaxHeight={window.innerHeight - 20}
                       />
                     </View>
                     <View style={{ width: "48%", height: "100%" }}>
@@ -1311,6 +1315,9 @@ export function BikeStandScreen() {
                         itemTextStyle={{ fontSize: 32 }}
                         itemStyle={{ paddingVertical: 28, height: "auto" }}
                         buttonText={zSettings.bikeOptionalBrandsName}
+                        modalCoordX={0}
+                        centerMenuVertically={true}
+                        menuMaxHeight={window.innerHeight - 20}
                       />
                     </View>
                   </View>
@@ -1353,6 +1360,9 @@ export function BikeStandScreen() {
                       itemTextStyle={{ fontSize: 32 }}
                       itemStyle={{ paddingVertical: 28, height: "auto" }}
                       buttonText="Descriptions"
+                      modalCoordX={0}
+                      centerMenuVertically={true}
+                      menuMaxHeight={window.innerHeight - 20}
                     />
                   </View>
                 </View>
@@ -1423,7 +1433,7 @@ export function BikeStandScreen() {
                         buttonTextStyle={{ fontSize: 28 }}
                         itemTextStyle={{ fontSize: 32 }}
                         itemStyle={{ paddingVertical: 28, height: "auto" }}
-                        menuMaxHeight={window.innerHeight - 10}
+                        menuMaxHeight={window.innerHeight - 20}
                         centerMenuVertically={true}
                         buttonText="Color 1"
                         modalCoordX={0}
@@ -1440,7 +1450,7 @@ export function BikeStandScreen() {
                         buttonTextStyle={{ fontSize: 28 }}
                         itemTextStyle={{ fontSize: 32 }}
                         itemStyle={{ paddingVertical: 28, height: "auto" }}
-                        menuMaxHeight={window.innerHeight - 10}
+                        menuMaxHeight={window.innerHeight - 20}
                         centerMenuVertically={true}
                         buttonText="Color 2"
                       />
@@ -1552,7 +1562,7 @@ export function BikeStandScreen() {
                   </View>
                   <View style={{ width: "50%", paddingLeft: 8 }}>
                     <DropdownMenu
-                      modalCoordX={50}
+                      modalCoordX={0}
                       dataArr={zSettings.waitTimes}
                       enabled={true}
                       onSelect={(item) => {
@@ -1565,6 +1575,8 @@ export function BikeStandScreen() {
                       itemTextStyle={{ fontSize: 32 }}
                       itemStyle={{ paddingVertical: 28, height: "auto" }}
                       buttonText="Wait Times"
+                      centerMenuVertically={true}
+                      menuMaxHeight={window.innerHeight - 20}
                     />
                   </View>
                 </View>

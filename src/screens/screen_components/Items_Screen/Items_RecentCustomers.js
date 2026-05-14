@@ -18,12 +18,15 @@ import {
   formatPhoneForDisplay,
   gray,
 } from "../../../utils";
-import { C, ICONS } from "../../../styles";
+import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 
 export function RecentCustomersComponent() {
   const zRecentCustomers = useRecentCustomersStore((s) => s.recentCustomers);
   const [sCustomerInfo, _setCustomerInfo] = useState(null);
+  const [sSelectedCustomer, _setSelectedCustomer] = useState(null);
+  const [sModalY, _setModalY] = useState(0);
+  const [sModalX, _setModalX] = useState(0);
 
   function handleRecentCustomerSelected(customer) {
     useLoginStore.getState().requireLogin(async () => {
@@ -98,28 +101,12 @@ export function RecentCustomersComponent() {
                 borderColor: gray(0.1),
               }}
             >
-              <View
-                style={{
-                  width: "15%",
-                  height: "100%",
-                  alignItems: "flex-start",
-                  justifyContent: "center",
-                }}
-              >
-                <Tooltip text="Customer info">
-                  <Button_
-                    onPress={() => handleInfoPress(item)}
-                    iconSize={25}
-                    icon={ICONS.info2}
-                  />
-                </Tooltip>
-              </View>
-              <Tooltip text="Start new workorder" style={{ flex: 1 }}>
-                <TouchableOpacity_
+              <TouchableOpacity_
                   style={{ flex: 1, height: "100%", justifyContent: "center", marginLeft: 10 }}
-                  onPress={async () => {
-                    let customer = await dbGetCustomer(item.id);
-                    if (customer) handleRecentCustomerSelected(customer);
+                  onPress={(e) => {
+                    _setModalY(e.nativeEvent?.clientY ?? e.nativeEvent?.pageY ?? 0);
+                    _setModalX(e.nativeEvent?.clientX ?? e.nativeEvent?.pageX ?? 0);
+                    _setSelectedCustomer(item);
                   }}
                 >
                   <Text style={{ fontSize: 16, color: C.text }}>
@@ -140,7 +127,6 @@ export function RecentCustomersComponent() {
                     </Text>
                   )}
                 </TouchableOpacity_>
-              </Tooltip>
             </View>
           )}
         />
@@ -166,6 +152,70 @@ export function RecentCustomersComponent() {
           />
         ),
         [sCustomerInfo]
+      )}
+      {sSelectedCustomer && (
+        <View
+          onClick={() => _setSelectedCustomer(null)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            zIndex: 999,
+          }}
+        >
+          <View
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "absolute",
+              top: sModalY,
+              left: sModalX,
+              backgroundColor: C.backgroundWhite,
+              borderRadius: 10,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              elevation: 5,
+            }}
+          >
+            <View style={{ flexDirection: "row", justifyContent: "flex-end", padding: 10 }}>
+              <TouchableOpacity_
+                onPress={() => _setSelectedCustomer(null)}
+              >
+                <Image_ icon={ICONS.close1} style={{ width: 28, height: 28 }} />
+              </TouchableOpacity_>
+            </View>
+            <View style={{ alignItems: "center", paddingHorizontal: 25, paddingBottom: 25 }}>
+              <Button_
+                text="New Workorder"
+                colorGradientArr={COLOR_GRADIENTS.green}
+                onPress={async () => {
+                  let customer = await dbGetCustomer(sSelectedCustomer.id);
+                  _setSelectedCustomer(null);
+                  if (customer) handleRecentCustomerSelected(customer);
+                }}
+                buttonStyle={{ width: 200, height: 45 }}
+                textStyle={{ fontSize: 16 }}
+              />
+              <Button_
+                text="Customer Info"
+                colorGradientArr={COLOR_GRADIENTS.blue}
+                onPress={async () => {
+                  let customer = await dbGetCustomer(sSelectedCustomer.id);
+                  _setSelectedCustomer(null);
+                  if (customer) {
+                    useRecentCustomersStore.getState().addRecentCustomer(customer);
+                    _setCustomerInfo(customer);
+                  }
+                }}
+                buttonStyle={{ width: 200, height: 45, marginTop: 15 }}
+                textStyle={{ fontSize: 16 }}
+            />
+            </View>
+          </View>
+        </View>
       )}
     </View>
   );

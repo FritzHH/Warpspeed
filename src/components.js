@@ -566,10 +566,14 @@ export const ScreenModal = ({
             icon={buttonIcon}
             iconSize={buttonIconSize}
             text={buttonLabel}
-            onPress={() => {
+            onPress={(e) => {
+              let clickX = e?.nativeEvent?.pageX ?? e?.pageX;
               if (ref?.current) {
                 const rect = ref.current.getBoundingClientRect();
-                _setModalCoordinates({ x: rect.x, y: rect.y, height: rect.height });
+                _setModalCoordinates({ x: clickX ?? rect.x, y: rect.y, height: rect.height });
+              } else if (clickX != null) {
+                let clickY = e?.nativeEvent?.pageY ?? e?.pageY ?? 0;
+                _setModalCoordinates({ x: clickX, y: clickY, height: 30 });
               }
               handleButtonPress();
               setModalVisibility(false);

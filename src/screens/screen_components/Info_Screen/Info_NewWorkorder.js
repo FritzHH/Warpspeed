@@ -67,6 +67,8 @@ export function NewWorkorderComponent({}) {
       useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.workorderSearchResults);
     } else if (zCustomerSearchResults.length > 0 || zIsSearching) {
       useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.customerList);
+    } else if (sTextInput.length > 0) {
+      useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.empty);
     } else {
       const currentTab = useTabNamesStore.getState().itemsTabName;
       if (
@@ -77,7 +79,7 @@ export function NewWorkorderComponent({}) {
         useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.recentCustomers);
       }
     }
-  }, [zCustomerSearchResults, zIsSearching, zWoSearchResults, zWoIsSearching]);
+  }, [zCustomerSearchResults, zIsSearching, zWoSearchResults, zWoIsSearching, sTextInput]);
 
   // Update button visibility when dependencies change
   useEffect(() => {

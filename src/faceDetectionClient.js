@@ -150,7 +150,8 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
               currentDesc
             );
             // log("dist", distance);
-            if (distance < FACE_DESCRIPTOR_CONFIDENCE_DISTANCE) {
+            const threshold = useSettingsStore.getState().settings?.faceRecognitionThreshold ?? FACE_DESCRIPTOR_CONFIDENCE_DISTANCE;
+            if (distance < threshold) {
               return true;
             } else {
               return null;

@@ -24,7 +24,7 @@ const MOTION_CANVAS_H = 120;
 
 // Recognition throttle timings
 const SCANNING_INTERVAL_MS = 500;
-const KEEPALIVE_INTERVAL_MS = 3000;
+const KEEPALIVE_INTERVAL_MS = 1000;
 const VERIFY_INTERVAL_MS = 1000;
 const VERIFY_MAX_ATTEMPTS = 3;
 
@@ -300,10 +300,12 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
 
   async function getFaceDescriptor() {
     if (!videoRef.current) return null;
+    const t0 = performance.now();
     const detection = await faceapi
       .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
       .withFaceLandmarks()
       .withFaceDescriptor();
+    log("[FaceRec] getFaceDescriptor: " + (performance.now() - t0).toFixed(1) + "ms" + (detection ? " (face found)" : " (no face)"));
     return detection ? detection.descriptor : null;
   }
 
@@ -311,16 +313,21 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
     const users = usersRef.current;
     if (!users) return null;
 
+    const t0 = performance.now();
+    let checked = 0;
     for (let i = 0; i < users.length; i++) {
       const user = users[i];
       if (!user.faceDescriptor) continue;
+      checked++;
 
       try {
         const distance = faceapi.euclideanDistance(
           Object.values(user.faceDescriptor),
           descriptor
         );
-        if (distance < FACE_DESCRIPTOR_CONFIDENCE_DISTANCE) {
+        const threshold = useSettingsStore.getState().settings?.faceRecognitionThreshold ?? FACE_DESCRIPTOR_CONFIDENCE_DISTANCE;
+        if (distance < threshold) {
+          log("[FaceRec] findMatchingUser: " + (performance.now() - t0).toFixed(1) + "ms, matched " + user.first + " (dist=" + distance.toFixed(3) + ", checked " + checked + "/" + users.length + ")");
           return user;
         }
       } catch (e) {
@@ -332,6 +339,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
       }
     }
 
+    log("[FaceRec] findMatchingUser: " + (performance.now() - t0).toFixed(1) + "ms, no match (checked " + checked + "/" + users.length + ")");
     return null;
   }
 
@@ -340,9 +348,12 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
     recognitionRunningRef.current = true;
     lastRecognitionCheckRef.current = Date.now();
 
+    const t0 = performance.now();
     try {
       const descriptor = await getFaceDescriptor();
       const matchedUser = descriptor ? findMatchingUser(descriptor) : null;
+
+      log("[FaceRec] total check: " + (performance.now() - t0).toFixed(1) + "ms | state=" + recognitionStateRef.current + " | result=" + (matchedUser ? matchedUser.first : "none"));
 
       if (matchedUser) {
         lastMatchRef.current = { userId: matchedUser.id, timestamp: Date.now() };

@@ -8,7 +8,7 @@ import {
 import { gray, resolveStatus, lightenRGBByPercent, capitalizeFirstLetterOfString } from "../../../utils";
 import { Image_, TouchableOpacity_, TextInput_, Tooltip, CustomerQuickNotesDropdown } from "../../../components";
 import { C, Colors, ICONS } from "../../../styles";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { useOpenWorkordersStore, useLoginStore, useSettingsStore } from "../../../stores";
 
 /// Notes Tab Component
@@ -63,6 +63,7 @@ export function Notes_MainComponent() {
   /////////////////////////////////////////////////////////////////////////////////
   const [sEditingNoteId, _setEditingNoteId] = useState(null);
   const [sShowQuickNotes, _setShowQuickNotes] = useState(null);
+  const cursorOffsetRef = useRef(null);
 
   function formatUserShowName() {
     const user = useLoginStore.getState().currentUser;
@@ -338,8 +339,15 @@ export function Notes_MainComponent() {
                         }
                         onBlur={() => _setEditingNoteId(null)}
                         onFocus={(e) => {
+                          useLoginStore.getState().requireLogin(() => {});
                           const el = e.target;
-                          el.selectionStart = el.selectionEnd = el.value.length;
+                          const offset = cursorOffsetRef.current;
+                          cursorOffsetRef.current = null;
+                          if (offset != null && offset <= el.value.length) {
+                            el.selectionStart = el.selectionEnd = offset;
+                          } else {
+                            el.selectionStart = el.selectionEnd = el.value.length;
+                          }
                         }}
                         style={{
                           padding: 2,
@@ -357,7 +365,16 @@ export function Notes_MainComponent() {
                       />
                     ) : (
                       <TouchableOpacity_
-                        onPress={() => _setEditingNoteId(item.id)}
+                        onPress={(e) => {
+                          const nativeEvt = e?.nativeEvent || e;
+                          const px = nativeEvt?.pageX;
+                          const py = nativeEvt?.pageY;
+                          if (px != null && py != null && document.caretRangeFromPoint) {
+                            const range = document.caretRangeFromPoint(px - window.scrollX, py - window.scrollY);
+                            if (range) cursorOffsetRef.current = range.startOffset;
+                          }
+                          _setEditingNoteId(item.id);
+                        }}
                         style={{ flex: 1, padding: 2, paddingLeft: 4, cursor: "text" }}
                       >
                         <Text
@@ -499,8 +516,15 @@ export function Notes_MainComponent() {
                         }
                         onBlur={() => _setEditingNoteId(null)}
                         onFocus={(e) => {
+                          useLoginStore.getState().requireLogin(() => {});
                           const el = e.target;
-                          el.selectionStart = el.selectionEnd = el.value.length;
+                          const offset = cursorOffsetRef.current;
+                          cursorOffsetRef.current = null;
+                          if (offset != null && offset <= el.value.length) {
+                            el.selectionStart = el.selectionEnd = offset;
+                          } else {
+                            el.selectionStart = el.selectionEnd = el.value.length;
+                          }
                         }}
                         style={{
                           padding: 2,
@@ -518,7 +542,16 @@ export function Notes_MainComponent() {
                       />
                     ) : (
                       <TouchableOpacity_
-                        onPress={() => _setEditingNoteId(item.id)}
+                        onPress={(e) => {
+                          const nativeEvt = e?.nativeEvent || e;
+                          const px = nativeEvt?.pageX;
+                          const py = nativeEvt?.pageY;
+                          if (px != null && py != null && document.caretRangeFromPoint) {
+                            const range = document.caretRangeFromPoint(px - window.scrollX, py - window.scrollY);
+                            if (range) cursorOffsetRef.current = range.startOffset;
+                          }
+                          _setEditingNoteId(item.id);
+                        }}
                         style={{ flex: 1, padding: 2, paddingLeft: 4, cursor: "text" }}
                       >
                         <Text

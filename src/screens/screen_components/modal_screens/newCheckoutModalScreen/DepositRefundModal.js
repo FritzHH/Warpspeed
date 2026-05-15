@@ -24,6 +24,8 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
   const [sSMS, _setSMS] = useState(false);
   const [sEmail, _setEmail] = useState(false);
   const [sShowConfirm, _setShowConfirm] = useState(false);
+  const [sShowRemoveConfirm, _setShowRemoveConfirm] = useState(false);
+  const [sRemoved, _setRemoved] = useState(false);
 
   let hasPhone = !!customer?.phone || !!customer?.customerCell;
   let hasEmail = !!customer?.email;
@@ -46,6 +48,10 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
     _setInitialized(true);
     loadTransaction(deposit.transactionId);
   }
+  if (visible && !sInitialized && !deposit?.transactionId) {
+    _setInitialized(true);
+    _setLoadMessage("No transaction linked to this deposit");
+  }
 
   async function loadTransaction(txnId) {
     _setLoading(true);
@@ -57,10 +63,6 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
         _setLoading(false);
         return;
       }
-      // DEV: simulate imported card transaction for testing — remove before deploy
-      txn._importSource = "lightspeed";
-      txn.method = "card";
-
       _setTransaction(txn);
       _setLoading(false);
       _setLoadMessage("");
@@ -200,6 +202,8 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
     _setSMS(false);
     _setEmail(false);
     _setShowConfirm(false);
+    _setShowRemoveConfirm(false);
+    _setRemoved(false);
     if (onClose) onClose();
   }
 
@@ -252,16 +256,54 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
             </View>
           )}
 
-          {/* ── Transaction Not Found ────────────────────── */}
-          {!sLoading && !sTransaction && sLoadMessage && (
-            <View style={{ padding: 30, alignItems: "center" }}>
-              <Text style={{ fontSize: 14, color: C.lightred }}>{sLoadMessage}</Text>
+          {/* ── Transaction Not Found / No Transaction ───── */}
+          {!sLoading && !sTransaction && sLoadMessage && !sRemoved && (
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <Text style={{ fontSize: 14, color: C.lightred, fontWeight: "600" }}>{sLoadMessage}</Text>
+              <Text style={{ fontSize: 12, color: gray(0.45), textAlign: "center", marginTop: 6 }}>
+                This {label.toLowerCase()} may have been created from an import error. You can remove it from the customer's account.
+              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, backgroundColor: lightenRGBByPercent(C.orange, 75), borderRadius: 6, paddingHorizontal: 10, paddingVertical: 5 }}>
+                <Text style={{ fontSize: 11, color: C.orange, fontWeight: "500" }}>
+                  {"$" + formatCurrencyDisp(refundAmount) + " - " + formatMillisForDisplay(deposit?.millis)}
+                </Text>
+              </View>
+              <View style={{ flexDirection: "row", gap: 12, marginTop: 18 }}>
+                <Button_
+                  text={"Remove " + label}
+                  onPress={() => _setShowRemoveConfirm(true)}
+                  colorGradientArr={COLOR_GRADIENTS.red}
+                  textStyle={{ fontSize: 13, color: C.textWhite, fontWeight: Fonts.weight.textHeavy }}
+                  buttonStyle={{ height: 36, paddingHorizontal: 18, borderRadius: 6 }}
+                />
+                <Button_
+                  text="Cancel"
+                  onPress={handleClose}
+                  colorGradientArr={COLOR_GRADIENTS.grey}
+                  textStyle={{ fontSize: 13, color: C.textWhite }}
+                  buttonStyle={{ height: 36, paddingHorizontal: 18, borderRadius: 6 }}
+                />
+              </View>
+            </View>
+          )}
+
+          {/* ── Removed Success ──────────────────────────── */}
+          {!sLoading && sRemoved && (
+            <View style={{ padding: 20, alignItems: "center" }}>
+              <View style={{ padding: 15, alignItems: "center", backgroundColor: lightenRGBByPercent(C.green, 80), borderRadius: 8, width: "100%" }}>
+                <Text style={{ fontSize: 14, fontWeight: "600", color: C.green }}>
+                  {label} removed from account
+                </Text>
+                <Text style={{ fontSize: 11, color: gray(0.5), marginTop: 4 }}>
+                  {"$" + formatCurrencyDisp(refundAmount) + " " + label.toLowerCase() + " has been removed"}
+                </Text>
+              </View>
               <Button_
-                text="Close"
+                text="Done"
                 onPress={handleClose}
-                colorGradientArr={COLOR_GRADIENTS.grey}
+                colorGradientArr={COLOR_GRADIENTS.green}
                 textStyle={{ fontSize: 13, color: C.textWhite }}
-                buttonStyle={{ marginTop: 15, width: 100, height: 34, borderRadius: 6 }}
+                buttonStyle={{ marginTop: 15, width: 120, height: 36, borderRadius: 6 }}
               />
             </View>
           )}
@@ -537,6 +579,59 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                   buttonStyle={{ paddingVertical: 4, flex: 1 }}
                   textStyle={{ color: C.textWhite, fontWeight: "600" }}
                   onPress={() => _setShowConfirm(false)}
+                />
+              </View>
+            </View>
+          </View>
+        )}
+        {sShowRemoveConfirm && (
+          <View
+            style={{
+              position: "fixed",
+              top: 0,
+              left: 0,
+              width: "100%",
+              height: "100%",
+              backgroundColor: "rgba(0, 0, 0, 0.5)",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 99999,
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: C.backgroundWhite,
+                borderRadius: 15,
+                alignItems: "center",
+                justifyContent: "space-around",
+                minWidth: "32%",
+                minHeight: "24%",
+              }}
+            >
+              <Text style={{ fontWeight: "500", marginTop: 25, fontSize: 25, color: "red", textAlign: "center" }}>
+                {"Remove " + label}
+              </Text>
+              <Text style={{ textAlign: "center", width: "90%", marginTop: 10, fontSize: 18, color: C.text }}>
+                {"Remove $" + formatCurrencyDisp(refundAmount) + " " + label.toLowerCase() + " from this customer? No refund will be issued."}
+              </Text>
+              <View style={{ marginTop: 25, flexDirection: "row", justifyContent: "center", alignItems: "center", marginBottom: 25, width: "100%", paddingHorizontal: 20, gap: 20 }}>
+                <Button_
+                  colorGradientArr={COLOR_GRADIENTS.red}
+                  text="REMOVE"
+                  buttonStyle={{ paddingVertical: 4, flex: 1 }}
+                  textStyle={{ color: C.textWhite, fontWeight: "600" }}
+                  onPress={() => {
+                    _setShowRemoveConfirm(false);
+                    removeDepositFromCustomer();
+                    _setRemoved(true);
+                  }}
+                />
+                <Button_
+                  colorGradientArr={COLOR_GRADIENTS.blue}
+                  text="CANCEL"
+                  buttonStyle={{ paddingVertical: 4, flex: 1 }}
+                  textStyle={{ color: C.textWhite, fontWeight: "600" }}
+                  onPress={() => _setShowRemoveConfirm(false)}
                 />
               </View>
             </View>

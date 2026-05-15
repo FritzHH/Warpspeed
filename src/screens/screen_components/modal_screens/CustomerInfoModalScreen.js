@@ -818,7 +818,7 @@ export const CustomerInfoScreenModalComponent = ({
               deposits={sCustomerInfo.deposits || []}
               credits={sCustomerInfo.credits || []}
               onDepositPress={(deposit) => {
-                if (!deposit.id || !deposit.transactionId) return;
+                if (!deposit.id) return;
                 _sSetRefundDeposit(deposit);
               }}
               onCreditPress={(credit) => _sSetEditingCredit(credit)}

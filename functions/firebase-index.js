@@ -2472,7 +2472,7 @@ exports.newCheckoutGetAvailableReadersCallable = onCall(
  * Input: { amount (cents), readerID, paymentIntentID? }
  */
 exports.newCheckoutInitiatePaymentIntentCallable = onCall(
-  { secrets: [stripeSecretKey] },
+  { secrets: [stripeSecretKey], minInstances: 1 },
   async (request) => {
     log("newCheckout: initiate payment intent request", request.data);
 

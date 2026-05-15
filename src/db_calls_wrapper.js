@@ -2026,7 +2026,7 @@ export async function dbSearchCustomersByName(name) {
  * @param {Function} onSnapshot - Callback function called when workorders change
  * @returns {Function} Unsubscribe function to stop listening
  */
-export function dbListenToOpenWorkorders(onSnapshot) {
+export function dbListenToOpenWorkorders(onSnapshot, onError) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
 
@@ -2053,6 +2053,7 @@ export function dbListenToOpenWorkorders(onSnapshot) {
       (workordersData, error) => {
         if (error) {
           log("Workorder listener error", { tenantID, storeID, error });
+          if (onError) onError(error);
           return;
         }
 
@@ -2063,11 +2064,12 @@ export function dbListenToOpenWorkorders(onSnapshot) {
     return unsubscribe;
   } catch (error) {
     log("Error setting up workorder listener:", error);
+    if (onError) onError(error);
     return null;
   }
 }
 
-export function dbListenToActiveSales(onSnapshot) {
+export function dbListenToActiveSales(onSnapshot, onError) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID) {
@@ -2084,6 +2086,7 @@ export function dbListenToActiveSales(onSnapshot) {
       (salesData, error) => {
         if (error) {
           log("Active sales listener error", { tenantID, storeID, error });
+          if (onError) onError(error);
           return;
         }
         onSnapshot(salesData);
@@ -2092,6 +2095,7 @@ export function dbListenToActiveSales(onSnapshot) {
     return unsubscribe;
   } catch (error) {
     log("Error setting up active sales listener:", error);
+    if (onError) onError(error);
     return null;
   }
 }
@@ -2122,7 +2126,7 @@ export function dbListenToSingleWorkorder(workorderID, callback) {
  * @param {Function} onChange - Callback function called when settings change
  * @returns {Function} Unsubscribe function to stop listening
  */
-export function dbListenToSettings(onChange) {
+export function dbListenToSettings(onChange, onError) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
 
@@ -2147,7 +2151,8 @@ export function dbListenToSettings(onChange) {
     const unsubscribe = firestoreSubscribe(path, (settingsData, error) => {
       if (error) {
         log("Settings listener error", { tenantID, storeID, error });
-        return; // Don't call onChange on error
+        if (onError) onError(error);
+        return;
       }
 
       onChange(settingsData, tenantID, storeID);
@@ -2156,6 +2161,7 @@ export function dbListenToSettings(onChange) {
     return unsubscribe;
   } catch (error) {
     log("Error setting up settings listener:", error);
+    if (onError) onError(error);
     return null;
   }
 }
@@ -2165,7 +2171,7 @@ export function dbListenToSettings(onChange) {
  * @param {Function} onChange - Callback function called when punch clock changes
  * @returns {Function} Unsubscribe function to stop listening
  */
-export function dbListenToCurrentPunchClock(onChange) {
+export function dbListenToCurrentPunchClock(onChange, onError) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
 
@@ -2190,7 +2196,8 @@ export function dbListenToCurrentPunchClock(onChange) {
     const unsubscribe = firestoreSubscribe(path, (punchClockData, error) => {
       if (error) {
         log("Current punch clock listener error", { tenantID, storeID, error });
-        return; // Don't call onChange on error
+        if (onError) onError(error);
+        return;
       }
       if (!punchClockData) punchClockData = {};
       onChange(punchClockData);
@@ -2199,6 +2206,7 @@ export function dbListenToCurrentPunchClock(onChange) {
     return unsubscribe;
   } catch (error) {
     log("Error setting up current punch clock listener:", error);
+    if (onError) onError(error);
     return null;
   }
 }
@@ -2208,7 +2216,7 @@ export function dbListenToCurrentPunchClock(onChange) {
  * @param {Function} onSnapshot - Callback function called when inventory changes
  * @returns {Function} Unsubscribe function to stop listening
  */
-export function dbListenToInventory(onSnapshot) {
+export function dbListenToInventory(onSnapshot, onError) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
 
@@ -2235,6 +2243,7 @@ export function dbListenToInventory(onSnapshot) {
       (inventoryData, error) => {
         if (error) {
           log("Inventory listener error", { tenantID, storeID, error });
+          if (onError) onError(error);
           return;
         }
 
@@ -2245,6 +2254,7 @@ export function dbListenToInventory(onSnapshot) {
     return unsubscribe;
   } catch (error) {
     log("Error setting up inventory listener:", error);
+    if (onError) onError(error);
     return null;
   }
 }
@@ -2986,7 +2996,7 @@ export async function dbGetAllMessageThreads() {
  * @param {Function} callback - receives array of { type, phone, ...threadData }
  * @returns {Function} unsubscribe function
  */
-export function dbListenToActiveMessageThreads(callback) {
+export function dbListenToActiveMessageThreads(callback, onError) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID) return null;
@@ -3002,11 +3012,13 @@ export function dbListenToActiveMessageThreads(callback) {
       },
       (error) => {
         log("Active threads listener error", { error });
+        if (onError) onError(error);
       }
     );
     return unsub;
   } catch (error) {
     log("Error setting up active threads listener", { error });
+    if (onError) onError(error);
     return null;
   }
 }
@@ -3477,7 +3489,7 @@ function buildEmailAuthCollectionPath(tenantID, storeID) {
   return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.EMAIL_AUTH}`;
 }
 
-export function dbListenToEmails(onSnapshot) {
+export function dbListenToEmails(onSnapshot, onError) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID) {
@@ -3492,6 +3504,7 @@ export function dbListenToEmails(onSnapshot) {
     const unsubscribe = firestoreSubscribeCollection(collectionPath, (data, error) => {
       if (error) {
         log("Email listener error", { tenantID, storeID, error });
+        if (onError) onError(error);
         return;
       }
       onSnapshot(data);
@@ -3499,11 +3512,12 @@ export function dbListenToEmails(onSnapshot) {
     return unsubscribe;
   } catch (error) {
     log("Error setting up email listener:", error);
+    if (onError) onError(error);
     return null;
   }
 }
 
-export function dbListenToEmailAuth(onSnapshot) {
+export function dbListenToEmailAuth(onSnapshot, onError) {
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID) {
@@ -3518,6 +3532,7 @@ export function dbListenToEmailAuth(onSnapshot) {
     const unsubscribe = firestoreSubscribeCollection(collectionPath, (data, error) => {
       if (error) {
         log("Email auth listener error", { tenantID, storeID, error });
+        if (onError) onError(error);
         return;
       }
       onSnapshot(data);
@@ -3525,6 +3540,7 @@ export function dbListenToEmailAuth(onSnapshot) {
     return unsubscribe;
   } catch (error) {
     log("Error setting up email auth listener:", error);
+    if (onError) onError(error);
     return null;
   }
 }
@@ -3590,7 +3606,7 @@ function getEmailStoreState() {
 // TENANT SUBSCRIPTION
 // ============================================================================
 
-export function dbListenToSubscription(onChange) {
+export function dbListenToSubscription(onChange, onError) {
   try {
     const { tenantID } = getTenantAndStore();
     if (!tenantID) {
@@ -3605,6 +3621,7 @@ export function dbListenToSubscription(onChange) {
     const unsubscribe = firestoreSubscribe(path, (data, error) => {
       if (error) {
         log("Subscription listener error", { tenantID, error });
+        if (onError) onError(error);
         return;
       }
       onChange(data);
@@ -3612,6 +3629,7 @@ export function dbListenToSubscription(onChange) {
     return unsubscribe;
   } catch (error) {
     log("Error setting up subscription listener:", error);
+    if (onError) onError(error);
     return null;
   }
 }

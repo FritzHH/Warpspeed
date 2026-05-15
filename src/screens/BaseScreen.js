@@ -56,6 +56,7 @@ import {
 } from "../db_calls_wrapper";
 import { SETTINGS_OBJ, TAB_NAMES, CUSTOMER_PROTO } from "../data";
 import { clog, log, recoverPendingAutoTexts, localStorageWrapper } from "../utils";
+import { register, reconnectAll, teardownAll, useListenerStatusStore } from "../listenerManager";
 import { cloneDeep, throttle } from "lodash";
 import { ROUTES } from "../routes";
 
@@ -85,6 +86,13 @@ export function BaseScreen() {
     (state) => state.settings?.useFacialRecognition !== false
   );
   const zShowAlert = useAlertScreenStore((state) => state.showAlert);
+  const zListenerStatuses = useListenerStatusStore((state) => state.statuses);
+  const zEverConnected = useListenerStatusStore((state) => state.everConnected);
+  const zReconnectingNames = [];
+  for (const [name, status] of Object.entries(zListenerStatuses)) {
+    if (status === "reconnecting" && zEverConnected[name]) zReconnectingNames.push(name);
+  }
+  const zIsReconnecting = zReconnectingNames.length > 0;
   const throttledSetLastAction = useRef(throttle(() => {
     useLoginStore.getState().setLastActionMillis();
   }, 1000)).current;
@@ -317,72 +325,88 @@ export function BaseScreen() {
   ////////// testing   ////////////////////////////////////////////////////////////////////
 
 
-  // subscribe to database listeners
+  // subscribe to database listeners with auto-reconnect
   useEffect(() => {
-    // Workorders first — small collection, needed immediately for UI
-    dbListenToOpenWorkorders((data) => {
-      let prev = useOpenWorkordersStore.getState().workorders;
-      let newSMS = data.some((wo) => {
-        if (!wo.hasNewSMS) return false;
-        let old = prev.find((p) => p.id === wo.id);
-        return !old || !old.hasNewSMS;
-      });
-      if (newSMS && localStorage.getItem("warpspeed_sms_sound") !== "false") {
-        playNotificationBeep();
-      }
-      useOpenWorkordersStore.getState().setOpenWorkorders(data);
-    });
-
-    // tested!!
-    dbListenToSettings((data) => {
-      // log("settings", data.users[0].faceDescriptor);
-      useSettingsStore.getState().setSettings(data, false, false);
-    });
-
-    dbListenToCurrentPunchClock((data) => {
-      // log('punch', data)
-      useLoginStore.getState().setPunchClock(data);
-      // log("punch clock data", data);
-    });
-
-    dbListenToInventory((data) => {
-      useInventoryStore.getState().setItems(data);
-      // log("inventory", data);
-    });
-
-    dbListenToSubscription((data) => {
-      useSubscriptionStore.getState().setSubscription(data);
-    });
-
     let activeSalesRecoveryDone = false;
-    dbListenToActiveSales((data) => {
-      useActiveSalesStore.getState().setActiveSales(data);
-      if (!activeSalesRecoveryDone) {
-        activeSalesRecoveryDone = true;
-        recoverPendingActiveSales(data);
-      }
+
+    register("workorders", (onConnected, onError) => {
+      return dbListenToOpenWorkorders((data) => {
+        let prev = useOpenWorkordersStore.getState().workorders;
+        let newSMS = data.some((wo) => {
+          if (!wo.hasNewSMS) return false;
+          let old = prev.find((p) => p.id === wo.id);
+          return !old || !old.hasNewSMS;
+        });
+        if (newSMS && localStorage.getItem("warpspeed_sms_sound") !== "false") {
+          playNotificationBeep();
+        }
+        useOpenWorkordersStore.getState().setOpenWorkorders(data);
+        onConnected();
+      }, onError);
     });
 
-    // Email listeners: cached emails + auth status (unread counts)
-    const emailUnsub = dbListenToEmails((data) => {
-      useEmailStore.getState().setEmails(data);
+    register("settings", (onConnected, onError) => {
+      return dbListenToSettings((data) => {
+        useSettingsStore.getState().setSettings(data, false, false);
+        onConnected();
+      }, onError);
     });
-    useEmailStore.getState().setEmailsUnsub(emailUnsub);
 
-    const emailAuthUnsub = dbListenToEmailAuth((docs) => {
-      const authMap = {};
-      docs.forEach((doc) => {
-        authMap[doc.id] = doc;
-      });
-      useEmailStore.getState().setEmailAuth(authMap);
+    register("punch-clock", (onConnected, onError) => {
+      return dbListenToCurrentPunchClock((data) => {
+        useLoginStore.getState().setPunchClock(data);
+        onConnected();
+      }, onError);
     });
-    useEmailStore.getState().setAuthUnsub(emailAuthUnsub);
+
+    register("inventory", (onConnected, onError) => {
+      return dbListenToInventory((data) => {
+        useInventoryStore.getState().setItems(data);
+        onConnected();
+      }, onError);
+    });
+
+    register("subscription", (onConnected, onError) => {
+      return dbListenToSubscription((data) => {
+        useSubscriptionStore.getState().setSubscription(data);
+        onConnected();
+      }, onError);
+    });
+
+    register("active-sales", (onConnected, onError) => {
+      return dbListenToActiveSales((data) => {
+        useActiveSalesStore.getState().setActiveSales(data);
+        if (!activeSalesRecoveryDone) {
+          activeSalesRecoveryDone = true;
+          recoverPendingActiveSales(data);
+        }
+        onConnected();
+      }, onError);
+    });
+
+    const emailTeardown = register("emails", (onConnected, onError) => {
+      return dbListenToEmails((data) => {
+        useEmailStore.getState().setEmails(data);
+        onConnected();
+      }, onError);
+    });
+    useEmailStore.getState().setEmailsUnsub(emailTeardown);
+
+    const emailAuthTeardown = register("email-auth", (onConnected, onError) => {
+      return dbListenToEmailAuth((docs) => {
+        const authMap = {};
+        docs.forEach((doc) => {
+          authMap[doc.id] = doc;
+        });
+        useEmailStore.getState().setEmailAuth(authMap);
+        onConnected();
+      }, onError);
+    });
+    useEmailStore.getState().setAuthUnsub(emailAuthTeardown);
 
     // SMS threads: load from IndexedDB FIRST, then start Firestore listener
-    // (avoids race condition where listener fires against empty state)
     import("../hubMessageDB").then(async (hubDB) => {
       try {
-        // First-time setup: if IndexedDB is empty, seed from Firestore
         const initialized = await hubDB.isInitialized();
         if (!initialized) {
           const { dbGetSmsThreadCards } = await import("../db_calls_wrapper");
@@ -393,13 +417,11 @@ export function BaseScreen() {
           await hubDB.setInitialized();
         }
 
-        // Load thread cards from IndexedDB -> Zustand (instant sidebar render)
         const allCards = await hubDB.getAllThreadCards();
         if (allCards.length > 0) {
           useCustMessagesStore.getState().setSmsThreads(allCards);
         }
 
-        // Batch-load 30 most recent conversations (single state update, no write-back)
         const recentPhones = allCards.slice(0, 30).map((c) => c.phone);
         const batch = {};
         for (const phone of recentPhones) {
@@ -410,39 +432,56 @@ export function BaseScreen() {
           useCustMessagesStore.getState().batchSetHubCachedThreads(batch);
         }
 
-        // Purge old conversation messages (60 days inactive)
         hubDB.purgeOldConversations(60);
       } catch (e) {
         log("IndexedDB init error (non-fatal)", e);
       }
 
-      // Start Firestore listener AFTER IndexedDB is loaded so getSmsThreads() is pre-populated
-      const threadsUnsub = dbListenToActiveMessageThreads((changes) => {
-        const current = useCustMessagesStore.getState().getSmsThreads();
-        let updated = [...current];
-        changes.forEach(({ type, phone, ...data }) => {
-          const idx = updated.findIndex((t) => t.phone === phone);
-          if (type === "removed") {
-            if (idx !== -1) updated.splice(idx, 1);
-          } else {
-            const thread = { phone, ...data };
-            if (idx !== -1) updated[idx] = thread;
-            else updated.push(thread);
-          }
-        });
-        updated.sort((a, b) => b.lastMillis - a.lastMillis);
-        useCustMessagesStore.getState().setSmsThreads(updated);
-        // Sync changed thread cards to IndexedDB (fire-and-forget)
-        changes.forEach(({ type, phone, ...data }) => {
-          if (type === "removed") return;
-          hubDB.putThreadCard(phone, { phone, ...data });
-        });
+      const smsTeardown = register("sms-threads", (onConnected, onError) => {
+        return dbListenToActiveMessageThreads((changes) => {
+          const current = useCustMessagesStore.getState().getSmsThreads();
+          let updated = [...current];
+          changes.forEach(({ type, phone, ...data }) => {
+            const idx = updated.findIndex((t) => t.phone === phone);
+            if (type === "removed") {
+              if (idx !== -1) updated.splice(idx, 1);
+            } else {
+              const thread = { phone, ...data };
+              if (idx !== -1) updated[idx] = thread;
+              else updated.push(thread);
+            }
+          });
+          updated.sort((a, b) => b.lastMillis - a.lastMillis);
+          useCustMessagesStore.getState().setSmsThreads(updated);
+          changes.forEach(({ type, phone, ...data }) => {
+            if (type === "removed") return;
+            hubDB.putThreadCard(phone, { phone, ...data });
+          });
+          onConnected();
+        }, onError);
       });
-      useCustMessagesStore.getState().setThreadsUnsub(threadsUnsub);
+      useCustMessagesStore.getState().setThreadsUnsub(smsTeardown);
     });
 
-    // Recover any pending auto-text messages from localStorage (crash recovery)
     recoverPendingAutoTexts();
+
+    // Reconnect listeners when tab regains focus after being hidden 5+ minutes
+    let hiddenAt = null;
+    const STALE_THRESHOLD = 5 * 60 * 1000;
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenAt = Date.now();
+      } else if (document.visibilityState === "visible" && hiddenAt && Date.now() - hiddenAt > STALE_THRESHOLD) {
+        hiddenAt = null;
+        reconnectAll();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      teardownAll();
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
   }, []);
 
   // Inactivity timer — clear active workorder/customer after timeout
@@ -593,6 +632,36 @@ export function BaseScreen() {
               }}
             >
               Double-click anywhere in the secondary display to go Full Screen!
+            </Text>
+          </div>
+        )}
+        {zIsReconnecting && (
+          <div
+            style={{
+              height: 25,
+              width: "95%",
+              alignSelf: "center",
+              display: "flex",
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              paddingLeft: 10,
+              paddingRight: 10,
+              paddingTop: 4,
+              paddingBottom: 4,
+              backgroundColor: C.orange,
+              borderRadius: 5,
+              animation: "bannerPulse 1.5s ease-in-out infinite",
+            }}
+          >
+            <Text
+              style={{
+                fontSize: 15,
+                color: C.textWhite,
+                fontWeight: "600",
+              }}
+            >
+              Reconnecting: {zReconnectingNames.join(", ")}...
             </Text>
           </div>
         )}

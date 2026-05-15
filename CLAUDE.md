@@ -29,6 +29,8 @@ Follow these steps before acting on any user request:
 
 **Standalone / solo sale = no customerID.** When the user refers to a "standalone sale" or "solo sale", that means a workorder with no `customerID` (`!workorder.customerID`). There are no special flags or fields — the absence of `customerID` is the sole indicator. Do not use or reference `isStandaloneSale` or any other flag.
 
+** This app is being transitioned to a full-scale SaaS for distribution. Suggest professional-grade upgrades or transitions where you see them.
+
 Then execute the user's prompt according to these guidelines.
 
 ---

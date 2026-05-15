@@ -6281,7 +6281,7 @@ async function completeSaleServerSide({
             fromNumber: _fromReceipt,
             tenantID,
             storeID,
-            type: "outgoing",
+            type: "incoming",
             millis: Date.now(),
             textToPay: true,
             paymentConfirmation: true,
@@ -6289,10 +6289,7 @@ async function completeSaleServerSide({
         await confirmConvRef.set({
           lastMessage: confirmMsg,
           lastMillis: Date.now(),
-          lastType: "outgoing",
-          lastOutgoingMessageID: confirmMsgID,
-          lastOutgoingMessageStatus: "delivered",
-          lastOutgoingMillis: Date.now(),
+          lastType: "incoming",
           threadStatus: "open",
         }, { merge: true });
         log(`completeSaleServerSide[${logPrefix}]: confirmation added to SMS queue`, { phone: cleanPhone });
@@ -6899,7 +6896,7 @@ exports.stripeCheckoutWebhook_LinkToPay = onRequest(
                   phoneNumber: cleanPhone,
                   tenantID,
                   storeID,
-                  type: "outgoing",
+                  type: "incoming",
                   millis: Date.now(),
                   textToPay: true,
                 });

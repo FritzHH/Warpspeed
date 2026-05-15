@@ -285,6 +285,7 @@ export function NewCheckoutModalScreen() {
   let custLast = zOpenWorkorder?.customerLast || zCustomer?.last || "";
   let custLanguage = zOpenWorkorder?.customerLanguage || zCustomer?.language || "";
   let isZeroTotal = (sSale?.total === 0) && !saleComplete;
+  let isFullyPaid = !isZeroTotal && !saleComplete && amountLeftToPay <= 0 && (sSale?.amountCaptured || 0) > 0;
   let hasRealPayments = sTransactions.some((t) => {
     let refunded = (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
     return (t.amountCaptured || 0) > refunded;
@@ -410,10 +411,8 @@ export function NewCheckoutModalScreen() {
 
           if (needsPersist) persistSale(existingSale, loadedTxns, reconciledCredits);
 
-          // If reconciliation completed the sale, trigger completion
-          if (existingSale.paymentComplete) {
-            handleSaleComplete(existingSale, loadedTxns, reconciledCredits);
-          }
+          // If reconciliation shows fully paid, just update the UI — don't auto-complete.
+          // The user will see the "fully paid" state and can click Complete Sale.
         })();
 
         return;
@@ -904,6 +903,15 @@ export function NewCheckoutModalScreen() {
     let sale = cloneDeep(sSale);
     sale.paymentComplete = true;
     sale.amountCaptured = 0;
+    sale.workorderIDs = sCombinedWorkorders.map((o) => o.id);
+    _setSale(sale);
+    handleSaleComplete(sale, sTransactions, sCredits);
+  }
+
+  function handleFullyPaidComplete() {
+    if (!sSale || saleComplete) return;
+    let sale = cloneDeep(sSale);
+    sale.paymentComplete = true;
     sale.workorderIDs = sCombinedWorkorders.map((o) => o.id);
     _setSale(sale);
     handleSaleComplete(sale, sTransactions, sCredits);
@@ -1681,6 +1689,18 @@ export function NewCheckoutModalScreen() {
                     <Text style={{ fontSize: 15, fontWeight: Fonts.weight.textHeavy, color: "white" }}>Complete Workorder</Text>
                   </TouchableOpacity>
                 </View>
+              ) : isFullyPaid ? (
+                <View style={{ height: "48%", justifyContent: "center", alignItems: "center", borderRadius: 15, ...SHADOW_RADIUS_PROTO, padding: 20 }}>
+                  <Text style={{ fontSize: 14, color: gray(0.5), marginBottom: 6 }}>AMOUNT PAID</Text>
+                  <Text style={{ fontSize: 28, fontWeight: Fonts.weight.textSuperheavy, color: C.green, marginBottom: 20 }}>{"$" + formatCurrencyDisp(sSale?.amountCaptured || 0)}</Text>
+                  <Text style={{ fontSize: 14, color: gray(0.5), marginBottom: 20 }}>{"Sale total: $" + formatCurrencyDisp(sSale?.total || 0)}</Text>
+                  <TouchableOpacity
+                    onPress={handleFullyPaidComplete}
+                    style={{ width: "80%", height: 50, backgroundColor: C.green, borderRadius: 8, justifyContent: "center", alignItems: "center" }}
+                  >
+                    <Text style={{ fontSize: 15, fontWeight: Fonts.weight.textHeavy, color: "white" }}>Complete Sale</Text>
+                  </TouchableOpacity>
+                </View>
               ) : (
                 <CashPayment
                   amountLeftToPay={cashAmountLeftToPay}
@@ -1694,7 +1714,7 @@ export function NewCheckoutModalScreen() {
                   cardIsProcessing={cardIsProcessing}
                 />
               )}
-              {sCardMode === "manual" ? (
+              {!isZeroTotal && !isFullyPaid && (sCardMode === "manual" ? (
                 <CardPayment
                   amountLeftToPay={amountLeftToPay}
                   onPaymentCapture={handlePaymentCapture}
@@ -1729,7 +1749,7 @@ export function NewCheckoutModalScreen() {
                     onSwitchToManual={() => { dlog(DCAT.BUTTON, "switchToManual", "CheckoutModal", {}); _setCardMode("manual"); }}
                     lockAmount={isDepositMode}
                   />
-              )}
+              ))}
             </View>
 
             {isDepositMode ? (

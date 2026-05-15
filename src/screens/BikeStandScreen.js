@@ -162,6 +162,7 @@ export function BikeStandScreen() {
   const [sDetailField, _setDetailField] = useState(null); // null | "brand" | "description" | "color1" | "color2" | "waitDays"
   const [sDetailForm, _setDetailForm] = useState({ brand: "", description: "", color1: "", color2: "", waitDays: "" });
   const detailDebounceRef = useRef(null);
+  const detailBackspaced = useRef(false);
   const waitDaysDebounceRef = useRef(null);
   const [sShowPrinterSelectModal, _setShowPrinterSelectModal] = useState(false);
   const [sSelectedPrinterID, _setSelectedPrinterID] = useState(() => localStorageWrapper.getItem("selectedPrinterID") || "");
@@ -741,12 +742,63 @@ export function BikeStandScreen() {
     useOpenWorkordersStore.getState().setField(fieldName, newColorObj, selectedWorkorder.id);
   }
 
+  function saveBrandToAllBrands(brand) {
+    if (!brand || !brand.trim()) return;
+    const trimmed = brand.trim();
+    const existing = zSettings.allBrands || [];
+    if (existing.some((b) => b.toLowerCase() === trimmed.toLowerCase())) return;
+    const updated = [...existing, trimmed].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    useSettingsStore.getState().setField("allBrands", updated);
+  }
+
+  function saveDescToAllDescriptions(desc) {
+    if (!desc || !desc.trim()) return;
+    const trimmed = desc.trim();
+    const existing = zSettings.allDescriptions || [];
+    if (existing.some((d) => d.toLowerCase() === trimmed.toLowerCase())) return;
+    const updated = [...existing, trimmed].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    useSettingsStore.getState().setField("allDescriptions", updated);
+  }
+
+  const allColorLabels = COLORS.map((c) => c.label);
+
+  const brandSuggestions = sDetailField === "brand" && sDetailForm.brand?.trim()
+    ? (zSettings.allBrands || []).filter(
+        (b) => b.toLowerCase().startsWith(sDetailForm.brand.trim().toLowerCase()) && b.toLowerCase() !== sDetailForm.brand.trim().toLowerCase()
+      ).slice(0, 8)
+    : [];
+
+  const descSuggestions = sDetailField === "description" && sDetailForm.description?.trim()
+    ? (zSettings.allDescriptions || []).filter(
+        (d) => d.toLowerCase().startsWith(sDetailForm.description.trim().toLowerCase()) && d.toLowerCase() !== sDetailForm.description.trim().toLowerCase()
+      ).slice(0, 8)
+    : [];
+
+  const color1Suggestions = sDetailField === "color1" && sDetailForm.color1?.trim()
+    ? allColorLabels.filter(
+        (c) => c.toLowerCase().startsWith(sDetailForm.color1.trim().toLowerCase()) && c.toLowerCase() !== sDetailForm.color1.trim().toLowerCase()
+      ).slice(0, 8)
+    : [];
+
+  const color2Suggestions = sDetailField === "color2" && sDetailForm.color2?.trim()
+    ? allColorLabels.filter(
+        (c) => c.toLowerCase().startsWith(sDetailForm.color2.trim().toLowerCase()) && c.toLowerCase() !== sDetailForm.color2.trim().toLowerCase()
+      ).slice(0, 8)
+    : [];
+
   // Bike detail keypad helpers
   const DETAIL_FIELDS = ["brand", "description", "color1", "color2", "waitDays"];
 
+  function saveDetailOnLeave(leavingField) {
+    if (!leavingField || !selectedWorkorder) return;
+    if (leavingField === "brand") saveBrandToAllBrands(selectedWorkorder.brand);
+    if (leavingField === "description") saveDescToAllDescriptions(selectedWorkorder.description);
+    detailBackspaced.current = false;
+  }
+
   function activateDetailField(fieldName) {
     if (!selectedWorkorder) return;
-    // Sync local form from workorder when activating a field
+    saveDetailOnLeave(sDetailField);
     _setDetailForm({
       brand: selectedWorkorder.brand || "",
       description: selectedWorkorder.description || "",
@@ -791,6 +843,7 @@ export function BikeStandScreen() {
   function handleDetailKeyPress(key) {
     if (!sDetailField) return;
     let val = sDetailForm[sDetailField] || "";
+    let isBackspace = key === "\u232B" || key === "CLR";
     if (key === "CLR") {
       val = "";
     } else if (key === "\u232B") {
@@ -809,7 +862,45 @@ export function BikeStandScreen() {
         val = val + key.toLowerCase();
       }
     }
+    detailBackspaced.current = isBackspace;
     _setDetailForm({ ...sDetailForm, [sDetailField]: val });
+
+    if (!isBackspace && val.trim().length >= 2 && sDetailField !== "waitDays") {
+      const q = val.trim().toLowerCase();
+      let matches = [];
+      if (sDetailField === "brand") {
+        matches = (zSettings.allBrands || []).filter((b) => b.toLowerCase().startsWith(q) && b.toLowerCase() !== q);
+      } else if (sDetailField === "description") {
+        matches = (zSettings.allDescriptions || []).filter((d) => d.toLowerCase().startsWith(q) && d.toLowerCase() !== q);
+      } else if (sDetailField === "color1" || sDetailField === "color2") {
+        matches = allColorLabels.filter((c) => c.toLowerCase().startsWith(q) && c.toLowerCase() !== q);
+      }
+      if (matches.length === 1) {
+        let match = matches[0];
+        if (sDetailField === "brand") {
+          useOpenWorkordersStore.getState().setField("brand", match, selectedWorkorder.id);
+          saveBrandToAllBrands(match);
+          _setDetailForm((prev) => ({ ...prev, brand: match }));
+        } else if (sDetailField === "description") {
+          useOpenWorkordersStore.getState().setField("description", match, selectedWorkorder.id);
+          saveDescToAllDescriptions(match);
+          _setDetailForm((prev) => ({ ...prev, description: match }));
+        } else {
+          setBikeColor(match, sDetailField);
+          _setDetailForm((prev) => ({ ...prev, [sDetailField]: match }));
+        }
+        let idx = DETAIL_FIELDS.indexOf(sDetailField);
+        let next = DETAIL_FIELDS[idx + 1];
+        if (next) {
+          _setDetailField(next);
+          _setDetailKeypadOverride(null);
+        } else {
+          _setDetailField(null);
+        }
+        return;
+      }
+    }
+
     debouncedSaveDetail(sDetailField, val);
   }
 
@@ -1261,40 +1352,105 @@ export function BikeStandScreen() {
               </View>
 
               {/* Fields */}
-              <ScrollView style={{ flex: 1, paddingHorizontal: 20, paddingTop: 16 }}>
+              <ScrollView style={{ flex: 1, paddingHorizontal: 20, paddingTop: 16, overflow: "visible" }}>
                 {/* Brand row */}
                 <Text style={{ fontSize: 22, fontWeight: "600", color: gray(0.4), marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Brand</Text>
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20 }}>
-                  <StandTouch onPress={() => activateDetailField("brand")}>
-                  <TouchableOpacity onPress={() => activateDetailField("brand")} style={{ width: "50%" }}>
-                    <View pointerEvents="none">
-                      <TextInput_
-                        placeholder="Brand"
-                        editable={false}
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20, overflow: "visible", zIndex: 12 }}>
+                  <View style={{ width: "50%", position: "relative", zIndex: 10, overflow: "visible" }}>
+                    <StandTouch onPress={() => activateDetailField("brand")}>
+                    <TouchableOpacity onPress={() => activateDetailField("brand")}>
+                      <View pointerEvents="none">
+                        <TextInput_
+                          placeholder="Brand"
+                          editable={false}
+                          style={{
+                            width: "100%",
+                            borderWidth: sDetailField === "brand" ? 2 : 1,
+                            borderColor: sDetailField === "brand" ? C.blue : selectedWorkorder?.brand ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                            color: C.text,
+                            paddingVertical: 12,
+                            paddingHorizontal: 10,
+                            fontSize: 32,
+                            outlineStyle: "none",
+                            borderRadius: 8,
+                            fontWeight: (sDetailField === "brand" ? sDetailForm.brand : selectedWorkorder?.brand) ? "500" : null,
+                            backgroundColor: sDetailField === "brand" ? lightenRGBByPercent(C.blue, 85) : undefined,
+                          }}
+                          value={sDetailField === "brand" ? capitalizeFirstLetterOfString(sDetailForm.brand) : capitalizeFirstLetterOfString(selectedWorkorder?.brand)}
+                        />
+                      </View>
+                    </TouchableOpacity>
+                    </StandTouch>
+                    {brandSuggestions.length > 0 && (
+                      <View
                         style={{
-                          width: "100%",
-                          borderWidth: sDetailField === "brand" ? 2 : 1,
-                          borderColor: sDetailField === "brand" ? C.blue : selectedWorkorder?.brand ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
-                          color: C.text,
-                          paddingVertical: 12,
-                          paddingHorizontal: 10,
-                          fontSize: 32,
-                          outlineStyle: "none",
-                          borderRadius: 8,
-                          fontWeight: (sDetailField === "brand" ? sDetailForm.brand : selectedWorkorder?.brand) ? "500" : null,
-                          backgroundColor: sDetailField === "brand" ? lightenRGBByPercent(C.blue, 85) : undefined,
+                          position: "absolute",
+                          top: "100%",
+                          left: 0,
+                          right: 0,
+                          backgroundColor: C.listItemWhite,
+                          borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderRadius: 5,
+                          maxHeight: 600,
+                          overflow: "auto",
+                          zIndex: 999,
                         }}
-                        value={sDetailField === "brand" ? capitalizeFirstLetterOfString(sDetailForm.brand) : capitalizeFirstLetterOfString(selectedWorkorder?.brand)}
-                      />
-                    </View>
-                  </TouchableOpacity>
-                  </StandTouch>
+                      >
+                        {brandSuggestions.map((item) => (
+                          <View
+                            key={item}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                            style={{ flexDirection: "row", alignItems: "center", paddingVertical: 18, paddingHorizontal: 24 }}
+                          >
+                            <StandTouch onPress={() => {
+                                useOpenWorkordersStore.getState().setField("brand", item, selectedWorkorder.id);
+                                saveBrandToAllBrands(item);
+                                _setDetailForm((prev) => ({ ...prev, brand: item }));
+                                let idx = DETAIL_FIELDS.indexOf("brand");
+                                let next = DETAIL_FIELDS[idx + 1];
+                                if (next) { _setDetailField(next); _setDetailKeypadOverride(null); } else { _setDetailField(null); }
+                              }}>
+                              <TouchableOpacity
+                                onPress={() => {
+                                  useOpenWorkordersStore.getState().setField("brand", item, selectedWorkorder.id);
+                                  saveBrandToAllBrands(item);
+                                  _setDetailForm((prev) => ({ ...prev, brand: item }));
+                                  let idx = DETAIL_FIELDS.indexOf("brand");
+                                  let next = DETAIL_FIELDS[idx + 1];
+                                  if (next) { _setDetailField(next); _setDetailKeypadOverride(null); } else { _setDetailField(null); }
+                                }}
+                                style={{ flex: 1, cursor: "pointer" }}
+                              >
+                                <Text style={{ fontSize: 42, color: C.text }}>{item}</Text>
+                              </TouchableOpacity>
+                            </StandTouch>
+                            <StandTouch onPress={() => {
+                                const updated = (zSettings.allBrands || []).filter((b) => b !== item);
+                                useSettingsStore.getState().setField("allBrands", updated);
+                              }}>
+                              <TouchableOpacity
+                                onPress={() => {
+                                  const updated = (zSettings.allBrands || []).filter((b) => b !== item);
+                                  useSettingsStore.getState().setField("allBrands", updated);
+                                }}
+                                style={{ paddingLeft: 24, cursor: "pointer" }}
+                              >
+                                <Text style={{ fontSize: 36, color: gray(0.55) }}>{"\u2715"}</Text>
+                              </TouchableOpacity>
+                            </StandTouch>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
                   <View style={{ width: "50%", flexDirection: "row", paddingLeft: 8, justifyContent: "space-between", alignItems: "center" }}>
                     <View style={{ width: "48%", height: "100%" }}>
                       <DropdownMenu
                         dataArr={zSettings.bikeBrands}
                         enabled={true}
-                        onSelect={(item) => useOpenWorkordersStore.getState().setField("brand", item, selectedWorkorder.id)}
+                        onSelect={(item) => { useOpenWorkordersStore.getState().setField("brand", item, selectedWorkorder.id); saveBrandToAllBrands(item); }}
                         buttonStyle={{ opacity: selectedWorkorder?.brand ? DROPDOWN_SELECTED_OPACITY : 1, paddingVertical: 12 }}
                         buttonTextStyle={{ fontSize: 28 }}
                         itemTextStyle={{ fontSize: 32 }}
@@ -1302,6 +1458,7 @@ export function BikeStandScreen() {
                         buttonText={zSettings.bikeBrandsName}
                         modalCoordX={0}
                         centerMenuVertically={true}
+                        centerOnClickX={true}
                         menuMaxHeight={window.innerHeight - 20}
                       />
                     </View>
@@ -1309,7 +1466,7 @@ export function BikeStandScreen() {
                       <DropdownMenu
                         dataArr={zSettings.bikeOptionalBrands}
                         enabled={true}
-                        onSelect={(item) => useOpenWorkordersStore.getState().setField("brand", item, selectedWorkorder.id)}
+                        onSelect={(item) => { useOpenWorkordersStore.getState().setField("brand", item, selectedWorkorder.id); saveBrandToAllBrands(item); }}
                         buttonStyle={{ opacity: selectedWorkorder?.brand ? DROPDOWN_SELECTED_OPACITY : 1, paddingVertical: 12 }}
                         buttonTextStyle={{ fontSize: 28 }}
                         itemTextStyle={{ fontSize: 32 }}
@@ -1317,6 +1474,7 @@ export function BikeStandScreen() {
                         buttonText={zSettings.bikeOptionalBrandsName}
                         modalCoordX={0}
                         centerMenuVertically={true}
+                        centerOnClickX={true}
                         menuMaxHeight={window.innerHeight - 20}
                       />
                     </View>
@@ -1325,36 +1483,101 @@ export function BikeStandScreen() {
 
                 {/* Description row */}
                 <Text style={{ fontSize: 22, fontWeight: "600", color: gray(0.4), marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Model / Description</Text>
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20 }}>
-                  <StandTouch onPress={() => activateDetailField("description")}>
-                  <TouchableOpacity onPress={() => activateDetailField("description")} style={{ width: "50%" }}>
-                    <View pointerEvents="none">
-                      <TextInput_
-                        placeholder="Model/Description"
-                        editable={false}
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20, overflow: "visible", zIndex: 11 }}>
+                  <View style={{ width: "50%", position: "relative", zIndex: 9, overflow: "visible" }}>
+                    <StandTouch onPress={() => activateDetailField("description")}>
+                    <TouchableOpacity onPress={() => activateDetailField("description")}>
+                      <View pointerEvents="none">
+                        <TextInput_
+                          placeholder="Model/Description"
+                          editable={false}
+                          style={{
+                            width: "100%",
+                            borderWidth: sDetailField === "description" ? 2 : 1,
+                            borderColor: sDetailField === "description" ? C.blue : selectedWorkorder?.description ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                            color: C.text,
+                            paddingVertical: 12,
+                            paddingHorizontal: 10,
+                            fontSize: 32,
+                            outlineStyle: "none",
+                            borderRadius: 8,
+                            fontWeight: (sDetailField === "description" ? sDetailForm.description : selectedWorkorder?.description) ? "500" : null,
+                            backgroundColor: sDetailField === "description" ? lightenRGBByPercent(C.blue, 85) : undefined,
+                          }}
+                          value={sDetailField === "description" ? capitalizeFirstLetterOfString(sDetailForm.description) : capitalizeFirstLetterOfString(selectedWorkorder?.description)}
+                        />
+                      </View>
+                    </TouchableOpacity>
+                    </StandTouch>
+                    {descSuggestions.length > 0 && (
+                      <View
                         style={{
-                          width: "100%",
-                          borderWidth: sDetailField === "description" ? 2 : 1,
-                          borderColor: sDetailField === "description" ? C.blue : selectedWorkorder?.description ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
-                          color: C.text,
-                          paddingVertical: 12,
-                          paddingHorizontal: 10,
-                          fontSize: 32,
-                          outlineStyle: "none",
-                          borderRadius: 8,
-                          fontWeight: (sDetailField === "description" ? sDetailForm.description : selectedWorkorder?.description) ? "500" : null,
-                          backgroundColor: sDetailField === "description" ? lightenRGBByPercent(C.blue, 85) : undefined,
+                          position: "absolute",
+                          top: "100%",
+                          left: 0,
+                          right: 0,
+                          backgroundColor: C.listItemWhite,
+                          borderWidth: 1,
+                          borderColor: C.buttonLightGreenOutline,
+                          borderRadius: 5,
+                          maxHeight: 600,
+                          overflow: "auto",
+                          zIndex: 999,
                         }}
-                        value={sDetailField === "description" ? capitalizeFirstLetterOfString(sDetailForm.description) : capitalizeFirstLetterOfString(selectedWorkorder?.description)}
-                      />
-                    </View>
-                  </TouchableOpacity>
-                  </StandTouch>
+                      >
+                        {descSuggestions.map((item) => (
+                          <View
+                            key={item}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                            onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                            style={{ flexDirection: "row", alignItems: "center", paddingVertical: 18, paddingHorizontal: 24 }}
+                          >
+                            <StandTouch onPress={() => {
+                                useOpenWorkordersStore.getState().setField("description", item, selectedWorkorder.id);
+                                saveDescToAllDescriptions(item);
+                                _setDetailForm((prev) => ({ ...prev, description: item }));
+                                let idx = DETAIL_FIELDS.indexOf("description");
+                                let next = DETAIL_FIELDS[idx + 1];
+                                if (next) { _setDetailField(next); _setDetailKeypadOverride(null); } else { _setDetailField(null); }
+                              }}>
+                              <TouchableOpacity
+                                onPress={() => {
+                                  useOpenWorkordersStore.getState().setField("description", item, selectedWorkorder.id);
+                                  saveDescToAllDescriptions(item);
+                                  _setDetailForm((prev) => ({ ...prev, description: item }));
+                                  let idx = DETAIL_FIELDS.indexOf("description");
+                                  let next = DETAIL_FIELDS[idx + 1];
+                                  if (next) { _setDetailField(next); _setDetailKeypadOverride(null); } else { _setDetailField(null); }
+                                }}
+                                style={{ flex: 1, cursor: "pointer" }}
+                              >
+                                <Text style={{ fontSize: 42, color: C.text }}>{item}</Text>
+                              </TouchableOpacity>
+                            </StandTouch>
+                            <StandTouch onPress={() => {
+                                const updated = (zSettings.allDescriptions || []).filter((d) => d !== item);
+                                useSettingsStore.getState().setField("allDescriptions", updated);
+                              }}>
+                              <TouchableOpacity
+                                onPress={() => {
+                                  const updated = (zSettings.allDescriptions || []).filter((d) => d !== item);
+                                  useSettingsStore.getState().setField("allDescriptions", updated);
+                                }}
+                                style={{ paddingLeft: 24, cursor: "pointer" }}
+                              >
+                                <Text style={{ fontSize: 36, color: gray(0.55) }}>{"\u2715"}</Text>
+                              </TouchableOpacity>
+                            </StandTouch>
+                          </View>
+                        ))}
+                      </View>
+                    )}
+                  </View>
                   <View style={{ width: "50%", paddingLeft: 8 }}>
                     <DropdownMenu
                       dataArr={zSettings.bikeDescriptions}
                       enabled={true}
-                      onSelect={(item) => useOpenWorkordersStore.getState().setField("description", item, selectedWorkorder.id)}
+                      onSelect={(item) => { useOpenWorkordersStore.getState().setField("description", item, selectedWorkorder.id); saveDescToAllDescriptions(item); }}
                       buttonStyle={{ opacity: selectedWorkorder?.description ? DROPDOWN_SELECTED_OPACITY : 1, paddingVertical: 12 }}
                       buttonTextStyle={{ fontSize: 28 }}
                       itemTextStyle={{ fontSize: 32 }}
@@ -1362,6 +1585,7 @@ export function BikeStandScreen() {
                       buttonText="Descriptions"
                       modalCoordX={0}
                       centerMenuVertically={true}
+                      centerOnClickX={true}
                       menuMaxHeight={window.innerHeight - 20}
                     />
                   </View>
@@ -1369,57 +1593,151 @@ export function BikeStandScreen() {
 
                 {/* Color row */}
                 <Text style={{ fontSize: 22, fontWeight: "600", color: gray(0.4), marginBottom: 6, textTransform: "uppercase", letterSpacing: 0.5 }}>Colors</Text>
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20 }}>
-                  <View style={{ width: "50%", flexDirection: "row", alignItems: "center" }}>
-                    <StandTouch onPress={() => activateDetailField("color1")}>
-                    <TouchableOpacity onPress={() => activateDetailField("color1")} style={{ width: "48%" }}>
-                      <View pointerEvents="none">
-                        <TextInput_
-                          placeholder="Color 1"
-                          editable={false}
+                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 20, overflow: "visible", zIndex: 10 }}>
+                  <View style={{ width: "50%", flexDirection: "row", alignItems: "center", overflow: "visible" }}>
+                    <View style={{ width: "48%", position: "relative", zIndex: 8, overflow: "visible" }}>
+                      <StandTouch onPress={() => activateDetailField("color1")}>
+                      <TouchableOpacity onPress={() => activateDetailField("color1")}>
+                        <View pointerEvents="none">
+                          <TextInput_
+                            placeholder="Color 1"
+                            editable={false}
+                            style={{
+                              width: "100%",
+                              borderWidth: sDetailField === "color1" ? 2 : 1,
+                              borderColor: sDetailField === "color1" ? C.blue : selectedWorkorder?.color1?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                              paddingVertical: 12,
+                              paddingHorizontal: 10,
+                              fontSize: 32,
+                              outlineStyle: "none",
+                              borderRadius: 8,
+                              fontWeight: (sDetailField === "color1" ? sDetailForm.color1 : selectedWorkorder?.color1?.label) ? "500" : null,
+                              backgroundColor: sDetailField === "color1" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color1?.backgroundColor,
+                              color: selectedWorkorder?.color1?.textColor || C.text,
+                            }}
+                            value={sDetailField === "color1" ? capitalizeFirstLetterOfString(sDetailForm.color1) : capitalizeFirstLetterOfString(selectedWorkorder?.color1?.label)}
+                          />
+                        </View>
+                      </TouchableOpacity>
+                      </StandTouch>
+                      {color1Suggestions.length > 0 && (
+                        <View
                           style={{
-                            width: "100%",
-                            borderWidth: sDetailField === "color1" ? 2 : 1,
-                            borderColor: sDetailField === "color1" ? C.blue : selectedWorkorder?.color1?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
-                            paddingVertical: 12,
-                            paddingHorizontal: 10,
-                            fontSize: 32,
-                            outlineStyle: "none",
-                            borderRadius: 8,
-                            fontWeight: (sDetailField === "color1" ? sDetailForm.color1 : selectedWorkorder?.color1?.label) ? "500" : null,
-                            backgroundColor: sDetailField === "color1" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color1?.backgroundColor,
-                            color: selectedWorkorder?.color1?.textColor || C.text,
+                            position: "absolute",
+                            top: "100%",
+                            left: 0,
+                            right: 0,
+                            backgroundColor: C.listItemWhite,
+                            borderWidth: 1,
+                            borderColor: C.buttonLightGreenOutline,
+                            borderRadius: 5,
+                            maxHeight: 600,
+                            overflow: "auto",
+                            zIndex: 999,
                           }}
-                          value={sDetailField === "color1" ? capitalizeFirstLetterOfString(sDetailForm.color1) : capitalizeFirstLetterOfString(selectedWorkorder?.color1?.label)}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                    </StandTouch>
+                        >
+                          {color1Suggestions.map((item) => (
+                            <View
+                              key={item}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                              style={{ flexDirection: "row", alignItems: "center", paddingVertical: 18, paddingHorizontal: 24 }}
+                            >
+                              <StandTouch onPress={() => {
+                                  setBikeColor(item, "color1");
+                                  _setDetailForm((prev) => ({ ...prev, color1: item }));
+                                  let idx = DETAIL_FIELDS.indexOf("color1");
+                                  let next = DETAIL_FIELDS[idx + 1];
+                                  if (next) { _setDetailField(next); _setDetailKeypadOverride(null); } else { _setDetailField(null); }
+                                }}>
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    setBikeColor(item, "color1");
+                                    _setDetailForm((prev) => ({ ...prev, color1: item }));
+                                    let idx = DETAIL_FIELDS.indexOf("color1");
+                                    let next = DETAIL_FIELDS[idx + 1];
+                                    if (next) { _setDetailField(next); _setDetailKeypadOverride(null); } else { _setDetailField(null); }
+                                  }}
+                                  style={{ flex: 1, cursor: "pointer" }}
+                                >
+                                  <Text style={{ fontSize: 42, color: C.text }}>{item}</Text>
+                                </TouchableOpacity>
+                              </StandTouch>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
                     <View style={{ width: "4%" }} />
-                    <StandTouch onPress={() => activateDetailField("color2")}>
-                    <TouchableOpacity onPress={() => activateDetailField("color2")} style={{ width: "48%" }}>
-                      <View pointerEvents="none">
-                        <TextInput_
-                          placeholder="Color 2"
-                          editable={false}
+                    <View style={{ width: "48%", position: "relative", zIndex: 7, overflow: "visible" }}>
+                      <StandTouch onPress={() => activateDetailField("color2")}>
+                      <TouchableOpacity onPress={() => activateDetailField("color2")}>
+                        <View pointerEvents="none">
+                          <TextInput_
+                            placeholder="Color 2"
+                            editable={false}
+                            style={{
+                              width: "100%",
+                              borderWidth: sDetailField === "color2" ? 2 : 1,
+                              borderColor: sDetailField === "color2" ? C.blue : selectedWorkorder?.color2?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
+                              paddingVertical: 12,
+                              paddingHorizontal: 10,
+                              fontSize: 32,
+                              outlineStyle: "none",
+                              borderRadius: 8,
+                              fontWeight: (sDetailField === "color2" ? sDetailForm.color2 : selectedWorkorder?.color2?.label) ? "500" : null,
+                              backgroundColor: sDetailField === "color2" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color2?.backgroundColor,
+                              color: selectedWorkorder?.color2?.textColor || C.text,
+                            }}
+                            value={sDetailField === "color2" ? capitalizeFirstLetterOfString(sDetailForm.color2) : capitalizeFirstLetterOfString(selectedWorkorder?.color2?.label)}
+                          />
+                        </View>
+                      </TouchableOpacity>
+                      </StandTouch>
+                      {color2Suggestions.length > 0 && (
+                        <View
                           style={{
-                            width: "100%",
-                            borderWidth: sDetailField === "color2" ? 2 : 1,
-                            borderColor: sDetailField === "color2" ? C.blue : selectedWorkorder?.color2?.label ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
-                            paddingVertical: 12,
-                            paddingHorizontal: 10,
-                            fontSize: 32,
-                            outlineStyle: "none",
-                            borderRadius: 8,
-                            fontWeight: (sDetailField === "color2" ? sDetailForm.color2 : selectedWorkorder?.color2?.label) ? "500" : null,
-                            backgroundColor: sDetailField === "color2" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color2?.backgroundColor,
-                            color: selectedWorkorder?.color2?.textColor || C.text,
+                            position: "absolute",
+                            top: "100%",
+                            left: 0,
+                            right: 0,
+                            backgroundColor: C.listItemWhite,
+                            borderWidth: 1,
+                            borderColor: C.buttonLightGreenOutline,
+                            borderRadius: 5,
+                            maxHeight: 600,
+                            overflow: "auto",
+                            zIndex: 999,
                           }}
-                          value={sDetailField === "color2" ? capitalizeFirstLetterOfString(sDetailForm.color2) : capitalizeFirstLetterOfString(selectedWorkorder?.color2?.label)}
-                        />
-                      </View>
-                    </TouchableOpacity>
-                    </StandTouch>
+                        >
+                          {color2Suggestions.map((item) => (
+                            <View
+                              key={item}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                              style={{ flexDirection: "row", alignItems: "center", paddingVertical: 18, paddingHorizontal: 24 }}
+                            >
+                              <StandTouch onPress={() => {
+                                  setBikeColor(item, "color2");
+                                  _setDetailForm((prev) => ({ ...prev, color2: item }));
+                                  _setDetailField(null);
+                                }}>
+                                <TouchableOpacity
+                                  onPress={() => {
+                                    setBikeColor(item, "color2");
+                                    _setDetailForm((prev) => ({ ...prev, color2: item }));
+                                    _setDetailField(null);
+                                  }}
+                                  style={{ flex: 1, cursor: "pointer" }}
+                                >
+                                  <Text style={{ fontSize: 42, color: C.text }}>{item}</Text>
+                                </TouchableOpacity>
+                              </StandTouch>
+                            </View>
+                          ))}
+                        </View>
+                      )}
+                    </View>
                   </View>
                   <View style={{ width: "50%", flexDirection: "row", paddingLeft: 8, alignItems: "center", justifyContent: "space-between" }}>
                     <View style={{ width: "48%", height: "100%", justifyContent: "center" }}>
@@ -1435,6 +1753,7 @@ export function BikeStandScreen() {
                         itemStyle={{ paddingVertical: 28, height: "auto" }}
                         menuMaxHeight={window.innerHeight - 20}
                         centerMenuVertically={true}
+                        centerOnClickX={true}
                         buttonText="Color 1"
                         modalCoordX={0}
                       />
@@ -1452,6 +1771,7 @@ export function BikeStandScreen() {
                         itemStyle={{ paddingVertical: 28, height: "auto" }}
                         menuMaxHeight={window.innerHeight - 20}
                         centerMenuVertically={true}
+                        centerOnClickX={true}
                         buttonText="Color 2"
                       />
                     </View>
@@ -1576,6 +1896,7 @@ export function BikeStandScreen() {
                       itemStyle={{ paddingVertical: 28, height: "auto" }}
                       buttonText="Wait Times"
                       centerMenuVertically={true}
+                      centerOnClickX={true}
                       menuMaxHeight={window.innerHeight - 20}
                     />
                   </View>
@@ -1602,8 +1923,8 @@ export function BikeStandScreen() {
                       onToggle={() => _setDetailKeypadOverride(modalKeypadMode === "phone" ? "alpha" : "phone")}
                     />
                     <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 6, paddingHorizontal: 4 }}>
-                      <StandTouch onPress={() => _setDetailField(null)}>
-                      <TouchableOpacity onPress={() => _setDetailField(null)} style={{ padding: 4 }}>
+                      <StandTouch onPress={() => { saveDetailOnLeave(sDetailField); _setDetailField(null); }}>
+                      <TouchableOpacity onPress={() => { saveDetailOnLeave(sDetailField); _setDetailField(null); }} style={{ padding: 4 }}>
                         <Image_ icon={ICONS.close1} size={36} />
                       </TouchableOpacity>
                       </StandTouch>
@@ -1617,9 +1938,9 @@ export function BikeStandScreen() {
                 let hasBrand = !!(selectedWorkorder?.brand);
                 return (
                   <View style={{ paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1, borderTopColor: gray(0.15) }}>
-                    <StandTouch onPress={() => { if (!hasBrand) return; _setShowBikeInfoModal(false); _setDetailField(null); }}>
+                    <StandTouch onPress={() => { if (!hasBrand) return; saveDetailOnLeave(sDetailField); _setShowBikeInfoModal(false); _setDetailField(null); }}>
                     <TouchableOpacity
-                      onPress={() => { if (!hasBrand) return; _setShowBikeInfoModal(false); _setDetailField(null); }}
+                      onPress={() => { if (!hasBrand) return; saveDetailOnLeave(sDetailField); _setShowBikeInfoModal(false); _setDetailField(null); }}
                       activeOpacity={hasBrand ? 0.2 : 1}
                       style={{
                         backgroundColor: hasBrand ? C.green : gray(0.15),
@@ -4197,14 +4518,6 @@ function sortWorkordersForStand(inputArr) {
       return 0;
     });
   }
-
-  finalArr.sort((a, b) => {
-    let aIsSender = a.lastSMSSenderUserID && a.lastSMSSenderUserID === currentUser?.id;
-    let bIsSender = b.lastSMSSenderUserID && b.lastSMSSenderUserID === currentUser?.id;
-    if (aIsSender && !bIsSender) return -1;
-    if (!aIsSender && bIsSender) return 1;
-    return 0;
-  });
 
   const now = new Date();
   const todayMonth = now.getMonth() + 1;

@@ -526,6 +526,7 @@ export const ScreenModal = ({
   openUpward = false,
   centerMenuVertically = false,
   centerMenuHorizontally = false,
+  centerOnClickX = false,
   menuHeight,
 }) => {
   const [sModalCoordinates, _setModalCoordinates] = useState(null);
@@ -727,6 +728,7 @@ export const DropdownMenu = ({
   menuMaxHeight,
   centerMenuVertically = false,
   centerMenuHorizontally = false,
+  centerOnClickX = false,
   isDiscountMenu = false,
   discountMaxCents = 0,
 }) => {
@@ -933,6 +935,7 @@ export const DropdownMenu = ({
       openUpward={openUpward}
       centerMenuVertically={centerMenuVertically}
       centerMenuHorizontally={centerMenuHorizontally}
+      centerOnClickX={centerOnClickX}
       menuHeight={calculatedMenuHeight}
     />
   );
@@ -4005,19 +4008,24 @@ export const WebPageModal = ({
   buttonStyle = {},
   buttonTextStyle = {},
 }) => {
+  const [sVisible, _setVisible] = useState(false);
   return (
     <ScreenModal
       showOuterModal={true}
-      handleModalActionInternally={true}
+      modalVisible={sVisible}
+      handleOuterClick={() => _setVisible(false)}
       buttonLabel={buttonLabel}
       buttonStyle={{ backgroundColor: C.green, borderRadius: 6, paddingHorizontal: 8, ...buttonStyle }}
       buttonTextStyle={{ fontSize: 12, color: "white", fontWeight: "600", ...buttonTextStyle }}
+      handleButtonPress={() => _setVisible(true)}
       Component={() => (
         <View style={{ width: "80vw", height: "85vh", backgroundColor: C.backgroundWhite, borderRadius: 12, overflow: "hidden", flexDirection: "column" }}>
           <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 15, paddingVertical: 10, backgroundColor: C.green }}>
             <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>{title}</Text>
             {subtitle ? <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", flex: 1, marginLeft: 10 }} numberOfLines={1}>{subtitle}</Text> : null}
-            <View style={{ width: 30 }} />
+            <TouchableOpacity onPress={() => _setVisible(false)} style={{ width: 30, height: 30, borderRadius: 15, justifyContent: "center", alignItems: "center" }}>
+              <Text style={{ fontSize: 18, fontWeight: "700", color: "white" }}>✕</Text>
+            </TouchableOpacity>
           </View>
           <View style={{ flex: 1, padding: 10 }}>
             <iframe

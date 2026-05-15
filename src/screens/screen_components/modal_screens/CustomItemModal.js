@@ -193,13 +193,14 @@ export const CustomItemModal = ({
   const modalWidth = 420;
   const modalHeight = 500;
   const margin = 10;
+  const bottomMargin = 60;
   const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
   const vh = typeof window !== "undefined" ? window.innerHeight : 800;
   let left = anchorX - modalWidth / 2;
   if (left + modalWidth > vw - margin) left = vw - modalWidth - margin;
   if (left < margin) left = margin;
   let top = anchorY + 5;
-  if (top + modalHeight > vh - margin) top = vh - modalHeight - margin;
+  if (top + modalHeight > vh - bottomMargin) top = vh - modalHeight - bottomMargin;
   if (top < margin) top = margin;
 
   return createPortal(
@@ -264,6 +265,7 @@ export const CustomItemModal = ({
             placeholder={isLabor ? "Labor description" : "Item name"}
             value={sName}
             onChangeText={(val) => _setName(val.length === 1 ? val.toUpperCase() : val.charAt(0).toUpperCase() + val.slice(1))}
+            debounceMs={0}
             autoFocus={true}
             style={{
               borderWidth: 1,

@@ -35,7 +35,6 @@ import {
   TRANSLATE_MSG_TYPES,
 } from "../../broadcastChannel";
 import { DevNotesModal } from "../screen_components/modal_screens/DevNotesModal";
-import { enableCheckoutDebug, isCheckoutDebugEnabled } from "../screen_components/modal_screens/newCheckoutModalScreen/checkoutDebugLog";
 
 export const Items_Section = React.memo(({}) => {
   // setters ///////////////////////////////////////////////////////////////////
@@ -180,7 +179,7 @@ const TranslateModal = ({ visible, onClose }) => {
         backgroundColor: "rgba(0, 0, 0, 0.5)",
         justifyContent: "center",
         alignItems: "center",
-        zIndex: 9999,
+        zIndex: 8000,
       }}
     >
       <TouchableOpacity
@@ -351,7 +350,6 @@ const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
   const zItemsTabName = useTabNamesStore((state) => state.itemsTabName);
   const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
   const zIsPreview = useOpenWorkordersStore((s) => !!s.workorderPreviewID && s.workorderPreviewID !== s.openWorkorderID);
-  const [sDevLog, _sSetDevLog] = useState(isCheckoutDebugEnabled);
   // log("Items_Section TabBar render");
   return (
     <View
@@ -405,19 +403,7 @@ const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
           alignItems: "center",
         }}
       >
-        <Tooltip text={sDevLog ? "Dev logging ON" : "Dev logging OFF"} position="bottom">
-          <TouchableOpacity
-            onPress={() => {
-              let next = !sDevLog;
-              enableCheckoutDebug(next);
-              _sSetDevLog(next);
-            }}
-            style={{ paddingHorizontal: 10, justifyContent: "center", opacity: sDevLog ? 1 : 0.35 }}
-          >
-            <Image_ icon={ICONS.infoGear} size={22} />
-          </TouchableOpacity>
-        </Tooltip>
-        <Tooltip text="Notes for the app dev" position="bottom">
+<Tooltip text="Notes for the app dev" position="bottom">
           <TouchableOpacity
             onPress={onDevNotesPress}
             style={{ paddingHorizontal: 10, justifyContent: "center" }}

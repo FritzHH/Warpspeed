@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import { View, Text, ScrollView, Modal, TouchableOpacity, Linking } from "react-native-web";
+import { View, Text, ScrollView, TouchableOpacity, Linking } from "react-native-web";
 import {
   formatCurrencyDisp,
   formatMillisForDisplay,
@@ -8,7 +8,7 @@ import {
   localStorageWrapper,
 } from "../../../utils";
 import { C, ICONS, COLOR_GRADIENTS } from "../../../styles";
-import { Button_, SHADOW_RADIUS_PROTO } from "../../../components";
+import { Button_, SHADOW_RADIUS_PROTO, Dialog_ } from "../../../components";
 import { useSettingsStore, useLoginStore } from "../../../stores";
 import { printBuilder, log } from "../../../utils";
 import { dbSavePrintObj } from "../../../db_calls_wrapper";
@@ -176,20 +176,12 @@ export const TransactionModal = ({ transaction, onClose, onRefund }) => {
   }
 
   return (
-    <Modal visible={true} transparent={true} animationType="fade">
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: "rgba(50,50,50,.65)",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
+    <Dialog_ visible={true} onClose={onClose} overlayColor="rgba(50,50,50,.65)">
         <View
           style={{
-            width: "45%",
+            width: "45vw",
             maxWidth: 600,
-            height: "70%",
+            height: "70vh",
             backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
             borderRadius: 8,
             ...SHADOW_RADIUS_PROTO,
@@ -392,7 +384,6 @@ export const TransactionModal = ({ transaction, onClose, onRefund }) => {
             <View style={{ height: 20 }} />
           </ScrollView>
         </View>
-      </View>
-    </Modal>
+    </Dialog_>
   );
 };

@@ -27,7 +27,6 @@ import {
   useActiveSalesStore,
   useCustMessagesStore,
   useEmailStore,
-  useSubscriptionStore,
   broadcastWorkorderToDisplay,
 } from "../stores";
 import {
@@ -52,7 +51,6 @@ import {
   dbListenToActiveMessageThreads,
   dbListenToEmails,
   dbListenToEmailAuth,
-  dbListenToSubscription,
 } from "../db_calls_wrapper";
 import { SETTINGS_OBJ, TAB_NAMES, CUSTOMER_PROTO } from "../data";
 import { clog, log, recoverPendingAutoTexts, localStorageWrapper } from "../utils";
@@ -362,13 +360,6 @@ export function BaseScreen() {
     register("inventory", (onConnected, onError) => {
       return dbListenToInventory((data) => {
         useInventoryStore.getState().setItems(data);
-        onConnected();
-      }, onError);
-    });
-
-    register("subscription", (onConnected, onError) => {
-      return dbListenToSubscription((data) => {
-        useSubscriptionStore.getState().setSubscription(data);
         onConnected();
       }, onError);
     });

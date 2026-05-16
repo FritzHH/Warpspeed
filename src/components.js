@@ -3,7 +3,6 @@ import {
   View,
   Text,
   Pressable,
-  Modal,
   TouchableOpacity,
   FlatList,
   TextInput,
@@ -13,6 +12,7 @@ import {
 } from "react-native-web";
 import React, {
   useEffect,
+  useImperativeHandle,
   useMemo,
   useRef,
   useState,
@@ -25,8 +25,6 @@ import { SETTINGS_OBJ, PRIVILEDGE_LEVELS, CUSTOMER_DEPOST_TYPES } from "./data";
 import { cloneDeep } from "lodash";
 import { DEBOUNCE_DELAY, DISCOUNT_TYPES, LOCAL_DB_KEYS, PAUSE_USER_CLOCK_IN_CHECK_MILLIS } from "./constants";
 import {
-  useInventoryStore,
-  useInvModalStore,
   useSettingsStore,
   useLoginStore,
   useAlertScreenStore,
@@ -39,10 +37,13 @@ import { PanResponder } from "react-native";
 
 import { StyleSheet } from "react-native";
 import { Animated } from "react-native";
-import { dbDeleteInventoryItem, dbSaveInventoryItem } from "./db_calls_wrapper";
+import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
+import * as PopoverPrimitive from "@radix-ui/react-popover";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
-export const VertSpacer = ({ pix }) => <View style={{ height: pix }} />;
-export const HorzSpacer = ({ pix }) => <View style={{ width: pix }} />;
+const RADIX_OVERLAY_STYLE = { position: "fixed", top: 0, left: 0, right: 0, bottom: 0 };
+
 
 export function ReceiptSentOverlay({ visible, sentSMS, sentEmail, duration = 1300, onDone }) {
   useEffect(() => {
@@ -226,14 +227,6 @@ export const TabMenuDivider = () => {
   );
 };
 
-export const TextInputLabelOnMainBackground = ({ value, styleProps = {} }) => {
-  const text_style = {
-    color: Colors.darkTextOnMainBackground,
-    fontSize: 12,
-    marginBottom: 1,
-  };
-  return <Text style={{ ...text_style, ...styleProps }}>{value}</Text>;
-};
 
 export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
   // store getters //////////////////////////////////////////////////////////////
@@ -270,174 +263,229 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
   //////////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////////
 
+  function dismissAlert() {
+    useAlertScreenStore.getState().setShowAlert(false);
+    setTimeout(() => { useAlertScreenStore.getState().resetAll(); }, 100);
+  }
+
   function handleButton1Press() {
     if (typeof zButton1Handler === "function") zButton1Handler();
-    useAlertScreenStore.getState().setShowAlert(false);
-    setTimeout(() => {
-      useAlertScreenStore.getState().resetAll();
-    }, 100);
+    dismissAlert();
   }
 
   function handleButton2Press() {
     if (typeof zButton2Handler === "function") zButton2Handler();
-    useAlertScreenStore.getState().setShowAlert(false);
-    setTimeout(() => {
-      useAlertScreenStore.getState().resetAll();
-    }, 100);
+    dismissAlert();
   }
 
   function handleButton3Press() {
     zButton3Handler();
-    useAlertScreenStore.getState().setShowAlert(false);
-    setTimeout(() => {
-      useAlertScreenStore.getState().resetAll();
-    }, 100);
+    dismissAlert();
   }
 
   if ((!zButton2Handler && !zButton3Handler) || zUseCancelButton)
     zUseCancelButton = true;
 
-  if (!showAlert) return null;
-
-  return ReactDOM.createPortal(
-    <View
-      onClick={() => (zCanExitOnOuterClick ? useAlertScreenStore.getState().resetAll() : null)}
-      style={{
-        position: "fixed",
-        top: 0, left: 0, right: 0, bottom: 0,
-        zIndex: 9500,
-        backgroundColor: "rgba(0, 0, 0, 0.4)",
-        alignItems: "center",
-        justifyContent: "center",
-        opacity: sFadedIn ? 1 : 0,
-        transition: "opacity 150ms ease-in",
-      }}
-    >
-        <View
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            backgroundColor: C.backgroundWhite,
-            borderRadius: 15,
-            alignItems: "center",
-            justifyContent: "space-around",
-            minWidth: "32%",
-            minHeight: "24%",
-            ...zAlertBoxStyle,
-          }}
-        >
-          <View style={{ alignItems: "center", width: "100%" }}>
-            {!!zTitle && (
-              <Text
-                numberOfLines={3}
-                style={{
-                  fontWeight: "500",
-                  marginTop: 25,
-                  color: Colors.darkText,
-                  fontSize: 25,
-                  color: "red",
-                  textAlign: "center",
-                }}
-              >
-                {zTitle || "Alert:"}
-              </Text>
-            )}
-
-            {!!zMessage && (
-              <Text
-                style={{
-                  textAlign: "center",
-                  width: "90%",
-                  marginTop: 10,
-                  color: Colors.darkText,
-                  fontSize: 18,
-                }}
-              >
-                {zMessage}
-              </Text>
-            )}
-            {!!zSubMessage && (
-              <Text
-                style={{
-                  marginTop: 20,
-                  width: "80%",
-                  textAlign: "center",
-                  color: Colors.darkText,
-                  fontSize: 16,
-                }}
-              >
-                {zSubMessage}
-              </Text>
-            )}
-          </View>
+  return (
+    <AlertDialogPrimitive.Root open={showAlert} onOpenChange={(open) => { if (!open) dismissAlert(); }}>
+      <AlertDialogPrimitive.Portal>
+        <AlertDialogPrimitive.Overlay asChild>
           <View
+            onClick={() => (zCanExitOnOuterClick ? useAlertScreenStore.getState().resetAll() : null)}
             style={{
-              marginTop: 25,
-              flexDirection: "row",
-              justifyContent: "center",
+              ...RADIX_OVERLAY_STYLE,
+              zIndex: 9500,
+              backgroundColor: "rgba(0, 0, 0, 0.4)",
               alignItems: "center",
-              marginBottom: 25,
-              width: "100%",
-              paddingHorizontal: 20,
-              gap: 20,
+              justifyContent: "center",
+              opacity: sFadedIn ? 1 : 0,
+              transition: "opacity 150ms ease-in",
+            }}
+          />
+        </AlertDialogPrimitive.Overlay>
+        <AlertDialogPrimitive.Content asChild onEscapeKeyDown={() => { dismissAlert(); }}>
+          <View
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              position: "fixed",
+              top: "50%", left: "50%",
+              transform: "translate(-50%, -50%)",
+              zIndex: 9501,
+              backgroundColor: C.backgroundWhite,
+              borderRadius: 15,
+              alignItems: "center",
+              justifyContent: "space-around",
+              minWidth: "32%",
+              minHeight: "24%",
+              opacity: sFadedIn ? 1 : 0,
+              transition: "opacity 150ms ease-in",
+              ...zAlertBoxStyle,
             }}
           >
-            <Button_
-              colorGradientArr={zButton1Text ? COLOR_GRADIENTS.green : []}
-              text={zButton1Text}
-              buttonStyle={{ paddingVertical: 4, flex: 1 }}
-              textStyle={{ color: C.textWhite, fontWeight: "600" }}
-              onPress={handleButton1Press}
-              iconSize={zIcon1Size || 60}
-              icon={zButton1Icon || (zButton1Text ? null : ICONS.check1)}
-            />
-            {!!zButton2Handler && (
-              <Button_
-                colorGradientArr={zButton2Text ? COLOR_GRADIENTS.blue : []}
-                text={zButton2Text}
-                buttonStyle={{ paddingVertical: 4, flex: 1 }}
-                textStyle={zButton2Text ? { color: C.textWhite, fontWeight: "600" } : {}}
-                onPress={handleButton2Press}
-                iconSize={zIcon2Size || 60}
-                icon={zButton2Icon || (zButton2Text ? null : ICONS.close1)}
-              />
-            )}
-            {!!zButton3Handler && (
-              <Button_
-                colorGradientArr={
-                  zButton3Text ? COLOR_GRADIENTS.purple : []
-                }
-                text={zButton3Text}
-                buttonStyle={{ paddingVertical: 4, flex: 1 }}
-                textStyle={zButton3Text ? { color: C.textWhite, fontWeight: "600" } : {}}
-                onPress={handleButton3Press}
-                iconSize={zIcon3Size || 60}
-                icon={zButton3Icon || (zButton3Text ? null : ICONS.close1)}
-              />
-            )}
+            <View style={{ alignItems: "center", width: "100%" }}>
+              {!!zTitle && (
+                <AlertDialogPrimitive.Title asChild>
+                  <Text
+                    numberOfLines={3}
+                    style={{
+                      fontWeight: "500",
+                      marginTop: 25,
+                      color: "red",
+                      fontSize: 25,
+                      textAlign: "center",
+                    }}
+                  >
+                    {zTitle || "Alert:"}
+                  </Text>
+                </AlertDialogPrimitive.Title>
+              )}
+
+              {!!zMessage && (
+                <AlertDialogPrimitive.Description asChild>
+                  <Text
+                    style={{
+                      textAlign: "center",
+                      width: "90%",
+                      marginTop: 10,
+                      color: Colors.darkText,
+                      fontSize: 18,
+                    }}
+                  >
+                    {zMessage}
+                  </Text>
+                </AlertDialogPrimitive.Description>
+              )}
+              {!!zSubMessage && (
+                <Text
+                  style={{
+                    marginTop: 20,
+                    width: "80%",
+                    textAlign: "center",
+                    color: Colors.darkText,
+                    fontSize: 16,
+                  }}
+                >
+                  {zSubMessage}
+                </Text>
+              )}
+            </View>
+            <View
+              style={{
+                marginTop: 25,
+                flexDirection: "row",
+                justifyContent: "center",
+                alignItems: "center",
+                marginBottom: 25,
+                width: "100%",
+                paddingHorizontal: 20,
+                gap: 20,
+              }}
+            >
+              <AlertDialogPrimitive.Action asChild>
+                <Button_
+                  colorGradientArr={zButton1Text ? COLOR_GRADIENTS.green : []}
+                  text={zButton1Text}
+                  buttonStyle={{ paddingVertical: 4, flex: 1 }}
+                  textStyle={{ color: C.textWhite, fontWeight: "600" }}
+                  onPress={handleButton1Press}
+                  iconSize={zIcon1Size || 60}
+                  icon={zButton1Icon || (zButton1Text ? null : ICONS.check1)}
+                />
+              </AlertDialogPrimitive.Action>
+              {!!zButton2Handler && (
+                <AlertDialogPrimitive.Action asChild>
+                  <Button_
+                    colorGradientArr={zButton2Text ? COLOR_GRADIENTS.blue : []}
+                    text={zButton2Text}
+                    buttonStyle={{ paddingVertical: 4, flex: 1 }}
+                    textStyle={zButton2Text ? { color: C.textWhite, fontWeight: "600" } : {}}
+                    onPress={handleButton2Press}
+                    iconSize={zIcon2Size || 60}
+                    icon={zButton2Icon || (zButton2Text ? null : ICONS.close1)}
+                  />
+                </AlertDialogPrimitive.Action>
+              )}
+              {!!zButton3Handler && (
+                <AlertDialogPrimitive.Action asChild>
+                  <Button_
+                    colorGradientArr={
+                      zButton3Text ? COLOR_GRADIENTS.purple : []
+                    }
+                    text={zButton3Text}
+                    buttonStyle={{ paddingVertical: 4, flex: 1 }}
+                    textStyle={zButton3Text ? { color: C.textWhite, fontWeight: "600" } : {}}
+                    onPress={handleButton3Press}
+                    iconSize={zIcon3Size || 60}
+                    icon={zButton3Icon || (zButton3Text ? null : ICONS.close1)}
+                  />
+                </AlertDialogPrimitive.Action>
+              )}
+            </View>
+            <View style={{ width: "100%", justifyContent: "flex-end" }}>
+              {zUseCancelButton && (
+                <AlertDialogPrimitive.Cancel asChild>
+                  <Button_
+                    textStyle={{ color: gray(0.4) }}
+                    buttonStyle={{
+                      backgroundColor: gray(0.09),
+                      borderRadius: 0,
+                      borderBottomRightRadius: 15,
+                      borderBottomLeftRadius: 15,
+                    }}
+                    text={"CANCEL"}
+                    onPress={dismissAlert}
+                  />
+                </AlertDialogPrimitive.Cancel>
+              )}
+            </View>
           </View>
-          <View style={{ width: "100%", justifyContent: "flex-end" }}>
-            {zUseCancelButton && (
-              <Button_
-                textStyle={{ color: gray(0.4) }}
-                buttonStyle={{
-                  backgroundColor: gray(0.09),
-                  borderRadius: 0,
-                  borderBottomRightRadius: 15,
-                  borderBottomLeftRadius: 15,
-                }}
-                text={"CANCEL"}
-                onPress={() => {
-                  useAlertScreenStore.getState().setShowAlert(false);
-                  setTimeout(() => {
-                    useAlertScreenStore.getState().resetAll();
-                  }, 100);
-                }}
-              />
-            )}
+        </AlertDialogPrimitive.Content>
+      </AlertDialogPrimitive.Portal>
+    </AlertDialogPrimitive.Root>
+  );
+};
+
+export const Dialog_ = ({ visible, onClose, overlayColor = "rgba(50,50,50,.65)", children, contentStyle = {}, preventClose = false }) => {
+  const [sFadedIn, _setFadedIn] = useState(false);
+  useEffect(() => {
+    if (visible) { requestAnimationFrame(() => _setFadedIn(true)); }
+    else { _setFadedIn(false); }
+  }, [visible]);
+
+  return (
+    <DialogPrimitive.Root open={visible} onOpenChange={(open) => { if (!open && onClose && !preventClose) onClose(); }}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay asChild>
+          <View style={{
+            ...RADIX_OVERLAY_STYLE,
+            zIndex: 9000,
+            backgroundColor: overlayColor,
+            opacity: sFadedIn ? 1 : 0,
+            transition: "opacity 150ms ease-in",
+          }} />
+        </DialogPrimitive.Overlay>
+        <DialogPrimitive.Content
+          asChild
+          onPointerDownOutside={(e) => { if (preventClose) e.preventDefault(); }}
+          onEscapeKeyDown={(e) => { if (preventClose) e.preventDefault(); }}
+        >
+          <View style={{
+            ...RADIX_OVERLAY_STYLE,
+            zIndex: 9001,
+            justifyContent: "center",
+            alignItems: "center",
+            pointerEvents: "none",
+            opacity: sFadedIn ? 1 : 0,
+            transition: "opacity 150ms ease-in",
+            ...contentStyle,
+          }}>
+            <View style={{ pointerEvents: "auto" }} onClick={(e) => e.stopPropagation()}>
+              {children}
+            </View>
           </View>
-        </View>
-    </View>,
-    document.body
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 };
 
@@ -494,15 +542,8 @@ export const DateTimePicker = ({ range, handleDateRangeChange = () => {} }) => {
 export const ScreenModal = ({
   enabled,
   ref,
-  modalCoordinateVars = {
-    // x: -30,
-    // y: 40,
-  },
-  mouseOverOptions = {
-    // enable: true,
-    // opacity: 1,
-    // highlightColor: Colors.tabMenuButton,
-  },
+  modalCoordinateVars = {},
+  mouseOverOptions = {},
   handleButtonPress = () => {},
   handleMouseOver,
   handleMouseExit,
@@ -529,7 +570,6 @@ export const ScreenModal = ({
   centerOnClickX = false,
   menuHeight,
 }) => {
-  const [sModalCoordinates, _setModalCoordinates] = useState(null);
   const [sInternalModalShow, _setInternalModalShow] = useState(false);
   const [sFadedIn, _setFadedIn] = useState(false);
 
@@ -544,20 +584,16 @@ export const ScreenModal = ({
   }, [isVisible]);
 
   if (!showShadow) shadowStyle = SHADOW_RADIUS_NOTHING;
-  if (!showOuterModal)
-    outerModalStyle = { ...outerModalStyle, width: null, height: null };
-
   if (mouseOverOptions.highlightColor) mouseOverOptions.enable = true;
 
-  return (
-    <TouchableWithoutFeedback
-      ref={ref}
-      onPress={() => {
-        _setInternalModalShow(false);
-        handleOuterClick();
-      }}
-    >
-      <View style={{}}>
+  const handleClose = () => {
+    _setInternalModalShow(false);
+    handleOuterClick();
+  };
+
+  if (showOuterModal) {
+    return (
+      <View>
         {buttonVisible && ButtonComponent && ButtonComponent()}
         {buttonVisible && !ButtonComponent && (
           <Button_
@@ -567,15 +603,7 @@ export const ScreenModal = ({
             icon={buttonIcon}
             iconSize={buttonIconSize}
             text={buttonLabel}
-            onPress={(e) => {
-              let clickX = e?.nativeEvent?.pageX ?? e?.pageX;
-              if (ref?.current) {
-                const rect = ref.current.getBoundingClientRect();
-                _setModalCoordinates({ x: clickX ?? rect.x, y: rect.y, height: rect.height });
-              } else if (clickX != null) {
-                let clickY = e?.nativeEvent?.pageY ?? e?.pageY ?? 0;
-                _setModalCoordinates({ x: clickX, y: clickY, height: 30 });
-              }
+            onPress={() => {
               handleButtonPress();
               setModalVisibility(false);
               _setInternalModalShow(!sInternalModalShow);
@@ -584,70 +612,105 @@ export const ScreenModal = ({
             buttonStyle={{
               alignItems: "center",
               justifyContent: "center",
-              width: !buttonVisible ? 0 : null,
-              height: !buttonVisible ? 0 : null,
               ...shadowStyle,
               ...buttonStyle,
             }}
           />
         )}
-
-        {isVisible && ReactDOM.createPortal(
-          <View
-            onClick={() => {
-              _setInternalModalShow(false);
-              handleOuterClick();
-            }}
-            style={{
-              position: "fixed",
-              top: 0, left: 0, right: 0, bottom: 0,
-              zIndex: 9000,
-              backgroundColor: showOuterModal ? "rgba(0, 0, 0, 0.5)" : "transparent",
-              opacity: sFadedIn ? 1 : 0,
-              transition: "opacity 150ms ease-in",
-            }}
-          >
-            <View
-              onClick={(e) => e.stopPropagation()}
-              style={{
+        <DialogPrimitive.Root open={isVisible} onOpenChange={(open) => { if (!open) handleClose(); }}>
+          <DialogPrimitive.Portal>
+            <DialogPrimitive.Overlay asChild>
+              <View style={{
+                ...RADIX_OVERLAY_STYLE,
+                zIndex: 9000,
+                backgroundColor: outerModalStyle?.backgroundColor || "rgba(0,0,0,0.5)",
+                opacity: sFadedIn ? 1 : 0,
+                transition: "opacity 150ms ease-in",
+              }} />
+            </DialogPrimitive.Overlay>
+            <DialogPrimitive.Content asChild onOpenAutoFocus={(e) => e.preventDefault()}>
+              <View style={{
+                ...RADIX_OVERLAY_STYLE,
+                zIndex: 9001,
                 width: "100%",
                 height: "100%",
                 justifyContent: "center",
                 alignItems: "center",
-                alignSelf: "center",
-                justifySelf: "center",
+                opacity: sFadedIn ? 1 : 0,
+                transition: "opacity 150ms ease-in",
                 ...outerModalStyle,
-                position: sModalCoordinates ? "absolute" : null,
-                top: sModalCoordinates && !openUpward
-                  ? centerMenuVertically && menuHeight
-                    ? Math.max(
-                        10,
-                        Math.min(
-                          sModalCoordinates.y +
-                            (sModalCoordinates.height || 30) / 2 -
-                            menuHeight / 2,
-                          window.innerHeight - menuHeight - 10
-                        )
-                      )
-                    : sModalCoordinates.y + modalCoordinateVars.y
-                  : null,
-                bottom: sModalCoordinates && openUpward ? window.innerHeight - sModalCoordinates.y : null,
-                left: sModalCoordinates
-                  ? centerMenuHorizontally
-                    ? 0
-                    : sModalCoordinates.x + modalCoordinateVars.x
-                  : null,
-                right: sModalCoordinates && centerMenuHorizontally ? 0 : undefined,
-                ...(centerMenuHorizontally ? { alignItems: "center" } : {}),
-              }}
-            >
-              {Component()}
-            </View>
-          </View>,
-          document.body
-        )}
+              }}>
+                {Component()}
+              </View>
+            </DialogPrimitive.Content>
+          </DialogPrimitive.Portal>
+        </DialogPrimitive.Root>
       </View>
-    </TouchableWithoutFeedback>
+    );
+  }
+
+  return (
+    <PopoverPrimitive.Root
+      open={isVisible}
+      onOpenChange={(open) => { if (!open) handleClose(); }}
+    >
+      <PopoverPrimitive.Anchor>
+        {buttonVisible && ButtonComponent && ButtonComponent()}
+        {buttonVisible && !ButtonComponent && (
+          <Button_
+            enabled={enabled}
+            handleMouseExit={handleMouseExit}
+            handleMouseOver={handleMouseOver}
+            icon={buttonIcon}
+            iconSize={buttonIconSize}
+            text={buttonLabel}
+            onPress={() => {
+              handleButtonPress();
+              setModalVisibility(false);
+              _setInternalModalShow(!sInternalModalShow);
+            }}
+            textStyle={{ ...buttonTextStyle }}
+            buttonStyle={{
+              alignItems: "center",
+              justifyContent: "center",
+              ...shadowStyle,
+              ...buttonStyle,
+            }}
+          />
+        )}
+      </PopoverPrimitive.Anchor>
+      {showOuterModal && isVisible && ReactDOM.createPortal(
+        <View
+          onClick={handleClose}
+          style={{
+            position: "fixed",
+            top: 0, left: 0, right: 0, bottom: 0,
+            zIndex: 8999,
+            backgroundColor: outerModalStyle?.backgroundColor || "rgba(0,0,0,0.5)",
+            opacity: sFadedIn ? 1 : 0,
+            transition: "opacity 150ms ease-in",
+          }}
+        />,
+        document.body
+      )}
+      <PopoverPrimitive.Portal>
+        <PopoverPrimitive.Content
+          side={openUpward ? "top" : "bottom"}
+          align={centerMenuHorizontally ? "center" : "start"}
+          sideOffset={4}
+          alignOffset={centerMenuHorizontally ? 0 : (modalCoordinateVars?.x ?? 0)}
+          collisionPadding={10}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          style={{
+            zIndex: 9000,
+            opacity: sFadedIn ? 1 : 0,
+            transition: "opacity 150ms ease-in",
+          }}
+        >
+          {Component()}
+        </PopoverPrimitive.Content>
+      </PopoverPrimitive.Portal>
+    </PopoverPrimitive.Root>
   );
 };
 
@@ -700,10 +763,12 @@ const CustomDiscountInput = ({ label, onApply, maxLength = 3, maxVal, currencyMo
   );
 };
 
-export const DropdownMenu = ({
+export const DropdownMenu = React.forwardRef(({
   enabled,
   dataArr = [],
   onSelect,
+  open: openProp,
+  onOpenChange,
   buttonIcon,
   buttonIconSize,
   itemTextStyle = {},
@@ -712,36 +777,67 @@ export const DropdownMenu = ({
   menuButtonStyle = { borderRadius: 5 },
   buttonTextStyle = {},
   buttonText,
-  modalCoordX = -15,
-  modalCoordY = 25,
+  modalCoordX = -15, // deprecated
+  modalCoordY = 25, // deprecated
   mouseOverOptions = {
     enable: true,
     opacity: 0.8,
   },
-  showButtonShadow,
-  shadowStyle = {},
+  showButtonShadow, // deprecated
+  shadowStyle = {}, // deprecated
   itemSeparatorStyle = {},
   menuBorderColor,
   selectedIdx = 0,
   useSelectedAsButtonTitle = false,
-  openUpward = false,
+  openUpward = false, // deprecated
   menuMaxHeight,
-  centerMenuVertically = false,
-  centerMenuHorizontally = false,
-  centerOnClickX = false,
+  centerMenuVertically = false, // deprecated
+  centerMenuHorizontally = false, // deprecated
+  centerOnClickX = false, // deprecated
   isDiscountMenu = false,
   discountMaxCents = 0,
-}) => {
-  const [sModalVisible, _setModalVisible] = useState(false);
-  const ref = useRef();
+  itemTextAlign = "center",
+  searchable = false,
+}, ref) => {
+  const [sOpenInternal, _setOpenInternal] = useState(false);
+  const [sActiveIdx, _setActiveIdx] = useState(-1);
+  const [sSearchQuery, _setSearchQuery] = useState("");
+  const isControlled = openProp !== undefined;
+  const sOpen = isControlled ? openProp : sOpenInternal;
+
+  function setOpen(val) {
+    if (!isControlled) _setOpenInternal(val);
+    if (val) _setActiveIdx(selectedIdx != null ? Number(selectedIdx) : -1);
+    else { _setActiveIdx(-1); _setSearchQuery(""); }
+    onOpenChange?.(val);
+  }
+
+  useImperativeHandle(ref, () => ({
+    open: () => { _calcPosition(); setOpen(true); },
+    close: () => setOpen(false),
+    toggle: () => { if (!sOpen) _calcPosition(); setOpen(!sOpen); },
+  }));
+
+  const _ddId = useRef("dd-" + Math.random().toString(36).slice(2, 8)).current;
+  const [sMenuPos, _setMenuPos] = useState({ left: 0, top: 10 });
+  const _anchorRef = useRef(null);
+
+  const VIEWPORT_PAD = 10;
+
+  function _calcPosition() {
+    if (!_anchorRef.current) return;
+    const rect = _anchorRef.current.getBoundingClientRect();
+    const anchorCenterX = rect.left + rect.width / 2;
+    _setMenuPos({ anchorCenterX, anchorBottom: rect.bottom + 4, anchorWidth: rect.width });
+  }
 
   const _discountRows = isDiscountMenu ? [
-    { component: <View style={{ height: 1, backgroundColor: gray(0.15), width: "100%" }} />, _isDivider: true },
+    { component: <div style={{ height: 1, backgroundColor: gray(0.15), width: "100%" }} />, _isDivider: true },
     {
       _isCustomInput: true,
       component: (
         <CustomDiscountInput label="Custom %" maxLength={3} maxVal={100} onApply={(num) => {
-          _setModalVisible(false);
+          setOpen(false);
           onSelect({ _customDiscount: { id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true } });
         }} />
       ),
@@ -750,7 +846,7 @@ export const DropdownMenu = ({
       _isCustomInput: true,
       component: (
         <CustomDiscountInput label="Custom $" currencyMode maxCents={discountMaxCents || 99900} onApply={(cents) => {
-          _setModalVisible(false);
+          setOpen(false);
           const dollars = (cents / 100).toFixed(2);
           onSelect({ _customDiscount: { id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(cents), type: DISCOUNT_TYPES.dollar, custom: true } });
         }} />
@@ -759,187 +855,303 @@ export const DropdownMenu = ({
   ] : [];
 
   const _fullDataArr = [...dataArr, ..._discountRows];
-  const _dividerCount = _fullDataArr.filter((i) => i._isDivider).length;
-  const _itemH = (itemStyle.height === "auto" && itemStyle.paddingVertical) ? itemStyle.paddingVertical * 2 + 40 : 40;
-  const calculatedMenuHeight = menuMaxHeight
-    ? Math.min((_fullDataArr.length - _dividerCount) * _itemH + _dividerCount, menuMaxHeight)
-    : (_fullDataArr.length - _dividerCount) * _itemH + _dividerCount;
+  const _displayArr = searchable && sSearchQuery
+    ? _fullDataArr.filter((it) => {
+        if (it._isDivider || it._isCustomInput) return false;
+        const label = typeof it === "string" ? it : (it.label || "");
+        return label.toLowerCase().includes(sSearchQuery.toLowerCase());
+      })
+    : _fullDataArr;
+  const br = menuButtonStyle.borderRadius || 5;
 
-  const BUTTON_STYLE = {
-    // width: "100%",
+  const BUTTON_DEFAULTS = {
+    display: "flex",
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     backgroundColor: C.buttonLightGreen,
     borderColor: C.buttonLightGreenOutline,
-    justifyContent: "center",
-    alignItems: "center",
     borderWidth: 1,
-    paddingVertical: 2,
+    borderStyle: "solid",
+    paddingTop: 2,
+    paddingBottom: 2,
     borderRadius: 5,
+    cursor: enabled === false ? "default" : "pointer",
+    opacity: enabled === false ? 0.2 : 1,
   };
-
-  if (buttonStyle) {
-    buttonStyle = { ...BUTTON_STYLE, ...buttonStyle };
-  } else {
-    buttonStyle = BUTTON_STYLE;
+  const mergedButtonStyle = buttonStyle ? { ...BUTTON_DEFAULTS, ...buttonStyle } : BUTTON_DEFAULTS;
+  if (mergedButtonStyle.paddingVertical != null) {
+    mergedButtonStyle.paddingTop = mergedButtonStyle.paddingVertical;
+    mergedButtonStyle.paddingBottom = mergedButtonStyle.paddingVertical;
+    delete mergedButtonStyle.paddingVertical;
+  }
+  if (mergedButtonStyle.paddingHorizontal != null) {
+    mergedButtonStyle.paddingLeft = mergedButtonStyle.paddingHorizontal;
+    mergedButtonStyle.paddingRight = mergedButtonStyle.paddingHorizontal;
+    delete mergedButtonStyle.paddingHorizontal;
+  }
+  if (mergedButtonStyle.borderWidth != null && !mergedButtonStyle.borderStyle) {
+    mergedButtonStyle.borderStyle = "solid";
   }
 
-  const TEXT_STYLE = {
-    fontSize: 13,
-    color: gray(0.55),
-    fontWeight: 500,
-  };
+  const RNW_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", sans-serif';
+  const TEXT_DEFAULTS = { fontSize: 13, color: gray(0.55), fontWeight: 500, textAlign: "center", fontFamily: RNW_FONT };
+  const mergedTextStyle = buttonTextStyle ? { ...TEXT_DEFAULTS, ...buttonTextStyle } : TEXT_DEFAULTS;
 
-  if (buttonTextStyle) {
-    buttonTextStyle = { ...TEXT_STYLE, ...buttonTextStyle };
-  } else {
-    buttonTextStyle = TEXT_STYLE;
-  }
-
-  if (buttonIcon === undefined) buttonIcon = ICONS.menu2;
-  if (!buttonIconSize) buttonIconSize = 11;
-
-  function getBackgroundColor(rgbString = "", index) {
-    // log(rgbString);
-    if (!rgbString) return null;
-    if (ifNumIsOdd(index) || !rgbString.includes("rgb")) {
-      return rgbString;
-    }
-    return lightenRGBByPercent(rgbString, 40);
-  }
+  const resolvedIcon = buttonIcon === undefined ? ICONS.menu2 : buttonIcon;
+  const resolvedIconSize = buttonIconSize || 11;
 
   if (useSelectedAsButtonTitle) {
     buttonText = dataArr[Number(selectedIdx)]?.label;
   }
 
-  const modalCoordinateVars = {
-    x: modalCoordX,
-    y: modalCoordY,
-  };
+  function getItemBg(rgbString = "", index) {
+    if (!rgbString) return null;
+    if (ifNumIsOdd(index) || !rgbString.includes("rgb")) return rgbString;
+    return lightenRGBByPercent(rgbString, 40);
+  }
 
-  const DropdownComponent = () => {
-    return (
-      <View
-        style={{
-          borderColor: menuBorderColor || C.buttonLightGreenOutline,
-          borderRadius: menuButtonStyle.borderRadius,
-          borderWidth: 2,
-          borderColor: gray(0.08),
-          backgroundColor: "white",
-          maxHeight: menuMaxHeight || undefined,
-          overflow: menuMaxHeight ? "hidden" : undefined,
-        }}
-      >
-        <FlatList
-          data={_fullDataArr}
-          ItemSeparatorComponent={() => (
-            <View
-              style={{
-                width: "100%",
-                ...itemSeparatorStyle,
-              }}
-            />
-          )}
-          renderItem={(item) => {
-            let idx = item.index;
-            item = item.item;
+  function itemBorderRadius(idx) {
+    const isFirst = idx === 0 && !searchable;
+    const isLast = idx === _displayArr.length - 1;
+    return {
+      borderTopLeftRadius: isFirst ? br : 0,
+      borderTopRightRadius: isFirst ? br : 0,
+      borderBottomLeftRadius: isLast ? br : 0,
+      borderBottomRightRadius: isLast ? br : 0,
+    };
+  }
 
-            if (item.component) {
-              return (
-                <View
-                  style={{
-                    height: item._isDivider ? 1 : 40,
-                    borderRadius: 0,
-                    backgroundColor: item._isDivider ? "transparent" : lightenRGBByPercent(C.blue, 60),
-                    borderTopLeftRadius:
-                      idx == 0 ? menuButtonStyle.borderRadius : null,
-                    borderTopRightRadius:
-                      idx == 0 ? menuButtonStyle.borderRadius : null,
-                    borderBottomLeftRadius:
-                      idx == _fullDataArr.length - 1
-                        ? menuButtonStyle.borderRadius
-                        : null,
-                    borderBottomRightRadius:
-                      idx == _fullDataArr.length - 1
-                        ? menuButtonStyle.borderRadius
-                        : null,
-                    ...itemStyle,
-                  }}
-                >
-                  {item.component}
-                </View>
-              );
-            }
+  const hoverOpacity = mouseOverOptions?.opacity ?? 0.8;
 
-            return (
-              <TouchableOpacity
-                onPress={(e) => {
-                  e?.stopPropagation?.();
-                  ReactDOM.flushSync(() => _setModalVisible(false));
-                  onSelect(item, idx);
-                }}
-                style={{
-                  padding: 10,
-                  minHeight: 40,
-                  justifyContent: "center",
-                  borderRadius: 0,
-                  backgroundColor:
-                    getBackgroundColor(item.backgroundColor, idx) ||
-                    getBackgroundColor(gray(0.036), idx),
-                  borderTopLeftRadius:
-                    idx == 0 ? menuButtonStyle.borderRadius : null,
-                  borderTopRightRadius:
-                    idx == 0 ? menuButtonStyle.borderRadius : null,
-                  borderBottomLeftRadius:
-                    idx == _fullDataArr.length - 1
-                      ? menuButtonStyle.borderRadius
-                      : null,
-                  borderBottomRightRadius:
-                    idx == _fullDataArr.length - 1
-                      ? menuButtonStyle.borderRadius
-                      : null,
-                  ...itemStyle,
-                }}
-              >
-                <Text style={{
-                  fontSize: 13,
-                  ...itemTextStyle,
-                  color: item.textColor || C.text,
-                  ...(item.strikethrough ? { textDecorationLine: "line-through" } : {}),
-                }}>{item.label != null ? item.label : item}</Text>
-                {item.subtitle ? <Text style={{ fontSize: 10, color: gray(0.5), marginTop: 2 }}>{item.subtitle}</Text> : null}
-              </TouchableOpacity>
-            );
-          }}
-        />
-      </View>
-    );
-  };
+  function _isSelectableIdx(i) {
+    const it = _displayArr[i];
+    return it && !it._isDivider && !it._isCustomInput && !it.disabled;
+  }
+
+  function _nextIdx(from, dir) {
+    let i = from + dir;
+    while (i >= 0 && i < _displayArr.length) {
+      if (_isSelectableIdx(i)) return i;
+      i += dir;
+    }
+    return from;
+  }
+
+  function _handleMenuKeyDown(e) {
+    if (e.key === "ArrowDown") { e.preventDefault(); _setActiveIdx((prev) => _nextIdx(prev, 1)); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); _setActiveIdx((prev) => _nextIdx(prev, -1)); }
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (sActiveIdx >= 0 && _isSelectableIdx(sActiveIdx)) {
+        const item = _displayArr[sActiveIdx];
+        const realIdx = _fullDataArr.indexOf(item);
+        setOpen(false);
+        onSelect(item, realIdx);
+      }
+    }
+    else if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
+    else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !searchable) {
+      const char = e.key.toLowerCase();
+      const start = sActiveIdx + 1;
+      for (let i = 0; i < _displayArr.length; i++) {
+        const idx = (start + i) % _displayArr.length;
+        if (!_isSelectableIdx(idx)) continue;
+        const it = _displayArr[idx];
+        const label = typeof it === "string" ? it : (it.label || "");
+        if (label.toLowerCase().startsWith(char)) { _setActiveIdx(idx); break; }
+      }
+    }
+  }
 
   return (
-    <ScreenModal
-      Component={() => <DropdownComponent />}
-      // handleModalActionInternally={true}
-      modalVisible={sModalVisible}
-      handleButtonPress={() => _setModalVisible(!sModalVisible)}
-      buttonStyle={buttonStyle}
-      buttonTextStyle={buttonTextStyle}
-      buttonLabel={buttonText}
-      ref={ref}
-      buttonIcon={buttonIcon}
-      buttonIconSize={buttonIconSize}
-      modalCoordinateVars={modalCoordinateVars}
-      showShadow={showButtonShadow}
-      mouseOverOptions={mouseOverOptions}
-      shadowStyle={shadowStyle}
-      handleOuterClick={() => _setModalVisible(false)}
-      enabled={enabled}
-      openUpward={openUpward}
-      centerMenuVertically={centerMenuVertically}
-      centerMenuHorizontally={centerMenuHorizontally}
-      centerOnClickX={centerOnClickX}
-      menuHeight={calculatedMenuHeight}
-    />
+    <div style={{ display: "flex", flex: 1 }}>
+      <div
+        ref={_anchorRef}
+        id={_ddId + "-btn"}
+        role="combobox"
+        aria-haspopup="listbox"
+        aria-expanded={sOpen}
+        tabIndex={enabled === false ? -1 : 0}
+        onClick={() => { if (enabled !== false) { _calcPosition(); setOpen(!sOpen); } }}
+        onKeyDown={(e) => {
+          if (enabled === false) return;
+          if (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            _calcPosition();
+            setOpen(true);
+          }
+        }}
+        onMouseEnter={(e) => { if (enabled !== false) e.currentTarget.style.opacity = String(hoverOpacity); }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = enabled === false ? "0.2" : "1"; }}
+        style={{ ...mergedButtonStyle, outline: "none" }}
+      >
+        {!!resolvedIcon && (
+          <img
+            src={resolvedIcon}
+            style={{ width: resolvedIconSize, height: resolvedIconSize, objectFit: "contain", marginRight: buttonText ? 6 : 0 }}
+            draggable={false}
+          />
+        )}
+        <span style={mergedTextStyle}>{buttonText}</span>
+      </div>
+      {sOpen && ReactDOM.createPortal(
+        <>
+          <div onClick={() => setOpen(false)} onWheel={() => setOpen(false)} style={{ position: "fixed", inset: 0, zIndex: 8999 }} />
+          <div
+            role="listbox"
+            aria-labelledby={_ddId + "-btn"}
+            aria-activedescendant={sActiveIdx >= 0 ? (_ddId + "-opt-" + sActiveIdx) : undefined}
+            tabIndex={-1}
+            onKeyDown={_handleMenuKeyDown}
+            ref={(el) => {
+              if (!el) return;
+              el.focus({ preventScroll: true });
+              const h = el.scrollHeight;
+              const w = el.offsetWidth;
+              const vp = window.innerHeight;
+              let top = sMenuPos.anchorBottom || VIEWPORT_PAD;
+              if (top + h > vp - VIEWPORT_PAD) top = Math.max(VIEWPORT_PAD, vp - VIEWPORT_PAD - Math.min(h, vp - VIEWPORT_PAD * 2));
+              let left = (sMenuPos.anchorCenterX || 0) - w / 2;
+              if (left + w > window.innerWidth - VIEWPORT_PAD) left = window.innerWidth - VIEWPORT_PAD - w;
+              if (left < VIEWPORT_PAD) left = VIEWPORT_PAD;
+              el.style.top = top + "px";
+              el.style.left = left + "px";
+            }}
+            style={{
+              position: "fixed",
+              zIndex: 9000,
+              borderColor: gray(0.08),
+              borderRadius: br,
+              borderWidth: 2,
+              borderStyle: "solid",
+              backgroundColor: "white",
+              minWidth: sMenuPos.anchorWidth || undefined,
+              maxHeight: menuMaxHeight || "calc(100vh - 20px)",
+              overflowY: "auto",
+              overflowX: "hidden",
+              outline: "none",
+            }}
+          >
+            {searchable && (
+              <input
+                autoFocus
+                placeholder="Search..."
+                value={sSearchQuery}
+                onChange={(e) => { _setSearchQuery(e.target.value); _setActiveIdx(-1); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") { e.preventDefault(); setOpen(false); }
+                  else if (e.key === "ArrowDown") { e.preventDefault(); _setActiveIdx((prev) => _nextIdx(prev, 1)); }
+                  else if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (sActiveIdx >= 0 && _isSelectableIdx(sActiveIdx)) {
+                      const item = _displayArr[sActiveIdx];
+                      setOpen(false);
+                      onSelect(item, _fullDataArr.indexOf(item));
+                    }
+                  }
+                }}
+                style={{
+                  display: "flex",
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "8px 10px",
+                  fontSize: 13,
+                  fontFamily: RNW_FONT,
+                  border: "none",
+                  borderBottom: "1px solid " + gray(0.15),
+                  borderTopLeftRadius: br,
+                  borderTopRightRadius: br,
+                  outline: "none",
+                }}
+              />
+            )}
+            {_displayArr.map((item, idx) => {
+              const realIdx = _fullDataArr.indexOf(item);
+              const sepStyle = idx > 0 && Object.keys(itemSeparatorStyle).length > 0
+                ? itemSeparatorStyle
+                : {};
+
+              if (item.component) {
+                return (
+                  <React.Fragment key={item._isDivider ? "div_" + idx : "cmp_" + idx}>
+                    {idx > 0 && <div style={{ width: "100%", ...sepStyle }} />}
+                    <div
+                      style={{
+                        display: "flex",
+                        height: item._isDivider ? 1 : 40,
+                        backgroundColor: item._isDivider ? "transparent" : lightenRGBByPercent(C.blue, 60),
+                        ...itemBorderRadius(idx),
+                        ...(item._isCustomInput ? {} : itemStyle),
+                      }}
+                    >
+                      {item.component}
+                    </div>
+                  </React.Fragment>
+                );
+              }
+
+              return (
+                <React.Fragment key={item.id ?? item.label ?? idx}>
+                  {idx > 0 && <div style={{ width: "100%", ...sepStyle }} />}
+                  <div
+                    onClick={(e) => {
+                      if (item.disabled) return;
+                      e.stopPropagation();
+                      setOpen(false);
+                      onSelect(item, realIdx);
+                    }}
+                    role="option"
+                    id={_ddId + "-opt-" + idx}
+                    aria-selected={realIdx === Number(selectedIdx)}
+                    aria-disabled={item.disabled || false}
+                    onMouseEnter={(e) => { if (!item.disabled) e.currentTarget.style.filter = "brightness(0.95)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.filter = "none"; }}
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "center",
+                      position: "relative",
+                      paddingLeft: 10,
+                      paddingRight: realIdx === Number(selectedIdx) ? 28 : 10,
+                      paddingTop: 6,
+                      paddingBottom: 6,
+                      minHeight: 32,
+                      cursor: item.disabled ? "default" : "pointer",
+                      opacity: item.disabled ? 0.4 : 1,
+                      pointerEvents: item.disabled ? "none" : "auto",
+                      backgroundColor: realIdx === Number(selectedIdx)
+                        ? lightenRGBByPercent(C.blue, 85)
+                        : (getItemBg(item.backgroundColor, idx) || getItemBg(gray(0.036), idx)),
+                      ...(sActiveIdx === idx ? { outline: "2px solid " + C.blue, outlineOffset: -2 } : {}),
+                      ...itemBorderRadius(idx),
+                      ...itemStyle,
+                    }}
+                  >
+                    <span style={{
+                      fontSize: 13,
+                      fontFamily: RNW_FONT,
+                      textAlign: itemTextAlign,
+                      ...itemTextStyle,
+                      color: item.textColor || C.text,
+                      ...(item.strikethrough ? { textDecorationLine: "line-through" } : {}),
+                    }}>{item.label != null ? item.label : item}</span>
+                    {realIdx === Number(selectedIdx) && (
+                      <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: C.green }}>&#10003;</span>
+                    )}
+                    {item.subtitle ? <span style={{ fontSize: 10, fontFamily: RNW_FONT, color: gray(0.5), marginTop: 2 }}>{item.subtitle}</span> : null}
+                  </div>
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </>,
+        document.body
+      )}
+    </div>
   );
-};
+});
 
 export const ModalDropdown = ({
   // ref,
@@ -963,464 +1175,113 @@ export const ModalDropdown = ({
 }) => {
   const [isModalVisible, setModalVisible] = useState(false);
   const [selectedValue, setSelectedValue] = useState(null);
-  const [sModalCoordinates, _setModalCoordinates] = useState({ x: 0, y: 0 });
-
-  useEffect(() => {
-    useLoginStore.getState().setModalVisible(true);
-    return () => {
-      useLoginStore.getState().setModalVisible(false);
-    };
-  });
-
-  useEffect(() => {
-    // const el = ref ? ref.current : null;
-    // if (el) {
-    //   log("el", el);
-    //   let rect = el.getBoundingClientRect();
-    //   _setModalCoordinates({ x: rect.x, y: rect.y });
-    // }
-  }, []);
 
   const toggleModal = () => setModalVisible(!isModalVisible);
-  if (modalCoordinateVars.y < 0) modalCoordinateVars.y = 0;
 
   const handleSelect = (item) => {
     setSelectedValue(item);
     onSelect(item);
     toggleModal();
   };
-  // log(data);
-  // log("ref", ref);
+
   return (
-    <TouchableWithoutFeedback
-      // ref={ref ? ref : null}
-      onPress={() => toggleModal()}
-    >
-      <View>
-        <TouchableOpacity onPress={toggleModal}>
-          <View
-            style={{
-              backgroundColor: Colors.blueButtonBackground,
-              borderRadius: 2,
-              paddingHorizontal: 10,
-              height: 25,
-              padding: 3,
-              alignItems: "center",
-              justifyContent: "center",
-              // position: ref ? "absolute" : null,
-              // top: ref ? sModalCoordinates.y + modalCoordinateVars.y : null,
-              // left: ref ? sModalCoordinates.x + modalCoordinateVars.x : null,
-              ...SHADOW_RADIUS_PROTO,
-              ...buttonStyle,
-            }}
-          >
-            <Text
-              style={{
-                color: "white",
-                textAlign: "center",
-                fontSize: 15,
-                ...textStyle,
-              }}
-            >
-              {buttonLabel}
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        <Modal visible={isModalVisible} transparent={true}>
-          <View
-            style={{
-              width: "100%",
-              height: "100%",
-              ...outerModalStyle,
-            }}
-          >
-            <TouchableWithoutFeedback>
-              <View style={{ width: "20%", ...innerModalStyle }}>
-                <FlatList
-                  data={data}
-                  keyExtractor={(item, index) => index.toString()}
-                  renderItem={({ item }) => {
-                    let label = "";
-                    let backgroundColor = null;
-                    let textColor = null;
-                    let fontSize = null;
-                    let itemStyleProps = {};
-                    if (typeof item === "object") {
-                      // bike colors modal
-                      if (Object.hasOwn(item, "backgroundColor")) {
-                        label = item.label;
-                        itemStyleProps.backgroundColor = item.backgroundColor;
-                        textColor = item.textColor;
-                        itemStyleProps.paddingVertical = 15;
-                        fontSize = 15;
-                        if (label === currentSelection.label) {
-                          itemStyleProps.borderWidth = 10;
-                          itemStyleProps.borderColor = Colors.mainBackground;
-                        }
-                      }
-                    } else {
-                      fontSize = 15;
-                      label = item;
-                      itemStyleProps.backgroundColor =
-                        Colors.opacityBackgroundLight;
-                      itemStyleProps.marginVertical = 2;
-                      textColor = "white";
-                    }
-                    return (
-                      <TouchableOpacity
-                        style={{
-                          ...styles.option,
-                          backgroundColor,
-                          // ...borderProps,
-                          borderColor: "dimgray",
-                          ...itemStyleProps,
-                        }}
-                        onPress={() => handleSelect(item)}
-                      >
-                        <Text style={{ fontSize, color: textColor }}>
-                          {label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  }}
-                />
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-around",
-                  }}
-                >
-                  {currentSelection && (
-                    <TouchableOpacity
-                      style={styles.removeButton}
-                      onPress={() => {
-                        onRemoveSelection();
-                        toggleModal();
-                      }}
-                    >
-                      <Text style={styles.closeText}>{removeButtonText}</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-          {/* </View> */}
-        </Modal>
-      </View>
-    </TouchableWithoutFeedback>
-  );
-};
-
-export const InventoryItemScreeenModalComponent = ({
-  itemIdx,
-  handleClosePress,
-}) => {
-  // store getters ///////////////////////////////////////////////////////
-  const zSettingsObj = useSettingsStore((state) => state.settings);
-  const zFocus = useInvModalStore((state) => state.currentFocusName);
-  const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
-  const zShowLoginScreen = useLoginStore((state) => state.showLoginScreen);
-
-  //////////////////////////////////////////////////////////////////////////
-
-  const [sItem, _setItem] = React.useState(() => zInventoryArr[itemIdx] ?? null);
-  const [sNewItem, _setNewItem] = React.useState(false);
-
-  // for automatic focus
-  const INPUT_FIELD_NAMES = {
-    formalName: "name",
-    informalName: "informalName",
-    price: "price",
-    category: "category",
-    sale: "sale",
-    upc: "upc",
-  };
-
-  useEffect(() => {
-    _setItem(zInventoryArr[itemIdx] ?? null);
-  }, [itemIdx]);
-
-  ///////////////////////////////////////////////////////////////////////
-
-  function handleChangeItem(item, focusName) {
-    useInvModalStore.getState().setFocus(focusName);
-    _setItem(item);
-
-    if (!sNewItem) {
-      useLoginStore.getState().requireLogin(() => {
-        useInventoryStore.getState().modItem(item, "change");
-        dbSaveInventoryItem(item);
-      });
-    }
-  }
-
-  function handleQuickButtonRemove(qBItemToRemove, objIdx) {
-    const obj = zInventoryArr[objIdx];
-    let idx = zSettingsObj.quickItemButtonNames.findIndex(
-      (o) => o.name === qBItemToRemove.name
-    );
-    let assignments = { ...zSettingsObj.quickItemButtonNames[idx] }.assignments;
-    let newAssignmentsArr = assignments.filter((id) => id != obj.id);
-    let newSettingsObj = { ...zSettingsObj };
-    newSettingsObj.quickItemButtonNames[idx] = newAssignmentsArr;
-    useSettingsStore.getState().setSettings(newSettingsObj);
-    // dbSaveSettings(newSettingsObj);
-  }
-
-  // log(zSettingsObj);
-  function handleQuickButtonAdd(itemName) {
-    const invItem = { ...zInventoryArr[itemIdx] };
-    let settingsObj = cloneDeep(zSettingsObj);
-    let idx = zSettingsObj.quickItemButtonNames.findIndex(
-      (o) => o.name === itemName
-    );
-    let obj = settingsObj.quickItemButtonNames[idx];
-    // log("obj", obj);
-    // return;
-    if (!obj.assignments) {
-      obj.assignments = [];
-      obj.assignments.push(invItem.id);
-    } else if (obj.assignments.find((o) => o === invItem.id)) {
-      return;
-    } else {
-      obj.assignments.push(invItem.id);
-    }
-    // log(obj.assignments);
-    settingsObj.quickItemButtonNames[idx] = obj;
-    useSettingsStore.getState().setSettings(settingsObj);
-    // dbSaveSettings(settingsObj);
-  }
-
-  function handleNewItemPress() {
-    log("new item", sItem);
-    return;
-  }
-
-  function handleRemoveItem() {
-    useLoginStore.getState().execute(() => {
-      useInventoryStore.getState().modItem(sItem, "remove");
-      dbDeleteInventoryItem(sItem.id);
-      handleClosePress();
-    }, "Admin");
-  }
-
-  function setComponent() {
-    if (!sItem) return null;
-    return (
-      <TouchableWithoutFeedback>
+    <View>
+      <TouchableOpacity onPress={toggleModal}>
         <View
           style={{
-            width: "40%",
-            height: "60%",
-            // backgroundColor: Colors.opacityBackgroundLight,
+            backgroundColor: Colors.blueButtonBackground,
+            borderRadius: 2,
+            paddingHorizontal: 10,
+            height: 25,
+            padding: 3,
+            alignItems: "center",
+            justifyContent: "center",
             ...SHADOW_RADIUS_PROTO,
-            shadowOffset: { width: 3, height: 3 },
-            padding: 15,
-            backgroundColor: "white",
+            ...buttonStyle,
           }}
         >
-          {zShowLoginScreen && <LoginModalScreen modalVisible={true} />}
-          <View
+          <Text
             style={{
-              width: "100%",
-              // height: "100%",
-              // flexDirection: "row",
-              justifyContent: "space-between",
+              color: "white",
+              textAlign: "center",
+              fontSize: 15,
+              ...textStyle,
             }}
           >
-            <View>
-              <Text style={{ fontStyle: "italic", color: "gray" }}>
-                {"Catalog Name"}
-              </Text>
-              <TextInput
-                numberOfLines={3}
-                style={{
-                  marginTop: 2,
-                  fontSize: 16,
-                  color: "black",
-                  // borderBottomWidth: 1,
-                }}
-                autoFocus={zFocus === INPUT_FIELD_NAMES.formalName}
-                onClick={() => useInvModalStore.getState().setFocus(INPUT_FIELD_NAMES.formalName)}
-                onChangeText={(val) => {
-                  let newItem = cloneDeep(sItem);
-                  newItem.formalName = val;
-                  handleChangeItem(newItem, INPUT_FIELD_NAMES.formalName);
-                }}
-                value={sItem.formalName}
-              />
-              <Text
-                style={{ marginTop: 20, fontStyle: "italic", color: "gray" }}
-              >
-                Keyword/Short Name
-              </Text>
-              <TextInput
-                numberOfLines={3}
-                style={{
-                  marginTop: 2,
-                  fontSize: 16,
-                  color: "black",
-                  // borderWidth: 1,
-                }}
-                autoFocus={zFocus === INPUT_FIELD_NAMES.informalName}
-                onClick={() => useInvModalStore.getState().setFocus(INPUT_FIELD_NAMES.informalName)}
-                onChangeText={(val) => {
-                  let newItem = cloneDeep(sItem);
-                  newItem.informalName = val;
-                  handleChangeItem(newItem, INPUT_FIELD_NAMES.informalName);
-                }}
-                value={sItem.informalName}
-              />
-            </View>
-            <View
-              style={{
-                flexDirection: "row",
-              }}
-            >
-              <View
-                style={{
-                  alignItems: "flex-end",
-                  justifyContent: "center",
-                }}
-              >
-                <Text
-                  style={{
-                    color: "red",
-                    fontSize: 16,
-                  }}
-                >
-                  {"Regular"}
-                </Text>
-                <Text style={{ color: "red", fontSize: 16 }}>{"Sale"}</Text>
-              </View>
-              <View
-                style={{
-                  marginLeft: 10,
-                  // alignItems: "flex-start",
-                  // justifyContent: "center",
-                }}
-              >
-                <TextInput
-                  autoFocus={zFocus === INPUT_FIELD_NAMES.price}
-                  onClick={() => useInvModalStore.getState().setFocus(INPUT_FIELD_NAMES.price)}
-                  onChangeText={(val) => {
-                    let newItem = cloneDeep(sItem);
-                    newItem.price = val;
-                    handleChangeItem(newItem, INPUT_FIELD_NAMES.price);
-                  }}
-                  value={"$" + sItem.price}
-                  style={{ fontSize: 16 }}
-                />
-                <TextInput
-                  autoFocus={zFocus === INPUT_FIELD_NAMES.sale}
-                  onClick={() => useInvModalStore.getState().setFocus(INPUT_FIELD_NAMES.sale)}
-                  onChangeText={(val) => {
-                    let newItem = cloneDeep(sItem);
-                    newItem.salePrice = val;
-                    handleChangeItem(newItem, INPUT_FIELD_NAMES.sale);
-                  }}
-                  value={"$" + sItem.salePrice}
-                  style={{ fontSize: 16 }}
-                />
-              </View>
-            </View>
-          </View>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginTop: 20,
-            }}
-          >
-            <Text style={{ marginLeft: 10 }}>{sItem.catMain}</Text>
-          </View>
+            {buttonLabel}
+          </Text>
+        </View>
+      </TouchableOpacity>
 
-          <View style={{ color: "dimgray", flexDirection: "row" }}>
-            <Text
-              style={{
-                fontSize: 12,
-                marginRight: 5,
-              }}
-            >
-              Barcode:
-            </Text>
-
-            <TextInput
-              autoFocus={zFocus === INPUT_FIELD_NAMES.upc}
-              onClick={() => useInvModalStore.getState().setFocus(INPUT_FIELD_NAMES.upc)}
-              style={{ fontSize: 12, color: "black", marginTop: 0 }}
-              value={sItem.primaryBarcode}
-              onChangeText={(val) => {
-                let newItem = cloneDeep(sItem);
-                newItem.primaryBarcode = val;
-                handleChangeItem(newItem, INPUT_FIELD_NAMES.upc);
-              }}
-            />
-          </View>
-          <ModalDropdown
-            buttonLabel={"Quick Items"}
-            buttonStyle={{ width: 125, marginTop: 15, marginBottom: 25 }}
-            data={
-              zSettingsObj.quickItemButtonNames
-                ? zSettingsObj.quickItemButtonNames.map((o) => o.name)
-                : []
-            }
-            onSelect={(itemName) => handleQuickButtonAdd(itemName)}
-          />
+      <Dialog_ visible={isModalVisible} onClose={toggleModal} overlayColor="rgba(0,0,0,0.5)">
+        <View style={{ width: "20%", ...innerModalStyle }}>
           <FlatList
-            data={(zSettingsObj.quickItemButtonNames || []).map((nameObj) => {
-              let found;
-              nameObj.assignments?.forEach((id) => {
-                if (id == sItem.id) found = nameObj;
-              });
-              return found;
-            })}
-            renderItem={(item) => {
-              // log("i", item);
-              if (!item.item) return null;
-              item = item.item;
+            data={data}
+            keyExtractor={(item, index) => index.toString()}
+            renderItem={({ item }) => {
+              let label = "";
+              let backgroundColor = null;
+              let textColor = null;
+              let fontSize = null;
+              let itemStyleProps = {};
+              if (typeof item === "object") {
+                if (Object.hasOwn(item, "backgroundColor")) {
+                  label = item.label;
+                  itemStyleProps.backgroundColor = item.backgroundColor;
+                  textColor = item.textColor;
+                  itemStyleProps.paddingVertical = 15;
+                  fontSize = 15;
+                  if (label === currentSelection?.label) {
+                    itemStyleProps.borderWidth = 10;
+                    itemStyleProps.borderColor = Colors.mainBackground;
+                  }
+                }
+              } else {
+                fontSize = 15;
+                label = item;
+                itemStyleProps.backgroundColor = Colors.opacityBackgroundLight;
+                itemStyleProps.marginVertical = 2;
+                textColor = "white";
+              }
               return (
-                <TouchableWithoutFeedback
-                  onLongPress={() => handleQuickButtonRemove(item)}
+                <TouchableOpacity
+                  style={{
+                    ...styles.option,
+                    backgroundColor,
+                    borderColor: "dimgray",
+                    ...itemStyleProps,
+                  }}
+                  onPress={() => handleSelect(item)}
                 >
-                  <Text>{item.name}</Text>
-                </TouchableWithoutFeedback>
+                  <Text style={{ fontSize, color: textColor }}>
+                    {label}
+                  </Text>
+                </TouchableOpacity>
               );
             }}
           />
           <View
             style={{
-              alignItems: "center",
-              justifyContent: "space-between",
               flexDirection: "row",
+              justifyContent: "space-around",
             }}
           >
-            <Button
-              buttonStyle={{ width: 125, marginVertical: 10 }}
-              text={"Create Item"}
-              onPress={handleNewItemPress}
-            />
-
-            <Button
-              buttonStyle={{ width: 125, marginVertical: 10 }}
-              text={"Delete Item"}
-              onPress={handleRemoveItem}
-            />
-
-            {/* ) : null} */}
+            {currentSelection && (
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={() => {
+                  onRemoveSelection();
+                  toggleModal();
+                }}
+              >
+                <Text style={styles.closeText}>{removeButtonText}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
-      </TouchableWithoutFeedback>
-    );
-  }
-  try {
-    return setComponent();
-  } catch (e) {
-    // log("Error setting component InventoryItemScreenModalComponent", e);
-    return null;
-  }
+      </Dialog_>
+    </View>
+  );
 };
 
 export const LoginModalScreen = ({ modalVisible }) => {
@@ -1660,8 +1521,6 @@ export const LoginModalScreen = ({ modalVisible }) => {
     document.body
   );
 };
-
-export const SaleModalComponent = ({}) => {};
 
 // Loading Indicator Components
 export const LoadingIndicator = ({
@@ -2098,102 +1957,6 @@ export const TouchableOpacity_ = ({
     </TouchableOpacity>
   );
 };
-
-export const Button = ({
-  visible = true,
-  ref,
-  onPress,
-  onLongPress,
-  numLines = 1,
-  text,
-  enableMouseOver = true,
-  TextComponent,
-  mouseOverOptions = {
-    opacity: 1,
-    highlightColor: Colors.tabMenuButton,
-    textColor: "white",
-  },
-  shadow = true,
-  allCaps = false,
-  buttonStyle = {},
-  textStyle = {},
-  viewStyle = {},
-}) => {
-  const [sMouseOver, _setMouseOver] = React.useState(false);
-  if (allCaps) text = text.toUpperCase();
-  let shadowStyle = SHADOW_RADIUS_PROTO;
-  if (!shadow) shadowStyle = SHADOW_RADIUS_NOTHING;
-  /////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////
-  const HEIGHT = null;
-  const WIDTH = null;
-
-  if (!visible) {
-    return <View style={{ width: WIDTH, height: HEIGHT }}></View>;
-  }
-
-  function handleButtonPress() {
-    if (visible) {
-      _setMouseOver(false);
-      onPress();
-    }
-  }
-
-  function getBackgroundColor() {
-    if (sMouseOver) {
-      return mouseOverOptions.highlightColor;
-    } else {
-      if (buttonStyle.backgroundColor) return buttonStyle.backgroundColor;
-      return Colors.tabMenuButton;
-    }
-  }
-
-  return (
-    <TouchableOpacity
-      style={{ ...viewStyle }}
-      ref={ref}
-      onMouseOver={() => (enableMouseOver ? _setMouseOver(true) : null)}
-      onMouseLeave={() => {
-        _setMouseOver(false);
-      }}
-      // on={() => log("here")}
-      onPress={handleButtonPress}
-      onLongPress={visible ? onLongPress : () => {}}
-    >
-      <LinearGradient
-        style={{
-          alignItems: "center",
-          justifyContent: "center",
-          paddingHorizontal: 12,
-          paddingVertical: 5,
-          ...shadowStyle,
-          ...buttonStyle,
-          backgroundColor: getBackgroundColor(),
-          // opacity: 0.1
-          // opacity:
-        }}
-      >
-        {TextComponent ? (
-          <TextComponent />
-        ) : (
-          <Text
-            numberOfLines={numLines}
-            style={{
-              textAlign: "center",
-              textAlignVertical: "center",
-              fontSize: 17,
-              ...textStyle,
-              color: sMouseOver ? "black" : textStyle.color || "white",
-            }}
-          >
-            {text || "Button"}
-          </Text>
-        )}
-      </LinearGradient>
-    </TouchableOpacity>
-  );
-};
-
 export const TabMenuButton = ({
   onPress,
   text,
@@ -3356,49 +3119,23 @@ export const Tooltip = ({
   offsetY = 0,
   hideOnPress = false,
 }) => {
-  const [sRect, _setRect] = useState(null);
-  const GAP = 6;
-
-  const containerRef = useRef(null);
-
-  function handleMouseEnter(e) {
-    _setRect(e.currentTarget.getBoundingClientRect());
-  }
-
-  function handleMouseLeave() {
-    _setRect(null);
-  }
-
-  function handleMouseDown() {
-    if (hideOnPress) _setRect(null);
-  }
-
-  function getPortalStyle() {
-    if (!sRect) return null;
-    const base = { position: "fixed", zIndex: 99999, pointerEvents: "none" };
-    if (position === "top")
-      return { ...base, bottom: window.innerHeight - sRect.top + GAP + offsetY, left: sRect.left + offsetX, width: sRect.width, alignItems: "center" };
-    if (position === "bottom")
-      return { ...base, top: sRect.bottom + GAP - offsetY, left: sRect.left + offsetX, width: sRect.width, alignItems: "center" };
-    if (position === "left")
-      return { ...base, right: window.innerWidth - sRect.left + GAP - offsetX, top: sRect.top + offsetY, height: sRect.height, justifyContent: "center", alignItems: "flex-end" };
-    if (position === "right")
-      return { ...base, left: sRect.right + GAP + offsetX, top: sRect.top + offsetY, height: sRect.height, justifyContent: "center" };
-  }
-
-  const portalStyle = getPortalStyle();
+  if (!text) return <View style={style}>{children}</View>;
 
   return (
-    <View
-      ref={containerRef}
-      style={style}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onMouseDown={handleMouseDown}
-    >
-      {children}
-      {!!sRect && ReactDOM.createPortal(
-        <View style={portalStyle}>
+    <TooltipPrimitive.Root delayDuration={400}>
+      <TooltipPrimitive.Trigger asChild>
+        <View style={style} onMouseDown={hideOnPress ? () => {} : undefined}>
+          {children}
+        </View>
+      </TooltipPrimitive.Trigger>
+      <TooltipPrimitive.Portal>
+        <TooltipPrimitive.Content
+          side={position}
+          sideOffset={6 + (position === "top" || position === "left" ? offsetY : -offsetY)}
+          alignOffset={offsetX}
+          collisionPadding={10}
+          style={{ zIndex: 99999, pointerEvents: "none" }}
+        >
           <View
             style={{
               backgroundColor: backgroundColor || (alert ? C.orange : "rgba(105,105,105,0.88)"),
@@ -3411,10 +3148,9 @@ export const Tooltip = ({
               {text}
             </Text>
           </View>
-        </View>,
-        document.body
-      )}
-    </View>
+        </TooltipPrimitive.Content>
+      </TooltipPrimitive.Portal>
+    </TooltipPrimitive.Root>
   );
 };
 
@@ -3528,43 +3264,11 @@ export const StatusPickerModal = ({
   itemTextStyle,
 }) => {
   const [sVisible, _setVisible] = useState(false);
-  const [sFadedIn, _setFadedIn] = useState(false);
-  const [sCoords, _setCoords] = useState({ x: 0, y: 0, height: 0 });
-  const ref = useRef();
-
-  useEffect(() => {
-    if (sVisible) {
-      requestAnimationFrame(() => _setFadedIn(true));
-    } else {
-      _setFadedIn(false);
-    }
-  }, [sVisible]);
-
-  useEffect(() => {
-    const el = ref?.current;
-    if (el) {
-      const rect = el.getBoundingClientRect();
-      _setCoords({ x: rect.x, y: rect.y, height: rect.height });
-    }
-  }, [ref]);
+  const [sLeft, _setLeft] = useState(0);
+  const anchorRef = useRef(null);
 
   const MENU_WIDTH = menuWidth || 320;
-  const ITEM_HEIGHT = itemHeight;
   const VIEWPORT_PADDING = 10;
-  const anchorLeft = centered ? (window.innerWidth - MENU_WIDTH) / 2 : sCoords.x + modalCoordX;
-  const buttonCenterY = sCoords.y + (sCoords.height || 25) / 2;
-  const listHeight = Math.min(
-    statuses.length * ITEM_HEIGHT,
-    window.innerHeight - VIEWPORT_PADDING * 2
-  );
-  const anchorTop = Math.max(
-    VIEWPORT_PADDING,
-    Math.min(
-      buttonCenterY - listHeight / 2,
-      window.innerHeight - listHeight - VIEWPORT_PADDING
-    )
-  );
-  const maxHeight = listHeight;
 
   const defaultButtonStyle = {
     backgroundColor: C.buttonLightGreen,
@@ -3585,16 +3289,19 @@ export const StatusPickerModal = ({
   };
 
   return (
-    <View ref={ref}>
+    <>
       <TouchableOpacity
+        ref={anchorRef}
         onPress={() => {
           if (!enabled) return;
-          const el = ref?.current;
-          if (el) {
-            const rect = el.getBoundingClientRect();
-            _setCoords({ x: rect.x, y: rect.y, height: rect.height });
+          if (anchorRef.current) {
+            const rect = anchorRef.current.getBoundingClientRect();
+            let l = centered ? (window.innerWidth - MENU_WIDTH) / 2 : rect.left + modalCoordX;
+            if (l + MENU_WIDTH > window.innerWidth - VIEWPORT_PADDING) l = window.innerWidth - MENU_WIDTH - VIEWPORT_PADDING;
+            if (l < VIEWPORT_PADDING) l = VIEWPORT_PADDING;
+            _setLeft(l);
           }
-          _setVisible(true);
+          _setVisible(v => !v);
         }}
         style={{ ...defaultButtonStyle, ...buttonStyleProp }}
       >
@@ -3602,56 +3309,39 @@ export const StatusPickerModal = ({
           {buttonText}
         </Text>
       </TouchableOpacity>
-
-      {sVisible && ReactDOM.createPortal(
-        <View
-          onClick={() => _setVisible(false)}
-          style={{
-            position: "fixed",
-            top: 0, left: 0, right: 0, bottom: 0,
-            zIndex: 9000,
-            backgroundColor: "transparent",
-            opacity: sFadedIn ? 1 : 0,
-            transition: "opacity 150ms ease-in",
-          }}
-        >
-          <View
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              position: "absolute",
-              top: anchorTop,
-              left: anchorLeft,
-              width: MENU_WIDTH,
-              maxHeight,
-              borderRadius: 5,
-              overflow: "hidden",
-              backgroundColor: "#FFFFFF",
-            }}
+      <Dialog_ visible={sVisible} onClose={() => _setVisible(false)} overlayColor="transparent">
+        <View style={{
+          position: "fixed",
+          top: VIEWPORT_PADDING,
+          bottom: VIEWPORT_PADDING,
+          left: sLeft,
+          width: MENU_WIDTH,
+          borderRadius: 5,
+          overflow: "hidden",
+          backgroundColor: "#FFFFFF",
+        }}>
+          <ScrollView
+            style={{ flex: 1 }}
+            showsVerticalScrollIndicator={true}
           >
-            <ScrollView
-              style={{ maxHeight }}
-              showsVerticalScrollIndicator={true}
-            >
-              {statuses.map((status, idx) => (
-                <StatusPickerRow
-                  key={status.id || idx}
-                  status={status}
-                  idx={idx}
-                  total={statuses.length}
-                  itemHeight={itemHeight}
-                  itemTextStyle={itemTextStyle}
-                  onPress={() => {
-                    ReactDOM.flushSync(() => _setVisible(false));
-                    onSelect(status);
-                  }}
-                />
-              ))}
-            </ScrollView>
-          </View>
-        </View>,
-        document.body
-      )}
-    </View>
+            {statuses.map((status, idx) => (
+              <StatusPickerRow
+                key={status.id || idx}
+                status={status}
+                idx={idx}
+                total={statuses.length}
+                itemHeight={itemHeight}
+                itemTextStyle={itemTextStyle}
+                onPress={() => {
+                  ReactDOM.flushSync(() => _setVisible(false));
+                  onSelect(status);
+                }}
+              />
+            ))}
+          </ScrollView>
+        </View>
+      </Dialog_>
+    </>
   );
 };
 
@@ -3872,27 +3562,9 @@ export const DepositModal = ({ visible, onClose, onPay, onCredit, inline, inline
   if (inline) return innerCard;
 
   return (
-    <View
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.4)",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 100,
-        borderRadius: 15,
-      }}
-    >
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={resetAndClose}
-        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-      />
+    <Dialog_ visible={true} onClose={resetAndClose} overlayColor="rgba(0,0,0,0.4)">
       {innerCard}
-    </View>
+    </Dialog_>
   );
 };
 
@@ -4078,7 +3750,7 @@ export const NoteHelperDropdown = ({
     }
   }, [visible]);
 
-  if (!visible) return <Modal visible={false} transparent animationType="fade"><View /></Modal>;
+  if (!visible) return null;
 
   function getInsertText(item) {
     if (typeof item === "string") return item;
@@ -4120,263 +3792,255 @@ export const NoteHelperDropdown = ({
   const filteredHelpers = noteHelpers.filter(cat => cat[sTarget] === true);
 
   const dropdownWidth = 580;
-  let left;
-  if (centered && typeof window !== "undefined") {
-    left = (window.innerWidth - dropdownWidth) / 2;
-  } else if (anchorX != null) {
-    left = (anchorX || 0) + 8;
-  } else {
-    left = (anchorPosition.x || 0) + 8;
-  }
-  if (typeof window !== "undefined") {
-    const vw = window.innerWidth;
-    if (left + dropdownWidth > vw - 10) left = vw - dropdownWidth - 10;
-    if (left < 10) left = 10;
-  }
-
-  const clickY = anchorY ?? anchorPosition?.y ?? 0;
+  const margin = 10;
+  const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
   const vh = typeof window !== "undefined" ? window.innerHeight : 900;
-  const third = clickY / vh;
-  let verticalStyle;
-  if (third < 1 / 3) {
-    verticalStyle = { top: 15 };
-  } else if (third < 2 / 3) {
-    verticalStyle = { top: "50%", transform: [{ translateY: "-50%" }] };
-  } else {
-    verticalStyle = { bottom: 15 };
-  }
+  const clickX = anchorX ?? anchorPosition?.x ?? 0;
+  const clickY = anchorY ?? anchorPosition?.y ?? 0;
+  let left = centered ? (vw - dropdownWidth) / 2 : clickX + 8;
+  if (left + dropdownWidth > vw - margin) left = vw - dropdownWidth - margin;
+  if (left < margin) left = margin;
+  let top = clickY + 5;
+  if (top + 400 > vh - margin) top = vh - 400 - margin;
+  if (top < margin) top = margin;
 
-  return (
-    <Modal visible={visible} transparent animationType="fade">
-      <TouchableWithoutFeedback onPress={() => { console.log("[NOTEHELPER] backdrop pressed", { elapsed: Date.now() - openTimeRef.current }); if (Date.now() - openTimeRef.current > 150) onClose(); }}>
-        <View style={{ width: "100%", height: "100%", position: "absolute" }} />
-      </TouchableWithoutFeedback>
+  return ReactDOM.createPortal(
+    <div
+      onClick={() => { if (Date.now() - openTimeRef.current > 150) onClose(); }}
+      style={{
+        position: "fixed",
+        top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: "rgba(0,0,0,0.4)",
+        zIndex: 9000,
+      }}
+    >
+      <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top, left }}>
       <View
         style={{
-          position: "absolute",
-          left: left,
-          ...verticalStyle,
           width: dropdownWidth,
+          maxHeight: vh - top - margin,
           backgroundColor: "white",
-          borderRadius: 10,
-          borderWidth: 2,
-          borderColor: C.buttonLightGreenOutline,
-          shadowColor: "#000",
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.25,
-          shadowRadius: 4,
-          elevation: 5,
-          padding: 10,
-        }}
-      >
-          {/* Item header */}
-          <View style={{
-            marginBottom: 8,
-            paddingBottom: 8,
-            borderBottomWidth: 1,
-            borderBottomColor: C.buttonLightGreenOutline,
-          }}>
-            <Text style={{ fontSize: 13 + fontSizeAdj, fontWeight: Fonts.weight.textHeavy, color: C.text, marginBottom: 6 }} numberOfLines={1}>
-              {workorderLine.inventoryItem?.informalName || workorderLine.inventoryItem?.formalName || "Item"}
-            </Text>
-            <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
-              <Text style={{ fontSize: 13, color: gray(0.5), fontStyle: "italic", marginRight: 7 }}>Adding to:</Text>
-              <TouchableOpacity_
-                onPress={() => _sSetTarget("intakeNotes")}
-                hoverOpacity={0.7}
-                style={{
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderRadius: 6,
-                  backgroundColor: sTarget === "intakeNotes" ? "orange" : gray(0.08),
-                }}
-              >
-                <Text style={{ fontSize: 12 + fontSizeAdj, fontWeight: "600", color: sTarget === "intakeNotes" ? C.textWhite : gray(0.5) }}>Intake</Text>
-              </TouchableOpacity_>
-              <TouchableOpacity_
-                onPress={() => _sSetTarget("receiptNotes")}
-                hoverOpacity={0.7}
-                style={{
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderRadius: 6,
-                  backgroundColor: sTarget === "receiptNotes" ? "green" : gray(0.08),
-                }}
-              >
-                <Text style={{ fontSize: 12 + fontSizeAdj, fontWeight: "600", color: sTarget === "receiptNotes" ? C.textWhite : gray(0.5) }}>Receipt</Text>
-              </TouchableOpacity_>
-            </View>
-          </View>
-
-          <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-            <View style={{ flex: 1, paddingRight: 8 }}>
-              {filteredHelpers.filter((_, i) => i % 2 === 0).map((category) => (
-                <View key={category.id} style={{ marginBottom: 19 }}>
-                  <Text
-                    style={{
-                      fontSize: 14 + fontSizeAdj,
-                      fontWeight: Fonts.weight.textHeavy,
-                      color: gray(0.4),
-                      marginBottom: 4,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                    }}
-                  >
-                    {category.label}
-                  </Text>
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
-                    {(category.items || []).map((item, chipIdx) => {
-                      const active = isChipActive(category.id, item);
-                      const label = getDisplayLabel(item);
-                      return (
-                        <TouchableOpacity_
-                          key={(item.id || label) + chipIdx}
-                          onPress={() => toggleChip(item, null, category.id)}
-                          hoverOpacity={0.6}
-                          style={{
-                            backgroundColor: active
-                              ? lightenRGBByPercent(C.red, 70)
-                              : C.buttonLightGreenOutline,
-                            borderRadius: 6,
-                            paddingHorizontal: 10,
-                            paddingVertical: 5 + chipPaddingVertAdj,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 15 + fontSizeAdj,
-                              color: active ? C.red : gray(0.5),
-                              fontWeight: Fonts.weight.textRegular,
-                            }}
-                          >
-                            {label}
-                          </Text>
-                        </TouchableOpacity_>
-                      );
-                    })}
-                  </View>
-                </View>
-              ))}
-            </View>
-            <View style={{ width: 1, backgroundColor: C.buttonLightGreenOutline, alignSelf: "stretch" }} />
-            <View style={{ flex: 1, paddingLeft: 14 }}>
-              {filteredHelpers.filter((_, i) => i % 2 === 1).map((category) => (
-                <View key={category.id} style={{ marginBottom: 19 }}>
-                    <Text
-                      style={{
-                        fontSize: 14 + fontSizeAdj,
-                        fontWeight: Fonts.weight.textHeavy,
-                        color: gray(0.4),
-                        marginBottom: 4,
-                        textTransform: "uppercase",
-                        letterSpacing: 0.5,
-                      }}
-                    >
-                      {category.label}
-                    </Text>
-                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
-                      {(category.items || []).map((item, chipIdx) => {
-                        const active = isChipActive(category.id, item);
-                        const label = getDisplayLabel(item);
-                        return (
-                          <TouchableOpacity_
-                            key={(item.id || label) + chipIdx}
-                            onPress={() => toggleChip(item, null, category.id)}
-                            hoverOpacity={0.6}
-                            style={{
-                              backgroundColor: active
-                                ? lightenRGBByPercent(C.red, 70)
-                                : C.buttonLightGreenOutline,
-                              borderRadius: 6,
-                              paddingHorizontal: 10,
-                              paddingVertical: 5 + chipPaddingVertAdj,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 15 + fontSizeAdj,
-                                color: active ? C.red : gray(0.5),
-                                fontWeight: Fonts.weight.textRegular,
-                              }}
-                            >
-                              {label}
-                            </Text>
-                          </TouchableOpacity_>
-                        );
-                      })}
-                    </View>
-                  </View>
-                ))}
-            </View>
-          </View>
-
-          <View
-            style={{
-              borderTopWidth: 1,
-              borderTopColor: C.buttonLightGreenOutline,
-              marginTop: 4,
-              paddingTop: 8,
+              borderRadius: 10,
+              borderWidth: 2,
+              borderColor: C.buttonLightGreenOutline,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.25,
+              shadowRadius: 4,
+              elevation: 5,
+              padding: 10,
             }}
           >
-            <View style={{ marginBottom: 6 }}>
-              <Text style={{ fontSize: 11 + fontSizeAdj, color: gray(0.4), fontWeight: Fonts.weight.textHeavy, textTransform: "uppercase", marginBottom: 2 }}>Intake notes</Text>
-              <TextInput_
-                multiline
-                numberOfLines={0}
-                debounceMs={500}
-                capitalize={true}
-                value={workorderLine.intakeNotes || ""}
-                onChangeText={(text) => onUpdateLine({ ...workorderLine, intakeNotes: text })}
-                placeholder="Intake notes"
-                placeholderTextColor={gray(0.35)}
+              {/* Item header */}
+              <View style={{
+                marginBottom: 8,
+                paddingBottom: 8,
+                borderBottomWidth: 1,
+                borderBottomColor: C.buttonLightGreenOutline,
+              }}>
+                <Text style={{ fontSize: 13 + fontSizeAdj, fontWeight: Fonts.weight.textHeavy, color: C.text, marginBottom: 6 }} numberOfLines={1}>
+                  {workorderLine.inventoryItem?.informalName || workorderLine.inventoryItem?.formalName || "Item"}
+                </Text>
+                <View style={{ flexDirection: "row", gap: 6, alignItems: "center" }}>
+                  <Text style={{ fontSize: 13, color: gray(0.5), fontStyle: "italic", marginRight: 7 }}>Adding to:</Text>
+                  <TouchableOpacity_
+                    onPress={() => _sSetTarget("intakeNotes")}
+                    hoverOpacity={0.7}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                      backgroundColor: sTarget === "intakeNotes" ? "orange" : gray(0.08),
+                    }}
+                  >
+                    <Text style={{ fontSize: 12 + fontSizeAdj, fontWeight: "600", color: sTarget === "intakeNotes" ? C.textWhite : gray(0.5) }}>Intake</Text>
+                  </TouchableOpacity_>
+                  <TouchableOpacity_
+                    onPress={() => _sSetTarget("receiptNotes")}
+                    hoverOpacity={0.7}
+                    style={{
+                      paddingHorizontal: 10,
+                      paddingVertical: 4,
+                      borderRadius: 6,
+                      backgroundColor: sTarget === "receiptNotes" ? "green" : gray(0.08),
+                    }}
+                  >
+                    <Text style={{ fontSize: 12 + fontSizeAdj, fontWeight: "600", color: sTarget === "receiptNotes" ? C.textWhite : gray(0.5) }}>Receipt</Text>
+                  </TouchableOpacity_>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+                <View style={{ flex: 1, paddingRight: 8 }}>
+                  {filteredHelpers.filter((_, i) => i % 2 === 0).map((category) => (
+                    <View key={category.id} style={{ marginBottom: 19 }}>
+                      <Text
+                        style={{
+                          fontSize: 14 + fontSizeAdj,
+                          fontWeight: Fonts.weight.textHeavy,
+                          color: gray(0.4),
+                          marginBottom: 4,
+                          textTransform: "uppercase",
+                          letterSpacing: 0.5,
+                        }}
+                      >
+                        {category.label}
+                      </Text>
+                      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
+                        {(category.items || []).map((item, chipIdx) => {
+                          const active = isChipActive(category.id, item);
+                          const label = getDisplayLabel(item);
+                          return (
+                            <TouchableOpacity_
+                              key={(item.id || label) + chipIdx}
+                              onPress={() => toggleChip(item, null, category.id)}
+                              hoverOpacity={0.6}
+                              style={{
+                                backgroundColor: active
+                                  ? lightenRGBByPercent(C.red, 70)
+                                  : C.buttonLightGreenOutline,
+                                borderRadius: 6,
+                                paddingHorizontal: 10,
+                                paddingVertical: 5 + chipPaddingVertAdj,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 15 + fontSizeAdj,
+                                  color: active ? C.red : gray(0.5),
+                                  fontWeight: Fonts.weight.textRegular,
+                                }}
+                              >
+                                {label}
+                              </Text>
+                            </TouchableOpacity_>
+                          );
+                        })}
+                      </View>
+                    </View>
+                  ))}
+                </View>
+                <View style={{ width: 1, backgroundColor: C.buttonLightGreenOutline, alignSelf: "stretch" }} />
+                <View style={{ flex: 1, paddingLeft: 14 }}>
+                  {filteredHelpers.filter((_, i) => i % 2 === 1).map((category) => (
+                    <View key={category.id} style={{ marginBottom: 19 }}>
+                        <Text
+                          style={{
+                            fontSize: 14 + fontSizeAdj,
+                            fontWeight: Fonts.weight.textHeavy,
+                            color: gray(0.4),
+                            marginBottom: 4,
+                            textTransform: "uppercase",
+                            letterSpacing: 0.5,
+                          }}
+                        >
+                          {category.label}
+                        </Text>
+                        <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5 }}>
+                          {(category.items || []).map((item, chipIdx) => {
+                            const active = isChipActive(category.id, item);
+                            const label = getDisplayLabel(item);
+                            return (
+                              <TouchableOpacity_
+                                key={(item.id || label) + chipIdx}
+                                onPress={() => toggleChip(item, null, category.id)}
+                                hoverOpacity={0.6}
+                                style={{
+                                  backgroundColor: active
+                                    ? lightenRGBByPercent(C.red, 70)
+                                    : C.buttonLightGreenOutline,
+                                  borderRadius: 6,
+                                  paddingHorizontal: 10,
+                                  paddingVertical: 5 + chipPaddingVertAdj,
+                                }}
+                              >
+                                <Text
+                                  style={{
+                                    fontSize: 15 + fontSizeAdj,
+                                    color: active ? C.red : gray(0.5),
+                                    fontWeight: Fonts.weight.textRegular,
+                                  }}
+                                >
+                                  {label}
+                                </Text>
+                              </TouchableOpacity_>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ))}
+                </View>
+              </View>
+
+              <View
                 style={{
-                  width: "100%",
-                  minHeight: 32 + fontSizeAdj,
-                  borderWidth: 1,
-                  borderColor: gray(0.25),
-                  borderRadius: 6,
-                  paddingHorizontal: 8,
-                  paddingVertical: 6,
-                  fontSize: 15 + fontSizeAdj,
-                  color: "orange",
-                  outlineWidth: 0,
-                  outline: "none",
-                  overflow: "hidden",
-                  backgroundColor: "white",
+                  borderTopWidth: 1,
+                  borderTopColor: C.buttonLightGreenOutline,
+                  marginTop: 4,
+                  paddingTop: 8,
                 }}
-              />
-            </View>
-            <View>
-              <Text style={{ fontSize: 11 + fontSizeAdj, color: gray(0.4), fontWeight: Fonts.weight.textHeavy, textTransform: "uppercase", marginBottom: 2 }}>Receipt notes</Text>
-              <TextInput_
-                multiline
-                numberOfLines={0}
-                debounceMs={500}
-                capitalize={true}
-                value={workorderLine.receiptNotes || ""}
-                onChangeText={(text) => onUpdateLine({ ...workorderLine, receiptNotes: text })}
-                placeholder="Receipt notes"
-                placeholderTextColor={gray(0.35)}
-                style={{
-                  width: "100%",
-                  minHeight: 32 + fontSizeAdj,
-                  borderWidth: 1,
-                  borderColor: gray(0.25),
-                  borderRadius: 6,
-                  paddingHorizontal: 8,
-                  paddingVertical: 6,
-                  fontSize: 15 + fontSizeAdj,
-                  color: "green",
-                  outlineWidth: 0,
-                  outline: "none",
-                  overflow: "hidden",
-                  backgroundColor: "white",
-                }}
-              />
-            </View>
+              >
+                <View style={{ marginBottom: 6 }}>
+                  <Text style={{ fontSize: 11 + fontSizeAdj, color: gray(0.4), fontWeight: Fonts.weight.textHeavy, textTransform: "uppercase", marginBottom: 2 }}>Intake notes</Text>
+                  <TextInput_
+                    multiline
+                    numberOfLines={0}
+                    debounceMs={500}
+                    capitalize={true}
+                    value={workorderLine.intakeNotes || ""}
+                    onChangeText={(text) => onUpdateLine({ ...workorderLine, intakeNotes: text })}
+                    placeholder="Intake notes"
+                    placeholderTextColor={gray(0.35)}
+                    style={{
+                      width: "100%",
+                      minHeight: 32 + fontSizeAdj,
+                      borderWidth: 1,
+                      borderColor: gray(0.25),
+                      borderRadius: 6,
+                      paddingHorizontal: 8,
+                      paddingVertical: 6,
+                      fontSize: 15 + fontSizeAdj,
+                      color: "orange",
+                      outlineWidth: 0,
+                      outline: "none",
+                      overflow: "hidden",
+                      backgroundColor: "white",
+                    }}
+                  />
+                </View>
+                <View>
+                  <Text style={{ fontSize: 11 + fontSizeAdj, color: gray(0.4), fontWeight: Fonts.weight.textHeavy, textTransform: "uppercase", marginBottom: 2 }}>Receipt notes</Text>
+                  <TextInput_
+                    multiline
+                    numberOfLines={0}
+                    debounceMs={500}
+                    capitalize={true}
+                    value={workorderLine.receiptNotes || ""}
+                    onChangeText={(text) => onUpdateLine({ ...workorderLine, receiptNotes: text })}
+                    placeholder="Receipt notes"
+                    placeholderTextColor={gray(0.35)}
+                    style={{
+                      width: "100%",
+                      minHeight: 32 + fontSizeAdj,
+                      borderWidth: 1,
+                      borderColor: gray(0.25),
+                      borderRadius: 6,
+                      paddingHorizontal: 8,
+                      paddingVertical: 6,
+                      fontSize: 15 + fontSizeAdj,
+                      color: "green",
+                      outlineWidth: 0,
+                      outline: "none",
+                      overflow: "hidden",
+                      backgroundColor: "white",
+                    }}
+                  />
+                </View>
+              </View>
           </View>
-      </View>
-    </Modal>
+      </div>
+    </div>,
+    document.body
   );
 };
 
@@ -4390,45 +4054,26 @@ export const CustomerQuickNotesDropdown = ({
   activeChips = [],
   anchorPosition,
 }) => {
-  const openTimeRef = useRef(0);
-  const prevVisibleRef = useRef(visible);
-
-  if (visible && !prevVisibleRef.current) {
-    openTimeRef.current = Date.now();
-  }
-  prevVisibleRef.current = visible;
-
-  if (!visible) return null;
-
   const dropdownWidth = 340;
   const maxHeight = 400;
   let left, top;
-  if (typeof window !== "undefined") {
+  if (typeof window !== "undefined" && anchorPosition) {
     const vh = window.innerHeight;
     const vw = window.innerWidth;
-    if (anchorPosition) {
-      left = anchorPosition.x;
-      top = anchorPosition.y;
-    } else {
-      left = (vw - dropdownWidth) / 2;
-      top = (vh - maxHeight) / 2;
-    }
+    left = anchorPosition.x;
+    top = anchorPosition.y;
     if (left + dropdownWidth > vw - 10) left = vw - dropdownWidth - 10;
     if (top + maxHeight > vh - 10) top = vh - maxHeight - 10;
     if (left < 10) left = 10;
     if (top < 10) top = 10;
   }
 
-  return ReactDOM.createPortal(
-    <View style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999 }}>
-      <TouchableWithoutFeedback onPress={() => { if (Date.now() - openTimeRef.current > 150) onClose(); }}>
-        <View style={{ width: "100%", height: "100%", position: "absolute" }} />
-      </TouchableWithoutFeedback>
+  return (
+    <Dialog_ visible={visible} onClose={onClose} overlayColor="transparent"
+      contentStyle={anchorPosition ? { justifyContent: "flex-start", alignItems: "flex-start" } : {}}
+    >
       <View
         style={{
-          position: "absolute",
-          left: left,
-          top: top,
           width: dropdownWidth,
           maxHeight: maxHeight,
           backgroundColor: "white",
@@ -4442,6 +4087,7 @@ export const CustomerQuickNotesDropdown = ({
           elevation: 5,
           padding: 10,
           overflow: "auto",
+          ...(anchorPosition ? { marginLeft: left, marginTop: top } : {}),
         }}
       >
         <View style={{
@@ -4502,8 +4148,7 @@ export const CustomerQuickNotesDropdown = ({
           </View>
         ))}
       </View>
-    </View>,
-    document.body
+    </Dialog_>
   );
 };
 

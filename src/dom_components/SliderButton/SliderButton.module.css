@@ -1,0 +1,52 @@
+.container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.label {
+  margin-bottom: 10px;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.track {
+  position: relative;
+  border-radius: 9999px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+.knob {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  transition: transform 0.1s ease;
+}
+
+.knob:active {
+  cursor: grabbing;
+}
+
+.knobText {
+  font-size: 20px;
+  font-weight: bold;
+}
+
+.knobIcon {
+  object-fit: contain;
+}
+
+.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}

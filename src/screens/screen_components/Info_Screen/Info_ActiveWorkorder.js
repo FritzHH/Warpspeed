@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { View, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback, Modal } from "react-native-web";
+import { View, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback } from "react-native-web";
 import {
   capitalizeFirstLetterOfString,
   checkInputForNumbersOnly,
@@ -30,7 +30,6 @@ import {
   Image_,
   TextInput_,
   PrinterButton,
-  StatusPickerModal,
   Tooltip,
   CheckBox_,
   Pressable_,
@@ -40,6 +39,7 @@ import {
   TimePicker_,
   DatePicker_,
 } from "../../../components";
+import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
   SETTINGS_OBJ,
@@ -83,20 +83,6 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
   const [sShowDatePicker, _sSetShowDatePicker] = useState(false);
   const [sShowStartPicker, _sSetShowStartPicker] = useState(false);
   const [sShowEndPicker, _sSetShowEndPicker] = useState(false);
-  const [sPickerCoords, _sSetPickerCoords] = useState({ x: 0, y: 0 });
-
-  const dateRef = useRef(null);
-  const startRef = useRef(null);
-  const endRef = useRef(null);
-
-  const openPicker = (ref, setter) => {
-    const el = ref.current;
-    if (el) {
-      const rect = el.getBoundingClientRect();
-      _sSetPickerCoords({ x: rect.left, y: rect.bottom + 4 });
-    }
-    setter(true);
-  };
 
   const pillStyle = {
     paddingHorizontal: 8,
@@ -110,68 +96,45 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
   const startParts = parse12To24Parts(pd.startTime);
   const endParts = parse12To24Parts(pd.endTime);
 
-  const pickerOverlay = { position: "absolute", top: 0, left: 0, right: 0, bottom: 0 };
-
   return (
     <>
-      <View ref={dateRef}>
-        <TouchableOpacity
-          disabled={isDonePaid}
-          onPress={() => openPicker(dateRef, _sSetShowDatePicker)}
-          style={[pillStyle, { backgroundColor: C.green }]}
-        >
-          <Text style={pillText}>{dateLabel}</Text>
-        </TouchableOpacity>
-      </View>
+      <PopoverPrimitive.Root open={sShowDatePicker} onOpenChange={_sSetShowDatePicker}>
+        <PopoverPrimitive.Anchor asChild>
+          <TouchableOpacity
+            disabled={isDonePaid}
+            onPress={() => _sSetShowDatePicker(v => !v)}
+            style={{ ...pillStyle, backgroundColor: C.green }}
+          >
+            <Text style={pillText}>{dateLabel}</Text>
+          </TouchableOpacity>
+        </PopoverPrimitive.Anchor>
+        <PopoverPrimitive.Portal>
+          <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: 9100 }}>
+            <View>
+              <DatePicker_
+                initialMonth={Number(pd.month) || new Date().getMonth() + 1}
+                initialDay={Number(pd.day) || new Date().getDate()}
+                onConfirm={({ month, day }) => {
+                  updatePickupFields({ month: String(month), day: String(day) });
+                  _sSetShowDatePicker(false);
+                }}
+                onCancel={() => _sSetShowDatePicker(false)}
+              />
+            </View>
+          </PopoverPrimitive.Content>
+        </PopoverPrimitive.Portal>
+      </PopoverPrimitive.Root>
+
       <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <View ref={startRef}>
-          <TouchableOpacity
-            disabled={isDonePaid}
-            onPress={() => openPicker(startRef, _sSetShowStartPicker)}
-            style={pillStyle}
-          >
-            <Text style={pillText}>{formatTime12(pd.startTime)}</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={[labelText, { marginLeft: 7 }]}>to</Text>
-        <View ref={endRef}>
-          <TouchableOpacity
-            disabled={isDonePaid}
-            onPress={() => openPicker(endRef, _sSetShowEndPicker)}
-            style={pillStyle}
-          >
-            <Text style={pillText}>{formatTime12(pd.endTime)}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Date picker modal */}
-      <Modal visible={sShowDatePicker} transparent animationType="fade">
-        <TouchableWithoutFeedback onPress={() => _sSetShowDatePicker(false)}>
-          <View style={pickerOverlay}>
-            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View style={{ position: "absolute", left: sPickerCoords.x, top: sPickerCoords.y }}>
-                <DatePicker_
-                  initialMonth={Number(pd.month) || new Date().getMonth() + 1}
-                  initialDay={Number(pd.day) || new Date().getDate()}
-                  onConfirm={({ month, day }) => {
-                    updatePickupFields({ month: String(month), day: String(day) });
-                    _sSetShowDatePicker(false);
-                  }}
-                  onCancel={() => _sSetShowDatePicker(false)}
-                />
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
-
-      {/* Start time picker modal */}
-      <Modal visible={sShowStartPicker} transparent animationType="fade">
-        <TouchableWithoutFeedback onPress={() => _sSetShowStartPicker(false)}>
-          <View style={pickerOverlay}>
-            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View style={{ position: "absolute", left: sPickerCoords.x, top: sPickerCoords.y }}>
+        <PopoverPrimitive.Root open={sShowStartPicker} onOpenChange={_sSetShowStartPicker}>
+          <PopoverPrimitive.Anchor asChild>
+            <TouchableOpacity disabled={isDonePaid} onPress={() => _sSetShowStartPicker(v => !v)} style={pillStyle}>
+              <Text style={pillText}>{formatTime12(pd.startTime)}</Text>
+            </TouchableOpacity>
+          </PopoverPrimitive.Anchor>
+          <PopoverPrimitive.Portal>
+            <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: 9100 }}>
+              <View>
                 <TimePicker_
                   initialHour={startParts.hour}
                   initialMinute={startParts.minute}
@@ -183,17 +146,21 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
                   onCancel={() => _sSetShowStartPicker(false)}
                 />
               </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+            </PopoverPrimitive.Content>
+          </PopoverPrimitive.Portal>
+        </PopoverPrimitive.Root>
 
-      {/* End time picker modal */}
-      <Modal visible={sShowEndPicker} transparent animationType="fade">
-        <TouchableWithoutFeedback onPress={() => _sSetShowEndPicker(false)}>
-          <View style={pickerOverlay}>
-            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View style={{ position: "absolute", left: sPickerCoords.x, top: sPickerCoords.y }}>
+        <Text style={[labelText, { marginLeft: 7 }]}>to</Text>
+
+        <PopoverPrimitive.Root open={sShowEndPicker} onOpenChange={_sSetShowEndPicker}>
+          <PopoverPrimitive.Anchor asChild>
+            <TouchableOpacity disabled={isDonePaid} onPress={() => _sSetShowEndPicker(v => !v)} style={pillStyle}>
+              <Text style={pillText}>{formatTime12(pd.endTime)}</Text>
+            </TouchableOpacity>
+          </PopoverPrimitive.Anchor>
+          <PopoverPrimitive.Portal>
+            <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: 9100 }}>
+              <View>
                 <TimePicker_
                   initialHour={endParts.hour}
                   initialMinute={endParts.minute}
@@ -205,10 +172,10 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
                   onCancel={() => _sSetShowEndPicker(false)}
                 />
               </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+            </PopoverPrimitive.Content>
+          </PopoverPrimitive.Portal>
+        </PopoverPrimitive.Root>
+      </View>
     </>
   );
 };
@@ -340,7 +307,7 @@ export const ActiveWorkorderComponent = ({}) => {
   // Color autocomplete
   const [sColor1Focused, _setColor1Focused] = useState(false);
   const [sColor2Focused, _setColor2Focused] = useState(false);
-  const [sHoveredDropdown, _setHoveredDropdown] = useState(null);
+
   const color1WrapperRef = useRef(null);
   const color2WrapperRef = useRef(null);
   const color2InputRef = useRef(null);
@@ -836,13 +803,14 @@ export const ActiveWorkorderComponent = ({}) => {
                   // backgroundColor: "green",
                 }}
               >
-                <View
-                  onMouseEnter={() => _setHoveredDropdown("brandBikes")}
-                  onMouseLeave={() => _setHoveredDropdown(null)}
+                <div
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = zOpenWorkorder?.brand ? String(FILLED_DROPDOWN_OPACITY) : "1"; }}
                   style={{
+                    display: "flex",
                     width: "48%",
                     height: "100%",
-                    opacity: sHoveredDropdown === "brandBikes" ? 1 : (zOpenWorkorder?.brand ? FILLED_DROPDOWN_OPACITY : 1),
+                    opacity: zOpenWorkorder?.brand ? FILLED_DROPDOWN_OPACITY : 1,
                   }}
                 >
                   <DropdownMenu
@@ -856,16 +824,16 @@ export const ActiveWorkorderComponent = ({}) => {
                     ref={bikesRef}
                     buttonText={zSettings.bikeBrandsName}
                   />
-                </View>
+                </div>
                 <View style={{ width: 5 }} />
-                <View
-                  onMouseEnter={() => _setHoveredDropdown("brandOptional")}
-                  onMouseLeave={() => _setHoveredDropdown(null)}
+                <div
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = zOpenWorkorder?.brand ? String(FILLED_DROPDOWN_OPACITY) : "1"; }}
                   style={{
+                    display: "flex",
                     width: "48%",
-                    alignItems: null,
                     justifyContent: "center",
-                    opacity: sHoveredDropdown === "brandOptional" ? 1 : (zOpenWorkorder?.brand ? FILLED_DROPDOWN_OPACITY : 1),
+                    opacity: zOpenWorkorder?.brand ? FILLED_DROPDOWN_OPACITY : 1,
                   }}
                 >
                   <DropdownMenu
@@ -879,7 +847,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     ref={ebikeRef}
                     buttonText={zSettings.bikeOptionalBrandsName}
                   />
-                </View>
+                </div>
               </View>
             </View>
             <View
@@ -993,10 +961,10 @@ export const ActiveWorkorderComponent = ({}) => {
                   // backgroundColor: "green",
                 }}
               >
-                <View
-                  onMouseEnter={() => _setHoveredDropdown("description")}
-                  onMouseLeave={() => _setHoveredDropdown(null)}
-                  style={{ width: "100%", opacity: sHoveredDropdown === "description" ? 1 : (zOpenWorkorder?.description ? FILLED_DROPDOWN_OPACITY : 1) }}
+                <div
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = zOpenWorkorder?.description ? String(FILLED_DROPDOWN_OPACITY) : "1"; }}
+                  style={{ display: "flex", width: "100%", opacity: zOpenWorkorder?.description ? FILLED_DROPDOWN_OPACITY : 1 }}
                 >
                   <DropdownMenu
                     modalCoordX={55}
@@ -1013,7 +981,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     ref={descriptionRef}
                     buttonText={"Descriptions"}
                   />
-                </View>
+                </div>
               </View>
             </View>
 
@@ -1199,14 +1167,15 @@ export const ActiveWorkorderComponent = ({}) => {
                   justifyContent: "space-between",
                 }}
               >
-                <View
-                  onMouseEnter={() => _setHoveredDropdown("color1")}
-                  onMouseLeave={() => _setHoveredDropdown(null)}
+                <div
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = zOpenWorkorder?.color1?.label ? String(FILLED_DROPDOWN_OPACITY) : "1"; }}
                   style={{
+                    display: "flex",
                     width: "48%",
                     height: "100%",
                     justifyContent: "center",
-                    opacity: sHoveredDropdown === "color1" ? 1 : (zOpenWorkorder?.color1?.label ? FILLED_DROPDOWN_OPACITY : 1),
+                    opacity: zOpenWorkorder?.color1?.label ? FILLED_DROPDOWN_OPACITY : 1,
                   }}
                 >
                   <DropdownMenu
@@ -1221,17 +1190,18 @@ export const ActiveWorkorderComponent = ({}) => {
                     buttonText={"Color 1"}
                     modalCoordX={0}
                   />
-                </View>
+                </div>
                 <View style={{ width: 5 }} />
 
-                <View
-                  onMouseEnter={() => _setHoveredDropdown("color2")}
-                  onMouseLeave={() => _setHoveredDropdown(null)}
+                <div
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = (zOpenWorkorder?.color2?.label || zOpenWorkorder?.color1?.label) ? String(FILLED_DROPDOWN_OPACITY) : "1"; }}
                   style={{
+                    display: "flex",
                     width: "48%",
                     height: "100%",
                     justifyContent: "center",
-                    opacity: sHoveredDropdown === "color2" ? 1 : ((zOpenWorkorder?.color2?.label || zOpenWorkorder?.color1?.label) ? FILLED_DROPDOWN_OPACITY : 1),
+                    opacity: (zOpenWorkorder?.color2?.label || zOpenWorkorder?.color1?.label) ? FILLED_DROPDOWN_OPACITY : 1,
                   }}
                 >
                   <DropdownMenu
@@ -1245,7 +1215,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     ref={color2Ref}
                     buttonText={"Color 2"}
                   />
-                </View>
+                </div>
               </View>
             </View>
             {(() => {
@@ -1381,26 +1351,41 @@ export const ActiveWorkorderComponent = ({}) => {
 
               return (
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: isPickupDelivery ? "space-between" : undefined, marginTop: 11, width: "100%" }}>
-                  <View style={{ width: isPickupDelivery ? "33%" : "100%" }}>
-                    <StatusPickerModal
-                      statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned && !s.hidden)}
+                  <div style={{ display: "flex", width: isPickupDelivery ? "33%" : "100%" }}>
+                    <DropdownMenu
+                      dataArr={(zSettings.statuses || []).filter((s) => !s.systemOwned && !s.hidden)}
                       enabled={!isDonePaid}
-                      onSelect={handleStatusSelect}
+                      onSelect={(item) => handleStatusSelect(item)}
+                      buttonIcon={null}
                       buttonStyle={{
-                        width: "100%",
                         backgroundColor: rs.backgroundColor,
-                        paddingHorizontal: isPickupDelivery ? 12 : 8,
+                        borderColor: rs.backgroundColor,
+                        paddingLeft: isPickupDelivery ? 12 : 8,
+                        paddingRight: isPickupDelivery ? 12 : 8,
                       }}
                       buttonTextStyle={{
                         color: rs.textColor,
                         fontWeight: "normal",
                         fontSize: 14,
                       }}
+                      itemStyle={{
+                        minHeight: 40,
+                        height: 40,
+                        paddingTop: 0,
+                        paddingBottom: 0,
+                      }}
+                      itemTextStyle={{
+                        fontWeight: "500",
+                      }}
+                      itemSeparatorStyle={{ height: 0 }}
+                      menuBorderColor={"transparent"}
                       modalCoordX={100}
-                      modalCoordY={40}
+                      menuMaxHeight={"calc(100vh - 20px)"}
+                      mouseOverOptions={{ enable: true, opacity: 1 }}
+                      ref={statusRef}
                       buttonText={(zOpenWorkorder?.status === "finished" ? (zOpenWorkorder.contacted ? "\u2713 " : "\u2717 ") : "") + rs.label}
                     />
-                  </View>
+                  </div>
                   {isPickupDelivery && (
                     <PickupDeliveryInputs
                       pd={pd}
@@ -1469,10 +1454,10 @@ export const ActiveWorkorderComponent = ({}) => {
                   alignItems: "center",
                 }}
               >
-                <View
-                  onMouseEnter={() => _setHoveredDropdown("waitTime")}
-                  onMouseLeave={() => _setHoveredDropdown(null)}
-                  style={{ width: "100%", opacity: sHoveredDropdown === "waitTime" ? 1 : (zOpenWorkorder?.waitTime?.label ? FILLED_DROPDOWN_OPACITY : 1) }}
+                <div
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = zOpenWorkorder?.waitTime?.label ? String(FILLED_DROPDOWN_OPACITY) : "1"; }}
+                  style={{ display: "flex", width: "100%", opacity: zOpenWorkorder?.waitTime?.label ? FILLED_DROPDOWN_OPACITY : 1 }}
                 >
                   <DropdownMenu
                     modalCoordX={50}
@@ -1486,7 +1471,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     ref={waitTimesRef}
                     buttonText={"Wait Times"}
                   />
-                </View>
+                </div>
               </View>
             </View>
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginTop: 4 }}>
@@ -1646,9 +1631,9 @@ export const ActiveWorkorderComponent = ({}) => {
                 }}
               >
                 <View
-                  onMouseEnter={() => _setHoveredDropdown("partSource")}
-                  onMouseLeave={() => _setHoveredDropdown(null)}
-                  style={{ opacity: sHoveredDropdown === "partSource" ? 1 : (zOpenWorkorder?.partSource ? FILLED_DROPDOWN_OPACITY : 1) }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = zOpenWorkorder?.partSource ? FILLED_DROPDOWN_OPACITY : 1; }}
+                  style={{ opacity: zOpenWorkorder?.partSource ? FILLED_DROPDOWN_OPACITY : 1 }}
                 >
                   <DropdownMenu
                     dataArr={zSettings.partSources}

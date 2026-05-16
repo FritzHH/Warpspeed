@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   ScrollView,
-  Modal,
 } from "react-native-web";
 import {
   formatPhoneWithDashes,
@@ -68,6 +67,7 @@ import {
   TouchableOpacity_,
   Pressable_,
   StatusPickerModal,
+  Dialog_,
 } from "../../../../components";
 import { cloneDeep, set } from "lodash";
 import React, { Children, useEffect, useRef, useState } from "react";
@@ -3000,13 +3000,10 @@ const NoteHelperEditorModal = ({ visible, category, isNew, onClose, onSave, onDe
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={{ width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
-          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+    <Dialog_ visible={visible} onClose={onClose} overlayColor="rgba(0,0,0,0.5)">
             <View style={{
               width: 500,
-              height: "75%",
+              height: "75vh",
               backgroundColor: "white",
               borderRadius: 12,
               borderWidth: 2,
@@ -3211,10 +3208,7 @@ const NoteHelperEditorModal = ({ visible, category, isNew, onClose, onSave, onDe
                 />
               </View>
             </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
+    </Dialog_>
   );
 };
 
@@ -3251,13 +3245,10 @@ const CustomerQuickNoteEditorModal = ({ visible, category, isNew, onClose, onSav
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade">
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={{ width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
-          <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
+    <Dialog_ visible={visible} onClose={onClose} overlayColor="rgba(0,0,0,0.5)">
             <View style={{
               width: 500,
-              height: "75%",
+              height: "75vh",
               backgroundColor: "white",
               borderRadius: 12,
               borderWidth: 2,
@@ -3433,10 +3424,7 @@ const CustomerQuickNoteEditorModal = ({ visible, category, isNew, onClose, onSav
                 />
               </View>
             </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </Modal>
+    </Dialog_>
   );
 };
 
@@ -4318,40 +4306,24 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     />
                   </View>
                 </View>
-                <Modal visible={isOpenPicker} transparent animationType="fade">
-                  <TouchableWithoutFeedback onPress={closePicker}>
-                    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.3)" }}>
-                      <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-                        <View>
-                          <TimePicker_
-                            initialHour={openH}
-                            initialMinute={openM}
-                            initialPeriod={openP}
-                            onConfirm={({ hour, minute, period }) => saveTime("open", hour, minute, period)}
-                            onCancel={closePicker}
-                          />
-                        </View>
-                      </TouchableWithoutFeedback>
-                    </View>
-                  </TouchableWithoutFeedback>
-                </Modal>
-                <Modal visible={isClosePicker} transparent animationType="fade">
-                  <TouchableWithoutFeedback onPress={closePicker}>
-                    <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.3)" }}>
-                      <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-                        <View>
-                          <TimePicker_
-                            initialHour={closeH}
-                            initialMinute={closeM}
-                            initialPeriod={closeP}
-                            onConfirm={({ hour, minute, period }) => saveTime("close", hour, minute, period)}
-                            onCancel={closePicker}
-                          />
-                        </View>
-                      </TouchableWithoutFeedback>
-                    </View>
-                  </TouchableWithoutFeedback>
-                </Modal>
+                <Dialog_ visible={isOpenPicker} onClose={closePicker} overlayColor="rgba(0,0,0,0.3)">
+                  <TimePicker_
+                    initialHour={openH}
+                    initialMinute={openM}
+                    initialPeriod={openP}
+                    onConfirm={({ hour, minute, period }) => saveTime("open", hour, minute, period)}
+                    onCancel={closePicker}
+                  />
+                </Dialog_>
+                <Dialog_ visible={isClosePicker} onClose={closePicker} overlayColor="rgba(0,0,0,0.3)">
+                  <TimePicker_
+                    initialHour={closeH}
+                    initialMinute={closeM}
+                    initialPeriod={closeP}
+                    onConfirm={({ hour, minute, period }) => saveTime("close", hour, minute, period)}
+                    onCancel={closePicker}
+                  />
+                </Dialog_>
               </View>
             );
           })}

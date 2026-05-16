@@ -5,9 +5,8 @@ import {
   Text,
   ScrollView,
   TouchableOpacity,
-  Modal,
 } from "react-native-web";
-import { Button_, DropdownMenu, Image_, TimePicker_, SmallLoadingIndicator } from "../../../components";
+import { Button_, DropdownMenu, Image_, TimePicker_, SmallLoadingIndicator, Dialog_ } from "../../../components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import ReactDOM from "react-dom";
@@ -1379,33 +1378,18 @@ const EditableTimeCell = ({ timeObj, prefix, onTimeChange }) => {
         </Text>
       </TouchableOpacity>
       {/* TimePicker_ modal */}
-      <Modal visible={sShowPicker} transparent animationType="fade">
-        <TouchableWithoutFeedback onPress={() => _sSetShowPicker(false)}>
-          <View
-            style={{
-              flex: 1,
-              backgroundColor: "rgba(0,0,0,0.4)",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-              <View>
-                <TimePicker_
-                  initialHour={timeObj.hour}
-                  initialMinute={timeObj.minutes}
-                  initialPeriod={timeObj.amPM}
-                  onConfirm={({ hour, minute, period }) => {
-                    onTimeChange(prefix, hour, minute, period);
-                    _sSetShowPicker(false);
-                  }}
-                  onCancel={() => _sSetShowPicker(false)}
-                />
-              </View>
-            </TouchableWithoutFeedback>
-          </View>
-        </TouchableWithoutFeedback>
-      </Modal>
+      <Dialog_ visible={sShowPicker} onClose={() => _sSetShowPicker(false)} overlayColor="rgba(0,0,0,0.4)">
+        <TimePicker_
+          initialHour={timeObj.hour}
+          initialMinute={timeObj.minutes}
+          initialPeriod={timeObj.amPM}
+          onConfirm={({ hour, minute, period }) => {
+            onTimeChange(prefix, hour, minute, period);
+            _sSetShowPicker(false);
+          }}
+          onCancel={() => _sSetShowPicker(false)}
+        />
+      </Dialog_>
     </View>
   );
 };

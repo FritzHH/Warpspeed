@@ -1,0 +1,47 @@
+.container {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+  position: relative;
+  cursor: text;
+}
+
+.box {
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 8px;
+  margin: 0 2px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.digit {
+  font-weight: 600;
+}
+
+.dash {
+  font-weight: bold;
+  margin: 0 8px;
+  align-self: center;
+}
+
+.hiddenInput {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0;
+  background-color: transparent;
+  color: transparent;
+  border: none;
+  outline: none;
+  caret-color: transparent;
+}
+
+.disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}

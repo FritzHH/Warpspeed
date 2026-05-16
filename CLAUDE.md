@@ -1,3 +1,24 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Development Commands
+
+```bash
+yarn start              # Dev server (CRA)
+yarn build              # Production build (runs scripts/update-version.js first)
+yarn emulator           # Firebase Functions emulator
+yarn begin              # Build + serve with local SSL (cert.pem/key.pem)
+yarn auth               # Re-authenticate Firebase CLI
+```
+
+**Deploy Cloud Functions** (never deploy all at once):
+```bash
+firebase deploy --only functions:functionName1,functions:functionName2
+```
+
+---
+
 # Agent behavior before executing prompts
 
 **Question mark = information only.** If the user's prompt ends with a question mark (`?`), treat it as a request for information only. Do not make any code changes, file edits, refactors, or run commands that alter the project. Answer with explanations, code references, or descriptions only. No exceptions unless otherwise stated by the user.
@@ -22,9 +43,10 @@ Follow these steps before acting on any user request:
 
 **No new `useEffect` without permission.** You are not allowed to create a new `useEffect` under any circumstances without the user's explicit permission. You must explain why you need it first; the user will confirm before you add it. No exceptions unless otherwise stated by the user.
 
-**Inline styling only.** Use inline styling only for both new and existing components; stay consistent with the rest of the app. Do not separate styles from the components (no separate StyleSheet files or style objects in other files). No exceptions unless otherwise stated by the user.
+**We are transitioning to a DOM-based system, moving away from React-Native-Web. Use CSS Modules and modern components to build new components. Use the same approach when asked to refactor react-native-web components**
 
-**No CSS — flexbox only.** Do not use CSS classes, stylesheets, or CSS-in-JS. All layout must use flexbox properties inline. No exceptions unless otherwise stated by the user.
+**Inline styling only unless it is a DOM refactor/migration.** for a DOM/React refactor or implementation, use CSS Modules. for a react-native-web component, Use inline styling only for both new and existing components;
+
 
 
 **Standalone / solo sale = no customerID.** When the user refers to a "standalone sale" or "solo sale", that means a workorder with no `customerID` (`!workorder.customerID`). There are no special flags or fields — the absence of `customerID` is the sole indicator. Do not use or reference `isStandaloneSale` or any other flag.

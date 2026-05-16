@@ -1,0 +1,104 @@
+.container {
+  background-color: #fff;
+  border-radius: 10px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.columnsWrapper {
+  position: relative;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.highlight {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  background-color: #2979FF;
+  border-radius: 8px;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.columns {
+  display: flex;
+  flex-direction: row;
+  position: relative;
+  z-index: 1;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.nudge {
+  height: 22px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  font-size: 9px;
+  color: rgba(128, 128, 128, 0.5);
+  transition: opacity 0.1s;
+}
+
+.nudge:hover {
+  opacity: 0.7;
+}
+
+.scrollArea {
+  overflow: hidden;
+}
+
+.scrollInner {
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  height: 100%;
+}
+
+.scrollInner::-webkit-scrollbar {
+  display: none;
+}
+
+.scrollItem {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  scroll-snap-align: center;
+  transition: opacity 0.1s;
+}
+
+.scrollItem:hover {
+  opacity: 0.8;
+}
+
+.footer {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-evenly;
+  padding-top: 10px;
+  padding-bottom: 6px;
+  border-top: 1px solid #eee;
+  margin-top: 4px;
+}
+
+.footerBtn {
+  padding: 8px;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footerBtn:hover {
+  opacity: 0.7;
+}

@@ -1,0 +1,43 @@
+.container {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100px;
+  padding-right: 4px;
+  border: 1px solid;
+  border-radius: 5px;
+  margin-left: 5px;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.dateText {
+  text-align: right;
+}
+
+.timeText {
+  font-size: 10px;
+  text-align: right;
+}
+
+.prefixText {
+  font-size: 11px;
+  text-align: right;
+  font-style: italic;
+}
+
+.dayText {
+  font-size: 13px;
+  text-align: right;
+}
+
+.questionIcon {
+  width: 20px;
+  height: 20px;
+}

@@ -1,5 +1,6 @@
 /* eslint-disable */
-import { View, Text, ScrollView, TouchableOpacity, Modal } from "react-native-web";
+import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
+import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { cloneDeep } from "lodash";
@@ -2901,12 +2902,10 @@ export function BikeStandScreen() {
                     )}
 
                     {/* Menu button */}
+                    <PopoverPrimitive.Root open={sShowFooterMenu} onOpenChange={_setShowFooterMenu}>
+                    <PopoverPrimitive.Anchor asChild>
                     <TouchableOpacity
-                      onPress={(e) => {
-                        let rect = e.currentTarget.getBoundingClientRect();
-                        _setFooterMenuCoords({ x: rect.left, y: rect.top });
-                        _setShowFooterMenu((p) => !p);
-                      }}
+                      onPress={() => _setShowFooterMenu(v => !v)}
                       style={{
                         alignItems: "center",
                         justifyContent: "center",
@@ -2915,15 +2914,12 @@ export function BikeStandScreen() {
                     >
                       <Image_ icon={ICONS.listsAndOptions} size={48} />
                     </TouchableOpacity>
-                  </View>
+                    </PopoverPrimitive.Anchor>
 
-                  {/* Footer action menu modal */}
-                  <Modal visible={sShowFooterMenu} transparent={true} animationType="fade" onRequestClose={() => _setShowFooterMenu(false)}>
-                    <TouchableOpacity activeOpacity={1} onPress={() => _setShowFooterMenu(false)} style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.3)" }}>
-                      <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={{
-                        position: "absolute",
-                        bottom: window.innerHeight - sFooterMenuCoords.y,
-                        left: sFooterMenuCoords.x,
+                  {/* Footer action menu popover */}
+                  <PopoverPrimitive.Portal>
+                    <PopoverPrimitive.Content side="top" align="start" sideOffset={10} collisionPadding={10} style={{ zIndex: 9100 }}>
+                      <View style={{
                         backgroundColor: "white",
                         borderRadius: 10,
                         borderWidth: 2,
@@ -2981,9 +2977,11 @@ export function BikeStandScreen() {
                           <Text style={{ fontSize: 30, fontWeight: "500", color: C.text }}>Reload Page</Text>
                         </TouchableOpacity>
                         </StandTouch>
-                      </TouchableOpacity>
-                    </TouchableOpacity>
-                  </Modal>
+                      </View>
+                    </PopoverPrimitive.Content>
+                  </PopoverPrimitive.Portal>
+                  </PopoverPrimitive.Root>
+                  </View>
                 </View>
               )}
             </View>

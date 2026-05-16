@@ -1,0 +1,18 @@
+.trigger {
+  display: inline-flex;
+}
+
+.content {
+  z-index: 99999;
+  pointer-events: none;
+}
+
+.bubble {
+  border-radius: 6px;
+  padding: 5px 9px;
+}
+
+.text {
+  font-size: 12px;
+  white-space: pre;
+}

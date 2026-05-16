@@ -891,44 +891,54 @@ exports.sendSMSEnhanced = onCall(
       }
 
       // Send SMS via Twilio
-      // Build media URL list: prefer mediaUrls array, fall back to single imageUrl
-      const allMediaUrls = mediaUrlsParam.length > 0
-        ? mediaUrlsParam.map((m) => m.url || m)
+      // Separate videos (sent as text links) from images/audio (sent as MMS attachments)
+      const imageMediaUrls = mediaUrlsParam.length > 0
+        ? mediaUrlsParam.filter((m) => !(m.contentType || "").startsWith("video/")).map((m) => m.url || m)
         : imageUrl ? [imageUrl] : [];
+      const videoLinks = mediaUrlsParam.length > 0
+        ? mediaUrlsParam.filter((m) => (m.contentType || "").startsWith("video/")).map((m) => m.url || m)
+        : [];
+
+      let bodyText = (message || "").trim();
+      if (videoLinks.length > 0) {
+        let linkText = videoLinks.join("\n");
+        bodyText = bodyText ? `${bodyText}\n\n${linkText}` : linkText;
+      }
+
       const callbackParams = messageID ? `?tenantID=${tenantID}&storeID=${storeID}&phone=${cleanPhoneNumber}&messageID=${messageID}` : "";
       const statusCallbackUrl = messageID ? `${FUNCTIONS_BASE_URL}/smsStatusCallback${callbackParams}` : "";
 
       let twilioResponse;
 
       // Send each image as a separate MMS for reliable carrier delivery
-      if (allMediaUrls.length > 1) {
+      if (imageMediaUrls.length > 1) {
         // First message: text body + first image
         twilioResponse = await twilioClient.messages.create({
-          body: (message || "").trim(),
+          body: bodyText,
           to: `+1${cleanPhoneNumber}`,
           from: fromNumber,
-          mediaUrl: [allMediaUrls[0]],
+          mediaUrl: [imageMediaUrls[0]],
           ...(statusCallbackUrl ? { statusCallback: statusCallbackUrl } : {}),
         });
-        log("SMS sent (1/" + allMediaUrls.length + ")", { messageSid: twilioResponse.sid, status: twilioResponse.status });
+        log("SMS sent (1/" + imageMediaUrls.length + ")", { messageSid: twilioResponse.sid, status: twilioResponse.status });
 
         // Remaining images: no text body, just the image
-        for (let i = 1; i < allMediaUrls.length; i++) {
+        for (let i = 1; i < imageMediaUrls.length; i++) {
           let extraResponse = await twilioClient.messages.create({
             body: "",
             to: `+1${cleanPhoneNumber}`,
             from: fromNumber,
-            mediaUrl: [allMediaUrls[i]],
+            mediaUrl: [imageMediaUrls[i]],
           });
-          log("SMS sent (" + (i + 1) + "/" + allMediaUrls.length + ")", { messageSid: extraResponse.sid, status: extraResponse.status });
+          log("SMS sent (" + (i + 1) + "/" + imageMediaUrls.length + ")", { messageSid: extraResponse.sid, status: extraResponse.status });
         }
       } else {
-        // Single image or text-only: send as one message
+        // Single image, text-only, or video links only
         twilioResponse = await twilioClient.messages.create({
-          body: (message || "").trim(),
+          body: bodyText,
           to: `+1${cleanPhoneNumber}`,
           from: fromNumber,
-          ...(allMediaUrls.length > 0 ? { mediaUrl: allMediaUrls } : {}),
+          ...(imageMediaUrls.length > 0 ? { mediaUrl: imageMediaUrls } : {}),
           ...(statusCallbackUrl ? { statusCallback: statusCallbackUrl } : {}),
         });
         log("SMS sent successfully", { messageSid: twilioResponse.sid, to: twilioResponse.to, status: twilioResponse.status });

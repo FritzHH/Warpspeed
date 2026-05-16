@@ -1,0 +1,29 @@
+.wrapper {
+  display: inline-flex;
+}
+
+.touchable {
+  user-select: none;
+}
+
+.inner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+}
+
+.disabled {
+  cursor: default;
+}
+
+.text {
+  text-align: center;
+  font-size: 15px;
+  color: white;
+}
+
+.icon {
+  object-fit: contain;
+  display: block;
+}

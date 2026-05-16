@@ -101,7 +101,7 @@ export function Items_ChangeLog() {
   }, deepEqual);
   const zChangeLog = zWorkorder?.changeLog || [];
 
-  let changeLog = zChangeLog;
+  let changeLog = zChangeLog.filter((e) => e && typeof e === "object" && e.timestamp);
   let sorted = [...changeLog].sort((a, b) => b.timestamp - a.timestamp);
 
   if (sorted.length === 0) {

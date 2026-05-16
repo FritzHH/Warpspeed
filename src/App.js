@@ -4,6 +4,7 @@ import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { BaseScreen } from "./screens/BaseScreen";
 import { LoginScreen } from "./screens/LoginScreen";
 import { ProtectedRoute } from "./components";
+import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { CustomerDisplayScreen } from "./screens/CustomerDisplayScreen";
 import { TranslateScreen } from "./screens/TranslateScreen";
 import { IntakeScreen } from "./screens/IntakeScreen";
@@ -250,6 +251,7 @@ function App() {
   }
 
   return (
+    <TooltipPrimitive.Provider delayDuration={400} skipDelayDuration={300}>
     <BrowserRouter>
       <Routes>
         {/* Public route - Login */}
@@ -325,6 +327,7 @@ function App() {
         />
       </Routes>
     </BrowserRouter>
+    </TooltipPrimitive.Provider>
   );
 }
 

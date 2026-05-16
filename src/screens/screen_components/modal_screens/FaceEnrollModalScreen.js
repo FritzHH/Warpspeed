@@ -1,8 +1,8 @@
 /*eslint-disable*/
 
-import { Modal, TouchableWithoutFeedback, View } from "react-native-web";
+import { View } from "react-native-web";
 import { useLoginStore } from "../../../stores";
-import { Button_, ScreenModal } from "../../../components";
+import { Button_, Dialog_ } from "../../../components";
 import { FaceDetectionClientComponent } from "../../../faceDetection";
 import { log } from "../../../utils";
 import { COLOR_GRADIENTS } from "../../../styles";
@@ -34,30 +34,23 @@ export function FaceEnrollModalScreen({
   }
 
   return (
-    <TouchableWithoutFeedback onPress={() => null}>
-      <Modal visible={userObj} transparent>
-        <View
-          style={{
-            backgroundColor: "rgba(0, 0, 0, 0.85)",
-            alignItems: "center",
-            justifyContent: "center",
-            alignSelf: "center",
-            justifySelf: "center",
-            width: "100%",
-            height: "100%",
-          }}
-        >
-          <FaceDetectionClientComponent
-            __handleEnrollDescriptor={handleDescriptor}
-          />
-          <Button_
-            text={"Exit"}
-            colorGradientArr={COLOR_GRADIENTS.green}
-            buttonStyle={{ paddingHorizontal: 20 }}
-            onPress={handleExitPress}
-          />
-        </View>
-      </Modal>
-    </TouchableWithoutFeedback>
+    <Dialog_ visible={!!userObj} onClose={handleExitPress} overlayColor="rgba(0, 0, 0, 0.85)" preventClose>
+      <View
+        style={{
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <FaceDetectionClientComponent
+          __handleEnrollDescriptor={handleDescriptor}
+        />
+        <Button_
+          text={"Exit"}
+          colorGradientArr={COLOR_GRADIENTS.green}
+          buttonStyle={{ paddingHorizontal: 20 }}
+          onPress={handleExitPress}
+        />
+      </View>
+    </Dialog_>
   );
 }

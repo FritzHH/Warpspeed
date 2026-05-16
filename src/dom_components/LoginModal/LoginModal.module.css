@@ -1,0 +1,105 @@
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+}
+
+.card {
+  width: 360px;
+  background-color: rgb(255, 255, 255);
+  border-radius: 12px;
+  border: 2px solid;
+  padding: 24px;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.privilegeBadge {
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 14px;
+}
+
+.privilegeText {
+  font-size: 12px;
+}
+
+.pinSection {
+  display: flex;
+  flex-direction: column;
+}
+
+.pinLabel {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.pinBoxes {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  cursor: text;
+}
+
+.pinBox {
+  width: 44px;
+  height: 52px;
+  border: 2px solid;
+  border-radius: 8px;
+  margin: 0 4px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.pinDot {
+  width: 14px;
+  height: 14px;
+  border-radius: 7px;
+}
+
+.hiddenInput {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  caret-color: transparent;
+  background-color: transparent;
+  color: transparent;
+  border: none;
+  outline: none;
+}
+
+.errorText {
+  font-size: 12px;
+  margin-top: 6px;
+  text-align: center;
+}
+
+.successIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+}

@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import { View, Text, FlatList, ScrollView, Modal, TouchableOpacity, Image } from "react-native-web";
+import { View, Text, FlatList, ScrollView, TouchableOpacity, Image } from "react-native-web";
 import { useState, useEffect } from "react";
 import {
   calculateRunningTotals,
@@ -15,7 +15,7 @@ import {
 } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useCheckoutStore, useSettingsStore, useLoginStore } from "../../../stores";
-import { Button_, SHADOW_RADIUS_PROTO } from "../../../components";
+import { Button_, SHADOW_RADIUS_PROTO, Dialog_ } from "../../../components";
 import { dbGetCompletedSale, dbSavePrintObj } from "../../../db_calls_wrapper";
 import { printBuilder } from "../../../utils";
 import { readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
@@ -321,19 +321,11 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
 
   return (
   <>
-    <Modal visible={true} transparent={true} animationType="fade">
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: "rgba(50,50,50,.65)",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
+    <Dialog_ visible={true} onClose={onClose} overlayColor="rgba(50,50,50,.65)">
         <View
           style={{
-            width: "85%",
-            height: "90%",
+            width: "85vw",
+            height: "90vh",
             backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
             borderRadius: 8,
             ...SHADOW_RADIUS_PROTO,
@@ -836,8 +828,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
             </View>
           </View>
         </View>
-      </View>
-    </Modal>
+    </Dialog_>
     {!!sSaleForModal && (
       <FullSaleModal
         item={{ saleID: sSaleForModal.id }}

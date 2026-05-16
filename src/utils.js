@@ -2020,7 +2020,6 @@ export function createNewWorkorder({
   wo.customerLanguage = customerLanguage || "";
   wo.customerID = customerID || "";
   wo.startedBy = (startedByFirst || "") + " " + (startedByLast || "");
-  wo.changeLog.push("Started by: " + (startedByFirst || "") + " " + (startedByLast || ""));
   wo.startedOnMillis = new Date().getTime();
   return wo;
 }

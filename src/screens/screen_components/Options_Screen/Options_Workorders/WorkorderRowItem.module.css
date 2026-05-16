@@ -1,0 +1,270 @@
+.row {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  margin-bottom: 2px;
+  border-radius: 7px;
+  border: 1px solid;
+  border-left-width: 4px;
+  padding-left: 5px;
+  padding-top: 1px;
+  padding-bottom: 1px;
+  cursor: pointer;
+  user-select: none;
+  overflow: hidden;
+}
+
+.row:hover {
+  opacity: 0.83;
+}
+
+.row:active {
+  opacity: 0.7;
+}
+
+.selected:hover {
+  opacity: 1;
+}
+
+.previewed {
+  opacity: 0.83;
+}
+
+.mainContent {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.topRow {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.customerInfo {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 65%;
+  justify-content: center;
+  margin: 2px 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.nameRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.customerName {
+  font-size: 14px;
+  color: dimgray;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.paidLabel {
+  font-size: 12px;
+  margin-left: 6px;
+  font-weight: 500;
+}
+
+.brandRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  overflow: hidden;
+}
+
+.colorDot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  margin-right: 4px;
+}
+
+.brandText {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.descriptionText {
+  font-size: 12px;
+}
+
+.separator {
+  display: inline-block;
+  height: 2px;
+  margin: 0 5px;
+  background-color: lightgray;
+}
+
+.lineCountBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: gray;
+  border-radius: 10px;
+  padding: 1px 6px;
+  margin-left: 8px;
+}
+
+.lineCountText {
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.totalsRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-left: 6px;
+}
+
+.strikethroughPrice {
+  color: gray;
+  font-size: 11px;
+  font-weight: 500;
+  text-decoration: line-through;
+  margin-right: 4px;
+}
+
+.totalPrice {
+  color: gray;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.itemNotHereBadge {
+  background-color: rgb(255, 243, 176);
+  border-radius: 10px;
+  padding: 1px 8px;
+  margin-left: 8px;
+}
+
+.itemNotHereText {
+  color: rgb(90, 75, 0);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.rightColumn {
+  display: flex;
+  flex: 0 0 35%;
+  justify-content: flex-end;
+  align-items: center;
+  flex-direction: row;
+  height: 100%;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.statusColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.dateText {
+  color: dimgray;
+  font-size: 11px;
+}
+
+.spacer {
+  width: 8px;
+}
+
+.wipPill {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  padding-left: 11px;
+  white-space: nowrap;
+}
+
+.wipUser {
+  font-size: 9px;
+  font-style: italic;
+  margin-right: 5px;
+}
+
+.statusPill {
+  display: flex;
+  flex-direction: row;
+  padding: 1px 11px;
+  align-items: center;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.statusPill.clickable:active {
+  opacity: 0.6;
+}
+
+.contactedIcon {
+  font-size: 11px;
+  margin-right: 4px;
+}
+
+.statusLabel {
+  font-size: 11px;
+  font-weight: normal;
+}
+
+.smsDot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  margin-right: 5px;
+}
+
+.partRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding-top: 2px;
+  padding-bottom: 1px;
+  margin-top: 2px;
+}
+
+.truncate {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.trackingButton {
+  padding: 1px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: none;
+  background: none;
+}
+
+.trackingButtonText {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.waitHoverZone {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+}

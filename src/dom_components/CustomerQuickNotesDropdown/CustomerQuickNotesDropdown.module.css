@@ -1,0 +1,60 @@
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9000;
+}
+
+.dropdown {
+  background-color: white;
+  border-radius: 10px;
+  border: 2px solid;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.header {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.category {
+  margin-bottom: 9px;
+}
+
+.categoryLabel {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+}
+
+.chipGrid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.chip {
+  border-radius: 6px;
+  padding: 5px 10px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+
+.chip:hover {
+  opacity: 0.6;
+}

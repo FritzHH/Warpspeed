@@ -1,0 +1,136 @@
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 9000;
+}
+
+.dropdown {
+  position: absolute;
+  background-color: white;
+  border-radius: 10px;
+  border: 2px solid;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.header {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid;
+}
+
+.itemName {
+  font-weight: 700;
+  display: block;
+  margin-bottom: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.targetRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.addingTo {
+  font-size: 13px;
+  font-style: italic;
+  margin-right: 7px;
+}
+
+.targetBtn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  transition: opacity 0.1s;
+}
+
+.targetBtn:hover {
+  opacity: 0.7;
+}
+
+.columnsContainer {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.column {
+  flex: 1;
+  padding-right: 8px;
+}
+
+.divider {
+  width: 1px;
+  align-self: stretch;
+}
+
+.category {
+  margin-bottom: 19px;
+}
+
+.categoryLabel {
+  font-weight: 700;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  display: block;
+}
+
+.chipGrid {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.chip {
+  border-radius: 6px;
+  padding: 5px 10px;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.1s;
+}
+
+.chip:hover {
+  opacity: 0.6;
+}
+
+.notesSection {
+  border-top: 1px solid;
+  margin-top: 4px;
+  padding-top: 8px;
+}
+
+.noteBlock {
+  margin-bottom: 6px;
+}
+
+.noteLabel {
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+  display: block;
+}
+
+.noteTextarea {
+  width: 100%;
+  border: 1px solid;
+  border-radius: 6px;
+  padding: 6px 8px;
+  outline: none;
+  overflow: hidden;
+  background-color: white;
+  font-family: inherit;
+  resize: none;
+}

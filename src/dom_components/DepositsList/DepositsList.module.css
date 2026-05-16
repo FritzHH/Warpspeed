@@ -1,0 +1,99 @@
+.container {
+  margin-top: 10px;
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.heading {
+  font-size: 15px;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.empty {
+  font-size: 12px;
+  text-align: center;
+  display: block;
+  margin-top: 4px;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  border-radius: 7px;
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-width: 1px;
+  border-style: solid;
+  padding: 6px 10px;
+  width: 100%;
+  cursor: pointer;
+  background: none;
+  text-align: left;
+  transition: opacity 0.1s;
+}
+
+.row:hover {
+  opacity: 0.7;
+}
+
+.rowLeft {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.badgeRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.badge {
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-right: 6px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.noteText {
+  font-size: 11px;
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dateText {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.rowRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.amount {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.reservedText {
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 1px;
+}
+
+.availableText {
+  font-size: 10px;
+  font-weight: 600;
+  margin-top: 1px;
+}

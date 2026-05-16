@@ -1,0 +1,32 @@
+.tabButton {
+  border: none;
+  border-radius: 0;
+  padding: 5px 15px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: row;
+  font-family: inherit;
+  transition: opacity 0.15s ease;
+  outline: none;
+}
+
+.tabButton:hover {
+  opacity: 0.85;
+}
+
+.tabButton:focus-visible {
+  outline: 2px solid #007bff;
+  outline-offset: -2px;
+}
+
+.text {
+  font-size: 15px;
+  text-align: center;
+}
+
+.icon {
+  object-fit: contain;
+  margin-right: 8px;
+}

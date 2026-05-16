@@ -1,0 +1,119 @@
+.trigger {
+  display: flex;
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  border-style: solid;
+  border-width: 1px;
+  border-radius: 5px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.trigger:hover:not(.disabled) {
+  opacity: 0.8;
+}
+
+.disabled {
+  cursor: default;
+  opacity: 0.2;
+}
+
+.triggerIcon {
+  object-fit: contain;
+}
+
+.triggerText {
+  font-size: 13px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 8999;
+}
+
+.menu {
+  position: fixed;
+  z-index: 9000;
+  border-width: 2px;
+  border-style: solid;
+  background-color: white;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 6px 10px;
+  min-height: 32px;
+  cursor: pointer;
+  transition: filter 0.1s ease;
+}
+
+.item:hover {
+  filter: brightness(0.95);
+}
+
+.item:focus-visible {
+  outline: 2px solid #007bff;
+  outline-offset: -2px;
+}
+
+.itemLabel {
+  font-size: 13px;
+}
+
+.itemSubtitle {
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.customInputRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  height: 100%;
+  padding-left: 2px;
+}
+
+.customInputLabel {
+  font-size: 13px;
+  margin-right: 6px;
+}
+
+.customInput {
+  width: 50px;
+  height: 28px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 13px;
+  text-align: center;
+  outline: none;
+  background-color: white;
+}
+
+.customInputWide {
+  width: 70px;
+}
+
+.customSubmit {
+  margin-left: 6px;
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}

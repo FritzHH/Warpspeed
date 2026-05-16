@@ -1,5 +1,6 @@
 /*eslint-disable*/
-import { View, Text, FlatList, Image, TouchableOpacity, Animated, Modal, TouchableWithoutFeedback, TextInput } from "react-native-web";
+import { View, Text, FlatList, Image, TouchableOpacity, Animated, TouchableWithoutFeedback, TextInput } from "react-native-web";
+import * as PopoverPrimitive from "@radix-ui/react-popover";
 import {
   applyDiscountToWorkorderItem,
   calculateRunningTotals,
@@ -1322,19 +1323,17 @@ export const LineItemComponent = ({
               alignItems: "center",
             }}
           >
+            <PopoverPrimitive.Root open={!!sLineActionModal} onOpenChange={(open) => { if (!open) { _setLineActionModal(null); _setModalTop(null); } }}>
+            <PopoverPrimitive.Anchor asChild>
             <Tooltip text="Actions" position="top">
               <Button_
                 ref={lineActionRef}
                 enabled={!isLocked}
                 icon={ICONS.menu2}
                 iconSize={22}
-                onPress={(e) => {
-                  const nativeEl = e?.target || e?.currentTarget || lineActionRef.current;
-                  const rect = nativeEl?.getBoundingClientRect?.();
-                  const x = rect ? rect.x + rect.width / 2 : 0;
-                  const y = rect ? rect.y + rect.height + 5 : 0;
+                onPress={() => {
                   _setModalTop(null);
-                  _setLineActionModal({ x, y });
+                  _setLineActionModal({ open: true });
                   _setCustomPercent("");
                   _setCustomDollar("");
                   _setCustomDollarCents(0);
@@ -1342,32 +1341,17 @@ export const LineItemComponent = ({
                 buttonStyle={{ backgroundColor: "transparent", borderWidth: 0, paddingHorizontal: 4, marginRight: 3 }}
               />
             </Tooltip>
-            <Modal visible={!!sLineActionModal} transparent animationType="fade">
-              <TouchableWithoutFeedback onPress={() => { _setLineActionModal(null); _setModalTop(null); }}>
-                <View style={{ width: "100%", height: "100%", position: "absolute" }} />
-              </TouchableWithoutFeedback>
+            </PopoverPrimitive.Anchor>
+            <PopoverPrimitive.Portal>
+              <PopoverPrimitive.Content
+                side="bottom"
+                align="center"
+                sideOffset={5}
+                collisionPadding={10}
+                style={{ zIndex: 9100 }}
+              >
               <View
-                ref={modalContentRef}
-                onLayout={() => {
-                  if (modalContentRef.current && sLineActionModal && sModalTop === null) {
-                    const el = modalContentRef.current;
-                    const rect = typeof el.getBoundingClientRect === "function" ? el.getBoundingClientRect() : null;
-                    if (rect) {
-                      const viewportH = window.innerHeight;
-                      const margin = 10;
-                      const bottom = sLineActionModal.y + rect.height;
-                      if (bottom > viewportH - margin) {
-                        _setModalTop(Math.max(margin, viewportH - rect.height - margin));
-                      } else {
-                        _setModalTop(sLineActionModal.y);
-                      }
-                    }
-                  }
-                }}
                 style={{
-                  position: "absolute",
-                  top: sModalTop !== null ? sModalTop : (sLineActionModal?.y || 0),
-                  left: sLineActionModal?.x || 0,
                   backgroundColor: "white",
                   borderRadius: 10,
                   borderWidth: 2,
@@ -1507,7 +1491,9 @@ export const LineItemComponent = ({
                         </View>
                       </View>
               </View>
-            </Modal>
+            </PopoverPrimitive.Content>
+            </PopoverPrimitive.Portal>
+            </PopoverPrimitive.Root>
           </View>
         </View>
         </View>

@@ -7,31 +7,26 @@
   border: none;
   padding: 0;
   user-select: none;
+}
+
+.hoverable {
   transition: opacity 0.15s ease;
 }
 
-.checkbox:hover:not(.disabled) {
-  opacity: 0.8;
-}
-
-.checkbox:focus-visible {
-  outline: 2px solid #007bff;
-  outline-offset: 2px;
+.hoverable:hover:not(.disabled) {
+  opacity: 0.82;
 }
 
 .disabled {
   cursor: not-allowed;
-  opacity: 0.4;
+  opacity: 0.3;
 }
 
 .icon {
-  width: 15px;
-  height: 15px;
-  object-fit: contain;
   flex-shrink: 0;
 }
 
-.label {
+.text {
   font-size: 15px;
   color: inherit;
 }

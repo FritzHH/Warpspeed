@@ -3,7 +3,8 @@ import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { View, Text, Image, TouchableOpacity, ScrollView } from "react-native-web";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
-import { Button_, Image_, CheckBox_, Tooltip } from "../../../components";
+import { Button_, Image_, Tooltip } from "../../../components";
+import { CheckBox } from "../../../dom_components";
 import { gray, log, compressImage } from "../../../utils";
 import {
   useOpenWorkordersStore,
@@ -425,7 +426,7 @@ export const WorkorderMediaModal = ({
             Workorder Media
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            <CheckBox_
+            <CheckBox
               text="Cast images to customer screen"
               isChecked={sCastToDisplay}
               onCheck={() => _setCastToDisplay(!sCastToDisplay)}
@@ -650,14 +651,14 @@ export const WorkorderMediaModal = ({
                 </Text>
               )}
               {onSendMedia && hasCell && (
-                <CheckBox_
+                <CheckBox
                   text="Text"
                   isChecked={sSendText}
                   onCheck={() => _setSendText(!sSendText)}
                 />
               )}
               {hasEmail && (
-                <CheckBox_
+                <CheckBox
                   text="Email"
                   isChecked={sSendEmail}
                   onCheck={() => _setSendEmail(!sSendEmail)}
@@ -758,7 +759,7 @@ export const WorkorderMediaModal = ({
             ))}
             <View style={{ height: 14 }} />
             <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-              <CheckBox_
+              <CheckBox
                 text="Medium compression"
                 isChecked={sCompressConfirm}
                 onCheck={() => _setCompressConfirm(!sCompressConfirm)}

@@ -19,13 +19,13 @@ import {
   Image_,
   Button_,
   TextInput_,
-  CheckBox_,
   DropdownMenu,
   LoginModalScreen,
   CustomerQuickNotesDropdown,
   Tooltip,
   SHADOW_RADIUS_PROTO,
 } from "../../../components";
+import { CheckBox } from "../../../dom_components";
 import { C, ICONS } from "../../../styles";
 import {
   formatCurrencyDisp,
@@ -785,7 +785,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
             </View>
 
             <View style={{ alignItems: "center", marginVertical: 10 }}>
-              <CheckBox_
+              <CheckBox
                 text="Receipt Note Required"
                 isChecked={!!sItem.receiptNoteRequired}
                 onCheck={() => handleFieldChange("receiptNoteRequired", !sItem.receiptNoteRequired)}

@@ -9,7 +9,8 @@ import {
 } from "react-native-web";
 import { useParams } from "react-router-dom";
 import { C, ICONS } from "../../styles";
-import { Button_, Image_, CheckBox_, AlertBox_ } from "../../components";
+import { Button_, Image_, AlertBox_ } from "../../components";
+import { CheckBox } from "../../dom_components";
 import {
   formatPhoneWithDashes,
   formatDateTimeForReceipt,
@@ -449,7 +450,7 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
               </View>
             ) : null}
           </View>
-          <CheckBox_
+          <CheckBox
             isChecked={sNotifyMe}
             onCheck={() => {
               let currentUser = useLoginStore.getState().getCurrentUser();
@@ -468,7 +469,7 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
             }}
             text="Notify me"
           />
-          <CheckBox_
+          <CheckBox
             isChecked={sCanRespond}
             onCheck={handleToggleCanRespond}
             text="User can respond"

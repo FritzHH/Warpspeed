@@ -2,7 +2,8 @@
 import { memo } from "react";
 import { View, Text, ScrollView } from "react-native-web";
 import { C, Fonts, ICONS } from "../../../../styles";
-import { CheckBox_, Image_, Button_, DropdownMenu, GradientView, Tooltip } from "../../../../components";
+import { Image_, Button_, DropdownMenu, GradientView, Tooltip } from "../../../../components";
+import { CheckBox } from "../../../../dom_components";
 import {
   formatCurrencyDisp,
   calculateRunningTotals,
@@ -151,7 +152,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                   {"Workorder #" + formatWorkorderNumber(wo.workorderNumber)}
                 </Text>
                 {!isPrimary && (
-                  <CheckBox_
+                  <CheckBox
                     enabled={isCombined ? !(amountCaptured > 0) : true}
                     buttonStyle={{
                       marginTop: 0,

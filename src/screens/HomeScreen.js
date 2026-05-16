@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { useNavigate } from "react-router-dom";
 import { C, COLOR_GRADIENTS, ICONS } from "../styles";
-import { Button_, CheckBox_, Image_ } from "../components";
+import { Button_, Image_ } from "../components";
+import { CheckBox } from "../dom_components";
 import { ROUTES } from "../routes";
 import { useSettingsStore, useLayoutStore } from "../stores";
 import { gray } from "../utils";
@@ -135,7 +136,7 @@ export function HomeScreen() {
 
       {/* Secondary display checkbox — desktop only */}
       {isDesktop && (
-        <CheckBox_
+        <CheckBox
           text="Secondary display attached"
           isChecked={sHasDisplay}
           onCheck={() => {
@@ -148,7 +149,7 @@ export function HomeScreen() {
         />
       )}
       {isDesktop && (
-        <CheckBox_
+        <CheckBox
           text="SMS notification sound"
           isChecked={sSmsSound}
           onCheck={() => {

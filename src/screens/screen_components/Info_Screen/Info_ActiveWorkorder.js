@@ -31,7 +31,6 @@ import {
   TextInput_,
   PrinterButton,
   Tooltip,
-  CheckBox_,
   Pressable_,
   StaleBanner,
   PrinterAlert,
@@ -39,6 +38,7 @@ import {
   TimePicker_,
   DatePicker_,
 } from "../../../components";
+import { CheckBox } from "../../../dom_components";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
@@ -1501,7 +1501,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   </Text>
                 ) : <View />;
               })()}
-              <CheckBox_
+              <CheckBox
                 isChecked={!!zOpenWorkorder?.itemNotHere}
                 text="Customer item not here"
                 textStyle={{ fontSize: 13, opacity: zOpenWorkorder?.itemNotHere ? 1 : 0.6, color: zOpenWorkorder?.itemNotHere ? C.red : undefined }}

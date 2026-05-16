@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { useState, useRef } from "react";
 import { C } from "../../../styles";
 import { gray, formatCurrencyDisp } from "../../../utils";
-import { CheckBox_ } from "../../../components";
+import { CheckBox } from "../../../dom_components";
 import { workerSearchInventory } from "../../../inventorySearchManager";
 import { StandKeypad } from "../../../shared/StandKeypad";
 
@@ -182,7 +182,7 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
                 }}
               >
                 <div onClick={(e) => { e.stopPropagation(); toggleCheck(item.id); }}>
-                  <CheckBox_
+                  <CheckBox
                     isChecked={isChecked}
                     onCheck={() => toggleCheck(item.id)}
                     size={40}

@@ -1,7 +1,8 @@
 /* eslint-disable */
 import { View, Text, TextInput, Image } from "react-native-web";
 import { useState, useRef, memo } from "react";
-import { Button_, CheckBox_, SHADOW_RADIUS_PROTO } from "../../../../components";
+import { Button_, SHADOW_RADIUS_PROTO } from "../../../../components";
+import { CheckBox } from "../../../../dom_components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import {
   usdTypeMask,
@@ -185,7 +186,7 @@ export const CashPayment = memo(function CashPayment({
         <View
           style={{ width: "100%", alignItems: "flex-start", paddingLeft: 10 }}
         >
-          <CheckBox_
+          <CheckBox
             enabled={isEnabled}
             textStyle={{ fontSize: 12 }}
             text={"Paper Check"}

@@ -54,7 +54,6 @@ import {
 import {
   Button,
   Button_,
-  CheckBox_,
   DropdownMenu,
   Image_,
   ModalDropdown,
@@ -69,6 +68,7 @@ import {
   StatusPickerModal,
   Dialog_,
 } from "../../../../components";
+import { CheckBox } from "../../../../dom_components";
 import { cloneDeep, set } from "lodash";
 import React, { Children, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -1272,7 +1272,7 @@ const AppUserListComponent = ({
         <View
           style={{ width: "100%", justifyContent: "flex-end", marginTop: 10 }}
         >
-          <CheckBox_
+          <CheckBox
             buttonStyle={{ justifyContent: "flex-end" }}
             isChecked={zSettingsObj?.lockScreenWhenUserLogsOut}
             text={"Lock screen when user logs out"}
@@ -1287,7 +1287,7 @@ const AppUserListComponent = ({
         <View
           style={{ width: "100%", justifyContent: "flex-end", marginTop: 10 }}
         >
-          <CheckBox_
+          <CheckBox
             buttonStyle={{ justifyContent: "flex-end" }}
             isChecked={zSettingsObj?.useFacialRecognition !== false}
             text={"Enable facial recognition"}
@@ -3738,7 +3738,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               });
             }}
           />
-          <CheckBox_
+          <CheckBox
             onCheck={() => toggleReceiptField("displayName")}
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
@@ -3788,7 +3788,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               });
             }}
           />
-          <CheckBox_
+          <CheckBox
             onCheck={() => toggleReceiptField("phone")}
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
@@ -3837,7 +3837,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               });
             }}
           />
-          <CheckBox_
+          <CheckBox
             onCheck={() => toggleReceiptField("supportEmail")}
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
@@ -3970,7 +3970,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               });
             }}
           />
-          <CheckBox_
+          <CheckBox
             onCheck={() => toggleReceiptField("street")}
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
@@ -4020,7 +4020,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               });
             }}
           />
-          <CheckBox_
+          <CheckBox
             onCheck={() => toggleReceiptField("unit")}
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
@@ -4070,7 +4070,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               });
             }}
           />
-          <CheckBox_
+          <CheckBox
             onCheck={() => toggleReceiptField("city")}
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
@@ -4120,7 +4120,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               });
             }}
           />
-          <CheckBox_
+          <CheckBox
             onCheck={() => toggleReceiptField("state")}
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
@@ -4170,7 +4170,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               });
             }}
           />
-          <CheckBox_
+          <CheckBox
             buttonStyle={{ marginLeft: 7 }}
             text={"Receipt"}
             textStyle={{ fontSize: 12 }}
@@ -4286,7 +4286,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       alignItems: "flex-end",
                     }}
                   >
-                    <CheckBox_
+                    <CheckBox
                       buttonStyle={{ marginLeft: 20 }}
                       text={"Open"}
                       isChecked={item.isOpen}
@@ -4335,7 +4335,7 @@ const StoreInfoComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
         <View style={{ width: "100%", marginBottom: 10 }}>
           <Text style={{ fontSize: 12, color: gray(0.6) }}>PAYMENT & TAX</Text>
         </View>
-        <CheckBox_
+        <CheckBox
           isChecked={zSettingsObj?.acceptChecks}
           textStyle={{ fontSize: 15 }}
           buttonStyle={{ backgroundColor: "transparent" }}
@@ -4393,7 +4393,7 @@ const PaymentProcessingComponent = ({
   return (
     <BoxContainerOuterComponent>
       <BoxContainerInnerComponent>
-        <CheckBox_
+        <CheckBox
           isChecked={zSettingsObj?.autoConnectToCardReader}
           textStyle={{ fontSize: 15 }}
           buttonStyle={{
@@ -4500,7 +4500,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               </View>
             </View>
             <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, justifyContent: "space-between" }}>
-              <CheckBox_
+              <CheckBox
                 isChecked={sSelectedReceiptPrinter === printer.id}
                 text="Use this printer"
                 textStyle={{ fontSize: 13 }}
@@ -4593,7 +4593,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
               </View>
             </View>
             <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, justifyContent: "space-between" }}>
-              <CheckBox_
+              <CheckBox
                 isChecked={sSelectedLabelPrinter === printer.id}
                 text="Use this printer"
                 textStyle={{ fontSize: 13 }}
@@ -4621,7 +4621,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
         <View style={{ width: "100%", marginBottom: 10 }}>
           <Text style={{ fontSize: 12, color: gray(0.6) }}>INTAKE RECEIPTS</Text>
         </View>
-        <CheckBox_
+        <CheckBox
           isChecked={zSettingsObj?.autoPrintIntakeReceipt}
           textStyle={{ fontSize: 15 }}
           buttonStyle={{ backgroundColor: "transparent" }}
@@ -4630,7 +4630,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             handleSettingsFieldChange("autoPrintIntakeReceipt", !zSettingsObj?.autoPrintIntakeReceipt)
           }
         />
-        <CheckBox_
+        <CheckBox
           isChecked={zSettingsObj?.autoSMSIntakeReceipt}
           textStyle={{ fontSize: 15 }}
           buttonStyle={{ backgroundColor: "transparent" }}
@@ -4639,7 +4639,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             handleSettingsFieldChange("autoSMSIntakeReceipt", !zSettingsObj?.autoSMSIntakeReceipt)
           }
         />
-        <CheckBox_
+        <CheckBox
           isChecked={zSettingsObj?.autoEmailIntakeReceipt}
           textStyle={{ fontSize: 15 }}
           buttonStyle={{ backgroundColor: "transparent" }}
@@ -4655,7 +4655,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
         <View style={{ width: "100%", marginBottom: 10 }}>
           <Text style={{ fontSize: 12, color: gray(0.6) }}>SALES RECEIPTS</Text>
         </View>
-        <CheckBox_
+        <CheckBox
           isChecked={zSettingsObj?.autoPrintSalesReceipt}
           textStyle={{ fontSize: 15 }}
           buttonStyle={{ backgroundColor: "transparent" }}
@@ -4664,7 +4664,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             handleSettingsFieldChange("autoPrintSalesReceipt", !zSettingsObj?.autoPrintSalesReceipt)
           }
         />
-        <CheckBox_
+        <CheckBox
           isChecked={zSettingsObj?.autoSMSSalesReceipt}
           textStyle={{ fontSize: 15 }}
           buttonStyle={{ backgroundColor: "transparent" }}
@@ -4673,7 +4673,7 @@ const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
             handleSettingsFieldChange("autoSMSSalesReceipt", !zSettingsObj?.autoSMSSalesReceipt)
           }
         />
-        <CheckBox_
+        <CheckBox
           isChecked={zSettingsObj?.autoEmailSalesReceipt}
           textStyle={{ fontSize: 15 }}
           buttonStyle={{ backgroundColor: "transparent" }}
@@ -4944,7 +4944,7 @@ const WorkorderStatusesComponent = ({
                       />
                     </Tooltip>
                     <Tooltip text="Require wait time before status change" position="top">
-                      <CheckBox_
+                      <CheckBox
                         text=""
                         isChecked={!!item.requireWaitTime}
                         onCheck={() => {
@@ -4987,7 +4987,7 @@ const WorkorderStatusesComponent = ({
                       />
                     </Tooltip>
                     <Tooltip text="Hidden from status picker" position="top">
-                      <CheckBox_
+                      <CheckBox
                         text=""
                         isChecked={!!item.hidden}
                         onCheck={() => {
@@ -5514,7 +5514,7 @@ const QBInventorySearchModal = ({ parentName, onClose, onAddItems, existingItemI
                   opacity: alreadyAdded ? 0.4 : 1,
                 }}
               >
-                <CheckBox_
+                <CheckBox
                   isChecked={isChecked}
                   onCheck={alreadyAdded ? undefined : () => toggleSelected(item.id)}
                   buttonStyle={{ marginRight: 4 }}
@@ -9034,7 +9034,7 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
                       />
                     </View>
                     <View style={{ marginLeft: 10 }}>
-                      <CheckBox_
+                      <CheckBox
                         text="Chat"
                         isChecked={templateObj.showInChat !== false}
                         onCheck={() => handleFieldChange(templateObj, "showInChat", templateObj.showInChat === false)}
@@ -9880,7 +9880,7 @@ const EmailInboxesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     </View>
                   )}
                   <Text numberOfLines={1} style={{ fontSize: 12, color: gray(0.5) }}>{acct.email}</Text>
-                  <CheckBox_
+                  <CheckBox
                     isChecked={!!acct.appendUserName}
                     text="Append user name"
                     onCheck={() => {
@@ -11716,7 +11716,7 @@ const StandButtonsSearchPanel = ({ zSettingsObj, handleSettingsFieldChange }) =>
                 borderRadius: 4,
               }}
             >
-              <CheckBox_
+              <CheckBox
                 isChecked={isSelected}
                 onCheck={() => toggleItem(item)}
                 buttonStyle={{ marginRight: 8 }}

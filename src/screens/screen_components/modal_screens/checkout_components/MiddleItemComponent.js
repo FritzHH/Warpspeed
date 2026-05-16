@@ -3,11 +3,11 @@ import { View, Text, TextInput, ScrollView } from "react-native-web";
 import { CONTACT_RESTRICTIONS } from "../../../../data";
 
 import {
-  CheckBox_,
   SHADOW_RADIUS_PROTO,
   Button_,
   Image_,
 } from "../../../../components";
+import { CheckBox } from "../../../../dom_components";
 import {
   capitalizeFirstLetterOfString,
   formatCurrencyDisp,
@@ -757,7 +757,7 @@ export const MiddleItemComponent = ({
                     }}
                   >
                     {!!sIsRefund && payment.method !== "cash" && (
-                      <CheckBox_
+                      <CheckBox
                         enabled={payment.amountRefunded}
                         buttonStyle={{
                           opacity:

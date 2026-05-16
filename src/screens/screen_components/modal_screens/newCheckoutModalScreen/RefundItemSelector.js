@@ -2,7 +2,8 @@
 import { memo } from "react";
 import { View, Text, ScrollView } from "react-native-web";
 import { C, Fonts } from "../../../../styles";
-import { CheckBox_, Button_ } from "../../../../components";
+import { Button_ } from "../../../../components";
+import { CheckBox } from "../../../../dom_components";
 import { COLOR_GRADIENTS } from "../../../../styles";
 import { formatCurrencyDisp, gray, formatWorkorderNumber } from "../../../../utils";
 import { dlog, DCAT } from "./checkoutDebugLog";
@@ -41,7 +42,7 @@ const RefundItemRow = memo(function RefundItemRow({
         borderRadius: 3,
       }}
     >
-      <CheckBox_
+      <CheckBox
         isChecked={isSelected || isRefunded}
         onCheck={() => {
           if (!isRefunded && !isDisabled) {

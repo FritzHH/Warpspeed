@@ -57,7 +57,6 @@ import {
   Button_,
   Image_,
   TextInput_,
-  CheckBox_,
   DropdownMenu,
   StatusPickerModal,
   PhoneNumberInput,
@@ -65,6 +64,7 @@ import {
   SmallLoadingIndicator,
   NoteHelperDropdown,
 } from "../components";
+import { CheckBox } from "../dom_components";
 import {
   dbListenToSettings,
   dbListenToInventory,
@@ -2079,7 +2079,7 @@ export function BikeStandScreen() {
                   backgroundColor: C.listItemWhite,
                 }}
               >
-                <CheckBox_
+                <CheckBox
                   isChecked={sBypassFaceRecognition}
                   onCheck={() => {
                     let next = !sBypassFaceRecognition;
@@ -3684,7 +3684,7 @@ export function BikeStandScreen() {
                             </View>
                           </View>
                           <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, justifyContent: "space-between" }}>
-                            <CheckBox_
+                            <CheckBox
                               isChecked={isSelected}
                               text="Use this printer"
                               textStyle={{ fontSize: 16 }}
@@ -6239,7 +6239,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
                 </Text>
               )}
             </View>
-            <CheckBox_
+            <CheckBox
               text="To be ordered"
               isChecked={!!zWorkorder?.partToBeOrdered}
               onCheck={() => setField("partToBeOrdered", !zWorkorder?.partToBeOrdered)}

@@ -2,7 +2,8 @@
 import { View, Text, ScrollView, Image, TouchableOpacity } from "react-native-web";
 import { useState, useRef, useEffect } from "react";
 import { cloneDeep } from "lodash";
-import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, CheckBox_, DropdownMenu, Tooltip, Image_, StaleBanner, TextInput_, LoadingIndicator, ReceiptSentOverlay } from "../../../../components";
+import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, DropdownMenu, Tooltip, Image_, StaleBanner, TextInput_, LoadingIndicator, ReceiptSentOverlay } from "../../../../components";
+import { CheckBox } from "../../../../dom_components";
 import { C, Fonts, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import {
   useCheckoutStore,
@@ -2010,7 +2011,7 @@ export function NewCheckoutModalScreen() {
                               alignItems: "center",
                             }}
                           >
-                            <CheckBox_
+                            <CheckBox
                               text=""
                               isChecked={false}
                               onCheck={() => handleApplyDeposit(item)}
@@ -2149,7 +2150,7 @@ export function NewCheckoutModalScreen() {
                 {/* Tax-Free & Receipt Language */}
 
                       {sCombinedWorkorders.length > 0 && !saleComplete && !(sTransactions.length > 0 || sCredits.length > 0) && (
-                  <CheckBox_
+                  <CheckBox
                     text="Tax-Free"
                     isChecked={!!sCombinedWorkorders[0]?.taxFree}
                     onCheck={handleTaxFreeToggle}

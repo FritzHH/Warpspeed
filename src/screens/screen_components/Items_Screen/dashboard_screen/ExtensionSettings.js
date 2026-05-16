@@ -1,7 +1,8 @@
 /*eslint-disable*/
 import { View, Text, TextInput, TouchableOpacity, ScrollView } from "react-native-web";
 import { useState } from "react";
-import { Button_, CheckBox_ } from "../../../../components";
+import { Button_ } from "../../../../components";
+import { CheckBox } from "../../../../dom_components";
 import { useSettingsStore } from "../../../../stores";
 import { C, gray } from "../../../../styles";
 import { copyToClipboard } from "../../../../utils";
@@ -345,7 +346,7 @@ function FeatureToggle({ label, description, checked, onToggle }) {
         cursor: "pointer"
       }}
     >
-      <CheckBox_
+      <CheckBox
         isChecked={checked}
         onPress={onToggle}
         style={{ marginRight: 15 }}

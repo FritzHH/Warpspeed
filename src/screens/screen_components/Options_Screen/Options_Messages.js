@@ -26,7 +26,6 @@ import {
 import {
   TabMenuDivider as Divider,
   Button,
-  CheckBox_,
   Button_,
   DropdownMenu,
   Image_,

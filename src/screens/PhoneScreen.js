@@ -29,7 +29,8 @@ import {
 } from "../utils";
 import { dbUploadWorkorderMedia, dbGetCustomer, dbSaveCustomer, dbListenToOpenWorkorders, dbListenToInventory, dbListenToCurrentPunchClock, dbListenToSettings } from "../db_calls_wrapper";
 import { authSignOut } from "../db_calls";
-import { Image_, AlertBox_, SmallLoadingIndicator, TextInput_, CheckBox_, DropdownMenu, StatusPickerModal } from "../components";
+import { Image_, AlertBox_, SmallLoadingIndicator, TextInput_, DropdownMenu, StatusPickerModal } from "../components";
+import { CheckBox } from "../dom_components";
 import { StandKeypad } from "../shared/StandKeypad";
 import { MILLIS_IN_DAY, DISCOUNT_TYPES } from "../constants";
 import { COLORS, NONREMOVABLE_WAIT_TIMES, WORKORDER_ITEM_PROTO } from "../data";
@@ -1365,7 +1366,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
               })()}
 
               {/* Item not here */}
-              <CheckBox_
+              <CheckBox
                 isChecked={!!workorder.itemNotHere}
                 text="Item not here"
                 textStyle={{ fontSize: 13 }}
@@ -1861,7 +1862,7 @@ function WorkorderDetailModal({ workorder, zSettings, onClose }) {
                   }}
                   style={{ flexDirection: "row", alignItems: "center", paddingVertical: 12, paddingHorizontal: 14, borderTopWidth: idx > 0 ? 1 : 0, borderTopColor: gray(0.92), backgroundColor: isSelected ? lightenRGBByPercent(C.green, 85) : "transparent" }}
                 >
-                  <CheckBox_ isChecked={isSelected} onCheck={() => {
+                  <CheckBox isChecked={isSelected} onCheck={() => {
                     if (isSelected) _setSelectedItems(sSelectedItems.filter((s) => s.id !== item.id));
                     else _setSelectedItems([...sSelectedItems, item]);
                   }} />

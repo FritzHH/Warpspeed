@@ -42,7 +42,8 @@ import {
   useCustMessagesStore,
 } from "../../../stores";
 import { CONTACT_RESTRICTIONS, CUSTOMER_CREDIT_PROTO, CUSTOMER_LANGUAGES, CUSTOMER_PROTO, SMS_PROTO, TAB_NAMES } from "../../../data";
-import { Button_, CheckBox_, DepositModal, DepositsList, DropdownMenu, Image_, SmallLoadingIndicator, TextInput_, Tooltip, TouchableOpacity_ } from "../../../components";
+import { Button_, DepositModal, DepositsList, DropdownMenu, Image_, SmallLoadingIndicator, TextInput_, Tooltip, TouchableOpacity_ } from "../../../components";
+import { CheckBox } from "../../../dom_components";
 import {
   dbSaveCustomer,
   dbGetCustomer,
@@ -477,7 +478,7 @@ export const CustomerInfoScreenModalComponent = ({
               marginBottom: 10,
             }}
           >
-            <CheckBox_
+            <CheckBox
               text={"Call Only"}
               isChecked={
                 sCustomerInfo?.contactRestriction === CONTACT_RESTRICTIONS.call
@@ -487,7 +488,7 @@ export const CustomerInfoScreenModalComponent = ({
                 saveField("contactRestriction", val);
               }}
             />
-            <CheckBox_
+            <CheckBox
               text={"Email Only"}
               isChecked={
                 sCustomerInfo?.contactRestriction === CONTACT_RESTRICTIONS.email
@@ -693,7 +694,7 @@ export const CustomerInfoScreenModalComponent = ({
             value={capitalizeFirstLetterOfString(sCustomerInfo.notes)}
             capitalize={true}
           />
-          <CheckBox_
+          <CheckBox
             isChecked={!!sCustomerInfo.gatedCommunity}
             text="Gated community"
             textStyle={{ fontSize: 13 }}
@@ -1383,7 +1384,7 @@ const CreditEditModal = ({ credit, customer, onClose, onSave, onDelete }) => {
             Send Receipt
           </Text>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <CheckBox_
+            <CheckBox
               text="SMS"
               isChecked={sSendSMS}
               onCheck={() => _sSetSendSMS(!sSendSMS)}
@@ -1391,7 +1392,7 @@ const CreditEditModal = ({ credit, customer, onClose, onSave, onDelete }) => {
               textStyle={{ fontSize: 13, color: hasPhone ? C.text : gray(0.3) }}
               buttonStyle={{ marginRight: 18 }}
             />
-            <CheckBox_
+            <CheckBox
               text="Email"
               isChecked={sSendEmail}
               onCheck={() => _sSetSendEmail(!sSendEmail)}
@@ -1399,7 +1400,7 @@ const CreditEditModal = ({ credit, customer, onClose, onSave, onDelete }) => {
               textStyle={{ fontSize: 13, color: hasEmail ? C.text : gray(0.3) }}
               buttonStyle={{ marginRight: 18 }}
             />
-            <CheckBox_
+            <CheckBox
               text="Print"
               isChecked={sPrint}
               onCheck={() => _sSetPrint(!sPrint)}

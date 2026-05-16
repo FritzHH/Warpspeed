@@ -10,11 +10,11 @@ import {
 import * as XLSX from "xlsx";
 
 import {
-  CheckBox_,
   SHADOW_RADIUS_PROTO,
   Button_,
   DropdownMenu,
 } from "../../../../components";
+import { CheckBox } from "../../../../dom_components";
 import { cloneDeep, initial } from "lodash";
 import {
   formatCurrencyDisp,
@@ -722,7 +722,7 @@ export const StripeCreditCardComponent = ({
           </View>
         </View>
       </View>
-      <CheckBox_
+      <CheckBox
         enabled={!sSale?.transactions.length > 0}
         buttonStyle={{ marginTop: 10 }}
         textStyle={{ color: gray(0.6), fontWeight: 500 }}

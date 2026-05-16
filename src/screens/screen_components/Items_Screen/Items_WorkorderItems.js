@@ -18,13 +18,13 @@ import { DISCOUNT_TYPES } from "../../../constants";
 import {
   GradientView,
   Button_,
-  CheckBox_,
   Image_,
   NoteHelperDropdown,
   TextInput_,
   Tooltip,
   StaleBanner,
 } from "../../../components";
+import { CheckBox } from "../../../dom_components";
 import { C, ICONS } from "../../../styles";
 import { EmptyItemsComponent } from "./Items_Empty";
 import {
@@ -563,7 +563,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             />
           </Tooltip>
           <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
-          <CheckBox_
+          <CheckBox
             text="Tax-Free"
             isChecked={!!zOpenWorkorder.taxFree}
             onCheck={handleTaxFreeToggle}
@@ -774,7 +774,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             backgroundColor: C.buttonLightGreenOutline,
           }}
         />
-        <CheckBox_
+        <CheckBox
           text="Tax-Free"
           isChecked={!!zOpenWorkorder.taxFree}
           onCheck={handleTaxFreeToggle}

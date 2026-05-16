@@ -11,10 +11,10 @@ import {
 import * as XLSX from "xlsx";
 
 import {
-  CheckBox_,
   SHADOW_RADIUS_PROTO,
   Button_,
 } from "../../../../components";
+import { CheckBox } from "../../../../dom_components";
 import { cloneDeep } from "lodash";
 import {
   formatCurrencyDisp,
@@ -220,7 +220,7 @@ export const CashSaleComponent = ({
           style={{ width: "100%", alignItems: "flex-start", paddingLeft: 10 }}
         >
           {!sIsRefund && (
-            <CheckBox_
+            <CheckBox
               enabled={!sSale?.transactions.length > 0}
               textStyle={{ fontSize: 12 }}
               text={"Paper Check"}
@@ -349,7 +349,7 @@ export const CashSaleComponent = ({
         </View>
       </View>
 
-      <CheckBox_
+      <CheckBox
         enabled={sSale?.transactions.length === 0}
         buttonStyle={{ marginTop: 7 }}
         textStyle={{ color: gray(0.6), fontWeight: 500, fontSize: 14 }}

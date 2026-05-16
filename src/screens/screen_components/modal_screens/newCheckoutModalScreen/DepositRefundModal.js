@@ -2,7 +2,8 @@
 import { View, Text } from "react-native-web";
 import { useState, memo } from "react";
 import { cloneDeep } from "lodash";
-import { ScreenModal, Button_, CheckBox_, SmallLoadingIndicator, SHADOW_RADIUS_PROTO } from "../../../../components";
+import { ScreenModal, Button_, SmallLoadingIndicator, SHADOW_RADIUS_PROTO } from "../../../../components";
+import { CheckBox } from "../../../../dom_components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import { useCurrentCustomerStore, useSettingsStore, useLoginStore } from "../../../../stores";
 import { formatCurrencyDisp, formatMillisForDisplay, gray, lightenRGBByPercent, log, generateEAN13Barcode, localStorageWrapper, findTemplateByType, printBuilder } from "../../../../utils";
@@ -397,14 +398,14 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                   paddingHorizontal: 2,
                 }}
               >
-                <CheckBox_
+                <CheckBox
                   text="Print"
                   isChecked={sPrint}
                   onCheck={() => _setPrint(!sPrint)}
                   textStyle={{ fontSize: 11, color: C.text }}
                   buttonStyle={{ marginRight: 10 }}
                 />
-                <CheckBox_
+                <CheckBox
                   text="SMS"
                   isChecked={sSMS}
                   enabled={hasPhone}
@@ -412,7 +413,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                   textStyle={{ fontSize: 11, color: hasPhone ? C.text : gray(0.3) }}
                   buttonStyle={{ marginRight: 10 }}
                 />
-                <CheckBox_
+                <CheckBox
                   text="Email"
                   isChecked={sEmail}
                   enabled={hasEmail}

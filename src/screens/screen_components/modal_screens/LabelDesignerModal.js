@@ -10,10 +10,10 @@ import {
 import {
   Button_,
   TextInput_,
-  CheckBox_,
   DropdownMenu,
   Image_,
 } from "../../../components";
+import { CheckBox } from "../../../dom_components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../styles";
 import {
   formatCurrencyDisp,
@@ -408,7 +408,7 @@ function PropertiesPanel({ field, onUpdate, onRemove }) {
 
           {/* Bold */}
           <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
-            <CheckBox_
+            <CheckBox
               isChecked={field.bold}
               onPress={() => handleChange("bold", !field.bold)}
             />
@@ -1065,7 +1065,7 @@ export const LabelDesignerModal = ({ handleExit, handleSettingsFieldChange }) =>
                 {/* Quick Print toggle */}
                 {sCurrentSlug && (
                   <View style={{ flexDirection: "row", alignItems: "center", marginRight: 8 }}>
-                    <CheckBox_
+                    <CheckBox
                       isChecked={isQuickPrint}
                       onPress={handleToggleQuickPrint}
                     />

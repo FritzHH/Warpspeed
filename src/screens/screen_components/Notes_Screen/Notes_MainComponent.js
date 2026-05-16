@@ -1,29 +1,21 @@
 /* eslint-disable */
-import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-} from "react-native-web";
 import { gray, resolveStatus, lightenRGBByPercent, capitalizeFirstLetterOfString } from "../../../utils";
-import { Image_, TouchableOpacity_, TextInput_, Tooltip, CustomerQuickNotesDropdown } from "../../../components";
-import { C, Colors, ICONS } from "../../../styles";
+import { Image } from "../../../dom_components/Image/Image";
+import { TouchableOpacity } from "../../../dom_components/TouchableOpacity/TouchableOpacity";
+import { TextInput } from "../../../dom_components/TextInput/TextInput";
+import { Tooltip } from "../../../dom_components/Tooltip/Tooltip";
+import { C, ICONS } from "../../../styles";
 import { useState, useRef } from "react";
 import { useOpenWorkordersStore, useLoginStore, useSettingsStore } from "../../../stores";
+import styles from "./Notes_MainComponent.module.css";
 
-/// Notes Tab Component
+const EMPTY_NOTES = [];
+
 export function Notes_MainComponent() {
-  // setters /////////////////////////////////////////////////////////////////////
-
-  // getters /////////////////////////////////////////////////////////////////////
-
-  const EMPTY_NOTES = [];
   const zInternalNotes = useOpenWorkordersStore(
     (state) => {
       const resolvedID = state.workorderPreviewID || state.openWorkorderID;
-      const workorder = state.workorders.find(
-        (wo) => wo.id === resolvedID
-      );
+      const workorder = state.workorders.find((wo) => wo.id === resolvedID);
       return workorder?.internalNotes || EMPTY_NOTES;
     },
     (prev, next) => {
@@ -36,9 +28,7 @@ export function Notes_MainComponent() {
   const zCustomerNotes = useOpenWorkordersStore(
     (state) => {
       const resolvedID = state.workorderPreviewID || state.openWorkorderID;
-      const workorder = state.workorders.find(
-        (wo) => wo.id === resolvedID
-      );
+      const workorder = state.workorders.find((wo) => wo.id === resolvedID);
       return workorder?.customerNotes || EMPTY_NOTES;
     },
     (prev, next) => {
@@ -48,7 +38,6 @@ export function Notes_MainComponent() {
       return prev.every((note, i) => note === next[i]);
     }
   );
-  const zCurrentUser = useLoginStore((state) => state.currentUser);
   const zOpenWorkorderID = useOpenWorkordersStore((s) => s.workorderPreviewID || s.openWorkorderID);
   const zWorkorderStatus = useOpenWorkordersStore((state) => {
     const resolvedID = state.workorderPreviewID || state.openWorkorderID;
@@ -58,32 +47,13 @@ export function Notes_MainComponent() {
   const zStatuses = useSettingsStore((state) => state.settings?.statuses);
   const isDonePaid = resolveStatus(zWorkorderStatus, zStatuses)?.label?.toLowerCase() === "done & paid";
   const zIsPreview = useOpenWorkordersStore((state) => !!state.workorderPreviewID && state.workorderPreviewID !== state.openWorkorderID);
-  const zCustomerQuickNotes = useSettingsStore((state) => state.settings?.customerQuickNotes) || EMPTY_NOTES;
 
-  /////////////////////////////////////////////////////////////////////////////////
   const [sEditingNoteId, _setEditingNoteId] = useState(null);
-  const [sShowQuickNotes, _setShowQuickNotes] = useState(null);
   const cursorOffsetRef = useRef(null);
 
   function formatUserShowName() {
     const user = useLoginStore.getState().currentUser;
-    return (
-      "(" + user.first.toString() + " " + user.last[0] + ")  "
-    );
-  }
-
-  function formatNoteDate(millis) {
-    if (!millis) return "";
-    const d = new Date(millis);
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    const day = days[d.getDay()];
-    const month = d.getMonth() + 1;
-    const date = d.getDate();
-    let hours = d.getHours();
-    const mins = d.getMinutes().toString().padStart(2, "0");
-    const ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12 || 12;
-    return `${day} ${month}/${date}, ${hours}:${mins} ${ampm}`;
+    return "(" + user.first.toString() + " " + user.last[0] + ")  ";
   }
 
   function formatNoteDateShort(millis) {
@@ -156,431 +126,236 @@ export function Notes_MainComponent() {
     notesArr[index] = line;
 
     useOpenWorkordersStore.getState().setField(fieldName, notesArr);
-
-    // ''(wo);
   }
 
-  let activeQuickChips = zCustomerNotes.map((n) => n.quickNoteItemId).filter(Boolean);
+  function handleNoteTextClick(e, item) {
+    const nativeEvt = e?.nativeEvent || e;
+    const px = nativeEvt?.pageX;
+    const py = nativeEvt?.pageY;
+    if (px != null && py != null && document.caretRangeFromPoint) {
+      const range = document.caretRangeFromPoint(px - window.scrollX, py - window.scrollY);
+      if (range) cursorOffsetRef.current = range.startOffset;
+    }
+    _setEditingNoteId(item.id);
+  }
 
-  function handleQuickNoteToggle(item) {
-    useLoginStore.getState().requireLogin(() => {
-      let currentUser = useLoginStore.getState().currentUser;
-      let existing = zCustomerNotes.find((n) => n.quickNoteItemId === item.id);
-      let updatedNotes;
-      if (existing) {
-        updatedNotes = zCustomerNotes.filter((n) => n.id !== existing.id);
-      } else {
-        let userName = "(" + currentUser.first + " " + (currentUser.last?.[0] || "") + ")  ";
-        updatedNotes = [...zCustomerNotes, {
-          name: userName,
-          userID: currentUser.id,
-          value: item.text || item.buttonLabel,
-          id: crypto.randomUUID(),
-          quickNoteItemId: item.id,
-          createdAt: Date.now(),
-        }];
-      }
-      useOpenWorkordersStore.getState().setField("customerNotes", updatedNotes);
-    });
+  function handleInputFocus(e) {
+    useLoginStore.getState().requireLogin(() => {});
+    const el = e.target;
+    const offset = cursorOffsetRef.current;
+    cursorOffsetRef.current = null;
+    if (offset != null && offset <= el.value.length) {
+      el.selectionStart = el.selectionEnd = offset;
+    } else {
+      el.selectionStart = el.selectionEnd = el.value.length;
+    }
   }
 
   if (!zOpenWorkorderID) {
-    return <View style={{ flex: 1 }}></View>;
+    return <div className={styles.emptyContainer}></div>;
   }
 
+  const containerStyle = {
+    backgroundImage: zIsPreview
+      ? `repeating-linear-gradient(135deg, ${lightenRGBByPercent(C.lightred, 92)}, ${lightenRGBByPercent(C.lightred, 92)} 10px, transparent 10px, transparent 20px)`
+      : undefined,
+  };
+
+  const headerBorderStyle = { borderColor: C.buttonLightGreenOutline };
+  const noteRowStyle = { backgroundColor: C.backgroundWhite };
+
   return (
-    <View
-      style={{
-        height: "100%",
-        borderRadius: 15,
-        backgroundImage: zIsPreview ? `repeating-linear-gradient(135deg, ${lightenRGBByPercent(C.lightred, 92)}, ${lightenRGBByPercent(C.lightred, 92)} 10px, transparent 10px, transparent 20px)` : undefined,
-      }}
+    <div
+      className={`${styles.container} ${isDonePaid ? styles.containerDisabled : ""}`}
+      style={containerStyle}
     >
-      <View
-        pointerEvents={isDonePaid ? "none" : "auto"}
-        style={{
-          paddingTop: 5,
-          paddingHorizontal: 5,
-          flexDirection: "row",
-        }}
-      >
-        <View
-          style={{
-            width: "50%",
-            height: "100%",
-            flexDirection: "column",
-            paddingRight: 10,
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              width: "100%",
-              height: 35,
-              alignItems: "center",
-              borderColor: C.buttonLightGreenOutline,
-              borderWidth: 1,
-              borderRadius: 15,
-              marginBottom: 5,
-              overflow: "hidden",
-            }}
-          >
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingLeft: 8,
-              }}
-            >
-              <Image_ icon={ICONS.notes} size={20} />
-              <Text
-                style={{
-                  fontSize: 15,
-                  color: C.text,
-                  fontWeight: 500,
-                  marginLeft: 10,
-                }}
-              >
+      <div className={styles.row}>
+        {/* CUSTOMER NOTES */}
+        <div className={`${styles.column} ${styles.columnLeft}`}>
+          <div className={styles.headerBar} style={headerBorderStyle}>
+            <div className={styles.headerIconGroup}>
+              <Image icon={ICONS.notes} size={20} />
+              <span className={styles.headerLabel} style={{ color: C.text }}>
                 Customer Notes
-              </Text>
-            </View>
-            <TouchableOpacity_
+              </span>
+            </div>
+            <TouchableOpacity
               onPress={() => outsideClicked("customer")}
               style={{
                 flex: 1,
                 height: "100%",
+                display: "flex",
                 justifyContent: "center",
                 alignItems: "center",
               }}
             >
-              <Text style={{ fontSize: 14, color: gray(0.18) }}>
+              <span className={styles.headerActionText} style={{ color: gray(0.18) }}>
                 Click to add
-              </Text>
-            </TouchableOpacity_>
-            {/* <TouchableOpacity_
-              onPress={(e) => {
-                const nativeEvent = e.nativeEvent || e;
-                _setShowQuickNotes({ x: nativeEvent.pageX, y: nativeEvent.pageY });
-              }}
-              style={{
-                flex: 1,
-                height: "100%",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ fontSize: 14, color: gray(0.18) }}>
-                Quick notes
-              </Text>
-            </TouchableOpacity_> */}
-          </View>
+              </span>
+            </TouchableOpacity>
+          </div>
 
-          <View
-            style={{
-              height: "100%",
-              width: "100%",
-            }}
-          >
-            <FlatList
-              keyExtractor={(i, idx) => idx}
-              data={zCustomerNotes}
-              renderItem={(item) => {
-                let index = item.index;
-                item = item.item;
-                const isEditing = sEditingNoteId === item.id;
-                return (
-                  <View
-                    style={{
-                      width: "100%",
-                      flexDirection: "row",
-                      alignItems: "center",
-                      borderRadius: 5,
-                      backgroundColor: C.backgroundWhite,
-                      marginBottom: 3,
-                    }}
-                  >
-                    <View style={{ justifyContent: "center", flexDirection: "column", paddingTop: 2 }}>
-                      <View style={{ alignItems: "center", flexDirection: "row" }}>
-                        <Tooltip text="Delete note" position="right">
-                          <TouchableOpacity_
-                            onPress={() => { deleteItem(item, index, "customer"); _setEditingNoteId(null); }}
-                            style={{ padding: 2 }}
-                          >
-                            <Image_
-                              icon={ICONS.trash}
-                              size={14}
-                              style={{ opacity: 0.35, filter: "grayscale(100%)" }}
-                            />
-                          </TouchableOpacity_>
-                        </Tooltip>
-                        <Text
-                          style={{
-                            color: gray(.4),
-                            padding: 2,
-                            fontSize: 12,
-                            outlineWidth: 0,
+          <div className={styles.notesList}>
+            {zCustomerNotes.map((item, index) => {
+              const isEditing = sEditingNoteId === item.id;
+              return (
+                <div key={item.id} className={styles.noteRow} style={noteRowStyle}>
+                  <div className={styles.noteMeta}>
+                    <div className={styles.noteMetaTopRow}>
+                      <Tooltip text="Delete note" position="right">
+                        <TouchableOpacity
+                          onPress={() => {
+                            deleteItem(item, index, "customer");
+                            _setEditingNoteId(null);
                           }}
+                          style={{ padding: 2 }}
                         >
-                          {item.name}
-                        </Text>
-                      </View>
-                      <Text style={{ color: gray(0.5), fontSize: 10, fontStyle: "italic", paddingLeft: 2 }}>
-                        {formatNoteDateShort(item.createdAt)}
-                      </Text>
-                    </View>
-                    {isEditing ? (
-                      <TextInput_
-                        multiline={true}
-                        numberOfLines={10}
-                        capitalize={true}
-                        debounceMs={1000}
-                        onChangeText={(val) =>
-                          textChanged(val, index, "customer")
-                        }
-                        onBlur={() => _setEditingNoteId(null)}
-                        onFocus={(e) => {
-                          useLoginStore.getState().requireLogin(() => {});
-                          const el = e.target;
-                          const offset = cursorOffsetRef.current;
-                          cursorOffsetRef.current = null;
-                          if (offset != null && offset <= el.value.length) {
-                            el.selectionStart = el.selectionEnd = offset;
-                          } else {
-                            el.selectionStart = el.selectionEnd = el.value.length;
-                          }
-                        }}
-                        style={{
-                          padding: 2,
-                          paddingLeft: 4,
-                          fontSize: 15,
-                          lineHeight: 18,
-                          outlineWidth: 0,
-                          outlineStyle: "none",
-                          borderWidth: 0,
-                          flex: 1,
-                          color: C.text,
-                        }}
-                        autoFocus={true}
-                        value={item.value}
-                      />
-                    ) : (
-                      <TouchableOpacity_
-                        onPress={(e) => {
-                          const nativeEvt = e?.nativeEvent || e;
-                          const px = nativeEvt?.pageX;
-                          const py = nativeEvt?.pageY;
-                          if (px != null && py != null && document.caretRangeFromPoint) {
-                            const range = document.caretRangeFromPoint(px - window.scrollX, py - window.scrollY);
-                            if (range) cursorOffsetRef.current = range.startOffset;
-                          }
-                          _setEditingNoteId(item.id);
-                        }}
-                        style={{ flex: 1, padding: 2, paddingLeft: 4, cursor: "text" }}
+                          <Image
+                            icon={ICONS.trash}
+                            size={14}
+                            className={styles.deleteIcon}
+                          />
+                        </TouchableOpacity>
+                      </Tooltip>
+                      <span className={styles.noteName} style={{ color: gray(0.4) }}>
+                        {item.name}
+                      </span>
+                    </div>
+                    <span className={styles.noteDate} style={{ color: gray(0.5) }}>
+                      {formatNoteDateShort(item.createdAt)}
+                    </span>
+                  </div>
+                  {isEditing ? (
+                    <TextInput
+                      multiline={true}
+                      numberOfLines={10}
+                      capitalize={true}
+                      debounceMs={1000}
+                      onChangeText={(val) => textChanged(val, index, "customer")}
+                      onBlur={() => _setEditingNoteId(null)}
+                      onFocus={handleInputFocus}
+                      className={styles.noteInput}
+                      style={{ color: C.text, lineHeight: "18px" }}
+                      autoFocus={true}
+                      value={item.value}
+                    />
+                  ) : (
+                    <div
+                      className={styles.noteTextBox}
+                      onClick={(e) => handleNoteTextClick(e, item)}
+                    >
+                      <span
+                        className={styles.noteText}
+                        style={{ color: item.value ? C.text : gray(0.5) }}
                       >
-                        <Text
-                          style={{
-                            lineHeight: 18,
-                            color: item.value ? C.text : gray(0.5),
-                            fontSize: 15,
-                          }}
-                        >
-                          {capitalizeFirstLetterOfString(item.value) || "Empty note"}
-                        </Text>
-                      </TouchableOpacity_>
-                    )}
-                  </View>
-                );
-              }}
-            />
-          </View>
-        </View>
+                        {capitalizeFirstLetterOfString(item.value) || "Empty note"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
 
-        {/* ///////////////INTERNAL NOTES /////////////////////////////////////*/}
-
-        <View
-          style={{
-            width: "50%",
-            height: "100%",
-            flexDirection: "column",
-            // paddingLeft: 10,
-          }}
-        >
+        {/* INTERNAL NOTES */}
+        <div className={`${styles.column} ${styles.columnRight}`}>
           <Tooltip text="Add note" position="top">
-            <TouchableOpacity_
+            <TouchableOpacity
               onPress={() => outsideClicked("internal")}
               style={{
-                flexDirection: "row",
                 width: "100%",
                 height: 35,
+                display: "flex",
+                flexDirection: "row",
                 justifyContent: "flex-start",
                 alignItems: "center",
                 borderColor: C.buttonLightGreenOutline,
+                borderStyle: "solid",
                 borderWidth: 1,
                 borderRadius: 15,
                 marginBottom: 5,
-                paddingHorizontal: 3,
+                paddingLeft: 3,
+                paddingRight: 3,
+                boxSizing: "border-box",
+                flexShrink: 0,
               }}
             >
-              <View
-                style={{
-                  width: "30%",
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-              >
-                <Image_ icon={ICONS.gears1} size={20} />
-                <Text
-                  style={{
-                    marginLeft: 10,
-                    fontSize: 15,
-                    color: C.text,
-                    fontWeight: 500,
-                  }}
-                >
-                  {"Internal Notes"}
-                </Text>
-              </View>
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: gray(0.18),
-                  width: "70%",
-                  textAlign: "center",
-                }}
-              >
+              <div className={styles.headerIconGroupInternal}>
+                <Image icon={ICONS.gears1} size={20} />
+                <span className={styles.headerLabel} style={{ color: C.text }}>
+                  Internal Notes
+                </span>
+              </div>
+              <span className={styles.headerActionInternal} style={{ color: gray(0.18) }}>
                 Click to add
-              </Text>
-            </TouchableOpacity_>
+              </span>
+            </TouchableOpacity>
           </Tooltip>
-          <View
-            style={{
-              width: "100%",
-              height: "100%",
-              flexDirection: "column",
-              paddingRight: 10,
-            }}
-          >
-            <FlatList
-              keyExtractor={(i, idx) => idx}
-              data={zInternalNotes}
-              renderItem={(item) => {
-                let index = item.index;
-                item = item.item;
-                const isEditing = sEditingNoteId === item.id;
-                return (
-                  <View
-                    style={{
-                      width: "100%",
-                      flexDirection: "row",
-                      alignItems: "center",
-                      backgroundColor: C.backgroundWhite,
-                      marginBottom: 3,
-                    }}
-                  >
-                    <View style={{ justifyContent: "center", flexDirection: "column", paddingTop: 2 }}>
-                      <View style={{ alignItems: "center", flexDirection: "row" }}>
-                        <Tooltip text="Delete note" position="right">
-                          <TouchableOpacity_
-                            onPress={() => { deleteItem(item, index, "internal"); _setEditingNoteId(null); }}
-                            style={{ padding: 2 }}
-                          >
-                            <Image_
-                              icon={ICONS.trash}
-                              size={14}
-                              style={{ opacity: 0.35, filter: "grayscale(100%)" }}
-                            />
-                          </TouchableOpacity_>
-                        </Tooltip>
-                        <Text
-                          style={{
-                            color: gray(.4),
-                            padding: 2,
-                            fontSize: 12,
+
+          <div className={`${styles.notesList} ${styles.notesListInternal}`}>
+            {zInternalNotes.map((item, index) => {
+              const isEditing = sEditingNoteId === item.id;
+              return (
+                <div key={item.id} className={styles.noteRow} style={noteRowStyle}>
+                  <div className={styles.noteMeta}>
+                    <div className={styles.noteMetaTopRow}>
+                      <Tooltip text="Delete note" position="right">
+                        <TouchableOpacity
+                          onPress={() => {
+                            deleteItem(item, index, "internal");
+                            _setEditingNoteId(null);
                           }}
+                          style={{ padding: 2 }}
                         >
-                          {item.name}
-                        </Text>
-                      </View>
-                      <Text style={{ color: gray(0.5), fontSize: 10, fontStyle: "italic", paddingLeft: 2 }}>
-                        {formatNoteDateShort(item.createdAt)}
-                      </Text>
-                    </View>
-                    {isEditing ? (
-                      <TextInput_
-                        multiline={true}
-                        numberOfLines={10}
-                        capitalize={true}
-                        debounceMs={1000}
-                        onChangeText={(val) =>
-                          textChanged(val, index, "internal")
-                        }
-                        onBlur={() => _setEditingNoteId(null)}
-                        onFocus={(e) => {
-                          useLoginStore.getState().requireLogin(() => {});
-                          const el = e.target;
-                          const offset = cursorOffsetRef.current;
-                          cursorOffsetRef.current = null;
-                          if (offset != null && offset <= el.value.length) {
-                            el.selectionStart = el.selectionEnd = offset;
-                          } else {
-                            el.selectionStart = el.selectionEnd = el.value.length;
-                          }
-                        }}
-                        style={{
-                          padding: 2,
-                          paddingLeft: 4,
-                          fontSize: 15,
-                          lineHeight: 18,
-                          outlineWidth: 0,
-                          outlineStyle: "none",
-                          borderWidth: 0,
-                          flex: 1,
-                          color: C.text,
-                        }}
-                        autoFocus={true}
-                        value={item.value}
-                      />
-                    ) : (
-                      <TouchableOpacity_
-                        onPress={(e) => {
-                          const nativeEvt = e?.nativeEvent || e;
-                          const px = nativeEvt?.pageX;
-                          const py = nativeEvt?.pageY;
-                          if (px != null && py != null && document.caretRangeFromPoint) {
-                            const range = document.caretRangeFromPoint(px - window.scrollX, py - window.scrollY);
-                            if (range) cursorOffsetRef.current = range.startOffset;
-                          }
-                          _setEditingNoteId(item.id);
-                        }}
-                        style={{ flex: 1, padding: 2, paddingLeft: 4, cursor: "text" }}
+                          <Image
+                            icon={ICONS.trash}
+                            size={14}
+                            className={styles.deleteIcon}
+                          />
+                        </TouchableOpacity>
+                      </Tooltip>
+                      <span className={styles.noteName} style={{ color: gray(0.4) }}>
+                        {item.name}
+                      </span>
+                    </div>
+                    <span className={styles.noteDate} style={{ color: gray(0.5) }}>
+                      {formatNoteDateShort(item.createdAt)}
+                    </span>
+                  </div>
+                  {isEditing ? (
+                    <TextInput
+                      multiline={true}
+                      numberOfLines={10}
+                      capitalize={true}
+                      debounceMs={1000}
+                      onChangeText={(val) => textChanged(val, index, "internal")}
+                      onBlur={() => _setEditingNoteId(null)}
+                      onFocus={handleInputFocus}
+                      className={styles.noteInput}
+                      style={{ color: C.text, lineHeight: "18px" }}
+                      autoFocus={true}
+                      value={item.value}
+                    />
+                  ) : (
+                    <div
+                      className={styles.noteTextBox}
+                      onClick={(e) => handleNoteTextClick(e, item)}
+                    >
+                      <span
+                        className={styles.noteText}
+                        style={{ color: item.value ? C.text : gray(0.5) }}
                       >
-                        <Text
-                          style={{
-                            lineHeight: 18,
-                            color: item.value ? C.text : gray(0.5),
-                            fontSize: 15,
-                          }}
-                        >
-                          {capitalizeFirstLetterOfString(item.value) || "Empty note"}
-                        </Text>
-                      </TouchableOpacity_>
-                    )}
-                  </View>
-                );
-              }}
-            />
-          </View>
-        </View>
-      </View>
-      {/* <CustomerQuickNotesDropdown
-        visible={!!sShowQuickNotes}
-        anchorPosition={sShowQuickNotes}
-        onClose={() => _setShowQuickNotes(null)}
-        quickNotes={zCustomerQuickNotes}
-        onToggleChip={handleQuickNoteToggle}
-        activeChips={activeQuickChips}
-      /> */}
-    </View>
+                        {capitalizeFirstLetterOfString(item.value) || "Empty note"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
-

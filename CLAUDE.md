@@ -43,7 +43,47 @@ Follow these steps before acting on any user request:
 
 **No new `useEffect` without permission.** You are not allowed to create a new `useEffect` under any circumstances without the user's explicit permission. You must explain why you need it first; the user will confirm before you add it. No exceptions unless otherwise stated by the user.
 
-**We are transitioning to a DOM-based system, moving away from React-Native-Web. Use CSS Modules and modern components to build new components. Use the same approach when asked to refactor react-native-web components**
+**We are transitioning to a DOM-based system, moving away from React-Native-Web and inline JSX styling. Use CSS Modules and modern components to build new components. Use the same approach when asked to refactor react-native-web components.**
+
+**Sizing rule:
+This app uses percentage-based sizing as the default for all width and height values. Layouts in this codebase are deliberate — most boxes have a specific proportion of their parent, not a "fill remaining space" relationship. Percentages express that intent directly and produce consistent proportions across all screen sizes.
+Default: percentages.
+
+Widths and heights of containers, panels, rows, cards, inputs, buttons — percentages of their parent.
+Padding and margin in percentages where layout-relevant. Px is acceptable for fine details (1-2px borders, small gaps).
+The default mental model is "this element is X% of its parent," not "this element fills available space."
+
+Use flex freely for arrangement:
+
+flex-direction, justify-content, align-items, gap, flex-wrap — these describe how children are laid out, not how big they are. Use them anywhere they help.
+
+flex-shrink: 0 is required on percentage-sized children.
+
+CSS defaults flex children to flex-shrink: 1, which means a child with width: 25% will compress below 25% if the parent runs short of space.
+All percentage-sized children must have flex-shrink: 0 to lock their declared size. This is the most important sizing-flex property in this codebase and is non-negotiable.
+
+Flex sizing (flex: 1, flex-grow, flex-basis) is for the rare flex-only layouts.
+
+A flex-only layout is one where children genuinely should share or fill available space rather than holding fixed proportions. These exist but are uncommon.
+Use flex sizing when the layout's intent is "split available space" or "fill what's left" — not when it's "this is 25% of the parent."
+When you do use flex sizing, use it deliberately and consistently within that layout. Don't mix flex: 1 siblings with percentage-sized siblings in the same row unless there's a specific reason.
+
+Do not replace existing percentages with flex sizing.
+
+The percentages already in the codebase are deliberate. Even if flex: 1 seems cleaner, do not substitute during unrelated work.
+The same rule applies when converting RN-web components to DOM: percentages stay as percentages.
+
+If you're unsure which approach a new layout calls for, default to percentages and ask.
+
+The cost of asking is small. The cost of silently using flex sizing where percentages were intended is a layout that behaves differently on different screens, which is hard to debug after the fact.
+
+Do not use vw, vh, vmin, vmax, rem, or em for layout.
+
+Percentages of the parent are the consistent idiom.
+
+Do not add media queries or breakpoints.
+
+The layout does not reflow at different screen sizes by design. Percentages handle cross-screen proportionality. **
 
 **Inline styling only unless it is a DOM refactor/migration.** for a DOM/React refactor or implementation, use CSS Modules. for a react-native-web component, Use inline styling only for both new and existing components;
 
@@ -271,7 +311,7 @@ tenants/{tenantID}/stores/{storeID}/
 ├── outgoing-messages/{...}
 └── incoming-messages/{...}
 ```
-**Realtime Database:** `{tenantID}/{storeID}/SETTINGS/`, `INVENTORY/`, `OPEN-WORKORDERS/`, `PAYMENT-PROCESSING/`, `PUNCH-CLOCK/`
+**Firestore Database:** `{tenantID}/{storeID}/SETTINGS/`, `INVENTORY/`, `OPEN-WORKORDERS/`, `PAYMENT-PROCESSING/`, `PUNCH-CLOCK/`
 **Cloud Storage:** `{tenantID}/{storeID}/completed-workorders/{status}/{year}/{month}/`, `completed-sales/...`, `punch-history/...`
 
 ## Database layer

@@ -48,7 +48,7 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
           borderLeftWidth: 4,
           backgroundColor: isSelected
             ? lightenRGBByPercent(C.lightred, 85)
-            : workorder.status?.toLowerCase().includes("finished")
+            : rs.label?.toLowerCase().includes("finished")
               ? lightenRGBByPercent(C.green, 85)
               : C.listItemWhite,
         }}

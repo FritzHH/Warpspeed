@@ -17,7 +17,7 @@ import dayjs from "dayjs";
 import { C } from "./styles";
 import { useAlertScreenStore, useLoginStore, useOpenWorkordersStore, useSettingsStore } from "./stores";
 import { DISCOUNT_TYPES, MILLIS_IN_MINUTE } from "./constants";
-const _shared = require("./shared/printBuilder");
+import * as _shared from "./shared/printBuilder";
 
 // const fs = require("node:fs");
 export const dim = {

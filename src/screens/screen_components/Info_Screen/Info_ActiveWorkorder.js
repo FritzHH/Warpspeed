@@ -28,7 +28,6 @@ import {
   Button_,
   Image_,
   TextInput_,
-  PrinterButton,
   Tooltip,
   Pressable_,
   StaleBanner,
@@ -68,7 +67,7 @@ import {
 } from "../../../stores";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
-import { dbSavePrintObj, dbTestCustomerPhoneWrite, dbTestCustomerPhoneWriteHTTP, dbSendReceipt, startNewWorkorder } from "../../../db_calls_wrapper";
+import { dbSavePrintObj, dbSendReceipt, startNewWorkorder } from "../../../db_calls_wrapper";
 
 // --- Dimming when field has text (easy to adjust) ---
 const FILLED_DROPDOWN_OPACITY = 0.3;                          // dropdown button opacity when text present

@@ -25,7 +25,6 @@ import {
 } from "../../../utils";
 import {
   TabMenuDivider as Divider,
-  Button,
   Button_,
   DropdownMenu,
   Image_,
@@ -35,6 +34,13 @@ import {
   Tooltip,
   TouchableOpacity_,
 } from "../../../components";
+import {
+  DropdownMenu as DropdownMenuDom,
+  Image as ImageDom,
+  TextInput as TextInputDom,
+  TouchableOpacity as TouchableOpacityDom,
+  Tooltip as TooltipDom,
+} from "../../../dom_components";
 import { C, COLOR_GRADIENTS, Colors, ICONS, Fonts } from "../../../styles";
 import hubStyles from "./MessagesHub.module.css";
 import { useTranslation } from "../../../useTranslation";
@@ -1388,17 +1394,19 @@ export function MessagesComponent({}) {
                 onDeleteAudio={handleDeleteAudio}
                 onToggleForward={handleToggleForwardReplies}
               />
-              <View style={{ flexDirection: "row", alignItems: "flex-end", borderWidth: 2, borderRadius: 5, borderColor: gray(0.15), backgroundColor: "white" }}>
-                <TextInput
-                  onChangeText={handleMessageChange}
+              <div className={hubStyles.inputRow} style={{ borderColor: gray(0.15) }}>
+                <TextInputDom
                   ref={textInputRef}
+                  value={sNewMessage}
+                  onChangeText={handleMessageChange}
+                  debounceMs={0}
                   autoFocus={true}
-                  autoCapitalize="sentences"
                   multiline={true}
-                  placeholderTextColor={"gray"}
+                  numberOfLines={0}
                   placeholder={"Message..."}
-                  onSelectionChange={(e) => {
-                    cursorPositionRef.current = e.nativeEvent.selection.start;
+                  placeholderTextColor={"gray"}
+                  onSelect={(e) => {
+                    if (e?.target) cursorPositionRef.current = e.target.selectionStart;
                   }}
                   onContentSizeChange={(e) => {
                     let h = e?.nativeEvent?.contentSize?.height;
@@ -1406,96 +1414,75 @@ export function MessagesComponent({}) {
                       _setInputHeight(Math.max(36, Math.ceil(h)));
                     }
                   }}
-                  style={{
-                    outlineStyle: "none",
-                    outlineColor: "transparent",
-                    outlineWidth: 0,
-                    borderWidth: 0,
-                    borderColor: "transparent",
-                    color: C.text,
-                    paddingTop: 0,
-                    paddingBottom: 0,
-                    paddingLeft: 5,
-                    paddingRight: 4,
-                    marginVertical: 8,
-                    fontSize: 15,
-                    lineHeight: 20,
-                    height: sInputHeight,
-                    overflow: "hidden",
-                    flex: 1,
-                    textAlignVertical: "top",
-                  }}
-                  value={sNewMessage}
+                  className={hubStyles.inputField}
+                  style={{ color: C.text }}
                 />
-                <View style={{ flexDirection: "column", alignItems: "center", justifyContent: "flex-end" }}>
-                  <TouchableOpacity
+                <div className={hubStyles.sendColumn}>
+                  <TouchableOpacityDom
                     onPress={() => { if (sNewMessage.trim() && !(sFromLang !== sToLang && sTranslateLoading)) { if (isUnmodifiedTemplateRef.current) { sendMessage(sNewMessage, "", false, false); isUnmodifiedTemplateRef.current = false; } else { _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); sendMessage(sNewMessage, "", sCanRespond); }); } } }}
-                    style={{ marginRight: 4, marginBottom: 2, padding: 6, opacity: (!sNewMessage.trim() || (sFromLang !== sToLang && sTranslateLoading)) ? 0.3 : 1 }}
+                    className={hubStyles.sendButton}
+                    style={{ opacity: (!sNewMessage.trim() || (sFromLang !== sToLang && sTranslateLoading)) ? 0.3 : 1 }}
                   >
-                    <Image_ icon={ICONS.airplane} size={41} />
-                  </TouchableOpacity>
-                </View>
-              </View>
+                    <ImageDom icon={ICONS.airplane} size={41} />
+                  </TouchableOpacityDom>
+                </div>
+              </div>
           </View>
-            <View style={{ width: "100%", marginTop: 10, paddingHorizontal: 10 }}>
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <DropdownMenu
-                    dataArr={TRANSLATION_LANGUAGES}
-                    onSelect={(item) => {
-                      _setFromLang(item.code);
-                      if (item.code && sToLang && item.code !== sToLang && sNewMessage.trim()) debouncedTranslate(sNewMessage, sToLang);
-                      if (!item.code || item.code === sToLang) clearTranslation();
-                    }}
-                    buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}
-                    buttonStyle={{ paddingVertical: 5 }}
-                    openUpward={true}
-                  />
-                  <Image_ icon={ICONS.rightArrowBlue} size={16} style={{ marginHorizontal: 6 }} />
-                  <DropdownMenu
-                    dataArr={TRANSLATION_LANGUAGES}
-                    onSelect={(item) => {
-                      _setToLang(item.code);
-                      if (sFromLang && item.code && sFromLang !== item.code && sNewMessage.trim()) debouncedTranslate(sNewMessage, item.code);
-                      if (!item.code || sFromLang === item.code) clearTranslation();
-                    }}
-                    buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sToLang)?.label || "English"}
-                    buttonStyle={{ paddingVertical: 5 }}
-                    openUpward={true}
-                  />
-                </View>
-                <DropdownMenu
-                  dataArr={(zSettings?.smsTemplates || zSettings?.textTemplates || [])
-                    .filter((t) => t.showInChat !== false)
-                    .sort((a, b) => {
-                      let aOrd = a.order || 999;
-                      let bOrd = b.order || 999;
-                      return bOrd - aOrd;
-                    })
-                    .map((t) => ({ label: t.label || t.name || t.buttonLabel || "Untitled", message: t.content || t.message || t.text || "" }))}
+            <div className={hubStyles.footerRow}>
+              <div className={hubStyles.footerGroup}>
+                <DropdownMenuDom
+                  dataArr={TRANSLATION_LANGUAGES}
                   onSelect={(item) => {
-                    let resolved = resolveTemplate(item.message);
-                    _setNewMessage(resolved);
-                    isUnmodifiedTemplateRef.current = true;
-                    if (sFromLang && sToLang && sFromLang !== sToLang) debouncedTranslate(resolved, sToLang);
+                    _setFromLang(item.code);
+                    if (item.code && sToLang && item.code !== sToLang && sNewMessage.trim()) debouncedTranslate(sNewMessage, sToLang);
+                    if (!item.code || item.code === sToLang) clearTranslation();
                   }}
-                  buttonText={"Templates"}
-                  buttonStyle={{ paddingVertical: 5, backgroundColor: C.blue }}
-                  buttonTextStyle={{ color: "white" }}
-                  openUpward={true}
+                  buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}
+                  buttonStyle={{ paddingVertical: 5 }}
                 />
-                <Tooltip text="Variables" position="top" hideOnPress>
-                  <DropdownMenu
+                <ImageDom icon={ICONS.rightArrowBlue} size={16} className={hubStyles.footerArrow} />
+                <DropdownMenuDom
+                  dataArr={TRANSLATION_LANGUAGES}
+                  onSelect={(item) => {
+                    _setToLang(item.code);
+                    if (sFromLang && item.code && sFromLang !== item.code && sNewMessage.trim()) debouncedTranslate(sNewMessage, item.code);
+                    if (!item.code || sFromLang === item.code) clearTranslation();
+                  }}
+                  buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sToLang)?.label || "English"}
+                  buttonStyle={{ paddingVertical: 5 }}
+                />
+              </div>
+              <DropdownMenuDom
+                dataArr={(zSettings?.smsTemplates || zSettings?.textTemplates || [])
+                  .filter((t) => t.showInChat !== false)
+                  .sort((a, b) => {
+                    let aOrd = a.order || 999;
+                    let bOrd = b.order || 999;
+                    return bOrd - aOrd;
+                  })
+                  .map((t) => ({ label: t.label || t.name || t.buttonLabel || "Untitled", message: t.content || t.message || t.text || "" }))}
+                onSelect={(item) => {
+                  let resolved = resolveTemplate(item.message);
+                  _setNewMessage(resolved);
+                  isUnmodifiedTemplateRef.current = true;
+                  if (sFromLang && sToLang && sFromLang !== sToLang) debouncedTranslate(resolved, sToLang);
+                }}
+                buttonText={"Templates"}
+                buttonStyle={{ paddingVertical: 5, backgroundColor: C.blue }}
+                buttonTextStyle={{ color: "white" }}
+              />
+              <div className={`${hubStyles.footerGroup} ${hubStyles.footerIconGroup}`}>
+                <TooltipDom text="Variables" position="top">
+                  <DropdownMenuDom
                     dataArr={TEXT_TEMPLATE_VARIABLES.map((v) => ({ label: v.label, variable: v.variable }))}
                     onSelect={(item) => handleInsertVariable(resolveTemplate(item.variable))}
                     buttonIcon={ICONS.variable}
                     buttonIconSize={40}
-                    buttonStyle={{ alignItems: "center", justifyContent: "center", padding: 6, backgroundColor: "transparent", borderWidth: 0 }}
-                    openUpward={true}
+                    buttonStyle={{ padding: 6, backgroundColor: "transparent", borderWidth: 0 }}
                   />
-                </Tooltip>
-                <Tooltip text="Send Info" position="top" hideOnPress>
-                  <DropdownMenu
+                </TooltipDom>
+                <TooltipDom text="Send Info" position="top">
+                  <DropdownMenuDom
                     dataArr={(() => {
                       let items = [
                         { label: "Send intake/estimate ticket", key: "workorder" },
@@ -1522,35 +1509,35 @@ export function MessagesComponent({}) {
                     }}
                     buttonIcon={ICONS.paperPlane}
                     buttonIconSize={35}
-                    buttonStyle={{ alignItems: "center", justifyContent: "center", padding: 6, backgroundColor: "transparent", borderWidth: 0 }}
-                    openUpward={true}
+                    buttonStyle={{ padding: 6, backgroundColor: "transparent", borderWidth: 0 }}
                   />
-                </Tooltip>
+                </TooltipDom>
                 {hasCustomer && !sCustomPhoneMode ? (
-                  <Tooltip text="Messages Hub" position="top" hideOnPress>
-                    <TouchableOpacity
+                  <TooltipDom text="Messages Hub" position="top">
+                    <TouchableOpacityDom
                       onPress={handleEnterHubMode}
-                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                      style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 6 }}
                     >
-                      <Image_ icon={ICONS.cellPhone} size={35} />
-                    </TouchableOpacity>
-                  </Tooltip>
+                      <ImageDom icon={ICONS.cellPhone} size={35} />
+                    </TouchableOpacityDom>
+                  </TooltipDom>
                 ) : null}
                 {sCustomPhoneMode ? (
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Text style={{ fontSize: 13, color: gray(0.45), marginRight: 8 }}>{formatPhoneWithDashes(sCustomPhone)}</Text>
+                  <div className={hubStyles.customPhoneInfo}>
+                    <span className={hubStyles.customPhoneText} style={{ color: gray(0.45) }}>{formatPhoneWithDashes(sCustomPhone)}</span>
                     {hasCustomer && (
-                      <TouchableOpacity
+                      <TouchableOpacityDom
                         onPress={handleExitCustomPhoneMode}
-                        style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: C.blue }}
+                        className={hubStyles.customPhoneBackBtn}
+                        style={{ backgroundColor: C.blue }}
                       >
-                        <Text style={{ fontSize: 13, color: "white" }}>Back to customer</Text>
-                      </TouchableOpacity>
+                        <span className={hubStyles.customPhoneBackText}>Back to customer</span>
+                      </TouchableOpacityDom>
                     )}
-                  </View>
+                  </div>
                 ) : null}
-              </View>
-            </View>
+              </div>
+            </div>
         </View>
       )}
       {sShowMediaPicker && zWorkorderObj?.id && (

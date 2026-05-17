@@ -214,7 +214,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
     <div style={{ display: "flex", flex: 1 }}>
       <div
         ref={anchorRef}
-        className={`${styles.trigger} ${isDisabled ? styles.disabled : ""} ${className}`}
+        className={`${styles.trigger} ${displayText ? styles.triggerHasText : ""} ${isDisabled ? styles.disabled : ""} ${className}`}
         style={triggerStyle}
         onClick={() => { if (!isDisabled) { calcPosition(); setOpen(!isOpen); } }}
         role="combobox"

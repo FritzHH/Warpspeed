@@ -5,8 +5,7 @@ import { C, Colors, Fonts } from "../styles";
 import { sendPasswordReset, dbLoginUser, dbLogout, loadTenantAndSettings } from "../db_calls_wrapper";
 import { gray } from "../utils";
 import { topUpPool } from "../idPool";
-
-const logo = require("../resources/default_app_logo_large.png");
+import logo from "../resources/default_app_logo_large.png";
 
 // ── Brand colors pulled from the logo ──
 const BRAND_BLUE = "#2B7CB5";

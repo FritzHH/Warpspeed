@@ -19,7 +19,6 @@ import {
 } from "../../../utils";
 import { workerSearchInventory } from "../../../inventorySearchManager";
 import {
-  Button,
   Button_,
   Image_,
   NoteHelperDropdown,

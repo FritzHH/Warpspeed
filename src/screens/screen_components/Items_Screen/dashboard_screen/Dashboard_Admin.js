@@ -52,7 +52,6 @@ import {
   useEmailStore,
 } from "../../../../stores";
 import {
-  Button,
   Button_,
   DropdownMenu,
   Image_,
@@ -74,6 +73,7 @@ import React, { Children, useEffect, useRef, useState, Suspense, lazy } from "re
 import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
+import defaultLogo from "../../../../resources/default_app_logo_large.png";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
 import { APP_USER, COLORS, INTAKE_QUICK_BUTTON_PROTO, NOTE_HELPER_PROTO, NOTE_HELPER_ITEM_PROTO, QUICK_CUSTOMER_NOTE_PROTO, QUICK_CUSTOMER_NOTE_ITEM_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../../data";
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
@@ -598,7 +598,7 @@ export function Dashboard_Admin({}) {
         {!sExpand && (
           <View style={{ width: "70%", height: "100%", justifyContent: "center", alignItems: "center" }}>
             <Image_
-              icon={require("../../../../resources/default_app_logo_large.png")}
+              icon={defaultLogo}
               style={{ opacity: 0.08, width: "60%", height: "60%" }}
             />
           </View>

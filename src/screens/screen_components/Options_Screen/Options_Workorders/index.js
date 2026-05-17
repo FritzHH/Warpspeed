@@ -24,6 +24,7 @@ export function WorkordersComponent({}) {
   const zOpenWorkorderID = useOpenWorkordersStore((state) => state.openWorkorderID);
   const zPreviewID = useOpenWorkordersStore((state) => state.workorderPreviewID);
   const zActiveSales = useActiveSalesStore((state) => state.activeSales);
+  const zCurrentUser = useLoginStore((state) => state.currentUser);
   const [sSearchTerm, _setSearchTerm] = useState("");
 
   const hasRehydratedMsgsRef = useRef(false);
@@ -209,9 +210,8 @@ export function WorkordersComponent({}) {
     const customerWorkorders = zOpenWorkorders.filter((wo) => !!wo.customerID);
     if (sSearchTerm.trim()) return filterAndRankWorkorders(customerWorkorders);
     const statuses = useSettingsStore.getState().settings?.statuses || [];
-    const currentUser = useLoginStore.getState().getCurrentUser();
-    return sortWorkorders(customerWorkorders, statuses, currentUser);
-  }, [zOpenWorkorders, sSearchTerm]);
+    return sortWorkorders(customerWorkorders, statuses, zCurrentUser);
+  }, [zOpenWorkorders, sSearchTerm, zCurrentUser]);
 
   return (
     <div className={styles.container}>

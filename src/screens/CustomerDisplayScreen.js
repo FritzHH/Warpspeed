@@ -12,8 +12,7 @@ import {
 } from "../broadcastChannel";
 import { formatCurrencyDisp, formatPhoneForDisplay, gray, capitalizeFirstLetterOfString } from "../utils";
 import { C, Fonts, ICONS } from "../styles";
-
-const logo = require("../resources/default_app_logo_large.png");
+import logo from "../resources/default_app_logo_large.png";
 
 const DEV_SHOW_OVERLAY = false;
 

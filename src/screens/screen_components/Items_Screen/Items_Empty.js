@@ -3,6 +3,7 @@ import { Text, View } from "react-native-web";
 import { Image_ } from "../../../components";
 import { ICONS } from "../../../styles";
 import { log } from "../../../utils";
+import defaultLogo from "../../../resources/default_app_logo_large.png";
 
 // TODO
 // need to replace picture with picture from user database
@@ -18,7 +19,7 @@ export function EmptyItemsComponent() {
       }}
     >
       <Image_
-        icon={require('../../../resources/default_app_logo_large.png')}
+        icon={defaultLogo}
         style={{ opacity: 0.1, width: "90%", height: "90%" }}
       />
     </View>

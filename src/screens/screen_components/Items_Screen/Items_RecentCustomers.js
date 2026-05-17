@@ -13,6 +13,7 @@ import {
 } from "../../../stores";
 import { TAB_NAMES } from "../../../data";
 import { startNewWorkorder, dbGetCustomer } from "../../../db_calls_wrapper";
+import defaultLogo from "../../../resources/default_app_logo_large.png";
 import {
   capitalizeFirstLetterOfString,
   formatPhoneForDisplay,
@@ -63,7 +64,7 @@ export function RecentCustomersComponent() {
         }}
       >
         <Image_
-          icon={require("../../../resources/default_app_logo_large.png")}
+          icon={defaultLogo}
           style={{ opacity: 0.1, width: "90%", height: "90%" }}
         />
       </View>
@@ -73,7 +74,7 @@ export function RecentCustomersComponent() {
   return (
     <View style={{ width: "100%", height: "100%", alignItems: "flex-start" }}>
       <Image_
-        icon={require("../../../resources/default_app_logo_large.png")}
+        icon={defaultLogo}
         style={{
           opacity: 0.1,
           width: "90%",

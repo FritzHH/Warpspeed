@@ -8,7 +8,6 @@ import {
   stringIsNumeric,
   gray,
   capitalizeAllWordsInSentence,
-  extractRandomFiveDigits,
   lightenRGBByPercent,
 } from "../../../utils";
 import { ScreenModal, Button_, PhoneNumberInput, Tooltip, TextInput_ } from "../../../components";

@@ -1,7 +1,8 @@
 // Smart database wrapper - handles path building, validation, and business logic
 // This file contains all business logic and calls the "dumb" db.js functions
 
-import { log, removeEmptyFields, stringifyAllObjectFields, stringifyObject, compressImage, localStorageWrapper } from "./utils";
+import { log, removeEmptyFields, stringifyAllObjectFields, compressImage, localStorageWrapper } from "./utils";
+import * as _storesModule from "./stores";
 import { takeId, getId } from "./idPool";
 import {
   DB_NODES,
@@ -3598,8 +3599,8 @@ export async function dbGmailDisconnect(accountKey) {
 
 
 function getEmailStoreState() {
-  const stores = require("./stores");
-  return stores.useEmailStore.getState();
+  // Circular dep with stores.js — accessed at call time via ESM live binding
+  return _storesModule.useEmailStore.getState();
 }
 
 // ============================================================================

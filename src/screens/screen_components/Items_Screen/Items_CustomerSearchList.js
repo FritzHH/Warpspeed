@@ -9,7 +9,6 @@ import {
   log,
 } from "../../../utils";
 import {
-  Button,
   Button_,
   Image_,
   ScreenModal,
@@ -30,6 +29,7 @@ import {
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 import { startNewWorkorder } from "../../../db_calls_wrapper";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
+import defaultLogo from "../../../resources/default_app_logo_large.png";
 
 export function CustomerSearchListComponent({}) {
   // store getters //////////////////////////////////////////////////////////////////////
@@ -122,7 +122,7 @@ export function CustomerSearchListComponent({}) {
       }}
     >
       <Animated.Image
-        source={require('../../../resources/default_app_logo_large.png')}
+        source={defaultLogo}
         style={{
           opacity: 0.1,
           width: "90%",

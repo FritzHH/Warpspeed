@@ -286,7 +286,7 @@ export function NewCheckoutModalScreen() {
   let custLast = zOpenWorkorder?.customerLast || zCustomer?.last || "";
   let custLanguage = zOpenWorkorder?.customerLanguage || zCustomer?.language || "";
   let isZeroTotal = (sSale?.total === 0) && !saleComplete;
-  let isFullyPaid = !isZeroTotal && !saleComplete && amountLeftToPay <= 0 && (sSale?.amountCaptured || 0) > 0;
+  let isFullyPaid = !isZeroTotal && amountLeftToPay <= 0 && (sSale?.amountCaptured || 0) > 0;
   let hasRealPayments = sTransactions.some((t) => {
     let refunded = (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
     return (t.amountCaptured || 0) > refunded;
@@ -299,19 +299,16 @@ export function NewCheckoutModalScreen() {
   }, [saleComplete]);
 
   // ─── Initialization ──────────────────────────────────────
-  // Called once when the modal opens. We use a flag to avoid
-  // repeated init without adding a useEffect.
-  if (zIsCheckingOut && !sInitialized) {
+  useEffect(() => {
+    if (!zIsCheckingOut || sInitialized) return;
     dlog(DCAT.INIT, "checkout_modal_open", "CheckoutModal", { workorderID: zOpenWorkorder?.id, customerID: zOpenWorkorder?.customerID, hasDepositInfo: !!useCheckoutStore.getState().depositInfo, hasViewOnlySale: !!useCheckoutStore.getState().viewOnlySale });
     _setInitialized(true);
     _setReceiptLanguage(
       Object.keys(CUSTOMER_LANGUAGES).find((k) => CUSTOMER_LANGUAGES[k] === zCustomer?.language) || "english"
     );
 
-    // Start fetching card readers immediately — no dependency on sale
     fetchReaders();
 
-    // Check if we're opening a partial sale from ticket search
     let viewOnlySale = useCheckoutStore.getState().viewOnlySale;
     let depositInfo = useCheckoutStore.getState().depositInfo;
     if (depositInfo) {
@@ -321,7 +318,7 @@ export function NewCheckoutModalScreen() {
     } else {
       initializeCheckout();
     }
-  }
+  }, [zIsCheckingOut, sInitialized]);
 
 
   async function initializeCheckout() {
@@ -910,7 +907,7 @@ export function NewCheckoutModalScreen() {
   }
 
   function handleFullyPaidComplete() {
-    if (!sSale || saleComplete) return;
+    if (!sSale) return;
     let sale = cloneDeep(sSale);
     sale.paymentComplete = true;
     sale.workorderIDs = sCombinedWorkorders.map((o) => o.id);

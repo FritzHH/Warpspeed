@@ -166,9 +166,9 @@ function generateLabelZpl(template, data) {
   return zpl;
 }
 
-module.exports = {
-  generateLabelZpl: generateLabelZpl,
-  measureTextLines: measureTextLines,
-  measureLineWidth: measureLineWidth,
-  calculateBarcodeModuleWidth: calculateBarcodeModuleWidth,
+export {
+  generateLabelZpl,
+  measureTextLines,
+  measureLineWidth,
+  calculateBarcodeModuleWidth,
 };

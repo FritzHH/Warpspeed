@@ -13,6 +13,11 @@
   transition: opacity 0.15s ease;
 }
 
+.triggerHasText {
+  padding-left: 7px;
+  padding-right: 7px;
+}
+
 .trigger:hover:not(.disabled) {
   opacity: 0.8;
 }

@@ -30,7 +30,7 @@ function _generateSimpleID() {
   return "lbl" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
-var { generateLabelZpl } = require("./labelZplBuilder");
+import { generateLabelZpl } from "./labelZplBuilder";
 
 // ── Label print builder ──
 
@@ -152,6 +152,4 @@ var labelPrintBuilder = {
   },
 };
 
-module.exports = {
-  labelPrintBuilder: labelPrintBuilder,
-};
+export { labelPrintBuilder };

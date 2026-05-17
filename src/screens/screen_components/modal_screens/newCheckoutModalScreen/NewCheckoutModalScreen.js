@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { View, Text, ScrollView, Image, TouchableOpacity } from "react-native-web";
 import { useState, useRef, useEffect } from "react";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, DropdownMenu, Tooltip, Image_, StaleBanner, TextInput_, LoadingIndicator, ReceiptSentOverlay } from "../../../../components";
 import { CheckBox } from "../../../../dom_components";
 import { C, Fonts, COLOR_GRADIENTS, ICONS } from "../../../../styles";

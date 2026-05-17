@@ -8,7 +8,7 @@ import { useSettingsStore } from "../stores";
 import { firestoreSubscribeCollection, firestoreDelete, firestoreWrite, firestoreRead } from "../db_calls";
 import { DB_NODES } from "../constants";
 import { ROUTES } from "../routes";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import { formatCurrencyDisp } from "../utils";
 
 const COLLECTIONS = [

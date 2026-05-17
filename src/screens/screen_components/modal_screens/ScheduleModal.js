@@ -8,7 +8,8 @@ import {
   TouchableWithoutFeedback,
 } from "react-native-web";
 import ReactDOM from "react-dom";
-import { cloneDeep, debounce } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
+import debounce from "lodash/debounce";
 import dayjs from "dayjs";
 import { C, ICONS } from "../../../styles";
 import { gray, trimToTwoDecimals } from "../../../utils";

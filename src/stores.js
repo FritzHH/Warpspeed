@@ -21,7 +21,7 @@ import {
   replaceOrAddToArr,
   resolveStatus,
 } from "./utils";
-import { debounce } from "lodash";
+import debounce from "lodash/debounce";
 import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "./broadcastChannel";
 import { calculateRunningTotals } from "./utils";
 

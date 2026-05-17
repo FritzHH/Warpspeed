@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { cloneDeep, last } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import {
   COLORS,
   CUSTOMER_PROTO,

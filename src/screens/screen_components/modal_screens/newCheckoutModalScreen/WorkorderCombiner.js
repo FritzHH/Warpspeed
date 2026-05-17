@@ -13,7 +13,7 @@ import {
   replaceOrAddToArr,
   formatWorkorderNumber,
 } from "../../../../utils";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import { useSettingsStore } from "../../../../stores";
 import { dlog, DCAT } from "./checkoutDebugLog";
 

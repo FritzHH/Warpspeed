@@ -14,7 +14,7 @@ import {
 import { ScreenModal, Button_, PhoneNumberInput, Tooltip, TextInput_ } from "../../../components";
 import { CUSTOMER_PROTO, SETTINGS_OBJ, TAB_NAMES, WORKORDER_PROTO } from "../../../data";
 import React, { useEffect, useRef, useState, useMemo } from "react";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import {
   useCurrentCustomerStore,
   useCustomerSearchStore,

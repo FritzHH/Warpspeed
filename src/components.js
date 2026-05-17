@@ -17,12 +17,14 @@ import React, {
   useRef,
   useState,
   useCallback,
+  Suspense,
+  lazy,
 } from "react";
 import { Image } from "react-native-web";
 import { formatCurrencyDisp, formatMillisForDisplay, gray, ifNumIsOdd, lightenRGBByPercent, localStorageWrapper, log, usdTypeMask, deepEqual } from "./utils";
 import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "./styles";
 import { SETTINGS_OBJ, PRIVILEDGE_LEVELS, CUSTOMER_DEPOST_TYPES } from "./data";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import { DEBOUNCE_DELAY, DISCOUNT_TYPES, LOCAL_DB_KEYS, PAUSE_USER_CLOCK_IN_CHECK_MILLIS } from "./constants";
 import {
   useSettingsStore,
@@ -32,7 +34,6 @@ import {
 import LinearGradient from "react-native-web-linear-gradient";
 import ReactDOM from "react-dom";
 // import DateTimePicker from "@react-native-community/datetimepicker";
-import CalendarPicker, { useDefaultStyles } from "react-native-ui-datepicker";
 import { PanResponder } from "react-native";
 
 import { StyleSheet } from "react-native";
@@ -489,55 +490,12 @@ export const Dialog_ = ({ visible, onClose, overlayColor = "rgba(50,50,50,.65)",
   );
 };
 
-export const DateTimePicker = ({ range, handleDateRangeChange = () => {} }) => {
-  const defaultStyles = useDefaultStyles();
-
-  function handleDateChange_(obj) {
-    if (!obj.endDate) obj.endDate = obj.startDate;
-    handleDateRangeChange(obj);
-  }
-
-  return (
-    <View
-      style={{
-        backgroundColor: "rgba(0, 0, 0, 0.75)",
-        alignItems: "center",
-        justifyContent: "center",
-        borderRadius: 15,
-      }}
-    >
-      <View
-        style={{
-          padding: 50,
-          // backgroundColor: "lightgray",
-          borderRadius: 15,
-          alignItems: "center",
-        }}
-      >
-        <CalendarPicker
-          styles={{
-            ...defaultStyles,
-            today: {
-              borderColor: C.lightred,
-              borderWidth: 2,
-              borderRadius: 100,
-            }, // Add a border to today's date
-            selected: {
-              borderRadius: 100,
-              backgroundColor: C.blue,
-            },
-            selected_label: { color: "white" },
-          }}
-          mode="range"
-          startDate={range.startDate}
-          endDate={range.endDate}
-          onChange={handleDateChange_}
-          // minDate={new Date()}
-        />
-      </View>
-    </View>
-  );
-};
+const _LegacyDateTimePicker = lazy(() => import("./legacyDateTimePicker"));
+export const DateTimePicker = (props) => (
+  <Suspense fallback={null}>
+    <_LegacyDateTimePicker {...props} />
+  </Suspense>
+);
 
 export const ScreenModal = ({
   enabled,

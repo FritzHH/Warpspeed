@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { useState, useEffect, useRef } from "react";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../styles";
 import {
   useSettingsStore,

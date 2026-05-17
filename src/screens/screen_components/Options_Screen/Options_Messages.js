@@ -36,6 +36,7 @@ import {
   TouchableOpacity_,
 } from "../../../components";
 import { C, COLOR_GRADIENTS, Colors, ICONS, Fonts } from "../../../styles";
+import hubStyles from "./MessagesHub.module.css";
 import { useTranslation } from "../../../useTranslation";
 import {
   SMS_PROTO,
@@ -195,6 +196,21 @@ export function MessagesComponent({}) {
   const [sHubSidebarFullWidth, _setHubSidebarFullWidth] = useState(false);
   const [sHubHoverPhone, _setHubHoverPhone] = useState("");
   const hoverTimerRef = useRef(null);
+  const [sHubVisibleCount, _setHubVisibleCount] = useState(35);
+  const hubLoadObserverRef = useRef(null);
+  const hubSentinelRef = useCallback((node) => {
+    if (hubLoadObserverRef.current) {
+      hubLoadObserverRef.current.disconnect();
+      hubLoadObserverRef.current = null;
+    }
+    if (!node) return;
+    hubLoadObserverRef.current = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting) {
+        _setHubVisibleCount((c) => c + 35);
+      }
+    }, { rootMargin: "200px 0px" });
+    hubLoadObserverRef.current.observe(node);
+  }, []);
 
   const {
     translatedText, isLoading: sTranslateLoading,
@@ -1108,34 +1124,37 @@ export function MessagesComponent({}) {
               </View>
             </View>
             {/* Thread list */}
-            <View style={{ flex: 1, overflow: "hidden" }}>
             {zSmsThreads.length < 1 ? (
               <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
                 <Text style={{ fontSize: 14, color: gray(0.3) }}>No conversations yet</Text>
               </View>
             ) : (
-              <FlatList
-                data={zSmsThreads}
-                keyExtractor={(item) => item.phone}
-                renderItem={({ item }) => {
+              <div className={hubStyles.threadList}>
+                {zSmsThreads.slice(0, sHubVisibleCount).map((item) => {
                   let activeWO = zAllWorkorders.find(wo => wo.customerCell === item.phone);
                   let isUnread = item.lastType === "incoming" && sHubSelectedPhone !== item.phone && (!sReadThreadPhones[item.phone] || sReadThreadPhones[item.phone] < item.lastMillis);
                   return (
                     <ThreadCard
+                      key={item.phone}
                       thread={item}
                       isSelected={sHubSelectedPhone === item.phone}
                       isHovered={sHubHoverPhone === item.phone}
                       isUnread={isUnread}
                       activeWO={activeWO}
                       onPress={() => handleHubThreadClick(item)}
-                      onHoverIn={() => { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = setTimeout(() => _setHubHoverPhone(item.phone), 150); }}
+                      onHoverIn={() => { clearTimeout(hoverTimerRef.current); hoverTimerRef.current = setTimeout(() => _setHubHoverPhone(item.phone), 500); }}
                       onHoverOut={() => { clearTimeout(hoverTimerRef.current); _setHubHoverPhone((prev) => prev === item.phone ? "" : prev); }}
                     />
                   );
-                }}
-              />
+                })}
+                {sHubVisibleCount < zSmsThreads.length && (
+                  <>
+                    <div className={hubStyles.loadingMore}>Loading more…</div>
+                    <div ref={hubSentinelRef} className={hubStyles.sentinel} />
+                  </>
+                )}
+              </div>
             )}
-            </View>
           </View>
         )}
         {/* Right panel: conversation */}
@@ -1583,30 +1602,45 @@ function ThreadCard({ thread, isSelected, isHovered, isUnread, activeWO, onPress
     else if (s === "queued" || s === "accepted" || s === "sending") { deliveryLabel = "Sending..."; }
   }
 
+  let cardClass = hubStyles.threadCard + (isSelected ? " " + hubStyles.threadCardSelected : "");
+  let cardStyle = { backgroundColor: bgColor };
+  if (isSelected) {
+    cardStyle.borderColor = C.orange;
+    cardStyle.borderBottomColor = C.orange;
+  }
+  let nameColor = isUnread ? "rgba(255,255,255,0.85)" : C.blue;
+  let previewColor = isUnread ? "rgba(255,255,255,0.85)" : gray(0.5);
+
   return (
-    <TouchableOpacity onPress={onPress} onMouseEnter={onHoverIn} onMouseLeave={onHoverOut} style={{ paddingVertical: 10, paddingHorizontal: 2, borderBottomWidth: isSelected ? 2 : 1, borderBottomColor: isSelected ? C.orange : gray(0.08), backgroundColor: bgColor, borderWidth: isSelected ? 2 : 0, borderColor: isSelected ? C.orange : "transparent" }}>
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            {!activeWO && <Image_ icon={ICONS.questionMark} size={14} style={{ marginRight: 6 }} />}
-            <Text style={{ fontSize: 14, fontWeight: Fonts.weight.textHeavy, color: textColor }}>{formattedPhone}</Text>
-          </View>
+    <div
+      className={cardClass}
+      style={cardStyle}
+      onClick={onPress}
+      onMouseEnter={onHoverIn}
+      onMouseLeave={onHoverOut}
+    >
+      <div className={hubStyles.threadRow}>
+        <div className={hubStyles.threadLeft}>
+          <div className={hubStyles.phoneLine}>
+            {!activeWO && <img src={ICONS.questionMark} alt="" className={hubStyles.questionIcon} />}
+            <span className={hubStyles.phoneText} style={{ color: textColor }}>{formattedPhone}</span>
+          </div>
           {customerName ? (
-            <Text style={{ fontSize: 12, color: isUnread ? "rgba(255,255,255,0.85)" : C.blue, marginTop: 2 }} numberOfLines={1}>{customerName}</Text>
+            <span className={hubStyles.customerName} style={{ color: nameColor }}>{customerName}</span>
           ) : (
-            <View style={{ height: 18, marginTop: 2 }} />
+            <div className={hubStyles.customerSpacer} />
           )}
-        </View>
-        <View style={{ alignItems: "flex-end" }}>
-          <Text style={{ fontSize: 11, color: subtextColor }}>{shortDate}</Text>
-          <Text style={{ fontSize: 11, color: subtextColor, marginTop: 2 }}>{dateObj?.time || ""}</Text>
-          {deliveryLabel ? <Text style={{ fontSize: 10, color: deliveryColor, marginTop: 1 }}>{deliveryLabel}</Text> : null}
-        </View>
-      </View>
-      <View style={{ marginTop: 4 }}>
-        <Text numberOfLines={2} style={{ fontSize: 13, color: isUnread ? "rgba(255,255,255,0.85)" : gray(0.5), flex: 1 }}>{preview}</Text>
-      </View>
-    </TouchableOpacity>
+        </div>
+        <div className={hubStyles.threadRight}>
+          <span className={hubStyles.dateText} style={{ color: subtextColor }}>{shortDate}</span>
+          <span className={hubStyles.timeText} style={{ color: subtextColor }}>{dateObj?.time || ""}</span>
+          {deliveryLabel ? <span className={hubStyles.deliveryText} style={{ color: deliveryColor }}>{deliveryLabel}</span> : null}
+        </div>
+      </div>
+      <div className={hubStyles.previewWrap}>
+        <span className={hubStyles.preview} style={{ color: previewColor }}>{preview}</span>
+      </div>
+    </div>
   );
 }
 

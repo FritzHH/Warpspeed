@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { View, Text, FlatList, TouchableOpacity } from "react-native-web";
 import { TAB_NAMES, RECEIPT_TYPES, WORKORDER_PROTO } from "../../../data";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import {
   useOpenWorkordersStore,
   useTabNamesStore,

@@ -69,8 +69,8 @@ import {
   Dialog_,
 } from "../../../../components";
 import { CheckBox } from "../../../../dom_components";
-import { cloneDeep, set } from "lodash";
-import React, { Children, useEffect, useRef, useState } from "react";
+import cloneDeep from "lodash/cloneDeep";
+import React, { Children, useEffect, useRef, useState, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
@@ -79,8 +79,16 @@ import { APP_USER, COLORS, INTAKE_QUICK_BUTTON_PROTO, NOTE_HELPER_PROTO, NOTE_HE
 import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
-import { SalesReportsModal } from "../../modal_screens/SalesReports";
-import { PayrollModal } from "../../modal_screens/PayrollModal";
+const SalesReportsModal = lazy(() =>
+  import("../../modal_screens/SalesReports").then((m) => ({
+    default: m.SalesReportsModal,
+  }))
+);
+const PayrollModal = lazy(() =>
+  import("../../modal_screens/PayrollModal").then((m) => ({
+    default: m.PayrollModal,
+  }))
+);
 import { ScheduleModal } from "../../modal_screens/ScheduleModal";
 import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection, dbSaveInventoryItem, dbGmailDisconnect, dbGmailInitiateAuth } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses, mapEmployees, mapPunchHistory, parseCSV } from "../../../../lightspeed_import";
@@ -195,10 +203,14 @@ export function Dashboard_Admin({}) {
         />
       )}
       {!!sShowSalesReportModal && (
-        <SalesReportsModal handleExit={() => _setShowSalesReportModal(false)} />
+        <Suspense fallback={null}>
+          <SalesReportsModal handleExit={() => _setShowSalesReportModal(false)} />
+        </Suspense>
       )}
       {!!sShowPayrollModal && (
-        <PayrollModal handleExit={() => _setShowPayrollModal(false)} />
+        <Suspense fallback={null}>
+          <PayrollModal handleExit={() => _setShowPayrollModal(false)} />
+        </Suspense>
       )}
       {!!sShowScheduleModal && (
         <ScheduleModal handleExit={() => _setShowScheduleModal(false)} />

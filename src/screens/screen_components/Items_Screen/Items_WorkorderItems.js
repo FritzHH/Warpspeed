@@ -35,7 +35,7 @@ import {
   TAB_NAMES,
 } from "../../../data";
 import { useEffect, useRef, useState } from "react";
-import { cloneDeep, zipObject } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import {
   useCheckoutStore,
   useCurrentCustomerStore,

@@ -1,5 +1,5 @@
 /* eslint-disable */
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense, lazy } from "react";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { BaseScreen } from "./screens/BaseScreen";
 import { LoginScreen } from "./screens/LoginScreen";
@@ -8,7 +8,11 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { CustomerDisplayScreen } from "./screens/CustomerDisplayScreen";
 import { TranslateScreen } from "./screens/TranslateScreen";
 import { IntakeScreen } from "./screens/IntakeScreen";
-import { BikeStandScreen } from "./screens/BikeStandScreen";
+const BikeStandScreen = lazy(() =>
+  import("./screens/BikeStandScreen").then((m) => ({
+    default: m.BikeStandScreen,
+  }))
+);
 import { PhoneScreen } from "./screens/PhoneScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { DatabaseViewerScreen } from "./screens/DatabaseViewerScreen";
@@ -303,7 +307,9 @@ function App() {
           path={ROUTES.stand}
           element={
             <ProtectedRoute user={user}>
-              <BikeStandScreenWrapper />
+              <Suspense fallback={null}>
+                <BikeStandScreenWrapper />
+              </Suspense>
             </ProtectedRoute>
           }
         />

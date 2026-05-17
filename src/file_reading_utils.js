@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import {
   generateBarcode,
   generateEAN13Barcode,

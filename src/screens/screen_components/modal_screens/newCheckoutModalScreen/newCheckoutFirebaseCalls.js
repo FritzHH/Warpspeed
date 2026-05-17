@@ -12,7 +12,7 @@ import { useSettingsStore, useOpenWorkordersStore } from "../../../../stores";
 import { log, generateEAN13Barcode } from "../../../../utils";
 import { ITEM_SALE_PROTO, CUSTOMER_DEPOSIT_PROTO } from "../../../../data";
 import { recomputeSaleAmounts, getAllAppliedCredits } from "./newCheckoutUtils";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import { dlog, DCAT } from "./checkoutDebugLog";
 
 // ─── Callable Function References ─────────────────────────────

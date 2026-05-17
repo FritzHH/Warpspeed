@@ -3,7 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import * as faceapi from "face-api.js";
 import { C, ICONS, COLOR_GRADIENTS } from "../styles";
 import {

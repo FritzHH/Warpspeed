@@ -8,7 +8,6 @@ const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const functions = require("firebase-functions");
 const { defineSecret } = require("firebase-functions/params");
 const Stripe = require("stripe");
-const { isArray } = require("lodash");
 const nodemailer = require("nodemailer");
 const { onInit } = require("firebase-functions/v2/core");
 const { onCall, HttpsError } = require("firebase-functions/v2/https");

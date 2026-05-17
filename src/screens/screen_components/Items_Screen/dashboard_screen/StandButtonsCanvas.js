@@ -24,7 +24,7 @@ import {
   Image_,
   TextInput_,
 } from "../../../../components";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import { C, Fonts, ICONS } from "../../../../styles";
 import { WORKORDER_ITEM_PROTO } from "../../../../data";
 import { dbSaveOpenWorkorder } from "../../../../db_calls_wrapper";

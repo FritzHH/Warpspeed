@@ -24,7 +24,7 @@ import {
 import { useSettingsStore, useInventoryStore, useAlertScreenStore } from "../../../stores";
 import { dbSavePrintObj } from "../../../db_calls_wrapper";
 import { workerSearchInventory } from "../../../inventorySearchManager";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
 
 // ─── Constants ──────────────────────────────────────────────────────────────

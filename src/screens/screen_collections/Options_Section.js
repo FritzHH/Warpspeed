@@ -13,7 +13,7 @@ import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../styles";
 import { TAB_NAMES } from "../../data";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
 import ReactDOM from "react-dom";
-import React, { useEffect, useRef, useState, useCallback } from "react";
+import React, { useEffect, useRef, useState, useCallback, Suspense, lazy } from "react";
 import { WorkordersComponent } from "../screen_components/Options_Screen/Options_Workorders";
 import { InventoryComponent } from "../screen_components/Options_Screen/Options_Inventory";
 import { MessagesComponent } from "../screen_components/Options_Screen/Options_Messages";
@@ -26,7 +26,11 @@ import {
   useEmailStore,
 } from "../../stores";
 import { INTERNET_CHECK_DELAY, LOCAL_DB_KEYS } from "../../constants";
-import { PayrollModal } from "../screen_components/modal_screens/PayrollModal";
+const PayrollModal = lazy(() =>
+  import("../screen_components/modal_screens/PayrollModal").then((m) => ({
+    default: m.PayrollModal,
+  }))
+);
 import { getWeekStart, formatTimeShort, getStoreHoursForDayIndex } from "../screen_components/modal_screens/ScheduleModal";
 import dayjs from "dayjs";
 import { gray } from "../../utils";
@@ -71,10 +75,12 @@ export const Options_Section = React.memo(({}) => {
       />
       {ScreenComponent()}
       {sShowPayroll && (
-        <PayrollModal
-          handleExit={() => _setShowPayroll(false)}
-          employeeUser={zCurrentUser}
-        />
+        <Suspense fallback={null}>
+          <PayrollModal
+            handleExit={() => _setShowPayroll(false)}
+            employeeUser={zCurrentUser}
+          />
+        </Suspense>
       )}
       {sShowUserClockModal && (
         <UserClockModal

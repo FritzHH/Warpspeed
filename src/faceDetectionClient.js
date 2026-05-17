@@ -17,7 +17,7 @@ import {
   PAUSE_USER_CLOCK_IN_CHECK_MILLIS,
 } from "./constants";
 import { useAlertScreenStore, useLoginStore, useSettingsStore } from "./stores";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import { Button_ } from "./components";
 import { C, COLOR_GRADIENTS } from "./styles";
 // import {} from "./models";

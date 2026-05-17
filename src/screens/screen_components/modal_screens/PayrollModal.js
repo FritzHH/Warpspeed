@@ -23,7 +23,8 @@ import dayjs from "dayjs";
 import CalendarPicker, {
   useDefaultStyles,
 } from "react-native-ui-datepicker";
-import { cloneDeep, sortBy } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
+import sortBy from "lodash/sortBy";
 import { useSettingsStore, useAlertScreenStore, useLoginStore } from "../../../stores";
 import {
   dbGetPunchesByTimeFrame,

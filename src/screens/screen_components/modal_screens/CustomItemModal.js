@@ -14,7 +14,7 @@ import { INVENTORY_ITEM_PROTO, WORKORDER_ITEM_PROTO } from "../../../data";
 import { DISCOUNT_TYPES } from "../../../constants";
 
 import { useSettingsStore } from "../../../stores";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 
 export const CustomItemModal = ({
   visible,

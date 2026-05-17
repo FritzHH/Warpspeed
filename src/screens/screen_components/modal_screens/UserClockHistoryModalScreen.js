@@ -26,9 +26,9 @@ import {
 } from "../../../utils";
 import dayjs from "dayjs";
 
-import sr from "dayjs/locale/sr";
-import { cloneDeep, range, sortBy } from "lodash";
-import { isEven } from "face-api.js/build/commonjs/utils";
+import cloneDeep from "lodash/cloneDeep";
+import sortBy from "lodash/sortBy";
+const isEven = (n) => n % 2 === 0;
 import { useLoginStore, useSettingsStore } from "../../../stores";
 import { deepEqual } from "../../../utils";
 import {

@@ -24,7 +24,7 @@ import {
   dbListenToSingleWorkorder,
 } from "../../db_calls_wrapper";
 import { WorkorderMediaModal } from "../screen_components/modal_screens/WorkorderMediaModal";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 
 export function MobileWorkorderDetailScreen() {
   const { id } = useParams();

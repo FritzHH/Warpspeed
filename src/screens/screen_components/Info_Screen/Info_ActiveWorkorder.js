@@ -57,7 +57,7 @@ import {
 } from "../../../data";
 import { MILLIS_IN_DAY, build_db_path } from "../../../constants";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import {
   useCurrentCustomerStore,
   useOpenWorkordersStore,

@@ -9,7 +9,8 @@ import {
 } from "react-native-web";
 import { createPortal } from "react-dom";
 import { useState, useRef } from "react";
-import { cloneDeep, debounce } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
+import debounce from "lodash/debounce";
 import {
   useSettingsStore,
   useInventoryStore,

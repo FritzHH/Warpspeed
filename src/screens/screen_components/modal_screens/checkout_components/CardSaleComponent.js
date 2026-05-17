@@ -15,7 +15,7 @@ import {
   DropdownMenu,
 } from "../../../../components";
 import { CheckBox } from "../../../../dom_components";
-import { cloneDeep, initial } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import {
   formatCurrencyDisp,
   log,

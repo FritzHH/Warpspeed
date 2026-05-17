@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, Suspense, lazy } from "react";
 import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native-web";
 import { C, Colors, ICONS, ViewStyles } from "../styles";
 
@@ -34,7 +34,11 @@ import {
   broadcastDisplayStatus,
   DISPLAY_STATUS,
 } from "../broadcastChannel";
-import { FaceDetectionClientComponent } from "../faceDetection";
+const FaceDetectionClientComponent = lazy(() =>
+  import("../faceDetection").then((m) => ({
+    default: m.FaceDetectionClientComponent,
+  }))
+);
 import { NewCheckoutModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewCheckoutModalScreen";
 import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
 import { FullSaleModal } from "./screen_components/modal_screens/FullSaleModal";
@@ -55,7 +59,8 @@ import {
 import { SETTINGS_OBJ, TAB_NAMES, CUSTOMER_PROTO } from "../data";
 import { clog, log, recoverPendingAutoTexts, localStorageWrapper } from "../utils";
 import { register, reconnectAll, teardownAll, useListenerStatusStore } from "../listenerManager";
-import { cloneDeep, throttle } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
+import throttle from "lodash/throttle";
 import { ROUTES } from "../routes";
 
 function playNotificationBeep() {
@@ -537,7 +542,11 @@ export function BaseScreen() {
       {zShowLoginScreen && !zLoginModalVisible && (
         <LoginModalScreen modalVisible={true} />
       )}
-      {!!zRunBackgroundRecognition && zUseFacialRecognition && <FaceDetectionClientComponent />}
+      {!!zRunBackgroundRecognition && zUseFacialRecognition && (
+        <Suspense fallback={null}>
+          <FaceDetectionClientComponent />
+        </Suspense>
+      )}
       {/* {!!(!zPauseAlertOnBaseComponent && zShowAlert) && <AlertBox_ />} */}
       <AlertBox_ showAlert={zShowAlert} />
       <View

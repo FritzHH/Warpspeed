@@ -34,7 +34,6 @@
     "face-api.js": "^0.22.2",
     "firebase": "^11.6.1",
     "fs": "^0.0.1-security",
-    "jspdf": "^3.0.1",
     "lodash": "^4.17.21",
     "random-words": "^2.0.1",
     "react": "^19.1.0",
@@ -79,7 +78,9 @@
     "auth": "firebase login --reauth",
     "begin": "yarn build && serve -s build --ssl-cert cert.pem --ssl-key key.pem",
     "serveit": "serve -s build --ssl-cert cert.pem --ssl-key key.pem",
-    "host": "yarn build && firebase deploy --only hosting"
+    "host": "yarn build && firebase deploy --only hosting",
+    "analyze": "source-map-explorer 'build/static/js/*.js' --no-border-checks",
+    "analyze:html": "source-map-explorer 'build/static/js/*.js' --no-border-checks --html build/bundle-report.html"
   },
   "eslintConfig": {
     "extends": [
@@ -101,6 +102,7 @@
   },
   "devDependencies": {
     "electron-builder": "^26.0.12",
+    "source-map-explorer": "^2.5.3",
     "webpack": "^5.99.7",
     "webpack-cli": "^6.0.1"
   }

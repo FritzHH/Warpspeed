@@ -1,8 +1,5 @@
 /* eslint-disable */
-import { View } from "react-native-web";
-import { gray } from "../../../../utils";
-import { Button_, TextInput_ } from "../../../../components";
-import { C, ICONS } from "../../../../styles";
+import { ICONS } from "../../../../styles";
 import { TAB_NAMES } from "../../../../data";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -19,6 +16,7 @@ import { dbGetCustomer, dbGetCustomerMessages, dbListenToNewMessages } from "../
 import { scoreWorkorder, sortWorkorders } from "./utils";
 import WorkorderRowItem from "./WorkorderRowItem";
 import EmptyState from "./EmptyState";
+import styles from "./WorkordersHeader.module.css";
 
 export function WorkordersComponent({}) {
   const zOpenWorkorders = useOpenWorkordersStore((state) => state.workorders);
@@ -216,53 +214,31 @@ export function WorkordersComponent({}) {
   }, [zOpenWorkorders, sSearchTerm]);
 
   return (
-    <View
-      style={{
-        flex: 1,
-        paddingHorizontal: 5,
-      }}
-    >
-      <View
-        style={{
-          height: "5%",
-          flexDirection: "row",
-          alignItems: "center",
-          paddingHorizontal: 4,
-          justifyContent: "space-between",
-        }}
-      >
-        <Button_
-          icon={ICONS.reset1}
-          iconSize={20}
-          onPress={() => {
+    <div className={styles.container}>
+      <div className={styles.header}>
+        <button
+          type="button"
+          className={styles.resetBtn}
+          onClick={() => {
             _setSearchTerm("");
             searchInputRef.current?.focus();
           }}
-          useColorGradient={false}
           disabled={!sSearchTerm}
-        />
-        <TextInput_
-          inputRef={searchInputRef}
-          style={{
-            borderBottomWidth: 1,
-            borderBottomColor: gray(0.2),
-            fontSize: 18,
-            color: C.text,
-            outlineWidth: 0,
-            outlineStyle: "none",
-            width: "80%",
-            marginLeft: 20,
-            marginRight: 30,
-          }}
+        >
+          <img src={ICONS.reset1} alt="" className={styles.resetIcon} />
+        </button>
+        <input
+          ref={searchInputRef}
+          type="text"
+          className={styles.input}
           placeholder="Find open workorder"
-          placeholderTextColor={gray(0.2)}
           value={sSearchTerm}
-          onChangeText={handleSearchChange}
-          autoFocus={true}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          autoFocus
         />
-      </View>
+      </div>
 
-      <div style={{ width: "100%", flex: 1, overflowY: "auto" }}>
+      <div className={styles.list}>
         {sortedData.length === 0 ? (
           <EmptyState isLoaded={zWorkordersLoaded} hasSearchTerm={!!sSearchTerm.trim()} />
         ) : (
@@ -285,6 +261,6 @@ export function WorkordersComponent({}) {
           })
         )}
       </div>
-    </View>
+    </div>
   );
 }

@@ -8,7 +8,7 @@
  */
 
 const admin = require("firebase-admin");
-const { cloneDeep } = require("lodash");
+const cloneDeep = require("lodash/cloneDeep");
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");

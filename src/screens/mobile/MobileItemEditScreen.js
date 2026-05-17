@@ -8,7 +8,7 @@ import {
   FlatList,
 } from "react-native-web";
 import { useParams } from "react-router-dom";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import { TextInput_, Button_, DropdownMenu, Image_ } from "../../components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
 import {

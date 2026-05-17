@@ -12,7 +12,7 @@ import {
   WORKORDER_PROTO,
 } from "./data";
 import { generate } from "random-words";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import dayjs from "dayjs";
 import { C } from "./styles";
 import { useAlertScreenStore, useLoginStore, useOpenWorkordersStore, useSettingsStore } from "./stores";

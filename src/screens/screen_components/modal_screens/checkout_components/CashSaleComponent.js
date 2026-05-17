@@ -15,7 +15,7 @@ import {
   Button_,
 } from "../../../../components";
 import { CheckBox } from "../../../../dom_components";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import {
   formatCurrencyDisp,
   gray,

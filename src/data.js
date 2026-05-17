@@ -1,6 +1,5 @@
 /* eslint-disable */
 
-import { identity } from "lodash";
 import { DISCOUNT_TYPES, MILLIS_IN_HOUR, PERMISSION_LEVELS } from "./constants";
 import { getRgbFromNamedColor, lightenRGBByPercent } from "./utils";
 import { C } from "./styles";

@@ -32,7 +32,7 @@ import {
 import { InventoryItemModalScreen } from "../modal_screens/InventoryItemModalScreen";
 import { CustomItemModal } from "../modal_screens/CustomItemModal";
 import { ColorPickerModal } from "../modal_screens/ColorPickerModal";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import {
   useSettingsStore,
   useOpenWorkordersStore,
@@ -41,6 +41,7 @@ import {
 } from "../../../stores";
 import { dbSaveSettingsField, dbSaveInventoryItem, dbSavePrintObj } from "../../../db_calls_wrapper";
 import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
+import headerStyles from "./InventoryHeader.module.css";
 
 function getQuickButtonFontSize(text, baseFontSize) {
   let len = (text || "").length;
@@ -1625,56 +1626,39 @@ export function InventoryComponent({}) {
           )}
         </View>
       ) : (
-        <View
-          style={{
-            width: "100%",
-            height: "5%",
-            flexDirection: "row",
-            paddingHorizontal: 4,
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <Button_
-            icon={ICONS.reset1}
-            iconSize={20}
-            onPress={() => clearSearch()}
-            useColorGradient={false}
-            enabled={!!sSearchTerm}
-          />
-          <TextInput_
-            autoFocus={true}
-            style={{
-              borderBottomWidth: 1,
-              borderBottomColor: gray(0.2),
-              fontSize: 18,
-              color: C.text,
-              outlineWidth: 0,
-              outlineStyle: "none",
-              width: "80%",
-              marginLeft: 20,
-              marginRight: 30,
-            }}
+        <div className={headerStyles.header}>
+          <button
+            type="button"
+            className={`${headerStyles.iconBtn} ${headerStyles.resetBtn}`}
+            onClick={() => clearSearch()}
+            disabled={!sSearchTerm}
+          >
+            <img src={ICONS.reset1} alt="" className={headerStyles.icon} />
+          </button>
+          <input
+            type="text"
+            autoFocus
+            className={headerStyles.input}
             placeholder="Search inventory"
-            placeholderTextColor={gray(0.2)}
             value={sSearchTerm}
-            onChangeText={(val) => handleSearch(val)}
+            onChange={(e) => handleSearch(e.target.value)}
           />
           <Tooltip text="New Item" position="bottom">
-            <Button_
-              icon={ICONS.new}
-              iconSize={25}
-              useColorGradient={false}
-              onPress={() => {
+            <button
+              type="button"
+              className={`${headerStyles.iconBtn} ${headerStyles.newBtn}`}
+              onClick={() => {
                 let newItem = cloneDeep(INVENTORY_ITEM_PROTO);
                 let barcode = generateEAN13Barcode();
                 newItem.id = barcode;
                 newItem.primaryBarcode = barcode;
                 _setModalItem(newItem);
               }}
-            />
+            >
+              <img src={ICONS.new} alt="" className={headerStyles.newIcon} />
+            </button>
           </Tooltip>
-        </View>
+        </div>
       )}
       <View
         style={{

@@ -17,7 +17,7 @@ import {
   Tooltip,
   TouchableOpacity_,
 } from "../../../components";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import { SETTINGS_OBJ, TAB_NAMES, WORKORDER_PROTO } from "../../../data";
 import {
   useCurrentCustomerStore,

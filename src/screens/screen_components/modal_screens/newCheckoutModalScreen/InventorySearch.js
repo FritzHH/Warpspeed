@@ -2,7 +2,7 @@
 import { View, Text, ScrollView } from "react-native-web";
 import { TouchableOpacity } from "react-native";
 import { useState, memo } from "react";
-import { cloneDeep } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
 import { TextInput_, Button_ } from "../../../../components";
 import { C, COLOR_GRADIENTS } from "../../../../styles";
 import {

@@ -34,7 +34,8 @@ import { CheckBox } from "../dom_components";
 import { StandKeypad } from "../shared/StandKeypad";
 import { MILLIS_IN_DAY, DISCOUNT_TYPES } from "../constants";
 import { COLORS, NONREMOVABLE_WAIT_TIMES, WORKORDER_ITEM_PROTO } from "../data";
-import { cloneDeep, throttle } from "lodash";
+import cloneDeep from "lodash/cloneDeep";
+import throttle from "lodash/throttle";
 import { workerSearchInventory } from "../inventorySearchManager";
 import { MobileMessagesScreen } from "./mobile/MobileMessagesScreen";
 

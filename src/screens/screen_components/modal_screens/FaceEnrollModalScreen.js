@@ -3,10 +3,15 @@
 import { View } from "react-native-web";
 import { useLoginStore } from "../../../stores";
 import { Button_, Dialog_ } from "../../../components";
-import { FaceDetectionClientComponent } from "../../../faceDetection";
 import { log } from "../../../utils";
 import { COLOR_GRADIENTS } from "../../../styles";
-import { useEffect } from "react";
+import { useEffect, Suspense, lazy } from "react";
+
+const FaceDetectionClientComponent = lazy(() =>
+  import("../../../faceDetection").then((m) => ({
+    default: m.FaceDetectionClientComponent,
+  }))
+);
 
 export function FaceEnrollModalScreen({
   handleExitPress,
@@ -41,9 +46,11 @@ export function FaceEnrollModalScreen({
           justifyContent: "center",
         }}
       >
-        <FaceDetectionClientComponent
-          __handleEnrollDescriptor={handleDescriptor}
-        />
+        <Suspense fallback={null}>
+          <FaceDetectionClientComponent
+            __handleEnrollDescriptor={handleDescriptor}
+          />
+        </Suspense>
         <Button_
           text={"Exit"}
           colorGradientArr={COLOR_GRADIENTS.green}

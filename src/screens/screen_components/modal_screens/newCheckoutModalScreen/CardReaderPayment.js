@@ -18,7 +18,6 @@ import {
   newCheckoutCancelStripePayment,
   newCheckoutListenToPaymentUpdates,
 } from "./newCheckoutFirebaseCalls";
-import { pad } from "lodash";
 import { dlog, DCAT } from "./checkoutDebugLog";
 
 function PulsingText({ text }) {

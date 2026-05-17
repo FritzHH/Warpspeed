@@ -80,8 +80,8 @@ import { InventorySearchModal } from "./screen_components/modal_screens/Inventor
 import { StandKeypad } from "../shared/StandKeypad";
 import { MILLIS_IN_DAY, DISCOUNT_TYPES, FACE_DESCRIPTOR_CONFIDENCE_DISTANCE, build_db_path } from "../constants";
 import { openCacheDB, clearStaleCache, loadModelCached } from "../faceDetection";
-import warningIcon from "../assets/warning.png";
-import plusIcon from "../assets/plus.png";
+import warningIcon from "../assets/webp/warning.webp";
+import plusIcon from "../assets/webp/plus.webp";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
 

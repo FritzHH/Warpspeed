@@ -72,7 +72,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
     buttonTextStyle = {},
     buttonText,
     menuButtonStyle = { borderRadius: 5 },
-    selectedIdx = 0,
+    selectedIdx = -1,
     useSelectedAsButtonTitle = false,
     menuMaxHeight,
     menuBorderColor,

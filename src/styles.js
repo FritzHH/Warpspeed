@@ -73,9 +73,9 @@ export const COLOR_GRADIENTS = {
   yellow: [lightenRGBByPercent(C.orange, 35), lightenRGBByPercent(C.orange, 15)],
 };
 
-const assetModules = import.meta.glob('./assets/*.{png,jpg,jpeg,gif,svg}', { eager: true, import: 'default' });
+const assetModules = import.meta.glob('./assets/webp/*.webp', { eager: true, import: 'default' });
 const gifModules = import.meta.glob('./assets/gifs/*.{gif,png}', { eager: true, import: 'default' });
-const asset = (name) => assetModules[`./assets/${name}`];
+const asset = (name) => assetModules[`./assets/webp/${name.replace(/\.(png|jpg|jpeg)$/i, '.webp')}`];
 const gif = (name) => gifModules[`./assets/gifs/${name}`];
 
 export const ICONS = {
@@ -88,37 +88,29 @@ export const ICONS = {
   dollarYellow: asset("dollar.png"),
   rightArrowBlue: asset("right-arrow.png"),
   expandGreen: asset("expandGreen.png"),
-  expandYellow: asset("expandYellow.png"),
   greenLeftArrow: asset("greenLeftArrow.png"),
   greenRightArrow: asset("greenRightArrow.png"),
+  forwardGreen: asset("forwardGreen.png"),
   blocked: asset("blocked.png"),
   unblock: asset("unblock.png"),
-  forward: asset("forward.png"),
   blockNotif: asset("block-notif.png"),
   allowNotif: asset("allow-notif.png"),
-  microphone: asset("microphone.png"),
-  stopRecord: asset("stop.png"),
   colorWheel: asset("colorWheel.png"),
   tools1: asset("tools1.png"),
   upArrowOrange: asset("up_arrow_orange.png"),
   downArrowOrange: asset("down_arrow_orange.png"),
   downArrow: asset("down-arrow.png"),
-  upRightArrow: asset("up-right-arrow.png"),
   clickHere: asset("clickHere.png"),
   importIcon: asset("in.png"),
-  exportIcon: asset("out.png"),
   editPencil: asset("edit_pencil.png"),
   close1: asset("close1.png"),
   check1: asset("check1.png"),
   check: asset("check.png"),
   shoppingCart: asset("shopping_cart.png"),
   minus: asset("minus.png"),
-  asterisk: asset("asterisk.png"),
   new: asset("new.png"),
   add: asset("plus.png"),
-  addRound: asset("add_round.png"),
   cellPhone: asset("cell.png"),
-  maximize: asset("maximize.png"),
   home: asset("home.png"),
   reset1: asset("reset.png"),
   gears1: asset("gears1.png"),
@@ -130,9 +122,7 @@ export const ICONS = {
   checkoxEmpty: asset("checkbox-empty.png"),
   search: asset("search.png"),
   info: asset("info.png"),
-  info2: asset("info2.png"),
   settings: asset("settings.png"),
-  infoGear: asset("info-gear.png"),
   internetOnlineGIF: gif("internetOnlineGIF.gif"),
   internetOfflineGIF: gif("internedDisconnectedGIF.gif"),
   cashRegister: asset("cashRegister.png"),
@@ -141,7 +131,6 @@ export const ICONS = {
   uploadCamera: asset("uploadCamera.png"),
   viewPhoto: asset("viewPhoto.png"),
   wifi: gif("wifi.gif"),
-  restricted: asset("restricted.png"),
   redx: asset("redx.png"),
   listGif: gif("list.gif"),
   clockGif: gif("clock.gif"),
@@ -166,8 +155,6 @@ export const ICONS = {
   storeInfo: asset("storeInfo.png"),
   ordering: asset("ordering.png"),
   letterW: asset("w-letter.png"),
-  letterI: asset("letter-i.png"),
-  letterR: asset("letter-r.png"),
   airplane: asset("airplane.png"),
   popperCelebration: gif("popperCelebration.gif"),
   guyCelebrating: gif("guyCelebrating.gif"),

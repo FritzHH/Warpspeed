@@ -43,6 +43,7 @@ export { DepositModal } from "./DepositModal/DepositModal";
 export { DepositsList } from "./DepositsList/DepositsList";
 export { WebPageModal } from "./WebPageModal/WebPageModal";
 export { NoteHelperDropdown } from "./NoteHelperDropdown/NoteHelperDropdown";
+export { LineActionsDropdown } from "./LineActionsDropdown/LineActionsDropdown";
 export { CustomerQuickNotesDropdown } from "./CustomerQuickNotesDropdown/CustomerQuickNotesDropdown";
 
 // Batch 6 - Animated components

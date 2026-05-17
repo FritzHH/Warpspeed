@@ -1,6 +1,5 @@
 /*eslint-disable*/
-import { View, Text, FlatList, Image, TouchableOpacity, Animated, TouchableWithoutFeedback, TextInput } from "react-native-web";
-import * as PopoverPrimitive from "@radix-ui/react-popover";
+import { View, Text, FlatList, Image, TouchableOpacity, Animated, TouchableWithoutFeedback } from "react-native-web";
 import {
   applyDiscountToWorkorderItem,
   calculateRunningTotals,
@@ -12,7 +11,6 @@ import {
   replaceOrAddToArr,
   resolveStatus,
   showAlert,
-  usdTypeMask,
 } from "../../../utils";
 import { DISCOUNT_TYPES } from "../../../constants";
 import {
@@ -24,7 +22,7 @@ import {
   Tooltip,
   StaleBanner,
 } from "../../../components";
-import { CheckBox } from "../../../dom_components";
+import { CheckBox, LineActionsDropdown } from "../../../dom_components";
 import { C, ICONS } from "../../../styles";
 import { EmptyItemsComponent } from "./Items_Empty";
 import {
@@ -985,13 +983,6 @@ export const LineItemComponent = ({
   const qtyDisplayStr = sQtyFocused ? sQtyInputVal : String(effectiveQty);
   const qtyDigits = qtyDisplayStr.length || 1;
   const qtyBoxWidth = qtyDigits <= 2 ? 31 : 31 + (qtyDigits - 2) * 10;
-  const [sLineActionModal, _setLineActionModal] = useState(null);
-  const [sModalTop, _setModalTop] = useState(null);
-  const lineActionRef = useRef(null);
-  const modalContentRef = useRef(null);
-  const [sCustomPercent, _setCustomPercent] = useState("");
-  const [sCustomDollar, _setCustomDollar] = useState("");
-  const [sCustomDollarCents, _setCustomDollarCents] = useState(0);
 
   /////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
@@ -1323,177 +1314,32 @@ export const LineItemComponent = ({
               alignItems: "center",
             }}
           >
-            <PopoverPrimitive.Root open={!!sLineActionModal} onOpenChange={(open) => { if (!open) { _setLineActionModal(null); _setModalTop(null); } }}>
-            <PopoverPrimitive.Anchor asChild>
             <Tooltip text="Actions" position="top">
-              <Button_
-                ref={lineActionRef}
+              <LineActionsDropdown
                 enabled={!isLocked}
-                icon={ICONS.menu2}
-                iconSize={22}
-                onPress={() => {
-                  _setModalTop(null);
-                  _setLineActionModal({ open: true });
-                  _setCustomPercent("");
-                  _setCustomDollar("");
-                  _setCustomDollarCents(0);
+                showSplit={effectiveQty > 1}
+                onSplit={() => __splitItems(workorderLine, index)}
+                onRemove={() => __deleteWorkorderLine(index)}
+                discounts={zSettingsObj.discounts || []}
+                currentDiscount={workorderLine.discountObj}
+                maxDiscountCents={workorderLine.inventoryItem.price * (workorderLine.qty || 1)}
+                onSelectDiscount={(discount) => {
+                  if (!discount) {
+                    __setWorkorderLineItem({ ...workorderLine, discountObj: null });
+                  } else {
+                    applyDiscount(workorderLine, discount);
+                  }
                 }}
-                buttonStyle={{ backgroundColor: "transparent", borderWidth: 0, paddingHorizontal: 4, marginRight: 3 }}
+                onCustomPercent={(num) => {
+                  applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
+                }}
+                onCustomDollar={(cents) => {
+                  const dollars = (cents / 100).toFixed(2);
+                  applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(cents), type: DISCOUNT_TYPES.dollar, custom: true });
+                }}
+                triggerStyle={{ marginRight: 3 }}
               />
             </Tooltip>
-            </PopoverPrimitive.Anchor>
-            <PopoverPrimitive.Portal>
-              <PopoverPrimitive.Content
-                side="bottom"
-                align="center"
-                sideOffset={5}
-                collisionPadding={10}
-                style={{ zIndex: 9100 }}
-              >
-              <View
-                style={{
-                  backgroundColor: "white",
-                  borderRadius: 10,
-                  borderWidth: 2,
-                  borderColor: gray(0.08),
-                  overflow: "hidden",
-                }}
-                    >
-                      <View style={{ flexDirection: "row", borderBottomWidth: 1, borderBottomColor: gray(0.1) }}>
-                        {effectiveQty > 1 && (
-                          <View style={{ width: "50%", alignItems: "center", justifyContent: "center", backgroundColor: lightenRGBByPercent(C.blue, 85) }}>
-                            <Tooltip text="Split into individual lines" position="top">
-                              <Button_
-                                icon={ICONS.axe}
-                                iconSize={28}
-                                onPress={() => {
-                                  _setLineActionModal(null);
-                                  __splitItems(workorderLine, index);
-                                }}
-                                buttonStyle={{ backgroundColor: "transparent", borderRadius: 0, borderWidth: 0, paddingVertical: 10 }}
-                              />
-                            </Tooltip>
-                          </View>
-                        )}
-                        <View style={{ width: effectiveQty > 1 ? "50%" : "100%", alignItems: "center", justifyContent: "center", backgroundColor: lightenRGBByPercent(C.lightred, 85), borderLeftWidth: effectiveQty > 1 ? 1 : 0, borderLeftColor: gray(0.1) }}>
-                          <Tooltip text="Remove item" position="top">
-                            <Button_
-                              icon={ICONS.trash}
-                              iconSize={28}
-                              onPress={() => {
-                                _setLineActionModal(null);
-                                __deleteWorkorderLine(index);
-                              }}
-                              buttonStyle={{ backgroundColor: "transparent", borderRadius: 0, borderWidth: 0, paddingVertical: 10 }}
-                            />
-                          </Tooltip>
-                        </View>
-                      </View>
-                      <View>
-                        <Button_
-                          text="No Discount"
-                          onPress={() => {
-                            _setLineActionModal(null);
-                            __setWorkorderLineItem({ ...workorderLine, discountObj: null });
-                          }}
-                          buttonStyle={{ backgroundColor: gray(0.036), borderRadius: 0, borderWidth: 0, paddingVertical: 8, paddingHorizontal: 10 }}
-                          textStyle={{ fontSize: 18, color: C.text }}
-                        />
-                        {(zSettingsObj.discounts || [])
-                          .filter((o) => o.type !== "$" || Number(o.value) <= workorderLine.inventoryItem.price * (workorderLine.qty || 1))
-                          .map((discount, dIdx) => (
-                            <Button_
-                              key={discount.name + dIdx}
-                              text={discount.name}
-                              onPress={() => {
-                                _setLineActionModal(null);
-                                applyDiscount(workorderLine, discount);
-                              }}
-                              buttonStyle={{ backgroundColor: dIdx % 2 === 0 ? "white" : gray(0.036), borderRadius: 0, borderWidth: 0, paddingVertical: 8, paddingHorizontal: 10 }}
-                              textStyle={{ fontSize: 18, color: C.text }}
-                            />
-                          ))}
-                        <View style={{ height: 1, backgroundColor: gray(0.15), width: "100%" }} />
-                        <View
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          style={{ flexDirection: "row", alignItems: "center", height: 40, paddingLeft: 8, backgroundColor: lightenRGBByPercent(C.blue, 60) }}
-                        >
-                          <Text style={{ fontSize: 14, color: gray(0.5), marginRight: 6, whiteSpace: "nowrap" }}>Custom %</Text>
-                          <TextInput
-                            value={sCustomPercent}
-                            placeholder="0"
-                            placeholderTextColor={gray(0.3)}
-                            maxLength={3}
-                            onChangeText={(v) => {
-                              let cleaned = v.replace(/[^0-9]/g, "");
-                              if (Number(cleaned) > 100) cleaned = "100";
-                              _setCustomPercent(cleaned);
-                            }}
-                            onSubmitEditing={() => {
-                              const num = Number(sCustomPercent);
-                              if (!num) return;
-                              _setLineActionModal(null);
-                              applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
-                            }}
-                            style={{ width: 50, height: 28, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 4, paddingHorizontal: 6, fontSize: 16, color: C.text, textAlign: "center", outlineWidth: 0, backgroundColor: "white" }}
-                          />
-                          <Button_
-                            icon={ICONS.check1}
-                            iconSize={19}
-                            enabled={Number(sCustomPercent) > 0}
-                            onPress={() => {
-                              const num = Number(sCustomPercent);
-                              if (!num) return;
-                              _setLineActionModal(null);
-                              applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
-                            }}
-                            buttonStyle={{ marginLeft: 6, backgroundColor: "transparent", borderWidth: 0, padding: 4 }}
-                          />
-                        </View>
-                        <View
-                          onClick={(e) => e.stopPropagation()}
-                          onMouseDown={(e) => e.stopPropagation()}
-                          style={{ flexDirection: "row", alignItems: "center", height: 40, paddingLeft: 8, backgroundColor: lightenRGBByPercent(C.blue, 60) }}
-                        >
-                          <Text style={{ fontSize: 14, color: gray(0.5), marginRight: 6, whiteSpace: "nowrap" }}>Custom $</Text>
-                          <TextInput
-                            value={sCustomDollar}
-                            placeholder="0.00"
-                            placeholderTextColor={gray(0.3)}
-                            onChangeText={(v) => {
-                              const maxCents = workorderLine.inventoryItem.price * (workorderLine.qty || 1);
-                              let result = usdTypeMask(v);
-                              if (maxCents && result.cents > maxCents) result = usdTypeMask(String(maxCents));
-                              _setCustomDollar(result.display);
-                              _setCustomDollarCents(result.cents);
-                            }}
-                            onSubmitEditing={() => {
-                              if (!sCustomDollarCents) return;
-                              _setLineActionModal(null);
-                              const dollars = (sCustomDollarCents / 100).toFixed(2);
-                              applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(sCustomDollarCents), type: DISCOUNT_TYPES.dollar, custom: true });
-                            }}
-                            style={{ width: 70, height: 28, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 4, paddingHorizontal: 6, fontSize: 16, color: C.text, textAlign: "center", outlineWidth: 0, backgroundColor: "white" }}
-                          />
-                          <Button_
-                            icon={ICONS.check1}
-                            iconSize={19}
-                            enabled={sCustomDollarCents > 0}
-                            onPress={() => {
-                              if (!sCustomDollarCents) return;
-                              _setLineActionModal(null);
-                              const dollars = (sCustomDollarCents / 100).toFixed(2);
-                              applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(sCustomDollarCents), type: DISCOUNT_TYPES.dollar, custom: true });
-                            }}
-                            buttonStyle={{ marginLeft: 6, backgroundColor: "transparent", borderWidth: 0, padding: 4 }}
-                          />
-                        </View>
-                      </View>
-              </View>
-            </PopoverPrimitive.Content>
-            </PopoverPrimitive.Portal>
-            </PopoverPrimitive.Root>
           </View>
         </View>
         </View>

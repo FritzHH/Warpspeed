@@ -25,7 +25,6 @@ import {
 import {
   ScreenModal,
   SHADOW_RADIUS_NOTHING,
-  DropdownMenu,
   Button_,
   Image_,
   TextInput_,
@@ -38,7 +37,7 @@ import {
   TimePicker_,
   DatePicker_,
 } from "../../../components";
-import { CheckBox } from "../../../dom_components";
+import { CheckBox, DropdownMenu } from "../../../dom_components";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
 import {
@@ -1189,6 +1188,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     ref={color1Ref}
                     buttonText={"Color 1"}
                     modalCoordX={0}
+                    itemStyle={{ paddingLeft: 35, paddingRight: 35, paddingTop: 15, paddingBottom: 15 }}
                   />
                 </div>
                 <View style={{ width: 5 }} />
@@ -1214,6 +1214,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     modalCoordX={0}
                     ref={color2Ref}
                     buttonText={"Color 2"}
+                    itemStyle={{ paddingLeft: 35, paddingRight: 35, paddingTop: 15, paddingBottom: 15 }}
                   />
                 </div>
               </View>

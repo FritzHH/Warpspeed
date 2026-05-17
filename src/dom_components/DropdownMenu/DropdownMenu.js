@@ -146,6 +146,14 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
   const selectableItems = fullDataArr.filter((item) => !item._isDivider && !item._isCustomInput && !item.component);
   const br = menuButtonStyle.borderRadius || 5;
 
+  const resolvedItemStyle = {
+    ...itemStyle,
+    ...(itemStyle.paddingVertical != null ? { paddingTop: itemStyle.paddingVertical, paddingBottom: itemStyle.paddingVertical } : {}),
+    ...(itemStyle.paddingHorizontal != null ? { paddingLeft: itemStyle.paddingHorizontal, paddingRight: itemStyle.paddingHorizontal } : {}),
+  };
+  delete resolvedItemStyle.paddingVertical;
+  delete resolvedItemStyle.paddingHorizontal;
+
   const resolvedIcon = buttonIcon === undefined ? ICONS.menu2 : buttonIcon;
   const resolvedIconSrc = resolvedIcon ? (typeof resolvedIcon === "object" ? resolvedIcon.default || resolvedIcon : resolvedIcon) : null;
   const resolvedIconSize = buttonIconSize || 11;
@@ -292,15 +300,20 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
               }
 
               const isFocused = selectableItems.indexOf(item) === focusedIdx;
+              const isSelected = idx === Number(selectedIdx);
               return (
                 <div
                   key={item.id ?? item.label ?? idx}
                   className={styles.item}
                   style={{
-                    backgroundColor: getItemBg(item.backgroundColor, idx) || getItemBg(gray(0.036), idx),
+                    position: "relative",
+                    paddingRight: isSelected ? 28 : undefined,
+                    backgroundColor: isSelected
+                      ? lightenRGBByPercent(C.blue, 85)
+                      : (getItemBg(item.backgroundColor, idx) || getItemBg(gray(0.036), idx)),
                     outline: isFocused ? "2px solid #007bff" : undefined,
                     ...itemBorderRadius(idx),
-                    ...itemStyle,
+                    ...resolvedItemStyle,
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
@@ -308,7 +321,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
                     onSelect(item, idx);
                   }}
                   role="option"
-                  aria-selected={idx === selectedIdx}
+                  aria-selected={isSelected}
                 >
                   <span
                     className={styles.itemLabel}
@@ -322,6 +335,11 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
                   >
                     {item.label != null ? item.label : item}
                   </span>
+                  {isSelected && (
+                    <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: C.green }}>
+                      {"\u2713"}
+                    </span>
+                  )}
                   {item.subtitle && (
                     <span className={styles.itemSubtitle} style={{ color: gray(0.5), fontFamily: SYSTEM_FONT }}>
                       {item.subtitle}

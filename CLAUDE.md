@@ -87,8 +87,6 @@ The layout does not reflow at different screen sizes by design. Percentages hand
 
 **Inline styling only unless it is a DOM refactor/migration.** for a DOM/React refactor or implementation, use CSS Modules. for a react-native-web component, Use inline styling only for both new and existing components;
 
-
-
 **Standalone / solo sale = no customerID.** When the user refers to a "standalone sale" or "solo sale", that means a workorder with no `customerID` (`!workorder.customerID`). There are no special flags or fields — the absence of `customerID` is the sole indicator. Do not use or reference `isStandaloneSale` or any other flag.
 
 ** This app is being transitioned to a full-scale SaaS for distribution. Suggest professional-grade upgrades or transitions where you see them.
@@ -103,11 +101,11 @@ Then execute the user's prompt according to these guidelines.
 Multi-tenant POS/service management system for Bonita Bikes. React frontend + Firebase backend + Stripe payments.
 
 ## Stack
-- **Frontend:** React 19.1 (Create React App), React Native Web 0.20, Zustand 5
+- **Frontend:** React 19.1 (Create React App), React Native Web 0.20 (transitioning out of), React/DOM/CSS Modules, Zustand 5
 - **Backend:** Firebase 11.6 (Firestore, Realtime DB, Auth, Storage, Cloud Functions Node 22)
 - **Payments:** Stripe Terminal (server-driven, physical card readers)
 - **SMS:** Vonage / Twilio
-- **UI:** react-native-web + @rneui/base — inline flexbox styling only
+- **UI:** WAS react-native-web + @rneui/base — inline flexbox styling only -- transitioning incrementally to pure DOM environment with CSS modules 
 - **Other:** face-api.js (facial recognition), jsPDF, dayjs, lodash
 
 ## Key files
@@ -117,7 +115,7 @@ Multi-tenant POS/service management system for Bonita Bikes. React frontend + Fi
 | `src/stores.js` | All Zustand stores (16 stores, 24KB) |
 | `src/styles.js` | Global theme — colors, gradients, fonts, icons |
 | `src/utils.js` | 2000+ lines of utility functions |
-| `src/components.js` | 2600+ lines of reusable UI components |
+| `src/dom_components` | 2600+ lines of reusable UI components | 
 | `src/data.js` | Data prototypes and config objects (19KB) |
 | `src/constants.js` | App-wide constants (permissions, DB nodes, discount types) |
 | `src/db_calls_wrapper.js` | Business logic layer wrapping Firebase ops (90KB) |
@@ -210,15 +208,6 @@ lightenRGBByPercent(C.green, 60) // lighten green by 60%
 - `extractStripeErrorMessage(data, res)` — parse Stripe API errors
 - `checkInputForNumbersOnly(val)` — validate numeric input
 - `printBuilder` — receipt printing utilities (printBuilder.sale, etc.)
-
-## `src/components.js` — Reusable UI Components
-
-**Inputs:** `TextInput_`, `PhoneNumberInput`, `NumberSpinner_`, `TimeSpinner`, `DateTimePicker`
-**Buttons:** `Button_` (supports icons, loading, gradients), `TabMenuButton`, `TouchableOpacity_`, `SliderButton_`
-**Selection:** `CheckBox_`, `DropdownMenu`, `ModalDropdown`
-**Display:** `Image_`, `GradientView`, `LoadingIndicator`, `SmallLoadingIndicator`
-**Modals:** `ScreenModal` (centered modal wrapper), `AlertBox_`, `LoginModalScreen`
-**Layout:** `VertSpacer`, `HorzSpacer`, `TabMenuDivider`
 
 ## `src/data.js` — Data Prototypes & Config
 

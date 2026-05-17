@@ -57,14 +57,12 @@ import {
   Button_,
   Image_,
   TextInput_,
-  DropdownMenu,
-  StatusPickerModal,
   PhoneNumberInput,
   Tooltip,
   SmallLoadingIndicator,
   NoteHelperDropdown,
 } from "../components";
-import { CheckBox } from "../dom_components";
+import { CheckBox, StatusPickerModal, DropdownMenu } from "../dom_components";
 import {
   dbListenToSettings,
   dbListenToInventory,
@@ -1305,9 +1303,12 @@ export function BikeStandScreen() {
                   onSelect={handleStatusSelect}
                   buttonStyle={{
                     backgroundColor: rs.backgroundColor,
-                    paddingHorizontal: 18,
-                    paddingVertical: 10,
+                    paddingTop: 15,
+                    paddingBottom: 15,
+                    paddingLeft: 18,
+                    paddingRight: 18,
                     borderRadius: 12,
+                    height: "auto",
                   }}
                   buttonTextStyle={{
                     color: rs.textColor,

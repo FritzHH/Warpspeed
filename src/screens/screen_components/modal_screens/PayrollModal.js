@@ -20,9 +20,8 @@ import {
   deepEqual,
 } from "../../../utils";
 import dayjs from "dayjs";
-import CalendarPicker, {
-  useDefaultStyles,
-} from "react-native-ui-datepicker";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/style.css";
 import cloneDeep from "lodash/cloneDeep";
 import sortBy from "lodash/sortBy";
 import { useSettingsStore, useAlertScreenStore, useLoginStore } from "../../../stores";
@@ -203,7 +202,6 @@ function pairPunches(filteredArr) {
 }
 
 export const PayrollModal = ({ handleExit, employeeUser }) => {
-  const defaultStyles = useDefaultStyles();
   const zDefaultPayrollTimeFrame = useSettingsStore((s) => s.settings?.defaultPayrollTimeFrame, deepEqual);
   const zStoreDisplayName = useSettingsStore((s) => s.settings?.storeInfo?.displayName);
   const zEmailTemplates = useSettingsStore((s) => s.settings?.emailTemplates, deepEqual);
@@ -222,11 +220,6 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
   const [sStartDate, _setStartDate] = useState(employeeUser ? dayjs().startOf("day") : defaultRange.start);
   const [sEndDate, _setEndDate] = useState(employeeUser ? dayjs().endOf("day") : defaultRange.end);
   const [sActiveShortcut, _setActiveShortcut] = useState(employeeUser ? "Today" : "Pay Period");
-  const [sPendingStart, _setPendingStart] = useState(null);
-  const [sPendingEnd, _setPendingEnd] = useState(null);
-  const [sEndCalMonth, _setEndCalMonth] = useState(dayjs().month());
-  const [sEndCalYear, _setEndCalYear] = useState(dayjs().year());
-  const [sCalKey, _setCalKey] = useState(0);
 
   // punch data
   const [sFilteredArr, _setFilteredArr] = useState([]);
@@ -296,13 +289,8 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     let curTf = zDefaultPayrollTimeFrame || { begin: "lastFriday", end: "thisThursday" };
     let range = getTimeFrameRange(curTf);
     _setActiveShortcut("Pay Period");
-    _setPendingStart(null);
-    _setPendingEnd(null);
     _setStartDate(range.start);
     _setEndDate(range.end);
-    _setEndCalMonth(range.end.month());
-    _setEndCalYear(range.end.year());
-    _setCalKey((prev) => prev + 1);
     fetchPunches(range.start, range.end);
   }
 
@@ -310,33 +298,25 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     let start = shortcut.start();
     let end = shortcut.end();
     _setActiveShortcut(shortcut.label);
-    _setPendingStart(null);
-    _setPendingEnd(null);
     _setStartDate(start);
     _setEndDate(end);
-    _setEndCalMonth(end.month());
-    _setEndCalYear(end.year());
-    _setCalKey((prev) => prev + 1);
     fetchPunches(start, end);
   }
 
   function handleGoButton() {
-    let start = sStartDate;
-    let end = sEndDate;
-    // If there's a pending calendar range, apply it first
-    if (sPendingStart && sPendingEnd) {
-      start = sPendingStart;
-      end = sPendingEnd;
-      _setActiveShortcut(null);
-      _setStartDate(start);
-      _setEndDate(end);
-      _setEndCalMonth(end.month());
-      _setEndCalYear(end.year());
-      _setCalKey((prev) => prev + 1);
-      _setPendingStart(null);
-      _setPendingEnd(null);
-    }
-    fetchPunches(start, end);
+    if (sStartDate && sEndDate) fetchPunches(sStartDate, sEndDate);
+  }
+
+  function handleRangeSelect(range) {
+    _setActiveShortcut(null);
+    _setStartDate(range?.from ? dayjs(range.from).startOf("day") : null);
+    _setEndDate(range?.to ? dayjs(range.to).endOf("day") : null);
+  }
+
+  function handleClearRange() {
+    _setActiveShortcut(null);
+    _setStartDate(null);
+    _setEndDate(null);
   }
 
   function handleUserSelect(userObj) {
@@ -344,9 +324,7 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     _setFilteredArr([]);
     _setHasUnsavedChanges(false);
     modifiedPunchIdsRef.current = new Set();
-    let start = sPendingStart || sStartDate;
-    let end = sPendingEnd || sEndDate;
-    if (start && end) fetchPunches(start, end, userObj);
+    if (sStartDate && sEndDate) fetchPunches(sStartDate, sEndDate, userObj);
   }
 
   function handleFullTimeChange(item, prefix, hour, minute, period) {
@@ -608,29 +586,26 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
   }
 
   // Display dates
-  let displayStart = sPendingStart || sStartDate;
-  let displayEnd = sPendingEnd || sEndDate;
-  let hasPendingRange = !!sPendingStart && !!sPendingEnd;
-  let canGo = !!sSelectedUser && (hasPendingRange || (!!sStartDate && !!sEndDate));
+  let displayStart = sStartDate;
+  let displayEnd = sEndDate;
+  let canGo = !!sSelectedUser && !!sStartDate && !!sEndDate;
+  let hasRange = !!sStartDate || !!sEndDate;
   let dateChips = generateDateChips(displayStart, displayEnd);
 
-  let calendarStyles = {
-    ...defaultStyles,
-    today: {
-      borderColor: C.lightred,
-      borderWidth: 2,
-      borderRadius: 100,
-    },
-    selected: {
-      borderRadius: 100,
-      backgroundColor: C.blue,
-    },
-    selected_label: { color: "white" },
-    range: {
-      backgroundColor: lightenRGBByPercent(C.blue, 70),
-      borderRadius: 0,
-    },
-    range_label: { color: C.text },
+  let selectedRange = hasRange
+    ? {
+        from: sStartDate ? dayjs(sStartDate).toDate() : undefined,
+        to: sEndDate ? dayjs(sEndDate).toDate() : undefined,
+      }
+    : undefined;
+
+  let dayPickerWrapperStyle = {
+    color: "white",
+    "--rdp-accent-color": C.blue,
+    "--rdp-accent-background-color": lightenRGBByPercent(C.blue, 60),
+    "--rdp-today-color": C.red,
+    "--rdp-day-height": "32px",
+    "--rdp-day-width": "32px",
   };
 
   let Component = useCallback(() => {
@@ -868,13 +843,13 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
             contentContainerStyle={{ padding: 8 }}
           >
             <View>
-                {/* Begin Calendar */}
+                {/* Range Calendar */}
                 <View
                   style={{
                     backgroundColor: "rgba(0,0,0,0.75)",
                     borderRadius: 10,
-                    paddingVertical: 4,
-                    paddingHorizontal: 2,
+                    paddingVertical: 6,
+                    paddingHorizontal: 4,
                     alignItems: "center",
                     marginBottom: 8,
                   }}
@@ -884,22 +859,19 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
                       color: C.orange,
                       fontSize: 10,
                       fontWeight: "600",
-                      marginBottom: 2,
+                      marginBottom: 4,
                     }}
                   >
-                    Begin Date
+                    Date Range
                   </Text>
-                  <CalendarPicker
-                    key={"begin-" + sCalKey}
-                    styles={calendarStyles}
-                    mode="range"
-                    startDate={displayStart}
-                    endDate={displayEnd}
-                    onChange={({ startDate }) => {
-                      _setActiveShortcut(null);
-                      _setPendingStart(dayjs(startDate));
-                    }}
-                  />
+                  <div style={dayPickerWrapperStyle}>
+                    <DayPicker
+                      mode="range"
+                      selected={selectedRange}
+                      defaultMonth={selectedRange?.from || new Date()}
+                      onSelect={handleRangeSelect}
+                    />
+                  </div>
                 </View>
 
                 {/* Date Range Summary */}
@@ -915,7 +887,18 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
                     justifyContent: "center",
                   }}
                 >
-                  {dateChips.length === 1 ? (
+                  {dateChips.length === 0 ? (
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: "600",
+                        color: gray(0.5),
+                        fontStyle: "italic",
+                      }}
+                    >
+                      No range selected
+                    </Text>
+                  ) : dateChips.length === 1 ? (
                     <Text
                       style={{
                         fontSize: 13,
@@ -949,103 +932,44 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
                   )}
                 </View>
 
-                {/* End Calendar */}
-                {(() => {
-                  let beginMonth = dayjs(displayStart).month();
-                  let beginYear = dayjs(displayStart).year();
-                  let beginIsCurrentMonth = beginMonth === dayjs().month() && beginYear === dayjs().year();
-                  let endSameAsBegin =
-                    beginIsCurrentMonth &&
-                    sEndCalMonth === beginMonth &&
-                    sEndCalYear === beginYear;
-
-                  function handleEndCalPrev() {
-                    let d = dayjs()
-                      .month(sEndCalMonth)
-                      .year(sEndCalYear)
-                      .subtract(1, "month");
-                    _setEndCalMonth(d.month());
-                    _setEndCalYear(d.year());
-                  }
-                  function handleEndCalNext() {
-                    let d = dayjs()
-                      .month(sEndCalMonth)
-                      .year(sEndCalYear)
-                      .add(1, "month");
-                    _setEndCalMonth(d.month());
-                    _setEndCalYear(d.year());
-                  }
-
-                  if (endSameAsBegin) return null;
-
-                  return (
-                    <View
-                      style={{
-                        backgroundColor: "rgba(0,0,0,0.75)",
-                        borderRadius: 10,
-                        paddingVertical: 4,
-                        paddingHorizontal: 2,
-                        alignItems: "center",
-                        marginBottom: 8,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: lightenRGBByPercent(C.green, 40),
-                          fontSize: 10,
-                          fontWeight: "600",
-                          marginBottom: 2,
-                        }}
-                      >
-                        End Date
-                      </Text>
-                      {(
-                        <CalendarPicker
-                          key={
-                            "end-" +
-                            sCalKey +
-                            "-" +
-                            sEndCalMonth +
-                            "-" +
-                            sEndCalYear
-                          }
-                          styles={calendarStyles}
-                          mode="range"
-                          startDate={displayStart}
-                          endDate={displayEnd}
-                          month={sEndCalMonth}
-                          year={sEndCalYear}
-                          onChange={({ endDate }) => {
-                            _setActiveShortcut(null);
-                            _setPendingEnd(dayjs(endDate));
-                          }}
-                        />
-                      )}
-                    </View>
-                  );
-                })()}
-
-                {/* Go Button / Loading */}
+                {/* Go / Clear Buttons */}
                 <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", minHeight: 40 }}>
                   {sLoading ? (
                     <SmallLoadingIndicator color={C.blue} message="" />
                   ) : (
-                    <Button_
-                      text="GO"
-                      colorGradientArr={
-                        canGo
-                          ? COLOR_GRADIENTS.green
-                          : COLOR_GRADIENTS.grey
-                      }
-                      onPress={handleGoButton}
-                      enabled={canGo}
-                      buttonStyle={{
-                        paddingLeft: 40,
-                        paddingRight: 40,
-                        paddingVertical: 10,
-                      }}
-                      textStyle={{ fontSize: 15, fontWeight: "700" }}
-                    />
+                    <>
+                      <Button_
+                        text="GO"
+                        colorGradientArr={
+                          canGo
+                            ? COLOR_GRADIENTS.green
+                            : COLOR_GRADIENTS.grey
+                        }
+                        onPress={handleGoButton}
+                        enabled={canGo}
+                        buttonStyle={{
+                          paddingLeft: 40,
+                          paddingRight: 40,
+                          paddingVertical: 10,
+                        }}
+                        textStyle={{ fontSize: 15, fontWeight: "700" }}
+                      />
+                      <View style={{ width: 8 }} />
+                      <Button_
+                        text="CLEAR"
+                        colorGradientArr={
+                          hasRange ? COLOR_GRADIENTS.red : COLOR_GRADIENTS.grey
+                        }
+                        onPress={handleClearRange}
+                        enabled={hasRange}
+                        buttonStyle={{
+                          paddingLeft: 20,
+                          paddingRight: 20,
+                          paddingVertical: 10,
+                        }}
+                        textStyle={{ fontSize: 13, fontWeight: "700" }}
+                      />
+                    </>
                   )}
                 </View>
               </View>
@@ -1311,11 +1235,6 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     sStartDate,
     sEndDate,
     sActiveShortcut,
-    sPendingStart,
-    sPendingEnd,
-    sEndCalMonth,
-    sEndCalYear,
-    sCalKey,
     sFilteredArr,
     sLoading,
     sHasUnsavedChanges,

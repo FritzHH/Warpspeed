@@ -41,7 +41,24 @@
 
 .scrollArea {
   height: 100%;
-  overflow-y: auto;
+  overflow-y: scroll;
+}
+
+.scrollArea::-webkit-scrollbar {
+  width: 12px;
+}
+
+.scrollArea::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.scrollArea::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 6px;
+}
+
+.scrollArea::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
 }
 
 .row {

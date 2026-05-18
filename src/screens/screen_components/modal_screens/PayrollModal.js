@@ -1,15 +1,16 @@
 /*eslint-disable*/
 import {
-  TouchableWithoutFeedback,
-  View,
-  Text,
-  ScrollView,
+  Button,
+  DropdownMenu,
+  Image,
+  TimePicker,
+  SmallLoadingIndicator,
+  Dialog,
   TouchableOpacity,
-} from "react-native-web";
-import { Button_, DropdownMenu, Image_, TimePicker_, SmallLoadingIndicator, Dialog_ } from "../../../components";
+} from "../../../dom_components";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import ReactDOM from "react-dom";
 import {
   formatMillisForDisplay,
   convertMillisToHoursMins,
@@ -28,6 +29,7 @@ import { useSettingsStore, useAlertScreenStore, useLoginStore } from "../../../s
 import {
   dbGetPunchesByTimeFrame,
   dbSavePunchObject,
+  dbDeletePunch,
   dbSendEmail,
 } from "../../../db_calls_wrapper";
 import { TIME_PUNCH_PROTO } from "../../../data";
@@ -35,6 +37,7 @@ import {
   MILLIS_IN_HOUR,
   MILLIS_IN_MINUTE,
 } from "../../../constants";
+import styles from "./PayrollModal.module.css";
 
 const DAY_NAMES = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
@@ -85,7 +88,7 @@ const STATIC_SHORTCUTS = [
   {
     label: "This Month",
     start: () => dayjs().startOf("month"),
-    end: () => dayjs(),
+    end: () => dayjs().endOf("day"),
   },
   {
     label: "Last Month",
@@ -95,7 +98,7 @@ const STATIC_SHORTCUTS = [
   {
     label: "This Year",
     start: () => dayjs().startOf("year"),
-    end: () => dayjs(),
+    end: () => dayjs().endOf("day"),
   },
   {
     label: "Last Year",
@@ -118,72 +121,38 @@ function generateDateChips(startDate, endDate) {
   return chips;
 }
 
-/** Pair raw punch array into in/out rows for display */
+/** Pair sorted punches into in/out rows. Consecutive ins flush the prior in
+ *  as an orphan row; an out with no open in becomes an orphan-out row. */
 function pairPunches(filteredArr) {
   let resArr = [];
-  let resObj = {};
-  let counter = 0;
-  let lastOneWasClockIn = false;
+  let pending = null;
 
-  filteredArr.forEach((obj) => {
-    obj = cloneDeep(obj);
-
-    if (counter === 0 && obj.option === "out") {
-      resObj.out = obj;
-      resArr.push(resObj);
-      resObj = {};
-      counter++;
-      lastOneWasClockIn = false;
-      return;
-    }
-
-    if (counter === filteredArr.length - 1 && obj.option === "in") {
-      resObj.in = obj;
-      resArr.push(resObj);
-      lastOneWasClockIn = true;
-      counter++;
-      return;
-    }
-
-    if (obj.option === "in" && lastOneWasClockIn) {
-      resObj.in = obj;
-      resArr.push(resObj);
-      resObj = {};
-      counter++;
-      return;
-    }
-
+  filteredArr.forEach((rawObj) => {
+    let obj = cloneDeep(rawObj);
     if (obj.option === "in") {
-      lastOneWasClockIn = true;
-      resObj.in = obj;
+      if (pending) resArr.push({ in: pending });
+      pending = obj;
     } else if (obj.option === "out") {
-      lastOneWasClockIn = false;
-      resObj.out = obj;
-      resArr.push(resObj);
-      resObj = {};
+      if (pending) {
+        resArr.push({ in: pending, out: obj });
+        pending = null;
+      } else {
+        resArr.push({ out: obj });
+      }
     }
-    counter++;
   });
+  if (pending) resArr.push({ in: pending });
 
   let arr = [];
   let runningTotalMinutes = 0;
-
   resArr.forEach((obj) => {
     obj = cloneDeep(obj);
-
     if (obj.in) {
-      obj.in = {
-        ...obj.in,
-        ...formatMillisForDisplay(obj.in.millis, true, true),
-      };
+      obj.in = { ...obj.in, ...formatMillisForDisplay(obj.in.millis, true, true) };
     }
     if (obj.out) {
-      obj.out = {
-        ...obj.out,
-        ...formatMillisForDisplay(obj.out.millis, true, true),
-      };
+      obj.out = { ...obj.out, ...formatMillisForDisplay(obj.out.millis, true, true) };
     }
-
     if (obj.in && obj.out) {
       let total = convertMillisToHoursMins(obj.out.millis - obj.in.millis);
       obj.hoursDiff = total.hours;
@@ -194,7 +163,6 @@ function pairPunches(filteredArr) {
         obj.minutesDiff = "0" + obj.minutesDiff.toString();
       }
     }
-
     arr.push(obj);
   });
 
@@ -213,29 +181,25 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
   let tf = zDefaultPayrollTimeFrame || { begin: "lastFriday", end: "thisThursday" };
   let defaultRange = getTimeFrameRange(tf);
 
-  // selected user — auto-set for employee mode
   const [sSelectedUser, _setSelectedUser] = useState(employeeUser || null);
 
-  // date state — employee mode defaults to today, admin to pay period
   const [sStartDate, _setStartDate] = useState(employeeUser ? dayjs().startOf("day") : defaultRange.start);
   const [sEndDate, _setEndDate] = useState(employeeUser ? dayjs().endOf("day") : defaultRange.end);
   const [sActiveShortcut, _setActiveShortcut] = useState(employeeUser ? "Today" : "Pay Period");
 
-  // punch data
   const [sFilteredArr, _setFilteredArr] = useState([]);
   const [sLoading, _setLoading] = useState(false);
   const [sHasUnsavedChanges, _setHasUnsavedChanges] = useState(false);
   const [sSaving, _setSaving] = useState(false);
   const [sEmailing, _setEmailing] = useState(false);
-  const [sEmailStatus, _setEmailStatus] = useState(null); // "sent" | "error" | "no-email"
+  const [sEmailStatus, _setEmailStatus] = useState(null);
   const [sShowRate, _setShowRate] = useState(false);
 
-  // track which punch IDs have been modified
   const modifiedPunchIdsRef = useRef(new Set());
+  const deletedPunchIdsRef = useRef(new Set());
   const queryIdRef = useRef(0);
   const hasAutoFetchedRef = useRef(false);
 
-  // Manual fetch — called by Go button and shortcut buttons
   function fetchPunches(overrideStart, overrideEnd, overrideUser) {
     let user = overrideUser || sSelectedUser;
     if (!user) return;
@@ -250,6 +214,7 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     _setLoading(true);
     _setHasUnsavedChanges(false);
     modifiedPunchIdsRef.current = new Set();
+    deletedPunchIdsRef.current = new Set();
 
     dbGetPunchesByTimeFrame(startMillis, endMillis, {
       userID: user.id,
@@ -269,7 +234,6 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
       });
   }
 
-  // Auto-fetch current pay period on mount (employee mode)
   useEffect(() => {
     if (hasAutoFetchedRef.current) return;
     if (!sSelectedUser) return;
@@ -277,7 +241,6 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     fetchPunches(sStartDate, sEndDate);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Compute paired display data from raw punches
   let { displayArr, runningTotalMinutes } = pairPunches(sFilteredArr);
   let totalHoursObj = convertMillisToHoursMins(
     runningTotalMinutes * MILLIS_IN_MINUTE
@@ -356,13 +319,29 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     modifiedPunchIdsRef.current.add(punch.id);
   }
 
-  function handleCreateMissingPunch(displayItem, option) {
+  function handleCreateMissingPunch(displayItem, option, customTime) {
     let referencePunch = option === "in" ? displayItem.out : displayItem.in;
     if (!referencePunch) return;
 
-    let newMillis = option === "in"
-      ? referencePunch.millis - MILLIS_IN_HOUR
-      : referencePunch.millis + MILLIS_IN_HOUR;
+    let newMillis;
+    if (customTime) {
+      let { hour, minute, period } = customTime;
+      let hours24;
+      if (period === "AM") hours24 = hour === 12 ? 0 : hour;
+      else hours24 = hour === 12 ? 12 : hour + 12;
+      let date = new Date(referencePunch.millis);
+      date.setHours(hours24);
+      date.setMinutes(minute);
+      date.setSeconds(0);
+      date.setMilliseconds(0);
+      newMillis = date.getTime();
+      if (option === "in" && newMillis >= referencePunch.millis) return;
+      if (option === "out" && newMillis <= referencePunch.millis) return;
+    } else {
+      newMillis = option === "in"
+        ? referencePunch.millis - MILLIS_IN_HOUR
+        : referencePunch.millis + MILLIS_IN_HOUR;
+    }
 
     let punchObj = { ...TIME_PUNCH_PROTO };
     punchObj.userID = sSelectedUser.id;
@@ -403,7 +382,8 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     let arr = cloneDeep(sFilteredArr).filter((o) => o.id !== punchObj.id);
     _setFilteredArr(arr);
     _setHasUnsavedChanges(true);
-    modifiedPunchIdsRef.current.add(punchObj.id);
+    modifiedPunchIdsRef.current.delete(punchObj.id);
+    deletedPunchIdsRef.current.add(punchObj.id);
   }
 
   async function handleSave() {
@@ -411,13 +391,18 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     _setSaving(true);
 
     try {
-      let promises = sFilteredArr
+      let savePromises = sFilteredArr
         .filter((p) => modifiedPunchIdsRef.current.has(p.id))
         .map((p) => dbSavePunchObject(p));
 
-      await Promise.all(promises);
+      let deletePromises = Array.from(deletedPunchIdsRef.current).map((id) =>
+        dbDeletePunch(id)
+      );
+
+      await Promise.all([...savePromises, ...deletePromises]);
       _setHasUnsavedChanges(false);
       modifiedPunchIdsRef.current = new Set();
+      deletedPunchIdsRef.current = new Set();
     } catch (e) {
       log("Error saving punches:", e);
     }
@@ -438,7 +423,6 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     _setEmailStatus(null);
 
     try {
-      // Build daily breakdown from display data
       let dailyLines = displayArr.map((row) => {
         let date =
           (row.in?.wordDayOfWeek || row.out?.wordDayOfWeek || "") +
@@ -470,7 +454,6 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
       let totalPayStr = "$" + Number(totalWages).toLocaleString();
       let storeName = zStoreDisplayName || "";
 
-      // Find the payroll template from settings
       let template = (zEmailTemplates || []).find(
         (t) => t.id === "default_payroll_summary"
       );
@@ -500,7 +483,6 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
           "---\n" + storeName;
       }
 
-      // Convert newlines to <br> for HTML email
       let htmlBody = body.replace(/\n/g, "<br>");
 
       let result = await dbSendEmail(userEmail, subject, htmlBody);
@@ -531,7 +513,6 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     _setEmailing(true);
 
     try {
-      // Build CSV
       let csvLines = ["Date,Day,Clock In,Clock Out,Hours"];
       displayArr.forEach((row) => {
         let date = (row.in?.wordDayOfMonth || row.out?.wordDayOfMonth || "") + " " + (row.in?.dayOfMonth || row.out?.dayOfMonth || "");
@@ -585,7 +566,6 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     useSettingsStore.getState().setField("defaultPayrollTimeFrame", updated);
   }
 
-  // Display dates
   let displayStart = sStartDate;
   let displayEnd = sEndDate;
   let canGo = !!sSelectedUser && !!sStartDate && !!sEndDate;
@@ -608,698 +588,398 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
     "--rdp-day-width": "32px",
   };
 
-  let Component = useCallback(() => {
-    return (
-      <TouchableWithoutFeedback>
-        <View
-          style={{
-            width: "92%",
-            height: "94%",
-            backgroundColor: C.backgroundWhite,
-            borderRadius: 15,
-            overflow: "hidden",
-            flexDirection: "row",
-          }}
+  let beginMatchLabel = BEGIN_OPTIONS.find((o) => o.value === tf.begin)?.label;
+  let endMatchLabel = END_OPTIONS.find((o) => o.value === tf.end)?.label;
+
+  return (
+    <DialogPrimitive.Root open={true} onOpenChange={(open) => { if (!open) handleExit(); }}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className={styles.radixOverlay} />
+        <DialogPrimitive.Content
+          className={styles.radixContent}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+          aria-label="Payroll"
         >
-          {/* ═══ LEFT COLUMN: Users + Shortcuts ═══ */}
-          <ScrollView
-            style={{ width: 60 }}
-            contentContainerStyle={{
-              paddingVertical: 8,
-              paddingHorizontal: 3,
-              flexGrow: 1,
-              justifyContent: "space-between",
-            }}
-          >
-            <View>
-              {isAdmin && (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "700",
-                    color: C.text,
-                    marginBottom: 6,
-                    textAlign: "center",
-                  }}
-                >
-                  Payroll
-                </Text>
-              )}
-
-              {isAdmin && (
-                <>
-                  {/* User Buttons */}
-                  <Text
-                    style={{
-                      fontSize: 9,
-                      fontWeight: "600",
-                      color: gray(0.5),
-                      marginBottom: 3,
-                      textAlign: "center",
-                    }}
-                  >
-                    SELECT USER
-                  </Text>
-                  {(zUsers || []).map((user) => {
-                    let isSelected = sSelectedUser?.id === user.id;
-                    return (
-                      <TouchableOpacity
-                        key={user.id}
-                        onPress={() => handleUserSelect(user)}
-                        style={{
-                          backgroundColor: isSelected ? C.orange : C.blue,
-                          borderRadius: 4,
-                          paddingVertical: 5,
-                          marginBottom: 3,
-                          alignItems: "center",
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: "white",
-                            fontSize: 11,
-                            fontWeight: "600",
-                          }}
-                        >
-                          {user.first} {user.last}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-
-                  {/* Divider */}
-                  <View
-                    style={{
-                      height: 1,
-                      backgroundColor: gray(0.8),
-                      marginVertical: 6,
-                    }}
-                  />
-                </>
-              )}
-
-              {/* Quick Buttons */}
-              {/* Pay Period button */}
-              <TouchableOpacity
-                onPress={handleDefaultRangeShortcut}
-                style={{
-                  backgroundColor:
-                    sActiveShortcut === "Pay Period" ? C.orange : C.blue,
-                  borderRadius: 4,
-                  paddingVertical: 5,
-                  marginBottom: 3,
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  style={{
-                    color: "white",
-                    fontSize: 11,
-                    fontWeight: "600",
-                  }}
-                >
-                  Pay Period{" "}
-                  <Text style={{ fontSize: 10 }}>
-                    {(zDefaultPayrollTimeFrame?.begin || "lastFriday").slice(4, 7)} → {(zDefaultPayrollTimeFrame?.end || "thisThursday").slice(4, 7)}
-                  </Text>
-                </Text>
-              </TouchableOpacity>
-
-              {STATIC_SHORTCUTS.map((sc) => {
-                let isActive = sActiveShortcut === sc.label;
-                return (
-                  <TouchableOpacity
-                    key={sc.label}
-                    onPress={() => handleShortcut(sc)}
-                    style={{
-                      backgroundColor: isActive
-                        ? C.orange
-                        : lightenRGBByPercent(C.blue, 30),
-                      borderRadius: 4,
-                      paddingVertical: 5,
-                      marginBottom: 3,
-                      alignItems: "center",
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: "white",
-                        fontSize: 11,
-                        fontWeight: "600",
-                      }}
-                    >
-                      {sc.label}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-
-              {isAdmin && (
-                <>
-                  {/* Divider */}
-                  <View
-                    style={{
-                      height: 1,
-                      backgroundColor: gray(0.8),
-                      marginVertical: 6,
-                    }}
-                  />
-
-                  {/* Default Time Frame editor */}
-                  <Text
-                    style={{
-                      fontSize: 9,
-                      fontWeight: "600",
-                      color: gray(0.5),
-                      marginBottom: 2,
-                      textAlign: "center",
-                    }}
-                  >
-                    PAY PERIOD
-                  </Text>
-                  <View style={{ marginBottom: 3 }}>
-                    <Text style={{ fontSize: 9, color: gray(0.5), marginBottom: 1 }}>
-                      Start Day
-                    </Text>
-                    <DropdownMenu
-                      dataArr={BEGIN_OPTIONS}
-                      selectedIdx={BEGIN_OPTIONS.findIndex((o) => o.value === tf.begin)}
-                      useSelectedAsButtonTitle={true}
-                      onSelect={(item) => handleTimeFrameChange("begin", item.value)}
-                      buttonStyle={{
-                        borderWidth: 1,
-                        borderColor: C.buttonLightGreenOutline,
-                        borderRadius: 4,
-                        paddingVertical: 4,
-                        paddingHorizontal: 6,
-                        backgroundColor: C.listItemWhite,
-                      }}
-                      buttonTextStyle={{ fontSize: 11, color: C.text }}
-                    />
-                  </View>
-                  <View>
-                    <Text style={{ fontSize: 9, color: gray(0.5), marginBottom: 1 }}>
-                      End Day
-                    </Text>
-                    <DropdownMenu
-                      dataArr={END_OPTIONS}
-                      selectedIdx={END_OPTIONS.findIndex((o) => o.value === tf.end)}
-                      useSelectedAsButtonTitle={true}
-                      onSelect={(item) => handleTimeFrameChange("end", item.value)}
-                      buttonStyle={{
-                        borderWidth: 1,
-                        borderColor: C.buttonLightGreenOutline,
-                        borderRadius: 4,
-                        paddingVertical: 4,
-                        paddingHorizontal: 6,
-                        backgroundColor: C.listItemWhite,
-                      }}
-                      buttonTextStyle={{ fontSize: 11, color: C.text }}
-                    />
-                  </View>
-                </>
-              )}
-            </View>
-
-            {/* Close Button */}
-            <View style={{ alignItems: "center", paddingTop: 8 }}>
-              <Button_
-                text="CLOSE"
-                colorGradientArr={COLOR_GRADIENTS.red}
-                onPress={handleExit}
-                buttonStyle={{
-                  paddingLeft: 20,
-                  paddingRight: 20,
-                  paddingVertical: 8,
-                }}
-                textStyle={{ fontSize: 13, fontWeight: "700" }}
-              />
-            </View>
-          </ScrollView>
-
-          {/* ═══ MIDDLE COLUMN: Date Selectors ═══ */}
-          <ScrollView
-            style={{ flex: 1 }}
-            contentContainerStyle={{ padding: 8 }}
-          >
-            <View>
-                {/* Range Calendar */}
-                <View
-                  style={{
-                    backgroundColor: "rgba(0,0,0,0.75)",
-                    borderRadius: 10,
-                    paddingVertical: 6,
-                    paddingHorizontal: 4,
-                    alignItems: "center",
-                    marginBottom: 8,
-                  }}
-                >
-                  <Text
-                    style={{
-                      color: C.orange,
-                      fontSize: 10,
-                      fontWeight: "600",
-                      marginBottom: 4,
-                    }}
-                  >
-                    Date Range
-                  </Text>
-                  <div style={dayPickerWrapperStyle}>
-                    <DayPicker
-                      mode="range"
-                      selected={selectedRange}
-                      defaultMonth={selectedRange?.from || new Date()}
-                      onSelect={handleRangeSelect}
-                    />
-                  </div>
-                </View>
-
-                {/* Date Range Summary */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    backgroundColor: gray(0.2),
-                    borderRadius: 6,
-                    paddingVertical: 6,
-                    paddingHorizontal: 10,
-                    marginBottom: 8,
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  {dateChips.length === 0 ? (
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: "600",
-                        color: gray(0.5),
-                        fontStyle: "italic",
-                      }}
-                    >
-                      No range selected
-                    </Text>
-                  ) : dateChips.length === 1 ? (
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: "700",
-                        color: gray(0.7),
-                      }}
-                    >
-                      {dayjs(displayStart).format("ddd M/D/YYYY")}
-                    </Text>
-                  ) : (
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: "700",
-                        color: gray(0.7),
-                      }}
-                    >
-                      {dateChips.length} days:{" "}
-                      <Text style={{ color: C.blue }}>
-                        {dayjs(displayStart).format("ddd M/D/YYYY")}
-                      </Text>
-                      {"  "}→{"  "}
-                      <Text
-                        style={{
-                          color: C.red,
-                        }}
-                      >
-                        {dayjs(displayEnd).format("ddd M/D/YYYY")}
-                      </Text>
-                    </Text>
-                  )}
-                </View>
-
-                {/* Go / Clear Buttons */}
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", minHeight: 40 }}>
-                  {sLoading ? (
-                    <SmallLoadingIndicator color={C.blue} message="" />
-                  ) : (
-                    <>
-                      <Button_
-                        text="GO"
-                        colorGradientArr={
-                          canGo
-                            ? COLOR_GRADIENTS.green
-                            : COLOR_GRADIENTS.grey
-                        }
-                        onPress={handleGoButton}
-                        enabled={canGo}
-                        buttonStyle={{
-                          paddingLeft: 40,
-                          paddingRight: 40,
-                          paddingVertical: 10,
-                        }}
-                        textStyle={{ fontSize: 15, fontWeight: "700" }}
-                      />
-                      <View style={{ width: 8 }} />
-                      <Button_
-                        text="CLEAR"
-                        colorGradientArr={
-                          hasRange ? COLOR_GRADIENTS.red : COLOR_GRADIENTS.grey
-                        }
-                        onPress={handleClearRange}
-                        enabled={hasRange}
-                        buttonStyle={{
-                          paddingLeft: 20,
-                          paddingRight: 20,
-                          paddingVertical: 10,
-                        }}
-                        textStyle={{ fontSize: 13, fontWeight: "700" }}
-                      />
-                    </>
-                  )}
-                </View>
-              </View>
-          </ScrollView>
-
-          {/* ═══ RIGHT COLUMN: Punch List + Summary ═══ */}
-          <View style={{ flex: 2 }}>
-            {/* Header */}
-            <PunchListHeader
-              sSelectedUser={sSelectedUser}
-              isAdmin={isAdmin}
-              sLoading={sLoading}
-              displayArr={displayArr}
-              handleNewPunchPress={handleNewPunchPress}
-            />
-
-            {/* Table Header */}
-            <View
-              style={{
-                flexDirection: "row",
-                backgroundColor: "rgba(0,0,0,0.75)",
-                paddingVertical: 6,
-                paddingHorizontal: 8,
-              }}
-            >
-              <Text
-                style={{
-                  flex: 0.8,
-                  fontSize: 11,
-                  fontWeight: "700",
-                  color: "white",
-                }}
-              >
-                Date
-              </Text>
-              <Text
-                style={{
-                  flex: 1.5,
-                  fontSize: 11,
-                  fontWeight: "700",
-                  color: "white",
-                  textAlign: "center",
-                }}
-              >
-                Clock In
-              </Text>
-              <Text
-                style={{
-                  flex: 1.5,
-                  fontSize: 11,
-                  fontWeight: "700",
-                  color: "white",
-                  textAlign: "center",
-                }}
-              >
-                Clock Out
-              </Text>
-              <Text
-                style={{
-                  flex: 0.8,
-                  fontSize: 11,
-                  fontWeight: "700",
-                  color: "white",
-                  textAlign: "center",
-                }}
-              >
-                Hours
-              </Text>
-              {isAdmin && (
-                <Text
-                  style={{
-                    flex: 0.4,
-                    fontSize: 11,
-                    fontWeight: "700",
-                    color: "white",
-                    textAlign: "center",
-                  }}
-                >
-                  Edit
-                </Text>
-              )}
-            </View>
-
-            {/* FlatList of punch pairs */}
-            {!sSelectedUser ? (
-              <View
-                style={{
-                  flex: 1,
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 16,
-                    color: gray(0.5),
-                    fontWeight: "500",
-                  }}
-                >
-                  Select a user to view payroll
-                </Text>
-              </View>
-            ) : (
-              <PunchList
-                displayArr={displayArr}
-                handleFullTimeChange={handleFullTimeChange}
-                handleCreateMissingPunch={handleCreateMissingPunch}
-                handleDeletePunchPress={handleDeletePunchPress}
-                isAdmin={isAdmin}
-              />
+          <DialogPrimitive.Title className={styles.srOnly}>Payroll</DialogPrimitive.Title>
+          <div className={styles.card} style={{ backgroundColor: C.backgroundWhite }}>
+        {/* ═══ LEFT RAIL ═══ */}
+        <div className={styles.leftRail}>
+          <div className={styles.leftRailTop}>
+            {isAdmin && (
+              <span className={styles.title} style={{ color: C.text, display: "block" }}>
+                Payroll
+              </span>
             )}
 
-            {/* Summary Footer */}
-            <View
+            {isAdmin && (
+              <>
+                <span className={styles.sectionLabel} style={{ color: gray(0.5), display: "block" }}>
+                  SELECT USER
+                </span>
+                {(zUsers || []).map((user) => {
+                  let isSelected = sSelectedUser?.id === user.id;
+                  return (
+                    <TouchableOpacity
+                      key={user.id}
+                      onPress={() => handleUserSelect(user)}
+                      className={styles.userRow}
+                      style={{ backgroundColor: isSelected ? C.orange : C.blue }}
+                    >
+                      <span className={styles.userRowText}>
+                        {user.first} {user.last}
+                      </span>
+                    </TouchableOpacity>
+                  );
+                })}
+
+                <div className={styles.divider} style={{ backgroundColor: gray(0.8) }} />
+              </>
+            )}
+
+            {/* Pay Period button */}
+            <TouchableOpacity
+              onPress={handleDefaultRangeShortcut}
+              className={styles.shortcutRow}
               style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                justifyContent: "space-evenly",
-                alignItems: "center",
-                paddingVertical: 10,
-                paddingHorizontal: 10,
-                backgroundColor: "rgba(0,0,0,0.75)",
-                borderTopWidth: 2,
-                borderTopColor: C.buttonLightGreenOutline,
+                backgroundColor:
+                  sActiveShortcut === "Pay Period" ? C.orange : C.blue,
               }}
             >
-              <PayrollSummaryItem
-                label="Total Hours"
-                value={
-                  totalHoursObj.hours +
-                  ":" +
-                  String(totalHoursObj.minutes).padStart(2, "0")
-                }
-              />
-              {isAdmin && (
-                <View style={{ alignItems: "center", marginHorizontal: 10, marginVertical: 2 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontWeight: "600" }}>
-                      Hourly Rate
-                    </Text>
-                    <TouchableOpacity onPress={() => _setShowRate((p) => !p)} style={{ marginLeft: 4 }}>
-                      <Image_ icon={ICONS.eyeballs} size={19} style={{ opacity: sShowRate ? 1 : 0.4 }} />
-                    </TouchableOpacity>
-                  </View>
-                  <Text style={{ fontSize: 16, fontWeight: "700", color: "white" }}>
-                    {sShowRate ? "$" + hourlyWage.toFixed(2) : "***"}
-                  </Text>
-                </View>
-              )}
-              {isAdmin && (
-                <View style={{ alignItems: "center", marginHorizontal: 10, marginVertical: 2 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontWeight: "600" }}>
-                      Total Wages
-                    </Text>
-                    <TouchableOpacity onPress={() => _setShowRate((p) => !p)} style={{ marginLeft: 4 }}>
-                      <Image_ icon={ICONS.eyeballs} size={19} style={{ opacity: sShowRate ? 1 : 0.4 }} />
-                    </TouchableOpacity>
-                  </View>
-                  <Text style={{ fontSize: 16, fontWeight: "700", color: lightenRGBByPercent(C.green, 30) }}>
-                    {sShowRate ? "$" + Number(totalWages).toLocaleString() : "***"}
-                  </Text>
-                </View>
-              )}
-              <View
-                style={{
-                  marginLeft: 15,
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-              >
-                {isAdmin && (
-                  <Button_
-                    text={sSaving ? "Saving..." : "SAVE"}
-                    colorGradientArr={
-                      sHasUnsavedChanges
-                        ? COLOR_GRADIENTS.green
-                        : COLOR_GRADIENTS.grey
-                    }
-                    onPress={handleSave}
-                    enabled={sHasUnsavedChanges && !sSaving}
-                    buttonStyle={{
-                      paddingLeft: 25,
-                      paddingRight: 25,
-                      paddingVertical: 8,
-                    }}
-                    textStyle={{ fontSize: 14, fontWeight: "700" }}
-                  />
-                )}
-                <Button_
-                  text={sEmailing ? "Sending..." : "EMAIL"}
-                  colorGradientArr={
-                    sSelectedUser && displayArr.length > 0
-                      ? COLOR_GRADIENTS.purple
-                      : COLOR_GRADIENTS.grey
-                  }
-                  onPress={() => {
-                    if (!sSelectedUser || displayArr.length === 0 || sEmailing) return;
-                    isAdmin ? handleEmailPayroll() : handleEmployeeEmailCSV();
+              <span className={styles.shortcutRowText}>
+                Pay Period{" "}
+                <span className={styles.shortcutRowSubText}>
+                  {(zDefaultPayrollTimeFrame?.begin || "lastFriday").slice(4, 7)} → {(zDefaultPayrollTimeFrame?.end || "thisThursday").slice(4, 7)}
+                </span>
+              </span>
+            </TouchableOpacity>
+
+            {STATIC_SHORTCUTS.map((sc) => {
+              let isActive = sActiveShortcut === sc.label;
+              return (
+                <TouchableOpacity
+                  key={sc.label}
+                  onPress={() => handleShortcut(sc)}
+                  className={styles.shortcutRow}
+                  style={{
+                    backgroundColor: isActive
+                      ? C.orange
+                      : lightenRGBByPercent(C.blue, 30),
                   }}
-                  enabled={
-                    !!sSelectedUser &&
-                    displayArr.length > 0 &&
-                    !sEmailing
+                >
+                  <span className={styles.shortcutRowText}>{sc.label}</span>
+                </TouchableOpacity>
+              );
+            })}
+
+            {isAdmin && (
+              <>
+                <div className={styles.divider} style={{ backgroundColor: gray(0.8) }} />
+
+                <span className={styles.payPeriodLabel} style={{ color: gray(0.5), display: "block" }}>
+                  PAY PERIOD
+                </span>
+                <div className={styles.dropdownGroup}>
+                  <span className={styles.smallLabel} style={{ color: gray(0.5) }}>
+                    Start Day
+                  </span>
+                  <DropdownMenu
+                    dataArr={BEGIN_OPTIONS}
+                    matchValue={beginMatchLabel}
+                    useSelectedAsButtonTitle={true}
+                    onSelect={(item) => handleTimeFrameChange("begin", item.value)}
+                    buttonStyle={{
+                      borderWidth: 1,
+                      borderColor: C.buttonLightGreenOutline,
+                      borderRadius: 4,
+                      paddingVertical: 4,
+                      paddingHorizontal: 6,
+                      backgroundColor: C.listItemWhite,
+                    }}
+                    buttonTextStyle={{ fontSize: 11, color: C.text }}
+                  />
+                </div>
+                <div className={styles.dropdownGroup}>
+                  <span className={styles.smallLabel} style={{ color: gray(0.5) }}>
+                    End Day
+                  </span>
+                  <DropdownMenu
+                    dataArr={END_OPTIONS}
+                    matchValue={endMatchLabel}
+                    useSelectedAsButtonTitle={true}
+                    onSelect={(item) => handleTimeFrameChange("end", item.value)}
+                    buttonStyle={{
+                      borderWidth: 1,
+                      borderColor: C.buttonLightGreenOutline,
+                      borderRadius: 4,
+                      paddingVertical: 4,
+                      paddingHorizontal: 6,
+                      backgroundColor: C.listItemWhite,
+                    }}
+                    buttonTextStyle={{ fontSize: 11, color: C.text }}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Close Button */}
+          <div className={styles.leftRailBottom}>
+            <Button
+              text="CLOSE"
+              colorGradientArr={COLOR_GRADIENTS.red}
+              onPress={handleExit}
+              buttonStyle={{
+                paddingLeft: 20,
+                paddingRight: 20,
+                paddingVertical: 8,
+              }}
+              textStyle={{ fontSize: 13, fontWeight: "700" }}
+            />
+          </div>
+        </div>
+
+        {/* ═══ MIDDLE COLUMN ═══ */}
+        <div className={styles.middleColumn}>
+          <div className={styles.calendarCard}>
+            <span className={styles.calendarHeader} style={{ color: C.orange }}>
+              Date Range
+            </span>
+            <div style={dayPickerWrapperStyle}>
+              <DayPicker
+                mode="range"
+                selected={selectedRange}
+                defaultMonth={selectedRange?.from || new Date()}
+                onSelect={handleRangeSelect}
+              />
+            </div>
+          </div>
+
+          <div className={styles.dateSummary} style={{ backgroundColor: gray(0.2) }}>
+            {dateChips.length === 0 ? (
+              <span className={styles.dateSummaryEmpty} style={{ color: gray(0.5) }}>
+                No range selected
+              </span>
+            ) : dateChips.length === 1 ? (
+              <span className={styles.dateSummaryText} style={{ color: gray(0.7) }}>
+                {dayjs(displayStart).format("ddd M/D/YYYY")}
+              </span>
+            ) : (
+              <span className={styles.dateSummaryText} style={{ color: gray(0.7) }}>
+                {dateChips.length} days:{" "}
+                <span style={{ color: C.blue }}>
+                  {dayjs(displayStart).format("ddd M/D/YYYY")}
+                </span>
+                {"  "}→{"  "}
+                <span style={{ color: C.red }}>
+                  {dayjs(displayEnd).format("ddd M/D/YYYY")}
+                </span>
+              </span>
+            )}
+          </div>
+
+          <div className={styles.actionRow}>
+            {sLoading ? (
+              <SmallLoadingIndicator color={C.blue} message="" />
+            ) : (
+              <>
+                <Button
+                  text="GO"
+                  colorGradientArr={
+                    canGo ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey
                   }
-                  icon={ICONS.notes}
-                  iconSize={16}
+                  onPress={handleGoButton}
+                  enabled={canGo}
                   buttonStyle={{
-                    paddingLeft: 15,
-                    paddingRight: 15,
+                    paddingLeft: 40,
+                    paddingRight: 40,
+                    paddingVertical: 10,
+                  }}
+                  textStyle={{ fontSize: 15, fontWeight: "700" }}
+                />
+                <div className={styles.actionRowSpacer} />
+                <Button
+                  text="CLEAR"
+                  colorGradientArr={
+                    hasRange ? COLOR_GRADIENTS.red : COLOR_GRADIENTS.grey
+                  }
+                  onPress={handleClearRange}
+                  enabled={hasRange}
+                  buttonStyle={{
+                    paddingLeft: 20,
+                    paddingRight: 20,
+                    paddingVertical: 10,
+                  }}
+                  textStyle={{ fontSize: 13, fontWeight: "700" }}
+                />
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* ═══ RIGHT COLUMN ═══ */}
+        <div className={styles.rightColumn}>
+          <PunchListHeader
+            sSelectedUser={sSelectedUser}
+            isAdmin={isAdmin}
+            sLoading={sLoading}
+            displayArr={displayArr}
+            handleNewPunchPress={handleNewPunchPress}
+          />
+
+          {/* Table Header */}
+          <div className={`${styles.tableHeader} ${!isAdmin ? styles.tableHeaderNoEdit : ""}`}>
+            <span className={styles.thDate}>Date</span>
+            <span className={styles.thIn}>Clock In</span>
+            <span className={styles.thOut}>Clock Out</span>
+            <span className={styles.thHours}>Hours</span>
+            {isAdmin && <span className={styles.thEdit}>Edit</span>}
+          </div>
+
+          {!sSelectedUser ? (
+            <div className={styles.emptyState}>
+              <span className={styles.emptyStateText} style={{ color: gray(0.5) }}>
+                Select a user to view payroll
+              </span>
+            </div>
+          ) : (
+            <PunchList
+              displayArr={displayArr}
+              handleFullTimeChange={handleFullTimeChange}
+              handleCreateMissingPunch={handleCreateMissingPunch}
+              handleDeletePunchPress={handleDeletePunchPress}
+              isAdmin={isAdmin}
+            />
+          )}
+
+          {/* Summary Footer */}
+          <div className={styles.footer} style={{ borderTopColor: C.buttonLightGreenOutline }}>
+            <PayrollSummaryItem
+              label="Total Hours"
+              value={
+                totalHoursObj.hours +
+                ":" +
+                String(totalHoursObj.minutes).padStart(2, "0")
+              }
+            />
+            {isAdmin && (
+              <div className={styles.summaryItem}>
+                <div className={styles.summaryRow}>
+                  <span className={styles.summaryLabel}>Hourly Rate</span>
+                  <TouchableOpacity onPress={() => _setShowRate((p) => !p)} className={styles.eyeToggle}>
+                    <Image icon={sShowRate ? ICONS.downArrow : ICONS.greenRightArrow} size={16} />
+                  </TouchableOpacity>
+                </div>
+                <span className={styles.summaryValue}>
+                  {sShowRate ? "$" + hourlyWage.toFixed(2) : "***"}
+                </span>
+              </div>
+            )}
+            {isAdmin && (
+              <div className={styles.summaryItem}>
+                <div className={styles.summaryRow}>
+                  <span className={styles.summaryLabel}>Total Wages</span>
+                  <TouchableOpacity onPress={() => _setShowRate((p) => !p)} className={styles.eyeToggle}>
+                    <Image icon={sShowRate ? ICONS.downArrow : ICONS.greenRightArrow} size={16} />
+                  </TouchableOpacity>
+                </div>
+                <span
+                  className={styles.summaryValue}
+                  style={{ color: lightenRGBByPercent(C.green, 30) }}
+                >
+                  {sShowRate ? "$" + Number(totalWages).toLocaleString() : "***"}
+                </span>
+              </div>
+            )}
+            <div className={styles.footerActions}>
+              {isAdmin && (
+                <Button
+                  text={sSaving ? "Saving..." : "SAVE"}
+                  colorGradientArr={
+                    sHasUnsavedChanges ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey
+                  }
+                  onPress={handleSave}
+                  enabled={sHasUnsavedChanges && !sSaving}
+                  buttonStyle={{
+                    paddingLeft: 25,
+                    paddingRight: 25,
                     paddingVertical: 8,
-                    marginLeft: isAdmin ? 8 : 0,
                   }}
                   textStyle={{ fontSize: 14, fontWeight: "700" }}
                 />
-                {sEmailing && !isAdmin && (
-                  <SmallLoadingIndicator color="white" containerStyle={{ marginLeft: 8 }} />
-                )}
-                {sEmailStatus === "sent" && (
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: lightenRGBByPercent(C.green, 30),
-                      fontWeight: "600",
-                      marginLeft: 8,
-                    }}
-                  >
-                    Sent!
-                  </Text>
-                )}
-                {sEmailStatus === "error" && (
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: C.lightred,
-                      fontWeight: "600",
-                      marginLeft: 8,
-                    }}
-                  >
-                    Failed
-                  </Text>
-                )}
-                {sEmailStatus === "no-email" && (
-                  <Text
-                    style={{
-                      fontSize: 12,
-                      color: C.orange,
-                      fontWeight: "600",
-                      marginLeft: 8,
-                    }}
-                  >
-                    No email on file
-                  </Text>
-                )}
-              </View>
-            </View>
-          </View>
-        </View>
-      </TouchableWithoutFeedback>
-    );
-  }, [
-    sSelectedUser,
-    sStartDate,
-    sEndDate,
-    sActiveShortcut,
-    sFilteredArr,
-    sLoading,
-    sHasUnsavedChanges,
-    sSaving,
-    sEmailing,
-    sEmailStatus,
-    sShowRate,
-    isAdmin,
-    zUsers,
-    zEmailTemplates,
-    zStoreDisplayName,
-    zDefaultPayrollTimeFrame,
-  ]);
-
-  return ReactDOM.createPortal(
-    <View
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: 999,
-      }}
-    >
-      <TouchableWithoutFeedback onPress={handleExit}>
-        <View
-          style={{
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Component />
-        </View>
-      </TouchableWithoutFeedback>
-    </View>,
-    document.body
+              )}
+              <Button
+                text={sEmailing ? "Sending..." : "EMAIL"}
+                colorGradientArr={
+                  sSelectedUser && displayArr.length > 0
+                    ? COLOR_GRADIENTS.purple
+                    : COLOR_GRADIENTS.grey
+                }
+                onPress={() => {
+                  if (!sSelectedUser || displayArr.length === 0 || sEmailing) return;
+                  isAdmin ? handleEmailPayroll() : handleEmployeeEmailCSV();
+                }}
+                enabled={
+                  !!sSelectedUser &&
+                  displayArr.length > 0 &&
+                  !sEmailing
+                }
+                icon={ICONS.notes}
+                iconSize={16}
+                buttonStyle={{
+                  paddingLeft: 15,
+                  paddingRight: 15,
+                  paddingVertical: 8,
+                  marginLeft: isAdmin ? 8 : 0,
+                }}
+                textStyle={{ fontSize: 14, fontWeight: "700" }}
+              />
+              {sEmailing && !isAdmin && (
+                <SmallLoadingIndicator color="white" style={{ marginLeft: 8 }} />
+              )}
+              {sEmailStatus === "sent" && (
+                <span
+                  className={styles.statusMsg}
+                  style={{ color: lightenRGBByPercent(C.green, 30) }}
+                >
+                  Sent!
+                </span>
+              )}
+              {sEmailStatus === "error" && (
+                <span className={styles.statusMsg} style={{ color: C.lightred }}>
+                  Failed
+                </span>
+              )}
+              {sEmailStatus === "no-email" && (
+                <span className={styles.statusMsg} style={{ color: C.orange }}>
+                  No email on file
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 };
 
-/** Reusable editable time cell — tappable time that opens TimePicker_ */
+/** Reusable editable time cell — tappable time that opens TimePicker */
 const EditableTimeCell = ({ timeObj, prefix, onTimeChange }) => {
   const [sShowPicker, _sSetShowPicker] = useState(false);
   return (
-    <View style={{ flexDirection: "row", alignItems: "center" }}>
-      {/* Tappable time display */}
+    <div className={styles.editableTimeWrap}>
       <TouchableOpacity
         onPress={() => _sSetShowPicker(true)}
-        style={{
-          paddingHorizontal: 6,
-          paddingVertical: 4,
-          borderRadius: 4,
-          backgroundColor: C.blue,
-        }}
+        className={styles.editableTimeChip}
+        style={{ backgroundColor: C.blue }}
       >
-        <Text style={{ fontSize: 12, color: "white", fontWeight: "600" }}>
+        <span className={styles.editableTimeChipText}>
           {timeObj.hour}:{String(timeObj.minutes).padStart(2, "0")} {timeObj.amPM}
-        </Text>
+        </span>
       </TouchableOpacity>
-      {/* TimePicker_ modal */}
-      <Dialog_ visible={sShowPicker} onClose={() => _sSetShowPicker(false)} overlayColor="rgba(0,0,0,0.4)">
-        <TimePicker_
+      <Dialog visible={sShowPicker} onClose={() => _sSetShowPicker(false)} overlayColor="rgba(0,0,0,0.4)">
+        <TimePicker
           initialHour={timeObj.hour}
           initialMinute={timeObj.minutes}
           initialPeriod={timeObj.amPM}
@@ -1309,38 +989,66 @@ const EditableTimeCell = ({ timeObj, prefix, onTimeChange }) => {
           }}
           onCancel={() => _sSetShowPicker(false)}
         />
-      </Dialog_>
-    </View>
+      </Dialog>
+    </div>
+  );
+};
+
+/** "+ Add" pill that opens a TimePicker; chosen time fills this row's missing slot */
+const AddMissingPunchCell = ({ option, referencePunch, onAdd, textColor, bgColor }) => {
+  const [sShowPicker, _sSetShowPicker] = useState(false);
+
+  let initHour = 12;
+  let initMinute = 0;
+  let initPeriod = "AM";
+  if (referencePunch?.millis) {
+    let refDate = new Date(referencePunch.millis);
+    let h24 = refDate.getHours();
+    initPeriod = h24 >= 12 ? "PM" : "AM";
+    initHour = h24 % 12;
+    if (initHour === 0) initHour = 12;
+    initMinute = refDate.getMinutes();
+  }
+
+  return (
+    <>
+      <TouchableOpacity
+        onPress={() => _sSetShowPicker(true)}
+        className={styles.addPill}
+        style={{ backgroundColor: bgColor }}
+      >
+        <span className={styles.addPillText} style={{ color: textColor }}>+ Add</span>
+      </TouchableOpacity>
+      <Dialog
+        visible={sShowPicker}
+        onClose={() => _sSetShowPicker(false)}
+        overlayColor="rgba(0,0,0,0.4)"
+      >
+        <TimePicker
+          initialHour={initHour}
+          initialMinute={initMinute}
+          initialPeriod={initPeriod}
+          onConfirm={({ hour, minute, period }) => {
+            onAdd({ hour, minute, period });
+            _sSetShowPicker(false);
+          }}
+          onCancel={() => _sSetShowPicker(false)}
+        />
+      </Dialog>
+    </>
   );
 };
 
 const PayrollSummaryItem = ({ label, value, highlight }) => (
-  <View
-    style={{
-      alignItems: "center",
-      marginHorizontal: 10,
-      marginVertical: 2,
-    }}
-  >
-    <Text
-      style={{
-        fontSize: 12,
-        color: "rgba(255,255,255,0.7)",
-        fontWeight: "600",
-      }}
-    >
-      {label}
-    </Text>
-    <Text
-      style={{
-        fontSize: 16,
-        fontWeight: "700",
-        color: highlight ? lightenRGBByPercent(C.green, 30) : "white",
-      }}
+  <div className={styles.summaryItem}>
+    <span className={styles.summaryLabel}>{label}</span>
+    <span
+      className={styles.summaryValue}
+      style={{ color: highlight ? lightenRGBByPercent(C.green, 30) : "#ffffff" }}
     >
       {value}
-    </Text>
-  </View>
+    </span>
+  </div>
 );
 
 const PunchListHeader = ({ sSelectedUser, isAdmin, sLoading, displayArr, handleNewPunchPress }) => {
@@ -1355,40 +1063,38 @@ const PunchListHeader = ({ sSelectedUser, isAdmin, sLoading, displayArr, handleN
   }
 
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-      }}
-    >
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
-        <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>
+    <div className={styles.empHeader}>
+      <div className={styles.empNameWrap}>
+        <span className={styles.empName} style={{ color: C.text }}>
           {sSelectedUser
             ? sSelectedUser.first + " " + sSelectedUser.last
             : "Select a user"}
-        </Text>
-      </View>
+        </span>
+      </div>
       {!!sSelectedUser && (
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isClockedIn ? C.green : C.red, marginRight: 5 }} />
-          <Text style={{ fontSize: 12, fontWeight: "600", color: isClockedIn ? C.green : C.red, marginRight: 8 }}>
+        <div className={styles.clockWrap}>
+          <div
+            className={styles.clockDot}
+            style={{ backgroundColor: isClockedIn ? C.green : C.red }}
+          />
+          <span
+            className={styles.clockText}
+            style={{ color: isClockedIn ? C.green : C.red }}
+          >
             {isClockedIn ? "Clocked In" : "Clocked Out"}
-          </Text>
-          <Button_
+          </span>
+          <Button
             text={isClockedIn ? "CLOCK OUT" : "CLOCK IN"}
             onPress={handleClockToggle}
             colorGradientArr={isClockedIn ? COLOR_GRADIENTS.red : COLOR_GRADIENTS.green}
             buttonStyle={{ paddingVertical: 3, paddingHorizontal: 10, borderRadius: 5 }}
             textStyle={{ fontSize: 10, fontWeight: "600" }}
           />
-        </View>
+        </div>
       )}
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
+      <div className={styles.headerActions}>
         {isAdmin && !!sSelectedUser && (
-          <Button_
+          <Button
             text="Add Punch"
             onPress={handleNewPunchPress}
             colorGradientArr={COLOR_GRADIENTS.blue}
@@ -1402,12 +1108,12 @@ const PunchListHeader = ({ sSelectedUser, isAdmin, sLoading, displayArr, handleN
           />
         )}
         {!!sSelectedUser && !sLoading && (
-          <Text style={{ fontSize: 12, color: gray(0.4) }}>
+          <span className={styles.entryCount} style={{ color: gray(0.4) }}>
             {displayArr.length} entries
-          </Text>
+          </span>
         )}
-      </View>
-    </View>
+      </div>
+    </div>
   );
 };
 
@@ -1418,13 +1124,11 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
   const [sPage, _setPage] = useState(0);
   const scrollRef = useRef(null);
 
-  // Reverse so most recent is first
   let reversed = [...displayArr].reverse();
   let totalPages = Math.max(1, Math.ceil(reversed.length / PAGE_SIZE));
   let page = Math.min(sPage, totalPages - 1);
   let pageData = reversed.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
-  // Reset page when data changes
   let prevLenRef = useRef(displayArr.length);
   if (displayArr.length !== prevLenRef.current) {
     prevLenRef.current = displayArr.length;
@@ -1434,52 +1138,42 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
   function goPage(p) {
     _setEditableRowIdx(null);
     _setPage(p);
-    if (scrollRef.current) scrollRef.current.scrollTo({ y: 0, animated: false });
+    if (scrollRef.current) scrollRef.current.scrollTop = 0;
   }
 
   return (
-    <View style={{ flex: 1 }}>
-      <ScrollView ref={scrollRef} style={{ flex: 1 }}>
+    <div className={styles.listWrap}>
+      <div ref={scrollRef} className={styles.listScroll}>
         {pageData.map((item, index) => {
           let globalIdx = page * PAGE_SIZE + index;
           let editable = globalIdx === sEditableRowIdx;
           let bgColor = index % 2 === 0 ? C.listItemWhite : gray(0.075);
 
           return (
-            <View
+            <div
               key={(item.in?.id || "") + (item.out?.id || "") + globalIdx}
+              className={`${styles.row} ${editable ? styles.rowEditable : ""} ${!isAdmin ? styles.rowNoEdit : ""}`}
               style={{
-                flexDirection: "row",
-                alignItems: "center",
                 backgroundColor: bgColor,
-                paddingVertical: editable ? 4 : 6,
-                paddingHorizontal: 8,
                 opacity: editable ? 1 : sEditableRowIdx != null ? 0.3 : 1,
               }}
             >
-              {/* Date column */}
-              <View style={{ flex: 0.8 }}>
-                <Text style={{ fontSize: 12, color: C.text, fontWeight: "500" }}>
+              {/* Date */}
+              <div className={styles.cellDate}>
+                <span className={styles.cellTextPrimary} style={{ color: C.text, display: "block" }}>
                   {item.in?.wordDayOfWeek || item.out?.wordDayOfWeek}
-                </Text>
-                <Text style={{ fontSize: 11, color: gray(0.5) }}>
+                </span>
+                <span className={styles.cellTextSecondary} style={{ color: gray(0.5), display: "block" }}>
                   {item.in?.wordDayOfMonth || item.out?.wordDayOfMonth}{" "}
                   {item.in?.dayOfMonth || item.out?.dayOfMonth}
-                </Text>
-              </View>
+                </span>
+              </div>
 
-              {/* Clock In column */}
-              <View
-                style={{
-                  flex: 1.5,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
+              {/* Clock In */}
+              <div className={styles.cellIn}>
                 {item.in ? (
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Image_ icon={ICONS.forwardGreen} size={12} style={{ marginRight: 4 }} />
+                  <div className={styles.editableTimeWrap}>
+                    <Image icon={ICONS.forwardGreen} size={12} style={{ marginRight: 4 }} />
                     {editable ? (
                       <EditableTimeCell
                         timeObj={item.in}
@@ -1489,40 +1183,28 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
                         }
                       />
                     ) : (
-                      <Text style={{ fontSize: 12, color: C.text }}>
+                      <span className={styles.cellTime} style={{ color: C.text }}>
                         {item.in.hour}:{String(item.in.minutes).padStart(2, "0")} {item.in.amPM}
-                      </Text>
+                      </span>
                     )}
-                  </View>
+                  </div>
                 ) : editable ? (
-                  <TouchableOpacity onPress={() => handleCreateMissingPunch(item, "in")}>
-                    <View
-                      style={{
-                        backgroundColor: lightenRGBByPercent(C.green, 60),
-                        borderRadius: 4,
-                        paddingVertical: 3,
-                        paddingHorizontal: 8,
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, color: C.green, fontWeight: "600" }}>+ Add</Text>
-                    </View>
-                  </TouchableOpacity>
+                  <AddMissingPunchCell
+                    option="in"
+                    referencePunch={item.out}
+                    onAdd={(customTime) => handleCreateMissingPunch(item, "in", customTime)}
+                    textColor={C.green}
+                    bgColor={lightenRGBByPercent(C.green, 60)}
+                  />
                 ) : (
-                  <Text style={{ fontSize: 12, color: gray(0.5), fontStyle: "italic" }}>--</Text>
+                  <span className={styles.cellTimeMuted} style={{ color: gray(0.5) }}>--</span>
                 )}
-              </View>
+              </div>
 
-              {/* Clock Out column */}
-              <View
-                style={{
-                  flex: 1.5,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
+              {/* Clock Out */}
+              <div className={styles.cellOut}>
                 {item.out ? (
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <div className={styles.editableTimeWrap}>
                     {editable ? (
                       <EditableTimeCell
                         timeObj={item.out}
@@ -1532,54 +1214,41 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
                         }
                       />
                     ) : (
-                      <Text style={{ fontSize: 12, color: C.text }}>
+                      <span className={styles.cellTime} style={{ color: C.text }}>
                         {item.out.hour}:{String(item.out.minutes).padStart(2, "0")} {item.out.amPM}
-                      </Text>
+                      </span>
                     )}
-                  </View>
+                  </div>
                 ) : editable ? (
-                  <TouchableOpacity onPress={() => handleCreateMissingPunch(item, "out")}>
-                    <View
-                      style={{
-                        backgroundColor: lightenRGBByPercent(C.lightred, 60),
-                        borderRadius: 4,
-                        paddingVertical: 3,
-                        paddingHorizontal: 8,
-                      }}
-                    >
-                      <Text style={{ fontSize: 11, color: C.lightred, fontWeight: "600" }}>+ Add</Text>
-                    </View>
-                  </TouchableOpacity>
+                  <AddMissingPunchCell
+                    option="out"
+                    referencePunch={item.in}
+                    onAdd={(customTime) => handleCreateMissingPunch(item, "out", customTime)}
+                    textColor={C.lightred}
+                    bgColor={lightenRGBByPercent(C.lightred, 60)}
+                  />
                 ) : (
-                  <Text style={{ fontSize: 12, color: gray(0.5), fontStyle: "italic" }}>--</Text>
+                  <span className={styles.cellTimeMuted} style={{ color: gray(0.5) }}>--</span>
                 )}
-              </View>
+              </div>
 
-              {/* Hours column */}
-              <View style={{ flex: 0.8, alignItems: "center" }}>
+              {/* Hours */}
+              <div className={styles.cellHours}>
                 {item.hoursDiff != null || item.minutesDiff != null ? (
-                  <Text style={{ fontSize: 12, fontWeight: "600", color: C.text }}>
+                  <span className={styles.cellTime} style={{ fontWeight: 600, color: C.text }}>
                     {item.hoursDiff || 0}:{item.minutesDiff || "00"}
-                  </Text>
+                  </span>
                 ) : (
-                  <Text style={{ fontSize: 12, color: gray(0.5), fontStyle: "italic" }}>--</Text>
+                  <span className={styles.cellTimeMuted} style={{ color: gray(0.5) }}>--</span>
                 )}
-              </View>
+              </div>
 
-              {/* Edit / Delete column */}
+              {/* Edit / Delete */}
               {isAdmin && (
-                <View
-                  style={{
-                    flex: 0.4,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
+                <div className={styles.cellEdit}>
                   <TouchableOpacity
                     onPress={() => {
                       if (sEditableRowIdx === globalIdx) {
-                        // Exiting edit mode — validate times
                         if (item.in && item.out && (item.out.millis - item.in.millis) < MILLIS_IN_MINUTE) {
                           useAlertScreenStore.getState().setValues({
                             title: "Invalid Time",
@@ -1597,9 +1266,9 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
                         _setEditableRowIdx(globalIdx);
                       }
                     }}
-                    style={{ padding: 2 }}
+                    className={styles.iconBtn}
                   >
-                    <Image_ icon={ICONS.editPencil} size={16} />
+                    <Image icon={ICONS.editPencil} size={16} />
                   </TouchableOpacity>
                   {editable && (
                     <TouchableOpacity
@@ -1620,58 +1289,45 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
                           canExitOnOuterClick: true,
                         });
                       }}
-                      style={{ padding: 2, marginLeft: 4 }}
+                      className={`${styles.iconBtn} ${styles.iconBtnLeft}`}
                     >
-                      <Image_ icon={ICONS.trash} size={14} />
+                      <Image icon={ICONS.trash} size={14} />
                     </TouchableOpacity>
                   )}
-                </View>
+                </div>
               )}
-            </View>
+            </div>
           );
         })}
-      </ScrollView>
+      </div>
 
       {/* Pagination bar */}
       {totalPages > 1 && (
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "center",
-            alignItems: "center",
-            paddingVertical: 4,
-            backgroundColor: gray(0.95),
-            borderTopWidth: 1,
-            borderTopColor: gray(0.85),
-          }}
+        <div
+          className={styles.pagination}
+          style={{ backgroundColor: gray(0.95), borderTopColor: gray(0.85) }}
         >
           <TouchableOpacity
             onPress={() => goPage(page - 1)}
             disabled={page === 0}
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 4,
-              opacity: page === 0 ? 0.3 : 1,
-            }}
+            className={styles.pagBtn}
+            style={{ opacity: page === 0 ? 0.3 : 1 }}
           >
-            <Image_ icon={ICONS.greenLeftArrow} size={16} />
+            <Image icon={ICONS.greenLeftArrow} size={16} />
           </TouchableOpacity>
-          <Text style={{ fontSize: 12, color: C.text, fontWeight: "600", marginHorizontal: 10 }}>
+          <span className={styles.pagText} style={{ color: C.text }}>
             Page {page + 1} of {totalPages}
-          </Text>
+          </span>
           <TouchableOpacity
             onPress={() => goPage(page + 1)}
             disabled={page >= totalPages - 1}
-            style={{
-              paddingHorizontal: 12,
-              paddingVertical: 4,
-              opacity: page >= totalPages - 1 ? 0.3 : 1,
-            }}
+            className={styles.pagBtn}
+            style={{ opacity: page >= totalPages - 1 ? 0.3 : 1 }}
           >
-            <Image_ icon={ICONS.greenRightArrow} size={16} />
+            <Image icon={ICONS.greenRightArrow} size={16} />
           </TouchableOpacity>
-        </View>
+        </div>
       )}
-    </View>
+    </div>
   );
 };

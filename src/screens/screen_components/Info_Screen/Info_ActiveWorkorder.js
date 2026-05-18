@@ -10,6 +10,7 @@ import {
   formatPhoneWithParens,
   createNewWorkorder,
   generateEAN13Barcode,
+  generate36CharUUID,
   gray,
   lightenRGBByPercent,
   log,
@@ -52,6 +53,7 @@ import {
   WAIT_TIMES_PROTO,
   CUSTOM_WAIT_TIME,
   CUSTOMER_LANGUAGES,
+  ITEM_ORDERED_PROTO,
 } from "../../../data";
 import { MILLIS_IN_DAY, build_db_path } from "../../../constants";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -216,20 +218,99 @@ export const ActiveWorkorderComponent = ({}) => {
 
   // Show/hide for Ordering Info section
   const [sShowItemOrdering, _sSetShowItemOrdering] = useState(false);
-  const hasItemOrderingData = !!(zOpenWorkorder?.partOrdered || zOpenWorkorder?.partSource || zOpenWorkorder?.trackingNumber || zOpenWorkorder?.partToBeOrdered === false || zOpenWorkorder?.partOrderEstimateMillis || zOpenWorkorder?.partOrderedMillis);
+  const hasItemOrderingData = (zOpenWorkorder?.orderedItems || []).length > 0;
 
-  // Estimated wait days — local state for instant UI, debounced DB write
+  // Active ordered item — null means no item selected (fields disabled)
+  const [sActiveOrderedItem, _sSetActiveOrderedItem] = useState(null);
+  const [sActiveOrderedIndex, _sSetActiveOrderedIndex] = useState(-1);
+  const [sShowTracker, _sSetShowTracker] = useState(false);
+  const hasCommittedRef = useRef(false);
+  const hasActiveItem = sActiveOrderedItem !== null;
+
+  function handleAddOrderedItem() {
+    useLoginStore.getState().requireLogin(() => {
+      const newItem = { ...cloneDeep(ITEM_ORDERED_PROTO), id: generate36CharUUID() };
+      const nextIndex = (zOpenWorkorder?.orderedItems || []).length;
+      _sSetActiveOrderedItem(newItem);
+      _sSetActiveOrderedIndex(nextIndex);
+      hasCommittedRef.current = false;
+      _setWaitDays(0);
+    });
+  }
+
+  function commitOrUpdateActiveItem(item) {
+    const woID = zOpenWorkorder?.id;
+    if (!woID) return;
+    const current = zOpenWorkorder?.orderedItems || [];
+    if (!hasCommittedRef.current) {
+      hasCommittedRef.current = true;
+      useOpenWorkordersStore.getState().setField("orderedItems", [...current, item], woID);
+    } else {
+      const updated = current.map((o) => o.id === item.id ? item : o);
+      useOpenWorkordersStore.getState().setField("orderedItems", updated, woID);
+    }
+  }
+
+  function updateActiveItemField(field, value) {
+    if (!sActiveOrderedItem) return;
+    const updated = { ...sActiveOrderedItem, [field]: value };
+    _sSetActiveOrderedItem(updated);
+    commitOrUpdateActiveItem(updated);
+  }
+
+  function handleNavigateRight() {
+    const items = zOpenWorkorder?.orderedItems || [];
+    if (items.length === 0) return;
+    const nextIndex = sActiveOrderedIndex >= items.length - 1 ? 0 : sActiveOrderedIndex + 1;
+    _sSetActiveOrderedItem(cloneDeep(items[nextIndex]));
+    _sSetActiveOrderedIndex(nextIndex);
+    hasCommittedRef.current = true;
+    const item = items[nextIndex];
+    const days = item.partOrderEstimateMillis && item.partOrderedMillis
+      ? Math.max(0, Math.round((item.partOrderEstimateMillis - item.partOrderedMillis) / MILLIS_IN_DAY))
+      : 0;
+    _setWaitDays(days);
+  }
+
+  function handleNavigateLeft() {
+    const items = zOpenWorkorder?.orderedItems || [];
+    if (items.length === 0) return;
+    const prevIndex = sActiveOrderedIndex <= 0 ? items.length - 1 : sActiveOrderedIndex - 1;
+    _sSetActiveOrderedItem(cloneDeep(items[prevIndex]));
+    _sSetActiveOrderedIndex(prevIndex);
+    hasCommittedRef.current = true;
+    const item = items[prevIndex];
+    const days = item.partOrderEstimateMillis && item.partOrderedMillis
+      ? Math.max(0, Math.round((item.partOrderEstimateMillis - item.partOrderedMillis) / MILLIS_IN_DAY))
+      : 0;
+    _setWaitDays(days);
+  }
+
+  // Auto-load first ordered item when workorder changes
+  useEffect(() => {
+    const items = zOpenWorkorder?.orderedItems || [];
+    if (items.length > 0) {
+      const first = cloneDeep(items[0]);
+      _sSetActiveOrderedItem(first);
+      _sSetActiveOrderedIndex(0);
+      hasCommittedRef.current = true;
+      _sSetShowItemOrdering(true);
+      const days = first.partOrderEstimateMillis && first.partOrderedMillis
+        ? Math.max(0, Math.round((first.partOrderEstimateMillis - first.partOrderedMillis) / MILLIS_IN_DAY))
+        : 0;
+      _setWaitDays(days);
+    } else {
+      _sSetActiveOrderedItem(null);
+      _sSetActiveOrderedIndex(-1);
+      hasCommittedRef.current = false;
+      _sSetShowItemOrdering(false);
+      _setWaitDays(0);
+    }
+  }, [zOpenWorkorder?.id]);
+
+  // Estimated wait days — local state for instant UI, debounced write
   const [sWaitDays, _setWaitDays] = useState(0);
   const waitDaysTimerRef = useRef(null);
-
-  useEffect(() => {
-    if (!zOpenWorkorder?.partOrderEstimateMillis || !zOpenWorkorder?.partOrderedMillis) {
-      _setWaitDays(0);
-      return;
-    }
-    const days = Math.max(0, Math.round((zOpenWorkorder.partOrderEstimateMillis - zOpenWorkorder.partOrderedMillis) / MILLIS_IN_DAY));
-    _setWaitDays(days);
-  }, [zOpenWorkorder?.id]);
 
   // Blink wait time input when status requires wait time but none is selected
   useEffect(() => {
@@ -250,14 +331,18 @@ export const ActiveWorkorderComponent = ({}) => {
   }, [zOpenWorkorder?.status, zOpenWorkorder?.waitTime?.label, zOpenWorkorder?.waitTime?.maxWaitTimeDays, zSettings?.statuses]);
 
   function updateWaitDays(newDays) {
+    if (!sActiveOrderedItem) return;
     _setWaitDays(newDays);
     clearTimeout(waitDaysTimerRef.current);
-    const woID = zOpenWorkorder?.id;
-    if (!woID) return;
     waitDaysTimerRef.current = setTimeout(() => {
-      let now = Date.now();
-      useOpenWorkordersStore.getState().setField("partOrderedMillis", now, woID, false);
-      useOpenWorkordersStore.getState().setField("partOrderEstimateMillis", now + (newDays * MILLIS_IN_DAY), woID);
+      const now = Date.now();
+      const updated = {
+        ...sActiveOrderedItem,
+        partOrderedMillis: now,
+        partOrderEstimateMillis: now + (newDays * MILLIS_IN_DAY),
+      };
+      _sSetActiveOrderedItem(updated);
+      commitOrUpdateActiveItem(updated);
     }, 700);
   }
 
@@ -1548,11 +1633,7 @@ export const ActiveWorkorderComponent = ({}) => {
               <TouchableOpacity
                 disabled={hasItemOrderingData}
                 onPress={() => {
-                  const willShow = !sShowItemOrdering;
-                  _sSetShowItemOrdering(willShow);
-                  if (willShow && !zOpenWorkorder?.partOrdered && !zOpenWorkorder?.partSource && !zOpenWorkorder?.trackingNumber) {
-                    useOpenWorkordersStore.getState().setField("partToBeOrdered", true, zOpenWorkorder.id);
-                  }
+                  _sSetShowItemOrdering((v) => !v);
                 }}
                 style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8 }}
                 activeOpacity={hasItemOrderingData ? 1 : 0.6}
@@ -1562,237 +1643,301 @@ export const ActiveWorkorderComponent = ({}) => {
               </TouchableOpacity>
               <View style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: gray(0.25) }} />
             </View>
-            {(sShowItemOrdering || hasItemOrderingData) && <>
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "flex-start",
-                alignItems: "center",
-                width: "100%",
-                marginTop: 5,
-              }}
-            >
-              <TextInput_
-                placeholder={"Item names/descriptions"}
-                placeholderTextColor={gray(0.2)}
-                editable={!isDonePaid}
-                capitalize={true}
-                style={{
-                  width: "100%",
-                  borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
-                  color: C.text,
-                  paddingVertical: 2,
-                  paddingHorizontal: 4,
-                  fontSize: 15,
-                  outlineStyle: "none",
-                  borderRadius: 5,
-                  fontWeight: zOpenWorkorder?.partOrdered ? "500" : null,
-                  backgroundColor: C.backgroundWhite,
-                }}
-                value={capitalizeFirstLetterOfString(zOpenWorkorder?.partOrdered)}
-                onFocus={() => useLoginStore.getState().requireLogin(() => {})}
-                onChangeText={(val) => {
-                  useOpenWorkordersStore.getState().setField("partOrdered", val, zOpenWorkorder.id);
-                  useOpenWorkordersStore.getState().setField("partOrderedMillis", Date.now(), zOpenWorkorder.id);
-                }}
-              />
-            </View>
+            {(sShowItemOrdering || hasItemOrderingData) && (
+              <View style={{ flexDirection: "row", width: "100%", marginTop: 5 }}>
 
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "flex-start",
-                alignItems: "center",
-                width: "100%",
-                marginTop: 11,
-              }}
-            >
-              <TextInput_
-                value={capitalizeFirstLetterOfString(zOpenWorkorder?.partSource)}
-                placeholder={"Item sources"}
-                placeholderTextColor={gray(0.2)}
-                editable={!isDonePaid}
-                capitalize={true}
-                style={{
-                  width: "50%",
-                  borderWidth: 1,
-                  borderColor: zOpenWorkorder?.partSource ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
-                  color: C.text,
-                  paddingVertical: 2,
-                  paddingHorizontal: 4,
-                  fontSize: 15,
-                  outlineStyle: "none",
-                  borderRadius: 5,
-                  fontWeight: zOpenWorkorder?.partSource ? "500" : null,
-                  backgroundColor: C.backgroundWhite,
-                }}
-                onFocus={() => useLoginStore.getState().requireLogin(() => {})}
-                onChangeText={(val) => {
-                  useOpenWorkordersStore.getState().setField("partSource", val, zOpenWorkorder.id);
-                  useOpenWorkordersStore.getState().setField("partOrderedMillis", Date.now(), zOpenWorkorder.id);
-                }}
-              />
-              <View
-                style={{
-                  // marginTop: 11,
-                  width: "50%",
-                  flexDirection: "row",
-                  paddingLeft: 5,
-                  justifyContent: "",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  // backgroundColor: "blue",
-                }}
-              >
-                <View
-                  onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.opacity = zOpenWorkorder?.partSource ? FILLED_DROPDOWN_OPACITY : 1; }}
-                  style={{ opacity: zOpenWorkorder?.partSource ? FILLED_DROPDOWN_OPACITY : 1 }}
-                >
-                  <DropdownMenu
-                    dataArr={zSettings.partSources}
-                    enabled={!isDonePaid}
-                    onSelect={(item, idx) => {
-                      useOpenWorkordersStore.getState().setField("partSource", item, zOpenWorkorder.id);
-                      useOpenWorkordersStore.getState().setField("partOrderedMillis", Date.now(), zOpenWorkorder.id);
+                {/* Fields — 87% */}
+                <View style={{ width: "87%", flexShrink: 0, paddingRight: 15, opacity: hasActiveItem ? 1 : 0.35 }}>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "flex-start",
+                      alignItems: "center",
+                      width: "100%",
                     }}
-                    modalCoordX={20}
-                    buttonStyle={{
-                      paddingHorizontal: 40,
-                    }}
-                    ref={partSourcesRef}
-                    matchValue={zOpenWorkorder?.partSource || ""}
-                    buttonText={zOpenWorkorder?.partSource || "Sources"}
-                  />
-                </View>
-              </View>
-            </View>
+                  >
+                    <TextInput_
+                      placeholder={"Item names/descriptions"}
+                      placeholderTextColor={gray(0.2)}
+                      editable={!isDonePaid && hasActiveItem}
+                      capitalize={true}
+                      style={{
+                        width: "100%",
+                        borderWidth: 1,
+                        borderColor: C.buttonLightGreenOutline,
+                        color: C.text,
+                        paddingVertical: 2,
+                        paddingHorizontal: 4,
+                        fontSize: 15,
+                        outlineStyle: "none",
+                        borderRadius: 5,
+                        fontWeight: sActiveOrderedItem?.partOrdered ? "500" : null,
+                        backgroundColor: C.backgroundWhite,
+                      }}
+                      value={capitalizeFirstLetterOfString(sActiveOrderedItem?.partOrdered || "")}
+                      onFocus={() => useLoginStore.getState().requireLogin(() => {})}
+                      onChangeText={(val) => {
+                        updateActiveItemField("partOrdered", val);
+                      }}
+                    />
+                  </View>
 
-            {/* Estimated wait days picker + To be ordered checkbox */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "space-between",
-                width: "100%",
-                marginTop: 11,
-              }}
-            >
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <Text style={{ fontSize: 13, color: gray(0.45), marginRight: 8 }}>
-                  Est. delivery
-                </Text>
-                <TouchableOpacity
-                  disabled={isDonePaid}
-                  onPress={() => updateWaitDays(Math.max(0, sWaitDays - 1))}
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: 4,
-                    backgroundColor: isDonePaid ? gray(0.85) : C.buttonLightGreen,
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  <Text style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>−</Text>
-                </TouchableOpacity>
-                <Text
-                  style={{
-                    fontSize: 13,
-                    fontWeight: "400",
-                    color: C.text,
-                    minWidth: 50,
-                    textAlign: "center",
-                  }}
-                >
-                  {sWaitDays + " days"}
-                </Text>
-                <TouchableOpacity
-                  disabled={isDonePaid}
-                  onPress={() => updateWaitDays(sWaitDays + 1)}
-                  style={{
-                    width: 20,
-                    height: 20,
-                    borderRadius: 4,
-                    backgroundColor: isDonePaid ? gray(0.85) : C.buttonLightGreen,
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
-                >
-                  <Text style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>+</Text>
-                </TouchableOpacity>
-              </View>
-              {!!zOpenWorkorder?.partOrderEstimateMillis && (
-                <Text style={{ fontSize: 14, color: sWaitDays > 0 ? gray(0.45) : "transparent" }}>
-                  {formatMillisForDisplay(zOpenWorkorder.partOrderEstimateMillis)}
-                </Text>
-              )}
-              <TouchableOpacity
-                disabled={isDonePaid}
-                activeOpacity={0.7}
-                onPress={() => {
-                  const newVal = !zOpenWorkorder?.partToBeOrdered;
-                  const store = useOpenWorkordersStore.getState();
-                  store.setField("partToBeOrdered", newVal, zOpenWorkorder.id);
-                  store.setField("status", newVal ? "is_order_part_for_customer" : "part_ordered", zOpenWorkorder.id);
-                }}
-                style={{ flexDirection: 'row', alignItems: 'center' }}
-              >
-                <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: zOpenWorkorder?.partToBeOrdered ? C.red : C.green, justifyContent: 'center', alignItems: 'center', marginRight: 4 }}>
-                  <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: zOpenWorkorder?.partToBeOrdered ? C.red : C.green }} />
-                </View>
-                <Text style={{ fontSize: 11, fontWeight: '600', color: zOpenWorkorder?.partToBeOrdered ? C.red : C.green }}>{zOpenWorkorder?.partToBeOrdered ? "Not ordered" : "Ordered"}</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', marginTop: 8, paddingVertical: 2 }}>
-              <TextInput_
-                placeholder="Tracking num or website here..."
-                placeholderTextColor={gray(.3)}
-                value={zOpenWorkorder?.trackingNumber || ""}
-                onChangeText={(val) => {
-                  useOpenWorkordersStore.getState().setField("trackingNumber", val, zOpenWorkorder.id);
-                }}
-                multiline={false}
-                numberOfLines={1}
-                style={{ height: '100%', fontSize: 11, flex: 1, paddingHorizontal: 5, borderWidth: 1, borderColor: gray(.15), borderRadius: 6, resize: "none", overflow: "hidden", color: C.text, outlineStyle: "none" }}
-              />
-              {zOpenWorkorder?.trackingNumber ? (() => {
-                const inputVal = zOpenWorkorder.trackingNumber.trim();
-                const isURL = /^https?:\/\/|^www\./i.test(inputVal);
-                if (isURL) {
-                  const openUrl = inputVal.startsWith("www.") ? "https://" + inputVal : inputVal;
-                  return (
-                    <View onContextMenu={(e) => { e.preventDefault(); navigator.clipboard.writeText(inputVal); }}>
-                      <Tooltip text="Press to open, right-click to copy" position="top">
-                        <Pressable_ onPress={() => window.open(openUrl, "_blank")} style={{ height: '90%', marginLeft: 5 }}>
-                          <View style={{ height: '100%', backgroundColor: C.buttonLightGreen, borderColor: C.buttonLightGreenOutline, borderWidth: 1, borderRadius: 5, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 8 }}>
-                            <Text style={{ fontSize: 13, color: gray(0.55), fontWeight: '500' }}>Open</Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      justifyContent: "flex-start",
+                      alignItems: "center",
+                      width: "100%",
+                      marginTop: 11,
+                    }}
+                  >
+                    <TextInput_
+                      value={capitalizeFirstLetterOfString(sActiveOrderedItem?.partSource || "")}
+                      placeholder={"Item sources"}
+                      placeholderTextColor={gray(0.2)}
+                      editable={!isDonePaid && hasActiveItem}
+                      capitalize={true}
+                      style={{
+                        width: "50%",
+                        borderWidth: 1,
+                        borderColor: sActiveOrderedItem?.partSource ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
+                        color: C.text,
+                        paddingVertical: 2,
+                        paddingHorizontal: 4,
+                        fontSize: 15,
+                        outlineStyle: "none",
+                        borderRadius: 5,
+                        fontWeight: sActiveOrderedItem?.partSource ? "500" : null,
+                        backgroundColor: C.backgroundWhite,
+                      }}
+                      onFocus={() => useLoginStore.getState().requireLogin(() => {})}
+                      onChangeText={(val) => {
+                        updateActiveItemField("partSource", val);
+                      }}
+                    />
+                    <View
+                      style={{
+                        width: "50%",
+                        flexDirection: "row",
+                        paddingLeft: 5,
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}
+                    >
+                      <View
+                        onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.opacity = sActiveOrderedItem?.partSource ? FILLED_DROPDOWN_OPACITY : 1; }}
+                        style={{ opacity: sActiveOrderedItem?.partSource ? FILLED_DROPDOWN_OPACITY : 1 }}
+                      >
+                        <DropdownMenu
+                          dataArr={zSettings.partSources}
+                          enabled={!isDonePaid && hasActiveItem}
+                          onSelect={(item) => {
+                            updateActiveItemField("partSource", item);
+                          }}
+                          modalCoordX={20}
+                          buttonStyle={{ paddingHorizontal: 40 }}
+                          ref={partSourcesRef}
+                          matchValue={sActiveOrderedItem?.partSource || ""}
+                          buttonText={sActiveOrderedItem?.partSource || "Sources"}
+                        />
+                      </View>
+                    </View>
+                  </View>
+
+                  {/* Estimated wait days picker + To be ordered toggle */}
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      width: "100%",
+                      marginTop: 11,
+                    }}
+                  >
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Text style={{ fontSize: 11, color: gray(0.45), marginRight: 8, fontStyle: "italic" }}>
+                        Est. delivery
+                      </Text>
+                      <TouchableOpacity
+                        disabled={isDonePaid || !hasActiveItem}
+                        onPress={() => updateWaitDays(Math.max(0, sWaitDays - 1))}
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 4,
+                          backgroundColor: (isDonePaid || !hasActiveItem) ? gray(0.85) : C.buttonLightGreen,
+                          justifyContent: "center",
+                          alignItems: "center",
+                        }}
+                      >
+                        <Text style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>−</Text>
+                      </TouchableOpacity>
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontWeight: "400",
+                          color: C.text,
+                          minWidth: 50,
+                          textAlign: "center",
+                        }}
+                      >
+                        {sWaitDays + " days"}
+                      </Text>
+                      <TouchableOpacity
+                        disabled={isDonePaid || !hasActiveItem}
+                        onPress={() => updateWaitDays(sWaitDays + 1)}
+                        style={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: 4,
+                          backgroundColor: (isDonePaid || !hasActiveItem) ? gray(0.85) : C.buttonLightGreen,
+                          justifyContent: "center",
+                          alignItems: "center",
+                        }}
+                      >
+                        <Text style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>+</Text>
+                      </TouchableOpacity>
+                    </View>
+                    {!!sActiveOrderedItem?.partOrderEstimateMillis && (
+                      <Text style={{ fontSize: 12, color: sWaitDays > 0 ? gray(0.45) : "transparent" }}>
+                        {formatMillisForDisplay(sActiveOrderedItem.partOrderEstimateMillis)}
+                      </Text>
+                    )}
+                    <TouchableOpacity
+                      disabled={isDonePaid || !hasActiveItem}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        const newVal = !sActiveOrderedItem?.partToBeOrdered;
+                        updateActiveItemField("partToBeOrdered", newVal);
+                        useOpenWorkordersStore.getState().setField("status", newVal ? "is_order_part_for_customer" : "part_ordered", zOpenWorkorder.id);
+                      }}
+                      style={{ flexDirection: 'row', alignItems: 'center' }}
+                    >
+                      <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green, justifyContent: 'center', alignItems: 'center', marginRight: 4 }}>
+                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green }} />
+                      </View>
+                      <Text style={{ fontSize: 11, fontWeight: '600', color: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green }}>{sActiveOrderedItem?.partToBeOrdered ? "Not ordered" : "Ordered"}</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  <div style={{ width: '100%', display: 'flex', flexDirection: 'row', alignItems: 'stretch', marginTop: 8, height: 22 }}>
+                    <TextInput_
+                      placeholder="Tracking num or website here..."
+                      placeholderTextColor={gray(.3)}
+                      editable={hasActiveItem}
+                      value={sActiveOrderedItem?.trackingNumber || ""}
+                      onChangeText={(val) => {
+                        updateActiveItemField("trackingNumber", val);
+                      }}
+                      multiline={false}
+                      numberOfLines={1}
+                      style={{ height: '100%', boxSizing: 'border-box', fontSize: 11, flex: 1, paddingHorizontal: 5, paddingVertical: 0, borderWidth: 1, borderColor: gray(.15), borderRadius: 6, resize: "none", overflow: "hidden", color: C.text, outlineStyle: "none" }}
+                    />
+                    {sActiveOrderedItem?.trackingNumber ? (() => {
+                      const inputVal = sActiveOrderedItem.trackingNumber.trim();
+                      const isURL = /^https?:\/\/|^www\./i.test(inputVal);
+                      const copyOnRightClick = (e) => { e.preventDefault(); navigator.clipboard.writeText(inputVal); };
+                      if (isURL) {
+                        const openUrl = inputVal.startsWith("www.") ? "https://" + inputVal : inputVal;
+                        return (
+                          <button
+                            type="button"
+                            title="Press to open, right-click to copy"
+                            onClick={() => window.open(openUrl, "_blank")}
+                            onContextMenu={copyOnRightClick}
+                            style={{ height: '100%', boxSizing: 'border-box', marginLeft: 5, backgroundColor: C.buttonLightGreen, borderColor: C.buttonLightGreenOutline, borderWidth: 1, borderStyle: 'solid', borderRadius: 5, paddingTop: 0, paddingBottom: 0, paddingLeft: 8, paddingRight: 8, fontSize: 12, color: gray(0.55), fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                          >
+                            Open
+                          </button>
+                        );
+                      }
+                      return (
+                        <button
+                          type="button"
+                          title="Press to track, right-click to copy"
+                          onClick={() => _sSetShowTracker(true)}
+                          onContextMenu={copyOnRightClick}
+                          style={{ height: '100%', boxSizing: 'border-box', marginLeft: 5, backgroundColor: C.green, borderWidth: 0, borderRadius: 5, paddingTop: 0, paddingBottom: 0, paddingLeft: 8, paddingRight: 8, fontSize: 12, color: 'white', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                        >
+                          Track
+                        </button>
+                      );
+                    })() : null}
+                  </div>
+                  {sActiveOrderedItem?.trackingNumber && !/^https?:\/\/|^www\./i.test(sActiveOrderedItem.trackingNumber.trim()) ? (
+                    <ScreenModal
+                      showOuterModal={true}
+                      modalVisible={sShowTracker}
+                      buttonVisible={false}
+                      handleOuterClick={() => _sSetShowTracker(false)}
+                      Component={() => (
+                        <View style={{ width: "80vw", height: "85vh", backgroundColor: C.backgroundWhite, borderRadius: 12, overflow: "hidden", flexDirection: "column" }}>
+                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 15, paddingVertical: 10, backgroundColor: C.green }}>
+                            <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>Package Tracking</Text>
+                            <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", flex: 1, marginLeft: 10 }} numberOfLines={1}>{sActiveOrderedItem.trackingNumber.trim()}</Text>
+                            <TouchableOpacity onPress={() => _sSetShowTracker(false)} style={{ width: 30, height: 30, borderRadius: 15, justifyContent: "center", alignItems: "center" }}>
+                              <Text style={{ fontSize: 18, fontWeight: "700", color: "white" }}>✕</Text>
+                            </TouchableOpacity>
                           </View>
-                        </Pressable_>
-                      </Tooltip>
+                          <View style={{ flex: 1, padding: 10 }}>
+                            <iframe
+                              src={"https://parcelsapp.com/en/tracking/" + sActiveOrderedItem.trackingNumber.trim()}
+                              style={{ width: "100%", height: "100%", border: "none", borderRadius: 6 }}
+                              title="Package Tracking"
+                            />
+                          </View>
+                        </View>
+                      )}
+                    />
+                  ) : null}
+                </View>
+
+                {/* Button column — 13% */}
+                {(() => {
+                  const items = zOpenWorkorder?.orderedItems || [];
+                  const canGoRight = sActiveOrderedIndex < items.length - 1;
+                  const canGoLeft = sActiveOrderedIndex > 0;
+                  const addTooltip = isDonePaid ? "Workorder is done & paid" : "Add ordered item";
+                  const rightTooltip = canGoRight
+                    ? `Next item (${sActiveOrderedIndex + 2} of ${items.length})`
+                    : items.length === 0 ? "No items yet" : "Already at last item";
+                  const leftTooltip = canGoLeft
+                    ? `Previous item (${sActiveOrderedIndex} of ${items.length})`
+                    : "Already at first item";
+                  return (
+                    <View style={{ width: "13%", flexShrink: 0, flexDirection: "column", paddingLeft: 5, borderLeftWidth: 1, borderLeftColor: gray(0.12) }}>
+                      {/* Plus button */}
+                      <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
+                        <Tooltip text={addTooltip} position="left">
+                          <TouchableOpacity disabled={isDonePaid} onPress={handleAddOrderedItem}>
+                            <Image_ icon={ICONS.add} size={32} />
+                          </TouchableOpacity>
+                        </Tooltip>
+                      </div>
+                      {/* Caret navigation */}
+                      <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
+                        <div style={{ opacity: canGoRight ? 1 : 0.2 }}>
+                          <Tooltip text={rightTooltip} position="left">
+                            <TouchableOpacity disabled={!canGoRight} onPress={handleNavigateRight}>
+                              <Image_ icon={ICONS.caretRight} size={22} />
+                            </TouchableOpacity>
+                          </Tooltip>
+                        </div>
+                        <div style={{ opacity: canGoLeft ? 1 : 0.2 }}>
+                          <Tooltip text={leftTooltip} position="left">
+                            <TouchableOpacity disabled={!canGoLeft} onPress={handleNavigateLeft}>
+                              <Image_ icon={ICONS.caretLeft} size={22} />
+                            </TouchableOpacity>
+                          </Tooltip>
+                        </div>
+                      </div>
                     </View>
                   );
-                }
-                return (
-                  <View onContextMenu={(e) => { e.preventDefault(); navigator.clipboard.writeText(inputVal); }}>
-                    <Tooltip text="Press to track, right-click to copy" position="top">
-                      <WebPageModal
-                        url={"https://parcelsapp.com/en/tracking/" + inputVal}
-                        title="Package Tracking"
-                        subtitle={inputVal}
-                        buttonLabel="Track"
-                        buttonStyle={{ height: '90%', marginLeft: 5 }}
-                      />
-                    </Tooltip>
-                  </View>
-                );
-              })() : null}
-            </View>
-            {!!(zOpenWorkorder?.trackingNumber || "").trim() && (
-              <Text style={{ fontSize: 10, fontStyle: 'italic', color: gray(0.3), marginTop: 3 }}>Place additional tracking info in Internal Notes</Text>
+                })()}
+
+              </View>
             )}
-            </>}
           </View>
         </View>
       </View>

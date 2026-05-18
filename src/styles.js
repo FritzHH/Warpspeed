@@ -2,8 +2,8 @@ import { dim, getRgbFromNamedColor, lightenRGBByPercent, gray } from "./utils";
 // const { getDefaultConfig } = require("metro"); // Or require('metro-config') for bare React Native
 
 export const Z = {
-  modal: 1000,
-  dropdown: 2000,
+  modal: 9000,
+  dropdown: 9500,
   tooltip: 3000,
   toast: 4000,
   alert: 5000,

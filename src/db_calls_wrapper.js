@@ -1171,6 +1171,29 @@ export async function dbSavePunchObject(punch, punchID = null) {
 }
 
 /**
+ * Delete a single punch document from Firestore by punch ID.
+ */
+export async function dbDeletePunch(punchID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: tenantID and storeID are not configured for dbDeletePunch");
+      return { success: false, error: "Configuration Error" };
+    }
+    if (!punchID) {
+      log("Error: punchID is required for dbDeletePunch");
+      return { success: false, error: "Invalid Parameter" };
+    }
+    const path = buildPunchPath(tenantID, storeID, punchID);
+    await firestoreDelete(path);
+    return { success: true, punchID, path };
+  } catch (error) {
+    log("Error deleting punch:", error);
+    return { success: false, error: "Database Error", message: error.message };
+  }
+}
+
+/**
  * Save current punch clock object to Firestore (overwrites entire punch_clock node)
  * @param {Object} punchClockData - Current punch clock object to save (required)
  * @returns {Promise<Object>} Save result

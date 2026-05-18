@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
+import { View, Text, ScrollView, TouchableOpacity, TextInput } from "react-native-web";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
@@ -2013,6 +2013,7 @@ export function BikeStandScreen() {
             _setShowWorkorderList(false);
           }}
           onClose={() => _setShowWorkorderList(false)}
+          onNewWorkorder={() => { _setShowWorkorderList(false); handleNewWorkorderPress(); }}
           activeWorkorderID={sSelectedWorkorderID}
         />
       )}
@@ -2241,9 +2242,9 @@ export function BikeStandScreen() {
           ) : (
             <View>
               {/* Header row: customer info + status + show/hide toggle */}
-              <StandTouch onPress={() => { _setShowBikeDetails((p) => { if (p) _setDetailField(null); return !p; }); }}>
+              <StandTouch onPress={() => { _setShowBikeInfoModal(true); }}>
               <View
-                onClick={() => { _setShowBikeDetails((p) => { if (p) _setDetailField(null); return !p; }); }}
+                onClick={() => { _setShowBikeInfoModal(true); }}
                 style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingTop: 20, paddingBottom: 14, cursor: "pointer" }}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
@@ -2257,14 +2258,18 @@ export function BikeStandScreen() {
                   ) : null}
                 </View>
                 {selectedWorkorder && (
-                  <View onClick={(e) => e.stopPropagation()}>
+                  <View onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
                     <StatusPickerModal
                       statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned && !s.hidden)}
                       enabled={true}
                       onSelect={handleStatusSelect}
                       buttonStyle={{
                         backgroundColor: rs.backgroundColor,
-                        paddingHorizontal: 18,
+                        paddingTop: 5,
+                        paddingBottom: 5,
+                        paddingLeft: 18,
+                        paddingRight: 18,
+                        height: "auto",
                       }}
                       buttonTextStyle={{
                         color: rs.textColor,
@@ -2669,6 +2674,39 @@ export function BikeStandScreen() {
                         </TouchableOpacity>
                         </StandTouch>
                       </View>
+                    </View>
+                  )}
+
+                  {/* Status picker */}
+                  {selectedWorkorder && (
+                    <View
+                      onClick={(e) => e.stopPropagation()}
+                      onTouchStart={(e) => e.stopPropagation()}
+                      style={{ alignItems: "center", marginBottom: 10 }}
+                    >
+                      <StatusPickerModal
+                        statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned && !s.hidden)}
+                        enabled={true}
+                        onSelect={handleStatusSelect}
+                        buttonStyle={{
+                          backgroundColor: rs.backgroundColor,
+                          paddingTop: 12,
+                          paddingBottom: 12,
+                          paddingLeft: 24,
+                          paddingRight: 24,
+                          height: "auto",
+                          borderRadius: 10,
+                        }}
+                        buttonTextStyle={{
+                          color: rs.textColor,
+                          fontWeight: "normal",
+                          fontSize: 27,
+                        }}
+                        modalCoordY={45}
+                        buttonText={rs.label}
+                        itemHeight={69}
+                        itemTextStyle={{ fontSize: 23 }}
+                      />
                     </View>
                   )}
 
@@ -4541,12 +4579,21 @@ function sortWorkordersForStand(inputArr) {
   return finalArr;
 }
 
-const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
+const WorkorderListModal = ({ onSelect, onClose, onNewWorkorder, activeWorkorderID }) => {
   const zWorkorders = useOpenWorkordersStore((state) => state.workorders);
   const zStatuses = useSettingsStore((s) => s.settings?.statuses);
+  const [sSearch, _setSearch] = useState("");
   const _swipeRef = useRef(null);
 
-  let sortedWorkorders = sortWorkordersForStand((zWorkorders || []).filter((wo) => !!wo.customerID));
+  let filtered = (zWorkorders || []).filter((wo) => !!wo.customerID);
+  if (sSearch.trim()) {
+    let q = sSearch.trim().toLowerCase();
+    filtered = filtered.filter((wo) => {
+      let fields = [wo.customerFirst, wo.customerLast, wo.customerCell, wo.brand, wo.description, wo.model];
+      return fields.some((f) => f && String(f).toLowerCase().includes(q));
+    });
+  }
+  let sortedWorkorders = sortWorkordersForStand(filtered);
 
   return (
     <StandTouch touchStart={false} onPress={onClose}>
@@ -4574,29 +4621,82 @@ const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
           overflow: "hidden",
         }}
       >
-        {/* Header — tap to close */}
+        {/* Header — title, search, new workorder */}
         <View
-          onClick={onClose}
-          onTouchStart={(e) => { _swipeRef.current = e.touches[0].clientY; }}
-          onTouchEnd={(e) => {
-            if (_swipeRef.current !== null) {
-              let diff = e.changedTouches[0].clientY - _swipeRef.current;
-              if (diff > 20) onClose();
-              _swipeRef.current = null;
-            }
-          }}
           style={{
             flexDirection: "row",
             alignItems: "center",
             paddingHorizontal: 20,
-            paddingVertical: 22,
+            paddingVertical: 16,
             borderBottomWidth: 1,
             borderBottomColor: gray(0.1),
-            cursor: "pointer",
+            gap: 12,
           }}
         >
-          <Text style={{ fontSize: 22, fontWeight: "600", color: C.text }}>Open Workorders</Text>
-          <Text style={{ flex: 1, fontSize: 18, fontStyle: "italic", color: gray(0.35), textAlign: "center" }}>Tap to close</Text>
+          <Text style={{ fontSize: 22, fontWeight: "600", color: C.text, flexShrink: 0 }}>Open Workorders</Text>
+          <View
+            style={{
+              flex: 1,
+              flexDirection: "row",
+              alignItems: "center",
+              borderWidth: 1,
+              borderColor: C.buttonLightGreenOutline,
+              borderRadius: 8,
+              backgroundColor: C.listItemWhite,
+              paddingHorizontal: 10,
+              height: 40,
+            }}
+          >
+            <Image_ icon={ICONS.search} size={16} style={{ marginRight: 6, opacity: 0.4 }} />
+            <TextInput
+              value={sSearch}
+              onChangeText={_setSearch}
+              placeholder="Search name, brand, description..."
+              placeholderTextColor={gray(0.6)}
+              style={{ flex: 1, fontSize: 16, color: C.text, outlineStyle: "none" }}
+            />
+            {!!sSearch && (
+              <TouchableOpacity onPress={() => _setSearch("")} style={{ padding: 4 }}>
+                <Image_ icon={ICONS.close1} size={18} />
+              </TouchableOpacity>
+            )}
+          </View>
+          <StandTouch onPress={onNewWorkorder}>
+          <TouchableOpacity
+            onPress={onNewWorkorder}
+            style={{
+              flexShrink: 0,
+              backgroundColor: C.green,
+              borderRadius: 8,
+              paddingVertical: 10,
+              paddingHorizontal: 18,
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: "700", color: C.textWhite }}>+ New Workorder</Text>
+          </TouchableOpacity>
+          </StandTouch>
+          <StandTouch onPress={onClose}>
+          <TouchableOpacity
+            onPress={onClose}
+            onTouchStart={(e) => { _swipeRef.current = e.touches[0].clientY; }}
+            onTouchEnd={(e) => {
+              if (_swipeRef.current !== null) {
+                let diff = e.changedTouches[0].clientY - _swipeRef.current;
+                if (diff > 20) onClose();
+                _swipeRef.current = null;
+              }
+            }}
+            style={{
+              flexShrink: 0,
+              paddingVertical: 10,
+              paddingHorizontal: 14,
+              borderRadius: 8,
+              backgroundColor: gray(0.08),
+            }}
+          >
+            <Text style={{ fontSize: 16, fontWeight: "600", color: gray(0.5) }}>Close</Text>
+          </TouchableOpacity>
+          </StandTouch>
         </View>
 
         {/* Workorder list */}

@@ -23,7 +23,7 @@ import {
 } from "./db_calls_wrapper";
 import { log, gray } from "./utils";
 import { View } from "react-native-web";
-import { useLayoutStore, useSettingsStore } from "./stores";
+import { useLayoutStore, useSettingsStore, useLoginStore } from "./stores";
 import { ROUTES } from "./routes";
 import { topUpPool } from "./idPool";
 import { BUILD_VERSION } from "./buildVersion";
@@ -209,6 +209,18 @@ function App() {
           const { tenantID, storeID } = tokenResult.claims;
           await loadTenantAndSettings(tenantID, storeID);
           topUpPool();
+
+          // DEV-ONLY: auto-login the user with id "1234" so owner-permissioned
+          // functions are available without waiting on face recognition.
+          // Stripped from production builds via Vite's import.meta.env.DEV.
+          if (import.meta.env.DEV) {
+            const devUser = useSettingsStore.getState().getSettings()?.users
+              ?.find((u) => u.id == "1234");
+            if (devUser) {
+              useLoginStore.getState().setCurrentUser(devUser);
+              useLoginStore.getState().setLastActionMillis();
+            }
+          }
           setUser({
             uid: firebaseUser.uid,
             email: firebaseUser.email,

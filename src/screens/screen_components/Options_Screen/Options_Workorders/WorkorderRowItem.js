@@ -223,29 +223,29 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
             </div>
           </div>
 
-          {!!(workorder.partOrdered || workorder.partSource || workorder.trackingNumber) && (
-            <div className={styles.partRow}>
-              {!!workorder.partOrdered && (
+          {(workorder.orderedItems || []).map((item) => (
+            <div key={item.id} className={styles.partRow}>
+              {!!item.partOrdered && (
                 <span className={styles.truncate} style={{ fontSize: 14, color: C.blue, fontWeight: "500" }}>
-                  {capitalizeFirstLetterOfString(workorder.partOrdered)}
+                  {capitalizeFirstLetterOfString(item.partOrdered)}
                 </span>
               )}
-              {!!(workorder.partOrdered && workorder.partSource) && (
+              {!!(item.partOrdered && item.partSource) && (
                 <span className={styles.separator} style={{ width: 5 }} />
               )}
-              {!!workorder.partSource && (
+              {!!item.partSource && (
                 <span className={styles.truncate} style={{ fontSize: 14, color: C.orange }}>
-                  {capitalizeFirstLetterOfString(workorder.partSource)}
+                  {capitalizeFirstLetterOfString(item.partSource)}
                 </span>
               )}
-              {!!(workorder.partOrderedMillis && workorder.partOrderEstimateMillis && Math.round((workorder.partOrderEstimateMillis - workorder.partOrderedMillis) / NUM_MILLIS_IN_DAY) > 0) && (
+              {!!(item.partOrderedMillis && item.partOrderEstimateMillis && Math.round((item.partOrderEstimateMillis - item.partOrderedMillis) / NUM_MILLIS_IN_DAY) > 0) && (
                 <span className={styles.truncate} style={{ fontSize: 12, color: "dimgray", marginLeft: 6 }}>
-                  {formatMillisForDisplay(workorder.partOrderedMillis)}
-                  {" \u2192 " + formatMillisForDisplay(workorder.partOrderEstimateMillis)}
+                  {formatMillisForDisplay(item.partOrderedMillis)}
+                  {" \u2192 " + formatMillisForDisplay(item.partOrderEstimateMillis)}
                 </span>
               )}
-              {!!workorder.trackingNumber && (() => {
-                const inputVal = workorder.trackingNumber.trim();
+              {!!item.trackingNumber && (() => {
+                const inputVal = item.trackingNumber.trim();
                 const isURL = /^https?:\/\/|^www\./i.test(inputVal);
                 if (isURL) {
                   const openUrl = inputVal.startsWith("www.") ? "https://" + inputVal : inputVal;
@@ -280,7 +280,7 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
                 );
               })()}
             </div>
-          )}
+          ))}
         </div>
         <div
           className={styles.waitHoverZone}

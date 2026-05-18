@@ -91,6 +91,8 @@ The layout does not reflow at different screen sizes by design. Percentages hand
 
 ** This app is being transitioned to a full-scale SaaS for distribution. Suggest professional-grade upgrades or transitions where you see them.
 
+** When the user says "view pic" in chat, you are to follow "C:\Users\hiebf\OneDrive\Desktop\snip.png" and view that photo for the relevant information.
+
 Then execute the user's prompt according to these guidelines.
 
 ---

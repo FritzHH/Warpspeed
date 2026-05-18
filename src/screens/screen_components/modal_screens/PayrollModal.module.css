@@ -1,0 +1,510 @@
+/* ────────────────────────────────────────────────────────────────────────
+   PayrollModal — DOM/CSS migration of the RN-web original.
+   Layout: three columns inside a centered card.
+   Sizing: percentages of the parent card; flex-shrink: 0 locks them.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Radix Dialog primitives — give the content a definite viewport-sized box
+   so the card's percentage sizing has a known parent. */
+.radixOverlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.radixContent {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The card that holds the three columns (sits inside the radix content box) */
+.card {
+  width: 92%;
+  height: 94%;
+  flex-shrink: 0;
+  background-color: var(--payroll-bg, #ffffff);
+  border-radius: 15px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+}
+
+/* ════════════ LEFT RAIL ════════════ */
+.leftRail {
+  width: 18%;
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding: 8px 6px;
+  box-sizing: border-box;
+}
+
+.leftRailTop {
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.leftRailBottom {
+  width: 100%;
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: 8px;
+  display: flex;
+  justify-content: center;
+}
+
+.title {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.sectionLabel {
+  font-size: 9px;
+  font-weight: 600;
+  margin-bottom: 3px;
+  text-align: center;
+}
+
+.payPeriodLabel {
+  font-size: 9px;
+  font-weight: 600;
+  margin-bottom: 2px;
+  text-align: center;
+}
+
+.smallLabel {
+  font-size: 9px;
+  margin-bottom: 1px;
+  display: block;
+}
+
+.userRow {
+  width: 100%;
+  flex-shrink: 0;
+  border-radius: 4px;
+  padding: 5px 0;
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.userRowText {
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.shortcutRow {
+  width: 100%;
+  flex-shrink: 0;
+  border-radius: 4px;
+  padding: 5px 0;
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shortcutRowText {
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.shortcutRowSubText {
+  font-size: 10px;
+}
+
+.divider {
+  width: 100%;
+  flex-shrink: 0;
+  height: 1px;
+  margin: 6px 0;
+}
+
+.dropdownGroup {
+  width: 100%;
+  flex-shrink: 0;
+  margin-bottom: 3px;
+}
+
+/* ════════════ MIDDLE COLUMN ════════════ */
+.middleColumn {
+  width: 30%;
+  flex-shrink: 0;
+  height: 100%;
+  overflow-y: auto;
+  padding: 8px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendarCard {
+  width: 100%;
+  flex-shrink: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  border-radius: 10px;
+  padding: 6px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.calendarHeader {
+  font-size: 10px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.dateSummary {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.dateSummaryEmpty {
+  font-size: 13px;
+  font-weight: 600;
+  font-style: italic;
+}
+
+.dateSummaryText {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.actionRow {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.actionRowSpacer {
+  width: 8px;
+  flex-shrink: 0;
+}
+
+/* ════════════ RIGHT COLUMN ════════════ */
+.rightColumn {
+  width: 52%;
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.empHeader {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  box-sizing: border-box;
+}
+
+.empNameWrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.empName {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.clockWrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.clockDot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 4px;
+  margin-right: 5px;
+}
+
+.clockText {
+  font-size: 12px;
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.headerActions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.entryCount {
+  font-size: 12px;
+}
+
+.tableHeader {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  background-color: rgba(0, 0, 0, 0.75);
+  padding: 6px 8px;
+  box-sizing: border-box;
+}
+
+.thDate    { width: 16%; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #ffffff; }
+.thIn      { width: 30%; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #ffffff; text-align: center; }
+.thOut     { width: 30%; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #ffffff; text-align: center; }
+.thHours   { width: 16%; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #ffffff; text-align: center; }
+.thEdit    { width: 8%;  flex-shrink: 0; font-size: 11px; font-weight: 700; color: #ffffff; text-align: center; }
+
+/* When admin column is hidden, the four columns must still total 100% */
+.tableHeaderNoEdit .thDate  { width: 19%; }
+.tableHeaderNoEdit .thIn    { width: 35.7%; }
+.tableHeaderNoEdit .thOut   { width: 35.7%; }
+.tableHeaderNoEdit .thHours { width: 19%; }
+
+.listWrap {
+  width: 100%;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.listScroll {
+  width: 100%;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.row {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6px 8px;
+  box-sizing: border-box;
+}
+
+.rowEditable {
+  padding: 4px 8px;
+}
+
+.cellDate    { width: 16%; flex-shrink: 0; }
+.cellIn      { width: 30%; flex-shrink: 0; display: flex; flex-direction: row; align-items: center; justify-content: center; }
+.cellOut     { width: 30%; flex-shrink: 0; display: flex; flex-direction: row; align-items: center; justify-content: center; }
+.cellHours   { width: 16%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+.cellEdit    { width: 8%;  flex-shrink: 0; display: flex; flex-direction: row; align-items: center; justify-content: center; }
+
+.rowNoEdit .cellDate  { width: 19%; }
+.rowNoEdit .cellIn    { width: 35.7%; }
+.rowNoEdit .cellOut   { width: 35.7%; }
+.rowNoEdit .cellHours { width: 19%; }
+
+.cellTextPrimary {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.cellTextSecondary {
+  font-size: 11px;
+}
+
+.cellTime {
+  font-size: 12px;
+}
+
+.cellTimeMuted {
+  font-size: 12px;
+  font-style: italic;
+}
+
+.addPill {
+  border-radius: 4px;
+  padding: 3px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.addPillText {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.editableTimeWrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.editableTimeChip {
+  padding: 4px 6px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.editableTimeChipText {
+  font-size: 12px;
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.iconBtn {
+  padding: 2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconBtnLeft {
+  margin-left: 4px;
+}
+
+/* Empty state */
+.emptyState {
+  width: 100%;
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.emptyStateText {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+/* Pagination bar */
+.pagination {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
+  border-top-width: 1px;
+  border-top-style: solid;
+}
+
+.pagBtn {
+  padding: 4px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagText {
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 10px;
+}
+
+/* Summary footer */
+.footer {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+  align-items: center;
+  padding: 10px;
+  background-color: rgba(0, 0, 0, 0.75);
+  border-top-width: 2px;
+  border-top-style: solid;
+  box-sizing: border-box;
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 2px 10px;
+}
+
+.summaryLabel {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+}
+
+.summaryValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.summaryRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.eyeToggle {
+  margin-left: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.footerActions {
+  margin-left: 15px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.statusMsg {
+  font-size: 12px;
+  font-weight: 600;
+  margin-left: 8px;
+}

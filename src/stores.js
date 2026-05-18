@@ -5,7 +5,6 @@ import { persist } from "zustand/middleware";
 import { clearIdPool } from "./idPool";
 import {
   CUSTOMER_PROTO,
-  FRITZ_USER_OBJ,
   INVENTORY_ITEM_PROTO,
   PRIVILEDGE_LEVELS,
   TAB_NAMES,
@@ -619,11 +618,9 @@ export const useLoginStore = create(
   webcamDetected: false,
   adminPrivilege: "",
   loginTimeout: 0,
-  // currentUser: { ...FRITZ_USER_OBJ }, //testing
   currentUser: null,
   punchClock: {}, // object of current user punches showing who is currently logged in
   modalVisible: false,
-  // lastActionMillis: Date.now(), //testing
   lastActionMillis: 0,
   postLoginFunctionCallback: null,
   showLoginScreen: false,
@@ -694,6 +691,14 @@ export const useLoginStore = create(
 
   setLastActionMillis: () => set({ lastActionMillis: new Date().getTime() }),
   setShowLoginScreen: (showLoginScreen) => {
+    if (showLoginScreen && import.meta.env.DEV) {
+      const devUser = useSettingsStore.getState().getSettings()?.users
+        ?.find((u) => u.id == "1234");
+      if (devUser) {
+        set({ currentUser: devUser, lastActionMillis: Date.now(), showLoginScreen: false });
+        return;
+      }
+    }
     set((state) => ({ showLoginScreen }));
   },
 
@@ -703,12 +708,6 @@ export const useLoginStore = create(
     let diffSeconds = (now - lastAction) / 1000;
     let timeout = useSettingsStore.getState().getSettings()?.activeLoginTimeoutSeconds || 60;
     let userObj = get().currentUser;
-
-    // // DEV: skip timeout for testing user
-    // if (userObj?.id === FRITZ_USER_OBJ.id) {
-    //   set({ lastActionMillis: now });
-    //   diffSeconds = 0;
-    // }
 
     if (!userObj || diffSeconds > timeout) {
       // If we know who the user is (face recognized) but they're not clocked in,
@@ -754,12 +753,6 @@ export const useLoginStore = create(
     let cur = new Date().getTime();
     let diff = (cur - lastMillis) / 1000;
     let userObj = get().currentUser;
-
-    // // DEV: skip timeout for testing user
-    // if (userObj?.id === FRITZ_USER_OBJ.id) {
-    //   set({ lastActionMillis: cur });
-    //   diff = 0;
-    // }
 
     let hasAccess = true;
 

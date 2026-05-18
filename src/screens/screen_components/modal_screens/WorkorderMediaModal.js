@@ -2,7 +2,7 @@
 import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { View, Text, Image, TouchableOpacity, ScrollView } from "react-native-web";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Z } from "../../../styles";
 import { Button_, Image_, Tooltip } from "../../../components";
 import { CheckBox } from "../../../dom_components";
 import { gray, log, compressImage } from "../../../utils";
@@ -285,7 +285,7 @@ export const WorkorderMediaModal = ({
           right: 0,
           bottom: 0,
           backgroundColor: "rgba(0,0,0,0.85)",
-          zIndex: 9999,
+          zIndex: Z.modal + 100,
           display: "flex",
           justifyContent: "center",
           alignItems: "center",
@@ -385,7 +385,7 @@ export const WorkorderMediaModal = ({
         right: 0,
         bottom: 0,
         backgroundColor: "rgba(0,0,0,0.5)",
-        zIndex: 9998,
+        zIndex: Z.modal,
         display: "flex",
         justifyContent: "center",
         alignItems: "center",

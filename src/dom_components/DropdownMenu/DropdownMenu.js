@@ -72,7 +72,9 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
     buttonTextStyle = {},
     buttonText,
     menuButtonStyle = { borderRadius: 5 },
-    selectedIdx = -1,
+    matchValue,
+    preserveItemBackground = false,
+    selectedItemOpacity = 0.55,
     useSelectedAsButtonTitle = false,
     menuMaxHeight,
     menuBorderColor,
@@ -146,6 +148,20 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
   const selectableItems = fullDataArr.filter((item) => !item._isDivider && !item._isCustomInput && !item.component);
   const br = menuButtonStyle.borderRadius || 5;
 
+  const matchNorm = matchValue == null || matchValue === ""
+    ? null
+    : String(matchValue).trim().toLowerCase();
+  const effectiveSelectedIdx = matchNorm == null
+    ? -1
+    : dataArr.findIndex((item) => {
+        if (item && typeof item === "object") {
+          if (item.id != null && String(item.id).toLowerCase() === matchNorm) return true;
+          if (typeof item.label === "string" && item.label.toLowerCase() === matchNorm) return true;
+          return false;
+        }
+        return typeof item === "string" && item.toLowerCase() === matchNorm;
+      });
+
   const resolvedItemStyle = {
     ...itemStyle,
     ...(itemStyle.paddingVertical != null ? { paddingTop: itemStyle.paddingVertical, paddingBottom: itemStyle.paddingVertical } : {}),
@@ -157,7 +173,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
   const resolvedIcon = buttonIcon === undefined ? ICONS.menu2 : buttonIcon;
   const resolvedIconSrc = resolvedIcon ? (typeof resolvedIcon === "object" ? resolvedIcon.default || resolvedIcon : resolvedIcon) : null;
   const resolvedIconSize = buttonIconSize || 11;
-  const displayText = useSelectedAsButtonTitle ? (dataArr[Number(selectedIdx)]?.label || buttonText) : buttonText;
+  const displayText = useSelectedAsButtonTitle ? (dataArr[effectiveSelectedIdx]?.label || buttonText) : buttonText;
 
   const handleKeyDown = useCallback((e) => {
     if (!isOpen) return;
@@ -182,9 +198,33 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
     }
   }, [isOpen, handleKeyDown]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onPointerDown = (e) => {
+      const t = e.target;
+      if (anchorRef.current && anchorRef.current.contains(t)) return;
+      if (menuRef.current && menuRef.current.contains(t)) return;
+      setOpen(false);
+    };
+    // Capture-phase listener: stop pointerdowns inside the menu from reaching
+    // Radix's DismissableLayer handler (which calls preventDefault on outside
+    // events and blocks input focus inside portaled menu content).
+    const onPointerDownCapture = (e) => {
+      if (menuRef.current && menuRef.current.contains(e.target)) {
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDownCapture, true);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDownCapture, true);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+  }, [isOpen]);
+
   function getItemBg(rgbString = "", index) {
     if (!rgbString) return null;
-    if (ifNumIsOdd(index) || !rgbString.includes("rgb")) return rgbString;
+    if (preserveItemBackground || ifNumIsOdd(index) || !rgbString.includes("rgb")) return rgbString;
     return lightenRGBByPercent(rgbString, 40);
   }
 
@@ -252,9 +292,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
       </div>
 
       {isOpen && ReactDOM.createPortal(
-        <>
-          <div className={styles.backdrop} onClick={() => setOpen(false)} />
-          <div
+        <div
             ref={(el) => {
               menuRef.current = el;
               if (!el) return;
@@ -300,7 +338,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
               }
 
               const isFocused = selectableItems.indexOf(item) === focusedIdx;
-              const isSelected = idx === Number(selectedIdx);
+              const isSelected = idx === effectiveSelectedIdx;
               return (
                 <div
                   key={item.id ?? item.label ?? idx}
@@ -308,9 +346,10 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
                   style={{
                     position: "relative",
                     paddingRight: isSelected ? 28 : undefined,
-                    backgroundColor: isSelected
+                    backgroundColor: isSelected && !preserveItemBackground
                       ? lightenRGBByPercent(C.blue, 85)
                       : (getItemBg(item.backgroundColor, idx) || getItemBg(gray(0.036), idx)),
+                    opacity: isSelected && preserveItemBackground ? selectedItemOpacity : undefined,
                     outline: isFocused ? "2px solid #007bff" : undefined,
                     ...itemBorderRadius(idx),
                     ...resolvedItemStyle,
@@ -336,7 +375,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
                     {item.label != null ? item.label : item}
                   </span>
                   {isSelected && (
-                    <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: C.green }}>
+                    <span style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", fontSize: 12, color: item.textColor || C.green }}>
                       {"\u2713"}
                     </span>
                   )}
@@ -348,8 +387,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
                 </div>
               );
             })}
-          </div>
-        </>,
+          </div>,
         document.body
       )}
     </div>

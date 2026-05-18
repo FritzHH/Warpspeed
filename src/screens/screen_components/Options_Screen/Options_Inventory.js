@@ -21,7 +21,7 @@ import { workerSearchInventory } from "../../../inventorySearchManager";
 import {
   Button_,
   Image_,
-  NoteHelperDropdown,
+  NoteHelper,
   ScreenModal,
   StaleBanner,
   TouchableOpacity_,
@@ -2036,7 +2036,7 @@ export function InventoryComponent({}) {
           anchorX={sCustomItemModal?.anchorX || 0}
           anchorY={sCustomItemModal?.anchorY || 0}
         />
-        <NoteHelperDropdown
+        <NoteHelper
           visible={!!sNoteHelperDropdown}
           onClose={() => _setNoteHelperDropdown(null)}
           workorderLine={sNoteHelperDropdown?.workorderLine}

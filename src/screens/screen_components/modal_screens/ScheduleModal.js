@@ -11,7 +11,7 @@ import ReactDOM from "react-dom";
 import cloneDeep from "lodash/cloneDeep";
 import debounce from "lodash/debounce";
 import dayjs from "dayjs";
-import { C, ICONS } from "../../../styles";
+import { C, ICONS, Z } from "../../../styles";
 import { gray, trimToTwoDecimals } from "../../../utils";
 import { Image_, TimePicker_ } from "../../../components";
 import { useSettingsStore, useAlertScreenStore } from "../../../stores";
@@ -795,7 +795,7 @@ export function ScheduleModal({ handleExit }) {
         left: 0,
         right: 0,
         bottom: 0,
-        zIndex: 9998,
+        zIndex: Z.modal,
       }}
     >
       <TouchableWithoutFeedback onPress={handleExit}>

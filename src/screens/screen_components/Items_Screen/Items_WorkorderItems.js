@@ -17,7 +17,7 @@ import {
   GradientView,
   Button_,
   Image_,
-  NoteHelperDropdown,
+  NoteHelper,
   TextInput_,
   Tooltip,
   StaleBanner,
@@ -939,7 +939,7 @@ export const Items_WorkorderItemsTab = ({}) => {
           anchorY={sEditingCustomLine.anchorY}
         />
       )}
-      <NoteHelperDropdown
+      <NoteHelper
         visible={!!sNoteHelperDropdown}
         onClose={() => _setNoteHelperDropdown(null)}
         workorderLine={sNoteHelperDropdown?.workorderLine}

@@ -1,7 +1,8 @@
 /* eslint-disable */
 import { View, Text, TextInput, Animated, Image } from "react-native-web";
 import { useState, useRef, useEffect, memo } from "react";
-import { Button_, DropdownMenu, SHADOW_RADIUS_PROTO, SmallLoadingIndicator, Tooltip } from "../../../../components";
+import { Button_, SHADOW_RADIUS_PROTO, SmallLoadingIndicator, Tooltip } from "../../../../components";
+import { DropdownMenu } from "../../../../dom_components/DropdownMenu/DropdownMenu";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
 import {
   usdTypeMask,
@@ -586,6 +587,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
           <DropdownMenu
             dataArr={readerDropdownData}
             onSelect={handleReaderSelect}
+            matchValue={activeReader?.id}
             buttonText={
               activeReader
                 ? (savedCardReaders.find((s) => s.id === activeReader.id)?.label || activeReader.id)

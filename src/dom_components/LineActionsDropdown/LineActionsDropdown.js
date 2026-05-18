@@ -1,4 +1,4 @@
-import React, { forwardRef, useState, useRef, useImperativeHandle } from "react";
+import React, { forwardRef, useState, useRef, useImperativeHandle, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { C, ICONS } from "../../styles";
 import { gray, lightenRGBByPercent, usdTypeMask } from "../../utils";
@@ -265,8 +265,34 @@ export const LineActionsDropdown = forwardRef(function LineActionsDropdown(
     anchorWidth: 0,
   });
   const anchorRef = useRef(null);
+  const menuRef = useRef(null);
 
   const isDisabled = enabled === false;
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onPointerDown = (e) => {
+      const t = e.target;
+      if (anchorRef.current && anchorRef.current.contains(t)) return;
+      if (menuRef.current && menuRef.current.contains(t)) return;
+      setOpen(false);
+    };
+    // Capture-phase listener: when the target is inside the menu, stop the
+    // event from bubbling to Radix's DismissableLayer pointerdown handler
+    // (which calls preventDefault on outside events and blocks input focus).
+    const onPointerDownCapture = (e) => {
+      if (menuRef.current && menuRef.current.contains(e.target)) {
+        e.stopPropagation();
+      }
+    };
+    document.addEventListener("pointerdown", onPointerDownCapture, true);
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDownCapture, true);
+      document.removeEventListener("pointerdown", onPointerDown);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const setOpen = (val) => {
     if (!isControlled) setInternalOpen(val);
@@ -352,51 +378,49 @@ export const LineActionsDropdown = forwardRef(function LineActionsDropdown(
 
       {isOpen &&
         ReactDOM.createPortal(
-          <>
-            <div className={styles.backdrop} onClick={close} />
-            <div
-              ref={(el) => {
-                if (!el) return;
-                const h = el.scrollHeight;
-                const w = el.offsetWidth;
-                const vp = window.innerHeight;
-                let top = menuPos.anchorBottom || VIEWPORT_PAD;
-                if (top + h > vp - VIEWPORT_PAD) {
-                  top = Math.max(
-                    VIEWPORT_PAD,
-                    vp - VIEWPORT_PAD - Math.min(h, vp - VIEWPORT_PAD * 2)
-                  );
-                }
-                let left = (menuPos.anchorCenterX || 0) - w / 2;
-                if (left + w > window.innerWidth - VIEWPORT_PAD) {
-                  left = window.innerWidth - VIEWPORT_PAD - w;
-                }
-                if (left < VIEWPORT_PAD) left = VIEWPORT_PAD;
-                el.style.top = top + "px";
-                el.style.left = left + "px";
-              }}
-              className={styles.menu}
-              style={{ borderColor: gray(0.08) }}
-              role="menu"
-            >
-              <MenuContent
-                showSplit={showSplit}
-                onSplit={onSplit}
-                onRemove={onRemove}
-                filteredDiscounts={filteredDiscounts}
-                noDiscountSelected={noDiscountSelected}
-                matchedPresetId={matchedPresetId}
-                pctInitial={pctInitial}
-                dolInitialDisplay={dolInitialDisplay}
-                dolInitialCents={dolInitialCents}
-                maxDiscountCents={maxDiscountCents}
-                close={close}
-                onSelectDiscount={onSelectDiscount}
-                onCustomPercent={onCustomPercent}
-                onCustomDollar={onCustomDollar}
-              />
-            </div>
-          </>,
+          <div
+            ref={(el) => {
+              menuRef.current = el;
+              if (!el) return;
+              const h = el.scrollHeight;
+              const w = el.offsetWidth;
+              const vp = window.innerHeight;
+              let top = menuPos.anchorBottom || VIEWPORT_PAD;
+              if (top + h > vp - VIEWPORT_PAD) {
+                top = Math.max(
+                  VIEWPORT_PAD,
+                  vp - VIEWPORT_PAD - Math.min(h, vp - VIEWPORT_PAD * 2)
+                );
+              }
+              let left = (menuPos.anchorCenterX || 0) - w / 2;
+              if (left + w > window.innerWidth - VIEWPORT_PAD) {
+                left = window.innerWidth - VIEWPORT_PAD - w;
+              }
+              if (left < VIEWPORT_PAD) left = VIEWPORT_PAD;
+              el.style.top = top + "px";
+              el.style.left = left + "px";
+            }}
+            className={styles.menu}
+            style={{ borderColor: gray(0.08) }}
+            role="menu"
+          >
+            <MenuContent
+              showSplit={showSplit}
+              onSplit={onSplit}
+              onRemove={onRemove}
+              filteredDiscounts={filteredDiscounts}
+              noDiscountSelected={noDiscountSelected}
+              matchedPresetId={matchedPresetId}
+              pctInitial={pctInitial}
+              dolInitialDisplay={dolInitialDisplay}
+              dolInitialCents={dolInitialCents}
+              maxDiscountCents={maxDiscountCents}
+              close={close}
+              onSelectDiscount={onSelectDiscount}
+              onCustomPercent={onCustomPercent}
+              onCustomDollar={onCustomDollar}
+            />
+          </div>,
           document.body
         )}
     </>

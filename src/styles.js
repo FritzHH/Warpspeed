@@ -1,6 +1,14 @@
 import { dim, getRgbFromNamedColor, lightenRGBByPercent, gray } from "./utils";
 // const { getDefaultConfig } = require("metro"); // Or require('metro-config') for bare React Native
 
+export const Z = {
+  modal: 1000,
+  dropdown: 2000,
+  tooltip: 3000,
+  toast: 4000,
+  alert: 5000,
+};
+
 export const Colors = {
   // mainBackground: "white",
   mainBackground: "rgb(61, 180, 231)",

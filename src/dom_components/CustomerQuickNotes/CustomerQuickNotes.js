@@ -2,9 +2,9 @@ import React, { forwardRef } from "react";
 import ReactDOM from "react-dom";
 import { C, Fonts } from "../../styles";
 import { gray, lightenRGBByPercent } from "../../utils";
-import styles from "./CustomerQuickNotesDropdown.module.css";
+import styles from "./CustomerQuickNotes.module.css";
 
-export const CustomerQuickNotesDropdown = forwardRef(function CustomerQuickNotesDropdown(
+export const CustomerQuickNotes = forwardRef(function CustomerQuickNotes(
   {
     visible,
     onClose,

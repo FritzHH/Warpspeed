@@ -22,12 +22,12 @@ import {
   TextInput_,
   DropdownMenu,
   LoginModalScreen,
-  CustomerQuickNotesDropdown,
+  CustomerQuickNotes,
   Tooltip,
   SHADOW_RADIUS_PROTO,
 } from "../../../components";
 import { CheckBox } from "../../../dom_components";
-import { C, ICONS } from "../../../styles";
+import { C, ICONS, Z } from "../../../styles";
 import {
   formatCurrencyDisp,
   usdTypeMask,
@@ -932,7 +932,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
             </View>
             </View>
 
-            <CustomerQuickNotesDropdown
+            <CustomerQuickNotes
               visible={!!sShowQuickNotePicker}
               anchorPosition={sShowQuickNotePicker}
               onClose={() => _setShowQuickNotePicker(null)}
@@ -999,7 +999,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
           right: 0,
           bottom: 0,
           backgroundColor: "rgba(50,50,50,.5)",
-          zIndex: 9998,
+          zIndex: Z.modal,
           display: "flex",
           justifyContent: "center",
           alignItems: "center",

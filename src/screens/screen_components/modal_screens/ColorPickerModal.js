@@ -2,7 +2,7 @@
 import React, { useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
-import { C, COLOR_GRADIENTS } from "../../../styles";
+import { C, COLOR_GRADIENTS, Z } from "../../../styles";
 import { Button_ } from "../../../components";
 import { ColorWheel } from "../../../ColorWheel";
 import { bestForegroundHex, gray } from "../../../utils";
@@ -52,7 +52,7 @@ export const ColorPickerModal = ({
         right: 0,
         bottom: 0,
         backgroundColor: "rgba(0,0,0,0.5)",
-        zIndex: 9999,
+        zIndex: Z.modal,
       }}
     >
       <div

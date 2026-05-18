@@ -22,7 +22,7 @@ import React, {
 } from "react";
 import { Image } from "react-native-web";
 import { formatCurrencyDisp, formatMillisForDisplay, gray, ifNumIsOdd, lightenRGBByPercent, localStorageWrapper, log, usdTypeMask, deepEqual } from "./utils";
-import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS } from "./styles";
+import { C, COLOR_GRADIENTS, Colors, Fonts, ICONS, Z } from "./styles";
 import { SETTINGS_OBJ, PRIVILEDGE_LEVELS, CUSTOMER_DEPOST_TYPES } from "./data";
 import cloneDeep from "lodash/cloneDeep";
 import { DEBOUNCE_DELAY, DISCOUNT_TYPES, LOCAL_DB_KEYS, PAUSE_USER_CLOCK_IN_CHECK_MILLIS } from "./constants";
@@ -134,7 +134,7 @@ export const PrinterAlert = ({ visible, x, y, onDone }) => {
         alignItems: "center",
         opacity,
         transform: [{ scale }],
-        zIndex: 99999,
+        zIndex: Z.toast,
         pointerEvents: "none",
       }}
     >
@@ -295,7 +295,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
             onClick={() => (zCanExitOnOuterClick ? useAlertScreenStore.getState().resetAll() : null)}
             style={{
               ...RADIX_OVERLAY_STYLE,
-              zIndex: 9500,
+              zIndex: Z.alert,
               backgroundColor: "rgba(0, 0, 0, 0.4)",
               alignItems: "center",
               justifyContent: "center",
@@ -311,7 +311,7 @@ export const AlertBox_ = ({ showAlert, pauseOnBaseScreen }) => {
               position: "fixed",
               top: "50%", left: "50%",
               transform: "translate(-50%, -50%)",
-              zIndex: 9501,
+              zIndex: Z.alert + 1,
               backgroundColor: C.backgroundWhite,
               borderRadius: 15,
               alignItems: "center",
@@ -459,7 +459,7 @@ export const Dialog_ = ({ visible, onClose, overlayColor = "rgba(50,50,50,.65)",
         <DialogPrimitive.Overlay asChild>
           <View style={{
             ...RADIX_OVERLAY_STYLE,
-            zIndex: 9000,
+            zIndex: Z.modal,
             backgroundColor: overlayColor,
             opacity: sFadedIn ? 1 : 0,
             transition: "opacity 150ms ease-in",
@@ -472,7 +472,7 @@ export const Dialog_ = ({ visible, onClose, overlayColor = "rgba(50,50,50,.65)",
         >
           <View style={{
             ...RADIX_OVERLAY_STYLE,
-            zIndex: 9001,
+            zIndex: Z.modal + 1,
             justifyContent: "center",
             alignItems: "center",
             pointerEvents: "none",
@@ -580,7 +580,6 @@ export const ScreenModal = ({
             <DialogPrimitive.Overlay asChild>
               <View style={{
                 ...RADIX_OVERLAY_STYLE,
-                zIndex: 9000,
                 backgroundColor: outerModalStyle?.backgroundColor || "rgba(0,0,0,0.5)",
                 opacity: sFadedIn ? 1 : 0,
                 transition: "opacity 150ms ease-in",
@@ -589,7 +588,6 @@ export const ScreenModal = ({
             <DialogPrimitive.Content asChild onOpenAutoFocus={(e) => e.preventDefault()}>
               <View style={{
                 ...RADIX_OVERLAY_STYLE,
-                zIndex: 9001,
                 width: "100%",
                 height: "100%",
                 justifyContent: "center",
@@ -663,7 +661,7 @@ export const ScreenModal = ({
           collisionPadding={10}
           onOpenAutoFocus={(e) => e.preventDefault()}
           style={{
-            zIndex: 9000,
+            zIndex: Z.dropdown,
             opacity: sFadedIn ? 1 : 0,
             transition: "opacity 150ms ease-in",
           }}
@@ -982,7 +980,7 @@ export const DropdownMenu = React.forwardRef(({
             }}
             style={{
               position: "fixed",
-              zIndex: 9000,
+              zIndex: Z.dropdown,
               borderColor: gray(0.08),
               borderRadius: br,
               borderWidth: 2,
@@ -1113,137 +1111,6 @@ export const DropdownMenu = React.forwardRef(({
     </div>
   );
 });
-
-export const ModalDropdown = ({
-  // ref,
-  data,
-  onSelect,
-  buttonLabel,
-  buttonBackgroundColor,
-  onRemoveSelection,
-  currentSelection,
-  removeButtonText,
-  buttonStyle = {},
-  textStyle = {},
-  outerModalStyle = {},
-  innerModalStyle = {},
-  modalCoordinateVars = {
-    x: 200,
-    y: -300,
-  },
-
-  // modalStyle = {},
-}) => {
-  const [isModalVisible, setModalVisible] = useState(false);
-  const [selectedValue, setSelectedValue] = useState(null);
-
-  const toggleModal = () => setModalVisible(!isModalVisible);
-
-  const handleSelect = (item) => {
-    setSelectedValue(item);
-    onSelect(item);
-    toggleModal();
-  };
-
-  return (
-    <View>
-      <TouchableOpacity onPress={toggleModal}>
-        <View
-          style={{
-            backgroundColor: Colors.blueButtonBackground,
-            borderRadius: 2,
-            paddingHorizontal: 10,
-            height: 25,
-            padding: 3,
-            alignItems: "center",
-            justifyContent: "center",
-            ...SHADOW_RADIUS_PROTO,
-            ...buttonStyle,
-          }}
-        >
-          <Text
-            style={{
-              color: "white",
-              textAlign: "center",
-              fontSize: 15,
-              ...textStyle,
-            }}
-          >
-            {buttonLabel}
-          </Text>
-        </View>
-      </TouchableOpacity>
-
-      <Dialog_ visible={isModalVisible} onClose={toggleModal} overlayColor="rgba(0,0,0,0.5)">
-        <View style={{ width: "20%", ...innerModalStyle }}>
-          <FlatList
-            data={data}
-            keyExtractor={(item, index) => index.toString()}
-            renderItem={({ item }) => {
-              let label = "";
-              let backgroundColor = null;
-              let textColor = null;
-              let fontSize = null;
-              let itemStyleProps = {};
-              if (typeof item === "object") {
-                if (Object.hasOwn(item, "backgroundColor")) {
-                  label = item.label;
-                  itemStyleProps.backgroundColor = item.backgroundColor;
-                  textColor = item.textColor;
-                  itemStyleProps.paddingVertical = 15;
-                  fontSize = 15;
-                  if (label === currentSelection?.label) {
-                    itemStyleProps.borderWidth = 10;
-                    itemStyleProps.borderColor = Colors.mainBackground;
-                  }
-                }
-              } else {
-                fontSize = 15;
-                label = item;
-                itemStyleProps.backgroundColor = Colors.opacityBackgroundLight;
-                itemStyleProps.marginVertical = 2;
-                textColor = "white";
-              }
-              return (
-                <TouchableOpacity
-                  style={{
-                    ...styles.option,
-                    backgroundColor,
-                    borderColor: "dimgray",
-                    ...itemStyleProps,
-                  }}
-                  onPress={() => handleSelect(item)}
-                >
-                  <Text style={{ fontSize, color: textColor }}>
-                    {label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            }}
-          />
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-around",
-            }}
-          >
-            {currentSelection && (
-              <TouchableOpacity
-                style={styles.removeButton}
-                onPress={() => {
-                  onRemoveSelection();
-                  toggleModal();
-                }}
-              >
-                <Text style={styles.closeText}>{removeButtonText}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        </View>
-      </Dialog_>
-    </View>
-  );
-};
 
 export const LoginModalScreen = ({ modalVisible }) => {
   const zAdminPrivilege = useLoginStore((state) => state.adminPrivilege);
@@ -1378,7 +1245,7 @@ export const LoginModalScreen = ({ modalVisible }) => {
         backgroundColor: "rgba(0,0,0,0.5)",
         justifyContent: "center",
         alignItems: "center",
-        zIndex: 9999,
+        zIndex: Z.modal,
       }}
       onClick={handleClose}
     >
@@ -3095,7 +2962,7 @@ export const Tooltip = ({
           sideOffset={6 + (position === "top" || position === "left" ? offsetY : -offsetY)}
           alignOffset={offsetX}
           collisionPadding={10}
-          style={{ zIndex: 99999, pointerEvents: "none" }}
+          style={{ zIndex: Z.tooltip, pointerEvents: "none" }}
         >
           <View
             style={{
@@ -3673,9 +3540,9 @@ export const WebPageModal = ({
   );
 };
 
-// Note Helper Dropdown ////////////////////////////////////////////////////
+// Note Helper ////////////////////////////////////////////////////
 
-export const NoteHelperDropdown = ({
+export const NoteHelper = ({
   visible,
   onClose,
   workorderLine,
@@ -3772,7 +3639,7 @@ export const NoteHelperDropdown = ({
         position: "fixed",
         top: 0, left: 0, right: 0, bottom: 0,
         backgroundColor: "rgba(0,0,0,0.4)",
-        zIndex: 9000,
+        zIndex: Z.dropdown,
       }}
     >
       <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top, left }}>
@@ -4005,9 +3872,9 @@ export const NoteHelperDropdown = ({
   );
 };
 
-// Customer Quick Notes Dropdown ////////////////////////////////////////////
+// Customer Quick Notes ////////////////////////////////////////////
 
-export const CustomerQuickNotesDropdown = ({
+export const CustomerQuickNotes = ({
   visible,
   onClose,
   quickNotes = [],

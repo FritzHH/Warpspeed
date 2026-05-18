@@ -38,7 +38,7 @@ import {
 } from "../../../components";
 import { CheckBox, DropdownMenu } from "../../../dom_components";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
-import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
+import { C, COLOR_GRADIENTS, Colors, ICONS, Z } from "../../../styles";
 import {
   SETTINGS_OBJ,
   WORKORDER_PROTO,
@@ -107,7 +107,7 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
           </TouchableOpacity>
         </PopoverPrimitive.Anchor>
         <PopoverPrimitive.Portal>
-          <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: 9100 }}>
+          <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: Z.dropdown }}>
             <View>
               <DatePicker_
                 initialMonth={Number(pd.month) || new Date().getMonth() + 1}
@@ -131,7 +131,7 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
             </TouchableOpacity>
           </PopoverPrimitive.Anchor>
           <PopoverPrimitive.Portal>
-            <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: 9100 }}>
+            <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: Z.dropdown }}>
               <View>
                 <TimePicker_
                   initialHour={startParts.hour}
@@ -157,7 +157,7 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
             </TouchableOpacity>
           </PopoverPrimitive.Anchor>
           <PopoverPrimitive.Portal>
-            <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: 9100 }}>
+            <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: Z.dropdown }}>
               <View>
                 <TimePicker_
                   initialHour={endParts.hour}
@@ -337,6 +337,11 @@ export const ActiveWorkorderComponent = ({}) => {
   const partSourcesRef = useRef();
 
   const isDonePaid = resolveStatus(zOpenWorkorder?.status, zSettings?.statuses)?.label?.toLowerCase() === "done & paid";
+
+  const selectedPrinterID = localStorageWrapper.getItem("selectedPrinterID");
+  const selectedPrinter = selectedPrinterID && zSettings?.printers?.[selectedPrinterID];
+  const isPrinterOffline = !!(selectedPrinter && selectedPrinter.active !== true);
+  const printerOfflineLabel = selectedPrinter?.name ? `Printer "${selectedPrinter.name}" is offline` : "Selected printer is offline";
 
 
   // Stable reference so ScreenModal doesn't remount the modal content on parent re-renders
@@ -821,6 +826,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     modalCoordX={-6}
                     ref={bikesRef}
                     buttonText={zSettings.bikeBrandsName}
+                    matchValue={zOpenWorkorder?.brand}
                   />
                 </div>
                 <View style={{ width: 5 }} />
@@ -844,6 +850,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     modalCoordX={0}
                     ref={ebikeRef}
                     buttonText={zSettings.bikeOptionalBrandsName}
+                    matchValue={zOpenWorkorder?.brand}
                   />
                 </div>
               </View>
@@ -978,6 +985,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     ref={descriptionRef}
                     buttonText={"Descriptions"}
+                    matchValue={zOpenWorkorder?.description}
                   />
                 </div>
               </View>
@@ -1188,6 +1196,8 @@ export const ActiveWorkorderComponent = ({}) => {
                     buttonText={"Color 1"}
                     modalCoordX={0}
                     itemStyle={{ paddingLeft: 35, paddingRight: 35, paddingTop: 15, paddingBottom: 15 }}
+                    matchValue={zOpenWorkorder?.color1?.label}
+                    preserveItemBackground={true}
                   />
                 </div>
                 <View style={{ width: 5 }} />
@@ -1214,6 +1224,8 @@ export const ActiveWorkorderComponent = ({}) => {
                     ref={color2Ref}
                     buttonText={"Color 2"}
                     itemStyle={{ paddingLeft: 35, paddingRight: 35, paddingTop: 15, paddingBottom: 15 }}
+                    matchValue={zOpenWorkorder?.color2?.label}
+                    preserveItemBackground={true}
                   />
                 </div>
               </View>
@@ -1384,6 +1396,8 @@ export const ActiveWorkorderComponent = ({}) => {
                       mouseOverOptions={{ enable: true, opacity: 1 }}
                       ref={statusRef}
                       buttonText={(zOpenWorkorder?.status === "finished" ? (zOpenWorkorder.contacted ? "\u2713 " : "\u2717 ") : "") + rs.label}
+                      preserveItemBackground={true}
+                      matchValue={rs.label}
                     />
                   </div>
                   {isPickupDelivery && (
@@ -1469,7 +1483,8 @@ export const ActiveWorkorderComponent = ({}) => {
                       useOpenWorkordersStore.getState().setField("waitTime", waitObj, zOpenWorkorder.id);
                     }}
                     ref={waitTimesRef}
-                    buttonText={"Wait Times"}
+                    matchValue={zOpenWorkorder?.waitTime?.label || ""}
+                    buttonText={zOpenWorkorder?.waitTime?.label || "Wait Times"}
                   />
                 </div>
               </View>
@@ -1647,7 +1662,8 @@ export const ActiveWorkorderComponent = ({}) => {
                       paddingHorizontal: 40,
                     }}
                     ref={partSourcesRef}
-                    buttonText={"Sources"}
+                    matchValue={zOpenWorkorder?.partSource || ""}
+                    buttonText={zOpenWorkorder?.partSource || "Sources"}
                   />
                 </View>
               </View>
@@ -1807,19 +1823,20 @@ export const ActiveWorkorderComponent = ({}) => {
             onPress={handleNewWorkorderPress}
           />
         </Tooltip>
-        <Tooltip text="Print Workorder" position="top">
+        <Tooltip text={isPrinterOffline ? printerOfflineLabel : "Print Workorder"} position="top">
           <Button_
             icon={ICONS.workorder}
             iconSize={30}
             iconStyle={{ paddingHorizontal: 0 }}
             buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
             onPress={handleWorkorderPrintPress}
+            enabled={!isPrinterOffline}
             // onPress={}
           />
         </Tooltip>
-        <Tooltip text="Print intake/estimate, right-click to send text/email" position="top">
+        <Tooltip text={isPrinterOffline ? `${printerOfflineLabel}, right-click to send text/email` : "Print intake/estimate, right-click to send text/email"} position="top">
         <Pressable_
-          onPress={handleIntakePrintPress}
+          onPress={isPrinterOffline ? undefined : handleIntakePrintPress}
           onRightPress={handleIntakeSendElectronic}
           >
           <Button_
@@ -1828,6 +1845,7 @@ export const ActiveWorkorderComponent = ({}) => {
             iconStyle={{ paddingHorizontal: 0 }}
             buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
             onPress={handleIntakePrintPress}
+            enabled={!isPrinterOffline}
           />
           </Pressable_>
         </Tooltip>

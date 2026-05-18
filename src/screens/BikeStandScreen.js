@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import cloneDeep from "lodash/cloneDeep";
 import * as faceapi from "face-api.js";
-import { C, ICONS, COLOR_GRADIENTS } from "../styles";
+import { C, ICONS, COLOR_GRADIENTS, Z } from "../styles";
 import {
   useSettingsStore,
   useOpenWorkordersStore,
@@ -60,7 +60,7 @@ import {
   PhoneNumberInput,
   Tooltip,
   SmallLoadingIndicator,
-  NoteHelperDropdown,
+  NoteHelper,
 } from "../components";
 import { CheckBox, StatusPickerModal, DropdownMenu } from "../dom_components";
 import {
@@ -2026,7 +2026,7 @@ export function BikeStandScreen() {
             backgroundColor: "rgba(0,0,0,0.5)",
             justifyContent: "center",
             alignItems: "center",
-            zIndex: 9999,
+            zIndex: Z.modal,
           }}
         >
           <View
@@ -2919,7 +2919,7 @@ export function BikeStandScreen() {
 
                   {/* Footer action menu popover */}
                   <PopoverPrimitive.Portal>
-                    <PopoverPrimitive.Content side="top" align="start" sideOffset={10} collisionPadding={10} style={{ zIndex: 9100 }}>
+                    <PopoverPrimitive.Content side="top" align="start" sideOffset={10} collisionPadding={10} style={{ zIndex: Z.dropdown }}>
                       <View style={{
                         backgroundColor: "white",
                         borderRadius: 10,
@@ -3800,7 +3800,7 @@ export function BikeStandScreen() {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                zIndex: 9999,
+                zIndex: Z.modal,
               }}
             >
               <div
@@ -4316,7 +4316,7 @@ export function BikeStandScreen() {
         />
       )}
 
-      <NoteHelperDropdown
+      <NoteHelper
         visible={!!sNoteHelperDropdown}
         onClose={() => _setNoteHelperDropdown(null)}
         workorderLine={sNoteHelperDropdown?.workorderLine}
@@ -4559,7 +4559,7 @@ const WorkorderListModal = ({ onSelect, onClose, activeWorkorderID }) => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 9999,
+        zIndex: Z.modal,
       }}
     >
       <div
@@ -4967,7 +4967,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 9999,
+        zIndex: Z.modal,
       }}
     >
       <div
@@ -5389,7 +5389,7 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 9999,
+        zIndex: Z.modal,
       }}
     >
       <div
@@ -5627,7 +5627,7 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
           </StandTouch>
         </div>
 
-        <NoteHelperDropdown
+        <NoteHelper
           visible={!!sQuickNotesTarget}
           onClose={() => _setQuickNotesTarget(null)}
           workorderLine={{ intakeNotes: sIntakeNotes, receiptNotes: sReceiptNotes }}
@@ -5694,7 +5694,7 @@ const PhoneSearchModal = ({ onSelect, onClose }) => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 9999,
+        zIndex: Z.modal,
       }}
     >
       <div
@@ -6375,7 +6375,7 @@ const CustomerInfoViewModal = ({ customer, onClose }) => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 9999,
+        zIndex: Z.modal,
       }}
     >
       <div

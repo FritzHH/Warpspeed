@@ -2,9 +2,9 @@ import React, { forwardRef, useState, useEffect, useRef, useCallback } from "rea
 import ReactDOM from "react-dom";
 import { C, Fonts } from "../../styles";
 import { gray, lightenRGBByPercent } from "../../utils";
-import styles from "./NoteHelperDropdown.module.css";
+import styles from "./NoteHelper.module.css";
 
-export const NoteHelperDropdown = forwardRef(function NoteHelperDropdown(
+export const NoteHelper = forwardRef(function NoteHelper(
   {
     visible,
     onClose,

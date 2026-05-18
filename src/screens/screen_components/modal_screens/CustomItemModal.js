@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { View, Text, TextInput, TouchableOpacity } from "react-native-web";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Z } from "../../../styles";
 import { Button_, TextInput_, Image_ } from "../../../components";
 import {
   usdTypeMask,
@@ -213,7 +213,7 @@ export const CustomItemModal = ({
         right: 0,
         bottom: 0,
         backgroundColor: "rgba(0,0,0,0.5)",
-        zIndex: 9999,
+        zIndex: Z.modal,
       }}
     >
       <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top, left }}>

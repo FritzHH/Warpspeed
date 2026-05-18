@@ -2,7 +2,8 @@
 import { View, Text, ScrollView, Image, TouchableOpacity } from "react-native-web";
 import { useState, useRef, useEffect } from "react";
 import cloneDeep from "lodash/cloneDeep";
-import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, DropdownMenu, Tooltip, Image_, StaleBanner, TextInput_, LoadingIndicator, ReceiptSentOverlay } from "../../../../components";
+import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, Tooltip, Image_, StaleBanner, TextInput_, LoadingIndicator, ReceiptSentOverlay } from "../../../../components";
+import { DropdownMenu } from "../../../../dom_components/DropdownMenu/DropdownMenu";
 import { CheckBox } from "../../../../dom_components";
 import { C, Fonts, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import {
@@ -2161,16 +2162,13 @@ export function NewCheckoutModalScreen() {
 
                   <DropdownMenu
                     dataArr={Object.keys(CUSTOMER_LANGUAGES).map((key) => ({ label: CUSTOMER_LANGUAGES[key], key }))}
-                    selectedIdx={Object.keys(CUSTOMER_LANGUAGES).indexOf(sReceiptLanguage || "english")}
+                    matchValue={CUSTOMER_LANGUAGES[sReceiptLanguage] || "English"}
                     useSelectedAsButtonTitle={true}
                     onSelect={(item) => { dlog(DCAT.DROPDOWN, "receiptLanguageSelect", "CheckoutModal", { language: item?.key }); _setReceiptLanguage(item.key); }}
-                    buttonStyle={{ marginLeft: 5, paddingHorizontal: 2, paddingVertical: 3 }}
+                    buttonStyle={{ marginLeft: 5, paddingHorizontal: 10, paddingVertical: 3 }}
                     buttonTextStyle={{ fontSize: 12 }}
                     buttonIcon={null}
                     buttonIconSize={0}
-                    modalCoordX={80}
-                    // modalCoordY={50}
-                    openUpward={true}
                   />
                 </View>
                 {(saleComplete || hasRealPayments) && (

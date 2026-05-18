@@ -37,20 +37,15 @@
   text-align: center;
 }
 
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 8999;
-}
-
 .menu {
   position: fixed;
-  z-index: 9000;
+  z-index: 2000;
   border-width: 2px;
   border-style: solid;
   background-color: white;
   overflow-y: auto;
   overflow-x: hidden;
+  pointer-events: auto;
 }
 
 .item {

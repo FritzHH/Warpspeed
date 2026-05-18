@@ -4,10 +4,11 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 9000;
+  z-index: 1999;
 }
 
 .dropdown {
+  z-index: 2000;
   background-color: white;
   border-radius: 10px;
   border: 2px solid;

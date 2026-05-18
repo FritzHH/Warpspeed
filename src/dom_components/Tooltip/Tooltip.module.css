@@ -3,7 +3,7 @@
 }
 
 .content {
-  z-index: 99999;
+  z-index: 3000;
   pointer-events: none;
 }
 

@@ -5,11 +5,12 @@
   right: 0;
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.4);
-  z-index: 9000;
+  z-index: 1999;
 }
 
 .dropdown {
   position: absolute;
+  z-index: 2000;
   background-color: white;
   border-radius: 10px;
   border: 2px solid;

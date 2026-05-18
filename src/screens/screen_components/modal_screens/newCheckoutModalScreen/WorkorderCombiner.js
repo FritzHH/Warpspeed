@@ -2,8 +2,10 @@
 import { memo } from "react";
 import { View, Text, ScrollView } from "react-native-web";
 import { C, Fonts, ICONS } from "../../../../styles";
-import { Image_, Button_, DropdownMenu, GradientView, Tooltip } from "../../../../components";
+import { Image_, Button_, GradientView, Tooltip } from "../../../../components";
 import { CheckBox } from "../../../../dom_components";
+import { LineActionsDropdown } from "../../../../dom_components/LineActionsDropdown/LineActionsDropdown";
+import { DISCOUNT_TYPES } from "../../../../constants";
 import {
   formatCurrencyDisp,
   calculateRunningTotals,
@@ -64,6 +66,26 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
     }
     let lines = replaceOrAddToArr(wo.workorderLines, newLine);
     if (direction === "down" && wouldDropBelowFloor(wo.id, lines)) return;
+    onLineChange(wo.id, lines);
+  }
+
+  function splitLine(wo, lineIdx) {
+    dlog(DCAT.BUTTON, "splitLine", "WorkorderCombiner", { woId: wo.id, lineId: wo.workorderLines[lineIdx]?.id });
+    let source = wo.workorderLines[lineIdx];
+    if (!source || (source.qty || 1) <= 1) return;
+    let num = source.qty;
+    let lines = cloneDeep(wo.workorderLines);
+    for (let i = 0; i < num; i++) {
+      let newLine = cloneDeep(source);
+      newLine.qty = 1;
+      newLine.id = crypto.randomUUID();
+      newLine.discountObj = null;
+      if (i === 0) {
+        lines[lineIdx] = newLine;
+        continue;
+      }
+      lines.splice(lineIdx + i, 0, newLine);
+    }
     onLineChange(wo.id, lines);
   }
 
@@ -441,44 +463,30 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                 alignItems: "center",
                               }}
                             >
-                              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                                  <Tooltip text="Discounts" position="top">
-                                    <DropdownMenu
-                                      enabled={canDiscount}
-                                      buttonIcon={ICONS.dollarYellow}
-                                      buttonIconSize={22}
-                                      modalCoordY={25}
-                                      modalCoordX={-100}
-                                    isDiscountMenu={!hasPayments}
-                                    discountMaxCents={lineTotal}
-                                      buttonStyle={{ borderWidth: 0, backgroundColor: "transparent", opacity: canDiscount ? 1 : 0.25 }}
-                                      dataArr={[
-                                        { label: "No Discount" },
-                                        ...safeDiscounts.map((o) => ({ label: o.name })),
-                                      ]}
-                                      onSelect={(item) => {
-                                        if (item._customDiscount) {
-                                          handleDiscount(wo, line, item._customDiscount);
-                                        } else if (item.label === "No Discount") {
-                                          handleDiscount(wo, line, null);
-                                        } else {
-                                          handleDiscount(wo, line, discounts.find((o) => o.name === item.label));
-                                        }
-                                      }}
-                                    />
-                                </Tooltip>
-                              </View>
-                              <Tooltip text="Remove" position="top">
-                                <Button_
-                                  enabled={canDelete}
-                                  onPress={() => deleteLine(wo, lineIdx)}
-                                  icon={ICONS.trash}
-                                  iconSize={21}
-                                  buttonStyle={{
-                                    paddingRight: 2,
-                                    marginLeft: -8,
-                                    opacity: canDelete ? 1 : 0.25,
+                              <Tooltip text="Actions" position="top">
+                                <LineActionsDropdown
+                                  enabled={canEdit && (canDelete || canDiscount)}
+                                  showSplit={(line.qty || 1) > 1}
+                                  onSplit={() => splitLine(wo, lineIdx)}
+                                  onRemove={() => deleteLine(wo, lineIdx)}
+                                  discounts={safeDiscounts}
+                                  currentDiscount={line.discountObj}
+                                  maxDiscountCents={lineTotal}
+                                  onSelectDiscount={(discount) => {
+                                    if (!discount) {
+                                      handleDiscount(wo, line, null);
+                                    } else {
+                                      handleDiscount(wo, line, discount);
+                                    }
                                   }}
+                                  onCustomPercent={(num) => {
+                                    handleDiscount(wo, line, { id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
+                                  }}
+                                  onCustomDollar={(cents) => {
+                                    const dollars = (cents / 100).toFixed(2);
+                                    handleDiscount(wo, line, { id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(cents), type: DISCOUNT_TYPES.dollar, custom: true });
+                                  }}
+                                  triggerStyle={{ marginRight: 3 }}
                                 />
                               </Tooltip>
                             </View>

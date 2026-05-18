@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { useState, useRef } from "react";
-import { C } from "../../../styles";
+import { C, Z } from "../../../styles";
 import { gray, formatCurrencyDisp } from "../../../utils";
 import { CheckBox } from "../../../dom_components";
 import { workerSearchInventory } from "../../../inventorySearchManager";
@@ -73,7 +73,7 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        zIndex: 9999,
+        zIndex: Z.modal,
       }}
     >
       <div

@@ -4,6 +4,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Button } from "../Button/Button";
 import { SHADOW_NONE } from "../shadows";
+import { Z } from "../../styles";
 import styles from "./ScreenModal.module.css";
 
 export const ScreenModal = ({
@@ -134,7 +135,7 @@ export const ScreenModal = ({
           collisionPadding={10}
           onOpenAutoFocus={(e) => e.preventDefault()}
           style={{
-            zIndex: 9000,
+            zIndex: Z.dropdown,
             opacity: sFadedIn ? 1 : 0,
             transition: "opacity 150ms ease-in",
           }}

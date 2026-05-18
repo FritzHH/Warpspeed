@@ -41,7 +41,7 @@ import {
   TouchableOpacity as TouchableOpacityDom,
   Tooltip as TooltipDom,
 } from "../../../dom_components";
-import { C, COLOR_GRADIENTS, Colors, ICONS, Fonts } from "../../../styles";
+import { C, COLOR_GRADIENTS, Colors, ICONS, Fonts, Z } from "../../../styles";
 import hubStyles from "./MessagesHub.module.css";
 import { useTranslation } from "../../../useTranslation";
 import {
@@ -1429,7 +1429,7 @@ export function MessagesComponent({}) {
               </div>
           </View>
             <div className={hubStyles.footerRow}>
-              <div className={hubStyles.footerGroup}>
+              <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
                 <DropdownMenuDom
                   dataArr={TRANSLATION_LANGUAGES}
                   onSelect={(item) => {
@@ -1438,9 +1438,9 @@ export function MessagesComponent({}) {
                     if (!item.code || item.code === sToLang) clearTranslation();
                   }}
                   buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}
-                  buttonStyle={{ paddingVertical: 5 }}
+                  buttonStyle={{ paddingVertical: 5, paddingHorizontal: 10 }}
                 />
-                <ImageDom icon={ICONS.rightArrowBlue} size={16} className={hubStyles.footerArrow} />
+                <ImageDom icon={ICONS.rightArrowBlue} size={16} style={{ marginLeft: 6, marginRight: 6 }} />
                 <DropdownMenuDom
                   dataArr={TRANSLATION_LANGUAGES}
                   onSelect={(item) => {
@@ -1449,7 +1449,7 @@ export function MessagesComponent({}) {
                     if (!item.code || sFromLang === item.code) clearTranslation();
                   }}
                   buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sToLang)?.label || "English"}
-                  buttonStyle={{ paddingVertical: 5 }}
+                  buttonStyle={{ paddingVertical: 5, paddingHorizontal: 10 }}
                 />
               </div>
               <DropdownMenuDom
@@ -2185,7 +2185,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
       </View>
       {sWoDropdown && createPortal(
         <TouchableWithoutFeedback onPress={() => _setWoDropdown(null)}>
-          <View style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 99999 }}>
+          <View style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: Z.dropdown }}>
             <View style={{ position: "absolute", top: sWoDropdown.y, left: sWoDropdown.x, backgroundColor: C.listItemWhite, borderRadius: 8, borderWidth: 2, borderColor: C.buttonLightGreenOutline, minWidth: 240, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 10, overflow: "hidden" }}>
               {matchingWorkorders.map((wo) => (
                 <TouchableOpacity
@@ -2516,7 +2516,7 @@ const MediaThumbnail = memo(({ url, thumbnailUrl, contentType }) => {
             right: 0,
             bottom: 0,
             backgroundColor: "rgba(0,0,0,0.85)",
-            zIndex: 9999,
+            zIndex: Z.modal + 100,
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
@@ -2703,7 +2703,7 @@ const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom, autoTranslate
         <Text style={{ fontSize: 10, color: gray(0.5), fontStyle: "italic" }}>Auto-response sent (thread was closed)</Text>
       )}
       {sContextMenu.visible && createPortal(
-        <div onMouseDown={(e) => e.stopPropagation()} style={{ position: "fixed", left: sContextMenu.x, bottom: window.innerHeight - sContextMenu.y, zIndex: 99999, backgroundColor: "white", borderRadius: 8, boxShadow: "0 3px 16px rgba(0,0,0,0.22)", padding: 6, minWidth: 160 }}>
+        <div onMouseDown={(e) => e.stopPropagation()} style={{ position: "fixed", left: sContextMenu.x, bottom: window.innerHeight - sContextMenu.y, zIndex: Z.dropdown, backgroundColor: "white", borderRadius: 8, boxShadow: "0 3px 16px rgba(0,0,0,0.22)", padding: 6, minWidth: 160 }}>
           <div style={{ padding: "5px 12px", fontSize: 11, fontWeight: "600", color: gray(0.45), textTransform: "uppercase", letterSpacing: 0.5 }}>Translate to</div>
           {TRANSLATION_LANGUAGES.map((lang) => (
             <div

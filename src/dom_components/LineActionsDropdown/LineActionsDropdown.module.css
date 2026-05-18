@@ -13,21 +13,16 @@
   cursor: not-allowed;
 }
 
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 8999;
-}
-
 .menu {
   position: fixed;
-  z-index: 9100;
+  z-index: 2000;
   background-color: white;
   border-width: 2px;
   border-style: solid;
   border-radius: 10px;
   overflow: hidden;
   min-width: 180px;
+  pointer-events: auto;
 }
 
 .iconRow {

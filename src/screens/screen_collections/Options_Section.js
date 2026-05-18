@@ -9,7 +9,7 @@ import {
   log,
 } from "../../utils";
 import { TabMenuButton, Image_, Button_, Tooltip } from "../../components";
-import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../styles";
+import { C, COLOR_GRADIENTS, Fonts, ICONS, Z } from "../../styles";
 import { TAB_NAMES } from "../../data";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
 import ReactDOM from "react-dom";
@@ -488,7 +488,7 @@ const UserClockModal = ({ user, handleExit, handleViewHistory }) => {
         backgroundColor: "rgba(0,0,0,0.4)",
         justifyContent: "center",
         alignItems: "center",
-        zIndex: 9998,
+        zIndex: Z.modal,
       }}
     >
       <TouchableOpacity
@@ -628,7 +628,7 @@ const CameraPreviewModal = ({ visible, onClose }) => {
         backgroundColor: "rgba(0, 0, 0, 0.5)",
         justifyContent: "center",
         alignItems: "center",
-        zIndex: 9999,
+        zIndex: Z.modal,
       }}
     >
       <TouchableOpacity

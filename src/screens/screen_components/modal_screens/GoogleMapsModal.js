@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { View, Text } from "react-native-web";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Z } from "../../../styles";
 import { Button_ } from "../../../components";
 import { gray } from "../../../utils";
 import { useLayoutStore } from "../../../stores";
@@ -170,7 +170,7 @@ export const GoogleMapsModal = ({
         right: 0,
         bottom: 0,
         backgroundColor: "rgba(0,0,0,0.55)",
-        zIndex: 9999,
+        zIndex: Z.modal,
         display: "flex",
         justifyContent: "center",
         alignItems: "center",

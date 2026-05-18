@@ -55,7 +55,6 @@ import {
   Button_,
   DropdownMenu,
   Image_,
-  ModalDropdown,
   NumberSpinner_,
   ScreenModal,
   TextInput_,
@@ -72,7 +71,7 @@ import cloneDeep from "lodash/cloneDeep";
 import React, { Children, useEffect, useRef, useState, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
-import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
+import { C, COLOR_GRADIENTS, Fonts, ICONS, Z } from "../../../../styles";
 import defaultLogo from "../../../../resources/default_app_logo_large.png";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
 import { APP_USER, COLORS, INTAKE_QUICK_BUTTON_PROTO, NOTE_HELPER_PROTO, NOTE_HELPER_ITEM_PROTO, QUICK_CUSTOMER_NOTE_PROTO, QUICK_CUSTOMER_NOTE_ITEM_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../../data";
@@ -247,7 +246,7 @@ export function Dashboard_Admin({}) {
               display: "flex",
               justifyContent: "center",
               alignItems: "center",
-              zIndex: 9998,
+              zIndex: Z.modal,
             }}
           >
             <div
@@ -5055,7 +5054,7 @@ const WorkorderStatusesComponent = ({
             backgroundColor: "rgba(0,0,0,0.5)",
             justifyContent: "center",
             alignItems: "center",
-            zIndex: 9999,
+            zIndex: Z.modal,
           }}
         >
           <View
@@ -5410,7 +5409,7 @@ const QBInventorySearchModal = ({ parentName, onClose, onAddItems, existingItemI
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        zIndex: 9999,
+        zIndex: Z.modal,
       }}
       onClick={onClose}
     >
@@ -9177,7 +9176,7 @@ const TextTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) => 
 
         {/* Emoji picker modal — portaled to body to avoid z-index issues */}
         {!!sEmojiModalTemplateId && createPortal(
-          <View style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", zIndex: 9999 }}>
+          <View style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", zIndex: Z.modal }}>
             <TouchableWithoutFeedback onPress={() => _setEmojiModalTemplateId(null)}>
               <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
             </TouchableWithoutFeedback>
@@ -9693,7 +9692,7 @@ const EmailTemplatesComponent = ({ zSettingsObj, handleSettingsFieldChange }) =>
 
         {/* Emoji picker modal */}
         {!!sEmojiModalRefKey && createPortal(
-          <View style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", zIndex: 9999 }}>
+          <View style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", zIndex: Z.modal }}>
             <TouchableWithoutFeedback onPress={() => _setEmojiModalRefKey(null)}>
               <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }} />
             </TouchableWithoutFeedback>
@@ -12484,7 +12483,7 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        zIndex: 9999,
+        zIndex: Z.modal,
       }}
     >
       <div

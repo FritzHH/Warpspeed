@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { View, Text, TouchableOpacity, ScrollView, Image } from "react-native-web";
 import { useParams } from "react-router-dom";
 import { compressImage, formatWorkorderNumber } from "../utils";
+import { Z } from "../styles";
 
 const CLOUD_FN_BASE = "https://us-central1-warpspeed-bonitabikes.cloudfunctions.net";
 
@@ -177,7 +178,7 @@ const S = {
     backgroundColor: "rgba(0,0,0,0.85)",
     justifyContent: "center",
     alignItems: "center",
-    zIndex: 9999,
+    zIndex: Z.modal + 100,
   },
   fullImg: {
     maxWidth: "90vw",

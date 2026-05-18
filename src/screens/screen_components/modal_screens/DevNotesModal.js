@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import { View, Text, TouchableOpacity, ScrollView } from "react-native-web";
-import { C, ICONS, Fonts, COLOR_GRADIENTS } from "../../../styles";
+import { C, ICONS, Fonts, COLOR_GRADIENTS, Z } from "../../../styles";
 import { Button_, TextInput_, Image_ } from "../../../components";
 import { useLoginStore, useSettingsStore, useAlertScreenStore } from "../../../stores";
 import { PRIVILEDGE_LEVELS } from "../../../data";
@@ -96,7 +96,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
         backgroundColor: "rgba(0,0,0,0.5)",
         justifyContent: "center",
         alignItems: "center",
-        zIndex: 9999,
+        zIndex: Z.modal,
       }}
     >
       {/* Click-outside overlay */}

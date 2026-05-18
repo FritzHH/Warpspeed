@@ -4,7 +4,7 @@ import { useState, memo } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import { ScreenModal, Button_, SmallLoadingIndicator, SHADOW_RADIUS_PROTO } from "../../../../components";
 import { CheckBox } from "../../../../dom_components";
-import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
+import { C, COLOR_GRADIENTS, Fonts, Z } from "../../../../styles";
 import { useCurrentCustomerStore, useSettingsStore, useLoginStore } from "../../../../stores";
 import { formatCurrencyDisp, formatMillisForDisplay, gray, lightenRGBByPercent, log, generateEAN13Barcode, localStorageWrapper, findTemplateByType, printBuilder } from "../../../../utils";
 import { readTransaction, writeCashRefund, newCheckoutProcessStripeRefund } from "./newCheckoutFirebaseCalls";
@@ -544,7 +544,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
               backgroundColor: "rgba(0, 0, 0, 0.5)",
               alignItems: "center",
               justifyContent: "center",
-              zIndex: 99999,
+              zIndex: Z.alert,
             }}
           >
             <View
@@ -596,7 +596,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
               backgroundColor: "rgba(0, 0, 0, 0.5)",
               alignItems: "center",
               justifyContent: "center",
-              zIndex: 99999,
+              zIndex: Z.alert,
             }}
           >
             <View

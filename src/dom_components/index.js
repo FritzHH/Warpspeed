@@ -27,7 +27,6 @@ export { AlertBox } from "./AlertBox/AlertBox";
 // Batch 4 - Complex interactive components
 export { ScreenModal } from "./ScreenModal/ScreenModal";
 export { DropdownMenu } from "./DropdownMenu/DropdownMenu";
-export { ModalDropdown } from "./ModalDropdown/ModalDropdown";
 export { NumberSpinner } from "./NumberSpinner/NumberSpinner";
 export { TimeSpinner } from "./TimeSpinner/TimeSpinner";
 export { TimePicker } from "./TimePicker/TimePicker";
@@ -42,9 +41,9 @@ export { StatusPickerModal } from "./StatusPickerModal/StatusPickerModal";
 export { DepositModal } from "./DepositModal/DepositModal";
 export { DepositsList } from "./DepositsList/DepositsList";
 export { WebPageModal } from "./WebPageModal/WebPageModal";
-export { NoteHelperDropdown } from "./NoteHelperDropdown/NoteHelperDropdown";
+export { NoteHelper } from "./NoteHelper/NoteHelper";
 export { LineActionsDropdown } from "./LineActionsDropdown/LineActionsDropdown";
-export { CustomerQuickNotesDropdown } from "./CustomerQuickNotesDropdown/CustomerQuickNotesDropdown";
+export { CustomerQuickNotes } from "./CustomerQuickNotes/CustomerQuickNotes";
 
 // Batch 6 - Animated components
 export { StaleBanner } from "./StaleBanner/StaleBanner";

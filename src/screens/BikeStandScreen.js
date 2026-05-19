@@ -3001,39 +3001,15 @@ export function BikeStandScreen() {
 
           {/* Printer selection modal */}
           {sShowPrinterSelectModal && (
-            <StandTouch touchStart={false} onPress={() => _setShowPrinterSelectModal(false)}>
-            <View
-              onClick={() => _setShowPrinterSelectModal(false)}
-              style={{
-                position: "absolute",
-                top: 0, left: 0, right: 0, bottom: 0,
-                backgroundColor: "rgba(0,0,0,0.5)",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
-            >
-              <View onClick={(e) => e.stopPropagation()} style={{
-                backgroundColor: C.listItemWhite,
-                borderRadius: 14,
-                width: "75%",
-                maxHeight: "85%",
-                overflow: "hidden",
-              }}>
-                <ScrollView style={{ paddingHorizontal: 20, paddingVertical: 16 }}>
+            <StandTouch touchStart={false} className={styles.printerBackdrop} onPress={() => _setShowPrinterSelectModal(false)}>
+              <div className={styles.printerDialog} style={{ backgroundColor: C.listItemWhite }} onClick={(e) => e.stopPropagation()}>
+                <div className={styles.printerScroll}>
 
                   {/* Intake section */}
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: gray(0.5), marginBottom: 8, letterSpacing: 1 }}>INTAKE</Text>
-                  <View style={{
-                    borderRadius: 10,
-                    borderWidth: 1,
-                    borderColor: C.buttonLightGreenOutline,
-                    backgroundColor: C.backgroundListWhite,
-                    padding: 14,
-                    marginBottom: 20,
-                  }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 15 }}>
-                        <StandTouch onPress={() => { handleIntakePrint(); }}>
+                  <span className={styles.printerSectionLabel} style={{ color: gray(0.5), display: "block" }}>INTAKE</span>
+                  <div className={styles.printerIntakeCard} style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.backgroundListWhite }}>
+                    <div className={styles.printerIntakeRow}>
+                      <div className={styles.printerIntakeLeft}>
                         <Button_
                           text="Print"
                           onPress={() => { handleIntakePrint(); }}
@@ -3042,10 +3018,8 @@ export function BikeStandScreen() {
                           textStyle={{ fontSize: 23, fontWeight: "700" }}
                           enabled={!!sSelectedPrinterID && !selectedPrinterOffline}
                         />
-                        </StandTouch>
                         {(customerCell || customerEmail) ? (
-                          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                            <StandTouch onPress={() => { handleIntakeElectronic(); }}>
+                          <div className={styles.printerIntakeSent}>
                             <Button_
                               text="Text/Email"
                               onPress={() => { handleIntakeElectronic(); }}
@@ -3053,18 +3027,16 @@ export function BikeStandScreen() {
                               style={{ paddingVertical: 14, paddingHorizontal: 24 }}
                               textStyle={{ fontSize: 23, fontWeight: "700" }}
                             />
-                            </StandTouch>
                             {zSendStatuses[sSelectedWorkorderID] === "sent" && (
                               <Image_ icon={ICONS.check1} size={28} />
                             )}
                             {zSendStatuses[sSelectedWorkorderID] === "failed" && (
                               <Image_ icon={ICONS.redx} size={28} />
                             )}
-                          </View>
+                          </div>
                         ) : null}
-                      </View>
+                      </div>
                       {(customerCell || customerEmail) ? (
-                        <StandTouch onPress={() => { handleIntakePrint(); handleIntakeElectronic(); }}>
                         <Button_
                           text="Both"
                           onPress={() => { handleIntakePrint(); handleIntakeElectronic(); }}
@@ -3073,14 +3045,12 @@ export function BikeStandScreen() {
                           textStyle={{ fontSize: 23, fontWeight: "700" }}
                           enabled={!!sSelectedPrinterID && !selectedPrinterOffline}
                         />
-                        </StandTouch>
                       ) : null}
-                    </View>
-                  </View>
+                    </div>
+                  </div>
 
                   {/* Print workorder button */}
-                  <View style={{ marginTop: 20, marginBottom: 40 }}>
-                    <StandTouch onPress={() => { handleWorkorderPrint(); }}>
+                  <div className={styles.printerWorkorderBlock}>
                     <Button_
                       text="PRINT WORKORDER"
                       onPress={() => { handleWorkorderPrint(); }}
@@ -3089,45 +3059,42 @@ export function BikeStandScreen() {
                       textStyle={{ fontSize: 22, fontWeight: "700", color: "white" }}
                       enabled={!!sSelectedPrinterID && !selectedPrinterOffline}
                     />
-                    </StandTouch>
-                  </View>
+                  </div>
 
                   {/* Printer selection section */}
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: gray(0.5), marginTop: 30, marginBottom: 8, letterSpacing: 1 }}>AVAILABLE PRINTERS</Text>
+                  <span className={`${styles.printerSectionLabel} ${styles.printerSectionLabelTop}`} style={{ color: gray(0.5), display: "block" }}>AVAILABLE PRINTERS</span>
                   {receiptPrinters.length === 0 ? (
-                    <Text style={{ fontSize: 16, color: gray(0.5), paddingVertical: 20, textAlign: "center" }}>No receipt printers configured</Text>
+                    <span className={styles.printerEmpty} style={{ color: gray(0.5), display: "block" }}>No receipt printers configured</span>
                   ) : (
                     receiptPrinters.map((printer, idx) => {
                       let isSelected = printer.id === sSelectedPrinterID;
                       let isOnline = printer.active === true;
                       return (
-                        <View
+                        <div
                           key={printer.id}
+                          className={styles.printerCard}
                           style={{
-                            borderRadius: 10,
-                            borderWidth: 1,
                             borderColor: isSelected ? C.green : gray(0.15),
                             backgroundColor: isSelected ? lightenRGBByPercent(C.green, 70) : C.backgroundListWhite,
-                            padding: 12,
                             marginBottom: idx < receiptPrinters.length - 1 ? 8 : 0,
                           }}
                         >
                           {!isOnline ? (
-                            <View style={{ marginBottom: 6 }}>
-                              <Text style={{ fontSize: 12, fontWeight: "700", color: C.red, backgroundColor: "yellow", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: "hidden", alignSelf: "flex-start" }}>Printer Offline</Text>
-                            </View>
+                            <div className={styles.printerOfflineWrap}>
+                              <span className={styles.printerOfflineBadge} style={{ color: C.red, backgroundColor: "yellow" }}>Printer Offline</span>
+                            </div>
                           ) : null}
-                          <View style={{ flexDirection: "row", alignItems: "center" }}>
-                            <View style={{ flex: 1 }}>
-                              <Text style={{ fontSize: 17, fontWeight: isSelected ? "700" : "normal", color: C.text }}>
+                          <div className={styles.printerHeaderRow}>
+                            <div className={styles.printerHeaderInfo}>
+                              <span className={styles.printerName} style={{ fontWeight: isSelected ? "700" : "normal", color: C.text }}>
                                 {printer.label || printer.printerName || printer.id}
-                              </Text>
+                              </span>
                               {printer.printerName && printer.label ? (
-                                <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 2 }}>{printer.printerName}</Text>
+                                <span className={styles.printerSubname} style={{ color: gray(0.5) }}>{printer.printerName}</span>
                               ) : null}
-                            </View>
-                          </View>
-                          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, justifyContent: "space-between" }}>
+                            </div>
+                          </div>
+                          <div className={styles.printerActionRow}>
                             <CheckBox
                               isChecked={isSelected}
                               text="Use this printer"
@@ -3135,22 +3102,6 @@ export function BikeStandScreen() {
                               buttonStyle={{ backgroundColor: "transparent" }}
                               onCheck={() => handleSelectPrinter(printer.id)}
                             />
-                            <StandTouch onPress={() => {
-                                let testObj = printBuilder.test();
-                                dbSavePrintObj(testObj, printer.id);
-                                useAlertScreenStore.getState().setValues({
-                                  title: "Test Print",
-                                  message: "Was the test print successful?",
-                                  btn1Text: "Yes",
-                                  btn2Text: "No",
-                                  handleBtn1Press: () => {
-                                    handleSelectPrinter(printer.id);
-                                    useAlertScreenStore.getState().setShowAlert(false);
-                                  },
-                                  handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
-                                  canExitOnOuterClick: true,
-                                });
-                              }}>
                             <Button_
                               text="Test Print"
                               onPress={() => {
@@ -3174,16 +3125,14 @@ export function BikeStandScreen() {
                               textStyle={{ fontSize: 14, fontWeight: "700" }}
                               enabled={isOnline}
                             />
-                            </StandTouch>
-                          </View>
-                        </View>
+                          </div>
+                        </div>
                       );
                     })
                   )}
-                  <View style={{ height: 16 }} />
-                </ScrollView>
-              </View>
-            </View>
+                  <div className={styles.printerSpacer16} />
+                </div>
+              </div>
             </StandTouch>
           )}
 
@@ -3233,34 +3182,15 @@ export function BikeStandScreen() {
             }
 
             return (
-            <StandTouch touchStart={false} onPress={() => _setIntakeNotesLineID(null)}>
-            <div
-              onClick={() => _setIntakeNotesLineID(null)}
-              style={{
-                position: "absolute",
-                top: 0, left: 0, right: 0, bottom: 0,
-                backgroundColor: "rgba(0,0,0,0.4)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                zIndex: Z.modal,
-              }}
-            >
+            <StandTouch touchStart={false} className={styles.notesBackdrop} style={{ zIndex: Z.modal }} onPress={() => _setIntakeNotesLineID(null)}>
               <div
+                className={styles.notesDialog}
                 onClick={(e) => { e.stopPropagation(); _setNotesDiscountOpen(false); }}
-                style={{
-                  width: "95%",
-                  height: "98%",
-                  backgroundColor: "rgba(255,255,255,0.97)",
-                  borderRadius: 12,
-                  display: "flex",
-                  flexDirection: "column",
-                  overflow: "hidden",
-                  padding: 10,
-                }}
               >
                 {/* Header: item name + target toggle + tap/swipe to close */}
                 <div
+                  className={styles.notesHeader}
+                  style={{ borderBottom: "1px solid " + gray(0.1) }}
                   onClick={() => _setIntakeNotesLineID(null)}
                   onTouchStart={(e) => { notesSwipeRef.current = e.touches[0].clientY; }}
                   onTouchEnd={(e) => {
@@ -3270,277 +3200,187 @@ export function BikeStandScreen() {
                       notesSwipeRef.current = null;
                     }
                   }}
-                  style={{
-                    display: "flex",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    paddingVertical: 16,
-                    paddingHorizontal: 10,
-                    borderBottom: "1px solid " + gray(0.1),
-                    cursor: "pointer",
-                  }}
                 >
-                  <Text style={{ fontSize: 25, fontWeight: "600", color: C.text }} numberOfLines={1}>{itemLabel}</Text>
-                  <View onClick={(e) => e.stopPropagation()} style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={{ fontSize: 18, fontStyle: "italic", color: gray(0.4) }}>Font size</Text>
-                    <StandTouch onPress={() => {
-                        let next = sNoteHelperFontAdj - 1;
-                        _setNoteHelperFontAdj(next);
-                        localStorageWrapper.setItem("standNoteHelperFontAdj", String(next));
-                      }}>
-                    <TouchableOpacity
+                  <span className={styles.notesHeaderTitle} style={{ color: C.text }}>{itemLabel}</span>
+                  <div className={styles.notesFontGroup} onClick={(e) => e.stopPropagation()}>
+                    <span className={styles.notesFontLabel} style={{ color: gray(0.4) }}>Font size</span>
+                    <StandTouch
+                      className={styles.notesFontBtn}
                       onPress={() => {
                         let next = sNoteHelperFontAdj - 1;
                         _setNoteHelperFontAdj(next);
                         localStorageWrapper.setItem("standNoteHelperFontAdj", String(next));
                       }}
-                      style={{ padding: 4 }}
                     >
                       <Image_ source={ICONS.minus} style={{ width: 22, height: 22 }} />
-                    </TouchableOpacity>
                     </StandTouch>
-                    <StandTouch onPress={() => {
-                        let next = sNoteHelperFontAdj + 1;
-                        _setNoteHelperFontAdj(next);
-                        localStorageWrapper.setItem("standNoteHelperFontAdj", String(next));
-                      }}>
-                    <TouchableOpacity
+                    <StandTouch
+                      className={styles.notesFontBtn}
                       onPress={() => {
                         let next = sNoteHelperFontAdj + 1;
                         _setNoteHelperFontAdj(next);
                         localStorageWrapper.setItem("standNoteHelperFontAdj", String(next));
                       }}
-                      style={{ padding: 4 }}
                     >
                       <Image_ source={ICONS.add} style={{ width: 22, height: 22 }} />
-                    </TouchableOpacity>
                     </StandTouch>
-                  </View>
-                  <Text style={{ fontSize: 21, fontStyle: "italic", color: gray(0.35) }}>Tap to close</Text>
+                  </div>
+                  <span className={styles.notesHeaderHint} style={{ color: gray(0.35) }}>Tap to close</span>
                 </div>
 
                 {/* Tap-off overlay to dismiss keyboard */}
                 {sNotesKeyboardOpen && (
-                  <StandTouch touchStart={false} onPress={() => _setNotesKeyboardOpen(false)}>
-                  <div
-                    onClick={(e) => { e.stopPropagation(); _setNotesKeyboardOpen(false); }}
-                    style={{
-                      position: "absolute",
-                      top: 0, left: 0, right: 0, bottom: 0,
-                      zIndex: 50,
-                    }}
+                  <StandTouch
+                    touchStart={false}
+                    className={styles.notesKeyboardOverlay}
+                    onPress={() => _setNotesKeyboardOpen(false)}
                   />
-                  </StandTouch>
                 )}
 
                 {/* Note helper categories - 2 column layout */}
-                <ScrollView style={{ flex: 1, paddingHorizontal: 10, paddingTop: 8 }}>
-                  <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
-                    <View style={{ flex: 1, paddingRight: 8 }}>
+                <div className={styles.notesCategoryScroll}>
+                  <div className={styles.notesCategoryRow}>
+                    <div className={`${styles.notesCategoryCol} ${styles.notesCategoryColLeft}`}>
                       {noteHelpers.filter((_, i) => i % 2 === 0).map((category) => (
-                        <View key={category.id} style={{ marginBottom: 10, borderWidth: 1, borderColor: gray(0.15), borderRadius: 8, padding: 12 }}>
-                          <Text style={{ fontSize: 19 + sNoteHelperFontAdj, fontWeight: "700", color: gray(0.4), marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        <div key={category.id} className={styles.notesCategoryCard} style={{ borderColor: gray(0.15) }}>
+                          <span className={styles.notesCategoryLabel} style={{ fontSize: 19 + sNoteHelperFontAdj, color: gray(0.4), display: "block" }}>
                             {category.label}
-                          </Text>
-                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                          </span>
+                          <div className={styles.notesChipRow}>
                             {(category.items || []).map((item, chipIdx) => {
                               let insertText = typeof item === "string" ? item : (item.text || item.buttonLabel || "").trim();
                               let displayLabel = typeof item === "string" ? item : (item.buttonLabel || "");
                               let active = sActiveNoteChips.has(category.id + "::" + insertText);
                               return (
-                                <StandTouch key={(item.id || displayLabel) + chipIdx} onPress={() => toggleNoteChip(category.id, item)}>
-                                <TouchableOpacity
-                                  onPress={() => toggleNoteChip(category.id, item)}
+                                <StandTouch
+                                  key={(item.id || displayLabel) + chipIdx}
+                                  className={styles.notesChip}
                                   style={{
                                     backgroundColor: active ? lightenRGBByPercent(C.blue, 70) : C.buttonLightGreenOutline,
-                                    borderRadius: 5,
-                                    paddingHorizontal: 12,
-                                    paddingVertical: 12,
-                                    borderWidth: 1,
                                     borderColor: active ? C.blue : C.buttonLightGreenOutline,
                                   }}
+                                  onPress={() => toggleNoteChip(category.id, item)}
                                 >
-                                  <Text style={{ fontSize: 25 + sNoteHelperFontAdj, color: active ? C.blue : gray(0.5), fontWeight: active ? "600" : "400" }}>
+                                  <span style={{ fontSize: 25 + sNoteHelperFontAdj, color: active ? C.blue : gray(0.5), fontWeight: active ? "600" : "400" }}>
                                     {displayLabel}
-                                  </Text>
-                                </TouchableOpacity>
+                                  </span>
                                 </StandTouch>
                               );
                             })}
-                          </View>
-                        </View>
+                          </div>
+                        </div>
                       ))}
-                    </View>
-                    <View style={{ width: 1, backgroundColor: C.buttonLightGreenOutline, alignSelf: "stretch" }} />
-                    <View style={{ flex: 1, paddingLeft: 8 }}>
+                    </div>
+                    <div className={styles.notesCategoryDivider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
+                    <div className={`${styles.notesCategoryCol} ${styles.notesCategoryColRight}`}>
                       {noteHelpers.filter((_, i) => i % 2 === 1).map((category) => (
-                        <View key={category.id} style={{ marginBottom: 10, borderWidth: 1, borderColor: gray(0.15), borderRadius: 8, padding: 12 }}>
-                          <Text style={{ fontSize: 19 + sNoteHelperFontAdj, fontWeight: "700", color: gray(0.4), marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>
+                        <div key={category.id} className={styles.notesCategoryCard} style={{ borderColor: gray(0.15) }}>
+                          <span className={styles.notesCategoryLabel} style={{ fontSize: 19 + sNoteHelperFontAdj, color: gray(0.4), display: "block" }}>
                             {category.label}
-                          </Text>
-                          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+                          </span>
+                          <div className={styles.notesChipRow}>
                             {(category.items || []).map((item, chipIdx) => {
                               let insertText = typeof item === "string" ? item : (item.text || item.buttonLabel || "").trim();
                               let displayLabel = typeof item === "string" ? item : (item.buttonLabel || "");
                               let active = sActiveNoteChips.has(category.id + "::" + insertText);
                               return (
-                                <StandTouch key={(item.id || displayLabel) + chipIdx} onPress={() => toggleNoteChip(category.id, item)}>
-                                <TouchableOpacity
-                                  onPress={() => toggleNoteChip(category.id, item)}
+                                <StandTouch
+                                  key={(item.id || displayLabel) + chipIdx}
+                                  className={styles.notesChip}
                                   style={{
                                     backgroundColor: active ? lightenRGBByPercent(C.blue, 70) : C.buttonLightGreenOutline,
-                                    borderRadius: 5,
-                                    paddingHorizontal: 12,
-                                    paddingVertical: 12,
-                                    borderWidth: 1,
                                     borderColor: active ? C.blue : C.buttonLightGreenOutline,
                                   }}
+                                  onPress={() => toggleNoteChip(category.id, item)}
                                 >
-                                  <Text style={{ fontSize: 25 + sNoteHelperFontAdj, color: active ? C.blue : gray(0.5), fontWeight: active ? "600" : "400" }}>
+                                  <span style={{ fontSize: 25 + sNoteHelperFontAdj, color: active ? C.blue : gray(0.5), fontWeight: active ? "600" : "400" }}>
                                     {displayLabel}
-                                  </Text>
-                                </TouchableOpacity>
+                                  </span>
                                 </StandTouch>
                               );
                             })}
-                          </View>
-                        </View>
+                          </div>
+                        </div>
                       ))}
-                    </View>
-                  </View>
-                </ScrollView>
+                    </div>
+                  </div>
+                </div>
 
                 {/* Notes target label + toggle + action buttons */}
-                <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 10, paddingVertical: 6, gap: 8, position: "relative", zIndex: 60 }}>
-                  <StandTouch onPress={() => switchNotesTarget("intakeNotes")}>
-                  <TouchableOpacity
+                <div className={styles.notesActionRow}>
+                  <StandTouch
+                    className={styles.notesTargetBtn}
+                    style={{ backgroundColor: sNotesTarget === "intakeNotes" ? C.orange : gray(0.08) }}
                     onPress={() => switchNotesTarget("intakeNotes")}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 8,
-                      paddingHorizontal: 24,
-                      paddingVertical: 10,
-                      borderRadius: 8,
-                      backgroundColor: sNotesTarget === "intakeNotes" ? C.orange : gray(0.08),
-                    }}
                   >
                     <Image_ icon={ICONS.editPencil} size={24} />
-                    <Text style={{ fontSize: 26, fontWeight: "600", color: sNotesTarget === "intakeNotes" ? C.textWhite : gray(0.5) }}>Intake</Text>
-                  </TouchableOpacity>
+                    <span className={styles.notesTargetText} style={{ color: sNotesTarget === "intakeNotes" ? C.textWhite : gray(0.5) }}>Intake</span>
                   </StandTouch>
-                  <StandTouch onPress={() => switchNotesTarget("receiptNotes")}>
-                  <TouchableOpacity
+                  <StandTouch
+                    className={styles.notesTargetBtn}
+                    style={{ backgroundColor: sNotesTarget === "receiptNotes" ? C.green : gray(0.08) }}
                     onPress={() => switchNotesTarget("receiptNotes")}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 8,
-                      paddingHorizontal: 24,
-                      paddingVertical: 10,
-                      borderRadius: 8,
-                      backgroundColor: sNotesTarget === "receiptNotes" ? C.green : gray(0.08),
-                    }}
                   >
                     <Image_ icon={ICONS.receipt} size={24} />
-                    <Text style={{ fontSize: 26, fontWeight: "600", color: sNotesTarget === "receiptNotes" ? C.textWhite : gray(0.5) }}>Receipt</Text>
-                  </TouchableOpacity>
+                    <span className={styles.notesTargetText} style={{ color: sNotesTarget === "receiptNotes" ? C.textWhite : gray(0.5) }}>Receipt</span>
                   </StandTouch>
-                  <Text style={{ fontSize: 26, color: gray(0.4) }}>
-                    Adding to <Text style={{ color: sNotesTarget === "intakeNotes" ? C.orange : C.green }}>{sNotesTarget === "intakeNotes" ? "Intake" : "Receipt"}</Text> notes
-                  </Text>
+                  <span className={styles.notesAddingLabel} style={{ color: gray(0.4) }}>
+                    Adding to <span style={{ color: sNotesTarget === "intakeNotes" ? C.orange : C.green }}>{sNotesTarget === "intakeNotes" ? "Intake" : "Receipt"}</span> notes
+                  </span>
 
-                  <View style={{ flex: 1 }} />
+                  <div className={styles.notesFlexSpacer} />
 
                   {/* Discount button */}
-                  <View style={{ position: "relative" }}>
-                    <StandTouch onPress={() => _setNotesDiscountOpen((p) => !p)}>
-                    <TouchableOpacity
+                  <div className={styles.notesDiscountWrap}>
+                    <StandTouch
+                      className={styles.notesActionBtn}
+                      style={{ backgroundColor: "rgb(103, 124, 231)" }}
                       onPress={() => _setNotesDiscountOpen((p) => !p)}
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        gap: 8,
-                        paddingVertical: 10,
-                        paddingHorizontal: 24,
-                        borderRadius: 8,
-                        backgroundColor: "rgb(103, 124, 231)",
-                      }}
                     >
                       <Image_ icon={ICONS.dollarYellow} size={32} />
-                      <Text style={{ fontSize: 26, fontWeight: "600", color: C.textWhite }}>Discount</Text>
-                    </TouchableOpacity>
+                      <span className={styles.notesActionBtnText} style={{ color: C.textWhite }}>Discount</span>
                     </StandTouch>
                     {sNotesDiscountOpen && (() => {
                       let currentLine = (selectedWorkorder?.workorderLines || []).find((ln) => ln.id === sIntakeNotesLineID);
                       let invItemID = currentLine?.inventoryItem?.id;
                       return (
                         <div
+                          className={styles.notesDiscountMenu}
                           onClick={(e) => e.stopPropagation()}
-                          style={{
-                            position: "absolute",
-                            bottom: "100%",
-                            right: 0,
-                            zIndex: 100,
-                            backgroundColor: "white",
-                            borderRadius: 6,
-                            border: "1px solid " + gray(0.2),
-                            boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                            minWidth: 160,
-                            overflow: "hidden",
-                            marginBottom: 4,
-                            whiteSpace: "nowrap",
-                          }}
+                          style={{ border: "1px solid " + gray(0.2) }}
                         >
-                          <StandTouch onPress={() => { handleDiscountSelect(invItemID, null); _setNotesDiscountOpen(false); }}>
-                          <div
-                            onClick={() => { handleDiscountSelect(invItemID, null); _setNotesDiscountOpen(false); }}
-                            style={{ padding: "9px 10px", cursor: "pointer", fontSize: 31, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
+                          <StandTouch
+                            className={styles.notesDiscountItem}
+                            style={{ borderBottom: "1px solid " + gray(0.1), color: C.text }}
+                            onPress={() => { handleDiscountSelect(invItemID, null); _setNotesDiscountOpen(false); }}
                           >
                             No Discount
-                          </div>
                           </StandTouch>
                           {(zSettings.discounts || [])
                             .filter((d) => d.type !== "$" || Number(d.value) <= (currentLine?.inventoryItem?.price || 0) * (currentLine?.qty || 1))
                             .map((d, dIdx) => (
-                            <StandTouch key={d.name + "-" + dIdx} onPress={() => { handleDiscountSelect(invItemID, d); _setNotesDiscountOpen(false); }}>
-                            <div
-                              onClick={() => { handleDiscountSelect(invItemID, d); _setNotesDiscountOpen(false); }}
-                              style={{ padding: "9px 10px", cursor: "pointer", fontSize: 31, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
+                            <StandTouch
+                              key={d.name + "-" + dIdx}
+                              className={styles.notesDiscountItem}
+                              style={{ borderBottom: "1px solid " + gray(0.1), color: C.text }}
+                              onPress={() => { handleDiscountSelect(invItemID, d); _setNotesDiscountOpen(false); }}
                             >
                               {d.name}
-                            </div>
                             </StandTouch>
                           ))}
                         </div>
                       );
                     })()}
-                  </View>
+                  </div>
 
                   {/* Split button */}
                   {(() => {
                     let currentLine = (selectedWorkorder?.workorderLines || []).find((ln) => ln.id === sIntakeNotesLineID);
                     let canSplit = (currentLine?.qty || 1) > 1;
                     return (
-                      <StandTouch onPress={() => {
-                          if (!canSplit) return;
-                          let lines = cloneDeep(selectedWorkorder.workorderLines);
-                          let idx = lines.findIndex((ln) => ln.id === sIntakeNotesLineID);
-                          if (idx === -1) return;
-                          let line = lines[idx];
-                          let num = line.qty;
-                          for (let i = 0; i < num; i++) {
-                            let newLine = cloneDeep(line);
-                            newLine.qty = 1;
-                            newLine.id = crypto.randomUUID();
-                            newLine.discountObj = null;
-                            if (i === 0) { lines[idx] = newLine; _setIntakeNotesLineID(newLine.id); }
-                            else lines.splice(idx + 1 + (i - 1), 0, newLine);
-                          }
-                          useOpenWorkordersStore.getState().setField("workorderLines", lines, sSelectedWorkorderID, true);
-                        }}>
-                      <TouchableOpacity
+                      <StandTouch
+                        className={styles.notesActionBtn}
+                        style={{ backgroundColor: C.blue, opacity: canSplit ? 1 : 0.4 }}
                         onPress={() => {
                           if (!canSplit) return;
                           let lines = cloneDeep(selectedWorkorder.workorderLines);
@@ -3558,26 +3398,14 @@ export function BikeStandScreen() {
                           }
                           useOpenWorkordersStore.getState().setField("workorderLines", lines, sSelectedWorkorderID, true);
                         }}
-                        disabled={!canSplit}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          gap: 8,
-                          paddingVertical: 10,
-                          paddingHorizontal: 24,
-                          borderRadius: 8,
-                          backgroundColor: C.blue,
-                          opacity: canSplit ? 1 : 0.4,
-                        }}
                       >
                         <Image_ icon={ICONS.axe} size={32} />
-                        <Text style={{ fontSize: 26, fontWeight: "600", color: C.textWhite }}>Split</Text>
-                      </TouchableOpacity>
+                        <span className={styles.notesActionBtnText} style={{ color: C.textWhite }}>Split</span>
                       </StandTouch>
                     );
                   })()}
 
-                </View>
+                </div>
                 {(() => {
                   let currentLine = (selectedWorkorder?.workorderLines || []).find((ln) => ln.id === sIntakeNotesLineID);
                   let dObj = currentLine?.discountObj;
@@ -3585,9 +3413,9 @@ export function BikeStandScreen() {
                     let label = dObj.name;
                     if (dObj.savings) label += " (-$" + formatCurrencyDisp(dObj.savings, false) + ")";
                     return (
-                      <View style={{ flexDirection: "row", justifyContent: "flex-end", paddingHorizontal: 10, paddingBottom: 4 }}>
-                        <Text style={{ fontSize: 22, color: "rgb(103, 124, 231)", fontWeight: "600" }}>{label}</Text>
-                      </View>
+                      <div className={styles.notesDiscountLabelRow}>
+                        <span className={styles.notesDiscountLabelText} style={{ color: "rgb(103, 124, 231)" }}>{label}</span>
+                      </div>
                     );
                   }
                   return null;
@@ -3596,8 +3424,10 @@ export function BikeStandScreen() {
                   let cursorPos = sNotesCursorPos != null ? Math.min(sNotesCursorPos, activeText.length) : activeText.length;
                   return (
                     <>
-                      <View style={{ flexDirection: "row", paddingHorizontal: 10, paddingBottom: 6, position: "relative", zIndex: 60 }}>
+                      <div className={styles.notesEditorRow}>
                         <div
+                          className={styles.notesEditorBox}
+                          style={{ borderColor: sNotesKeyboardOpen ? C.blue : C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
                           onClick={(e) => {
                             let range = document.caretRangeFromPoint(e.clientX, e.clientY);
                             if (range) {
@@ -3616,52 +3446,23 @@ export function BikeStandScreen() {
                             }
                             if (!sNotesKeyboardOpen) _setNotesKeyboardOpen(true);
                           }}
-                          style={{
-                            flex: 1,
-                            borderWidth: 2,
-                            borderColor: sNotesKeyboardOpen ? C.blue : C.buttonLightGreenOutline,
-                            borderRadius: 8,
-                            backgroundColor: C.listItemWhite,
-                            paddingVertical: 6,
-                            paddingHorizontal: 10,
-                            minHeight: 88,
-                            cursor: "text",
-                          }}
                         >
                           {activeText.length === 0 && cursorPos === 0 ? (
-                            <Text data-notes-text="true" style={{ fontSize: 26, color: C.text }}>
-                              <Text style={{ color: C.blue, fontSize: 52 }}>|</Text>
-                              <Text style={{ color: gray(0.35), fontStyle: "italic" }}>Tap here to type</Text>
-                            </Text>
+                            <span data-notes-text="true" className={styles.notesEditorText} style={{ color: C.text }}>
+                              <span className={styles.notesEditorCaret} style={{ color: C.blue }}>|</span>
+                              <span className={styles.notesEditorPlaceholder} style={{ color: gray(0.35) }}>Tap here to type</span>
+                            </span>
                           ) : (
-                            <Text data-notes-text="true" style={{ fontSize: 26, color: C.text }}>
-                              {activeText.slice(0, cursorPos)}<Text style={{ color: C.blue, fontSize: 52 }}>|</Text>{activeText.slice(cursorPos)}
-                            </Text>
+                            <span data-notes-text="true" className={styles.notesEditorText} style={{ color: C.text }}>
+                              {activeText.slice(0, cursorPos)}<span className={styles.notesEditorCaret} style={{ color: C.blue }}>|</span>{activeText.slice(cursorPos)}
+                            </span>
                           )}
                         </div>
-                        {/* {sNotesKeyboardOpen ? (
-                          <TouchableOpacity
-                            onPress={() => _setNotesKeyboardOpen(false)}
-                            style={{
-                              marginLeft: 8,
-                              paddingHorizontal: 24,
-                              borderRadius: 8,
-                              backgroundColor: lightenRGBByPercent(C.red, 80),
-                              alignItems: "center",
-                              justifyContent: "center",
-                              alignSelf: "stretch",
-                            }}
-                          >
-                            <Text style={{ fontSize: 32, color: C.red, fontWeight: "600" }}>▼ HIDE</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={{ marginLeft: 8, paddingHorizontal: 24 }} />
-                        )} */}
-                      </View>
+                      </div>
 
                       {/* Keypad — collapsible */}
                       {sNotesKeyboardOpen && (
-                        <View style={{ paddingHorizontal: 10, paddingBottom: 6, position: "relative", zIndex: 60 }}>
+                        <div className={styles.notesKeypadWrap}>
                           <StandKeypad mode="alpha" showNumberRow={true} onKeyPress={(key) => {
                             let pos = sNotesCursorPos != null ? Math.min(sNotesCursorPos, activeText.length) : activeText.length;
                             if (key === "CLR") { activeSetText(""); _setNotesCursorPos(0); return; }
@@ -3679,15 +3480,15 @@ export function BikeStandScreen() {
                             activeSetText(activeText.slice(0, pos) + char + activeText.slice(pos));
                             _setNotesCursorPos(pos + 1);
                           }} />
-                        </View>
+                        </div>
                       )}
                     </>
                   );
                 })()}
 
                 {/* Qty arrows + Close button */}
-                <View style={{ paddingHorizontal: 10, paddingBottom: 10, flexDirection: "row", alignItems: "stretch", gap: 8, position: "relative", zIndex: 60 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+                <div className={styles.notesFooterRow}>
+                  <div className={styles.notesQtyGroup}>
                     <Button_
                       enabled={sNotesQty > 0}
                       onPress={() => _setNotesQty((q) => Math.max(0, q - 1))}
@@ -3695,28 +3496,18 @@ export function BikeStandScreen() {
                       icon={ICONS.downArrowOrange}
                       iconSize={96}
                     />
-                    <Text style={{ fontSize: 48, fontWeight: "700", color: sNotesQty === 0 ? C.red : C.text, minWidth: 60, textAlign: "center" }}>{sNotesQty}</Text>
+                    <span className={styles.notesQtyValue} style={{ color: sNotesQty === 0 ? C.red : C.text }}>{sNotesQty}</span>
                     <Button_
                       onPress={() => _setNotesQty((q) => q + 1)}
                       buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 3 }}
                       icon={ICONS.upArrowOrange}
                       iconSize={96}
                     />
-                  </View>
-                  <View style={{ width: 20 }} />
-                  <StandTouch style={{ flex: 1, display: "flex" }} onPress={() => {
-                      if (sNotesQty <= 0) {
-                        let updatedLines = (selectedWorkorder?.workorderLines || []).filter((ln) => ln.id !== sIntakeNotesLineID);
-                        useOpenWorkordersStore.getState().setField("workorderLines", updatedLines, sSelectedWorkorderID, true);
-                      } else {
-                        let updatedLines = (selectedWorkorder?.workorderLines || []).map((ln) =>
-                          ln.id === sIntakeNotesLineID ? { ...ln, intakeNotes: sIntakeNotesText, receiptNotes: sReceiptNotesText, qty: sNotesQty } : ln
-                        );
-                        useOpenWorkordersStore.getState().setField("workorderLines", updatedLines, sSelectedWorkorderID, true);
-                      }
-                      _setIntakeNotesLineID(null);
-                    }}>
-                  <TouchableOpacity
+                  </div>
+                  <div className={styles.notesQtySpacer} />
+                  <StandTouch
+                    className={styles.notesCloseBtn}
+                    style={{ backgroundColor: sNotesQty <= 0 ? C.red : C.green }}
                     onPress={() => {
                       if (sNotesQty <= 0) {
                         let updatedLines = (selectedWorkorder?.workorderLines || []).filter((ln) => ln.id !== sIntakeNotesLineID);
@@ -3729,23 +3520,14 @@ export function BikeStandScreen() {
                       }
                       _setIntakeNotesLineID(null);
                     }}
-                    style={{
-                      flex: 1,
-                      borderRadius: 8,
-                      backgroundColor: sNotesQty <= 0 ? C.red : C.green,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
                   >
-                    <Text style={{ fontSize: 28, fontWeight: "600", color: C.textWhite }}>
+                    <span className={styles.notesCloseBtnText} style={{ color: C.textWhite }}>
                       {sNotesQty <= 0 ? "REMOVE" : "CLOSE"}
-                    </Text>
-                  </TouchableOpacity>
+                    </span>
                   </StandTouch>
-                </View>
+                </div>
 
               </div>
-            </div>
             </StandTouch>
             );
           })()}

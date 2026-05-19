@@ -2044,3 +2044,427 @@
   font-size: 22px;
   font-weight: 700;
 }
+
+/* ── Phase 3g: Printer Modal ── */
+
+.printerBackdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.printerDialog {
+  border-radius: 14px;
+  width: 75%;
+  max-height: 85%;
+  overflow: hidden;
+}
+
+.printerScroll {
+  padding: 16px 20px;
+  overflow-y: auto;
+  max-height: 100%;
+  box-sizing: border-box;
+}
+
+.printerSectionLabel {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+
+.printerSectionLabelTop {
+  margin-top: 30px;
+}
+
+.printerIntakeCard {
+  border-radius: 10px;
+  border-width: 1px;
+  border-style: solid;
+  padding: 14px;
+  margin-bottom: 20px;
+}
+
+.printerIntakeRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.printerIntakeLeft {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 15px;
+}
+
+.printerIntakeSent {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.printerWorkorderBlock {
+  margin-top: 20px;
+  margin-bottom: 40px;
+}
+
+.printerEmpty {
+  font-size: 16px;
+  padding: 20px 0;
+  text-align: center;
+}
+
+.printerCard {
+  border-radius: 10px;
+  border-width: 1px;
+  border-style: solid;
+  padding: 12px;
+}
+
+.printerOfflineWrap {
+  margin-bottom: 6px;
+}
+
+.printerOfflineBadge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+.printerHeaderRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.printerHeaderInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.printerName {
+  font-size: 17px;
+}
+
+.printerSubname {
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.printerActionRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 8px;
+  justify-content: space-between;
+}
+
+.printerSpacer16 {
+  height: 16px;
+}
+
+/* ── Phase 3g: Intake Notes Modal ── */
+
+.notesBackdrop {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notesDialog {
+  width: 95%;
+  height: 98%;
+  background-color: rgba(255, 255, 255, 0.97);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.notesHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 10px;
+  cursor: pointer;
+}
+
+.notesHeaderTitle {
+  font-size: 25px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notesFontGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.notesFontLabel {
+  font-size: 18px;
+  font-style: italic;
+}
+
+.notesFontBtn {
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.notesHeaderHint {
+  font-size: 21px;
+  font-style: italic;
+}
+
+.notesKeyboardOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+}
+
+.notesCategoryScroll {
+  flex: 1;
+  padding: 8px 10px 0 10px;
+  overflow-y: auto;
+}
+
+.notesCategoryRow {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.notesCategoryCol {
+  flex: 1;
+}
+
+.notesCategoryColLeft {
+  padding-right: 8px;
+}
+
+.notesCategoryColRight {
+  padding-left: 8px;
+}
+
+.notesCategoryDivider {
+  width: 1px;
+  align-self: stretch;
+}
+
+.notesCategoryCard {
+  margin-bottom: 10px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.notesCategoryLabel {
+  font-weight: 700;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.notesChipRow {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.notesChip {
+  border-radius: 5px;
+  padding: 12px;
+  border-width: 1px;
+  border-style: solid;
+  cursor: pointer;
+}
+
+.notesChipText {
+  /* font-size set inline */
+}
+
+.notesActionRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6px 10px;
+  gap: 8px;
+  position: relative;
+  z-index: 60;
+}
+
+.notesTargetBtn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border-radius: 8px;
+}
+
+.notesTargetText {
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.notesAddingLabel {
+  font-size: 26px;
+}
+
+.notesFlexSpacer {
+  flex: 1;
+}
+
+.notesDiscountWrap {
+  position: relative;
+}
+
+.notesActionBtn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 24px;
+  border-radius: 8px;
+}
+
+.notesActionBtnText {
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.notesDiscountMenu {
+  position: absolute;
+  bottom: 100%;
+  right: 0;
+  z-index: 100;
+  background-color: white;
+  border-radius: 6px;
+  border: 1px solid;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  min-width: 160px;
+  overflow: hidden;
+  margin-bottom: 4px;
+  white-space: nowrap;
+}
+
+.notesDiscountItem {
+  padding: 9px 10px;
+  cursor: pointer;
+  font-size: 31px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+}
+
+.notesDiscountLabelRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  padding: 0 10px 4px 10px;
+}
+
+.notesDiscountLabelText {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.notesEditorRow {
+  display: flex;
+  flex-direction: row;
+  padding: 0 10px 6px 10px;
+  position: relative;
+  z-index: 60;
+}
+
+.notesEditorBox {
+  flex: 1;
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 8px;
+  padding: 6px 10px;
+  min-height: 88px;
+  cursor: text;
+}
+
+.notesEditorText {
+  font-size: 26px;
+}
+
+.notesEditorPlaceholder {
+  font-style: italic;
+}
+
+.notesEditorCaret {
+  font-size: 52px;
+}
+
+.notesKeypadWrap {
+  padding: 0 10px 6px 10px;
+  position: relative;
+  z-index: 60;
+}
+
+.notesFooterRow {
+  padding: 0 10px 10px 10px;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 8px;
+  position: relative;
+  z-index: 60;
+}
+
+.notesQtyGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.notesQtyValue {
+  font-size: 48px;
+  font-weight: 700;
+  min-width: 60px;
+  text-align: center;
+}
+
+.notesQtySpacer {
+  width: 20px;
+}
+
+.notesCloseBtn {
+  flex: 1;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.notesCloseBtnText {
+  font-size: 28px;
+  font-weight: 600;
+}

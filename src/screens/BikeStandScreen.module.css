@@ -1445,3 +1445,222 @@
   font-size: 64px;
   font-weight: 700;
 }
+
+/* ── Bike Info Modal (Phase 3c) ── */
+.bmBackdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 8999;
+}
+
+.bmDialog {
+  width: 95%;
+  height: 95%;
+  background-color: rgba(255, 255, 255, 0.97);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.bmHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 20px 12px 20px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+}
+
+.bmHeaderInfo {
+  display: flex;
+  flex-direction: column;
+}
+
+.bmHeaderName {
+  font-size: 36px;
+  font-weight: 700;
+}
+
+.bmHeaderPhone {
+  font-size: 28px;
+  margin-top: 4px;
+}
+
+.bmCancelBtn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-radius: 10px;
+  padding: 10px 18px;
+  gap: 8px;
+}
+
+.bmCancelText {
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.bmScroll {
+  flex: 1;
+  padding: 16px 20px 0 20px;
+  overflow-y: auto;
+  overflow-x: visible;
+}
+
+.bmFieldLabel {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.bmFieldRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 20px;
+  overflow: visible;
+}
+
+.bmFieldHalf {
+  width: 50%;
+  position: relative;
+  overflow: visible;
+  flex-shrink: 0;
+}
+
+.bmFieldHalfRight {
+  width: 50%;
+  display: flex;
+  flex-direction: row;
+  padding-left: 8px;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.bmDropdownSlot {
+  width: 48%;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.bmSuggestionList {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 5px;
+  max-height: 600px;
+  overflow: auto;
+  z-index: 999;
+}
+
+.bmSuggestionRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 18px 24px;
+}
+
+.bmSuggestionItem {
+  flex: 1;
+  cursor: pointer;
+}
+
+.bmSuggestionItemText {
+  font-size: 42px;
+}
+
+.bmSuggestionRemove {
+  padding-left: 24px;
+  cursor: pointer;
+}
+
+.bmSuggestionRemoveText {
+  font-size: 36px;
+}
+
+.bmWaitRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.bmWaitLeft {
+  width: 50%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.bmWaitDaysLabel {
+  font-size: 28px;
+  margin-right: 8px;
+}
+
+.bmWaitDropdownSlot {
+  width: 50%;
+  padding-left: 8px;
+  flex-shrink: 0;
+}
+
+.bmWaitEstimate {
+  font-size: 24px;
+  font-style: italic;
+  margin-bottom: 12px;
+}
+
+.bmKeypadWrap {
+  margin-top: 8px;
+  margin-bottom: 16px;
+}
+
+.bmKeypadCloseRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  margin-top: 6px;
+  padding: 0 4px;
+}
+
+.bmKeypadCloseBtn {
+  padding: 4px;
+}
+
+.bmFooter {
+  padding: 16px 20px;
+  border-top-width: 1px;
+  border-top-style: solid;
+  flex-shrink: 0;
+}
+
+.bmAddItemsBtn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  padding: 20px 0;
+  gap: 12px;
+}
+
+.bmAddItemsText {
+  font-size: 36px;
+  font-weight: 700;
+}

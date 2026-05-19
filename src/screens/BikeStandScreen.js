@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { View, Text, ScrollView, TouchableOpacity, TextInput } from "react-native-web";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import cloneDeep from "lodash/cloneDeep";
 import * as faceapi from "face-api.js";
@@ -82,22 +82,25 @@ import { MILLIS_IN_DAY, DISCOUNT_TYPES, FACE_DESCRIPTOR_CONFIDENCE_DISTANCE, bui
 import { openCacheDB, clearStaleCache, loadModelCached } from "../faceDetection";
 import warningIcon from "../assets/webp/warning.webp";
 import plusIcon from "../assets/webp/plus.webp";
+import styles from "./BikeStandScreen.module.css";
 
 const DROPDOWN_SELECTED_OPACITY = 0.3;
 
 let _standTouchFired = false;
-function StandTouch({ onPress, children, style, touchStart = true }) {
-  if (!touchStart) return <div onClick={() => onPress?.()} style={style}>{children}</div>;
+const StandTouch = forwardRef(function StandTouch({ onPress, children, style, className, touchStart = true }, ref) {
+  if (!touchStart) return <div ref={ref} onClick={() => onPress?.()} style={style} className={className}>{children}</div>;
   return (
     <div
+      ref={ref}
       onTouchStartCapture={(e) => { e.preventDefault(); e.stopPropagation(); _standTouchFired = true; onPress?.(); }}
       onClickCapture={(e) => { if (_standTouchFired) { _standTouchFired = false; e.stopPropagation(); } }}
       style={style}
+      className={className}
     >
       {children}
     </div>
   );
-}
+});
 
 function getQuickButtonFontSize(text, baseFontSize) {
   let len = (text || "").length;
@@ -2020,66 +2023,23 @@ export function BikeStandScreen() {
 
       {/* Stand settings modal */}
       {sShowStandSettings && (
-        <View
-          style={{
-            position: "absolute",
-            top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: Z.modal,
-          }}
-        >
-          <View
-            style={{
-              width: "70%",
-              maxWidth: 500,
-              backgroundColor: "white",
-              borderRadius: 14,
-              overflow: "hidden",
-            }}
-          >
+        <div className={styles.standModalBackdrop} style={{ zIndex: Z.modal }}>
+          <div className={styles.standSettingsDialog}>
             <StandTouch touchStart={false} onPress={() => _setShowStandSettings(false)}>
-            <View
-              onClick={() => _setShowStandSettings(false)}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingHorizontal: 20,
-                paddingVertical: 18,
-                borderBottomWidth: 1,
-                borderBottomColor: gray(0.1),
-                cursor: "pointer",
-              }}
-            >
-              <Text style={{ fontSize: 22, fontWeight: "600", color: C.text }}>Stand Settings</Text>
-              <Text style={{ flex: 1, fontSize: 18, fontStyle: "italic", color: gray(0.35), textAlign: "center" }}>Tap to close</Text>
-            </View>
+              <div className={styles.standSettingsHeader} style={{ borderBottomColor: gray(0.1) }}>
+                <span className={styles.standSettingsHeaderTitle} style={{ color: C.text }}>Stand Settings</span>
+                <span className={styles.standSettingsHeaderHint} style={{ color: gray(0.35) }}>Tap to close</span>
+              </div>
             </StandTouch>
-            <View style={{ paddingHorizontal: 20, paddingVertical: 20 }}>
-              <Text style={{ fontSize: 14, fontWeight: "600", color: gray(0.4), marginBottom: 12, letterSpacing: 1 }}>LOGIN</Text>
+            <div className={styles.standSettingsBody}>
+              <div className={styles.standSettingsSectionLabel} style={{ color: gray(0.4) }}>LOGIN</div>
               <StandTouch onPress={() => {
                   let next = !sBypassFaceRecognition;
                   _setBypassFaceRecognition(next);
                   localStorageWrapper.setItem("standBypassFaceRecognition", String(next));
-                }}>
-              <TouchableOpacity
-                onPress={() => {
-                  let next = !sBypassFaceRecognition;
-                  _setBypassFaceRecognition(next);
-                  localStorageWrapper.setItem("standBypassFaceRecognition", String(next));
                 }}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 12,
-                  paddingVertical: 12,
-                  paddingHorizontal: 14,
-                  borderRadius: 10,
-                  borderWidth: 2,
-                  borderColor: C.buttonLightGreenOutline,
-                  backgroundColor: C.listItemWhite,
-                }}
+                className={styles.standSettingsToggleRow}
+                style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
               >
                 <CheckBox
                   isChecked={sBypassFaceRecognition}
@@ -2089,71 +2049,39 @@ export function BikeStandScreen() {
                     localStorageWrapper.setItem("standBypassFaceRecognition", String(next));
                   }}
                 />
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 18, fontWeight: "500", color: C.text }}>Bypass facial recognition</Text>
-                  <Text style={{ fontSize: 14, color: gray(0.45), marginTop: 2 }}>Skip face scan and go straight to PIN entry on this device</Text>
-                </View>
-              </TouchableOpacity>
+                <div className={styles.standSettingsToggleTextCol}>
+                  <span className={styles.standSettingsToggleTitle} style={{ color: C.text }}>Bypass facial recognition</span>
+                  <span className={styles.standSettingsToggleSubtitle} style={{ color: gray(0.45) }}>Skip face scan and go straight to PIN entry on this device</span>
+                </div>
               </StandTouch>
-            </View>
-          </View>
-        </View>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Face recognition modal */}
       {sShowFaceModal && (
-        <View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.6)",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 200,
-          }}
-        >
-          <View
-            style={{
-              alignItems: "center",
-              paddingHorizontal: 40,
-              paddingVertical: 30,
-              backgroundColor: "white",
-              borderRadius: 16,
-            }}
-          >
+        <div className={styles.standModalBackdropStrong} style={{ zIndex: 200 }}>
+          <div className={styles.standFaceDialog}>
             <SmallLoadingIndicator />
-            <Text style={{ fontSize: 22, fontWeight: "600", color: C.text, marginTop: 12 }}>
+            <span className={styles.standFaceTitle} style={{ color: C.text }}>
               Scanning face...
-            </Text>
-            <Text style={{ fontSize: 52, fontWeight: "700", color: C.green, marginTop: 16 }}>
+            </span>
+            <span className={styles.standFaceCountdown} style={{ color: C.green }}>
               {sFaceCountdown}
-            </Text>
-            <StandTouch onPress={() => {
-                stopFaceLogin();
-                _setShowFaceModal(false);
-                _setShowPinModal(true);
-              }}>
-            <TouchableOpacity
+            </span>
+            <StandTouch
               onPress={() => {
                 stopFaceLogin();
                 _setShowFaceModal(false);
                 _setShowPinModal(true);
               }}
-              style={{
-                marginTop: 20,
-                paddingVertical: 12,
-                paddingHorizontal: 28,
-                borderRadius: 8,
-                backgroundColor: gray(0.15),
-              }}
+              className={styles.standFacePinBtn}
+              style={{ backgroundColor: gray(0.15) }}
             >
-              <Text style={{ fontSize: 18, fontWeight: "600", color: C.text }}>Use PIN</Text>
-            </TouchableOpacity>
+              <span className={styles.standFacePinBtnText} style={{ color: C.text }}>Use PIN</span>
             </StandTouch>
-          </View>
+          </div>
           <video
             ref={faceVideoRef}
             width={0}
@@ -2163,102 +2091,69 @@ export function BikeStandScreen() {
             onLoadedMetadata={(e) => e.target.play()}
             style={{ position: "absolute", opacity: 0 }}
           />
-        </View>
+        </div>
       )}
 
       {/* Pin login modal */}
       {sShowPinModal && (
-        <View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.6)",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 200,
-          }}
-        >
-          <View
-            style={{
-              alignItems: "center",
-              paddingHorizontal: 40,
-              paddingVertical: 30,
-              backgroundColor: "white",
-              borderRadius: 16,
-              minWidth: 280,
-            }}
-          >
-            <Text style={{ fontSize: 35, fontWeight: "600", color: C.text, marginBottom: 20 }}>
+        <div className={styles.standModalBackdropStrong} style={{ zIndex: 200 }}>
+          <div className={styles.standPinDialog}>
+            <span className={styles.standPinTitle} style={{ color: C.text }}>
               Enter PIN
-            </Text>
-            <View style={{ flexDirection: "row", marginBottom: 20, alignItems: "center" }}>
+            </span>
+            <div className={styles.standPinDotRow}>
               {Array.from({ length: zSettings?.userPinStrength || 4 }).map((_, i) => {
                 const isFilled = i < sPin.length;
                 const isCursor = i === sPin.length;
                 return (
-                  <View
+                  <div
                     key={i}
+                    className={styles.standPinDot}
                     style={{
-                      width: 44,
-                      height: 52,
-                      borderWidth: 2,
                       borderColor: isCursor ? C.cursorRed : isFilled ? "#007bff" : "#ddd",
-                      borderRadius: 8,
-                      marginHorizontal: 4,
-                      justifyContent: "center",
-                      alignItems: "center",
                       backgroundColor: isCursor ? C.cursorRed : isFilled ? "#fff" : "#f8f9fa",
                       boxShadow: isCursor ? "0 0 10px rgba(255, 107, 107, 0.5)" : "none",
                     }}
                   >
                     {isFilled && (
-                      <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: C.text }} />
+                      <div className={styles.standPinDotFilled} style={{ backgroundColor: C.text }} />
                     )}
-                  </View>
+                  </div>
                 );
               })}
-            </View>
+            </div>
             <StandKeypad mode="phone" onKeyPress={handleStandPinKeyPress} fontSizeAdj={7} paddingAdj={42} />
-            <StandTouch onPress={() => { _setShowPinModal(false); _setPin(""); pendingActionRef.current = null; }}>
-            <TouchableOpacity
+            <StandTouch
               onPress={() => { _setShowPinModal(false); _setPin(""); pendingActionRef.current = null; }}
-              style={{ marginTop: 16 }}
+              className={styles.standPinCancel}
             >
-              <Text style={{ fontSize: 31, color: gray(0.5) }}>Cancel</Text>
-            </TouchableOpacity>
+              <span className={styles.standPinCancelText} style={{ color: gray(0.5) }}>Cancel</span>
             </StandTouch>
-          </View>
-        </View>
+          </div>
+        </div>
       )}
 
       {sViewMode === "buttons" ? (
-        <View style={{ flex: 1 }}>
+        <div className={styles.bvOuter}>
           {/* ── Header: "Add Customer" button when no WO/pending, full header when ready ── */}
           {!hasWorkorderReady ? (
-            <View style={{ width: "100%", height: 1 }} />
+            <div className={styles.bvSpacer1} />
           ) : (
-            <View>
+            <div>
               {/* Header row: customer info + status + show/hide toggle */}
-              <StandTouch onPress={() => { _setShowBikeInfoModal(true); }}>
-              <View
-                onClick={() => { _setShowBikeInfoModal(true); }}
-                style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 18, paddingTop: 20, paddingBottom: 14, cursor: "pointer" }}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
-                  <Text style={{ fontSize: 27, fontWeight: "600", color: C.text }}>
+              <StandTouch onPress={() => { _setShowBikeInfoModal(true); }} className={styles.bvHeader}>
+                <div className={styles.bvHeaderLeft}>
+                  <span className={styles.bvHeaderName} style={{ color: C.text }}>
                     {customerName || "Standalone Sale"}
-                  </Text>
+                  </span>
                   {customerCell ? (
-                    <Text style={{ fontSize: 24, color: gray(0.5) }}>
+                    <span className={styles.bvHeaderPhone} style={{ color: gray(0.5) }}>
                       {formatPhoneWithDashes(customerCell)}
-                    </Text>
+                    </span>
                   ) : null}
-                </View>
+                </div>
                 {selectedWorkorder && (
-                  <View onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
+                  <div className={styles.bvStatusWrap} onClick={(e) => e.stopPropagation()} onTouchStart={(e) => e.stopPropagation()}>
                     <StatusPickerModal
                       statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned && !s.hidden)}
                       enabled={true}
@@ -2281,34 +2176,32 @@ export function BikeStandScreen() {
                       itemHeight={69}
                       itemTextStyle={{ fontSize: 23 }}
                     />
-                  </View>
+                  </div>
                 )}
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 9, marginRight: 15 }}>
+                <div className={styles.bvHeaderRight}>
                   {selectedWorkorder?.brand ? (
-                    <Text style={{ fontSize: 26, fontWeight: "600", color: gray(0.5) }}>
+                    <span className={styles.bvHeaderBrand} style={{ color: gray(0.5) }}>
                       {capitalizeFirstLetterOfString(selectedWorkorder.brand)}
-                    </Text>
+                    </span>
                   ) : null}
                   {selectedWorkorder?.description ? (
-                    <Text style={{ fontSize: 26, fontWeight: "600", color: gray(0.5) }}>
+                    <span className={styles.bvHeaderDescription} style={{ color: gray(0.5) }}>
                       {capitalizeFirstLetterOfString(selectedWorkorder.description)}
-                    </Text>
+                    </span>
                   ) : null}
                   <Image_ icon={ICONS.info} size={39} />
-                  <Text style={{ fontSize: 27, fontStyle: "italic", color: gray(0.35) }}>Tap for workorder info</Text>
-                </View>
-              </View>
+                  <span className={styles.bvHeaderHint} style={{ color: gray(0.35) }}>Tap for workorder info</span>
+                </div>
               </StandTouch>
 
               {/* Collapsible bike details panel */}
               {sShowBikeDetails && selectedWorkorder && (
-                <View style={{ paddingHorizontal: 12, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: gray(0.15) }}>
+                <div className={styles.bvDetailsPanel} style={{ borderBottomColor: gray(0.15) }}>
 
                   {/* Brand row */}
-                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                    <StandTouch onPress={() => activateDetailField("brand")}>
-                    <TouchableOpacity onPress={() => activateDetailField("brand")} style={{ width: "50%" }}>
-                      <View pointerEvents="none">
+                  <div className={styles.bvFieldRow}>
+                    <StandTouch onPress={() => activateDetailField("brand")} className={styles.bvFieldHalf}>
+                      <div style={{ pointerEvents: "none" }}>
                         <TextInput_
                           placeholder={"Brand"}
                           editable={false}
@@ -2327,11 +2220,10 @@ export function BikeStandScreen() {
                           }}
                           value={sDetailField === "brand" ? capitalizeFirstLetterOfString(sDetailForm.brand) : capitalizeFirstLetterOfString(selectedWorkorder?.brand)}
                         />
-                      </View>
-                    </TouchableOpacity>
+                      </div>
                     </StandTouch>
-                    <View style={{ width: "50%", flexDirection: "row", paddingLeft: 5, justifyContent: "space-between", alignItems: "center" }}>
-                      <View style={{ width: "48%", height: "100%" }}>
+                    <div className={styles.bvFieldHalfRow}>
+                      <div className={styles.bvFieldDropdownSlot48}>
                         <DropdownMenu
                           dataArr={zSettings.bikeBrands}
                           enabled={true}
@@ -2346,9 +2238,9 @@ export function BikeStandScreen() {
                           ref={bikeBrandsRef}
                           buttonText={zSettings.bikeBrandsName}
                         />
-                      </View>
-                      <View style={{ width: 5 }} />
-                      <View style={{ width: "48%", justifyContent: "center" }}>
+                      </div>
+                      <div className={styles.bvFieldGap5} />
+                      <div className={styles.bvFieldDropdownSlot48}>
                         <DropdownMenu
                           dataArr={zSettings.bikeOptionalBrands}
                           enabled={true}
@@ -2363,15 +2255,14 @@ export function BikeStandScreen() {
                           ref={bikeOptBrandsRef}
                           buttonText={zSettings.bikeOptionalBrandsName}
                         />
-                      </View>
-                    </View>
-                  </View>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Description row */}
-                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                    <StandTouch onPress={() => activateDetailField("description")}>
-                    <TouchableOpacity onPress={() => activateDetailField("description")} style={{ width: "50%" }}>
-                      <View pointerEvents="none">
+                  <div className={styles.bvFieldRow}>
+                    <StandTouch onPress={() => activateDetailField("description")} className={styles.bvFieldHalf}>
+                      <div style={{ pointerEvents: "none" }}>
                         <TextInput_
                           placeholder={"Model/Description"}
                           editable={false}
@@ -2390,11 +2281,10 @@ export function BikeStandScreen() {
                           }}
                           value={sDetailField === "description" ? capitalizeFirstLetterOfString(sDetailForm.description) : capitalizeFirstLetterOfString(selectedWorkorder?.description)}
                         />
-                      </View>
-                    </TouchableOpacity>
+                      </div>
                     </StandTouch>
-                    <View style={{ width: "50%", flexDirection: "row", paddingLeft: 5, justifyContent: "center", alignItems: "center" }}>
-                      <View style={{ width: "100%" }}>
+                    <div className={styles.bvFieldHalfRowCenter}>
+                      <div className={styles.bvFieldDropdownSlotFull}>
                         <DropdownMenu
                           modalCoordX={55}
                           dataArr={zSettings.bikeDescriptions}
@@ -2409,16 +2299,15 @@ export function BikeStandScreen() {
                           ref={descriptionRef}
                           buttonText={"Descriptions"}
                         />
-                      </View>
-                    </View>
-                  </View>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Color row */}
-                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-                    <View style={{ width: "50%", flexDirection: "row", alignItems: "center" }}>
-                      <StandTouch onPress={() => activateDetailField("color1")}>
-                      <TouchableOpacity onPress={() => activateDetailField("color1")} style={{ width: "48%" }}>
-                        <View pointerEvents="none">
+                  <div className={styles.bvFieldRow}>
+                    <div className={styles.bvColorHalf}>
+                      <StandTouch onPress={() => activateDetailField("color1")} className={styles.bvColorInput48}>
+                        <div style={{ pointerEvents: "none" }}>
                           <TextInput_
                             placeholder={"Color 1"}
                             editable={false}
@@ -2437,13 +2326,11 @@ export function BikeStandScreen() {
                             }}
                             value={sDetailField === "color1" ? capitalizeFirstLetterOfString(sDetailForm.color1) : capitalizeFirstLetterOfString(selectedWorkorder?.color1?.label)}
                           />
-                        </View>
-                      </TouchableOpacity>
+                        </div>
                       </StandTouch>
-                      <View style={{ width: "4%" }} />
-                      <StandTouch onPress={() => activateDetailField("color2")}>
-                      <TouchableOpacity onPress={() => activateDetailField("color2")} style={{ width: "48%" }}>
-                        <View pointerEvents="none">
+                      <div className={styles.bvFieldGap4pct} />
+                      <StandTouch onPress={() => activateDetailField("color2")} className={styles.bvColorInput48}>
+                        <div style={{ pointerEvents: "none" }}>
                           <TextInput_
                             placeholder={"Color 2"}
                             editable={false}
@@ -2462,12 +2349,11 @@ export function BikeStandScreen() {
                             }}
                             value={sDetailField === "color2" ? capitalizeFirstLetterOfString(sDetailForm.color2) : capitalizeFirstLetterOfString(selectedWorkorder?.color2?.label)}
                           />
-                        </View>
-                      </TouchableOpacity>
+                        </div>
                       </StandTouch>
-                    </View>
-                    <View style={{ width: "50%", flexDirection: "row", paddingLeft: 5, alignItems: "center", justifyContent: "space-between" }}>
-                      <View style={{ width: "48%", height: "100%", justifyContent: "center" }}>
+                    </div>
+                    <div className={styles.bvFieldHalfRow}>
+                      <div className={styles.bvFieldDropdownSlot48}>
                         <DropdownMenu
                           itemSeparatorStyle={{ height: 0 }}
                           dataArr={COLORS}
@@ -2486,9 +2372,9 @@ export function BikeStandScreen() {
                           buttonText={"Color 1"}
                           modalCoordX={0}
                         />
-                      </View>
-                      <View style={{ width: 5 }} />
-                      <View style={{ width: "48%", height: "100%", justifyContent: "center" }}>
+                      </div>
+                      <div className={styles.bvFieldGap5} />
+                      <div className={styles.bvFieldDropdownSlot48}>
                         <DropdownMenu
                           itemSeparatorStyle={{ height: 0 }}
                           dataArr={COLORS}
@@ -2506,19 +2392,18 @@ export function BikeStandScreen() {
                           ref={color2Ref}
                           buttonText={"Color 2"}
                         />
-                      </View>
-                    </View>
-                  </View>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Wait time row */}
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <View style={{ width: "50%", flexDirection: "row", alignItems: "center" }}>
-                      <Text style={{ color: gray(0.5), fontSize: 18, marginRight: 4 }}>
+                  <div className={styles.bvFieldRowTight}>
+                    <div className={styles.bvWaitHalf}>
+                      <span className={styles.bvWaitLabel} style={{ color: gray(0.5) }}>
                         Max wait days:
-                      </Text>
+                      </span>
                       <StandTouch onPress={() => activateDetailField("waitDays")}>
-                      <TouchableOpacity onPress={() => activateDetailField("waitDays")}>
-                        <View pointerEvents="none">
+                        <div style={{ pointerEvents: "none" }}>
                           <TextInput_
                             placeholder={"0"}
                             editable={false}
@@ -2538,25 +2423,9 @@ export function BikeStandScreen() {
                             }}
                             value={sDetailField === "waitDays" ? sDetailForm.waitDays : String(selectedWorkorder?.waitTime?.maxWaitTimeDays ?? "")}
                           />
-                        </View>
-                      </TouchableOpacity>
+                        </div>
                       </StandTouch>
-                      <StandTouch onPress={() => {
-                          let current = Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) || 0;
-                          if (current <= 1) return;
-                          let newDays = current - 1;
-                          let woID = selectedWorkorder.id;
-                          let allWaits = (zSettings.waitTimes || []).filter((w) => w.maxWaitTimeDays > 0);
-                          let match = allWaits.reduce((best, w) => (!best || Math.abs(w.maxWaitTimeDays - newDays) < Math.abs(best.maxWaitTimeDays - newDays)) ? w : best, null);
-                          let waitObj = match ? { ...match, maxWaitTimeDays: newDays } : { ...(selectedWorkorder?.waitTime || {}), maxWaitTimeDays: newDays };
-                          useOpenWorkordersStore.getState().setField("waitTime", waitObj, woID, false);
-                          clearTimeout(waitDaysDebounceRef.current);
-                          waitDaysDebounceRef.current = setTimeout(() => {
-                            let wo = useOpenWorkordersStore.getState().getWorkorders().find((w) => w.id === woID);
-                            if (wo) useOpenWorkordersStore.getState().setField("waitTime", wo.waitTime, woID, true);
-                          }, 500);
-                      }}>
-                      <TouchableOpacity
+                      <StandTouch
                         onPress={() => {
                           let current = Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) || 0;
                           if (current <= 1) return;
@@ -2572,27 +2441,12 @@ export function BikeStandScreen() {
                             if (wo) useOpenWorkordersStore.getState().setField("waitTime", wo.waitTime, woID, true);
                           }, 500);
                         }}
-                        disabled={!selectedWorkorder?.waitTime?.maxWaitTimeDays || Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) <= 1}
-                        style={{ marginLeft: 6, opacity: (!selectedWorkorder?.waitTime?.maxWaitTimeDays || Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) <= 1) ? 0.3 : 1 }}
+                        className={styles.bvWaitStep}
+                        style={{ opacity: (!selectedWorkorder?.waitTime?.maxWaitTimeDays || Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) <= 1) ? 0.3 : 1 }}
                       >
                         <Image_ icon={ICONS.minus} size={29} />
-                      </TouchableOpacity>
                       </StandTouch>
-                      <StandTouch onPress={() => {
-                          let current = Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) || 0;
-                          let newDays = current + 1;
-                          let woID = selectedWorkorder.id;
-                          let allWaits = (zSettings.waitTimes || []).filter((w) => w.maxWaitTimeDays > 0);
-                          let match = allWaits.reduce((best, w) => (!best || Math.abs(w.maxWaitTimeDays - newDays) < Math.abs(best.maxWaitTimeDays - newDays)) ? w : best, null);
-                          let waitObj = match ? { ...match, maxWaitTimeDays: newDays } : { ...(selectedWorkorder?.waitTime || {}), maxWaitTimeDays: newDays };
-                          useOpenWorkordersStore.getState().setField("waitTime", waitObj, woID, false);
-                          clearTimeout(waitDaysDebounceRef.current);
-                          waitDaysDebounceRef.current = setTimeout(() => {
-                            let wo = useOpenWorkordersStore.getState().getWorkorders().find((w) => w.id === woID);
-                            if (wo) useOpenWorkordersStore.getState().setField("waitTime", wo.waitTime, woID, true);
-                          }, 500);
-                      }}>
-                      <TouchableOpacity
+                      <StandTouch
                         onPress={() => {
                           let current = Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) || 0;
                           let newDays = current + 1;
@@ -2607,14 +2461,13 @@ export function BikeStandScreen() {
                             if (wo) useOpenWorkordersStore.getState().setField("waitTime", wo.waitTime, woID, true);
                           }, 500);
                         }}
-                        style={{ marginLeft: 4 }}
+                        className={styles.bvWaitStepPlus}
                       >
                         <Image_ icon={ICONS.add} size={29} />
-                      </TouchableOpacity>
                       </StandTouch>
-                    </View>
-                    <View style={{ width: "50%", flexDirection: "row", paddingLeft: 5, alignItems: "center" }}>
-                      <View style={{ width: "100%" }}>
+                    </div>
+                    <div className={styles.bvFieldHalfRowAlign}>
+                      <div className={styles.bvFieldDropdownSlotFull}>
                         <DropdownMenu
                           modalCoordX={50}
                           dataArr={zSettings.waitTimes}
@@ -2631,58 +2484,44 @@ export function BikeStandScreen() {
                           ref={waitTimesRef}
                           buttonText={"Wait Times"}
                         />
-                      </View>
-                    </View>
-                  </View>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Wait estimate label */}
                   {(() => {
                     let estimateLabel = calculateWaitEstimateLabel(selectedWorkorder, zSettings);
                     let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
                     return estimateLabel ? (
-                      <Text
-                        style={{
-                          color: isMissing ? C.red : gray(0.5),
-                          fontSize: 18,
-                          fontStyle: "italic",
-                          marginTop: 4,
-                          paddingHorizontal: 4,
-                          paddingVertical: 2,
-                        }}
-                      >
+                      <span className={styles.bvWaitEstimate} style={{ color: isMissing ? C.red : gray(0.5) }}>
                         {estimateLabel}
-                      </Text>
+                      </span>
                     ) : null;
                   })()}
 
                   {/* On-screen keypad for detail fields */}
                   {sDetailField !== null && (
-                    <View style={{ marginTop: 8 }}>
+                    <div className={styles.bvKeypadWrap}>
                       <StandKeypad
                         mode={detailKeypadMode}
                         onKeyPress={handleDetailKeyPress}
                         toggleLabel={detailKeypadMode === "phone" ? "ABC" : "123"}
                         onToggle={() => _setDetailKeypadOverride(detailKeypadMode === "phone" ? "alpha" : "phone")}
                       />
-                      <View style={{ flexDirection: "row", justifyContent: "flex-end", marginTop: 6, paddingHorizontal: 4 }}>
-                        <StandTouch onPress={() => _setDetailField(null)}>
-                        <TouchableOpacity
-                          onPress={() => _setDetailField(null)}
-                          style={{ padding: 4 }}
-                        >
+                      <div className={styles.bvKeypadCloseRow}>
+                        <StandTouch onPress={() => _setDetailField(null)} className={styles.bvKeypadClose}>
                           <Image_ icon={ICONS.close1} size={32} />
-                        </TouchableOpacity>
                         </StandTouch>
-                      </View>
-                    </View>
+                      </div>
+                    </div>
                   )}
 
                   {/* Status picker */}
                   {selectedWorkorder && (
-                    <View
+                    <div
                       onClick={(e) => e.stopPropagation()}
                       onTouchStart={(e) => e.stopPropagation()}
-                      style={{ alignItems: "center", marginBottom: 10 }}
+                      className={styles.bvStatusPickerWrap}
                     >
                       <StatusPickerModal
                         statuses={(zSettings.statuses || []).filter((s) => !s.systemOwned && !s.hidden)}
@@ -2707,11 +2546,11 @@ export function BikeStandScreen() {
                         itemHeight={69}
                         itemTextStyle={{ fontSize: 23 }}
                       />
-                    </View>
+                    </div>
                   )}
 
                   {/* Tap/swipe-up divider to hide */}
-                  <View
+                  <div
                     onClick={() => { _setShowBikeDetails(false); _setDetailField(null); }}
                     onTouchStart={(e) => { swipeDividerRef.current = e.touches[0].clientY; }}
                     onTouchEnd={(e) => {
@@ -2721,111 +2560,62 @@ export function BikeStandScreen() {
                         swipeDividerRef.current = null;
                       }
                     }}
-                    style={{
-                      alignItems: "center",
-                      justifyContent: "center",
-                      paddingVertical: 15,
-                      backgroundColor: "rgb(255,220,220)",
-                      borderRadius: 10,
-                      cursor: "pointer",
-                    }}
+                    className={styles.bvHideDivider}
                   >
-                    <Text style={{ fontSize: 32, fontStyle: "italic", color: gray(0.35) }}>Tap to hide</Text>
-                  </View>
+                    <span className={styles.bvHideDividerText} style={{ color: gray(0.35) }}>Tap to hide</span>
+                  </div>
 
-                </View>
+                </div>
               )}
-            </View>
+            </div>
           )}
 
           {/* Centered new/search overlay when no workorder */}
           {!hasWorkorderReady && (
-            <View
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                justifyContent: "center",
-                alignItems: "center",
-                zIndex: 10,
-              }}
-            >
-              <View style={{ flexDirection: "column", gap: 24, alignItems: "center" }}>
-                <StandTouch onPress={() => {
-                    _setSelectedWorkorderID(null);
-                    _setPendingCustomer(null);
-                    pendingActionRef.current = () => _setShowWorkorderList(true);
-                    startFaceLogin();
-                }}>
-                <TouchableOpacity
+            <div className={styles.shoOverlay} style={{ zIndex: 10 }}>
+              <div className={styles.shoColumn}>
+                <StandTouch
+                  className={styles.shoFindBtn}
+                  style={{ backgroundColor: C.blue }}
                   onPress={() => {
                     _setSelectedWorkorderID(null);
                     _setPendingCustomer(null);
                     pendingActionRef.current = () => _setShowWorkorderList(true);
                     startFaceLogin();
                   }}
-                  style={{
-                    backgroundColor: C.blue,
-                    borderRadius: 12,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingVertical: 60,
-                    paddingHorizontal: 60,
-                    gap: 12,
-                  }}
                 >
                   <Image_ icon={ICONS.search} size={69} />
-                  <Text style={{ fontSize: 32, fontWeight: "700", color: C.textWhite }}>Find Workorder</Text>
-                </TouchableOpacity>
+                  <span className={styles.shoFindText} style={{ color: C.textWhite }}>Find Workorder</span>
                 </StandTouch>
-                <StandTouch onPress={handleNewWorkorderPress}>
-                <TouchableOpacity
+                <StandTouch
+                  className={styles.shoNewBtn}
+                  style={{ backgroundColor: C.green }}
                   onPress={handleNewWorkorderPress}
-                  style={{
-                    backgroundColor: C.green,
-                    borderRadius: 12,
-                    alignItems: "center",
-                    justifyContent: "center",
-                    paddingVertical: 120,
-                    paddingHorizontal: 120,
-                    gap: 24,
-                  }}
                 >
                   <Image_ icon={ICONS.gears1} size={138} />
-                  <Text style={{ fontSize: 64, fontWeight: "700", color: C.textWhite }}>New Workorder</Text>
-                </TouchableOpacity>
+                  <span className={styles.shoNewText} style={{ color: C.textWhite }}>New Workorder</span>
                 </StandTouch>
-              </View>
-            </View>
+              </div>
+            </div>
           )}
 
           {/* ── 20% sidebar + 80% canvas ── */}
           <View style={{ flex: 1, flexDirection: "row", opacity: hasWorkorderReady ? 1 : 0.35 }} pointerEvents={hasWorkorderReady ? "auto" : "none"}>
             {/* Left sidebar - root buttons */}
-            <View style={{ width: "20%", borderRightWidth: 1, borderRightColor: gray(0.15) }}>
+            <div className={styles.standSidebar} style={{ borderRightColor: gray(0.15) }}>
               {/* Breadcrumbs in sidebar */}
               {sCurrentParentID !== null && sMenuPath.length > 0 && (
-                <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 6, paddingTop: 6, paddingBottom: 4, flexWrap: "wrap" }}>
+                <div className={styles.standBreadcrumbRow}>
                   <StandTouch onPress={() => {
                       _setCurrentParentID(null);
                       _setMenuPath([]);
                       _setSelectedButtonID(null);
                   }}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      _setCurrentParentID(null);
-                      _setMenuPath([]);
-                      _setSelectedButtonID(null);
-                    }}
-                  >
-                    <Text style={{ fontSize: 13, color: C.blue, fontWeight: "600" }}>{"\u2190"} All</Text>
-                  </TouchableOpacity>
+                    <span className={styles.standBreadcrumbBackText} style={{ color: C.blue }}>{"\u2190"} All</span>
                   </StandTouch>
                   {sMenuPath.map((crumb, i) => (
-                    <View key={crumb.id} style={{ flexDirection: "row", alignItems: "center" }}>
-                      <Text style={{ color: gray(0.3), marginHorizontal: 3, fontSize: 13 }}>{">"}</Text>
+                    <div key={crumb.id} className={styles.standBreadcrumbSeg}>
+                      <span className={styles.standBreadcrumbSep} style={{ color: gray(0.3) }}>{">"}</span>
                       <StandTouch onPress={() => {
                           let newPath = sMenuPath.slice(0, i + 1);
                           _setMenuPath(newPath);
@@ -2837,37 +2627,22 @@ export function BikeStandScreen() {
                             _setSelectedButtonID(null);
                           }
                       }}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          let newPath = sMenuPath.slice(0, i + 1);
-                          _setMenuPath(newPath);
-                          _setCurrentParentID(crumb.id);
-                          let crumbBtn = (zQuickItemButtons || []).find((b) => b.id === crumb.id);
-                          if (crumbBtn?.items?.length > 0) {
-                            _setSelectedButtonID(crumb.id);
-                          } else {
-                            _setSelectedButtonID(null);
-                          }
-                        }}
-                      >
-                        <Text style={{
+                        <span className={styles.standBreadcrumbText} style={{
                           color: i === sMenuPath.length - 1 ? gray(0.4) : gray(0.55),
-                          fontSize: 13,
                           fontWeight: i === sMenuPath.length - 1 ? "bold" : "normal",
                         }}>
                           {(crumb.name || "").toUpperCase()}
-                        </Text>
-                      </TouchableOpacity>
+                        </span>
                       </StandTouch>
-                    </View>
+                    </div>
                   ))}
-                </View>
+                </div>
               )}
 
               {/* Button list */}
-              <ScrollView style={{ flex: 1, paddingHorizontal: 6, paddingTop: 6 }}>
+              <div className={styles.standNavScroll}>
                 {/* Inventory search button — always top */}
-                <View style={{ marginBottom: 6 }}>
+                <div className={styles.standNavItem}>
                   <Button_
                     onPress={() => _setShowInventoryModal(true)}
                     colorGradientArr={COLOR_GRADIENTS.purple}
@@ -2887,7 +2662,7 @@ export function BikeStandScreen() {
                     }}
                     text={"INVENTORY"}
                   />
-                </View>
+                </div>
                 {(sCurrentParentID
                   ? currentChildren
                   : (zQuickItemButtons || []).filter((b) => !b.parentID)
@@ -2896,7 +2671,7 @@ export function BikeStandScreen() {
                     sSelectedButtonID === item.id ||
                     (sMenuPath.length > 0 && sMenuPath[0].id === item.id);
                   return (
-                    <View key={item.id} style={{ marginBottom: 6 }}>
+                    <div key={item.id} className={styles.standNavItem}>
                       <Button_
                         onPress={() => handleNavButtonPress(item)}
                         colorGradientArr={isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "item" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
@@ -2917,113 +2692,81 @@ export function BikeStandScreen() {
                         }}
                         text={splitButtonLabel(item.name).toUpperCase()}
                       />
-                    </View>
+                    </div>
                   );
                 })}
-              </ScrollView>
+              </div>
 
               {/* Static bottom container: Print + Menu */}
               {hasWorkorderReady && (
-                <View style={{ position: "relative", paddingHorizontal: 10, paddingVertical: 14, borderTopWidth: 1, borderTopColor: gray(0.15) }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-around" }}>
+                <div className={styles.standSidebarFooter} style={{ borderTopColor: gray(0.15) }}>
+                  <div className={styles.standSidebarFooterRow}>
                     {/* Print button — opens unified print modal */}
                     {selectedWorkorder && (
-                      <TouchableOpacity
-                        onPress={() => _setShowPrinterSelectModal(true)}
-                        style={{
-                          alignItems: "center",
-                          justifyContent: "center",
-                          paddingHorizontal: 6,
-                        }}
-                      >
+                      <StandTouch onPress={() => _setShowPrinterSelectModal(true)} className={styles.standFooterIconBtn}>
                         <Image_ icon={selectedPrinterOffline ? warningIcon : ICONS.print} size={48} />
-                      </TouchableOpacity>
+                      </StandTouch>
                     )}
 
                     {/* Menu button */}
                     <PopoverPrimitive.Root open={sShowFooterMenu} onOpenChange={_setShowFooterMenu}>
                     <PopoverPrimitive.Anchor asChild>
-                    <TouchableOpacity
-                      onPress={() => _setShowFooterMenu(v => !v)}
-                      style={{
-                        alignItems: "center",
-                        justifyContent: "center",
-                        paddingHorizontal: 6,
-                      }}
-                    >
-                      <Image_ icon={ICONS.listsAndOptions} size={48} />
-                    </TouchableOpacity>
+                      <StandTouch onPress={() => _setShowFooterMenu(v => !v)} className={styles.standFooterIconBtn}>
+                        <Image_ icon={ICONS.listsAndOptions} size={48} />
+                      </StandTouch>
                     </PopoverPrimitive.Anchor>
 
                   {/* Footer action menu popover */}
                   <PopoverPrimitive.Portal>
                     <PopoverPrimitive.Content side="top" align="start" sideOffset={10} collisionPadding={10} style={{ zIndex: Z.dropdown }}>
-                      <View style={{
-                        backgroundColor: "white",
-                        borderRadius: 10,
-                        borderWidth: 2,
-                        borderColor: C.buttonLightGreenOutline,
-                        shadowColor: "#000",
-                        shadowOffset: { width: 0, height: -2 },
-                        shadowOpacity: 0.2,
-                        shadowRadius: 8,
-                        elevation: 5,
-                        overflow: "hidden",
-                        minWidth: 320,
-                      }}>
-                        <StandTouch onPress={() => { _setShowFooterMenu(false); _setSelectedWorkorderID(null); _setPendingCustomer(null); _setShowWorkorderList(true); }}>
-                        <TouchableOpacity
+                      <div className={styles.standFooterMenuContent} style={{ borderColor: C.buttonLightGreenOutline }}>
+                        <StandTouch
                           onPress={() => { _setShowFooterMenu(false); _setSelectedWorkorderID(null); _setPendingCustomer(null); _setShowWorkorderList(true); }}
-                          style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}
+                          className={styles.standFooterMenuItem}
+                          style={{ borderBottomColor: gray(0.1) }}
                         >
                           <Image_ icon={ICONS.search} size={36} />
-                          <Text style={{ fontSize: 30, fontWeight: "500", color: C.text }}>Find Workorder</Text>
-                        </TouchableOpacity>
+                          <span className={styles.standFooterMenuItemText} style={{ color: C.text }}>Find Workorder</span>
                         </StandTouch>
-                        <StandTouch onPress={() => { _setShowFooterMenu(false); handleNewWorkorderPress(); }}>
-                        <TouchableOpacity
+                        <StandTouch
                           onPress={() => { _setShowFooterMenu(false); handleNewWorkorderPress(); }}
-                          style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}
+                          className={styles.standFooterMenuItem}
+                          style={{ borderBottomColor: gray(0.1) }}
                         >
                           <Image_ icon={plusIcon} size={36} />
-                          <Text style={{ fontSize: 30, fontWeight: "500", color: C.text }}>New Workorder</Text>
-                        </TouchableOpacity>
+                          <span className={styles.standFooterMenuItemText} style={{ color: C.text }}>New Workorder</span>
                         </StandTouch>
-                        <StandTouch onPress={() => { _setShowFooterMenu(false); _setSubMenuEditMode(!sSubMenuEditMode); }}>
-                        <TouchableOpacity
+                        <StandTouch
                           onPress={() => { _setShowFooterMenu(false); _setSubMenuEditMode(!sSubMenuEditMode); }}
-                          style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}
+                          className={styles.standFooterMenuItem}
+                          style={{ borderBottomColor: gray(0.1) }}
                         >
                           <Image_ icon={ICONS.editPencil} size={36} />
-                          <Text style={{ fontSize: 30, fontWeight: "500", color: C.text }}>Edit Sizing</Text>
-                        </TouchableOpacity>
+                          <span className={styles.standFooterMenuItemText} style={{ color: C.text }}>Edit Sizing</span>
                         </StandTouch>
-                        <StandTouch onPress={() => { _setShowFooterMenu(false); _setShowStandSettings(true); }}>
-                        <TouchableOpacity
+                        <StandTouch
                           onPress={() => { _setShowFooterMenu(false); _setShowStandSettings(true); }}
-                          style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}
+                          className={styles.standFooterMenuItem}
+                          style={{ borderBottomColor: gray(0.1) }}
                         >
                           <Image_ icon={ICONS.settings} size={36} />
-                          <Text style={{ fontSize: 30, fontWeight: "500", color: C.text }}>Settings</Text>
-                        </TouchableOpacity>
+                          <span className={styles.standFooterMenuItemText} style={{ color: C.text }}>Settings</span>
                         </StandTouch>
-                        <StandTouch onPress={() => { _setShowFooterMenu(false); window.location.href = window.location.pathname + "?v=" + Date.now(); }}>
-                        <TouchableOpacity
+                        <StandTouch
                           onPress={() => { _setShowFooterMenu(false); window.location.href = window.location.pathname + "?v=" + Date.now(); }}
-                          style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, paddingHorizontal: 16 }}
+                          className={styles.standFooterMenuItem}
                         >
                           <Image_ icon={ICONS.gears1} size={36} />
-                          <Text style={{ fontSize: 30, fontWeight: "500", color: C.text }}>Reload Page</Text>
-                        </TouchableOpacity>
+                          <span className={styles.standFooterMenuItemText} style={{ color: C.text }}>Reload Page</span>
                         </StandTouch>
-                      </View>
+                      </div>
                     </PopoverPrimitive.Content>
                   </PopoverPrimitive.Portal>
                   </PopoverPrimitive.Root>
-                  </View>
-                </View>
+                  </div>
+                </div>
               )}
-            </View>
+            </div>
 
             {/* Right panel - canvas */}
             <View style={{ width: "80%", position: "relative", zIndex: 1 }}>
@@ -4344,7 +4087,7 @@ export function BikeStandScreen() {
             </StandTouch>
             );
           })()}
-        </View>
+        </div>
       ) : (
         <StandWorkorderDetail
           workorderID={sSelectedWorkorderID}
@@ -5058,254 +4801,169 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
 
   return (
     <StandTouch touchStart={false} onPress={onClose}>
-    <div
-      onClick={onClose}
-      style={{
-        position: "absolute",
-        top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: Z.modal,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "95%",
-          height: "95%",
-          backgroundColor: "white",
-          borderRadius: 12,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
-        {/* Header */}
-        {sMode === "create" ? (
-          <View style={{
-            flexDirection: "row",
-            alignItems: "center",
-            padding: 12,
-            borderBottomWidth: 1,
-            borderBottomColor: gray(0.1),
-          }}>
-            <StandTouch onPress={() => _setMode("search")}>
-            <TouchableOpacity
-              onPress={() => _setMode("search")}
-              style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+      <div onClick={onClose} className={styles.nwmBackdrop} style={{ zIndex: Z.modal }}>
+        <div onClick={(e) => e.stopPropagation()} className={styles.nwmDialog}>
+          {/* Header */}
+          {sMode === "create" ? (
+            <div className={styles.nwmCreateHeader} style={{ borderBottomColor: gray(0.1) }}>
+              <StandTouch onPress={() => _setMode("search")}>
+                <span className={styles.nwmBackBtn} style={{ color: C.blue }}>
+                  {"\u2190"} Back to Search
+                </span>
+              </StandTouch>
+            </div>
+          ) : (
+            <div
+              onClick={onClose}
+              onTouchStart={(e) => { _swipeRefCust.current = e.touches[0].clientY; }}
+              onTouchEnd={(e) => {
+                if (_swipeRefCust.current !== null) {
+                  let diff = e.changedTouches[0].clientY - _swipeRefCust.current;
+                  if (diff > 20) onClose();
+                  _swipeRefCust.current = null;
+                }
+              }}
+              className={styles.nwmTapToClose}
             >
-              <Text style={{ fontSize: 21, color: C.blue, fontWeight: "600" }}>{"\u2190"} Back to Search</Text>
-            </TouchableOpacity>
-            </StandTouch>
-          </View>
-        ) : (
-          <View
-            onClick={onClose}
-            onTouchStart={(e) => { _swipeRefCust.current = e.touches[0].clientY; }}
-            onTouchEnd={(e) => {
-              if (_swipeRefCust.current !== null) {
-                let diff = e.changedTouches[0].clientY - _swipeRefCust.current;
-                if (diff > 20) onClose();
-                _swipeRefCust.current = null;
-              }
-            }}
-            style={{
-              paddingVertical: 12,
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-            }}
-          >
-            <Text style={{ fontSize: 26, fontStyle: "italic", color: gray(0.35) }}>Tap to close</Text>
-          </View>
-        )}
+              <span className={styles.nwmTapToCloseText} style={{ color: gray(0.35) }}>Tap to close</span>
+            </div>
+          )}
 
-        {sMode === "search" ? (
-          <>
-            {/* Search display + mode toggle */}
-            <div style={{ padding: 12, display: "flex", flexDirection: "row", alignItems: "stretch", gap: 10 }}>
-              <div style={{
-                flex: 1,
-                borderRadius: 8,
-                borderWidth: 2,
-                borderStyle: "solid",
-                borderColor: C.buttonLightGreenOutline,
-                backgroundColor: C.listItemWhite,
-                display: "flex",
-                flexDirection: "row",
-                alignItems: "center",
-                height: 56,
-                paddingLeft: 12,
-                paddingRight: 12,
-                fontSize: 38,
-                fontWeight: "500",
-                color: C.text,
-              }}>
-                <div style={{ flex: 1 }}>
-                  {displayText || <span style={{ color: gray(0.3) }}>{sKeypadMode === "phone" ? "Phone number..." : "Name..."}</span>}
+          {sMode === "search" ? (
+            <>
+              {/* Search display + mode toggle */}
+              <div className={styles.nwmSearchRow}>
+                <div
+                  className={styles.nwmSearchBox}
+                  style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite, color: C.text }}
+                >
+                  <div className={styles.nwmSearchText}>
+                    {displayText || (
+                      <span style={{ color: gray(0.3) }}>
+                        {sKeypadMode === "phone" ? "Phone number..." : "Name..."}
+                      </span>
+                    )}
+                  </div>
+                  {sSearching && (
+                    <SmallLoadingIndicator size={35} color={C.blue} message="" containerStyle={{ padding: 0 }} />
+                  )}
                 </div>
-                {sSearching && <SmallLoadingIndicator size={35} color={C.blue} message="" containerStyle={{ padding: 0 }} />}
-              </div>
-              <StandTouch onPress={() => {
+                <StandTouch onPress={() => {
                   let newMode = sKeypadMode === "phone" ? "alpha" : "phone";
                   _setKeypadMode(newMode);
                   _setSearchText("");
                   _setSearchResults([]);
                 }}>
-              <TouchableOpacity
-                onPress={() => {
-                  let newMode = sKeypadMode === "phone" ? "alpha" : "phone";
-                  _setKeypadMode(newMode);
-                  _setSearchText("");
-                  _setSearchResults([]);
-                }}
-                style={{
-                  paddingHorizontal: 34,
-                  borderRadius: 8,
-                  backgroundColor: C.blue,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Text style={{ fontSize: 23, fontWeight: "600", color: "white" }}>
-                  {sKeypadMode === "phone" ? "ABC" : "123"}
-                </Text>
-              </TouchableOpacity>
-              </StandTouch>
-            </div>
-
-            {/* Keypad */}
-            <div style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 8 }}>
-              <StandKeypad mode={effectiveKeypadMode} onKeyPress={handleKeyPress} fontSizeAdj={23} paddingAdj={35} />
-            </div>
-
-            {/* Search results */}
-            <ScrollView style={{ flex: 1, paddingHorizontal: 12, marginTop: 15 }}>
-              {sSearchResults.map((cust) => (
-                <StandTouch key={cust.id} onPress={() => handleSelectCustomer(cust)}>
-                <TouchableOpacity
-                  onPress={() => handleSelectCustomer(cust)}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingVertical: 17,
-                    paddingHorizontal: 12,
-                    marginBottom: 4,
-                    borderRadius: 8,
-                    borderWidth: 1,
-                    borderColor: C.buttonLightGreenOutline,
-                    backgroundColor: C.listItemWhite,
-                    gap: 16,
-                  }}
-                >
-                  <Text style={{ flex: 1, fontSize: 27, fontWeight: "600", color: C.text }}>
-                    {capitalizeFirstLetterOfString(cust.first || "")} {capitalizeFirstLetterOfString(cust.last || "")}
-                  </Text>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    {!(cust.customerCell || cust.cell) && cust.landline && <Text style={{ fontSize: 14, color: gray(0.35) }}>landline</Text>}
-                    <Text style={{ fontSize: 25, color: gray(0.5) }} numberOfLines={1}>
-                      {(cust.customerCell || cust.cell) ? formatPhoneWithDashes(cust.customerCell || cust.cell) : cust.landline ? formatPhoneWithDashes(cust.landline) : cust.email || ""}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-                </StandTouch>
-              ))}
-              {!sSearching && sSearchResults.length === 0 && ((sKeypadMode === "phone" && sSearchText.replace(/\D/g, "").length >= 4) || (sKeypadMode === "alpha" && sSearchText.length >= 3)) && (
-                <Text style={{ fontSize: 26, color: gray(0.4), textAlign: "center", paddingVertical: 10 }}>No results found.</Text>
-              )}
-            </ScrollView>
-
-            {/* Create new customer button - phone: 10 digits + no results; name: 3+ chars */}
-            {((sKeypadMode === "phone" && sSearchText.replace(/\D/g, "").length === 10 && sSearchResults.length === 0 && !sSearching) ||
-              (sKeypadMode === "alpha" && sSearchText.length >= 3 && !sSearching)) && (
-              <div style={{ padding: 12, borderTop: "1px solid " + gray(0.1) }}>
-                <StandTouch onPress={handleSwitchToCreate}>
-                <TouchableOpacity
-                  onPress={handleSwitchToCreate}
-                  style={{
-                    paddingVertical: 14,
-                    borderRadius: 8,
-                    backgroundColor: C.green,
-                    alignItems: "center",
-                  }}
-                >
-                  <Text style={{ fontSize: 21, fontWeight: "600", color: "white" }}>+ Create New Customer</Text>
-                </TouchableOpacity>
+                  <div className={styles.nwmModeToggle} style={{ backgroundColor: C.blue }}>
+                    {sKeypadMode === "phone" ? "ABC" : "123"}
+                  </div>
                 </StandTouch>
               </div>
-            )}
-          </>
-        ) : (
-          /* Create customer mode */
-          <>
-            {/* Form fields */}
-            <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
-              {[
-                { key: "first", label: "First Name" },
-                { key: "last", label: "Last Name" },
-                { key: "phone", label: "Phone" },
-                { key: "email", label: "Email" },
-              ].map((field) => (
-                <StandTouch key={field.key} onPress={() => _setActiveField(field.key)}>
-                <div
-                  onClick={() => _setActiveField(field.key)}
-                  style={{
-                    display: "flex",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: 10,
-                    padding: 10,
-                    borderRadius: 8,
-                    borderWidth: 2,
-                    borderStyle: "solid",
-                    borderColor: sActiveField === field.key ? C.blue : C.buttonLightGreenOutline,
-                    backgroundColor: sActiveField === field.key ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
-                    cursor: "pointer",
-                  }}
-                >
-                  <Text style={{ fontSize: 16, color: gray(0.5), width: 80 }}>{field.label}</Text>
-                  <Text style={{ fontSize: 19, fontWeight: "500", color: C.text, flex: 1 }}>
-                    {field.key === "phone"
-                      ? formatPhoneWithDashes((sCreateForm[field.key] || "").replace(/\D/g, ""))
-                      : sCreateForm[field.key] || ""
-                    }
-                    {sActiveField === field.key && <span style={{ color: C.blue }}>|</span>}
-                  </Text>
+
+              {/* Keypad */}
+              <div className={styles.nwmKeypadWrap}>
+                <StandKeypad mode={effectiveKeypadMode} onKeyPress={handleKeyPress} fontSizeAdj={23} paddingAdj={35} />
+              </div>
+
+              {/* Search results */}
+              <div className={styles.nwmResultsScroll}>
+                {sSearchResults.map((cust) => (
+                  <StandTouch key={cust.id} onPress={() => handleSelectCustomer(cust)}>
+                    <div
+                      className={styles.nwmResultRow}
+                      style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
+                    >
+                      <span className={styles.nwmResultName} style={{ color: C.text }}>
+                        {capitalizeFirstLetterOfString(cust.first || "")} {capitalizeFirstLetterOfString(cust.last || "")}
+                      </span>
+                      <div className={styles.nwmResultMeta}>
+                        {!(cust.customerCell || cust.cell) && cust.landline && (
+                          <span className={styles.nwmResultMetaLandline} style={{ color: gray(0.35) }}>landline</span>
+                        )}
+                        <span className={styles.nwmResultPhone} style={{ color: gray(0.5) }}>
+                          {(cust.customerCell || cust.cell)
+                            ? formatPhoneWithDashes(cust.customerCell || cust.cell)
+                            : cust.landline ? formatPhoneWithDashes(cust.landline) : cust.email || ""}
+                        </span>
+                      </div>
+                    </div>
+                  </StandTouch>
+                ))}
+                {!sSearching && sSearchResults.length === 0 && ((sKeypadMode === "phone" && sSearchText.replace(/\D/g, "").length >= 4) || (sKeypadMode === "alpha" && sSearchText.length >= 3)) && (
+                  <div className={styles.nwmNoResults} style={{ color: gray(0.4) }}>No results found.</div>
+                )}
+              </div>
+
+              {/* Create new customer button - phone: 10 digits + no results; name: 3+ chars */}
+              {((sKeypadMode === "phone" && sSearchText.replace(/\D/g, "").length === 10 && sSearchResults.length === 0 && !sSearching) ||
+                (sKeypadMode === "alpha" && sSearchText.length >= 3 && !sSearching)) && (
+                <div className={styles.nwmCreateBtnWrap} style={{ borderTopColor: gray(0.1) }}>
+                  <StandTouch onPress={handleSwitchToCreate}>
+                    <div className={styles.nwmCreateBtn} style={{ backgroundColor: C.green, textAlign: "center" }}>
+                      + Create New Customer
+                    </div>
+                  </StandTouch>
                 </div>
+              )}
+            </>
+          ) : (
+            /* Create customer mode */
+            <>
+              {/* Form fields */}
+              <div className={styles.nwmFormCol}>
+                {[
+                  { key: "first", label: "First Name" },
+                  { key: "last", label: "Last Name" },
+                  { key: "phone", label: "Phone" },
+                  { key: "email", label: "Email" },
+                ].map((field) => (
+                  <StandTouch key={field.key} onPress={() => _setActiveField(field.key)}>
+                    <div
+                      className={styles.nwmFormField}
+                      style={{
+                        borderColor: sActiveField === field.key ? C.blue : C.buttonLightGreenOutline,
+                        backgroundColor: sActiveField === field.key ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
+                      }}
+                    >
+                      <span className={styles.nwmFormLabel} style={{ color: gray(0.5) }}>{field.label}</span>
+                      <span className={styles.nwmFormValue} style={{ color: C.text }}>
+                        {field.key === "phone"
+                          ? formatPhoneWithDashes((sCreateForm[field.key] || "").replace(/\D/g, ""))
+                          : sCreateForm[field.key] || ""}
+                        {sActiveField === field.key && <span style={{ color: C.blue }}>|</span>}
+                      </span>
+                    </div>
+                  </StandTouch>
+                ))}
+              </div>
+
+              {/* Keypad for create mode */}
+              <div className={styles.nwmKeypadWrap}>
+                <StandKeypad mode={effectiveKeypadMode} onKeyPress={handleKeyPress} />
+              </div>
+
+              {/* Spacer + Create button */}
+              <div className={styles.nwmSpacer} />
+              <div className={styles.nwmCreateBtnWrap} style={{ borderTopColor: gray(0.1) }}>
+                <StandTouch
+                  onPress={() => { if (sCreateForm.first || sCreateForm.phone) handleCreateAndStart(); }}
+                >
+                  <div
+                    className={styles.nwmCreateBtn}
+                    style={{
+                      backgroundColor: C.green,
+                      textAlign: "center",
+                      opacity: (sCreateForm.first || sCreateForm.phone) ? 1 : 0.4,
+                    }}
+                  >
+                    Create & Start Workorder
+                  </div>
                 </StandTouch>
-              ))}
-            </div>
-
-            {/* Keypad for create mode */}
-            <div style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 8 }}>
-              <StandKeypad mode={effectiveKeypadMode} onKeyPress={handleKeyPress} />
-            </div>
-
-            {/* Spacer + Create button */}
-            <View style={{ flex: 1 }} />
-            <div style={{ padding: 12, borderTop: "1px solid " + gray(0.1) }}>
-              <StandTouch onPress={handleCreateAndStart}>
-              <TouchableOpacity
-                onPress={handleCreateAndStart}
-                style={{
-                  paddingVertical: 14,
-                  borderRadius: 8,
-                  backgroundColor: C.green,
-                  alignItems: "center",
-                  opacity: (sCreateForm.first || sCreateForm.phone) ? 1 : 0.4,
-                }}
-                disabled={!(sCreateForm.first || sCreateForm.phone)}
-              >
-                <Text style={{ fontSize: 21, fontWeight: "600", color: "white" }}>Create & Start Workorder</Text>
-              </TouchableOpacity>
-              </StandTouch>
-            </div>
-          </>
-        )}
+              </div>
+            </>
+          )}
+        </div>
       </div>
-    </div>
     </StandTouch>
   );
 };
@@ -5480,52 +5138,20 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
   }
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "absolute",
-        top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.4)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: Z.modal,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "95%",
-          height: "95%",
-          backgroundColor: "rgba(255,255,255,0.95)",
-          borderRadius: 12,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
+    <div onClick={onClose} className={styles.scimBackdrop} style={{ zIndex: Z.modal }}>
+      <div onClick={(e) => e.stopPropagation()} className={styles.scimDialog}>
         {/* Header — tap to close */}
         <StandTouch onPress={onClose}>
-        <div
-          onClick={onClose}
-          style={{
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            padding: 16,
-            borderBottom: "1px solid " + gray(0.1),
-            cursor: "pointer",
-          }}
-        >
-          <Text style={{ fontSize: 22, fontWeight: "600", color: C.text }}>
-            Add Custom {isLabor ? "Labor" : "Item"}
-          </Text>
-          <Text style={{ flex: 1, fontSize: 18, fontStyle: "italic", color: gray(0.35), textAlign: "center" }}>Tap to close</Text>
-        </div>
+          <div className={styles.scimHeader} style={{ borderBottomColor: gray(0.1) }}>
+            <span className={styles.scimTitle} style={{ color: C.text }}>
+              Add Custom {isLabor ? "Labor" : "Item"}
+            </span>
+            <span className={styles.scimTapToClose} style={{ color: gray(0.35) }}>Tap to close</span>
+          </div>
         </StandTouch>
 
         {/* Fields */}
-        <ScrollView style={{ flex: 1, paddingHorizontal: 12, paddingTop: 8 }}>
+        <div className={styles.scimScroll}>
           {fields.map((field) => {
             if (field.paired) {
               let isMinActive = sActiveField === "minutes";
@@ -5533,57 +5159,43 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
               let minVal = getFieldValue("minutes");
               let priceVal = getFieldValue("price");
               return (
-                <div key="minutes-price" style={{ display: "flex", flexDirection: "row", gap: 6, marginBottom: 6 }}>
-                  <StandTouch onPress={() => _setActiveField("minutes")} style={{ flex: 1 }}>
-                  <div
-                    onClick={() => _setActiveField("minutes")}
-                    style={{
-                      display: "flex",
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: 10,
-                      borderRadius: 8,
-                      borderWidth: 2,
-                      borderStyle: "solid",
-                      borderColor: isMinActive ? C.blue : C.buttonLightGreenOutline,
-                      backgroundColor: isMinActive ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <View>
-                      <Text style={{ fontSize: 17, color: gray(0.5) }}>Minutes</Text>
-                      {zLaborRate ? <Text style={{ fontSize: 14, color: gray(0.4) }}>{"@ $" + usdTypeMask(zLaborRate, { withDollar: false }).display + "/hr"}</Text> : null}
-                    </View>
-                    <Text style={{ fontSize: 20, fontWeight: "500", color: minVal ? C.text : gray(0.3), flex: 1 }}>
-                      {minVal || ""}
-                      {isMinActive && <span style={{ color: C.blue }}>|</span>}
-                    </Text>
-                  </div>
+                <div key="minutes-price" className={styles.scimPairedRow}>
+                  <StandTouch onPress={() => _setActiveField("minutes")} style={{ flex: 1, display: "flex", minWidth: 0 }}>
+                    <div
+                      className={styles.scimPairedField}
+                      style={{
+                        borderColor: isMinActive ? C.blue : C.buttonLightGreenOutline,
+                        backgroundColor: isMinActive ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
+                      }}
+                    >
+                      <div className={styles.scimPairedLabelCol}>
+                        <span className={styles.scimPairedLabel} style={{ color: gray(0.5) }}>Minutes</span>
+                        {zLaborRate ? (
+                          <span className={styles.scimPairedSublabel} style={{ color: gray(0.4) }}>
+                            {"@ $" + usdTypeMask(zLaborRate, { withDollar: false }).display + "/hr"}
+                          </span>
+                        ) : null}
+                      </div>
+                      <span className={styles.scimPairedValue} style={{ color: minVal ? C.text : gray(0.3) }}>
+                        {minVal || ""}
+                        {isMinActive && <span style={{ color: C.blue }}>|</span>}
+                      </span>
+                    </div>
                   </StandTouch>
-                  <StandTouch onPress={() => _setActiveField("price")} style={{ flex: 1 }}>
-                  <div
-                    onClick={() => _setActiveField("price")}
-                    style={{
-                      display: "flex",
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 10,
-                      padding: 10,
-                      borderRadius: 8,
-                      borderWidth: 2,
-                      borderStyle: "solid",
-                      borderColor: isPriceActive ? C.blue : C.buttonLightGreenOutline,
-                      backgroundColor: isPriceActive ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
-                      cursor: "pointer",
-                    }}
-                  >
-                    <Text style={{ fontSize: 17, color: gray(0.5) }}>Price *</Text>
-                    <Text style={{ fontSize: 20, fontWeight: "500", color: priceVal ? C.text : gray(0.3), flex: 1 }}>
-                      {priceVal || "$0.00"}
-                      {isPriceActive && <span style={{ color: C.blue }}>|</span>}
-                    </Text>
-                  </div>
+                  <StandTouch onPress={() => _setActiveField("price")} style={{ flex: 1, display: "flex", minWidth: 0 }}>
+                    <div
+                      className={styles.scimPairedField}
+                      style={{
+                        borderColor: isPriceActive ? C.blue : C.buttonLightGreenOutline,
+                        backgroundColor: isPriceActive ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
+                      }}
+                    >
+                      <span className={styles.scimPairedLabel} style={{ color: gray(0.5) }}>Price *</span>
+                      <span className={styles.scimPairedValue} style={{ color: priceVal ? C.text : gray(0.3) }}>
+                        {priceVal || "$0.00"}
+                        {isPriceActive && <span style={{ color: C.blue }}>|</span>}
+                      </span>
+                    </div>
                   </StandTouch>
                 </div>
               );
@@ -5593,74 +5205,53 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
             let isNotes = field.key === "intake" || field.key === "receipt";
             return (
               <StandTouch key={field.key} onPress={() => _setActiveField(field.key)}>
-              <div
-                onClick={() => _setActiveField(field.key)}
-                style={{
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: 10,
-                  marginBottom: 6,
-                  borderRadius: 8,
-                  borderWidth: 2,
-                  borderStyle: "solid",
-                  borderColor: isActive ? C.blue : C.buttonLightGreenOutline,
-                  backgroundColor: isActive ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
-                  cursor: "pointer",
-                  maxWidth: field.key === "price" ? 300 : undefined,
-                }}
-              >
-                <View style={{ width: 130 }}>
-                  <Text style={{ fontSize: 17, color: gray(0.5) }}>
-                    {field.label}{field.required ? " *" : ""}
-                  </Text>
-                  {field.sublabel ? (
-                    <Text style={{ fontSize: 14, color: gray(0.4) }}>{field.sublabel}</Text>
-                  ) : null}
-                </View>
-                <Text style={{ fontSize: 20, fontWeight: "500", color: val ? getFieldColor(field.key) : gray(0.3), flex: 1 }}>
-                  {val || (field.key === "price" ? "$0.00" : "")}
-                  {isActive && <span style={{ color: C.blue }}>|</span>}
-                </Text>
-                {isNotes && (
-                  <StandTouch onPress={() => _setQuickNotesTarget(field.key === "intake" ? "intakeNotes" : "receiptNotes")}>
-                  <TouchableOpacity
-                    onPress={(e) => { e.stopPropagation(); _setQuickNotesTarget(field.key === "intake" ? "intakeNotes" : "receiptNotes"); }}
-                    style={{
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                      borderRadius: 6,
-                      backgroundColor: C.blue,
-                    }}
-                  >
-                    <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>Quick Notes</Text>
-                  </TouchableOpacity>
-                  </StandTouch>
-                )}
-              </div>
+                <div
+                  className={styles.scimField}
+                  style={{
+                    borderColor: isActive ? C.blue : C.buttonLightGreenOutline,
+                    backgroundColor: isActive ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
+                    maxWidth: field.key === "price" ? 300 : undefined,
+                  }}
+                >
+                  <div className={styles.scimFieldLabelCol}>
+                    <span className={styles.scimFieldLabel} style={{ color: gray(0.5) }}>
+                      {field.label}{field.required ? " *" : ""}
+                    </span>
+                    {field.sublabel ? (
+                      <span className={styles.scimFieldSublabel} style={{ color: gray(0.4) }}>{field.sublabel}</span>
+                    ) : null}
+                  </div>
+                  <span className={styles.scimFieldValue} style={{ color: val ? getFieldColor(field.key) : gray(0.3) }}>
+                    {val || (field.key === "price" ? "$0.00" : "")}
+                    {isActive && <span style={{ color: C.blue }}>|</span>}
+                  </span>
+                  {isNotes && (
+                    <StandTouch onPress={() => _setQuickNotesTarget(field.key === "intake" ? "intakeNotes" : "receiptNotes")}>
+                      <div className={styles.scimQuickNotesBtn} style={{ backgroundColor: C.blue }}>
+                        Quick Notes
+                      </div>
+                    </StandTouch>
+                  )}
+                </div>
               </StandTouch>
             );
           })}
 
           {/* Discount selector */}
-          <div style={{ marginTop: 4, marginBottom: 8 }}>
-            <Text style={{ fontSize: 21, color: gray(0.5), marginBottom: 4, paddingLeft: 2 }}>Discount</Text>
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
+          <div className={styles.scimDiscountSection}>
+            <div className={styles.scimDiscountLabel} style={{ color: gray(0.5) }}>Discount</div>
+            <div className={styles.scimDiscountChips}>
               <StandTouch onPress={() => _setDiscountObj(null)}>
-              <TouchableOpacity
-                onPress={() => _setDiscountObj(null)}
-                style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 8,
-                  borderRadius: 6,
-                  borderWidth: 1,
-                  borderColor: !sDiscountObj ? C.blue : gray(0.15),
-                  backgroundColor: !sDiscountObj ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
-                }}
-              >
-                <Text style={{ fontSize: 22, color: !sDiscountObj ? C.blue : gray(0.5) }}>None</Text>
-              </TouchableOpacity>
+                <div
+                  className={styles.scimDiscountChip}
+                  style={{
+                    borderColor: !sDiscountObj ? C.blue : gray(0.15),
+                    backgroundColor: !sDiscountObj ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
+                    color: !sDiscountObj ? C.blue : gray(0.5),
+                  }}
+                >
+                  None
+                </div>
               </StandTouch>
               {(zDiscounts || [])
                 .filter((d) => d.type !== "$" || Number(d.value) <= sPriceCents)
@@ -5668,62 +5259,56 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
                   let isSelected = sDiscountObj?.name === d.name;
                   return (
                     <StandTouch key={d.name + "-" + dIdx} onPress={() => handleDiscountSelect(d)}>
-                    <TouchableOpacity
-                      onPress={() => handleDiscountSelect(d)}
-                      style={{
-                        paddingHorizontal: 12,
-                        paddingVertical: 8,
-                        borderRadius: 6,
-                        borderWidth: 1,
-                        borderColor: isSelected ? C.blue : gray(0.15),
-                        backgroundColor: isSelected ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
-                      }}
-                    >
-                      <Text style={{ fontSize: 22, color: isSelected ? C.blue : C.text }}>{d.name}</Text>
-                    </TouchableOpacity>
+                      <div
+                        className={styles.scimDiscountChip}
+                        style={{
+                          borderColor: isSelected ? C.blue : gray(0.15),
+                          backgroundColor: isSelected ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
+                          color: isSelected ? C.blue : C.text,
+                        }}
+                      >
+                        {d.name}
+                      </div>
                     </StandTouch>
                   );
                 })}
-            </View>
+            </div>
             {discountedCents !== null && (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6, paddingLeft: 2 }}>
-                <Text style={{ fontSize: 23, color: gray(0.5), textDecorationLine: "line-through" }}>
+              <div className={styles.scimDiscountPreview}>
+                <span className={styles.scimDiscountOriginal} style={{ color: gray(0.5) }}>
                   {"$" + usdTypeMask(sPriceCents, { withDollar: false }).display}
-                </Text>
-                <Text style={{ fontSize: 25, fontWeight: "600", color: C.green }}>
+                </span>
+                <span className={styles.scimDiscountFinal} style={{ color: C.green }}>
                   {"$" + usdTypeMask(discountedCents, { withDollar: false }).display}
-                </Text>
-                <Text style={{ fontSize: 21, color: C.lightred }}>
+                </span>
+                <span className={styles.scimDiscountAmount} style={{ color: C.lightred }}>
                   {sDiscountObj.type === DISCOUNT_TYPES.percent
                     ? sDiscountObj.value + "% off"
                     : "$" + usdTypeMask(sDiscountObj.value, { withDollar: false }).display + " off"}
-                </Text>
-              </View>
+                </span>
+              </div>
             )}
           </div>
-        </ScrollView>
+        </div>
 
         {/* Keypad */}
-        <div style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 8 }}>
+        <div className={styles.scimKeypadWrap}>
           <StandKeypad mode={keypadMode} onKeyPress={handleKeyPress} fontSizeAdj={keypadMode === "phone" ? 28 : 0} paddingAdj={keypadMode === "phone" ? 42 : 0} />
         </div>
 
         {/* Save button */}
-        <div style={{ padding: 12, borderTop: "1px solid " + gray(0.1) }}>
-          <StandTouch onPress={handleSave}>
-          <TouchableOpacity
-            onPress={handleSave}
-            disabled={!canSave}
-            style={{
-              paddingVertical: 32,
-              borderRadius: 8,
-              backgroundColor: C.green,
-              alignItems: "center",
-              opacity: canSave ? 1 : 0.4,
-            }}
-          >
-            <Text style={{ fontSize: 28, fontWeight: "600", color: "white" }}>CLOSE</Text>
-          </TouchableOpacity>
+        <div className={styles.scimSaveWrap} style={{ borderTopColor: gray(0.1) }}>
+          <StandTouch onPress={() => { if (canSave) handleSave(); }}>
+            <div
+              className={styles.scimSaveBtn}
+              style={{
+                backgroundColor: C.green,
+                textAlign: "center",
+                opacity: canSave ? 1 : 0.4,
+              }}
+            >
+              CLOSE
+            </div>
           </StandTouch>
         </div>
 
@@ -5782,56 +5367,18 @@ const PhoneSearchModal = ({ onSelect, onClose }) => {
   }
 
   return createPortal(
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: Z.modal,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "80%",
-          maxWidth: 500,
-          maxHeight: "80%",
-          backgroundColor: "white",
-          borderRadius: 12,
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
+    <div onClick={onClose} className={styles.psmBackdrop} style={{ zIndex: Z.modal }}>
+      <div onClick={(e) => e.stopPropagation()} className={styles.psmDialog}>
         {/* Header */}
-        <View style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          borderBottomWidth: 1,
-          borderBottomColor: gray(0.1),
-        }}>
-          <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>
-            Search Customer
-          </Text>
+        <div className={styles.psmHeader} style={{ borderBottomColor: gray(0.1) }}>
+          <span className={styles.psmTitle} style={{ color: C.text }}>Search Customer</span>
           <StandTouch onPress={onClose}>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={{ fontSize: 14, color: gray(0.5) }}>Close</Text>
-          </TouchableOpacity>
+            <span className={styles.psmClose} style={{ color: gray(0.5) }}>Close</span>
           </StandTouch>
-        </View>
+        </div>
 
         {/* Phone input */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+        <div className={styles.psmInputWrap}>
           <PhoneNumberInput
             boxStyle={{
               width: "8%",
@@ -5848,53 +5395,39 @@ const PhoneSearchModal = ({ onSelect, onClose }) => {
             dashColor={gray(0.2)}
             textColor={C.text}
           />
-        </View>
+        </div>
 
         {/* Results */}
-        <ScrollView style={{ flex: 1, paddingHorizontal: 16, paddingBottom: 12 }}>
+        <div className={styles.psmResults}>
           {sIsSearching && (
-            <Text style={{ fontSize: 14, color: gray(0.4), textAlign: "center", paddingVertical: 12 }}>
-              Searching...
-            </Text>
+            <div className={styles.psmStatusText} style={{ color: gray(0.4) }}>Searching...</div>
           )}
           {!sIsSearching && sSearchResults.length === 0 && sPhoneInput.length > 0 && removeDashesFromPhone(sPhoneInput).length >= 5 && (
-            <Text style={{ fontSize: 14, color: gray(0.4), textAlign: "center", paddingVertical: 12 }}>
-              No customers found.
-            </Text>
+            <div className={styles.psmStatusText} style={{ color: gray(0.4) }}>No customers found.</div>
           )}
           {sSearchResults.map((customer) => (
             <StandTouch key={customer.id} onPress={() => onSelect(customer)}>
-            <TouchableOpacity
-              onPress={() => onSelect(customer)}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 10,
-                paddingHorizontal: 8,
-                marginBottom: 4,
-                borderRadius: 6,
-                borderWidth: 1,
-                borderColor: gray(0.08),
-                backgroundColor: C.listItemWhite,
-              }}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 15, color: C.text, fontWeight: "500" }}>
-                  {capitalizeFirstLetterOfString(customer.first || "")} {capitalizeFirstLetterOfString(customer.last || "")}
-                </Text>
-                <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 2 }}>
-                  {formatPhoneWithDashes(customer.customerCell || "")}
-                </Text>
-              </View>
-              {customer.email && (
-                <Text style={{ fontSize: 14, color: gray(0.4) }} numberOfLines={1}>
-                  {customer.email}
-                </Text>
-              )}
-            </TouchableOpacity>
+              <div
+                className={styles.psmResultRow}
+                style={{ borderColor: gray(0.08), backgroundColor: C.listItemWhite }}
+              >
+                <div className={styles.psmResultMain}>
+                  <span className={styles.psmResultName} style={{ color: C.text }}>
+                    {capitalizeFirstLetterOfString(customer.first || "")} {capitalizeFirstLetterOfString(customer.last || "")}
+                  </span>
+                  <span className={styles.psmResultPhone} style={{ color: gray(0.5) }}>
+                    {formatPhoneWithDashes(customer.customerCell || "")}
+                  </span>
+                </div>
+                {customer.email && (
+                  <span className={styles.psmResultEmail} style={{ color: gray(0.4) }}>
+                    {customer.email}
+                  </span>
+                )}
+              </div>
             </StandTouch>
           ))}
-        </ScrollView>
+        </div>
       </div>
     </div>,
     document.body
@@ -6023,63 +5556,37 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
   };
 
   return (
-    <View style={{ flex: 1 }}>
+    <div className={styles.swdContainer}>
       {/* Top bar: customer info + back button */}
-      <View style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: gray(0.1),
-      }}>
-        <StandTouch onPress={onShowCustomerModal} style={{ flex: 1 }}>
-        <TouchableOpacity
-          onPress={onShowCustomerModal}
-          style={{ flexDirection: "row", alignItems: "center", flex: 1 }}
-        >
-          <Image_ icon={ICONS.ridingBike} size={28} style={{ marginRight: 8 }} />
-          <View>
-            <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>
-              {custName || "Customer"}
-            </Text>
-            {custPhone ? (
-              <Text style={{ fontSize: 14, color: gray(0.5) }}>
-                {formatPhoneWithDashes(custPhone)}
-              </Text>
-            ) : null}
-          </View>
-        </TouchableOpacity>
+      <div className={styles.swdTopBar} style={{ borderBottomColor: gray(0.1) }}>
+        <StandTouch onPress={onShowCustomerModal} style={{ flex: 1, display: "flex", minWidth: 0 }}>
+          <div className={styles.swdCustomerInner}>
+            <Image_ icon={ICONS.ridingBike} size={28} style={{ marginRight: 8 }} />
+            <div className={styles.swdCustomerTextCol}>
+              <span className={styles.swdCustomerName} style={{ color: C.text }}>
+                {custName || "Customer"}
+              </span>
+              {custPhone ? (
+                <span className={styles.swdCustomerPhone} style={{ color: gray(0.5) }}>
+                  {formatPhoneWithDashes(custPhone)}
+                </span>
+              ) : null}
+            </div>
+          </div>
         </StandTouch>
         <StandTouch onPress={onBack}>
-        <TouchableOpacity
-          onPress={onBack}
-          style={{
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            borderRadius: 6,
-            backgroundColor: gray(0.12),
-          }}
-        >
-          <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>Back to Buttons</Text>
-        </TouchableOpacity>
+          <div className={styles.swdBackButton} style={{ backgroundColor: gray(0.12), color: C.text }}>
+            Back to Buttons
+          </div>
         </StandTouch>
-      </View>
+      </div>
 
       {/* Scrollable form */}
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
+      <div className={styles.swdScroll}>
         {/* Bike details section */}
-        <View style={{
-          paddingHorizontal: 8,
-          paddingVertical: 8,
-          backgroundColor: C.backgroundListWhite,
-          borderWidth: 1,
-          borderColor: gray(0.05),
-          borderRadius: 5,
-        }}>
+        <div className={styles.swdSectionBike} style={{ backgroundColor: C.backgroundListWhite, borderColor: gray(0.05) }}>
           {/* Brand row */}
-          <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
+          <div className={styles.swdRow}>
             <TextInput_
               placeholder="Brand"
               capitalize={true}
@@ -6087,28 +5594,28 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
               value={zWorkorder?.brand}
               onChangeText={(val) => setField("brand", val)}
             />
-            <View style={{ width: "55%", flexDirection: "row", paddingLeft: 5, justifyContent: "space-between" }}>
-              <View style={{ width: "48%" }}>
+            <div className={styles.swdDropdownPair}>
+              <div className={styles.swdDropdownHalf}>
                 <DropdownMenu
                   dataArr={zSettings.bikeBrands}
                   onSelect={(item) => setField("brand", item)}
                   buttonStyle={{ opacity: zWorkorder?.brand ? DROPDOWN_SELECTED_OPACITY : 1 }}
                   buttonText={zSettings.bikeBrandsName}
                 />
-              </View>
-              <View style={{ width: "48%" }}>
+              </div>
+              <div className={styles.swdDropdownHalf}>
                 <DropdownMenu
                   dataArr={zSettings.bikeOptionalBrands}
                   onSelect={(item) => setField("brand", item)}
                   buttonStyle={{ opacity: zWorkorder?.brand ? DROPDOWN_SELECTED_OPACITY : 1 }}
                   buttonText={zSettings.bikeOptionalBrandsName}
                 />
-              </View>
-            </View>
-          </View>
+              </div>
+            </div>
+          </div>
 
           {/* Model/Description row */}
-          <View style={{ flexDirection: "row", alignItems: "center", width: "100%", marginTop: 8 }}>
+          <div className={`${styles.swdRow} ${styles.swdRowMT}`}>
             <TextInput_
               placeholder="Model/Description"
               capitalize={true}
@@ -6116,18 +5623,18 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
               value={zWorkorder?.description}
               onChangeText={(val) => setField("description", val)}
             />
-            <View style={{ width: "55%", paddingLeft: 5 }}>
+            <div className={styles.swdDescDropdownWrap}>
               <DropdownMenu
                 dataArr={zSettings.bikeDescriptions}
                 onSelect={(item) => setField("description", item)}
                 buttonStyle={{ opacity: zWorkorder?.description ? DROPDOWN_SELECTED_OPACITY : 1 }}
                 buttonText="Descriptions"
               />
-            </View>
-          </View>
+            </div>
+          </div>
 
           {/* Colors row */}
-          <View style={{ flexDirection: "row", alignItems: "center", width: "100%", marginTop: 8 }}>
+          <div className={`${styles.swdRow} ${styles.swdRowMT}`}>
             <TextInput_
               placeholder="Color 1"
               capitalize={true}
@@ -6141,7 +5648,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
               }}
               onChangeText={(val) => setBikeColor(val, "color1")}
             />
-            <View style={{ width: 4 }} />
+            <div className={styles.swdColorGap} />
             <TextInput_
               placeholder="Color 2"
               capitalize={true}
@@ -6155,8 +5662,8 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
               }}
               onChangeText={(val) => setBikeColor(val, "color2")}
             />
-            <View style={{ width: "50%", flexDirection: "row", paddingLeft: 5, justifyContent: "space-between" }}>
-              <View style={{ width: "48%" }}>
+            <div className={styles.swdColorDropdownPair}>
+              <div className={styles.swdDropdownHalf}>
                 <DropdownMenu
                   itemSeparatorStyle={{ height: 0 }}
                   dataArr={COLORS}
@@ -6165,8 +5672,8 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
                   buttonStyle={{ opacity: zWorkorder?.color1 ? DROPDOWN_SELECTED_OPACITY : 1 }}
                   buttonText="Color 1"
                 />
-              </View>
-              <View style={{ width: "48%" }}>
+              </div>
+              <div className={styles.swdDropdownHalf}>
                 <DropdownMenu
                   itemSeparatorStyle={{ height: 0 }}
                   dataArr={COLORS}
@@ -6175,9 +5682,9 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
                   buttonStyle={{ opacity: zWorkorder?.color2 ? DROPDOWN_SELECTED_OPACITY : 1 }}
                   buttonText="Color 2"
                 />
-              </View>
-            </View>
-          </View>
+              </div>
+            </div>
+          </div>
 
           {/* Status */}
           <StatusPickerModal
@@ -6209,8 +5716,8 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
           />
 
           {/* Wait time row */}
-          <View style={{ flexDirection: "row", alignItems: "center", width: "100%", marginTop: 8 }}>
-            <Text style={{ color: gray(0.5), fontSize: 14, marginRight: 4 }}>Max wait days:</Text>
+          <div className={`${styles.swdRow} ${styles.swdRowMT}`}>
+            <span className={styles.swdGrayLabel} style={{ color: gray(0.5) }}>Max wait days:</span>
             <TextInput_
               placeholder="0"
               inputMode="numeric"
@@ -6232,7 +5739,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
                 setField("waitTime", waitObj);
               }}
             />
-            <View style={{ flex: 1, paddingLeft: 5 }}>
+            <div className={styles.swdWaitDropdownWrap}>
               <DropdownMenu
                 dataArr={zSettings.waitTimes}
                 onSelect={(item) => {
@@ -6243,23 +5750,17 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
                 buttonStyle={{ opacity: zWorkorder?.waitTime?.label ? DROPDOWN_SELECTED_OPACITY : 1 }}
                 buttonText="Wait Times"
               />
-            </View>
-          </View>
+            </div>
+          </div>
           {estimateLabel && (
-            <Text style={{ color: gray(0.5), fontSize: 14, fontStyle: "italic", marginTop: 4 }}>
+            <div className={styles.swdEstimateLine} style={{ color: gray(0.5) }}>
               {estimateLabel}
-            </Text>
+            </div>
           )}
-        </View>
+        </div>
 
         {/* Parts section */}
-        <View style={{
-          marginTop: 8,
-          paddingHorizontal: 8,
-          paddingVertical: 8,
-          backgroundColor: gray(0.05),
-          borderRadius: 5,
-        }}>
+        <div className={styles.swdSectionParts} style={{ backgroundColor: gray(0.05) }}>
           <TextInput_
             placeholder="Part name/description"
             capitalize={true}
@@ -6271,7 +5772,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
             }}
           />
 
-          <View style={{ flexDirection: "row", alignItems: "center", width: "100%", marginTop: 8 }}>
+          <div className={`${styles.swdRow} ${styles.swdRowMT}`}>
             <TextInput_
               placeholder="Part Source"
               capitalize={true}
@@ -6282,7 +5783,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
                 useOpenWorkordersStore.getState().setField("partOrderedMillis", Date.now(), workorderID, false);
               }}
             />
-            <View style={{ width: "50%", paddingLeft: 5 }}>
+            <div className={styles.swdPartSourceWrap}>
               <DropdownMenu
                 dataArr={zSettings.partSources}
                 onSelect={(item) => {
@@ -6292,62 +5793,40 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
                 buttonStyle={{ opacity: zWorkorder?.partSource ? DROPDOWN_SELECTED_OPACITY : 1 }}
                 buttonText="Part Sources"
               />
-            </View>
-          </View>
+            </div>
+          </div>
 
           {/* Est delivery + to be ordered */}
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", marginTop: 8 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", opacity: zWorkorder?.partToBeOrdered ? 0.35 : 1 }}>
-              <Text style={{ fontSize: 14, color: gray(0.45), marginRight: 8 }}>Est. delivery</Text>
-              <StandTouch onPress={() => updateWaitDays(Math.max(0, sWaitDays - 1))}>
-              <TouchableOpacity
-                disabled={!!zWorkorder?.partToBeOrdered}
-                onPress={() => updateWaitDays(Math.max(0, sWaitDays - 1))}
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 4,
-                  backgroundColor: zWorkorder?.partToBeOrdered ? gray(0.85) : C.buttonLightGreen,
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Text style={{ color: gray(0.55), fontSize: 16, fontWeight: "700", marginTop: -1 }}>-</Text>
-              </TouchableOpacity>
+          <div className={`${styles.swdRowSpaced} ${styles.swdRowMT}`}>
+            <div className={styles.swdEstDeliveryGroup} style={{ opacity: zWorkorder?.partToBeOrdered ? 0.35 : 1 }}>
+              <span className={styles.swdEstLabel} style={{ color: gray(0.45) }}>Est. delivery</span>
+              <StandTouch onPress={() => { if (!zWorkorder?.partToBeOrdered) updateWaitDays(Math.max(0, sWaitDays - 1)); }}>
+                <div className={styles.swdAdjustBtn} style={{ backgroundColor: zWorkorder?.partToBeOrdered ? gray(0.85) : C.buttonLightGreen }}>
+                  <span className={styles.swdAdjustBtnText} style={{ color: gray(0.55) }}>-</span>
+                </div>
               </StandTouch>
-              <Text style={{ fontSize: 14, fontWeight: "400", color: C.text, minWidth: 50, textAlign: "center" }}>
+              <span className={styles.swdDaysDisplay} style={{ color: C.text }}>
                 {sWaitDays + " days"}
-              </Text>
-              <StandTouch onPress={() => updateWaitDays(sWaitDays + 1)}>
-              <TouchableOpacity
-                disabled={!!zWorkorder?.partToBeOrdered}
-                onPress={() => updateWaitDays(sWaitDays + 1)}
-                style={{
-                  width: 24,
-                  height: 24,
-                  borderRadius: 4,
-                  backgroundColor: zWorkorder?.partToBeOrdered ? gray(0.85) : C.buttonLightGreen,
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Text style={{ color: gray(0.55), fontSize: 16, fontWeight: "700", marginTop: -1 }}>+</Text>
-              </TouchableOpacity>
+              </span>
+              <StandTouch onPress={() => { if (!zWorkorder?.partToBeOrdered) updateWaitDays(sWaitDays + 1); }}>
+                <div className={styles.swdAdjustBtn} style={{ backgroundColor: zWorkorder?.partToBeOrdered ? gray(0.85) : C.buttonLightGreen }}>
+                  <span className={styles.swdAdjustBtnText} style={{ color: gray(0.55) }}>+</span>
+                </div>
               </StandTouch>
               {!!zWorkorder?.partOrderEstimateMillis && !zWorkorder?.partToBeOrdered && (
-                <Text style={{ fontSize: 14, color: gray(0.45), marginLeft: 8 }}>
+                <span className={styles.swdEstDate} style={{ color: gray(0.45) }}>
                   {formatMillisForDisplay(zWorkorder.partOrderEstimateMillis)}
-                </Text>
+                </span>
               )}
-            </View>
+            </div>
             <CheckBox
               text="To be ordered"
               isChecked={!!zWorkorder?.partToBeOrdered}
               onCheck={() => setField("partToBeOrdered", !zWorkorder?.partToBeOrdered)}
               textStyle={{ fontSize: 14, color: gray(0.55) }}
             />
-          </View>
-        </View>
+          </div>
+        </div>
 
         {/* Media buttons */}
         <input
@@ -6356,75 +5835,60 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
           accept="image/*,video/*"
           multiple
           onChange={handleDirectUpload}
-          style={{ display: "none" }}
+          className={styles.swdHiddenInput}
         />
-        <View style={{ alignItems: "center", marginTop: 8 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+        <div className={styles.swdMediaCol}>
+          <div className={styles.swdMediaBtnRow}>
             <StandTouch onPress={() => uploadInputRef.current?.click()}>
-            <Button_
-              icon={ICONS.uploadCamera}
-              iconSize={40}
-              onPress={() => uploadInputRef.current?.click()}
-              buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 0, paddingVertical: 0 }}
-            />
-            </StandTouch>
-            <View>
-              <StandTouch onPress={() => _setShowMediaModal("view")}>
               <Button_
-                icon={ICONS.viewPhoto}
-                iconSize={50}
-                onPress={() => _setShowMediaModal("view")}
+                icon={ICONS.uploadCamera}
+                iconSize={40}
+                onPress={() => uploadInputRef.current?.click()}
                 buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 0, paddingVertical: 0 }}
               />
+            </StandTouch>
+            <div className={styles.swdViewMediaWrap}>
+              <StandTouch onPress={() => _setShowMediaModal("view")}>
+                <Button_
+                  icon={ICONS.viewPhoto}
+                  iconSize={50}
+                  onPress={() => _setShowMediaModal("view")}
+                  buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 0, paddingVertical: 0 }}
+                />
               </StandTouch>
-              <View style={{
-                position: "absolute",
-                top: -1,
-                right: -5,
-                borderRadius: 8,
-                minWidth: 16,
-                height: 16,
-                justifyContent: "center",
-                alignItems: "center",
-                paddingHorizontal: 3,
-              }}>
-                <Text style={{
-                  color: zWorkorder?.media?.length > 0 ? C.red : "gray",
-                  fontSize: 15,
-                  fontWeight: "700",
-                }}>
+              <div className={styles.swdMediaCountBadge}>
+                <span
+                  className={styles.swdMediaCountText}
+                  style={{ color: zWorkorder?.media?.length > 0 ? C.red : "gray" }}
+                >
                   {zWorkorder?.media?.length || 0}
-                </Text>
-              </View>
-            </View>
-          </View>
+                </span>
+              </div>
+            </div>
+          </div>
           {/* Upload progress bar */}
           {sUploadProgress && (
-            <View style={{ flexDirection: "row", alignItems: "center", width: "100%", paddingBottom: 4 }}>
-              <Text style={{
-                fontSize: 14,
-                color: sUploadProgress.done ? (sUploadProgress.failed > 0 ? C.red : C.green) : gray(0.45),
-                fontWeight: "700",
-                marginRight: 6,
-              }}>
+            <div className={styles.swdProgressRow}>
+              <span
+                className={styles.swdProgressText}
+                style={{ color: sUploadProgress.done ? (sUploadProgress.failed > 0 ? C.red : C.green) : gray(0.45) }}
+              >
                 {sUploadProgress.completed}/{sUploadProgress.total}
-              </Text>
-              <View style={{ flex: 1, height: 4, backgroundColor: gray(0.88), borderRadius: 2, overflow: "hidden" }}>
+              </span>
+              <div className={styles.swdProgressTrack} style={{ backgroundColor: gray(0.88) }}>
                 {!sUploadProgress.done ? (
-                  <View style={{ width: "40%", height: "100%", backgroundColor: C.blue, borderRadius: 2 }} />
+                  <div className={styles.swdProgressFill} style={{ width: "40%", backgroundColor: C.blue }} />
                 ) : (
-                  <View style={{
-                    width: "100%",
-                    height: "100%",
-                    backgroundColor: sUploadProgress.failed > 0 ? C.red : C.green,
-                    borderRadius: 2,
-                  }} />
+                  <div
+                    className={styles.swdProgressFill}
+                    style={{ width: "100%", backgroundColor: sUploadProgress.failed > 0 ? C.red : C.green }}
+                  />
                 )}
-              </View>
-            </View>
+              </div>
+            </div>
           )}
-        </View>
-      </ScrollView>
+        </div>
+      </div>
 
       {/* Media view modal */}
       <WorkorderMediaModal
@@ -6433,7 +5897,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
         workorderID={workorderID}
         mode="view"
       />
-    </View>
+    </div>
   );
 };
 
@@ -6463,66 +5927,28 @@ const CustomerInfoViewModal = ({ customer, onClose }) => {
   ].filter((f) => f.value);
 
   return createPortal(
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: Z.modal,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "70%",
-          maxWidth: 420,
-          backgroundColor: "white",
-          borderRadius: 12,
-          overflow: "hidden",
-        }}
-      >
-        <View style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          borderBottomWidth: 1,
-          borderBottomColor: gray(0.1),
-        }}>
-          <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>Customer Info</Text>
+    <div onClick={onClose} className={styles.cimBackdrop} style={{ zIndex: Z.modal }}>
+      <div onClick={(e) => e.stopPropagation()} className={styles.cimDialog}>
+        <div className={styles.cimHeader} style={{ borderBottomColor: gray(0.1) }}>
+          <span className={styles.cimTitle} style={{ color: C.text }}>Customer Info</span>
           <StandTouch onPress={onClose}>
-          <TouchableOpacity onPress={onClose}>
-            <Text style={{ fontSize: 14, color: gray(0.5) }}>Close</Text>
-          </TouchableOpacity>
+            <span className={styles.cimClose} style={{ color: gray(0.5) }}>Close</span>
           </StandTouch>
-        </View>
-        <View style={{ padding: 16 }}>
+        </div>
+        <div className={styles.cimBody}>
           {fields.map((f, idx) => (
-            <View
+            <div
               key={idx}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 8,
-                borderBottomWidth: idx < fields.length - 1 ? 1 : 0,
-                borderBottomColor: gray(0.06),
-              }}
+              className={`${styles.cimField}${idx < fields.length - 1 ? " " + styles.cimFieldBordered : ""}`}
+              style={idx < fields.length - 1 ? { borderBottomColor: gray(0.06) } : undefined}
             >
-              <Text style={{ fontSize: 14, color: gray(0.5), width: 100 }}>{f.label}</Text>
-              <Text style={{ fontSize: 14, color: C.text, fontWeight: "500", flex: 1 }}>
+              <span className={styles.cimFieldLabel} style={{ color: gray(0.5) }}>{f.label}</span>
+              <span className={styles.cimFieldValue} style={{ color: C.text }}>
                 {capitalizeFirstLetterOfString(String(f.value))}
-              </Text>
-            </View>
+              </span>
+            </div>
           ))}
-        </View>
+        </div>
       </div>
     </div>,
     document.body

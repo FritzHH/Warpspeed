@@ -1,0 +1,1447 @@
+/* =================================================================
+   StandWorkorderDetail
+   ================================================================= */
+
+.swdContainer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.swdTopBar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid;
+  flex-shrink: 0;
+}
+
+.swdCustomerTouch {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+
+.swdCustomerInner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.swdCustomerTextCol {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.swdCustomerName {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.swdCustomerPhone {
+  font-size: 14px;
+}
+
+.swdBackButton {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.swdScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  min-height: 0;
+}
+
+.swdSectionBike {
+  padding: 8px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 5px;
+}
+
+.swdSectionParts {
+  margin-top: 8px;
+  padding: 8px;
+  border-radius: 5px;
+}
+
+.swdRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+}
+
+.swdRowSpaced {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.swdRowMT {
+  margin-top: 8px;
+}
+
+.swdDropdownPair {
+  width: 55%;
+  display: flex;
+  flex-direction: row;
+  padding-left: 5px;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.swdDropdownHalf {
+  width: 48%;
+  flex-shrink: 0;
+}
+
+.swdDescDropdownWrap {
+  width: 55%;
+  padding-left: 5px;
+  flex-shrink: 0;
+}
+
+.swdColorDropdownPair {
+  width: 50%;
+  display: flex;
+  flex-direction: row;
+  padding-left: 5px;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.swdColorGap {
+  width: 4px;
+  flex-shrink: 0;
+}
+
+.swdWaitDropdownWrap {
+  flex: 1;
+  padding-left: 5px;
+}
+
+.swdPartSourceWrap {
+  width: 50%;
+  padding-left: 5px;
+  flex-shrink: 0;
+}
+
+.swdInput {
+  border-width: 1px;
+  border-style: solid;
+  padding: 4px 6px;
+  font-size: 14px;
+  border-radius: 5px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.swdEstDeliveryGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.swdEstLabel {
+  font-size: 14px;
+  margin-right: 8px;
+}
+
+.swdAdjustBtn {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.swdAdjustBtnText {
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: -1px;
+}
+
+.swdDaysDisplay {
+  font-size: 14px;
+  font-weight: 400;
+  min-width: 50px;
+  text-align: center;
+}
+
+.swdEstDate {
+  font-size: 14px;
+  margin-left: 8px;
+}
+
+.swdMediaCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.swdMediaBtnRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.swdViewMediaWrap {
+  position: relative;
+  display: flex;
+}
+
+.swdMediaCountBadge {
+  position: absolute;
+  top: -1px;
+  right: -5px;
+  border-radius: 8px;
+  min-width: 16px;
+  height: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0 3px;
+}
+
+.swdMediaCountText {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.swdProgressRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+  padding-bottom: 4px;
+}
+
+.swdProgressText {
+  font-size: 14px;
+  font-weight: 700;
+  margin-right: 6px;
+}
+
+.swdProgressTrack {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.swdProgressFill {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.swdGrayLabel {
+  font-size: 14px;
+  margin-right: 4px;
+}
+
+.swdEstimateLine {
+  font-size: 14px;
+  font-style: italic;
+  margin-top: 4px;
+}
+
+.swdHiddenInput {
+  display: none;
+}
+
+/* =================================================================
+   CustomerInfoViewModal
+   ================================================================= */
+
+.cimBackdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cimDialog {
+  width: 70%;
+  max-width: 420px;
+  background-color: white;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.cimHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid;
+}
+
+.cimTitle {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.cimClose {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+}
+
+.cimBody {
+  padding: 16px;
+}
+
+.cimField {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 0;
+}
+
+.cimFieldBordered {
+  border-bottom: 1px solid;
+}
+
+.cimFieldLabel {
+  font-size: 14px;
+  width: 100px;
+  flex-shrink: 0;
+}
+
+.cimFieldValue {
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+}
+
+/* =================================================================
+   NewWorkorderModal
+   ================================================================= */
+
+.nwmBackdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nwmDialog {
+  width: 95%;
+  height: 95%;
+  background-color: white;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.nwmCreateHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 12px;
+  border-bottom: 1px solid;
+  flex-shrink: 0;
+}
+
+.nwmBackBtn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 21px;
+  font-weight: 600;
+}
+
+.nwmTapToClose {
+  padding: 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.nwmTapToCloseText {
+  font-size: 26px;
+  font-style: italic;
+}
+
+.nwmSearchRow {
+  padding: 12px;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.nwmSearchBox {
+  flex: 1;
+  border-radius: 8px;
+  border-width: 2px;
+  border-style: solid;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  height: 56px;
+  padding: 0 12px;
+  font-size: 38px;
+  font-weight: 500;
+}
+
+.nwmSearchText {
+  flex: 1;
+}
+
+.nwmModeToggle {
+  padding: 0 34px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  font-size: 23px;
+  font-weight: 600;
+  color: white;
+  flex-shrink: 0;
+}
+
+.nwmKeypadWrap {
+  padding: 0 12px 8px;
+  flex-shrink: 0;
+}
+
+.nwmResultsScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 12px;
+  margin-top: 15px;
+  min-height: 0;
+}
+
+.nwmResultRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 17px 12px;
+  margin-bottom: 4px;
+  border-radius: 8px;
+  border-width: 1px;
+  border-style: solid;
+  gap: 16px;
+}
+
+.nwmResultName {
+  flex: 1;
+  font-size: 27px;
+  font-weight: 600;
+}
+
+.nwmResultMeta {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.nwmResultMetaLandline {
+  font-size: 14px;
+}
+
+.nwmResultPhone {
+  font-size: 25px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nwmNoResults {
+  font-size: 26px;
+  text-align: center;
+  padding: 10px 0;
+}
+
+.nwmCreateBtnWrap {
+  padding: 12px;
+  border-top: 1px solid;
+  flex-shrink: 0;
+}
+
+.nwmCreateBtn {
+  padding: 14px 0;
+  border-radius: 8px;
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  font-size: 21px;
+  font-weight: 600;
+  color: white;
+}
+
+.nwmFormCol {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.nwmFormField {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  border-width: 2px;
+  border-style: solid;
+  cursor: pointer;
+}
+
+.nwmFormLabel {
+  font-size: 16px;
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.nwmFormValue {
+  font-size: 19px;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+}
+
+.nwmSpacer {
+  flex: 1;
+}
+
+/* =================================================================
+   StandCustomItemModal
+   ================================================================= */
+
+.scimBackdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.scimDialog {
+  width: 95%;
+  height: 95%;
+  background-color: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.scimHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 1px solid;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.scimTitle {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.scimTapToClose {
+  flex: 1;
+  font-size: 18px;
+  font-style: italic;
+  text-align: center;
+}
+
+.scimScroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 12px 0;
+  min-height: 0;
+}
+
+.scimPairedRow {
+  display: flex;
+  flex-direction: row;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.scimPairedFieldWrap {
+  flex: 1;
+  display: flex;
+  min-width: 0;
+}
+
+.scimPairedField {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  border-radius: 8px;
+  border-width: 2px;
+  border-style: solid;
+  cursor: pointer;
+  flex: 1;
+  min-width: 0;
+}
+
+.scimPairedLabelCol {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.scimPairedLabel {
+  font-size: 17px;
+}
+
+.scimPairedSublabel {
+  font-size: 14px;
+}
+
+.scimPairedValue {
+  font-size: 20px;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+}
+
+.scimField {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  margin-bottom: 6px;
+  border-radius: 8px;
+  border-width: 2px;
+  border-style: solid;
+  cursor: pointer;
+}
+
+.scimFieldLabelCol {
+  width: 130px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.scimFieldLabel {
+  font-size: 17px;
+}
+
+.scimFieldSublabel {
+  font-size: 14px;
+}
+
+.scimFieldValue {
+  font-size: 20px;
+  font-weight: 500;
+  flex: 1;
+  min-width: 0;
+}
+
+.scimQuickNotesBtn {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: 600;
+  color: white;
+  flex-shrink: 0;
+}
+
+.scimDiscountSection {
+  margin: 4px 0 8px;
+}
+
+.scimDiscountLabel {
+  font-size: 21px;
+  margin-bottom: 4px;
+  padding-left: 2px;
+}
+
+.scimDiscountChips {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scimDiscountChip {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border-width: 1px;
+  border-style: solid;
+  cursor: pointer;
+  font-size: 22px;
+}
+
+.scimDiscountPreview {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding-left: 2px;
+}
+
+.scimDiscountOriginal {
+  font-size: 23px;
+  text-decoration: line-through;
+}
+
+.scimDiscountFinal {
+  font-size: 25px;
+  font-weight: 600;
+}
+
+.scimDiscountAmount {
+  font-size: 21px;
+}
+
+.scimKeypadWrap {
+  padding: 0 12px 8px;
+  flex-shrink: 0;
+}
+
+.scimSaveWrap {
+  padding: 12px;
+  border-top: 1px solid;
+  flex-shrink: 0;
+}
+
+.scimSaveBtn {
+  padding: 32px 0;
+  border-radius: 8px;
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  font-size: 28px;
+  font-weight: 600;
+  color: white;
+}
+
+/* =================================================================
+   PhoneSearchModal
+   ================================================================= */
+
+.psmBackdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.psmDialog {
+  width: 80%;
+  max-width: 500px;
+  max-height: 80%;
+  background-color: white;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.psmHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid;
+  flex-shrink: 0;
+}
+
+.psmTitle {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.psmClose {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-size: 14px;
+}
+
+.psmInputWrap {
+  padding: 12px 16px;
+  flex-shrink: 0;
+}
+
+.psmResults {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 16px 12px;
+  min-height: 0;
+}
+
+.psmStatusText {
+  font-size: 14px;
+  text-align: center;
+  padding: 12px 0;
+}
+
+.psmResultRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 10px 8px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  border-width: 1px;
+  border-style: solid;
+  cursor: pointer;
+}
+
+.psmResultMain {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.psmResultName {
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.psmResultPhone {
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.psmResultEmail {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 50%;
+}
+
+/* Reset button + chip defaults used in StandCustomItemModal/NewWorkorderModal */
+.resetBtn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+/* =================================================================
+   Phase 3e — Sidebar Nav + Button Grid (main BikeStandScreen)
+   ================================================================= */
+
+.standMainRow {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+}
+
+.standSidebar {
+  width: 20%;
+  border-right-width: 1px;
+  border-right-style: solid;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.standBreadcrumbRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6px 6px 4px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.standBreadcrumbBackText {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.standBreadcrumbSeg {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.standBreadcrumbSep {
+  margin: 0 3px;
+  font-size: 13px;
+}
+
+.standBreadcrumbText {
+  font-size: 13px;
+}
+
+.standNavScroll {
+  flex: 1;
+  padding: 6px 6px 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.standNavItem {
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.standSidebarFooter {
+  position: relative;
+  padding: 14px 10px;
+  border-top-width: 1px;
+  border-top-style: solid;
+  flex-shrink: 0;
+}
+
+.standSidebarFooterRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-around;
+}
+
+.standFooterIconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+}
+
+.standFooterMenuContent {
+  background-color: white;
+  border-radius: 10px;
+  border-width: 2px;
+  border-style: solid;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  min-width: 320px;
+}
+
+.standFooterMenuItem {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+}
+
+.standFooterMenuItem:last-child {
+  border-bottom: none;
+}
+
+.standFooterMenuItemText {
+  font-size: 30px;
+  font-weight: 500;
+}
+
+/* =================================================================
+   Phase 3b — Stand Settings / Face Recognition / PIN modals
+   ================================================================= */
+
+.standModalBackdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.standModalBackdropStrong {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.standSettingsDialog {
+  width: 70%;
+  max-width: 500px;
+  background-color: white;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.standSettingsHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 18px 20px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  cursor: pointer;
+}
+
+.standSettingsHeaderTitle {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.standSettingsHeaderHint {
+  flex: 1;
+  font-size: 18px;
+  font-style: italic;
+  text-align: center;
+}
+
+.standSettingsBody {
+  padding: 20px;
+}
+
+.standSettingsSectionLabel {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 12px;
+  letter-spacing: 1px;
+}
+
+.standSettingsToggleRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border-width: 2px;
+  border-style: solid;
+}
+
+.standSettingsToggleTextCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.standSettingsToggleTitle {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+.standSettingsToggleSubtitle {
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.standFaceDialog {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px 40px;
+  background-color: white;
+  border-radius: 16px;
+}
+
+.standFaceTitle {
+  font-size: 22px;
+  font-weight: 600;
+  margin-top: 12px;
+}
+
+.standFaceCountdown {
+  font-size: 52px;
+  font-weight: 700;
+  margin-top: 16px;
+}
+
+.standFacePinBtn {
+  margin-top: 20px;
+  padding: 12px 28px;
+  border-radius: 8px;
+}
+
+.standFacePinBtnText {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.standPinDialog {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 30px 40px;
+  background-color: white;
+  border-radius: 16px;
+  min-width: 280px;
+}
+
+.standPinTitle {
+  font-size: 35px;
+  font-weight: 600;
+  margin-bottom: 20px;
+}
+
+.standPinDotRow {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 20px;
+  align-items: center;
+}
+
+.standPinDot {
+  width: 44px;
+  height: 52px;
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 8px;
+  margin: 0 4px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.standPinDotFilled {
+  width: 14px;
+  height: 14px;
+  border-radius: 7px;
+}
+
+.standPinCancel {
+  margin-top: 16px;
+}
+
+.standPinCancelText {
+  font-size: 31px;
+}
+
+/* =================================================================
+   Phase 3d — Header + Collapsible Bike Details panel
+   ================================================================= */
+
+.bvOuter {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.bvSpacer1 {
+  width: 100%;
+  height: 1px;
+}
+
+.bvHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 18px 14px;
+  cursor: pointer;
+}
+
+.bvHeaderLeft {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.bvHeaderName {
+  font-size: 27px;
+  font-weight: 600;
+}
+
+.bvHeaderPhone {
+  font-size: 24px;
+}
+
+.bvHeaderRight {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 9px;
+  margin-right: 15px;
+}
+
+.bvHeaderBrand {
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.bvHeaderDescription {
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.bvHeaderHint {
+  font-size: 27px;
+  font-style: italic;
+}
+
+.bvStatusWrap {
+  display: flex;
+}
+
+.bvDetailsPanel {
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px 8px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+}
+
+.bvFieldRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.bvFieldRowTight {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.bvFieldHalf {
+  width: 50%;
+  flex-shrink: 0;
+}
+
+.bvFieldHalfRow {
+  width: 50%;
+  display: flex;
+  flex-direction: row;
+  padding-left: 5px;
+  justify-content: space-between;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.bvFieldHalfRowCenter {
+  width: 50%;
+  display: flex;
+  flex-direction: row;
+  padding-left: 5px;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.bvFieldHalfRowAlign {
+  width: 50%;
+  display: flex;
+  flex-direction: row;
+  padding-left: 5px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.bvFieldDropdownSlot48 {
+  width: 48%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bvFieldDropdownSlotFull {
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.bvFieldGap5 {
+  width: 5px;
+  flex-shrink: 0;
+}
+
+.bvFieldGap4pct {
+  width: 4%;
+  flex-shrink: 0;
+}
+
+.bvColorHalf {
+  width: 50%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.bvColorInput48 {
+  width: 48%;
+  flex-shrink: 0;
+}
+
+.bvWaitHalf {
+  width: 50%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.bvWaitLabel {
+  font-size: 18px;
+  margin-right: 4px;
+}
+
+.bvWaitStep {
+  margin-left: 6px;
+}
+
+.bvWaitStepPlus {
+  margin-left: 4px;
+}
+
+.bvWaitEstimate {
+  font-size: 18px;
+  font-style: italic;
+  margin-top: 4px;
+  padding: 2px 4px;
+}
+
+.bvKeypadWrap {
+  margin-top: 8px;
+}
+
+.bvKeypadCloseRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  margin-top: 6px;
+  padding: 0 4px;
+}
+
+.bvKeypadClose {
+  padding: 4px;
+}
+
+.bvStatusPickerWrap {
+  display: flex;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.bvHideDivider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 15px 0;
+  background-color: rgb(255, 220, 220);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.bvHideDividerText {
+  font-size: 32px;
+  font-style: italic;
+}
+
+.shoOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.shoColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: center;
+}
+
+.shoFindBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px;
+  border-radius: 12px;
+  gap: 12px;
+}
+
+.shoFindText {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+.shoNewBtn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 120px;
+  border-radius: 12px;
+  gap: 24px;
+}
+
+.shoNewText {
+  font-size: 64px;
+  font-weight: 700;
+}

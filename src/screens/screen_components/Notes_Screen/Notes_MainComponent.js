@@ -181,13 +181,7 @@ export function Notes_MainComponent() {
             </div>
             <TouchableOpacity
               onPress={() => outsideClicked("customer")}
-              style={{
-                flex: 1,
-                height: "100%",
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-              }}
+              className={styles.headerAction}
             >
               <span className={styles.headerActionText} style={{ color: gray(0.18) }}>
                 Click to add
@@ -208,7 +202,7 @@ export function Notes_MainComponent() {
                             deleteItem(item, index, "customer");
                             _setEditingNoteId(null);
                           }}
-                          style={{ padding: 2 }}
+                          className={styles.deleteBtn}
                         >
                           <Image
                             icon={ICONS.trash}
@@ -263,23 +257,8 @@ export function Notes_MainComponent() {
           <Tooltip text="Add note" position="top">
             <TouchableOpacity
               onPress={() => outsideClicked("internal")}
-              style={{
-                width: "100%",
-                height: 35,
-                display: "flex",
-                flexDirection: "row",
-                justifyContent: "flex-start",
-                alignItems: "center",
-                borderColor: C.buttonLightGreenOutline,
-                borderStyle: "solid",
-                borderWidth: 1,
-                borderRadius: 15,
-                marginBottom: 5,
-                paddingLeft: 3,
-                paddingRight: 3,
-                boxSizing: "border-box",
-                flexShrink: 0,
-              }}
+              className={styles.headerBarInternal}
+              style={{ borderColor: C.buttonLightGreenOutline }}
             >
               <div className={styles.headerIconGroupInternal}>
                 <Image icon={ICONS.gears1} size={20} />
@@ -306,7 +285,7 @@ export function Notes_MainComponent() {
                             deleteItem(item, index, "internal");
                             _setEditingNoteId(null);
                           }}
-                          style={{ padding: 2 }}
+                          className={styles.deleteBtn}
                         >
                           <Image
                             icon={ICONS.trash}

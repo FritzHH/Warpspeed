@@ -1,0 +1,185 @@
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.tabBarRoot {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  justify-content: space-between;
+  padding-right: 5px;
+  box-sizing: border-box;
+}
+
+.tabBarLeft {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.tabBarRight {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.spacer5 {
+  width: 5px;
+  flex-shrink: 0;
+}
+
+.userBtnWrap {
+  display: inline-flex;
+}
+
+.userBtn,
+.loginBtn {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 2px 7px;
+  margin-right: 5px;
+  border: 1px solid rgb(200, 228, 220);
+  background: rgb(232, 239, 245);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  transition: opacity 120ms ease;
+}
+
+.userBtn {
+  border-radius: 5px;
+}
+
+.loginBtn {
+  border-radius: 15px;
+}
+
+.userBtn:hover,
+.loginBtn:hover {
+  opacity: 0.82;
+}
+
+.btnIcon {
+  width: 13px;
+  height: 13px;
+  object-fit: contain;
+  display: block;
+}
+
+.btnText {
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(0, 0, 0, 0.1);
+  border-top-color: currentColor;
+  animation: spin 0.75s linear infinite;
+  display: inline-block;
+}
+
+.cameraBtnWrap {
+  position: relative;
+  width: 19px;
+  height: 19px;
+  flex-shrink: 0;
+}
+
+.cameraBtn {
+  width: 19px;
+  height: 19px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: block;
+}
+
+.cameraIcon {
+  width: 19px;
+  height: 19px;
+  object-fit: contain;
+  display: block;
+}
+
+.cameraErrorOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.printerOfflineBtn {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  background: yellow;
+  padding: 3px 8px;
+  border-radius: 6px;
+  margin-right: 5px;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.printerOfflineIcon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  margin-right: 4px;
+  display: block;
+}
+
+.printerOfflineText {
+  font-size: 12px;
+  font-weight: 700;
+  color: red;
+}
+
+.wifiIcon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  display: block;
+}
+
+.emailTabWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.emailBadge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 10px;
+  background: rgb(255, 28, 28);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 4px;
+  pointer-events: none;
+  box-sizing: border-box;
+}
+
+.emailBadgeText {
+  color: rgb(255, 255, 255);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}

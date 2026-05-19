@@ -1,0 +1,47 @@
+.root {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.emptyState {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  min-height: 0;
+}
+
+.emptyStateIcon {
+  opacity: 0.2;
+  margin-bottom: 16px;
+}
+
+.emptyStateText {
+  font-size: 16px;
+}
+
+.sendingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.7);
+  z-index: 999;
+}
+
+.sendingText {
+  font-size: 15px;
+  margin-top: 12px;
+}

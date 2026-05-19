@@ -4,6 +4,8 @@ import { View, Text, TouchableOpacity, ScrollView, FlatList, ActivityIndicator }
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../styles";
 import { Button_, Image_, TextInput_ } from "../../../components";
+import { Image } from "../../../dom_components/Image/Image";
+import styles from "./Items_EmailView.module.css";
 import { useEmailStore, useLoginStore, useSettingsStore } from "../../../stores";
 import { dbGmailSendEmail, dbGmailModifyLabels, dbGmailGetAttachment } from "../../../db_calls_wrapper";
 import { log, gray } from "../../../utils";
@@ -88,39 +90,30 @@ export const Items_EmailView = React.memo(() => {
     content = <ThreadView />;
   } else {
     content = (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
-        <Image_ icon={ICONS.paperPlane} size={64} style={{ opacity: 0.2, marginBottom: 16 }} />
-        <Text style={{ fontSize: 16, color: gray(0.5) }}>
+      <div className={styles.emptyState}>
+        <Image icon={ICONS.paperPlane} size={64} className={styles.emptyStateIcon} />
+        <span className={styles.emptyStateText} style={{ color: gray(0.5) }}>
           Select an email to read, or compose a new message
-        </Text>
-      </View>
+        </span>
+      </div>
     );
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <div className={styles.root}>
       {content}
       {zSendingEmail && (
-        <View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(255,255,255,0.7)",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 999,
-          }}
-        >
-          <Image_ icon={ICONS.wheelGIF} size={80} />
-          <Text style={{ fontSize: 15, color: C.text, marginTop: 12, fontWeight: Fonts.weight.textHeavy }}>
+        <div className={styles.sendingOverlay}>
+          <Image icon={ICONS.wheelGIF} size={80} />
+          <span
+            className={styles.sendingText}
+            style={{ color: C.text, fontWeight: Fonts.weight.textHeavy }}
+          >
             Sending email...
-          </Text>
-        </View>
+          </span>
+        </div>
       )}
-    </View>
+    </div>
   );
 });
 

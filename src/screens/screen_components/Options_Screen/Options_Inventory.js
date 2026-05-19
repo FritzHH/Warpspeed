@@ -1,8 +1,7 @@
 /*eslint-disable*/
 import React, { useEffect, useImperativeHandle, useRef, useState } from "react";
-import { View, FlatList, Text, TouchableOpacity, ScrollView } from "react-native-web";
 import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO, QUICK_BUTTON_ITEM_PROTO, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../data";
-import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
+import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 
 import {
   applyDiscountToWorkorderItem,
@@ -19,12 +18,8 @@ import {
 } from "../../../utils";
 import { workerSearchInventory } from "../../../inventorySearchManager";
 import {
-  Button_,
   Image_,
   NoteHelper,
-  ScreenModal,
-  StaleBanner,
-  TouchableOpacity_,
   TextInput_,
   Tooltip,
 } from "../../../components";
@@ -41,6 +36,7 @@ import {
 import { dbSaveSettingsField, dbSaveInventoryItem, dbSavePrintObj } from "../../../db_calls_wrapper";
 import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
 import headerStyles from "./InventoryHeader.module.css";
+import styles from "./OptionsInventory.module.css";
 
 function getQuickButtonFontSize(text, baseFontSize) {
   let len = (text || "").length;
@@ -326,7 +322,8 @@ const QuickItemCanvasCard = ({
         cursor: sEditMode ? (sDragging ? "grabbing" : (sResizing ? "auto" : "grab")) : "pointer",
         opacity: sPressed ? 0.7 : (sDragging ? 0.7 : 1),
         boxSizing: "border-box",
-        paddingHorizontal: 4,
+        paddingLeft: 4,
+        paddingRight: 4,
         paddingTop: 2,
         paddingBottom: sEditMode ? 2 : (sShowActions ? 20 : 2),
         userSelect: "none",
@@ -418,17 +415,17 @@ const QuickItemCanvasCard = ({
         </div>
       ) : (
           <div title={defaultName} style={{ display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", width: "100%", height: "100%" }}>
-          <Text
-            style={{
-              fontSize: itemObj.fontSize || 10,
-              color: itemObj.textColor || (invItem ? C.text : gray(0.35)),
-              textAlign: "center",
-              fontWeight: "500",
-              lineHeight: (itemObj.fontSize || 10) + 6,
-            }}
-          >
-            {name}
-          </Text>
+            <span
+              style={{
+                fontSize: itemObj.fontSize || 10,
+                color: itemObj.textColor || (invItem ? C.text : gray(0.35)),
+                textAlign: "center",
+                fontWeight: 500,
+                lineHeight: ((itemObj.fontSize || 10) + 6) + "px",
+              }}
+            >
+              {name}
+            </span>
           </div>
       )}
       {!sEditMode && (
@@ -456,7 +453,7 @@ const QuickItemCanvasCard = ({
                   cursor: "pointer",
                 }}
               >
-                <Text style={{ fontSize: 8, color: itemObj.textColor || C.text, opacity: 0.12, lineHeight: 14 }}>{sShowActions ? "\u25BC" : "\u25B6"}</Text>
+                <span style={{ fontSize: 8, color: itemObj.textColor || C.text, opacity: 0.12, lineHeight: "14px" }}>{sShowActions ? "\u25BC" : "\u25B6"}</span>
               </div>
             </Tooltip>
           </div>
@@ -499,9 +496,9 @@ const QuickItemCanvasCard = ({
                 <Image_ icon={ICONS.info} size={13} />
               </div>
               {!!price && (
-                <Text style={{ fontSize: 12, color: gray(0.45) }}>
+                <span style={{ fontSize: 12, color: gray(0.45) }}>
                   ${price}
-                </Text>
+                </span>
               )}
             </div>
           )}
@@ -558,7 +555,7 @@ const QuickItemCanvasCard = ({
           {/* Print success flash */}
           {sPrintSuccess && (
             <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(88,145,65,0.15)", borderRadius: 8, zIndex: 5, pointerEvents: "none" }}>
-              <Text style={{ fontSize: 9, color: C.green, fontWeight: "600" }}>Sent!</Text>
+              <span style={{ fontSize: 9, color: C.green, fontWeight: 600 }}>Sent!</span>
             </div>
           )}
         </>
@@ -839,7 +836,7 @@ const QuickItemCanvas = React.forwardRef(({
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
       {/* Canvas */}
       <div
         ref={canvasRef}
@@ -1015,12 +1012,12 @@ const QuickItemCanvas = React.forwardRef(({
         )}
 
         {rawItems.length === 0 && (
-          <View style={{ flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 60 }}>
-            <Text style={{ fontSize: 13, color: gray(0.4) }}>No items in this button</Text>
-          </View>
+          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", paddingTop: 60, boxSizing: "border-box" }}>
+            <span style={{ fontSize: 13, color: gray(0.4) }}>No items in this button</span>
+          </div>
         )}
       </div>
-    </View>
+    </div>
   );
 });
 
@@ -1546,84 +1543,63 @@ export function InventoryComponent({}) {
   // Show loading state until all data is ready and component is ready
   if (!isDataLoaded || !isReady) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: C.listItemWhite,
-        }}
-      >
-        <Text style={{ fontSize: 16, color: C.text, textAlign: "center" }}>
+      <div className={styles.loadingSplash}>
+        <div className={styles.loadingSplashText}>
           {/* Loading Quick Items... */}
-        </Text>
-      </View>
+        </div>
+      </div>
     );
   }
   return (
-    <View
-      style={{
-        paddingRight: 3,
-        flex: 1,
-      }}
-    >
+    <div className={styles.container}>
       {/* {isInventoryLocked && (
         <StaleBanner
-          text="Sale in Progress — Workorder Locked"
+          text="Sale in Progress - Workorder Locked"
           style={{ marginHorizontal: 4, marginTop: 3, marginBottom: 3, backgroundColor: "black" }}
           textStyle={{ color: "#FFD600" }}
         />
       )} */}
-      <View
-        style={{ flex: 1, opacity: isInventoryLocked ? 0.4 : 1 }}
-        pointerEvents={isInventoryLocked ? "none" : "auto"}
-      >
+      <div className={`${styles.lockOverlay} ${isInventoryLocked ? styles.lockOverlayLocked : ""}`}>
       {sCanvasEditMode && sSelectedButtonID ? (
-        <View
-          style={{
-            width: "100%",
-            height: "5%",
-            flexDirection: "row",
-            paddingHorizontal: 6,
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ fontSize: 13, color: gray(0.45), marginRight: 8 }}>
-              Drag edges to resize; use hand icon to move card; and right-click to save & exit.
-          </Text>
+        <div className={styles.editBar}>
+          <span className={styles.editBarText}>
+            Drag edges to resize; use hand icon to move card; and right-click to save & exit.
+          </span>
           {sCanvasSelectedItemId && (
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 2 }}>
+            <div className={styles.editBarControls}>
               <Tooltip text="Card Colors" position="bottom">
-                <TouchableOpacity
-                  onPress={(e) => {
-                    let evt = e?.nativeEvent || e;
-                    _setColorPickerAnchor({ x: evt.pageX || 0, y: evt.pageY || 0 });
+                <button
+                  type="button"
+                  className={`${styles.editBarIconBtn} ${styles.editBarIconBtnSpacer}`}
+                  onClick={(e) => {
+                    _setColorPickerAnchor({ x: e.pageX || 0, y: e.pageY || 0 });
                     _setShowColorPickerModal(true);
                   }}
-                  style={{ width: 25, height: 25, borderRadius: 4, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center", marginRight: 8 }}
                 >
                   <Image_ icon={ICONS.colorWheel} size={18} />
-                </TouchableOpacity>
+                </button>
               </Tooltip>
-                <Text style={{ fontSize: 13, color: gray(0.45), marginRight: 4 }}>Font size:</Text>
-              <TouchableOpacity
-                onPress={() => quickCanvasRef.current?.fontSizeSelected(-1)}
-                style={{ width: 25, height: 25, borderRadius: 4, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}
+              <span className={styles.editBarLabel}>Font size:</span>
+              <button
+                type="button"
+                className={styles.editBarIconBtn}
+                onClick={() => quickCanvasRef.current?.fontSizeSelected(-1)}
               >
-                <Text style={{ fontSize: 15, color: C.text, fontWeight: "700" }}>A-</Text>
-              </TouchableOpacity>
-              <Text style={{ fontSize: 13, color: C.text, minWidth: 16, textAlign: "center" }}>
+                <span className={styles.editBarFontSizeGlyph} style={{ color: C.text }}>A-</span>
+              </button>
+              <span className={styles.editBarFontSizeValue} style={{ color: C.text }}>
                 {canvasSelectedFontSize}
-              </Text>
-              <TouchableOpacity
-                onPress={() => quickCanvasRef.current?.fontSizeSelected(1)}
-                style={{ width: 25, height: 25, borderRadius: 4, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}
+              </span>
+              <button
+                type="button"
+                className={styles.editBarIconBtn}
+                onClick={() => quickCanvasRef.current?.fontSizeSelected(1)}
               >
-                <Text style={{ fontSize: 15, color: C.text, fontWeight: "700" }}>A+</Text>
-              </TouchableOpacity>
-            </View>
+                <span className={styles.editBarFontSizeGlyph} style={{ color: C.text }}>A+</span>
+              </button>
+            </div>
           )}
-        </View>
+        </div>
       ) : (
         <div className={headerStyles.header}>
           <button
@@ -1659,32 +1635,34 @@ export function InventoryComponent({}) {
           </Tooltip>
         </div>
       )}
-      <View
-        style={{
-          width: "100%",
-          flexDirection: "row",
-          paddingTop: 10,
-          justifyContent: "flex-start",
-          height: "95%",
-        }}
-      >
-        {/** Left column — ALWAYS shows root-level buttons */}
-        <View
-          style={{
-            width: "20%",
-            paddingHorizontal: 2,
-          }}
-        >
-          <ScrollView style={{ flex: 1, scrollbarWidth: "thin", scrollbarColor: "rgba(0,0,0,0.08) transparent" }}>
+      <div className={styles.body}>
+        {/** Left column - ALWAYS shows root-level buttons */}
+        <div className={styles.leftCol}>
           {zQuickItemButtons
             ?.filter((b) => !b.parentID)
             .map((item) => {
-              let isActive =
+              const isActive =
                 sSelectedButtonID === item.id ||
                 (sMenuPath.length > 0 && sMenuPath[0].id === item.id);
+              const isLaborOrItem = item.id === "labor" || item.id === "item";
+              const isDisabled = isLaborOrItem && !zOpenWorkorderID;
+              const gradientArr = isDisabled
+                ? COLOR_GRADIENTS.grey
+                : isActive
+                ? ["rgb(245,166,35)", "rgb(245,166,35)"]
+                : (isLaborOrItem || item.id === "common")
+                ? COLOR_GRADIENTS.green
+                : COLOR_GRADIENTS.blue;
               return (
-                <div
+                <button
                   key={item.id}
+                  type="button"
+                  disabled={isDisabled}
+                  className={`${styles.rootBtn} ${item.id === "common" ? styles.rootBtnCommon : ""}`}
+                  style={{
+                    background: `linear-gradient(to right, ${gradientArr[0]}, ${gradientArr[1]})`,
+                  }}
+                  onClick={(e) => handleQuickButtonPress(item, e)}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     handleQuickButtonPress(item);
@@ -1692,146 +1670,82 @@ export function InventoryComponent({}) {
                     _setCanvasEditMode(true);
                   }}
                 >
-                  <Button_
-                    onPress={(e) => handleQuickButtonPress(item, e)}
-                    enabled={(item.id === "labor" || item.id === "item") ? !!zOpenWorkorderID : true}
-                    colorGradientArr={(item.id === "labor" || item.id === "item") && !zOpenWorkorderID ? COLOR_GRADIENTS.grey : isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "item" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
-                    buttonStyle={{
-                      borderWidth: 1,
-                      borderRadius: 5,
-                      borderColor: C.buttonLightGreenOutline,
-                      marginBottom: 10,
-                      paddingHorizontal: 2,
-                      paddingLeft: 2,
-                      paddingVertical: item.id === "common" ? 14 : 5,
-                      backgroundColor: undefined,
-                    }}
-                    numLines={item.name.length > 17 ? 2 : 1}
-                    textStyle={{
-                      fontSize: getQuickButtonFontSize(item.name, 14),
-                      fontWeight: 400,
-                      textAlign: "center",
-                      color: isActive ? "white" : C.textWhite,
-                    }}
-                    text={item.name.toUpperCase()}
-                  />
-                </div>
+                  <span
+                    className={styles.rootBtnText}
+                    style={{ fontSize: getQuickButtonFontSize(item.name, 14) }}
+                  >
+                    {item.name.toUpperCase()}
+                  </span>
+                </button>
               );
             })}
-          </ScrollView>
-        </View>
+        </div>
 
-        {/** Right panel — breadcrumbs + wrapping buttons + FlatList */}
-        <View
-          style={{
-            height: "100%",
-            width: "80%",
-            paddingTop: 0,
-            paddingLeft: 20,
-            paddingRight: 20,
-          }}
-        >
+        {/** Right panel - breadcrumbs + wrapping buttons + FlatList */}
+        <div className={styles.rightCol}>
           {/** Section 1: Breadcrumbs + Back button (only when sub-menu is open) */}
           {sCurrentParentID !== null && (
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                marginBottom: 8,
-                flexWrap: "wrap",
-              }}
-            >
-              {sMenuPath.map((crumb, i) => (
-                <View
-                  key={crumb.id}
-                  style={{ flexDirection: "row", alignItems: "center" }}
-                >
-                  {i > 0 && (
-                    <Text
-                      style={{
-                        color: gray(0.3),
-                        marginHorizontal: 4,
-                        fontSize: 13,
-                      }}
-                    >
-                      {">"}
-                    </Text>
-                  )}
-                  <TouchableOpacity
-                    onPress={() => {
-                      let newPath = sMenuPath.slice(0, i + 1);
-                      _setMenuPath(newPath);
-                      _setCurrentParentID(crumb.id);
-                      // Restore the crumb's items (same logic as handleBackPress)
-                      let crumbBtn = (zQuickItemButtons || []).find((b) => b.id === crumb.id);
-                      let items = [];
-                      crumbBtn?.items?.forEach((entry) => {
-                        let id = typeof entry === "string" ? entry : entry.inventoryItemID;
-                        let item = zInventoryArr.find((inv) => inv.id === id);
-                        if (item) items.push(item);
-                      });
-                      if (items.length > 0) {
-                        _setSelectedButtonID(crumb.id);
-                        _setSearchResults(items);
-                      } else {
-                        _setSelectedButtonID(null);
-                        _setSearchResults([]);
-                      }
-                      _setSearchTerm("");
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color:
-                          i === sMenuPath.length - 1 ? gray(0.4) : gray(0.55),
-                        fontSize: 13,
-                        fontWeight:
-                          i === sMenuPath.length - 1 ? "bold" : "normal",
+            <div className={styles.crumbBar}>
+              {sMenuPath.map((crumb, i) => {
+                const isCurrent = i === sMenuPath.length - 1;
+                return (
+                  <div key={crumb.id} className={styles.crumbCell}>
+                    {i > 0 && <span className={styles.crumbSep}>{">"}</span>}
+                    <button
+                      type="button"
+                      className={`${styles.crumbLink} ${isCurrent ? styles.crumbLinkCurrent : styles.crumbLinkTrail}`}
+                      onClick={() => {
+                        const newPath = sMenuPath.slice(0, i + 1);
+                        _setMenuPath(newPath);
+                        _setCurrentParentID(crumb.id);
+                        const crumbBtn = (zQuickItemButtons || []).find((b) => b.id === crumb.id);
+                        const items = [];
+                        crumbBtn?.items?.forEach((entry) => {
+                          const id = typeof entry === "string" ? entry : entry.inventoryItemID;
+                          const item = zInventoryArr.find((inv) => inv.id === id);
+                          if (item) items.push(item);
+                        });
+                        if (items.length > 0) {
+                          _setSelectedButtonID(crumb.id);
+                          _setSearchResults(items);
+                        } else {
+                          _setSelectedButtonID(null);
+                          _setSearchResults([]);
+                        }
+                        _setSearchTerm("");
                       }}
                     >
                       {(crumb.name || "(unnamed)").toUpperCase()}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
           )}
 
           {/** Section 2: Wrapping child buttons (only when sub-menu has children) */}
           {currentChildren.length > 0 && (
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                marginBottom: 0,
-              }}
-            >
+            <div className={styles.subMenuRow}>
               {currentChildren.map((btn) => {
                 let isSelected = sSelectedButtonID === btn.id;
                 return (
-                  <Button_
+                  <button
                     key={btn.id}
-                    onPress={(e) => handleQuickButtonPress(btn, e)}
-                    colorGradientArr={isSelected ? ["rgb(240,200,40)", "rgb(240,200,40)"] : [C.green, C.green]}
-                    buttonStyle={{
-                      borderWidth: 1,
-                      borderRadius: 5,
-                      borderColor: C.buttonLightGreenOutline,
-                      marginRight: 6,
-                      marginBottom: 6,
-                      paddingHorizontal: 12,
-                      paddingVertical: 8,
-                    }}
-                    textStyle={{
+                    type="button"
+                    className={styles.subMenuBtn}
+                    style={{
+                      background: isSelected
+                        ? "rgb(240, 200, 40)"
+                        : `linear-gradient(to right, ${C.green}, ${C.green})`,
                       fontSize: getQuickButtonFontSize(btn.name, 12),
-                      fontWeight: 400,
-                      color: C.textWhite,
                     }}
-                    text={btn.name.toUpperCase() + (isSelected ? " \u25BC" : " \u25B6")}
-                  />
+                    onClick={(e) => handleQuickButtonPress(btn, e)}
+                  >
+                    {btn.name.toUpperCase() + (isSelected ? " \u25BC" : " \u25B6")}
+                  </button>
                 );
               })}
-            </View>
+            </div>
           )}
 
           {/** Section 3: Canvas (quick button selected) or list (search results) */}
@@ -1840,10 +1754,10 @@ export function InventoryComponent({}) {
               let activeBtn = (zQuickItemButtons || []).find((b) => b.id === sSelectedButtonID);
               if (!activeBtn || !activeBtn.items || activeBtn.items.length === 0) {
                 return (
-                  <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 }}>
+                  <div className={styles.emptyState}>
                     <Image_ icon={ICONS.info} size={40} />
-                    <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 12 }}>No items in menu</Text>
-                  </View>
+                    <div className={styles.emptyStateText}>No items in menu</div>
+                  </div>
                 );
               }
               return (
@@ -1866,62 +1780,45 @@ export function InventoryComponent({}) {
               );
             })()
           ) : sSearchResults.length === 0 && sSelectedButtonID && !sSearchTerm ? (
-            <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 }}>
+            <div className={styles.emptyState}>
               <Image_ icon={ICONS.info} size={40} />
-              <Text style={{ fontSize: 14, color: gray(0.5), marginTop: 12 }}>No items in menu</Text>
-            </View>
+              <div className={styles.emptyStateText}>No items in menu</div>
+            </div>
           ) : (
-            <ScrollView style={{ width: "100%", flex: 1 }}>
+            <div className={styles.resultsList}>
               {sSearchResults.slice(0, 50).map((item, index) => {
-                let activeBtn = sSelectedButtonID ? (zQuickItemButtons || []).find((b) => b.id === sSelectedButtonID) : null;
-                let dividerObj = (activeBtn?.dividers || []).find((d) => d.itemID === item.id);
-                let hasDivider = !!dividerObj;
+                const activeBtn = sSelectedButtonID
+                  ? (zQuickItemButtons || []).find((b) => b.id === sSelectedButtonID)
+                  : null;
+                const dividerObj = (activeBtn?.dividers || []).find((d) => d.itemID === item.id);
                 return (
                   <React.Fragment key={item.id}>
-                    {hasDivider && (
-                      <View style={{ marginTop: 3 }}>
-                        <View style={{ height: 4, backgroundColor: C.buttonLightGreenOutline, borderRadius: 2 }} />
-                        {!!dividerObj?.label && (
-                          <Text style={{ fontSize: 16, color: C.blue, paddingVertical: 2, paddingHorizontal: 6, textAlign: "center", fontWeight: "600" }}>
-                            {dividerObj.label}
-                          </Text>
+                    {dividerObj && (
+                      <div className={styles.divider}>
+                        <div className={styles.dividerBar} />
+                        {!!dividerObj.label && (
+                          <div className={styles.dividerLabel}>{dividerObj.label}</div>
                         )}
-                      </View>
+                      </div>
                     )}
-                    <View
-                      style={{
-                        borderRadius: 7,
-                        borderLeftColor: C.buttonLightGreenOutline,
-                        borderWidth: 1,
-                        borderLeftWidth: 2,
-                        borderColor: C.listItemBorder,
-                        flexDirection: "row",
-                        alignItems: "center",
-                        backgroundColor: index % 2 === 0 ? C.backgroundListWhite : gray(0.04),
-                        paddingRight: 3,
-                        paddingVertical: 2,
-                        marginTop: index === 0 ? 0 : 5,
-                        marginBottom: 5,
-                      }}
+                    <div
+                      className={`${styles.resultsRow} ${index % 2 === 0 ? styles.resultsRowEven : styles.resultsRowOdd}`}
                     >
                       {!!zOpenWorkorderID && (
-                        <View style={{ width: "5%" }}>
-                          <Button_
-                            icon={ICONS.info}
-                            iconSize={15}
-                            buttonStyle={{ width: 30 }}
-                            onPress={() => {
-                              handleInventoryInfoPress(item);
-                            }}
-                          />
-                        </View>
+                        <div className={styles.infoBtn}>
+                          <button
+                            type="button"
+                            className={styles.infoIconBtn}
+                            onClick={() => handleInventoryInfoPress(item)}
+                          >
+                            <img src={ICONS.info} alt="" className={styles.infoIconImg} />
+                          </button>
+                        </div>
                       )}
-                      <TouchableOpacity_
-                        style={{
-                          height: "100%",
-                          width: zOpenWorkorderID ? "95%" : "100%",
-                        }}
-                        onPress={(e) => {
+                      <div
+                        className={styles.resultsRowBody}
+                        style={{ width: zOpenWorkorderID ? "95%" : "100%" }}
+                        onClick={(e) => {
                           const now = Date.now();
                           if (lastClickItemRef.current === item.id && now - lastClickTimeRef.current < 500) {
                             lastClickTimeRef.current = 0;
@@ -1933,93 +1830,42 @@ export function InventoryComponent({}) {
                             inventoryItemSelected(item);
                           }
                         }}
-                        onLongPress={(e) => openNoteHelperDropdown(item, e)}
+                        onContextMenu={(e) => {
+                          e.preventDefault();
+                          openNoteHelperDropdown(item, e);
+                        }}
                       >
-                        <View
-                          style={{
-                            width: "100%",
-                            flexDirection: "row",
-                            height: "100%",
-                            alignItems: "center",
-                          }}
-                        >
-                          <Text
-                            style={{
-                              width: "85%",
-                              fontSize: 15,
-                              paddingLeft: 7,
-                              paddingRight: 5,
-                              color: C.text,
-                            }}
-                          >
-                            {item.informalName || item.formalName}
-                            {!!item.informalName && !sSelectedButtonID && (
-                              <Text style={{ fontSize: 12, color: "gray" }}>
-                                {"\n" + item.formalName}
-                              </Text>
-                            )}
-                          </Text>
-
-                          <View
-                            style={{
-                              width: "15%",
-                              height: "100%",
-                              alignItems: "flex-end",
-                              justifyContent: "center",
-                              borderLeftWidth: 1,
-                              borderColor: C.listItemBorder,
-                              paddingRight: 5,
-                              backgroundColor: C.backgroundListWhite,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                textAlign: "right",
-                                fontSize: 10,
-                                color: gray(0.4),
-                              }}
+                        <div className={styles.resultsRowName}>
+                          {item.informalName || item.formalName}
+                          {!!item.informalName && !sSelectedButtonID && (
+                            <div className={styles.resultsRowFormal}>{item.formalName}</div>
+                          )}
+                        </div>
+                        <div className={styles.resultsRowPriceCol}>
+                          <div className={styles.resultsRowPriceLine}>
+                            {"$ "}
+                            <span className={styles.resultsRowPrice}>{formatCurrencyDisp(item.price)}</span>
+                          </div>
+                          {!!item.salePrice && (
+                            <div
+                              className={styles.resultsRowSalePriceLine}
+                              style={{ color: lightenRGBByPercent(C.red, 60) }}
                             >
                               {"$ "}
-                              <Text
-                                style={{
-                                  textAlignVertical: "top",
-                                  fontSize: 14,
-                                  color: C.text,
-                                }}
-                              >
-                                {formatCurrencyDisp(item.price)}
-                              </Text>
-                            </Text>
-                            {!!item.salePrice && (
-                              <Text
-                                style={{
-                                  textAlign: "right",
-                                  fontSize: 10,
-                                  color: lightenRGBByPercent(C.red, 60),
-                                }}
-                              >
-                                {"$ "}
-                                <Text
-                                  style={{
-                                    textAlignVertical: "top",
-                                    fontSize: 12,
-                                    color: C.red,
-                                  }}
-                                >
-                                  {/* {formatCurrencyDisp(item.salePrice)} */}
-                                </Text>
-                              </Text>
-                            )}
-                          </View>
-                        </View>
-                      </TouchableOpacity_>
-                    </View>
+                              <span style={{ fontSize: 12, color: C.red }}>
+                                {/* {formatCurrencyDisp(item.salePrice)} */}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   </React.Fragment>
                 );
               })}
-            </ScrollView>
+            </div>
           )}
-        </View>
+        </div>
         {sModalItem && (
           <InventoryItemModalScreen
             key={sModalItem.id}
@@ -2059,8 +1905,8 @@ export function InventoryComponent({}) {
             colorSchemes={existingColorSchemes}
           />
         )}
-      </View>
-      </View>
-    </View>
+      </div>
+      </div>
+    </div>
   );
 }

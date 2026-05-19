@@ -1,16 +1,11 @@
 /*eslint-disable*/
+import React, { useEffect, useRef, useState } from "react";
 import {
-  TouchableWithoutFeedback,
-  View,
-  Text,
-  TextInput,
-  ScrollView,
-  TouchableOpacity,
-} from "react-native-web";
-import { Button_, LoadingIndicator } from "../../../components";
+  Button,
+  Dialog,
+  LoadingIndicator,
+} from "../../../dom_components";
 import { C, COLOR_GRADIENTS } from "../../../styles";
-import React, { useCallback, useEffect, useRef, useState } from "react";
-import ReactDOM from "react-dom";
 import {
   getPreviousMondayDayJS,
   capitalizeFirstLetterOfString,
@@ -18,69 +13,33 @@ import {
   formatMillisForDisplay,
   gray,
   lightenRGBByPercent,
-  log,
 } from "../../../utils";
 import dayjs from "dayjs";
 import CalendarPicker, {
   useDefaultStyles,
 } from "react-native-ui-datepicker";
-import { queryCompletedSalesReport, queryActiveSalesForReport, queryTransactionsByDateRange } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import {
+  queryCompletedSalesReport,
+  queryActiveSalesForReport,
+  queryTransactionsByDateRange,
+} from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { useActiveSalesStore, useCheckoutStore } from "../../../stores";
 import { FullSaleModal } from "./FullSaleModal";
+import styles from "./SalesReports.module.css";
 
 const PAGE_SIZE = 50;
 
 const DATE_SHORTCUTS = [
-  {
-    label: "Today",
-    start: () => dayjs().startOf("day"),
-    end: () => dayjs().endOf("day"),
-  },
-  {
-    label: "Yesterday",
-    start: () => dayjs().subtract(1, "day").startOf("day"),
-    end: () => dayjs().subtract(1, "day").endOf("day"),
-  },
-  {
-    label: "Day Before",
-    start: () => dayjs().subtract(2, "day").startOf("day"),
-    end: () => dayjs().subtract(2, "day").endOf("day"),
-  },
-  {
-    label: "This Week",
-    start: () => getPreviousMondayDayJS(),
-    end: () => dayjs(),
-  },
-  {
-    label: "Last Week",
-    start: () => getPreviousMondayDayJS().subtract(7, "day"),
-    end: () => getPreviousMondayDayJS().subtract(1, "day"),
-  },
-  {
-    label: "This Month",
-    start: () => dayjs().startOf("month"),
-    end: () => dayjs(),
-  },
-  {
-    label: "Last Month",
-    start: () => dayjs().subtract(1, "month").startOf("month"),
-    end: () => dayjs().subtract(1, "month").endOf("month"),
-  },
-  {
-    label: "Last Yr Same Mo",
-    start: () => dayjs().subtract(1, "year").startOf("month"),
-    end: () => dayjs().subtract(1, "year").endOf("month"),
-  },
-  {
-    label: "This Year",
-    start: () => dayjs().startOf("year"),
-    end: () => dayjs(),
-  },
-  {
-    label: "Last Year",
-    start: () => dayjs().subtract(1, "year").startOf("year"),
-    end: () => dayjs().subtract(1, "year").endOf("year"),
-  },
+  { label: "Today",            start: () => dayjs().startOf("day"),                              end: () => dayjs().endOf("day") },
+  { label: "Yesterday",        start: () => dayjs().subtract(1, "day").startOf("day"),           end: () => dayjs().subtract(1, "day").endOf("day") },
+  { label: "Day Before",       start: () => dayjs().subtract(2, "day").startOf("day"),           end: () => dayjs().subtract(2, "day").endOf("day") },
+  { label: "This Week",        start: () => getPreviousMondayDayJS(),                            end: () => dayjs() },
+  { label: "Last Week",        start: () => getPreviousMondayDayJS().subtract(7, "day"),         end: () => getPreviousMondayDayJS().subtract(1, "day") },
+  { label: "This Month",       start: () => dayjs().startOf("month"),                            end: () => dayjs() },
+  { label: "Last Month",       start: () => dayjs().subtract(1, "month").startOf("month"),       end: () => dayjs().subtract(1, "month").endOf("month") },
+  { label: "Last Yr Same Mo",  start: () => dayjs().subtract(1, "year").startOf("month"),        end: () => dayjs().subtract(1, "year").endOf("month") },
+  { label: "This Year",        start: () => dayjs().startOf("year"),                             end: () => dayjs() },
+  { label: "Last Year",        start: () => dayjs().subtract(1, "year").startOf("year"),         end: () => dayjs().subtract(1, "year").endOf("year") },
 ];
 
 function generateDateChips(startDate, endDate) {
@@ -113,7 +72,7 @@ export const SalesReportsModal = ({ handleExit }) => {
   const [sEndCalMonth, _setEndCalMonth] = useState(dayjs().month());
   const [sEndCalYear, _setEndCalYear] = useState(dayjs().year());
   const [sCalKey, _setCalKey] = useState(0);
-  const [sViewMode, _setViewMode] = useState("sale"); // "sale" or "transaction"
+  const [sViewMode, _setViewMode] = useState("sale");
   const [sSortField, _setSortField] = useState("date");
   const [sSortDir, _setSortDir] = useState("desc");
   const [sTransactionResults, _setTransactionResults] = useState([]);
@@ -123,7 +82,6 @@ export const SalesReportsModal = ({ handleExit }) => {
   const txnQueryIdRef = useRef(0);
   const hasUserSelected = useRef(false);
 
-  // Cache: { startMillis, endMillis, data }
   const saleCacheRef = useRef(null);
   const txnCacheRef = useRef(null);
 
@@ -135,7 +93,6 @@ export const SalesReportsModal = ({ handleExit }) => {
     let endMillis = dayjs(sEndDate).endOf("day").valueOf();
     _setPage(0);
 
-    // Check if cached data covers the requested range
     let cache = saleCacheRef.current;
     if (cache && startMillis >= cache.startMillis && endMillis <= cache.endMillis) {
       let filtered = cache.data.filter((r) => {
@@ -238,12 +195,43 @@ export const SalesReportsModal = ({ handleExit }) => {
     _setPendingEnd(null);
   }
 
-  // Display dates: pending overrides active for calendar display
+  function handleViewModeTransaction() {
+    _setViewMode("transaction");
+    _setPage(0);
+    if (!sStartDate || !sEndDate) return;
+    let startMillis = dayjs(sStartDate).startOf("day").valueOf();
+    let endMillis = dayjs(sEndDate).endOf("day").valueOf();
+
+    let cache = txnCacheRef.current;
+    if (cache && startMillis >= cache.startMillis && endMillis <= cache.endMillis) {
+      let filtered = cache.data.filter((tx) => {
+        let m = tx.millis || tx.createdAt || 0;
+        return m >= startMillis && m <= endMillis;
+      });
+      _setTransactionResults(filtered);
+      return;
+    }
+
+    let thisQueryId = ++txnQueryIdRef.current;
+    _setTransactionLoading(true);
+    queryTransactionsByDateRange(startMillis, endMillis)
+      .then((txns) => {
+        if (thisQueryId !== txnQueryIdRef.current) return;
+        txnCacheRef.current = { startMillis, endMillis, data: txns };
+        _setTransactionResults(txns);
+        _setTransactionLoading(false);
+      })
+      .catch(() => {
+        if (thisQueryId !== txnQueryIdRef.current) return;
+        _setTransactionResults([]);
+        _setTransactionLoading(false);
+      });
+  }
+
   let displayStart = sPendingStart || sStartDate;
   let displayEnd = sPendingEnd || sEndDate;
   let hasPendingRange = !!sPendingStart && !!sPendingEnd;
 
-  // Search filtering — filter transactions, then group
   let searchQuery = sSearchText.trim().toLowerCase();
   let filteredResults = sResults;
   if (searchQuery) {
@@ -269,7 +257,6 @@ export const SalesReportsModal = ({ handleExit }) => {
     }
   }
 
-  // Search filtering for transaction mode (uses sTransactionResults)
   let filteredTransactions = sTransactionResults;
   if (searchQuery) {
     let isAmountSearch = searchQuery.includes(".");
@@ -295,7 +282,6 @@ export const SalesReportsModal = ({ handleExit }) => {
     }
   }
 
-  // Mode-aware data processing
   let groups = [];
   let flatSorted = [];
 
@@ -348,13 +334,11 @@ export const SalesReportsModal = ({ handleExit }) => {
       });
   }
 
-  // Mode-aware pagination
   let itemCount = sViewMode === "sale" ? groups.length : flatSorted.length;
   let totalPages = Math.max(1, Math.ceil(itemCount / PAGE_SIZE));
   let pageGroups = sViewMode === "sale" ? groups.slice(sPage * PAGE_SIZE, (sPage + 1) * PAGE_SIZE) : [];
   let pageTransactions = sViewMode === "transaction" ? flatSorted.slice(sPage * PAGE_SIZE, (sPage + 1) * PAGE_SIZE) : [];
 
-  // Summary calculations over all filtered transactions
   let totalPayments = 0;
   let taxExemptTotal = 0;
   let taxableTotal = 0;
@@ -405,32 +389,21 @@ export const SalesReportsModal = ({ handleExit }) => {
       ? (capitalizeFirstLetterOfString(group.customerFirst) + " " + capitalizeFirstLetterOfString(group.customerLast)).trim()
       : "";
     return (
-      <View
+      <div
         key={"gh-" + group.saleID}
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          paddingVertical: 6,
-          paddingHorizontal: 10,
-          backgroundColor: gray(0.06),
-        }}
+        className={styles.groupHeader}
+        style={{ backgroundColor: gray(0.06) }}
       >
-        <Text style={{ fontSize: 13, fontWeight: "700", color: C.darkBlue }}>
-          {!hasCustomer && <Text style={{ color: labelColor }}>{label}</Text>}
+        <span className={styles.groupHeaderText} style={{ color: C.darkBlue }}>
+          {!hasCustomer && <span style={{ color: labelColor }}>{label}</span>}
           {hasCustomer && customerName}
-        </Text>
+        </span>
         {isActive && (
-          <View style={{
-            marginLeft: 8,
-            backgroundColor: C.orange,
-            borderRadius: 4,
-            paddingHorizontal: 6,
-            paddingVertical: 2,
-          }}>
-            <Text style={{ fontSize: 10, fontWeight: "700", color: "white" }}>Active</Text>
-          </View>
+          <div className={styles.activeBadge} style={{ backgroundColor: C.orange }}>
+            <span className={styles.activeBadgeText}>Active</span>
+          </div>
         )}
-      </View>
+      </div>
     );
   }
 
@@ -439,102 +412,81 @@ export const SalesReportsModal = ({ handleExit }) => {
     let isDeposit = tx.depositType === "deposit";
     let isGiftCard = tx.method === "credit";
     let isActive = tx.source === "active";
-    let bgColor = isRefund
-      ? lightenRGBByPercent(C.red, 85)
-      : C.listItemWhite;
+    let bgColor = isRefund ? lightenRGBByPercent(C.red, 85) : C.listItemWhite;
+    let typeColor = isRefund ? C.red : (isDeposit || isGiftCard) ? C.green : C.text;
+    let dateStr = "";
+    if (tx.millis) {
+      let d = formatMillisForDisplay(tx.millis, true, true, true);
+      let min = String(d.minutes).padStart(2, "0");
+      dateStr = d.wordDayOfWeek + ", " + d.wordDayOfMonth + " " + d.dayOfMonth + " '" + d.year + "  " + d.hour + ":" + min + " " + d.amPM;
+    }
 
     return (
-      <TouchableOpacity
+      <button
+        type="button"
         key={tx.id || tx.saleID + "-" + index}
-        onPress={() => handleRowPress(tx)}
-        activeOpacity={0.6}
+        onClick={() => handleRowPress(tx)}
+        className={styles.row}
         style={{
-          flexDirection: "row",
-          alignItems: "center",
-          paddingVertical: 8,
-          paddingHorizontal: 10,
           backgroundColor: bgColor,
-          borderBottomWidth: 1,
           borderBottomColor: gray(0.05),
+          background: bgColor,
+          border: "none",
+          borderBottom: "1px solid " + gray(0.05),
+          font: "inherit",
+          cursor: "pointer",
+          textAlign: "left",
         }}
       >
-        {isActive && (
-          <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: C.orange, marginRight: 4 }} />
-        )}
-        <Text
-          numberOfLines={1}
-          style={{
-            flex: 1,
-            fontSize: 14,
-            fontWeight: "600",
-            color: isRefund ? C.red : (isDeposit || isGiftCard) ? C.green : C.text,
-            paddingLeft: isActive ? 0 : 10,
-          }}
-        >
-          {isDeposit ? "Deposit" : isGiftCard ? "Gift Card" : capitalizeFirstLetterOfString(tx.type || "payment")}
-        </Text>
-        <Text
-          numberOfLines={1}
-          style={{
-            flex: 0.8,
-            fontSize: 14,
-            color: gray(0.5),
-            fontWeight: "600",
-            textAlign: "center",
-          }}
-        >
-          {capitalizeFirstLetterOfString(tx.method || "")}
-        </Text>
-        <Text
-          numberOfLines={1}
-          style={{
-            flex: 1,
-            fontSize: 15,
-            fontWeight: "600",
-            color: isRefund ? C.red : C.text,
-            textAlign: "right",
-          }}
-        >
-          {isRefund ? "-" : ""}{formatCurrencyDisp(tx.amountCaptured || 0, true)}
-        </Text>
-        <Text
-          numberOfLines={1}
-          style={{
-            flex: 1.5,
-            fontSize: 13,
-            color: gray(0.45),
-            textAlign: "right",
-            paddingRight: 5,
-          }}
-        >
-          {tx.millis ? (() => {
-            let d = formatMillisForDisplay(tx.millis, true, true, true);
-            let min = String(d.minutes).padStart(2, "0");
-            return d.wordDayOfWeek + ", " + d.wordDayOfMonth + " " + d.dayOfMonth + " '" + d.year + "  " + d.hour + ":" + min + " " + d.amPM;
-          })() : ""}
-        </Text>
-      </TouchableOpacity>
+        <div className={`${styles.cell} ${styles.cellType}`}>
+          {isActive && (
+            <div className={styles.activeDot} style={{ backgroundColor: C.orange }} />
+          )}
+          <span
+            className={styles.cellTypeText}
+            style={{
+              color: typeColor,
+              paddingLeft: isActive ? 0 : 10,
+              width: "100%",
+            }}
+          >
+            {isDeposit ? "Deposit" : isGiftCard ? "Gift Card" : capitalizeFirstLetterOfString(tx.type || "payment")}
+          </span>
+        </div>
+        <div className={`${styles.cell} ${styles.cellMethod}`}>
+          <span className={styles.cellMethodText} style={{ color: gray(0.5), width: "100%" }}>
+            {capitalizeFirstLetterOfString(tx.method || "")}
+          </span>
+        </div>
+        <div className={`${styles.cell} ${styles.cellAmount}`}>
+          <span
+            className={styles.cellAmountText}
+            style={{ color: isRefund ? C.red : C.text, width: "100%" }}
+          >
+            {isRefund ? "-" : ""}
+            {formatCurrencyDisp(tx.amountCaptured || 0, true)}
+          </span>
+        </div>
+        <div className={`${styles.cell} ${styles.cellDate}`}>
+          <span className={styles.cellDateText} style={{ color: gray(0.45), width: "100%" }}>
+            {dateStr}
+          </span>
+        </div>
+      </button>
     );
   }
 
   function renderHeader() {
     let headers = [
-      { field: "type", label: "Type", flex: 1, align: "flex-start", padLeft: 10 },
-      { field: "method", label: "Method", flex: 0.8, align: "center" },
-      { field: "amount", label: "Amount", flex: 1, align: "flex-end" },
-      { field: "date", label: "Date", flex: 1.5, align: "flex-end", padRight: 5 },
+      { field: "type", label: "Type", cls: styles.thType },
+      { field: "method", label: "Method", cls: styles.thMethod },
+      { field: "amount", label: "Amount", cls: styles.thAmount },
+      { field: "date", label: "Date", cls: styles.thDate },
     ];
     return (
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          paddingVertical: 6,
-          paddingHorizontal: 10,
-          backgroundColor: "rgba(0,0,0,0.75)",
-          borderBottomWidth: 2,
-          borderBottomColor: C.buttonLightGreenOutline,
-        }}
+      <div
+        className={styles.tableHeader}
+        style={{ borderBottomColor: C.buttonLightGreenOutline }}
       >
         {headers.map((h) => {
           let isActive = sSortField === h.field;
@@ -544,111 +496,88 @@ export const SalesReportsModal = ({ handleExit }) => {
             ? "Sorted by " + h.label.toLowerCase() + " (" + (sSortDir === "asc" ? "ascending" : "descending") + "). Click to reverse."
             : "Click to sort by " + h.label.toLowerCase();
           return (
-            <TouchableOpacity
+            <button
+              type="button"
               key={h.field}
-              onPress={() => handleHeaderSort(h.field)}
+              onClick={() => handleHeaderSort(h.field)}
               title={tooltip}
-              activeOpacity={0.6}
+              className={`${styles.thCell} ${h.cls}`}
               style={{
-                flex: h.flex,
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: h.align,
-                paddingLeft: h.padLeft || 0,
-                paddingRight: h.padRight || 0,
+                background: "none",
+                border: "none",
+                padding: 0,
+                font: "inherit",
+                cursor: "pointer",
+                color: "inherit",
               }}
             >
-              <Text style={{ fontSize: 11, fontWeight: "700", color: isActive ? C.orange : "white" }}>
-                {h.label}{arrow}
-              </Text>
-              <Text style={{ fontSize: 9, fontWeight: "700", color: caretColor, marginLeft: 4 }}>{"\u25B8"}</Text>
-            </TouchableOpacity>
+              <span className={styles.thText} style={{ color: isActive ? C.orange : "white" }}>
+                {h.label}
+                {arrow}
+              </span>
+              <span className={styles.thCaret} style={{ color: caretColor }}>
+                {"\u25B8"}
+              </span>
+            </button>
           );
         })}
-      </View>
+      </div>
     );
   }
 
-  let Component = useCallback(() => {
-    return (
-      <TouchableWithoutFeedback>
-        <View
-          style={{
-            width: "92%",
-            height: "94%",
-            backgroundColor: C.backgroundWhite,
-            borderRadius: 15,
-            overflow: "hidden",
-            flexDirection: "row",
-          }}
-        >
+  return (
+    <>
+      <Dialog
+        visible={true}
+        onClose={handleExit}
+        overlayColor="rgba(0,0,0,0.5)"
+        title="Sales History"
+      >
+        <div className={styles.card}>
           {/* ═══ LEFT COLUMN: Quick Buttons ═══ */}
-          <View
-            style={{
-              width: 165,
-              paddingVertical: 8,
-              paddingHorizontal: 6,
-              justifyContent: "space-between",
-            }}
-          >
-            <View>
-              <Text style={{ fontSize: 14, fontWeight: "700", color: C.text, marginBottom: 8, textAlign: "center" }}>
+          <div className={styles.leftRail}>
+            <div className={styles.leftRailTop}>
+              <span className={styles.title} style={{ color: C.text }}>
                 Sales History
-              </Text>
+              </span>
               {DATE_SHORTCUTS.map((sc) => {
                 let isActive = sActiveShortcut === sc.label;
                 return (
-                  <TouchableOpacity
+                  <button
+                    type="button"
                     key={sc.label}
-                    onPress={() => handleShortcut(sc)}
+                    onClick={() => handleShortcut(sc)}
+                    className={styles.shortcutRow}
                     style={{
                       backgroundColor: isActive ? C.orange : C.blue,
-                      borderRadius: 5,
-                      paddingVertical: 8,
-                      marginBottom: 6,
-                      alignItems: "center",
+                      border: "none",
+                      cursor: "pointer",
+                      font: "inherit",
                     }}
                   >
-                    <Text style={{ color: "white", fontSize: 14, fontWeight: "600" }}>
-                      {sc.label}
-                    </Text>
-                  </TouchableOpacity>
+                    <span className={styles.shortcutRowText}>{sc.label}</span>
+                  </button>
                 );
               })}
-            </View>
-            <View style={{ alignItems: "center", paddingTop: 8 }}>
-              <Button_
+            </div>
+            <div className={styles.leftRailBottom}>
+              <Button
                 text="CLOSE"
                 colorGradientArr={COLOR_GRADIENTS.red}
                 onPress={handleExit}
                 buttonStyle={{ paddingLeft: 30, paddingRight: 30, paddingVertical: 10 }}
                 textStyle={{ fontSize: 15, fontWeight: "700" }}
               />
-            </View>
-          </View>
+            </div>
+          </div>
 
           {/* ═══ MIDDLE COLUMN: Date Selectors ═══ */}
-          <ScrollView
-            style={{
-              flex: 1,
-              maxWidth: "28%",
-            }}
-            contentContainerStyle={{ padding: 8 }}
-          >
+          <div className={styles.middleColumn}>
             {/* Begin Calendar */}
-            <View
-              style={{
-                backgroundColor: "rgba(0,0,0,0.75)",
-                borderRadius: 10,
-                paddingVertical: 4,
-                paddingHorizontal: 2,
-                alignItems: "center",
-                marginBottom: 8,
-              }}
-            >
-              <Text style={{ color: C.orange, fontSize: 10, fontWeight: "600", marginBottom: 2 }}>
+            <div className={styles.calendarCard}>
+              <span className={styles.calendarHeader} style={{ color: C.orange }}>
                 Begin Date
-              </Text>
+              </span>
               <CalendarPicker
                 key={"begin-" + sCalKey}
                 styles={calendarStyles}
@@ -661,31 +590,25 @@ export const SalesReportsModal = ({ handleExit }) => {
                   if (endDate) _setPendingEnd(dayjs(endDate));
                 }}
               />
-            </View>
+            </div>
 
             {/* Date Range Summary */}
-            <View
-              style={{
-                flexDirection: "row",
-                backgroundColor: C.blue,
-                borderRadius: 6,
-                paddingVertical: 6,
-                paddingHorizontal: 10,
-                marginBottom: 8,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
+            <div className={styles.dateSummary} style={{ backgroundColor: C.blue }}>
               {dateChips.length === 1 ? (
-                <Text style={{ fontSize: 13, fontWeight: "700", color: "white" }}>
+                <span className={styles.dateSummaryText}>
                   {dayjs(displayStart).format("ddd M/D/YYYY")}
-                </Text>
+                </span>
               ) : (
-                <Text style={{ fontSize: 13, fontWeight: "700", color: "white" }}>
-                  {dateChips.length} days:  <Text style={{ color: "white" }}>{dayjs(displayStart).format("ddd M/D/YYYY")}</Text>  →  <Text style={{ color: lightenRGBByPercent(C.green, 40) }}>{dayjs(displayEnd).format("ddd M/D/YYYY")}</Text>
-                </Text>
+                <span className={styles.dateSummaryText}>
+                  {dateChips.length} days:{"  "}
+                  <span>{dayjs(displayStart).format("ddd M/D/YYYY")}</span>
+                  {"  →  "}
+                  <span style={{ color: lightenRGBByPercent(C.green, 40) }}>
+                    {dayjs(displayEnd).format("ddd M/D/YYYY")}
+                  </span>
+                </span>
               )}
-            </View>
+            </div>
 
             {/* End Calendar */}
             {(() => {
@@ -705,40 +628,35 @@ export const SalesReportsModal = ({ handleExit }) => {
               }
 
               return (
-                <View
-                  style={{
-                    backgroundColor: "rgba(0,0,0,0.75)",
-                    borderRadius: 10,
-                    paddingVertical: 4,
-                    paddingHorizontal: 2,
-                    alignItems: "center",
-                    marginBottom: 8,
-                  }}
-                >
-                  <Text style={{ color: lightenRGBByPercent(C.green, 40), fontSize: 10, fontWeight: "600", marginBottom: 2 }}>
+                <div className={styles.calendarCard}>
+                  <span
+                    className={styles.calendarHeader}
+                    style={{ color: lightenRGBByPercent(C.green, 40) }}
+                  >
                     End Date
-                  </Text>
+                  </span>
                   {endSameAsBegin ? (
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        width: "100%",
-                        paddingVertical: 8,
-                        paddingHorizontal: 12,
-                      }}
-                    >
-                      <TouchableOpacity onPress={handleEndCalPrev} style={{ padding: 4 }}>
-                        <Text style={{ color: "white", fontSize: 16, fontWeight: "700" }}>{"<"}</Text>
-                      </TouchableOpacity>
-                      <Text style={{ color: "white", fontSize: 13, fontWeight: "600" }}>
+                    <div className={styles.endCalNavRow}>
+                      <button
+                        type="button"
+                        onClick={handleEndCalPrev}
+                        className={styles.endCalNavBtn}
+                        style={{ background: "none", border: "none", cursor: "pointer", font: "inherit" }}
+                      >
+                        <span className={styles.endCalNavArrow}>{"<"}</span>
+                      </button>
+                      <span className={styles.endCalNavText}>
                         {dayjs().month(sEndCalMonth).year(sEndCalYear).format("MMMM YYYY")}
-                      </Text>
-                      <TouchableOpacity onPress={handleEndCalNext} style={{ padding: 4 }}>
-                        <Text style={{ color: "white", fontSize: 16, fontWeight: "700" }}>{">"}</Text>
-                      </TouchableOpacity>
-                    </View>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleEndCalNext}
+                        className={styles.endCalNavBtn}
+                        style={{ background: "none", border: "none", cursor: "pointer", font: "inherit" }}
+                      >
+                        <span className={styles.endCalNavArrow}>{">"}</span>
+                      </button>
+                    </div>
                   ) : (
                     <CalendarPicker
                       key={"end-" + sCalKey + "-" + sEndCalMonth + "-" + sEndCalYear}
@@ -748,42 +666,41 @@ export const SalesReportsModal = ({ handleExit }) => {
                       endDate={displayEnd}
                       month={sEndCalMonth}
                       year={sEndCalYear}
-                      onChange={({ endDate }) => { _setActiveShortcut(null); _setPendingEnd(dayjs(endDate)); }}
+                      onChange={({ endDate }) => {
+                        _setActiveShortcut(null);
+                        _setPendingEnd(dayjs(endDate));
+                      }}
                     />
                   )}
-                </View>
+                </div>
               );
             })()}
 
             {/* Go Button */}
-            <View style={{ alignItems: "center" }}>
-              <Button_
+            <div className={styles.actionRow}>
+              <Button
                 text="GO"
                 colorGradientArr={hasPendingRange ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
                 onPress={handleGoButton}
-                disabled={!hasPendingRange}
+                enabled={hasPendingRange}
                 buttonStyle={{ paddingLeft: 40, paddingRight: 40, paddingVertical: 10 }}
                 textStyle={{ fontSize: 15, fontWeight: "700" }}
               />
-            </View>
-          </ScrollView>
+            </div>
+          </div>
 
           {/* ═══ RIGHT COLUMN: Results ═══ */}
-          <View style={{ flex: 2, position: "relative" }}>
+          <div className={styles.rightColumn}>
             {(sLoading || sTransactionLoading) && (
-              <LoadingIndicator message={sLoading ? "Loading sales..." : "Loading transactions..."} color={C.blue} />
+              <LoadingIndicator
+                message={sLoading ? "Loading sales..." : "Loading transactions..."}
+                color={C.blue}
+              />
             )}
-            {/* Results Count + Loading */}
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                paddingHorizontal: 10,
-                paddingVertical: 5,
-              }}
-            >
-              <Text style={{ fontSize: 12, color: gray(0.4) }}>
+
+            {/* Results Count + Page Info */}
+            <div className={styles.resultsHeader}>
+              <span className={styles.resultsCount} style={{ color: gray(0.4) }}>
                 {sLoading
                   ? "Loading..."
                   : sViewMode === "sale"
@@ -795,228 +712,169 @@ export const SalesReportsModal = ({ handleExit }) => {
                   : (searchQuery
                       ? flatSorted.length + " transactions of " + sTransactionResults.length
                       : flatSorted.length + " transactions")}
-              </Text>
-              <Text style={{ fontSize: 12, color: gray(0.4) }}>
+              </span>
+              <span className={styles.pageOf} style={{ color: gray(0.4) }}>
                 Page {sPage + 1} of {totalPages}
-              </Text>
-            </View>
+              </span>
+            </div>
 
             {/* Search Bar */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: "center",
-                paddingHorizontal: 10,
-                paddingBottom: 5,
-              }}
-            >
-              {/* View Mode Toggle */}
-              <View style={{ flexDirection: "row", marginRight: 10 }}>
-                <TouchableOpacity
-                  onPress={() => { _setViewMode("sale"); _setPage(0); }}
+            <div className={styles.searchRow}>
+              <div className={styles.viewModeToggle}>
+                <button
+                  type="button"
+                  onClick={() => { _setViewMode("sale"); _setPage(0); }}
+                  className={`${styles.viewModeBtn} ${styles.viewModeBtnLeft}`}
                   style={{
-                    paddingVertical: 6,
-                    paddingHorizontal: 12,
                     backgroundColor: sViewMode === "sale" ? C.blue : gray(0.85),
-                    borderTopLeftRadius: 6,
-                    borderBottomLeftRadius: 6,
+                    border: "none",
+                    cursor: "pointer",
+                    font: "inherit",
                   }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: "600", color: sViewMode === "sale" ? "white" : gray(0.4) }}>
+                  <span
+                    className={styles.viewModeText}
+                    style={{ color: sViewMode === "sale" ? "white" : gray(0.4) }}
+                  >
                     By Sale
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => {
-                    _setViewMode("transaction");
-                    _setPage(0);
-                    if (!sStartDate || !sEndDate) return;
-                    let startMillis = dayjs(sStartDate).startOf("day").valueOf();
-                    let endMillis = dayjs(sEndDate).endOf("day").valueOf();
-
-                    // Check if cached data covers the requested range
-                    let cache = txnCacheRef.current;
-                    if (cache && startMillis >= cache.startMillis && endMillis <= cache.endMillis) {
-                      let filtered = cache.data.filter((tx) => {
-                        let m = tx.millis || tx.createdAt || 0;
-                        return m >= startMillis && m <= endMillis;
-                      });
-                      _setTransactionResults(filtered);
-                      return;
-                    }
-
-                    let thisQueryId = ++txnQueryIdRef.current;
-                    _setTransactionLoading(true);
-                    queryTransactionsByDateRange(startMillis, endMillis)
-                      .then((txns) => {
-                        if (thisQueryId !== txnQueryIdRef.current) return;
-                        txnCacheRef.current = { startMillis, endMillis, data: txns };
-                        _setTransactionResults(txns);
-                        _setTransactionLoading(false);
-                      })
-                      .catch(() => {
-                        if (thisQueryId !== txnQueryIdRef.current) return;
-                        _setTransactionResults([]);
-                        _setTransactionLoading(false);
-                      });
-                  }}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleViewModeTransaction}
+                  className={`${styles.viewModeBtn} ${styles.viewModeBtnRight}`}
                   style={{
-                    paddingVertical: 6,
-                    paddingHorizontal: 12,
                     backgroundColor: sViewMode === "transaction" ? C.blue : gray(0.85),
-                    borderTopRightRadius: 6,
-                    borderBottomRightRadius: 6,
+                    border: "none",
+                    cursor: "pointer",
+                    font: "inherit",
                   }}
                 >
-                  <Text style={{ fontSize: 11, fontWeight: "600", color: sViewMode === "transaction" ? "white" : gray(0.4) }}>
+                  <span
+                    className={styles.viewModeText}
+                    style={{ color: sViewMode === "transaction" ? "white" : gray(0.4) }}
+                  >
                     By Transaction
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <TextInput
+                  </span>
+                </button>
+              </div>
+              <input
+                type="text"
                 value={sSearchText}
-                onChangeText={(text) => {
-                  _setSearchText(text);
+                onChange={(e) => {
+                  _setSearchText(e.target.value);
                   _setPage(0);
                 }}
-                placeholder={sViewMode === "transaction" ? "Search by amount or payment type" : "Search customer name or phone"}
-                placeholderTextColor={gray(0.65)}
+                placeholder={
+                  sViewMode === "transaction"
+                    ? "Search by amount or payment type"
+                    : "Search customer name or phone"
+                }
+                className={styles.searchInput}
                 style={{
-                  flex: 1,
-                  maxWidth: "50%",
-                  borderWidth: 2,
                   borderColor: C.buttonLightGreenOutline,
-                  borderRadius: 8,
-                  paddingVertical: 6,
-                  paddingHorizontal: 10,
-                  fontSize: 13,
                   color: C.text,
                   backgroundColor: C.listItemWhite,
                 }}
               />
-              <TouchableOpacity
-                onPress={() => {
+              <button
+                type="button"
+                onClick={() => {
                   _setSearchText("");
                   _setPage(0);
                 }}
                 disabled={!searchQuery}
+                className={styles.clearBtn}
                 style={{
-                  marginLeft: 8,
                   backgroundColor: searchQuery ? C.orange : gray(0.8),
-                  borderRadius: 5,
-                  paddingVertical: 6,
-                  paddingHorizontal: 12,
+                  border: "none",
+                  cursor: searchQuery ? "pointer" : "default",
+                  font: "inherit",
                 }}
               >
-                <Text
-                  style={{
-                    color: searchQuery ? "white" : gray(0.5),
-                    fontSize: 12,
-                    fontWeight: "600",
-                  }}
+                <span
+                  className={styles.clearBtnText}
+                  style={{ color: searchQuery ? "white" : gray(0.5) }}
                 >
                   Clear Search
-                </Text>
-              </TouchableOpacity>
-            </View>
+                </span>
+              </button>
+            </div>
 
             {/* Table Header */}
             {renderHeader()}
 
             {/* Transaction List */}
-            <ScrollView style={{ flex: 1 }}>
-              {sViewMode === "sale" ? (
-                pageGroups.map((group) => (
-                  <View key={group.saleID}>
-                    {renderGroupHeader(group)}
-                    {group.transactions.map((tx, idx) => renderTransactionRow(tx, idx))}
-                  </View>
-                ))
-              ) : (
-                pageTransactions.map((tx, idx) => renderTransactionRow(tx, idx))
-              )}
+            <div className={styles.listScroll}>
+              {sViewMode === "sale"
+                ? pageGroups.map((group) => (
+                    <div key={group.saleID}>
+                      {renderGroupHeader(group)}
+                      {group.transactions.map((tx, idx) => renderTransactionRow(tx, idx))}
+                    </div>
+                  ))
+                : pageTransactions.map((tx, idx) => renderTransactionRow(tx, idx))}
               {((sViewMode === "sale" && pageGroups.length === 0) ||
                 (sViewMode === "transaction" && pageTransactions.length === 0)) &&
                 !sLoading && (
-                  <View style={{ paddingVertical: 30, alignItems: "center" }}>
-                    <Text style={{ fontSize: 14, color: gray(0.5) }}>
-                      {sResults.length === 0 ? "Select a date range to view transactions" : "No matching transactions"}
-                    </Text>
-                  </View>
+                  <div className={styles.emptyState}>
+                    <span className={styles.emptyStateText} style={{ color: gray(0.5) }}>
+                      {sResults.length === 0
+                        ? "Select a date range to view transactions"
+                        : "No matching transactions"}
+                    </span>
+                  </div>
                 )}
-            </ScrollView>
+            </div>
 
             {/* Pagination Controls */}
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "center",
-                alignItems: "center",
-                paddingVertical: 4,
-                borderTopWidth: 1,
-                borderTopColor: gray(0.85),
-              }}
-            >
-              <TouchableOpacity
-                onPress={() => _setPage(Math.max(0, sPage - 1))}
+            <div className={styles.pagination} style={{ borderTopColor: gray(0.85) }}>
+              <button
+                type="button"
+                onClick={() => _setPage(Math.max(0, sPage - 1))}
                 disabled={sPage === 0}
+                className={styles.pagBtn}
                 style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 4,
                   backgroundColor: sPage === 0 ? gray(0.85) : C.blue,
-                  borderRadius: 5,
+                  border: "none",
+                  cursor: sPage === 0 ? "default" : "pointer",
+                  font: "inherit",
                   marginRight: 8,
                 }}
               >
-                <Text
-                  style={{
-                    color: sPage === 0 ? gray(0.5) : "white",
-                    fontSize: 11,
-                    fontWeight: "600",
-                  }}
+                <span
+                  className={styles.pagBtnText}
+                  style={{ color: sPage === 0 ? gray(0.5) : "white" }}
                 >
                   Prev
-                </Text>
-              </TouchableOpacity>
-              <Text style={{ fontSize: 11, color: C.text, marginRight: 8 }}>
+                </span>
+              </button>
+              <span className={styles.pagInfo} style={{ color: C.text }}>
                 {sPage + 1} / {totalPages}
-              </Text>
-              <TouchableOpacity
-                onPress={() => _setPage(Math.min(totalPages - 1, sPage + 1))}
+              </span>
+              <button
+                type="button"
+                onClick={() => _setPage(Math.min(totalPages - 1, sPage + 1))}
                 disabled={sPage >= totalPages - 1}
+                className={styles.pagBtn}
                 style={{
-                  paddingHorizontal: 12,
-                  paddingVertical: 4,
                   backgroundColor: sPage >= totalPages - 1 ? gray(0.85) : C.blue,
-                  borderRadius: 5,
+                  border: "none",
+                  cursor: sPage >= totalPages - 1 ? "default" : "pointer",
+                  font: "inherit",
                 }}
               >
-                <Text
-                  style={{
-                    color: sPage >= totalPages - 1 ? gray(0.5) : "white",
-                    fontSize: 11,
-                    fontWeight: "600",
-                  }}
+                <span
+                  className={styles.pagBtnText}
+                  style={{ color: sPage >= totalPages - 1 ? gray(0.5) : "white" }}
                 >
                   Next
-                </Text>
-              </TouchableOpacity>
-            </View>
+                </span>
+              </button>
+            </div>
 
             {/* Summary Footer */}
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                justifyContent: "space-evenly",
-                paddingVertical: 8,
-                paddingHorizontal: 10,
-                backgroundColor: "rgba(0,0,0,0.75)",
-                borderTopWidth: 2,
-                borderTopColor: C.buttonLightGreenOutline,
-              }}
-            >
+            <div className={styles.footer} style={{ borderTopColor: C.buttonLightGreenOutline }}>
               {sViewMode === "sale" ? (
                 <>
                   <SummaryItem label="Total Payments" value={totalPayments} />
@@ -1026,23 +884,41 @@ export const SalesReportsModal = ({ handleExit }) => {
                   <SummaryItem label="Refunds" value={refundsTotal} isNegative={true} />
                 </>
               ) : (
-                <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.75)", fontWeight: "500", fontStyle: "italic", paddingVertical: 4, textAlign: "center" }}>Transactions include deposits and no customer information attached. Return to Sale Mode to see information</Text>
+                <span className={styles.txModeNote}>
+                  Transactions include deposits and no customer information attached. Return to Sale Mode to see information
+                </span>
               )}
-            </View>
-          </View>
-        </View>
-      </TouchableWithoutFeedback>
-    );
-  }, [sStartDate, sEndDate, sResults, sPage, sLoading, sSaleModalItem, sActiveShortcut, sSearchText, sPendingStart, sPendingEnd, sEndCalMonth, sEndCalYear, sCalKey, sViewMode, sSortField, sSortDir, sTransactionResults, sTransactionLoading, sTransactionModalItem]);
+            </div>
+          </div>
 
-  return ReactDOM.createPortal(
-    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}>
-      <TouchableWithoutFeedback onPress={handleExit}>
-        <View style={{ width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
-          <Component />
-        </View>
-      </TouchableWithoutFeedback>
-      {/* Full Sale Modal */}
+          {/* Loading Overlay (full-card) */}
+          {sLoading && (
+            <div className={styles.loadingOverlay}>
+              <div className={styles.loadingCard}>
+                <span className={styles.loadingTitle} style={{ color: C.text }}>
+                  Loading Sales Data...
+                </span>
+                <LoadingIndicator
+                  size="large"
+                  color={C.blue}
+                  message=""
+                  centered={false}
+                  style={{ marginBottom: 20 }}
+                />
+                <Button
+                  text="Cancel"
+                  colorGradientArr={COLOR_GRADIENTS.red}
+                  onPress={handleCancelQuery}
+                  buttonStyle={{ paddingHorizontal: 30, paddingVertical: 10 }}
+                  textStyle={{ fontSize: 14 }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </Dialog>
+
+      {/* Full Sale Modal (nested) */}
       {!!sSaleModalItem && (
         <FullSaleModal
           item={sSaleModalItem}
@@ -1050,66 +926,21 @@ export const SalesReportsModal = ({ handleExit }) => {
           onRefund={handleRefundFromSaleModal}
         />
       )}
-      {/* Transaction Viewer Modal (no saleID) */}
+
+      {/* Transaction Viewer Modal (nested) */}
       {!!sTransactionModalItem && (
         <TransactionViewerModal
           tx={sTransactionModalItem}
           onClose={() => _setTransactionModalItem(null)}
         />
       )}
-      {/* Loading Overlay */}
-      {sLoading && (
-        <View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.6)",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1000,
-          }}
-        >
-          <View
-            style={{
-              backgroundColor: C.backgroundWhite,
-              borderRadius: 15,
-              padding: 30,
-              alignItems: "center",
-            }}
-          >
-            <Text style={{ fontSize: 16, fontWeight: "700", color: C.text, marginBottom: 15 }}>
-              Loading Sales Data...
-            </Text>
-            <View
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: 20,
-                borderWidth: 4,
-                borderColor: gray(0.85),
-                borderTopColor: C.blue,
-                marginBottom: 20,
-              }}
-            />
-            <Button_
-              text="Cancel"
-              colorGradientArr={COLOR_GRADIENTS.red}
-              onPress={handleCancelQuery}
-              buttonStyle={{ paddingHorizontal: 30, paddingVertical: 10 }}
-              textStyle={{ fontSize: 14 }}
-            />
-          </View>
-        </View>
-      )}
-    </View>,
-    document.body
+    </>
   );
 };
 
 const TransactionViewerModal = ({ tx, onClose }) => {
+  if (!tx) return null;
+
   let isRefund = tx.type === "refund";
   let dateStr = "";
   if (tx.millis) {
@@ -1121,7 +952,11 @@ const TransactionViewerModal = ({ tx, onClose }) => {
   let rows = [
     { label: "Type", value: capitalizeFirstLetterOfString(tx.type || "payment") },
     { label: "Method", value: capitalizeFirstLetterOfString(tx.method || "") },
-    { label: "Amount", value: (isRefund ? "-" : "") + "$" + formatCurrencyDisp(tx.amountCaptured || 0), color: isRefund ? C.lightred : C.text },
+    {
+      label: "Amount",
+      value: (isRefund ? "-" : "") + "$" + formatCurrencyDisp(tx.amountCaptured || 0),
+      color: isRefund ? C.lightred : C.text,
+    },
     { label: "Date", value: dateStr },
   ];
   if (tx.method === "card") {
@@ -1134,101 +969,62 @@ const TransactionViewerModal = ({ tx, onClose }) => {
   if (tx.method === "cash" && tx.amountTendered) rows.push({ label: "Tendered", value: "$" + formatCurrencyDisp(tx.amountTendered) });
   if (tx.id) rows.push({ label: "Transaction ID", value: tx.id });
 
-  return ReactDOM.createPortal(
-    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 1002 }}>
-      <TouchableWithoutFeedback onPress={onClose}>
-        <View style={{ width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
-          <TouchableWithoutFeedback>
-            <View
-              style={{
-                width: 400,
-                backgroundColor: C.backgroundWhite,
-                borderRadius: 12,
-                overflow: "hidden",
-              }}
-            >
-              {/* Header */}
-              <View
-                style={{
-                  backgroundColor: "rgba(0,0,0,0.75)",
-                  paddingVertical: 12,
-                  paddingHorizontal: 16,
-                  alignItems: "center",
-                }}
+  return (
+    <Dialog
+      visible={true}
+      onClose={onClose}
+      overlayColor="rgba(0,0,0,0.5)"
+      title="Transaction Details"
+    >
+      <div className={styles.txModalCard}>
+        <div className={styles.txModalHeader}>
+          <span className={styles.txModalHeaderText}>Transaction Details</span>
+        </div>
+        <div className={styles.txModalBody}>
+          {rows.map((row, idx) => {
+            let isLast = idx === rows.length - 1;
+            return (
+              <div
+                key={idx}
+                className={`${styles.txModalRow} ${isLast ? styles.txModalRowLast : ""}`}
+                style={{ borderBottomColor: gray(0.08) }}
               >
-                <Text style={{ fontSize: 15, fontWeight: "700", color: "white" }}>
-                  Transaction Details
-                </Text>
-              </View>
-
-              {/* Body */}
-              <View style={{ padding: 16 }}>
-                {rows.map((row, idx) => (
-                  <View
-                    key={idx}
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      paddingVertical: 8,
-                      borderBottomWidth: idx < rows.length - 1 ? 1 : 0,
-                      borderBottomColor: gray(0.08),
-                    }}
-                  >
-                    <Text style={{ fontSize: 12, color: gray(0.45), fontWeight: "600" }}>
-                      {row.label}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: "600",
-                        color: row.color || C.text,
-                        flex: 1,
-                        textAlign: "right",
-                        marginLeft: 12,
-                      }}
-                      numberOfLines={1}
-                    >
-                      {row.value}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-
-              {/* Footer */}
-              <View style={{ alignItems: "center", paddingBottom: 14, paddingTop: 4 }}>
-                <Button_
-                  text="Close"
-                  colorGradientArr={COLOR_GRADIENTS.grey}
-                  onPress={onClose}
-                  buttonStyle={{ paddingHorizontal: 30, paddingVertical: 8 }}
-                  textStyle={{ fontSize: 13 }}
-                />
-              </View>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
-    </View>,
-    document.body
+                <span className={styles.txModalLabel} style={{ color: gray(0.45) }}>
+                  {row.label}
+                </span>
+                <span
+                  className={styles.txModalValue}
+                  style={{ color: row.color || C.text }}
+                >
+                  {row.value}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className={styles.txModalFooter}>
+          <Button
+            text="Close"
+            colorGradientArr={COLOR_GRADIENTS.grey}
+            onPress={onClose}
+            buttonStyle={{ paddingHorizontal: 30, paddingVertical: 8 }}
+            textStyle={{ fontSize: 13 }}
+          />
+        </div>
+      </div>
+    </Dialog>
   );
 };
 
 const SummaryItem = ({ label, value, isNegative }) => (
-  <View style={{ alignItems: "center", marginHorizontal: 8, marginVertical: 2 }}>
-    <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.7)", fontWeight: "600" }}>
-      {label}
-    </Text>
-    <Text
-      style={{
-        fontSize: 16,
-        fontWeight: "700",
-        color: isNegative ? C.lightred : "white",
-      }}
+  <div className={styles.summaryItem}>
+    <span className={styles.summaryLabel}>{label}</span>
+    <span
+      className={styles.summaryValue}
+      style={isNegative ? { color: C.lightred } : undefined}
     >
       {isNegative ? "-" : ""}
       {formatCurrencyDisp(value, true)}
-    </Text>
-  </View>
+    </span>
+  </div>
 );
-

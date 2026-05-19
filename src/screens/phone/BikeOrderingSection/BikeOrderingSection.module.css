@@ -1,0 +1,401 @@
+.card {
+  background-color: rgb(254, 254, 255);
+  border-radius: 10px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgb(200, 228, 220);
+  padding: 12px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.editToggleRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  margin-bottom: 4px;
+}
+
+.editBtn {
+  padding: 4px;
+}
+
+.fieldLabel {
+  font-size: 11px;
+  color: rgb(140, 140, 140);
+  margin-bottom: 2px;
+  display: block;
+}
+
+.fieldLabelSmall {
+  font-size: 11px;
+  color: rgb(140, 140, 140);
+  margin-bottom: 4px;
+  display: block;
+}
+
+.fieldRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.input {
+  flex: 1;
+  height: 38px;
+  border-color: rgb(235, 235, 235);
+  border-width: 1px;
+  border-style: solid;
+  padding-left: 8px;
+  padding-right: 8px;
+  outline: none;
+  border-radius: 7px;
+  font-size: 14px;
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+.inputSmall {
+  width: 60px;
+  height: 38px;
+  border-color: rgb(235, 235, 235);
+  border-width: 1px;
+  border-style: solid;
+  padding-left: 8px;
+  padding-right: 8px;
+  outline: none;
+  border-radius: 7px;
+  font-size: 14px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.colorPair {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  min-width: 0;
+}
+
+.colorGap {
+  width: 8px;
+  flex-shrink: 0;
+}
+
+.estimate {
+  font-size: 13px;
+  font-style: italic;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.estimateMissing {
+  color: rgb(255, 26, 26);
+}
+
+.estimateNormal {
+  color: rgb(128, 128, 128);
+}
+
+.inputNoTopMargin8 {
+  margin-top: 0;
+  margin-bottom: 8px;
+}
+
+.inputNoTopMargin4 {
+  margin-top: 0;
+  margin-bottom: 4px;
+}
+
+.chevron {
+  margin-left: 6px;
+  transform: rotate(-90deg);
+}
+
+.chevronOpen {
+  transform: rotate(0deg);
+}
+
+.orderingToggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+
+.readOrderingToggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 6px;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.orderingTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgb(140, 140, 140);
+}
+
+.deliveryRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.waitBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+  background-color: rgb(232, 239, 245);
+}
+
+.waitBtnText {
+  font-size: 16px;
+  font-weight: 700;
+  margin-top: -1px;
+  color: rgb(115, 115, 115);
+}
+
+.waitDaysText {
+  font-size: 14px;
+  min-width: 60px;
+  text-align: center;
+  color: rgb(71, 71, 71);
+}
+
+.deliveryDate {
+  font-size: 13px;
+  color: rgb(140, 140, 140);
+  margin-left: 8px;
+}
+
+.orderedToggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.orderedDotOuter {
+  width: 12px;
+  height: 12px;
+  border-radius: 6px;
+  border-width: 1.5px;
+  border-style: solid;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 5px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.orderedDotInner {
+  width: 6px;
+  height: 6px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.orderedText {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.orderedRedBorder {
+  border-color: rgb(255, 26, 26);
+}
+
+.orderedGreenBorder {
+  border-color: rgb(33, 148, 86);
+}
+
+.orderedRedBg {
+  background-color: rgb(255, 26, 26);
+}
+
+.orderedGreenBg {
+  background-color: rgb(33, 148, 86);
+}
+
+.orderedRedText {
+  color: rgb(255, 26, 26);
+}
+
+.orderedGreenText {
+  color: rgb(33, 148, 86);
+}
+
+.trackingLink {
+  margin-bottom: 4px;
+}
+
+.linkText {
+  font-size: 13px;
+  color: rgb(53, 135, 210);
+  text-decoration: underline;
+}
+
+.linkTextLarge {
+  font-size: 14px;
+  color: rgb(53, 135, 210);
+  text-decoration: underline;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.readBrandBlock {
+  margin-bottom: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.readBrand {
+  font-size: 16px;
+  font-weight: 600;
+  color: rgb(71, 71, 71);
+}
+
+.readDescription {
+  font-size: 14px;
+  color: rgb(153, 153, 153);
+  margin-top: 1px;
+}
+
+.readColorRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.readColorItem {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-right: 12px;
+}
+
+.readColorDot {
+  width: 14px;
+  height: 14px;
+  border-radius: 7px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgb(51, 51, 51);
+  margin-right: 5px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.readColorLabel {
+  font-size: 13px;
+  color: rgb(71, 71, 71);
+}
+
+.readEstimateRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.itemNotHereBadge {
+  background-color: rgb(255, 243, 176);
+  border-radius: 10px;
+  padding-left: 8px;
+  padding-right: 8px;
+  padding-top: 1px;
+  padding-bottom: 1px;
+  flex-shrink: 0;
+}
+
+.itemNotHereText {
+  color: rgb(90, 75, 0);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.readMaxWait {
+  font-size: 13px;
+  color: rgb(140, 140, 140);
+  margin-bottom: 4px;
+  display: block;
+}
+
+.readOrderingBody {
+  margin-top: 6px;
+}
+
+.readOrderingItem {
+  margin-bottom: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.readValue {
+  font-size: 14px;
+  color: rgb(71, 71, 71);
+}
+
+.readDeliveryRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.readDeliveryLabel {
+  font-size: 13px;
+  color: rgb(140, 140, 140);
+}
+
+.readOrderedStatus {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.readOrderedDotOuter {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  border-width: 1.5px;
+  border-style: solid;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 4px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.readOrderedDotInner {
+  width: 5px;
+  height: 5px;
+  border-radius: 2.5px;
+  flex-shrink: 0;
+}
+
+.readTrackingBlock {
+  margin-bottom: 4px;
+  display: flex;
+  flex-direction: column;
+}

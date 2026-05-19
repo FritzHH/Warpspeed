@@ -1,0 +1,75 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: rgb(254, 254, 254);
+  position: relative;
+  box-sizing: border-box;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  background-color: rgb(225, 244, 235);
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-bottom-color: rgb(200, 228, 220);
+  flex-shrink: 0;
+}
+
+.backBtn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-right: 16px;
+}
+
+.backText {
+  font-size: 17px;
+  margin-left: 8px;
+  font-weight: 500;
+  color: rgb(71, 71, 71);
+}
+
+.scroll {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  box-sizing: border-box;
+}
+
+.statusWrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.totalRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  padding-top: 12px;
+  padding-bottom: 12px;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.totalLabel {
+  font-size: 17px;
+  font-weight: 600;
+  color: rgb(71, 71, 71);
+}
+
+.totalValue {
+  font-size: 17px;
+  font-weight: 700;
+  color: rgb(71, 71, 71);
+}

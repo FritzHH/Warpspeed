@@ -1,19 +1,16 @@
 /* eslint-disable */
 
-import { View, Text, TextInput, Button, TouchableOpacity } from "react-native-web";
+import React, { useEffect, useRef, useState, useMemo } from "react";
+import cloneDeep from "lodash/cloneDeep";
 import {
   formatPhoneWithDashes,
-  createNewWorkorder,
   removeDashesFromPhone,
   stringIsNumeric,
   gray,
   capitalizeAllWordsInSentence,
-  lightenRGBByPercent,
 } from "../../../utils";
-import { ScreenModal, Button_, PhoneNumberInput, Tooltip, TextInput_ } from "../../../components";
-import { CUSTOMER_PROTO, SETTINGS_OBJ, TAB_NAMES, WORKORDER_PROTO } from "../../../data";
-import React, { useEffect, useRef, useState, useMemo } from "react";
-import cloneDeep from "lodash/cloneDeep";
+import { Button, ScreenModal, PhoneNumberInput, Tooltip } from "../../../dom_components";
+import { CUSTOMER_PROTO, TAB_NAMES } from "../../../data";
 import {
   useCurrentCustomerStore,
   useCustomerSearchStore,
@@ -30,22 +27,26 @@ import {
   dbSearchCustomersByPhone,
   dbSearchCompletedWorkordersByNumber,
   dbGetCompletedWorkorder,
-  dbGetCompletedSale,
   dbGetCustomer,
   startNewWorkorder,
 } from "../../../db_calls_wrapper";
 import { TicketSearchInput } from "../../../shared/TicketSearchInput";
 import { readTransaction } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
+import styles from "./Info_NewWorkorder.module.css";
+
 export function NewWorkorderComponent({}) {
   // store getters ///////////////////////////////////////////////////////////////
   const zCustomerSearchResults = useCustomerSearchStore((s) => s.searchResults);
+  const zIsSearching = useCustomerSearchStore((s) => s.isSearching);
+  const zWoSearchResults = useWorkorderSearchStore((s) => s.searchResults);
+  const zWoIsSearching = useWorkorderSearchStore((s) => s.isSearching);
 
   //////////////////////////////////////////////////////////////////////
-  const [sTextInput, _setTextInput] = React.useState("");
-  const [sSearchFieldName, _setSearchFieldName] = React.useState("phone");
-  const [sCustomerInfo, _setCustomerInfo] = React.useState(null);
-  const [buttonVisible, setButtonVisible] = React.useState(false);
+  const [sTextInput, _setTextInput] = useState("");
+  const [sSearchFieldName, _setSearchFieldName] = useState("phone");
+  const [sCustomerInfo, _setCustomerInfo] = useState(null);
+  const [buttonVisible, setButtonVisible] = useState(false);
   const searchTimerRef = useRef(null);
   const woSearchTimerRef = useRef(null);
   const containerRef = useRef(null);
@@ -56,10 +57,6 @@ export function NewWorkorderComponent({}) {
     // handleTextChange(sTextInput);
   }, [sTextInput]);
   // dev ///////////////////////////////////
-
-  const zIsSearching = useCustomerSearchStore((s) => s.isSearching);
-  const zWoSearchResults = useWorkorderSearchStore((s) => s.searchResults);
-  const zWoIsSearching = useWorkorderSearchStore((s) => s.isSearching);
 
   useEffect(() => {
     if (zWoSearchResults.length > 0 || zWoIsSearching) {
@@ -332,7 +329,6 @@ export function NewWorkorderComponent({}) {
         if (split[1]) custInfo.last = split[1];
       }
     }
-    // log(custInfo);
     // do not set the customer id this is how the next screen knows it is a new customer. we will set the id in the modal automatically on creation
     _setCustomerInfo(custInfo);
   }
@@ -377,31 +373,18 @@ export function NewWorkorderComponent({}) {
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////
   return (
-    <View
+    <div
       ref={containerRef}
       onClick={() => {
         if (useLoginStore.getState().showLoginScreen) return;
-        let input = phoneInputRef.current?.querySelector("input");
+        const input = phoneInputRef.current?.querySelector("input");
         if (input) input.focus();
       }}
-      style={{
-        width: "100%",
-        height: "100%",
-        justifyContent: "space-between",
-        alignItems: "center",
-      }}
+      className={styles.container}
     >
       <TicketSearchInput />
 
-      <View
-        ref={phoneInputRef}
-        style={{
-          alignItems: "flex-end",
-          width: "100%",
-          padding: 20,
-          marginTop: "60%",
-        }}
-      >
+      <div ref={phoneInputRef} className={styles.inputBlock}>
         {sSearchFieldName === "phone" ? (
           <PhoneNumberInput
             boxStyle={{
@@ -421,46 +404,39 @@ export function NewWorkorderComponent({}) {
             textColor={C.text}
           />
         ) : (
-          <TextInput
+          <input
             value={capitalizeAllWordsInSentence(sTextInput)}
-            placeholder={"First, last or email"}
-            placeholderTextColor={gray(0.3)}
-            onChangeText={(val) => handleTextChange(val)}
-            autoFocus={true}
+            placeholder="First, last or email"
+            onChange={(e) => handleTextChange(e.target.value)}
+            autoFocus
             autoComplete="one-time-code"
+            className={styles.nameInput}
             style={{
               caretColor: C.cursorRed,
               color: C.text,
-              borderBottomWidth: 1,
-              borderColor: gray(0.2),
-              width: "100%",
-              height: 37,
-              outlineStyle: "none",
-              fontSize: 18,
+              borderBottomColor: gray(0.2),
             }}
           />
         )}
-        <TouchableOpacity
-          onPress={() => {
+        <button
+          type="button"
+          onClick={() => {
             _setSearchFieldName(sSearchFieldName === "phone" ? "name" : "phone");
             handleTextChange("");
           }}
-          style={{ alignSelf: "flex-end", marginTop: 8, backgroundColor: C.blue, borderRadius: 5, paddingHorizontal: 10, paddingVertical: 4 }}
+          className={styles.toggleBtn}
+          style={{ backgroundColor: C.blue }}
         >
-          <Text style={{ fontSize: 14, fontWeight: "600", color: C.textWhite }}>
-            {sSearchFieldName === "phone" ? "ABC" : "123"}
-          </Text>
-        </TouchableOpacity>
-        <View
-          style={{ flexDirection: "row", alignItems: "center", marginTop: 5 }}
-        >
+          {sSearchFieldName === "phone" ? "ABC" : "123"}
+        </button>
+        <div className={styles.modalRow}>
           {useMemo(
             () => (
               <ScreenModal
                 showOuterModal={true}
                 modalVisible={sCustomerInfo}
                 ButtonComponent={() => (
-                  <Button_
+                  <Button
                     text={"CUSTOMER"}
                     buttonStyle={{
                       marginRight: 20,
@@ -490,28 +466,18 @@ export function NewWorkorderComponent({}) {
             ),
             [sCustomerInfo, buttonVisible]
           )}
-        </View>
-      </View>
-      <View
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "100%",
-          alignItems: "flex-end",
-          marginRight: 11,
-          marginBottom: 20,
-        }}
-      >
+        </div>
+      </div>
+
+      <div onClick={(e) => e.stopPropagation()} className={styles.saleBtnRow}>
         <Tooltip text="Sale screen" position="top">
-          <Button_
+          <Button
             onPress={handleStartStandaloneSalePress}
             icon={ICONS.cashRegister}
             iconSize={35}
           />
         </Tooltip>
-      </View>
-
-    </View>
+      </div>
+    </div>
   );
 }
-
-

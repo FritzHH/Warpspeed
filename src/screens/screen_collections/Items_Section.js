@@ -1,11 +1,19 @@
 /* eslint-disable */
 
-import { View, Text, TouchableOpacity } from "react-native-web";
+import { View } from "react-native-web";
 import React, { useState, useCallback, useEffect, useRef } from "react";
-import ReactDOM from "react-dom";
 
 import { TAB_NAMES } from "../../data";
-import { TabMenuButton, Image_, TextInput_, Button_, Tooltip, DropdownMenu } from "../../components";
+import {
+  TabMenuButton,
+  Image,
+  Tooltip,
+  Dialog,
+  Button,
+  TextInput,
+  DropdownMenu,
+} from "../../dom_components";
+import sectionStyles from "./Items_Section.module.css";
 import { Items_Dashboard } from "../screen_components/Items_Screen/Items_Dashboard";
 import { CustomerSearchListComponent } from "../screen_components/Items_Screen/Items_CustomerSearchList";
 import { WorkorderPreview } from "../screen_components/Items_Screen/Items_WorkorderPreview";
@@ -18,7 +26,7 @@ import {
   useSettingsStore,
   broadcastFullWorkorderToDisplay,
 } from "../../stores";
-import { C, ICONS, Fonts, COLOR_GRADIENTS } from "../../styles";
+import { C, ICONS } from "../../styles";
 import { ROUTES } from "../../routes";
 import { EmptyItemsComponent } from "../screen_components/Items_Screen/Items_Empty";
 import { Items_ChangeLog } from "../screen_components/Items_Screen/Items_ChangeLog";
@@ -43,6 +51,8 @@ export const Items_Section = React.memo(({}) => {
 
   // getters ///////////////////////////////////////////////////////////////////
   const zItemsTabName = useTabNamesStore((state) => state.itemsTabName);
+  const zOptionsTabName = useTabNamesStore((state) => state.optionsTabName);
+  const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
 
   ///////////////////////////////////////////////////////////////////////////
   // log("Items_Section render");
@@ -64,7 +74,9 @@ export const Items_Section = React.memo(({}) => {
       case TAB_NAMES.itemsTab.workorderSearchResults:
         return <Items_WorkorderSearchList />;
       case TAB_NAMES.itemsTab.emailView:
-        return <Items_EmailView />;
+        if (zOptionsTabName === TAB_NAMES.optionsTab.email) return <Items_EmailView />;
+        if (zOpenWorkorderID) return <Items_WorkorderItemsTab />;
+        return <EmptyItemsComponent />;
       case TAB_NAMES.itemsTab.recentCustomers:
         return <RecentCustomersComponent />;
       case TAB_NAMES.itemsTab.empty:
@@ -76,7 +88,7 @@ export const Items_Section = React.memo(({}) => {
 
   // log("----------------------Items section render");
   return (
-    <View style={{ flex: 1 }}>
+    <View style={{ flex: 1, width: "100%", height: "100%" }}>
       <TabBar
         onTranslatePress={() => _sSetShowTranslateModal(true)}
         onDevNotesPress={() => _sSetShowDevNotes(true)}
@@ -166,183 +178,132 @@ const TranslateModal = ({ visible, onClose }) => {
     return () => { if (inactivityTimerRef.current) clearTimeout(inactivityTimerRef.current); };
   }, [visible]);
 
-  if (!visible) return null;
-
-  return ReactDOM.createPortal(
-    <View
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 8000,
-      }}
+  return (
+    <Dialog
+      visible={visible}
+      onClose={handleClose}
+      title="Translate"
+      aria-label="Translate"
     >
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={handleClose}
+      <div
+        className={sectionStyles.translateCard}
         style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          cursor: "default",
+          "--card-bg": C.backgroundWhite,
+          "--card-border": C.buttonLightGreenOutline,
         }}
-      />
-        <View
-          style={{
-            width: 500,
-            backgroundColor: C.backgroundWhite,
-            borderRadius: 12,
-            borderWidth: 2,
-            borderColor: C.buttonLightGreenOutline,
-            padding: 20,
-          }}
-        >
-          {/* Header */}
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 16,
-            }}
+      >
+        <div className={sectionStyles.translateHeader}>
+          <span className={sectionStyles.translateTitle} style={{ color: C.text }}>
+            Translate
+          </span>
+          <button
+            type="button"
+            className={sectionStyles.closeButton}
+            onClick={handleClose}
+            aria-label="Close"
           >
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: Fonts.weight.textHeavy,
-                color: C.text,
-              }}
-            >
-              Translate
-            </Text>
-            <TouchableOpacity onPress={handleClose}>
-              <Image_ source={ICONS.close1} width={18} height={18} />
-            </TouchableOpacity>
-          </View>
+            <Image icon={ICONS.close1} width={18} height={18} />
+          </button>
+        </div>
 
-          {/* Language dropdowns */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              marginBottom: 14,
+        <div className={sectionStyles.langRow}>
+          <DropdownMenu
+            dataArr={TRANSLATION_LANGUAGES}
+            onSelect={(item) => {
+              _sSetFromLang(item.code);
+              if (item.code && sToLang && item.code !== sToLang && sInputText.trim()) debouncedTranslate(sInputText, sToLang);
+              if (!item.code || item.code === sToLang) clearTranslation();
+              resetInactivityTimer();
             }}
-          >
-            <DropdownMenu
-              dataArr={TRANSLATION_LANGUAGES}
-              onSelect={(item) => {
-                _sSetFromLang(item.code);
-                if (item.code && sToLang && item.code !== sToLang && sInputText.trim()) debouncedTranslate(sInputText, sToLang);
-                if (!item.code || item.code === sToLang) clearTranslation();
-                resetInactivityTimer();
-              }}
-              buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}
-              buttonStyle={{ paddingVertical: 5 }}
-            />
-            <Image_ icon={ICONS.rightArrowBlue} size={16} style={{ marginHorizontal: 10 }} />
-            <DropdownMenu
-              dataArr={TRANSLATION_LANGUAGES}
-              onSelect={(item) => {
-                _sSetToLang(item.code);
-                if (sFromLang && item.code && sFromLang !== item.code && sInputText.trim()) debouncedTranslate(sInputText, item.code);
-                if (!item.code || sFromLang === item.code) clearTranslation();
-                resetInactivityTimer();
-              }}
-              buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sToLang)?.label || "Spanish"}
-              buttonStyle={{ paddingVertical: 5 }}
-            />
-          </View>
+            buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}
+            buttonStyle={{ paddingVertical: 5 }}
+          />
+          <Image icon={ICONS.rightArrowBlue} size={16} className={sectionStyles.langArrow} />
+          <DropdownMenu
+            dataArr={TRANSLATION_LANGUAGES}
+            onSelect={(item) => {
+              _sSetToLang(item.code);
+              if (sFromLang && item.code && sFromLang !== item.code && sInputText.trim()) debouncedTranslate(sInputText, item.code);
+              if (!item.code || sFromLang === item.code) clearTranslation();
+              resetInactivityTimer();
+            }}
+            buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sToLang)?.label || "Spanish"}
+            buttonStyle={{ paddingVertical: 5 }}
+          />
+        </div>
 
-          {/* Starter buttons */}
-          {zTranslateStarters.length > 0 && (
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                marginBottom: 10,
-              }}
-            >
-              {zTranslateStarters.map((starter) => (
-                <Button_
-                  key={starter.id}
-                  text={starter.label}
-                  onPress={() => handleStarterPress(starter)}
-                  buttonStyle={{ marginRight: 6, marginBottom: 4, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: C.blue }}
-                  textStyle={{ fontSize: 12, color: C.textWhite }}
-                />
-              ))}
-            </View>
-          )}
+        {zTranslateStarters.length > 0 && (
+          <div className={sectionStyles.startersRow}>
+            {zTranslateStarters.map((starter) => (
+              <Button
+                key={starter.id}
+                text={starter.label}
+                onPress={() => handleStarterPress(starter)}
+                buttonStyle={{ marginRight: 6, marginBottom: 4, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: C.blue }}
+                textStyle={{ fontSize: 12, color: C.textWhite }}
+              />
+            ))}
+          </div>
+        )}
 
-          {/* Input */}
-          <View style={{ flexDirection: "row", alignItems: "flex-start", marginBottom: 14 }}>
-            <TextInput_
-              value={sInputText}
-              onChangeText={handleTextChange}
-              debounceMs={0}
-              placeholder={`Type in ${TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}...`}
-              multiline={true}
-              numberOfLines={10}
-              autoFocus={true}
-              autoCapitalize="sentences"
-              style={{
-                flex: 1,
-                borderColor: C.buttonLightGreenOutline,
-                borderRadius: 10,
-                borderWidth: 2,
-                backgroundColor: C.listItemWhite,
-                paddingVertical: 10,
-                paddingHorizontal: 10,
-                fontSize: 16,
-              }}
-            />
-            {(sInputText.length > 0 || translatedText) && (
-              <TouchableOpacity
-                onPress={() => {
-                  _sSetInputText("");
-                  clearTranslation();
-                  resetInactivityTimer();
-                }}
-                style={{ marginLeft: 8, marginTop: 8, justifyContent: "center", alignItems: "center" }}
-              >
-                <Image_ icon={ICONS.reset1} size={22} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {/* Output */}
-          <View
+        <div className={sectionStyles.inputRow}>
+          <TextInput
+            value={sInputText}
+            onChangeText={handleTextChange}
+            debounceMs={0}
+            placeholder={`Type in ${TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}...`}
+            multiline={true}
+            numberOfLines={10}
+            autoFocus={true}
+            capitalize={true}
             style={{
+              flex: 1,
               borderColor: C.buttonLightGreenOutline,
               borderRadius: 10,
               borderWidth: 2,
-              backgroundColor: C.backgroundListWhite,
-              paddingVertical: 10,
-              paddingHorizontal: 10,
-              minHeight: 80,
+              backgroundColor: C.listItemWhite,
+              paddingTop: 10,
+              paddingBottom: 10,
+              paddingLeft: 10,
+              paddingRight: 10,
+              fontSize: 16,
             }}
-          >
-            {isLoading ? (
-              <Text style={{ fontSize: 14, color: gray(0.5), fontStyle: "italic" }}>
-                Translating...
-              </Text>
-            ) : (
-              <Text style={{ fontSize: 16, color: C.text }}>
-                {translatedText}
-              </Text>
-            )}
-          </View>
-        </View>
-    </View>,
-    document.body
+          />
+          {(sInputText.length > 0 || translatedText) && (
+            <button
+              type="button"
+              className={sectionStyles.resetButton}
+              onClick={() => {
+                _sSetInputText("");
+                clearTranslation();
+                resetInactivityTimer();
+              }}
+              aria-label="Reset"
+            >
+              <Image icon={ICONS.reset1} size={22} />
+            </button>
+          )}
+        </div>
+
+        <div
+          className={sectionStyles.outputBox}
+          style={{
+            borderColor: C.buttonLightGreenOutline,
+            backgroundColor: C.backgroundListWhite,
+          }}
+        >
+          {isLoading ? (
+            <span className={sectionStyles.outputLoading} style={{ color: gray(0.5) }}>
+              Translating...
+            </span>
+          ) : (
+            <span className={sectionStyles.outputText} style={{ color: C.text }}>
+              {translatedText}
+            </span>
+          )}
+        </div>
+      </div>
+    </Dialog>
   );
 };
 
@@ -350,90 +311,56 @@ const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
   const zItemsTabName = useTabNamesStore((state) => state.itemsTabName);
   const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
   const zIsPreview = useOpenWorkordersStore((s) => !!s.workorderPreviewID && s.workorderPreviewID !== s.openWorkorderID);
-  // log("Items_Section TabBar render");
+  const hasSecondaryDisplay = localStorage.getItem("warpspeed_has_secondary_display") === "true";
+
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        width: "100%",
-        justifyContent: "space-between",
-        backgroundColor: zIsPreview ? lightenRGBByPercent(C.blue, 70) : undefined,
-        transition: "background-color 0.2s ease",
-        // height: 50,
-      }}
+    <div
+      className={sectionStyles.tabBar}
+      style={{ backgroundColor: zIsPreview ? lightenRGBByPercent(C.blue, 70) : undefined }}
     >
-      <View
-        style={{
-          flexDirection: "row",
-        }}
-      >
+      <div className={sectionStyles.leftGroup}>
         {!!zOpenWorkorderID && (
-          <View>
-            <TabMenuButton
-              buttonStyle={{
-                borderTopLeftRadius: 15,
-              }}
-              onPress={() =>
-                useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.workorderItems)
-              }
-              text={TAB_NAMES.itemsTab.workorderItems}
-              isSelected={
-                zItemsTabName === TAB_NAMES.itemsTab.workorderItems
-                  ? true
-                  : false
-              }
-            />
-            {/* <View style={{ width: 20 }} /> */}
-          </View>
+          <TabMenuButton
+            style={{ borderTopLeftRadius: 15 }}
+            onPress={() =>
+              useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.workorderItems)
+            }
+            text={TAB_NAMES.itemsTab.workorderItems}
+            isSelected={zItemsTabName === TAB_NAMES.itemsTab.workorderItems}
+          />
         )}
         {!!zOpenWorkorderID && (
           <TabMenuButton
             onPress={() => useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.changeLog)}
             text={TAB_NAMES.itemsTab.changeLog}
-            isSelected={
-              zItemsTabName === TAB_NAMES.itemsTab.changeLog ? true : false
-            }
+            isSelected={zItemsTabName === TAB_NAMES.itemsTab.changeLog}
           />
         )}
-      </View>
+      </div>
 
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-        }}
-      >
-<Tooltip text="Notes for the app dev" position="bottom">
-          <TouchableOpacity
-            onPress={onDevNotesPress}
-            style={{ paddingHorizontal: 10, justifyContent: "center" }}
-          >
-            <Image_ icon={ICONS.thoughtBubble} size={22} />
-          </TouchableOpacity>
+      <div className={sectionStyles.rightGroup}>
+        <Tooltip text="Notes for the app dev" position="bottom">
+          <button type="button" className={sectionStyles.iconButton} onClick={onDevNotesPress}>
+            <Image icon={ICONS.thoughtBubble} size={22} />
+          </button>
         </Tooltip>
-        {localStorage.getItem("warpspeed_has_secondary_display") === "true" && (
+        {hasSecondaryDisplay && (
           <Tooltip text="Send translated text to customer display" position="bottom">
-            <TouchableOpacity
-              onPress={onTranslatePress}
-              style={{ paddingHorizontal: 10, justifyContent: "center" }}
-            >
-              <Image_ icon={ICONS.paperPlane} size={22} />
-            </TouchableOpacity>
+            <button type="button" className={sectionStyles.iconButton} onClick={onTranslatePress}>
+              <Image icon={ICONS.paperPlane} size={22} />
+            </button>
           </Tooltip>
         )}
-        {!!zOpenWorkorderID && localStorage.getItem("warpspeed_has_secondary_display") === "true" && (
-          <CastButton />
-        )}
-        <TouchableOpacity
-          onPress={() => (window.location.href = ROUTES.home)}
-          style={{ paddingHorizontal: 10, justifyContent: "center", marginTop: 4 }}
+        {!!zOpenWorkorderID && hasSecondaryDisplay && <CastButton />}
+        <button
+          type="button"
+          className={`${sectionStyles.iconButton} ${sectionStyles.homeButton}`}
+          onClick={() => (window.location.href = ROUTES.home)}
         >
-          <Image_ icon={ICONS.home} size={24} />
-        </TouchableOpacity>
+          <Image icon={ICONS.home} size={24} />
+        </button>
         <TabMenuButton
-          buttonStyle={{
-            borderTopRightRadius: 15,
-          }}
+          style={{ borderTopRightRadius: 15 }}
           onPress={() => {
             let current = useTabNamesStore.getState().itemsTabName;
             if (current === TAB_NAMES.itemsTab.dashboard && !useOpenWorkordersStore.getState().openWorkorderID) {
@@ -443,12 +370,10 @@ const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
             }
           }}
           text={TAB_NAMES.itemsTab.dashboard}
-          isSelected={
-            zItemsTabName === TAB_NAMES.itemsTab.dashboard ? true : false
-          }
+          isSelected={zItemsTabName === TAB_NAMES.itemsTab.dashboard}
         />
-      </View>
-    </View>
+      </div>
+    </div>
   );
 };
 
@@ -457,8 +382,11 @@ const CastButton = () => {
   const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
   return (
     <Tooltip text={zCasting ? "Stop casting to customer screen" : "Cast workorder to customer screen"} position="bottom">
-      <TouchableOpacity
-        onPress={() => {
+      <button
+        type="button"
+        className={sectionStyles.iconButton}
+        style={{ opacity: zCasting ? 1 : 0.4 }}
+        onClick={() => {
           if (zCasting) {
             broadcastClear();
             useOpenWorkordersStore.setState({ castingToDisplay: false });
@@ -470,10 +398,9 @@ const CastButton = () => {
             }
           }
         }}
-        style={{ paddingHorizontal: 10, justifyContent: "center", opacity: zCasting ? 1 : 0.4 }}
       >
-        <Image_ icon={ICONS.display} size={22} />
-      </TouchableOpacity>
+        <Image icon={ICONS.display} size={22} />
+      </button>
     </Tooltip>
   );
 };

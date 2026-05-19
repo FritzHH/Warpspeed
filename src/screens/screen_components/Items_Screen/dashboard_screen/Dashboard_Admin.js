@@ -66,7 +66,18 @@ import {
   StatusPickerModal,
   Dialog_,
 } from "../../../../components";
-import { CheckBox } from "../../../../dom_components";
+import {
+  CheckBox,
+  Image,
+  Tooltip as DomTooltip,
+  Pressable as DomPressable,
+  TouchableOpacity as DomTouchableOpacity,
+  TextInput as DomTextInput,
+  Button as DomButton,
+  DropdownMenu as DomDropdownMenu,
+  StatusPickerModal as DomStatusPickerModal,
+} from "../../../../dom_components";
+import adminStyles from "./Dashboard_Admin.module.css";
 import cloneDeep from "lodash/cloneDeep";
 import React, { Children, useEffect, useRef, useState, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
@@ -104,6 +115,8 @@ import { TextTemplatesComponent } from "./TextTemplates/TextTemplatesComponent";
 import { TEMPLATE_EMOJIS, TEXT_TEMPLATE_VARIABLES, TEXT_TEMPLATE_TYPE_VARIABLES } from "./TextTemplates/templateConstants";
 import { BackupRecoveryComponent } from "./BackupRecoveryComponent";
 import { ImportComponent } from "./ImportComponent/ImportComponent";
+import { CardReaderManager } from "./readers_printers/CardReaderManager";
+import { PrintersComponent } from "./readers_printers/PrintersComponent";
 
 
 const TAB_NAMES = {
@@ -323,21 +336,16 @@ export function Dashboard_Admin({}) {
         }}
       >
         {/*********************left-side column container *****************/}
-        <ScrollView style={{ width: "30%" }}>
-          <View
-            style={{
-              width: "100%",
-              alignItems: "flex-start",
-              borderRadius: 5,
-              paddingRight: 10,
-              paddingLeft: 5,
-              backgroundColor: C.backgroundListWhite,
-              borderColor: C.buttonLightGreenOutline,
-              borderWidth: 1,
-              paddingTop: 13,
-              paddingBottom: 13,
-            }}
-          >
+        <div
+          className={adminStyles.tabBarScroll}
+          style={{
+            "--tab-bar-bg": C.backgroundListWhite,
+            "--tab-bar-border": C.buttonLightGreenOutline,
+            "--tab-bar-spacer": gray(0.1),
+            "--tab-bar-row-selected-bg": C.orange,
+          }}
+        >
+          <div className={adminStyles.tabBarInner}>
             {/************************* settings list names ****************** */}
             {/****************** sales report modal *****************************/}
             <MenuListLabelComponent
@@ -575,8 +583,8 @@ export function Dashboard_Admin({}) {
               icon={ICONS.tools}
               disabled={sMenuLocked}
             />
-          </View>
-        </ScrollView>
+          </div>
+        </div>
 
         {/*********************right-side column container****************** */}
 
@@ -677,32 +685,47 @@ export function Dashboard_Admin({}) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-function VerticalSpacer({ height }) {
-  return (
-    <View
-      style={{
-        height: 1,
-        marginVertical: 7,
-        width: "100%",
-        backgroundColor: gray(0.1),
-      }}
-    />
-  );
+function VerticalSpacer() {
+  return <div className={adminStyles.tabBarSpacer} />;
 }
 
-function BoxContainerOuterComponent({ style = {}, children }) {
-  return (
-    <View
-      style={{
-        width: "97%",
-        alignItems: "center",
+// Translate residual RN-web style keys to their DOM CSS equivalents so that
+// callers can keep passing paddingHorizontal/paddingVertical/borderWidth
+// during the incremental migration.
+function rnStyleToDom(style) {
+  if (!style) return {};
+  const out = { ...style };
+  if (style.paddingHorizontal != null) {
+    out.paddingLeft = out.paddingLeft ?? style.paddingHorizontal;
+    out.paddingRight = out.paddingRight ?? style.paddingHorizontal;
+    delete out.paddingHorizontal;
+  }
+  if (style.paddingVertical != null) {
+    out.paddingTop = out.paddingTop ?? style.paddingVertical;
+    out.paddingBottom = out.paddingBottom ?? style.paddingVertical;
+    delete out.paddingVertical;
+  }
+  if (style.marginHorizontal != null) {
+    out.marginLeft = out.marginLeft ?? style.marginHorizontal;
+    out.marginRight = out.marginRight ?? style.marginHorizontal;
+    delete out.marginHorizontal;
+  }
+  if (style.marginVertical != null) {
+    out.marginTop = out.marginTop ?? style.marginVertical;
+    out.marginBottom = out.marginBottom ?? style.marginVertical;
+    delete out.marginVertical;
+  }
+  if (style.borderWidth != null && out.borderStyle == null) {
+    out.borderStyle = "solid";
+  }
+  return out;
+}
 
-        // marginHorizontal: 0,
-        ...style,
-      }}
-    >
+export function BoxContainerOuterComponent({ style = {}, children }) {
+  return (
+    <div className={adminStyles.boxContainerOuter} style={rnStyleToDom(style)}>
       {children}
-    </View>
+    </div>
   );
 }
 
@@ -718,38 +741,24 @@ function MenuListLabelComponent({
   onDropdownSelect,
   disabled,
 }) {
-  let ICON_SIZE = 18;
-  const [sOpacity, _setOpacity] = useState(1);
+  const ICON_SIZE = 18;
+  const rowClassName = selected
+    ? `${adminStyles.tabBarRow} ${adminStyles.tabBarRowSelected}`
+    : adminStyles.tabBarRow;
   return (
-    <TouchableOpacity
-      onMouseEnter={() => !disabled && _setOpacity(0.6)}
-      onMouseLeave={() => _setOpacity(1)}
-      onPress={disabled ? undefined : handleExpandPress}
-      activeOpacity={disabled ? 1 : 0.2}
-      style={{
-        flexDirection: "row",
-        width: "100%",
-        justifyContent: "space-between",
-        alignItems: "center",
-        marginBottom: 4,
-        opacity: disabled ? 0.4 : sOpacity,
-        backgroundColor: selected ? C.orange : "transparent",
-        borderRadius: 5,
-        paddingVertical: 4,
-        paddingHorizontal: 6,
-        cursor: disabled ? "default" : "pointer",
-      }}
+    <button
+      type="button"
+      className={rowClassName}
+      disabled={disabled}
+      onClick={disabled ? undefined : handleExpandPress}
     >
       {!dropdownDataArr && (
-        <Text
-          style={{
-            fontSize: 16,
-            color: selected ? C.textWhite : gray(0.5),
-            fontWeight: "500",
-          }}
+        <span
+          className={adminStyles.tabBarRowText}
+          style={{ color: selected ? C.textWhite : gray(0.5) }}
         >
           {text.toUpperCase()}
-        </Text>
+        </span>
       )}
       {!!dropdownDataArr && (
         <DropdownMenu
@@ -758,9 +767,7 @@ function MenuListLabelComponent({
             paddingHorizontal: 0,
             paddingVertical: 0,
           }}
-          itemStyle={{
-            width: null,
-          }}
+          itemStyle={{ width: null }}
           buttonText={dropdownLabel}
           dataArr={dropdownDataArr}
           onSelect={onDropdownSelect}
@@ -772,29 +779,23 @@ function MenuListLabelComponent({
           }}
         />
       )}
-      <Image_ size={iconSize || ICON_SIZE} icon={icon || ICONS.expandGreen} />
-    </TouchableOpacity>
+      <Image size={iconSize || ICON_SIZE} icon={icon || ICONS.expandGreen} />
+    </button>
   );
 }
 
-function BoxContainerInnerComponent({ style = {}, children }) {
+export function BoxContainerInnerComponent({ style = {}, children }) {
   return (
-    <View
+    <div
+      className={adminStyles.boxContainerInner}
       style={{
-        // width: null,
-        borderWidth: 1,
-        borderColor: C.buttonLightGreenOutline,
-        backgroundColor: C.listItemWhite,
-        borderRadius: 10,
-        alignItems: "flex-end",
-        padding: 15,
-        borderColore: C.buttonLightGreenOutline,
-        width: "100%",
-        ...style,
+        "--box-inner-border": C.buttonLightGreenOutline,
+        "--box-inner-bg": C.listItemWhite,
+        ...rnStyleToDom(style),
       }}
     >
       {children}
-    </View>
+    </div>
   );
 }
 
@@ -808,15 +809,17 @@ function BoxButton1({
   colorGradientArr,
 }) {
   return (
-    <Button_
+    <DomButton
       colorGradientArr={colorGradientArr}
       text={label}
       icon={icon || ICONS.add}
       iconSize={iconSize || 30}
       textStyle={{ fontSize: 14, color: gray(0.6), ...textStyle }}
       buttonStyle={{
-        paddingHorizontal: 0,
-        paddingVertical: 0,
+        paddingLeft: 0,
+        paddingRight: 0,
+        paddingTop: 0,
+        paddingBottom: 0,
         borderRadius: 5,
         backgroundColor: gray(0.2),
         marginBottom: 0,
@@ -845,269 +848,6 @@ function MoveArrows({ index, listLength, onMove }) {
         <Image_ icon={ICONS.downChevron} size={13} />
       </TouchableOpacity>
     </View>
-  );
-}
-
-const LS_CARD_READER_KEY = "warpspeed_selected_card_reader";
-
-function CardReaderManager({ liveReaders = [], savedReaders = [], onSaveReaders }) {
-  const [sEditingId, _setEditingId] = useState(null);
-  const [sLabelDraft, _setLabelDraft] = useState("");
-  const [sSelectedReader, _setSelectedReader] = useState(() => localStorageWrapper.getItem(LS_CARD_READER_KEY));
-
-  // Merge live Stripe readers with saved labels
-  let mergedReaders = liveReaders.map((live) => {
-    let saved = savedReaders.find((s) => s.id === live.id);
-    return {
-      id: live.id,
-      label: saved?.label || "",
-      status: live.status || "offline",
-      device_type: live.device_type || "",
-      isLive: true,
-    };
-  });
-  // Add saved readers not in live list (stale/disconnected)
-  savedReaders.forEach((saved) => {
-    if (saved.id && !mergedReaders.find((m) => m.id === saved.id)) {
-      mergedReaders.push({ id: saved.id, label: saved.label || "", status: "offline", device_type: "", isLive: false });
-    }
-  });
-
-  function saveLabel(readerId, label) {
-    let updated = savedReaders.filter((s) => s.id !== readerId);
-    if (label.trim()) updated.push({ id: readerId, label: label.trim() });
-    onSaveReaders(updated);
-  }
-
-  function handleDeleteReader(reader) {
-    let isConnected = reader.isLive;
-    useAlertScreenStore.getState().setValues({
-      title: isConnected ? "Reader Connected" : "Remove Reader",
-      message: isConnected
-        ? "This reader is connected to the Stripe account. It will appear back in this list until it is removed from your account."
-        : "This reader is no longer connected to the account. Safely remove?",
-      btn1Text: "Remove",
-      btn2Text: "Cancel",
-      handleBtn1Press: () => {
-        let updated = savedReaders.filter((s) => s.id !== reader.id);
-        onSaveReaders(updated);
-        // If this was the selected reader, clear local selection
-        if (sSelectedReader?.id === reader.id) {
-          _setSelectedReader(null);
-          localStorageWrapper.removeItem(LS_CARD_READER_KEY);
-        }
-        useAlertScreenStore.getState().setShowAlert(false);
-      },
-      handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
-      canExitOnOuterClick: true,
-    });
-  }
-
-  // Build dropdown data for selected reader
-  let dropdownData = mergedReaders.map((r) => {
-    let isOffline = r.status !== "online";
-    return {
-      id: r.id,
-      label: (r.label || r.id) + (isOffline ? "  (offline)" : ""),
-      disabled: isOffline,
-      rawLabel: r.label,
-      textColor: isOffline ? gray(0.5) : C.text,
-    };
-  });
-
-  let selectedLabel = "";
-  if (sSelectedReader?.id) {
-    selectedLabel = sSelectedReader.label || sSelectedReader.id;
-  }
-
-  return (
-    <View style={{ marginTop: 7, width: "100%", alignItems: "flex-end" }}>
-      <View
-        style={{
-          borderRadius: 8,
-          backgroundColor: C.backgroundListWhite,
-          borderWidth: 1,
-          borderColor: C.buttonLightGreenOutline,
-          padding: 10,
-          width: "100%",
-        }}
-      >
-        <Text style={{ fontSize: 12, color: gray(0.6), marginBottom: 10 }}>
-          {"STRIPE CARD READERS"}
-        </Text>
-
-        {mergedReaders.length === 0 && (
-          <Text style={{ fontSize: 12, color: gray(0.4), fontStyle: "italic", marginBottom: 5 }}>
-            No readers found on account
-          </Text>
-        )}
-
-        <FlatList
-          data={mergedReaders}
-          ItemSeparatorComponent={() => <View style={{ height: 5 }} />}
-          renderItem={(obj) => {
-            let reader = obj.item;
-            let isOnline = reader.status === "online";
-            let isEditing = sEditingId === reader.id;
-            let hasLabel = !!reader.label;
-
-            return (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  backgroundColor: C.listItemWhite,
-                  borderRadius: 6,
-                  paddingVertical: 6,
-                  paddingHorizontal: 10,
-                  borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
-                }}
-              >
-                {/* Status dot */}
-                <View
-                  style={{
-                    width: 10,
-                    height: 10,
-                    borderRadius: 5,
-                    backgroundColor: isOnline ? C.green : gray(0.4),
-                    marginRight: 10,
-                  }}
-                />
-                {/* Reader info */}
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 11, color: gray(0.5) }}>
-                    {reader.device_type ? reader.device_type + "  ·  " : ""}{reader.id.length > 20 ? "..." + reader.id.slice(-12) : reader.id}
-                  </Text>
-                  {hasLabel && !isEditing && (
-                    <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
-                      <Text style={{ fontSize: 14, color: C.text, fontWeight: "500" }}>
-                        {reader.label}
-                      </Text>
-                      <Button_
-                        icon={ICONS.editPencil}
-                        iconSize={14}
-                        buttonStyle={{ paddingHorizontal: 6, backgroundColor: "transparent" }}
-                        onPress={() => {
-                          _setEditingId(reader.id);
-                          _setLabelDraft(reader.label);
-                        }}
-                      />
-                    </View>
-                  )}
-                  {(!hasLabel || isEditing) && (
-                    <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
-                      <TextInput_
-                        debounceMs={500}
-                        value={isEditing ? sLabelDraft : ""}
-                        onChangeText={(val) => {
-                          _setLabelDraft(val);
-                          saveLabel(reader.id, val);
-                        }}
-                        placeholder="Enter label..."
-                        placeholderTextColor={gray(0.4)}
-                        style={{
-                          outlineWidth: 0,
-                          fontSize: 14,
-                          paddingVertical: 3,
-                          paddingHorizontal: 6,
-                          backgroundColor: C.backgroundWhite,
-                          borderWidth: 1,
-                          borderColor: C.buttonLightGreenOutline,
-                          borderRadius: 5,
-                          minWidth: 140,
-                        }}
-                        onFocus={() => {
-                          if (sEditingId !== reader.id) {
-                            _setEditingId(reader.id);
-                            _setLabelDraft(reader.label || "");
-                          }
-                        }}
-                        onBlur={() => {
-                          _setEditingId(null);
-                          _setLabelDraft("");
-                        }}
-                      />
-                    </View>
-                  )}
-                </View>
-                {/* Delete button */}
-                <TouchableOpacity
-                  onPress={() => handleDeleteReader(reader)}
-                  style={{ padding: 6, marginLeft: 4 }}
-                >
-                  <Image_ icon={ICONS.trash} size={14} />
-                </TouchableOpacity>
-              </View>
-            );
-          }}
-        />
-      </View>
-
-      {/* Selected Reader Dropdown */}
-      <View
-        style={{
-          flexDirection: "row",
-          width: "100%",
-          justifyContent: "flex-end",
-          alignItems: "center",
-          marginTop: 15,
-        }}
-      >
-        <Text style={{ marginRight: 5 }}>Selected Reader: </Text>
-        <DropdownComponent
-          label={selectedLabel || "None"}
-          data={dropdownData}
-          onSelect={(item) => {
-            if (item.disabled) return;
-            let obj = { id: item.id, label: item.rawLabel || "" };
-            _setSelectedReader(obj);
-            localStorageWrapper.setItem(LS_CARD_READER_KEY, obj);
-          }}
-          itemTextStyle={{}}
-          itemStyle={{}}
-        />
-      </View>
-    </View>
-  );
-}
-
-function DropdownComponent({
-  ref,
-  data,
-  onSelect,
-  textStyle = {},
-  buttonStyle = {},
-  itemStyle = {},
-  itemTextStyle = {},
-  label,
-  modalCoordX,
-  modalCoordY,
-  menuMaxHeight,
-  centerMenuVertically,
-}) {
-  return (
-    <DropdownMenu
-      buttonText={label}
-      buttonTextStyle={{ fontSize: 14, ...textStyle }}
-      buttonStyle={{
-        borderRadius: 5,
-        borderWidth: 1,
-        borderColor: C.buttonLightGreenOutline,
-        paddingHorizontal: 7,
-        paddingVertical: 3,
-        ...buttonStyle,
-      }}
-      itemTextStyle={{ ...itemTextStyle }}
-      itemStyle={{ ...itemStyle }}
-      onSelect={onSelect}
-      dataArr={data}
-      ref={ref}
-      modalCoordX={modalCoordX}
-      modalCoordY={modalCoordY}
-      menuMaxHeight={menuMaxHeight}
-      centerMenuVertically={centerMenuVertically}
-    />
   );
 }
 
@@ -1145,114 +885,58 @@ const AppUserListComponent = ({
     _setEditUserIndex(0);
   }
 
+  const ucVars = {
+    "--uc-text": C.text,
+    "--uc-input-border": C.green,
+  };
+
   return (
     <BoxContainerOuterComponent style={{}}>
-      {/**Flatlist showing all app users, edit functions. sPunchClockUserObj */}
+      {/* User Control: settings, facial recognition, user list */}
       <BoxContainerInnerComponent
         style={{
           backgroundColor: C.backgroundListWhite,
-          borderWidth: 0
-          // width: "100%",
+          borderWidth: 0,
+          ...ucVars,
         }}
       >
-        <View style={{ width: "100%", justifyContent: "flex-end" }}>
-          <View style={{ flexDirection: "row", justifyContent: "flex-end" }}>
-            <Text
-              style={{
-                color: C.text,
-              }}
-            >
-              {"Seconds to log user out: "}
-            </Text>
-            <TextInput_
-              debounceMs={500}
-              onChangeText={(val) => {
-                _setLoginTimeout(val);
-                handleSettingsFieldChange("activeLoginTimeoutSeconds", val);
-              }}
-              style={{
-                width: 50,
-                marginLeft: 10,
-                borderColor: C.green,
-                borderWidth: 1,
-                borderRadius: 5,
-                paddingLeft: 3,
-                outlineWidth: 0,
-                color: C.text,
-              }}
-              value={String(sLoginTimeout)}
-            />
-          </View>
-        </View>
-        <View style={{ justifyContent: "flex-end" }}>
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "flex-end",
-              marginTop: 10,
+        <div className={`${adminStyles.ucSettingRow} ${adminStyles.ucSettingRowFirst}`}>
+          <span className={adminStyles.ucSettingLabel}>Seconds to log user out: </span>
+          <DomTextInput
+            debounceMs={500}
+            onChangeText={(val) => {
+              _setLoginTimeout(val);
+              handleSettingsFieldChange("activeLoginTimeoutSeconds", val);
             }}
-          >
-            <Text
-              style={{
-                // width: "40%",
-                color: C.text,
-              }}
-            >
-              {"Hours to lock app: "}
-            </Text>
-            <TextInput_
-              debounceMs={500}
-              onChangeText={(val) => {
-                _setLockHours(val);
-                handleSettingsFieldChange("idleLoginTimeoutHours", val);
-              }}
-              style={{
-                width: 50,
-                marginLeft: 10,
-                borderColor: C.green,
-                borderWidth: 1,
-                borderRadius: 5,
-                paddingLeft: 3,
-                color: C.text,
-                outlineWidth: 0,
-              }}
-              value={String(sLockHours)}
-            />
-          </View>
-          <View style={{ width: "100%", justifyContent: "flex-end" }}>
-            <View style={{ flexDirection: "row", marginTop: 10 }}>
-              <Text
-                style={{
-                  // width: "40%",
-                  color: C.text,
-                }}
-              >
-                {"User login PIN length: "}
-              </Text>
-              <TextInput_
-                debounceMs={500}
-                onChangeText={(val) => {
-                  _setPinLength(val);
-                  handleSettingsFieldChange("userPinStrength", val);
-                }}
-                style={{
-                  width: 50,
-                  marginLeft: 10,
-                  borderColor: C.green,
-                  borderWidth: 1,
-                  borderRadius: 5,
-                  paddingLeft: 3,
-                  outlineWidth: 0,
-                  color: C.text,
-                }}
-                value={String(sPinLength)}
-              />
-            </View>
-          </View>
-        </View>
-        <View
-          style={{ width: "100%", justifyContent: "flex-end", marginTop: 10 }}
-        >
+            style={{ width: 50, marginLeft: 10, border: "1px solid " + C.green, borderRadius: 5, paddingLeft: 3, outline: "none", color: C.text, boxSizing: "border-box" }}
+            value={String(sLoginTimeout)}
+          />
+        </div>
+        <div className={adminStyles.ucSettingRow}>
+          <span className={adminStyles.ucSettingLabel}>Hours to lock app: </span>
+          <DomTextInput
+            debounceMs={500}
+            onChangeText={(val) => {
+              _setLockHours(val);
+              handleSettingsFieldChange("idleLoginTimeoutHours", val);
+            }}
+            style={{ width: 50, marginLeft: 10, border: "1px solid " + C.green, borderRadius: 5, paddingLeft: 3, outline: "none", color: C.text, boxSizing: "border-box" }}
+            value={String(sLockHours)}
+          />
+        </div>
+        <div className={adminStyles.ucSettingRow}>
+          <span className={adminStyles.ucSettingLabel}>User login PIN length: </span>
+          <DomTextInput
+            debounceMs={500}
+            onChangeText={(val) => {
+              _setPinLength(val);
+              handleSettingsFieldChange("userPinStrength", val);
+            }}
+            style={{ width: 50, marginLeft: 10, border: "1px solid " + C.green, borderRadius: 5, paddingLeft: 3, outline: "none", color: C.text, boxSizing: "border-box" }}
+            value={String(sPinLength)}
+          />
+        </div>
+        <div className={adminStyles.ucCheckRow}>
           <CheckBox
             buttonStyle={{ justifyContent: "flex-end" }}
             isChecked={zSettingsObj?.lockScreenWhenUserLogsOut}
@@ -1264,10 +948,8 @@ const AppUserListComponent = ({
               );
             }}
           />
-        </View>
-        <View
-          style={{ width: "100%", justifyContent: "flex-end", marginTop: 10 }}
-        >
+        </div>
+        <div className={adminStyles.ucCheckRow}>
           <CheckBox
             buttonStyle={{ justifyContent: "flex-end" }}
             isChecked={zSettingsObj?.useFacialRecognition !== false}
@@ -1279,19 +961,19 @@ const AppUserListComponent = ({
               );
             }}
           />
-        </View>
+        </div>
         {zSettingsObj?.useFacialRecognition !== false && (
-          <View style={{ width: "100%", marginTop: 10, paddingHorizontal: 5 }}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-              <Text style={{ fontSize: 13, color: C.text, fontWeight: Fonts.weight.textRegular }}>
+          <div className={adminStyles.ucSensitivityBlock}>
+            <div className={adminStyles.ucSensitivityHeader}>
+              <span style={{ fontSize: 13, color: C.text, fontWeight: Fonts.weight.textRegular }}>
                 Match Sensitivity
-              </Text>
-              <Text style={{ fontSize: 13, color: C.text, fontWeight: Fonts.weight.textHeavy }}>
+              </span>
+              <span style={{ fontSize: 13, color: C.text, fontWeight: Fonts.weight.textHeavy }}>
                 {(zSettingsObj?.faceRecognitionThreshold ?? 0.55).toFixed(2)}
-              </Text>
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 11, color: gray(0.5), marginRight: 8 }}>Strict</Text>
+              </span>
+            </div>
+            <div className={adminStyles.ucSensitivityRow}>
+              <span style={{ fontSize: 11, color: gray(0.5), marginRight: 8 }}>Strict</span>
               <input
                 type="range"
                 min="0.35"
@@ -1303,11 +985,11 @@ const AppUserListComponent = ({
                 }}
                 style={{ flex: 1, cursor: "pointer" }}
               />
-              <Text style={{ fontSize: 11, color: gray(0.5), marginLeft: 8 }}>Loose</Text>
-            </View>
-          </View>
+              <span style={{ fontSize: 11, color: gray(0.5), marginLeft: 8 }}>Loose</span>
+            </div>
+          </div>
         )}
-        <View style={{ width: "100%", height: 1, backgroundColor: gray(0.2), marginVertical: 20 }} />
+        <div className={adminStyles.ucDivider} style={{ backgroundColor: gray(0.2) }} />
         {/* <View
             style={{
               flexDirection: "row",
@@ -1333,630 +1015,465 @@ const AppUserListComponent = ({
             }}
           /> */}
 
-        {/* </View> */}
-        <View
-          style={{
-            width: "100%",
-            alignItems: "flex-start",
-          }}
-        >
-          <View title="Add user">
-            <BoxButton1
-              iconSize={35}
-              icon={ICONS.add}
-              onPress={handleNewUserPress}
-              style={{}}
-            />
-          </View>
-        </View>
-        <View style={{ width: "100%" }}>
-          <FlatList
-            ItemSeparatorComponent={() => (
-              <View
-                style={{
-                  height: 5,
-                }}
-              />
-            )}
-            style={{ borderRadius: 5 }}
-            data={
-              zSettingsObj
-                ? sNewUserObj
-                  ? [sNewUserObj, ...zSettingsObj.users]
-                  : zSettingsObj.users
-                : []
-            }
-            renderItem={(obj) => {
-              obj = cloneDeep(obj);
-              let idx = obj.index;
-              let userObj = obj.item;
+        <div className={adminStyles.ucAddUserWrap}>
+          <BoxButton1
+            iconSize={35}
+            icon={ICONS.add}
+            onPress={handleNewUserPress}
+            style={{}}
+          />
+        </div>
+        <div className={adminStyles.ucUserList}>
+          {(() => {
+            let data = zSettingsObj
+              ? sNewUserObj
+                ? [sNewUserObj, ...zSettingsObj.users]
+                : zSettingsObj.users
+              : [];
+            return data.map((userObj, idx) => {
+              userObj = cloneDeep(userObj);
               let editable = sEditUserIndex === idx;
+              let borderColor = editable ? C.buttonLightGreenOutline : "transparent";
               return (
-                <View
-                  ref={(element) => (userListItemRefs.current[idx] = element)}
-                  style={{
-                    flexDirection: "row",
-                    backgroundColor: C.listItemWhite,
-                    borderWidth: 1,
-                    borderColor: C.buttonLightGreenOutline,
-                    borderRadius: 5,
-                    padding: 3,
-                    paddingRight: 10,
-                    opacity: !editable && sEditUserIndex ? 0.3 : 1,
-                  }}
-                >
-                  <View
+                <React.Fragment key={userObj.id || idx}>
+                  {idx > 0 && <div className={adminStyles.ucUserListItem} />}
+                  <div
+                    ref={(element) => (userListItemRefs.current[idx] = element)}
+                    className={adminStyles.ucUserRow}
                     style={{
-                      marginRight: 5,
-                      width: "16%",
+                      backgroundColor: C.listItemWhite,
+                      borderColor: C.buttonLightGreenOutline,
+                      opacity: !editable && sEditUserIndex ? 0.3 : 1,
                     }}
                   >
-                    {/* Row 1 - aligns with name row */}
-                    <View style={{ height: 25, justifyContent: "center", alignItems: "center" }}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          if (!canEditUsers) return;
-                          if (sEditUserIndex == null) {
-                            console.log(JSON.stringify(userObj, null, 2));
-                          }
-                          _setEditUserIndex(sEditUserIndex != null ? null : idx);
-                          _setShowPinIndex(null);
-                          _setShowWageIndex(null);
-                        }}
-                        style={{ opacity: canEditUsers ? 1 : 0.3 }}
-                      >
-                        <Image_ icon={editable ? ICONS.check1 : ICONS.editPencil} size={20} />
-                      </TouchableOpacity>
-                    </View>
-                    {/* Row 2 - Clock In/Out button (aligns with phone/email row) */}
-                    <View style={{ height: 25, justifyContent: "center", marginTop: 7 }}>
-                      <Button_
-                        text={zPunchClock[userObj.id] ? "Clock Out" : "Clock In"}
-                        onPress={() => {
-                          let isClockedIn = !!zPunchClock[userObj.id];
-                          let option = isClockedIn ? "out" : "in";
-                          let name = capitalizeFirstLetterOfString(userObj.first) + " " + capitalizeFirstLetterOfString(userObj.last);
-                          useAlertScreenStore.getState().setValues({
-                            title: "PUNCH CLOCK",
-                            message: (option === "in" ? "Clock in " : "Clock out ") + name + "?",
-                            btn1Text: option === "in" ? "CLOCK IN" : "CLOCK OUT",
-                            btn2Text: "CANCEL",
-                            handleBtn1Press: () => {
-                              useLoginStore.getState().setCreateUserClock(userObj.id, new Date().getTime(), option);
-                              if (option === "out") {
-                                useLoginStore.getState().setCurrentUser(null);
-                              }
-                            },
-                            handleBtn2Press: () => null,
-                            showAlert: true,
-                          });
-                        }}
-                        buttonStyle={{
-                          borderWidth: 1,
-                          borderColor: zPunchClock[userObj.id] ? C.lightred : C.buttonLightGreenOutline,
-                          backgroundColor: zPunchClock[userObj.id] ? C.lightred : C.buttonLightGreen,
-                          paddingVertical: 2,
-                          paddingHorizontal: 4,
-                          borderRadius: 5,
-                          width: "100%",
-                        }}
-                        mouseOverOptions={{ opacity: 0.7 }}
-                        textStyle={{ fontSize: 11, color: zPunchClock[userObj.id] ? C.textWhite : C.text, fontWeight: "600", numLines: 2, width: '100%', textAlign: "center" }}
-                      />
-                    </View>
-                    {/* Row 3 - Enroll button (aligns with PIN/wage/role row) */}
-                    {zSettingsObj?.useFacialRecognition !== false && (
-                    <View style={{ height: 25, justifyContent: "center", marginTop: 7 }}>
-                      <Tooltip text="Click to enroll user, right-click to remove" position="right">
-                        <Pressable_
+                    <div className={adminStyles.ucUserLeftCol}>
+                      {/* Row 1 - aligns with name row */}
+                      <div className={adminStyles.ucIconCell}>
+                        <DomTouchableOpacity
                           onPress={() => {
-                            if (!editable) return;
-                            _setFacialRecognitionModalUserObj(userObj);
+                            if (!canEditUsers) return;
+                            if (sEditUserIndex == null) {
+                              console.log(JSON.stringify(userObj, null, 2));
+                            }
+                            _setEditUserIndex(sEditUserIndex != null ? null : idx);
+                            _setShowPinIndex(null);
+                            _setShowWageIndex(null);
                           }}
-                          onRightPress={() => {
-                            if (!editable) return;
-                            handleDescriptorCapture(userObj, "");
-                          }}
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            borderWidth: 1,
-                            borderColor: C.buttonLightGreenOutline,
-                            backgroundColor: C.buttonLightGreen,
-                            paddingVertical: 2,
-                            paddingHorizontal: 4,
-                            borderRadius: 5,
-                            width: "100%",
-                            opacity: editable ? 1 : 0.5,
-                          }}
+                          style={{ opacity: canEditUsers ? 1 : 0.3 }}
                         >
-                          <Image_ icon={userObj.faceDescriptor ? ICONS.check1 : ICONS.redx} size={12} />
-                          <Text style={{ fontSize: 11, color: C.text, fontWeight: "600", marginLeft: 4 }}>Enroll</Text>
-                        </Pressable_>
-                      </Tooltip>
-                    </View>
-                    )}
-                    {/* Row 4 - aligns with statuses row */}
-                    <View style={{ marginTop: 7 }} />
-                  </View>
-                  <View
-                    style={{
-                      justifyContent: "center",
-                      marginTop: 2,
-                      width: "84%",
-                    }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                        // width: "100%",
-                        // backgroundColor: "red",
-                      }}
-                    >
-                      <TextInput_
-                        debounceMs={500}
-                        value={userObj.first}
-                        placeholder="First name"
-                        placeholderTextColor={"lightgray"}
-                        editable={editable}
-                        style={{
-                          paddingHorizontal: 5,
-                          padding: 1,
-                          borderColor: editable
-                            ? C.buttonLightGreenOutline
-                            : "transparent",
-                          outlineWidth: 0,
-                          width: "49%",
-                          borderWidth: 1,
-                          fontSize: 14,
-                          height: 25,
-                          color: editable ? C.text : gray(0.5),
-                        }}
-                        onChangeText={(value) => {
-                          userObj.first = value;
-                          commitUserInfoChange(userObj);
-                        }}
-                      />
-                      <TextInput_
-                        debounceMs={500}
-                        value={userObj.last}
-                        onChangeText={(value) => {
-                          userObj.last = value;
-                          commitUserInfoChange(userObj);
-                        }}
-                        placeholder="Last name"
-                        placeholderTextColor={"lightgray"}
-                        editable={editable}
-                        style={{
-                          paddingHorizontal: 5,
-                          borderColor: editable
-                            ? C.buttonLightGreenOutline
-                            : "transparent",
-                          outlineWidth: 0,
-                          width: "49%",
-                          borderWidth: 1,
-                          fontSize: 14,
-                          height: 25,
-                          color: editable ? C.text : gray(0.5),
-                        }}
-                      />
-                    </View>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                        width: "100%",
-                        alignItems: "center",
-                        marginTop: 7,
-                      }}
-                    >
-                      <TextInput_
-                        debounceMs={500}
-                        value={formatPhoneWithDashes(userObj.phone)}
-                        onChangeText={(value) => {
-                          let val = removeDashesFromPhone(value);
-                          userObj.phone = val;
-                          commitUserInfoChange(userObj);
-                        }}
-                        placeholder="Phone num."
-                        placeholderTextColor={"lightgray"}
-                        editable={editable}
-                        style={{
-                          paddingHorizontal: 5,
-                          padding: 1,
-                          borderColor: editable
-                            ? C.buttonLightGreenOutline
-                            : "transparent",
-                          outlineWidth: 0,
-                          width: 120,
-                          borderWidth: 1,
-                          height: 25,
-                          fontSize: 14,
-                          color: editable ? C.text : gray(0.5),
-                        }}
-                      />
-                      <TextInput_
-                        debounceMs={500}
-                        value={userObj.email || ""}
-                        onChangeText={(value) => {
-                          userObj.email = value;
-                          commitUserInfoChange(userObj);
-                        }}
-                        placeholder="Email"
-                        placeholderTextColor={"lightgray"}
-                        editable={editable}
-                        style={{
-                          paddingHorizontal: 5,
-                          padding: 1,
-                          borderColor: editable
-                            ? C.buttonLightGreenOutline
-                            : "transparent",
-                          backgroundColor: "transparent",
-                          outlineWidth: 0,
-                          flex: 1,
-                          marginLeft: 5,
-                          borderWidth: 1,
-                          height: 25,
-                          fontSize: 14,
-                          color: editable ? C.text : gray(0.5),
-                        }}
-                      />
-                    </View>
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        justifyContent: "space-around",
-                        width: "100%",
-                        marginTop: 7,
-                        alignItems: "center",
-                      }}
-                    >
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          borderColor: editable
-                            ? C.buttonLightGreenOutline
-                            : "transparent",
-                          width: "22%",
-                          borderWidth: 1,
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          height: 25,
-                        }}
-                      >
-                        <TextInput_
-                          debounceMs={500}
-                          caretHidden={sShowPinIndex != idx}
-                          focused={sShowPinIndex === idx}
-                          value={sShowPinIndex === idx ? userObj.pin : ""}
-                          onChangeText={(value) => {
-                            let otherPins = (zSettingsObj?.users || []).filter((u) => u.id !== userObj.id).map((u) => u.pin);
-                            if (value && otherPins.includes(value)) {
-                              value = value.slice(0, -1);
-                            }
-                            userObj.pin = value;
-                            commitUserInfoChange(userObj);
-                          }}
-                          placeholder={sShowPinIndex === idx ? "pin..." : "PIN"}
-                          placeholderTextColor={"lightgray"}
-                          editable={editable}
-                          style={{
-                            outlineWidth: 0,
-                            paddingHorizontal: 5,
-                            padding: 1,
-                            fontSize: 14,
-                            width: "80%",
-                            color: editable ? C.text : gray(0.5),
-                          }}
-                        />
-                        {editable ? (
-                          <TouchableOpacity
-                            onPress={() =>
-                              _setShowPinIndex(
-                                sShowPinIndex != null ? null : idx
-                              )
-                            }
-                          >
-                            <Image_ icon={ICONS.editPencil} size={15} />
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={{ width: 15 }} />
-                        )}
-                      </View>
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          borderColor: editable
-                            ? C.buttonLightGreenOutline
-                            : "transparent",
-                          width: "22%",
-                          borderWidth: 1,
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                          height: 25,
-                        }}
-                      >
-                        <TextInput_
-                          debounceMs={500}
-                          caretHidden={sShowWageIndex != idx}
-                          value={
-                            sShowWageIndex === idx ? userObj.hourlyWage : ""
-                          }
-                          onChangeText={(value) => {
-                            userObj.hourlyWage = value;
-                            commitUserInfoChange(userObj);
-                          }}
-                          placeholder={
-                            sShowWageIndex === idx ? "wage..." : "Wage"
-                          }
-                          placeholderTextColor={"lightgray"}
-                          editable={editable}
-                          style={{
-                            outlineWidth: 0,
-                            paddingHorizontal: 5,
-                            padding: 1,
-                            fontSize: 14,
-                            width: "80%",
-                            color: editable ? C.text : gray(0.5),
-                          }}
-                        />
-                        {editable ? (
-                          <TouchableOpacity
-                            onPress={() =>
-                              _setShowWageIndex(
-                                sShowWageIndex != null ? null : idx
-                              )
-                            }
-                          >
-                            <Image_ icon={ICONS.editPencil} size={15} />
-                          </TouchableOpacity>
-                        ) : (
-                          <View style={{ width: 15 }} />
-                        )}
-                      </View>
-                      <View style={{ width: "40%", alignItems: "center" }}>
-                        <DropdownMenu
-                          enabled={editable}
-                          ref={userListItemRefs.current[idx]}
-                          dataArr={Object.values(PERMISSION_LEVELS).map(
-                            (o) => o.name
-                          )}
-                          onSelect={(item) => {
-                            if (!editable) return;
-                            let perm = Object.values(PERMISSION_LEVELS).find(
-                              (o) => o.name === item
-                            );
-                            userObj.permissions = perm;
-                            commitUserInfoChange(userObj);
-                          }}
-                          buttonStyle={{
-                            paddingHorizontal: 5,
-                            padding: 1,
-                            borderColor: C.buttonLightGreenOutline,
-                            outlineWidth: 0,
-                            borderRadius: 5,
-                            minWidth: 100,
-                            height: 25,
-                            borderWidth: 1,
-                            alignItems: "flex-start",
-                            backgroundColor: editable
-                              ? C.buttonLightGreen
-                              : "transparent",
-                            paddingVertical: 2,
-                          }}
-                          buttonText={userObj.permissions.name}
-                          buttonTextStyle={{
-                            color: editable ? C.text : gray(0.5),
-                            fontSize: 14,
-                          }}
-                        />
-                      </View>
-                      {editable && (
-                        <TouchableOpacity
+                          <Image icon={editable ? ICONS.check1 : ICONS.editPencil} size={20} />
+                        </DomTouchableOpacity>
+                      </div>
+                      {/* Row 2 - Clock In/Out (aligns with phone/email row) */}
+                      <div className={adminStyles.ucActionCell}>
+                        <DomButton
+                          text={zPunchClock[userObj.id] ? "Clock Out" : "Clock In"}
                           onPress={() => {
+                            let isClockedIn = !!zPunchClock[userObj.id];
+                            let option = isClockedIn ? "out" : "in";
+                            let name = capitalizeFirstLetterOfString(userObj.first) + " " + capitalizeFirstLetterOfString(userObj.last);
                             useAlertScreenStore.getState().setValues({
-                              title: "DELETE USER",
-                              message: "Are you sure you want to delete " + capitalizeFirstLetterOfString(userObj.first) + " " + capitalizeFirstLetterOfString(userObj.last) + "?",
-                              btn1Text: "DELETE",
+                              title: "PUNCH CLOCK",
+                              message: (option === "in" ? "Clock in " : "Clock out ") + name + "?",
+                              btn1Text: option === "in" ? "CLOCK IN" : "CLOCK OUT",
                               btn2Text: "CANCEL",
                               handleBtn1Press: () => {
-                                handleRemoveUserPress(userObj);
-                                _setEditUserIndex(null);
+                                useLoginStore.getState().setCreateUserClock(userObj.id, new Date().getTime(), option);
+                                if (option === "out") {
+                                  useLoginStore.getState().setCurrentUser(null);
+                                }
                               },
                               handleBtn2Press: () => null,
                               showAlert: true,
                             });
                           }}
-                        >
-                          <Image_ icon={ICONS.trash} size={18} />
-                        </TouchableOpacity>
-                      )}
-                    </View>
-                    {/* ROW 4: Statuses */}
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        marginTop: 7,
-                        flexWrap: "wrap",
-                        gap: 5,
-                      }}
-                    >
-                      {editable && (
-                        <StatusPickerModal
-                          statuses={zSettingsObj.statuses}
-                          onSelect={(item) => {
-                            if (!item) return;
-                            let currentStatuses = userObj.statuses || [];
-                            if (currentStatuses.includes(item.id)) return;
-                            userObj.statuses = [...currentStatuses, item.id];
-                            commitUserInfoChange(userObj);
-                          }}
-                          buttonText="+ Status"
-                          modalCoordX={80}
-                          modalCoordY={0}
                           buttonStyle={{
-                            paddingHorizontal: 8,
-                            paddingVertical: 2,
-                            borderColor: C.buttonLightGreenOutline,
-                            borderRadius: 5,
-                            height: 25,
                             borderWidth: 1,
-                            alignItems: "center",
-                            backgroundColor: C.buttonLightGreen,
+                            borderStyle: "solid",
+                            borderColor: zPunchClock[userObj.id] ? C.lightred : C.buttonLightGreenOutline,
+                            backgroundColor: zPunchClock[userObj.id] ? C.lightred : C.buttonLightGreen,
+                            paddingTop: 2,
+                            paddingBottom: 2,
+                            paddingLeft: 4,
+                            paddingRight: 4,
+                            borderRadius: 5,
+                            width: "100%",
                           }}
-                          buttonTextStyle={{
-                            color: C.text,
-                            fontSize: 12,
-                          }}
+                          mouseOverOptions={{ opacity: 0.7 }}
+                          textStyle={{ fontSize: 11, color: zPunchClock[userObj.id] ? C.textWhite : C.text, fontWeight: "600", width: '100%', textAlign: "center" }}
                         />
-                      )}
-                      {(userObj.statuses || []).map((statusId) => {
-                        let status = zSettingsObj.statuses.find(
-                          (s) => s.id === statusId
-                        );
-                        if (!status) return null;
-                        return (
-                          <View
-                            key={statusId}
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              backgroundColor: editable ? status.backgroundColor : gray(0.85),
-                              borderRadius: 4,
-                              paddingHorizontal: 6,
-                              paddingVertical: 2,
-                            }}
-                          >
-                            <Text
+                      </div>
+                      {/* Row 3 - Enroll (aligns with PIN/wage/role row) */}
+                      {zSettingsObj?.useFacialRecognition !== false && (
+                        <div className={adminStyles.ucActionCell}>
+                          <DomTooltip text="Click to enroll user, right-click to remove" position="right">
+                            <div
+                              className={adminStyles.ucEnrollBtn}
                               style={{
-                                color: editable ? status.textColor : gray(0.5),
-                                fontSize: 12,
-                                fontWeight: "600",
+                                "--uc-enroll-border": C.buttonLightGreenOutline,
+                                "--uc-enroll-bg": C.buttonLightGreen,
+                                opacity: editable ? 1 : 0.5,
+                                cursor: editable ? "pointer" : "default",
+                              }}
+                              onClick={() => {
+                                if (!editable) return;
+                                _setFacialRecognitionModalUserObj(userObj);
+                              }}
+                              onContextMenu={(e) => {
+                                e.preventDefault();
+                                if (!editable) return;
+                                handleDescriptorCapture(userObj, "");
                               }}
                             >
-                              {status.label}
-                            </Text>
-                            {editable && (
-                              <TouchableOpacity
-                                onPress={() => {
-                                  userObj.statuses = (
-                                    userObj.statuses || []
-                                  ).filter((id) => id !== statusId);
-                                  commitUserInfoChange(userObj);
-                                }}
-                                style={{ marginLeft: 4 }}
+                              <Image icon={userObj.faceDescriptor ? ICONS.check1 : ICONS.redx} size={12} />
+                              <span className={adminStyles.ucEnrollText} style={{ color: C.text }}>Enroll</span>
+                            </div>
+                          </DomTooltip>
+                        </div>
+                      )}
+                      {/* Row 4 - aligns with statuses row */}
+                      <div className={adminStyles.ucRowSpacer} />
+                    </div>
+                    <div className={adminStyles.ucUserRightCol}>
+                      <div className={adminStyles.ucNameRow}>
+                        <DomTextInput
+                          debounceMs={500}
+                          value={userObj.first}
+                          placeholder="First name"
+                          placeholderTextColor={"lightgray"}
+                          editable={editable}
+                          style={{
+                            paddingLeft: 5,
+                            paddingRight: 5,
+                            paddingTop: 1,
+                            paddingBottom: 1,
+                            borderColor: borderColor,
+                            color: editable ? C.text : gray(0.5),
+                          }}
+                          className={adminStyles.ucNameInput}
+                          onChangeText={(value) => {
+                            userObj.first = value;
+                            commitUserInfoChange(userObj);
+                          }}
+                        />
+                        <DomTextInput
+                          debounceMs={500}
+                          value={userObj.last}
+                          onChangeText={(value) => {
+                            userObj.last = value;
+                            commitUserInfoChange(userObj);
+                          }}
+                          placeholder="Last name"
+                          placeholderTextColor={"lightgray"}
+                          editable={editable}
+                          style={{
+                            paddingLeft: 5,
+                            paddingRight: 5,
+                            borderColor: borderColor,
+                            color: editable ? C.text : gray(0.5),
+                          }}
+                          className={adminStyles.ucNameInput}
+                        />
+                      </div>
+                      <div className={adminStyles.ucContactRow}>
+                        <DomTextInput
+                          debounceMs={500}
+                          value={formatPhoneWithDashes(userObj.phone)}
+                          onChangeText={(value) => {
+                            let val = removeDashesFromPhone(value);
+                            userObj.phone = val;
+                            commitUserInfoChange(userObj);
+                          }}
+                          placeholder="Phone num."
+                          placeholderTextColor={"lightgray"}
+                          editable={editable}
+                          style={{
+                            paddingLeft: 5,
+                            paddingRight: 5,
+                            paddingTop: 1,
+                            paddingBottom: 1,
+                            borderColor: borderColor,
+                            color: editable ? C.text : gray(0.5),
+                          }}
+                          className={adminStyles.ucPhoneInput}
+                        />
+                        <DomTextInput
+                          debounceMs={500}
+                          value={userObj.email || ""}
+                          onChangeText={(value) => {
+                            userObj.email = value;
+                            commitUserInfoChange(userObj);
+                          }}
+                          placeholder="Email"
+                          placeholderTextColor={"lightgray"}
+                          editable={editable}
+                          style={{
+                            paddingLeft: 5,
+                            paddingRight: 5,
+                            paddingTop: 1,
+                            paddingBottom: 1,
+                            borderColor: borderColor,
+                            color: editable ? C.text : gray(0.5),
+                          }}
+                          className={adminStyles.ucEmailInput}
+                        />
+                      </div>
+                      <div className={adminStyles.ucCredsRow}>
+                        <div className={adminStyles.ucCredBox} style={{ borderColor: borderColor }}>
+                          <DomTextInput
+                            debounceMs={500}
+                            caretHidden={sShowPinIndex != idx}
+                            focused={sShowPinIndex === idx}
+                            value={sShowPinIndex === idx ? userObj.pin : ""}
+                            onChangeText={(value) => {
+                              let otherPins = (zSettingsObj?.users || []).filter((u) => u.id !== userObj.id).map((u) => u.pin);
+                              if (value && otherPins.includes(value)) {
+                                value = value.slice(0, -1);
+                              }
+                              userObj.pin = value;
+                              commitUserInfoChange(userObj);
+                            }}
+                            placeholder={sShowPinIndex === idx ? "pin..." : "PIN"}
+                            placeholderTextColor={"lightgray"}
+                            editable={editable}
+                            className={adminStyles.ucCredInput}
+                            style={{ color: editable ? C.text : gray(0.5) }}
+                          />
+                          {editable ? (
+                            <DomTouchableOpacity
+                              onPress={() =>
+                                _setShowPinIndex(sShowPinIndex != null ? null : idx)
+                              }
+                            >
+                              <Image icon={ICONS.editPencil} size={15} />
+                            </DomTouchableOpacity>
+                          ) : (
+                            <div className={adminStyles.ucCredPlaceholder} />
+                          )}
+                        </div>
+                        <div className={adminStyles.ucCredBox} style={{ borderColor: borderColor }}>
+                          <DomTextInput
+                            debounceMs={500}
+                            caretHidden={sShowWageIndex != idx}
+                            value={sShowWageIndex === idx ? userObj.hourlyWage : ""}
+                            onChangeText={(value) => {
+                              userObj.hourlyWage = value;
+                              commitUserInfoChange(userObj);
+                            }}
+                            placeholder={sShowWageIndex === idx ? "wage..." : "Wage"}
+                            placeholderTextColor={"lightgray"}
+                            editable={editable}
+                            className={adminStyles.ucCredInput}
+                            style={{ color: editable ? C.text : gray(0.5) }}
+                          />
+                          {editable ? (
+                            <DomTouchableOpacity
+                              onPress={() =>
+                                _setShowWageIndex(sShowWageIndex != null ? null : idx)
+                              }
+                            >
+                              <Image icon={ICONS.editPencil} size={15} />
+                            </DomTouchableOpacity>
+                          ) : (
+                            <div className={adminStyles.ucCredPlaceholder} />
+                          )}
+                        </div>
+                        <div className={adminStyles.ucRoleWrap}>
+                          <DomDropdownMenu
+                            enabled={editable}
+                            ref={userListItemRefs.current[idx]}
+                            dataArr={Object.values(PERMISSION_LEVELS).map((o) => o.name)}
+                            onSelect={(item) => {
+                              if (!editable) return;
+                              let perm = Object.values(PERMISSION_LEVELS).find(
+                                (o) => o.name === item
+                              );
+                              userObj.permissions = perm;
+                              commitUserInfoChange(userObj);
+                            }}
+                            buttonStyle={{
+                              paddingLeft: 5,
+                              paddingRight: 5,
+                              paddingTop: 2,
+                              paddingBottom: 2,
+                              borderColor: C.buttonLightGreenOutline,
+                              borderStyle: "solid",
+                              borderWidth: 1,
+                              outline: "none",
+                              borderRadius: 5,
+                              minWidth: 100,
+                              height: 25,
+                              alignItems: "flex-start",
+                              backgroundColor: editable ? C.buttonLightGreen : "transparent",
+                            }}
+                            buttonText={userObj.permissions.name}
+                            buttonTextStyle={{
+                              color: editable ? C.text : gray(0.5),
+                              fontSize: 14,
+                            }}
+                          />
+                        </div>
+                        {editable && (
+                          <DomTouchableOpacity
+                            onPress={() => {
+                              useAlertScreenStore.getState().setValues({
+                                title: "DELETE USER",
+                                message: "Are you sure you want to delete " + capitalizeFirstLetterOfString(userObj.first) + " " + capitalizeFirstLetterOfString(userObj.last) + "?",
+                                btn1Text: "DELETE",
+                                btn2Text: "CANCEL",
+                                handleBtn1Press: () => {
+                                  handleRemoveUserPress(userObj);
+                                  _setEditUserIndex(null);
+                                },
+                                handleBtn2Press: () => null,
+                                showAlert: true,
+                              });
+                            }}
+                          >
+                            <Image icon={ICONS.trash} size={18} />
+                          </DomTouchableOpacity>
+                        )}
+                      </div>
+                      {/* ROW 4: Statuses */}
+                      <div className={adminStyles.ucChipRow}>
+                        {editable && (
+                          <DomStatusPickerModal
+                            statuses={zSettingsObj.statuses}
+                            onSelect={(item) => {
+                              if (!item) return;
+                              let currentStatuses = userObj.statuses || [];
+                              if (currentStatuses.includes(item.id)) return;
+                              userObj.statuses = [...currentStatuses, item.id];
+                              commitUserInfoChange(userObj);
+                            }}
+                            buttonText="+ Status"
+                            modalCoordX={80}
+                            modalCoordY={0}
+                            buttonStyle={{
+                              paddingLeft: 8,
+                              paddingRight: 8,
+                              paddingTop: 2,
+                              paddingBottom: 2,
+                              borderColor: C.buttonLightGreenOutline,
+                              borderStyle: "solid",
+                              borderWidth: 1,
+                              borderRadius: 5,
+                              height: 25,
+                              alignItems: "center",
+                              backgroundColor: C.buttonLightGreen,
+                            }}
+                            buttonTextStyle={{
+                              color: C.text,
+                              fontSize: 12,
+                            }}
+                          />
+                        )}
+                        {(userObj.statuses || []).map((statusId) => {
+                          let status = zSettingsObj.statuses.find((s) => s.id === statusId);
+                          if (!status) return null;
+                          return (
+                            <div
+                              key={statusId}
+                              className={adminStyles.ucChip}
+                              style={{ backgroundColor: editable ? status.backgroundColor : gray(0.85) }}
+                            >
+                              <span
+                                className={adminStyles.ucChipLabel}
+                                style={{ color: editable ? status.textColor : gray(0.5) }}
                               >
-                                <Text
-                                  style={{
-                                    color: status.textColor,
-                                    fontSize: 14,
-                                    fontWeight: "700",
+                                {status.label}
+                              </span>
+                              {editable && (
+                                <button
+                                  type="button"
+                                  className={adminStyles.ucChipRemove}
+                                  style={{ color: status.textColor }}
+                                  onClick={() => {
+                                    userObj.statuses = (userObj.statuses || []).filter((id) => id !== statusId);
+                                    commitUserInfoChange(userObj);
                                   }}
                                 >
                                   ×
-                                </Text>
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        );
-                      })}
-                    </View>
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
 
-                    {/* ROW 5: Email Inboxes */}
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        marginTop: 7,
-                        flexWrap: "wrap",
-                        gap: 5,
-                      }}
-                    >
-                      {editable && (zSettingsObj?.emailAccounts || []).length > 0 && (
-                        <DropdownMenu
-                          dataArr={(zSettingsObj.emailAccounts || [])
-                            .filter((a) => !(userObj.emailInboxes || []).includes(a.accountKey))
-                            .map((a) => ({ label: a.displayName, value: a.accountKey }))}
-                          onSelect={(item) => {
-                            if (!item) return;
-                            let current = userObj.emailInboxes || [];
-                            if (current.includes(item.value)) return;
-                            userObj.emailInboxes = [...current, item.value];
-                            commitUserInfoChange(userObj);
-                          }}
-                          buttonText="+ Inbox"
-                          buttonStyle={{
-                            paddingHorizontal: 8,
-                            paddingVertical: 2,
-                            borderColor: C.buttonLightGreenOutline,
-                            borderRadius: 5,
-                            height: 25,
-                            borderWidth: 1,
-                            alignItems: "center",
-                            backgroundColor: C.buttonLightGreen,
-                          }}
-                          buttonTextStyle={{
-                            color: C.text,
-                            fontSize: 12,
-                          }}
-                        />
-                      )}
-                      {(userObj.emailInboxes || []).map((accountKey) => {
-                        let acct = (zSettingsObj.emailAccounts || []).find((a) => a.accountKey === accountKey);
-                        if (!acct) return null;
-                        return (
-                          <View
-                            key={accountKey}
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              backgroundColor: editable ? C.blue : gray(0.85),
-                              borderRadius: 4,
-                              paddingHorizontal: 6,
-                              paddingVertical: 2,
+                      {/* ROW 5: Email Inboxes */}
+                      <div className={adminStyles.ucChipRow}>
+                        {editable && (zSettingsObj?.emailAccounts || []).length > 0 && (
+                          <DomDropdownMenu
+                            dataArr={(zSettingsObj.emailAccounts || [])
+                              .filter((a) => !(userObj.emailInboxes || []).includes(a.accountKey))
+                              .map((a) => ({ label: a.displayName, value: a.accountKey }))}
+                            onSelect={(item) => {
+                              if (!item) return;
+                              let current = userObj.emailInboxes || [];
+                              if (current.includes(item.value)) return;
+                              userObj.emailInboxes = [...current, item.value];
+                              commitUserInfoChange(userObj);
                             }}
-                          >
-                            <Text
-                              style={{
-                                color: editable ? C.textWhite : gray(0.5),
-                                fontSize: 12,
-                                fontWeight: "600",
-                              }}
+                            buttonText="+ Inbox"
+                            buttonStyle={{
+                              paddingLeft: 8,
+                              paddingRight: 8,
+                              paddingTop: 2,
+                              paddingBottom: 2,
+                              borderColor: C.buttonLightGreenOutline,
+                              borderStyle: "solid",
+                              borderWidth: 1,
+                              borderRadius: 5,
+                              height: 25,
+                              alignItems: "center",
+                              backgroundColor: C.buttonLightGreen,
+                            }}
+                            buttonTextStyle={{
+                              color: C.text,
+                              fontSize: 12,
+                            }}
+                          />
+                        )}
+                        {(userObj.emailInboxes || []).map((accountKey) => {
+                          let acct = (zSettingsObj.emailAccounts || []).find((a) => a.accountKey === accountKey);
+                          if (!acct) return null;
+                          return (
+                            <div
+                              key={accountKey}
+                              className={adminStyles.ucChip}
+                              style={{ backgroundColor: editable ? C.blue : gray(0.85) }}
                             >
-                              {acct.displayName}
-                            </Text>
-                            {editable && (
-                              <TouchableOpacity
-                                onPress={() => {
-                                  userObj.emailInboxes = (userObj.emailInboxes || []).filter((k) => k !== accountKey);
-                                  commitUserInfoChange(userObj);
-                                }}
-                                style={{ marginLeft: 4 }}
+                              <span
+                                className={adminStyles.ucChipLabel}
+                                style={{ color: editable ? C.textWhite : gray(0.5) }}
                               >
-                                <Text
-                                  style={{
-                                    color: C.textWhite,
-                                    fontSize: 14,
-                                    fontWeight: "700",
+                                {acct.displayName}
+                              </span>
+                              {editable && (
+                                <button
+                                  type="button"
+                                  className={adminStyles.ucChipRemove}
+                                  style={{ color: C.textWhite }}
+                                  onClick={() => {
+                                    userObj.emailInboxes = (userObj.emailInboxes || []).filter((k) => k !== accountKey);
+                                    commitUserInfoChange(userObj);
                                   }}
                                 >
                                   ×
-                                </Text>
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        );
-                      })}
-                    </View>
-                  </View>
-                </View>
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                </React.Fragment>
               );
-            }}
-          />
-        </View>
+            });
+          })()}
+        </div>
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );
@@ -1996,276 +1513,6 @@ const PaymentProcessingComponent = ({
         />
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
-  );
-};
-
-function isPrinterOnline(printer) {
-  return printer.active === true;
-}
-
-const PrintersComponent = ({ zSettingsObj, handleSettingsFieldChange }) => {
-  const printersObj = zSettingsObj?.printers || {};
-  const printersList = Object.values(printersObj);
-  const receiptPrinters = printersList.filter((p) => p.type === "receipt");
-  const labelPrinters = printersList.filter((p) => p.type === "label");
-  const [sSelectedReceiptPrinter, _setSelectedReceiptPrinter] = useState(localStorageWrapper.getItem("selectedPrinterID") || "");
-  const [sSelectedLabelPrinter, _setSelectedLabelPrinter] = useState(localStorageWrapper.getItem("selectedLabelPrinterID") || "");
-
-  function handleSelectReceiptPrinter(printerID) {
-    localStorageWrapper.setItem("selectedPrinterID", printerID);
-    _setSelectedReceiptPrinter(printerID);
-  }
-
-  function handleSelectLabelPrinter(printerID) {
-    localStorageWrapper.setItem("selectedLabelPrinterID", printerID);
-    _setSelectedLabelPrinter(printerID);
-  }
-
-  return (
-    <>
-    <BoxContainerOuterComponent style={{ marginTop: 20 }}>
-      <BoxContainerInnerComponent>
-        <View style={{ width: "100%", marginBottom: 10 }}>
-          <Text style={{ fontSize: 12, color: gray(0.6) }}>RECEIPT PRINTER</Text>
-        </View>
-        {receiptPrinters.length === 0 && (
-          <Text style={{ fontSize: 13, color: gray(0.5) }}>No receipt printers configured</Text>
-        )}
-        {receiptPrinters.map((printer, idx) => (
-          <View
-            key={printer.id || idx}
-            style={{
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: sSelectedReceiptPrinter === printer.id ? C.green : C.buttonLightGreenOutline,
-              backgroundColor: C.backgroundListWhite,
-              padding: 10,
-              marginBottom: idx < receiptPrinters.length - 1 ? 8 : 0,
-              width: "100%",
-            }}
-          >
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-              {!isPrinterOnline(printer) ? (
-                <Text style={{ fontSize: 12, fontWeight: "700", color: C.red, backgroundColor: "yellow", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: "hidden" }}>Printer Offline</Text>
-              ) : <View />}
-              <TouchableOpacity
-                onPress={() => {
-                  useAlertScreenStore.getState().setValues({
-                    title: "Remove Printer",
-                    message: "This will delete the printer from the database for all users. It must be re-added through the WarpHub app.",
-                    btn1Text: "Delete",
-                    btn2Text: "Cancel",
-                    handleBtn1Press: () => {
-                      let updated = { ...printersObj };
-                      delete updated[printer.id];
-                      handleSettingsFieldChange("printers", updated);
-                      if (sSelectedReceiptPrinter === printer.id) {
-                        localStorageWrapper.removeItem("selectedPrinterID");
-                        _setSelectedReceiptPrinter("");
-                      }
-                      useAlertScreenStore.getState().setShowAlert(false);
-                    },
-                    handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
-                    canExitOnOuterClick: true,
-                  });
-                }}
-                style={{ padding: 4 }}
-              >
-                <Image_ icon={ICONS.trash} size={14} />
-              </TouchableOpacity>
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>{printer.label || "Unlabeled"}</Text>
-                <Text style={{ fontSize: 12, color: gray(0.5), marginTop: 2 }}>{printer.printerName || "—"}</Text>
-              </View>
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, justifyContent: "space-between" }}>
-              <CheckBox
-                isChecked={sSelectedReceiptPrinter === printer.id}
-                text="Use this printer"
-                textStyle={{ fontSize: 13 }}
-                buttonStyle={{ backgroundColor: "transparent" }}
-                onCheck={() => handleSelectReceiptPrinter(printer.id)}
-              />
-              <Button_
-                text="Test Print"
-                onPress={() => {
-                  let testObj = printBuilder.test();
-                  dbSavePrintObj(testObj, printer.id);
-                  useAlertScreenStore.getState().setValues({
-                    title: "Test Print",
-                    message: "Was the test print successful?",
-                    btn1Text: "Yes",
-                    btn2Text: "No",
-                    handleBtn1Press: () => {
-                      handleSelectReceiptPrinter(printer.id);
-                      useAlertScreenStore.getState().setShowAlert(false);
-                    },
-                    handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
-                    canExitOnOuterClick: true,
-                  });
-                }}
-                colorGradientArr={COLOR_GRADIENTS.green}
-                style={{ paddingHorizontal: 16, paddingVertical: 10 }}
-                textStyle={{ fontSize: 14, fontWeight: "700" }}
-                enabled={isPrinterOnline(printer)}
-              />
-            </View>
-          </View>
-        ))}
-      </BoxContainerInnerComponent>
-    </BoxContainerOuterComponent>
-    <BoxContainerOuterComponent style={{ marginTop: 20 }}>
-      <BoxContainerInnerComponent>
-        <View style={{ width: "100%", marginBottom: 10 }}>
-          <Text style={{ fontSize: 12, color: gray(0.6) }}>LABEL PRINTER</Text>
-        </View>
-        {labelPrinters.length === 0 && (
-          <Text style={{ fontSize: 13, color: gray(0.5) }}>No label printers configured</Text>
-        )}
-        {labelPrinters.map((printer, idx) => (
-          <View
-            key={printer.id || idx}
-            style={{
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: sSelectedLabelPrinter === printer.id ? C.green : C.buttonLightGreenOutline,
-              backgroundColor: C.backgroundListWhite,
-              padding: 10,
-              marginBottom: idx < labelPrinters.length - 1 ? 8 : 0,
-              width: "100%",
-            }}
-          >
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
-              {!isPrinterOnline(printer) ? (
-                <Text style={{ fontSize: 12, fontWeight: "700", color: C.red, backgroundColor: "yellow", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, overflow: "hidden" }}>Printer Offline</Text>
-              ) : <View />}
-              <TouchableOpacity
-                onPress={() => {
-                  useAlertScreenStore.getState().setValues({
-                    title: "Remove Printer",
-                    message: "This will delete the printer from the database for all users. It must be re-added through the WarpHub app.",
-                    btn1Text: "Delete",
-                    btn2Text: "Cancel",
-                    handleBtn1Press: () => {
-                      let updated = { ...printersObj };
-                      delete updated[printer.id];
-                      handleSettingsFieldChange("printers", updated);
-                      if (sSelectedLabelPrinter === printer.id) {
-                        localStorageWrapper.removeItem("selectedLabelPrinterID");
-                        _setSelectedLabelPrinter("");
-                      }
-                      useAlertScreenStore.getState().setShowAlert(false);
-                    },
-                    handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
-                    canExitOnOuterClick: true,
-                  });
-                }}
-                style={{ padding: 4 }}
-              >
-                <Image_ icon={ICONS.trash} size={14} />
-              </TouchableOpacity>
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>{printer.label || "Unlabeled"}</Text>
-                <Text style={{ fontSize: 12, color: gray(0.5), marginTop: 2 }}>{printer.printerName || "—"}</Text>
-              </View>
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8, justifyContent: "space-between" }}>
-              <CheckBox
-                isChecked={sSelectedLabelPrinter === printer.id}
-                text="Use this printer"
-                textStyle={{ fontSize: 13 }}
-                buttonStyle={{ backgroundColor: "transparent" }}
-                onCheck={() => handleSelectLabelPrinter(printer.id)}
-              />
-              <Button_
-                text="Test Print"
-                onPress={() => {
-                  let testObj = labelPrintBuilder.test();
-                  dbSavePrintObj(testObj, printer.id);
-                }}
-                colorGradientArr={COLOR_GRADIENTS.green}
-                style={{ paddingHorizontal: 16, paddingVertical: 10 }}
-                textStyle={{ fontSize: 14, fontWeight: "700" }}
-                enabled={isPrinterOnline(printer)}
-              />
-            </View>
-          </View>
-        ))}
-      </BoxContainerInnerComponent>
-    </BoxContainerOuterComponent>
-    <BoxContainerOuterComponent style={{ marginTop: 20 }}>
-      <BoxContainerInnerComponent>
-        <View style={{ width: "100%", marginBottom: 10 }}>
-          <Text style={{ fontSize: 12, color: gray(0.6) }}>INTAKE RECEIPTS</Text>
-        </View>
-        <CheckBox
-          isChecked={zSettingsObj?.autoPrintIntakeReceipt}
-          textStyle={{ fontSize: 15 }}
-          buttonStyle={{ backgroundColor: "transparent" }}
-          text={"Auto print intake receipt"}
-          onCheck={() =>
-            handleSettingsFieldChange("autoPrintIntakeReceipt", !zSettingsObj?.autoPrintIntakeReceipt)
-          }
-        />
-        <CheckBox
-          isChecked={zSettingsObj?.autoSMSIntakeReceipt}
-          textStyle={{ fontSize: 15 }}
-          buttonStyle={{ backgroundColor: "transparent" }}
-          text={"Auto SMS intake receipt"}
-          onCheck={() =>
-            handleSettingsFieldChange("autoSMSIntakeReceipt", !zSettingsObj?.autoSMSIntakeReceipt)
-          }
-        />
-        <CheckBox
-          isChecked={zSettingsObj?.autoEmailIntakeReceipt}
-          textStyle={{ fontSize: 15 }}
-          buttonStyle={{ backgroundColor: "transparent" }}
-          text={"Auto email intake receipt"}
-          onCheck={() =>
-            handleSettingsFieldChange("autoEmailIntakeReceipt", !zSettingsObj?.autoEmailIntakeReceipt)
-          }
-        />
-      </BoxContainerInnerComponent>
-    </BoxContainerOuterComponent>
-    <BoxContainerOuterComponent style={{ marginTop: 20 }}>
-      <BoxContainerInnerComponent>
-        <View style={{ width: "100%", marginBottom: 10 }}>
-          <Text style={{ fontSize: 12, color: gray(0.6) }}>SALES RECEIPTS</Text>
-        </View>
-        <CheckBox
-          isChecked={zSettingsObj?.autoPrintSalesReceipt}
-          textStyle={{ fontSize: 15 }}
-          buttonStyle={{ backgroundColor: "transparent" }}
-          text={"Auto print sales receipt"}
-          onCheck={() =>
-            handleSettingsFieldChange("autoPrintSalesReceipt", !zSettingsObj?.autoPrintSalesReceipt)
-          }
-        />
-        <CheckBox
-          isChecked={zSettingsObj?.autoSMSSalesReceipt}
-          textStyle={{ fontSize: 15 }}
-          buttonStyle={{ backgroundColor: "transparent" }}
-          text={"Auto SMS sales receipt"}
-          onCheck={() =>
-            handleSettingsFieldChange("autoSMSSalesReceipt", !zSettingsObj?.autoSMSSalesReceipt)
-          }
-        />
-        <CheckBox
-          isChecked={zSettingsObj?.autoEmailSalesReceipt}
-          textStyle={{ fontSize: 15 }}
-          buttonStyle={{ backgroundColor: "transparent" }}
-          text={"Auto email sales receipt"}
-          onCheck={() =>
-            handleSettingsFieldChange("autoEmailSalesReceipt", !zSettingsObj?.autoEmailSalesReceipt)
-          }
-        />
-      </BoxContainerInnerComponent>
-    </BoxContainerOuterComponent>
-    </>
   );
 };
 
@@ -3897,7 +3144,7 @@ const OrderingComponent = () => {
   return (
     <BoxContainerOuterComponent>
       <BoxContainerInnerComponent style={{ width: "100%", alignItems: "center", justifyContent: "center", minHeight: 200 }}>
-        <Text style={{ color: gray(0.15), fontSize: 28, fontWeight: "600" }}>Ordering system not ready</Text>
+        <span style={{ color: gray(0.15), fontSize: 28, fontWeight: "600" }}>Ordering system not ready</span>
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );

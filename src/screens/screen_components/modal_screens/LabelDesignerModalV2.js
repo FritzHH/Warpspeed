@@ -1,31 +1,23 @@
 /*eslint-disable*/
-import React, { useState, useRef, useCallback } from "react";
-import ReactDOM from "react-dom";
+import React, { useState, useRef } from "react";
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-} from "react-native-web";
-import {
-  Button_,
-  TextInput_,
+  Button,
+  TextInput,
   DropdownMenu,
-  Image_,
-} from "../../../components";
-import { CheckBox } from "../../../dom_components";
+  Image,
+  CheckBox,
+  Dialog,
+} from "../../../dom_components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../styles";
 import {
-  formatCurrencyDisp,
   gray,
   lightenRGBByPercent,
   localStorageWrapper,
 } from "../../../utils";
-import { useSettingsStore, useInventoryStore, useAlertScreenStore } from "../../../stores";
+import { useSettingsStore, useAlertScreenStore } from "../../../stores";
 import { dbSavePrintObj } from "../../../db_calls_wrapper";
-import { workerSearchInventory } from "../../../inventorySearchManager";
-import cloneDeep from "lodash/cloneDeep";
 import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
+import styles from "./LabelDesignerModalV2.module.css";
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 
@@ -70,7 +62,7 @@ const DEFAULT_BARCODE_FIELD = {
   type: "barcode",
   x: 20,
   y: 20,
-  width: 211, // module 1 for 13-char barcode
+  width: 211,
   height: 60,
 };
 
@@ -196,7 +188,6 @@ function CanvasField({ field, scale, isSelected, onSelect, onDragStart, onResize
     );
   }
 
-  // Text field — Arial font at actual fontSize (no 0.75 factor)
   let scaledFontSize = Math.max(8, (field.fontSize || 30) * scale);
   let scaledW = (field.width || 200) * scale;
   let scaledH = (field.height || 60) * scale;
@@ -235,62 +226,65 @@ function FieldPalette({ fields, onAddField, onRemoveField }) {
   let fieldNamesOnCanvas = fields.map((f) => f.name);
 
   return (
-    <View style={{ width: "15%", minWidth: 120, paddingRight: 10 }}>
-      <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.text, marginBottom: 8 }}>
+    <div className={styles.fieldPalette}>
+      <span
+        className={styles.fieldPaletteHeader}
+        style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}
+      >
         FIELDS
-      </Text>
+      </span>
       {AVAILABLE_FIELDS.map((af) => {
         let isOnCanvas = fieldNamesOnCanvas.includes(af.name);
         return (
-          <TouchableOpacity
+          <div
             key={af.name}
-            onPress={() => {
+            onClick={() => {
               if (isOnCanvas) return;
               onAddField(af);
             }}
+            className={styles.fieldPaletteItem}
             style={{
-              paddingVertical: 6,
-              paddingHorizontal: 8,
-              marginBottom: 4,
-              borderRadius: 5,
               backgroundColor: isOnCanvas ? gray(0.92) : C.buttonLightGreen,
-              borderWidth: 1,
               borderColor: isOnCanvas ? gray(0.8) : C.buttonLightGreenOutline,
               opacity: isOnCanvas ? 0.5 : 1,
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
+              cursor: isOnCanvas ? "default" : "pointer",
             }}
           >
-            <Text style={{ fontSize: 12, color: isOnCanvas ? gray(0.5) : C.text }}>
+            <span
+              className={styles.fieldPaletteItemLabel}
+              style={{ color: isOnCanvas ? gray(0.5) : C.text }}
+            >
               {af.label}
-            </Text>
+            </span>
             {isOnCanvas && (
-              <TouchableOpacity
-                onPress={(e) => {
+              <div
+                onClick={(e) => {
                   e.stopPropagation();
                   onRemoveField(af.name);
                 }}
-                style={{ paddingLeft: 6 }}
+                className={styles.fieldPaletteRemoveBtn}
               >
-                <Image_ icon={ICONS.trash} size={11} />
-              </TouchableOpacity>
+                <Image icon={ICONS.trash} size={11} />
+              </div>
             )}
-          </TouchableOpacity>
+          </div>
         );
       })}
-    </View>
+    </div>
   );
 }
 
 function PropertiesPanel({ field, onUpdate, onRemove, labelWidth }) {
   if (!field) {
     return (
-      <View style={{ width: "22%", minWidth: 160, paddingLeft: 15, justifyContent: "center", alignItems: "center" }}>
-        <Text style={{ fontSize: 12, color: gray(0.5), textAlign: "center" }}>
+      <div className={styles.propertiesEmpty}>
+        <span
+          className={styles.propertiesEmptyText}
+          style={{ color: gray(0.5) }}
+        >
           Select a field on the canvas to edit its properties
-        </Text>
-      </View>
+        </span>
+      </div>
     );
   }
 
@@ -301,23 +295,25 @@ function PropertiesPanel({ field, onUpdate, onRemove, labelWidth }) {
   let isBarcode = field.type === "barcode";
 
   return (
-    <View style={{ width: "22%", minWidth: 160, paddingLeft: 15 }}>
-      <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.text, marginBottom: 8 }}>
+    <div className={styles.propertiesPanel}>
+      <span
+        className={styles.propertiesTitle}
+        style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}
+      >
         {field.name.toUpperCase()}
-      </Text>
+      </span>
 
       {/* Position display */}
-      <View style={{ marginBottom: 10 }}>
-        <Text style={{ fontSize: 11, color: gray(0.5), marginBottom: 2 }}>Position</Text>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <Text style={{ fontSize: 12, color: C.text }}>X: {field.x}  Y: {field.y}</Text>
-        </View>
-        <Text style={{ fontSize: 10, color: gray(0.6), marginTop: 2 }}>Arrow keys to move (Shift = fine)</Text>
-      </View>
+      <div className={styles.propertiesSection}>
+        <span className={styles.propertiesPositionLabel} style={{ color: gray(0.5) }}>Position</span>
+        <div className={styles.propertiesPositionRow}>
+          <span className={styles.propertiesPositionValue} style={{ color: C.text }}>X: {field.x}  Y: {field.y}</span>
+        </div>
+        <span className={styles.propertiesHint} style={{ color: gray(0.6) }}>Arrow keys to move (Shift = fine)</span>
+      </div>
 
       {isBarcode ? (
         <>
-          {/* Width — steps through valid barcode widths, filtered by label width */}
           <PropRow label="Width" value={field.width}>
             <StepperButtons
               onMinus={() => {
@@ -337,7 +333,6 @@ function PropertiesPanel({ field, onUpdate, onRemove, labelWidth }) {
             />
           </PropRow>
 
-          {/* Height */}
           <PropRow label="Height" value={field.height}>
             <StepperButtons
               onMinus={() => handleChange("height", Math.max(20, field.height - 10))}
@@ -347,7 +342,6 @@ function PropertiesPanel({ field, onUpdate, onRemove, labelWidth }) {
         </>
       ) : (
         <>
-          {/* Width */}
           <PropRow label="Width" value={field.width || 200}>
             <StepperButtons
               onMinus={() => handleChange("width", Math.max(40, (field.width || 200) - 20))}
@@ -355,7 +349,6 @@ function PropertiesPanel({ field, onUpdate, onRemove, labelWidth }) {
             />
           </PropRow>
 
-          {/* Height */}
           <PropRow label="Height" value={field.height || 60}>
             <StepperButtons
               onMinus={() => handleChange("height", Math.max(20, (field.height || 60) - 10))}
@@ -363,7 +356,6 @@ function PropertiesPanel({ field, onUpdate, onRemove, labelWidth }) {
             />
           </PropRow>
 
-          {/* Font Size */}
           <PropRow label="Font Size" value={field.fontSize || 30}>
             <StepperButtons
               onMinus={() => handleChange("fontSize", Math.max(10, (field.fontSize || 30) - 5))}
@@ -371,183 +363,84 @@ function PropertiesPanel({ field, onUpdate, onRemove, labelWidth }) {
             />
           </PropRow>
 
-          {/* Bold */}
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+          <div className={styles.boldRow}>
             <CheckBox
               isChecked={field.bold}
               onPress={() => handleChange("bold", !field.bold)}
             />
-            <Text style={{ fontSize: 12, color: C.text, marginLeft: 6 }}>Bold</Text>
-          </View>
+            <span className={styles.boldLabel} style={{ color: C.text }}>Bold</span>
+          </div>
 
-          {/* Align */}
-          <View style={{ marginBottom: 10 }}>
-            <Text style={{ fontSize: 11, color: gray(0.5), marginBottom: 4 }}>Align</Text>
-            <View style={{ flexDirection: "row" }}>
-              {["left", "center", "right"].map((a) => (
-                <TouchableOpacity
-                  key={a}
-                  onPress={() => handleChange("align", a)}
-                  style={{
-                    flex: 1,
-                    paddingVertical: 5,
-                    borderRadius: 4,
-                    borderWidth: 1,
-                    borderColor: (field.align || "center") === a ? C.blue : gray(0.8),
-                    backgroundColor: (field.align || "center") === a ? lightenRGBByPercent(C.blue, 85) : "transparent",
-                    marginRight: a !== "right" ? 4 : 0,
-                    alignItems: "center",
-                  }}
-                >
-                  <Text style={{ fontSize: 11, color: (field.align || "center") === a ? C.blue : C.text, fontWeight: (field.align || "center") === a ? "bold" : "normal" }}>
-                    {a.charAt(0).toUpperCase() + a.slice(1)}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+          <div className={styles.alignSection}>
+            <span className={styles.alignLabel} style={{ color: gray(0.5) }}>Align</span>
+            <div className={styles.alignRow}>
+              {["left", "center", "right"].map((a) => {
+                let selected = (field.align || "center") === a;
+                return (
+                  <div
+                    key={a}
+                    onClick={() => handleChange("align", a)}
+                    className={styles.alignBtn}
+                    style={{
+                      borderColor: selected ? C.blue : gray(0.8),
+                      backgroundColor: selected ? lightenRGBByPercent(C.blue, 85) : "transparent",
+                      marginRight: a !== "right" ? 4 : 0,
+                    }}
+                  >
+                    <span
+                      className={styles.alignBtnText}
+                      style={{
+                        color: selected ? C.blue : C.text,
+                        fontWeight: selected ? "bold" : "normal",
+                      }}
+                    >
+                      {a.charAt(0).toUpperCase() + a.slice(1)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </>
       )}
 
-      {/* Remove */}
-      <Button_
+      <Button
         text="Remove Field"
         onPress={onRemove}
         icon={ICONS.trash}
         iconSize={14}
         colorGradientArr={COLOR_GRADIENTS.red}
-        style={{ marginTop: 15 }}
+        buttonStyle={{ marginTop: 15 }}
         textStyle={{ fontSize: 12 }}
       />
-    </View>
+    </div>
   );
 }
 
 function PropRow({ label, value, children }) {
   return (
-    <View style={{ marginBottom: 10 }}>
-      <Text style={{ fontSize: 11, color: gray(0.5), marginBottom: 2 }}>{label}</Text>
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
+    <div className={styles.propRow}>
+      <span className={styles.propRowLabel} style={{ color: gray(0.5) }}>{label}</span>
+      <div className={styles.propRowValueRow}>
         {children}
-        <Text style={{ fontSize: 13, color: C.text, marginLeft: 8, fontWeight: "500" }}>{value}</Text>
-      </View>
-    </View>
+        <span className={styles.propRowValue} style={{ color: C.text }}>{value}</span>
+      </div>
+    </div>
   );
 }
 
 function StepperButtons({ onMinus, onPlus }) {
   let btnStyle = {
-    width: 28,
-    height: 28,
-    borderRadius: 5,
-    borderWidth: 1,
     borderColor: C.buttonLightGreenOutline,
     backgroundColor: C.buttonLightGreen,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 4,
   };
   return (
-    <View style={{ flexDirection: "row", alignItems: "center" }}>
-      <TouchableOpacity onPress={onMinus} style={btnStyle}>
-        <Text style={{ fontSize: 16, fontWeight: "bold", color: C.text }}>-</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={onPlus} style={btnStyle}>
-        <Text style={{ fontSize: 16, fontWeight: "bold", color: C.text }}>+</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function PrintSearchOverlay({ onSelect, onClose }) {
-  const [sSearchText, _setSearchText] = useState("");
-  const [sResults, _setResults] = useState([]);
-
-  function handleSearch(text) {
-    _setSearchText(text);
-    if (!text || !text.trim()) {
-      _setResults([]);
-      return;
-    }
-    workerSearchInventory(text, (results) => {
-      _setResults(results.slice(0, 30));
-    });
-  }
-
-  return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        zIndex: 1001,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: 450,
-          maxHeight: "70%",
-          backgroundColor: C.backgroundWhite,
-          borderRadius: 12,
-          padding: 20,
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        <Text style={{ fontSize: 15, fontWeight: Fonts.weight.textHeavy, color: C.text, marginBottom: 10 }}>
-          Select Product to Print
-        </Text>
-        <TextInput_
-          placeholder="Search inventory..."
-          value={sSearchText}
-          onChangeText={handleSearch}
-          style={{ marginBottom: 10 }}
-        />
-        <div style={{ flex: 1, overflowY: "auto", maxHeight: 350 }}>
-          {sResults.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              onPress={() => onSelect(item)}
-              style={{
-                paddingVertical: 8,
-                paddingHorizontal: 10,
-                borderBottomWidth: 1,
-                borderBottomColor: gray(0.9),
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, color: C.text }}>{item.formalName || "Unnamed"}</Text>
-                <Text style={{ fontSize: 11, color: gray(0.5) }}>{item.brand || ""} {item.primaryBarcode ? " | " + item.primaryBarcode : ""}</Text>
-              </View>
-              <Text style={{ fontSize: 13, color: C.green, fontWeight: "500" }}>
-                {formatCurrencyDisp(item.price, true)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-          {sSearchText && sResults.length === 0 && (
-            <Text style={{ fontSize: 12, color: gray(0.5), textAlign: "center", marginTop: 20 }}>
-              No results
-            </Text>
-          )}
-        </div>
-        <Button_
-          text="Cancel"
-          onPress={onClose}
-          colorGradientArr={COLOR_GRADIENTS.grey}
-          style={{ marginTop: 10 }}
-          textStyle={{ fontSize: 12 }}
-        />
+    <div className={styles.stepperRow}>
+      <div onClick={onMinus} className={styles.stepperBtn} style={btnStyle}>
+        <span className={styles.stepperBtnText} style={{ color: C.text }}>-</span>
+      </div>
+      <div onClick={onPlus} className={styles.stepperBtn} style={btnStyle}>
+        <span className={styles.stepperBtnText} style={{ color: C.text }}>+</span>
       </div>
     </div>
   );
@@ -558,7 +451,6 @@ function PrintSearchOverlay({ onSelect, onClose }) {
 export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) => {
   const zSettingsObj = useSettingsStore((state) => state.settings);
 
-  // Layout state
   const [sLabelSize, _setLabelSize] = useState(() => {
     let saved = zSettingsObj?.defaultLabelSize;
     if (saved) {
@@ -574,14 +466,12 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
   const [sCurrentSlug, _setCurrentSlug] = useState(null);
   const [sIsDirty, _setIsDirty] = useState(false);
 
-  // Drag/resize state (ref to avoid re-renders during drag)
   const dragRef = useRef(null);
   const resizeRef = useRef(null);
   const canvasRef = useRef(null);
 
   const [sPrintSuccess, _setPrintSuccess] = useState(false);
 
-  // Derived
   let templates = zSettingsObj?.labelTemplates || {};
   let templateEntries = Object.entries(templates);
   let quickPrintSlugs = zSettingsObj?.quickPrintLayouts || [];
@@ -589,14 +479,11 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
   let selectedField = sSelectedFieldIdx !== null ? sFields[sSelectedFieldIdx] : null;
   let isDefaultSize = zSettingsObj?.defaultLabelSize?.width === sLabelSize.width && zSettingsObj?.defaultLabelSize?.height === sLabelSize.height;
 
-  // Canvas scale
   let scaleX = MAX_CANVAS_WIDTH / sLabelSize.width;
   let scaleY = MAX_CANVAS_HEIGHT / sLabelSize.height;
   let scale = Math.min(scaleX, scaleY, 1);
   let canvasW = sLabelSize.width * scale;
   let canvasH = sLabelSize.height * scale;
-
-  // ─── Handlers ─────────────────────────────────────────────────────
 
   function handleKeyDown(e) {
     if (sSelectedFieldIdx === null) return;
@@ -681,14 +568,12 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
         let updated = [...prev];
         let f = { ...r.startField };
         let pos = r.position;
-        // Height resize (all field types)
         if (pos.includes("s")) f.height = Math.max(20, Math.round(r.startField.height + dy));
         if (pos.includes("n")) {
           let newH = Math.max(20, Math.round(r.startField.height - dy));
           f.y = Math.max(0, Math.round(r.startField.y + (r.startField.height - newH)));
           f.height = newH;
         }
-        // Width resize (text only — barcode width must use stepper for valid sizes)
         if (f.type !== "barcode") {
           if (pos.includes("e")) f.width = Math.max(40, Math.round(r.startField.width + dx));
           if (pos.includes("w")) {
@@ -752,7 +637,6 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
     let baseSlug = slugify(name);
     let existingTemplates = zSettingsObj?.labelTemplates || {};
 
-    // Resolve unique slug (skip conflict check if same as current)
     let slug = baseSlug;
     if (existingTemplates[slug] && slug !== sCurrentSlug) {
       let counter = 2;
@@ -770,7 +654,6 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
 
     let updatedTemplates = { ...existingTemplates };
 
-    // If slug changed (rename), remove old key and update quickPrintLayouts
     if (sCurrentSlug && sCurrentSlug !== slug) {
       delete updatedTemplates[sCurrentSlug];
       let qp = zSettingsObj?.quickPrintLayouts || [];
@@ -788,7 +671,6 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
 
   function migrateField(field) {
     let f = { ...field };
-    // Migrate old barcode fields
     if (f.type === "barcode") {
       if (f.barcodeHeight && !f.height) f.height = Number(f.barcodeHeight);
       if (!f.width) f.width = 211;
@@ -796,14 +678,12 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
       delete f.barcodeHeight;
       delete f.moduleWidth;
     }
-    // Ensure numbers
     f.x = Number(f.x) || 0;
     f.y = Number(f.y) || 0;
     if (f.type === "barcode") {
       f.width = snapBarcodeWidth(Number(f.width) || 211);
       f.height = Number(f.height) || 60;
     } else {
-      // Migrate old fontHeight/fontWidth to new fontSize/width/height
       if (f.fontHeight && !f.fontSize) f.fontSize = Number(f.fontHeight);
       if (!f.width) f.width = 200;
       if (!f.height) f.height = 60;
@@ -939,215 +819,195 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
     handleSettingsFieldChange("quickPrintLayouts", updated);
   }
 
-  // ─── Render ───────────────────────────────────────────────────────
+  return (
+    <Dialog
+      visible={true}
+      onClose={handleExitPress}
+      title="Label Designer"
+      contentStyle={{ backgroundColor: "transparent", padding: 0, boxShadow: "none", width: "92%", maxWidth: 1000, height: "88%" }}
+    >
+      <div
+        tabIndex={0}
+        ref={(el) => { if (el && !el._focused) { el.focus(); el._focused = true; } }}
+        className={styles.modal}
+        style={{ backgroundColor: C.backgroundWhite }}
+      >
+        {/* ─── Top Bar ─── */}
+        <div className={styles.topBar}>
+          <span
+            className={styles.title}
+            style={{ fontWeight: Fonts.weight.textSuperheavy, color: C.text }}
+          >
+            Label Designer
+          </span>
 
-  return ReactDOM.createPortal(
-    <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, zIndex: 999 }}>
-      <TouchableWithoutFeedback onPress={handleExitPress}>
-        <View style={{ width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center" }}>
-          <TouchableWithoutFeedback onPress={() => {}}>
+          <Button
+            text="New"
+            onPress={handleNewLayout}
+            colorGradientArr={COLOR_GRADIENTS.blue}
+            buttonStyle={{ marginRight: 8, paddingLeft: 12, paddingRight: 12 }}
+            textStyle={{ fontSize: 12 }}
+          />
+
+          <TextInput
+            placeholder="Layout name..."
+            value={sLayoutName}
+            onChangeText={(t) => { _setLayoutName(t); _setIsDirty(true); }}
+            style={{ width: 160, marginRight: 8 }}
+          />
+
+          {templateEntries.length > 0 && (
+            <DropdownMenu
+              dataArr={templateEntries.map(([slug, t]) => t.name)}
+              onSelect={(item, idx) => handleLoadLayout(templateEntries[idx][0], templateEntries[idx][1])}
+              buttonText="Load Layout"
+              buttonStyle={{ paddingLeft: 10, paddingRight: 10, paddingTop: 4, paddingBottom: 4, marginRight: 8 }}
+              buttonTextStyle={{ fontSize: 12 }}
+            />
+          )}
+
+          <div className={styles.sizePickerWrap}>
+            <DropdownMenu
+              dataArr={LABEL_SIZES.map((s) => s.name)}
+              onSelect={(item) => handleLabelSizeChange(item)}
+              buttonText={sLabelSize.name}
+              buttonStyle={{ paddingLeft: 10, paddingRight: 10, paddingTop: 4, paddingBottom: 4 }}
+              buttonTextStyle={{ fontSize: 12 }}
+            />
+            {!isDefaultSize && (
+              <span
+                onClick={handleSetDefaultSize}
+                className={styles.setDefaultLink}
+                style={{ color: C.blue }}
+              >
+                Set Default
+              </span>
+            )}
+            {isDefaultSize && (
+              <span className={styles.defaultLabel} style={{ color: C.green }}>Default</span>
+            )}
+          </div>
+
+          {sCurrentSlug && (
+            <Button
+              text="Delete"
+              onPress={handleDeleteLayout}
+              icon={ICONS.trash}
+              iconSize={14}
+              colorGradientArr={COLOR_GRADIENTS.red}
+              buttonStyle={{ marginRight: 6, paddingLeft: 12, paddingRight: 12 }}
+              textStyle={{ fontSize: 12 }}
+            />
+          )}
+
+          {sCurrentSlug && (
+            <div className={styles.quickPrintWrap}>
+              <CheckBox
+                isChecked={isQuickPrint}
+                onPress={handleToggleQuickPrint}
+              />
+              <span
+                className={styles.quickPrintLabel}
+                style={{ color: isQuickPrint ? C.green : gray(0.5) }}
+              >
+                Quick Print
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* ─── Main Area ─── */}
+        <div className={styles.mainArea}>
+          <FieldPalette
+            fields={sFields}
+            onAddField={handleAddField}
+            onRemoveField={handleRemoveField}
+          />
+
+          <div className={styles.canvasArea}>
+            <Button
+              text={sIsDirty ? "Save Layout" : "Saved"}
+              onPress={handleSaveLayout}
+              colorGradientArr={sIsDirty ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
+              buttonStyle={{ paddingLeft: 40, paddingRight: 40, paddingTop: 10, paddingBottom: 10, marginBottom: 6 }}
+              textStyle={{ fontSize: 18 }}
+              enabled={sIsDirty && sFields.length > 0}
+            />
+            <span className={styles.canvasInfoText} style={{ color: gray(0.5) }}>
+              {sLabelSize.name} - {sLabelSize.width} x {sLabelSize.height} dots
+            </span>
             <div
+              ref={canvasRef}
               tabIndex={0}
-              ref={(el) => { if (el && !el._focused) { el.focus(); el._focused = true; } }}
+              onKeyDown={handleKeyDown}
+              onClick={() => { _setSelectedFieldIdx(null); canvasRef.current?.focus(); }}
+              className={styles.canvas}
               style={{
-                width: "92%",
-                maxWidth: 1000,
-                height: "88%",
-                backgroundColor: C.backgroundWhite,
-                borderRadius: 15,
-                padding: 20,
-                display: "flex",
-                flexDirection: "column",
-                outline: "none",
+                width: canvasW,
+                height: canvasH,
+                borderColor: gray(0.3),
               }}
             >
-              {/* ─── Top Bar ─── */}
-              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12, flexWrap: "wrap" }}>
-                <Text style={{ fontSize: 16, fontWeight: Fonts.weight.textSuperheavy, color: C.text, marginRight: 15 }}>
-                  Label Designer
-                </Text>
+              {/* Printer margin guides */}
+              <div className={styles.marginGuideV} style={{ left: 30 * scale, borderLeftColor: gray(0.7) }} />
+              <div className={styles.marginGuideV} style={{ right: 30 * scale, left: "auto", borderLeftColor: gray(0.7) }} />
+              <div className={styles.marginGuideH} style={{ top: 20 * scale, borderTopColor: gray(0.7) }} />
+              <div className={styles.marginGuideH} style={{ bottom: 20 * scale, top: "auto", borderTopColor: gray(0.7) }} />
+              {/* Vertical center line */}
+              <div className={styles.centerLine} />
 
-                {/* New layout */}
-                <Button_
-                  text="New"
-                  onPress={handleNewLayout}
-                  colorGradientArr={COLOR_GRADIENTS.blue}
-                  style={{ marginRight: 8, paddingHorizontal: 12 }}
-                  textStyle={{ fontSize: 12 }}
+              {sFields.map((field, idx) => (
+                <CanvasField
+                  key={field.name}
+                  field={field}
+                  scale={scale}
+                  canvasW={canvasW}
+                  isSelected={idx === sSelectedFieldIdx}
+                  onSelect={() => _setSelectedFieldIdx(idx)}
+                  onDragStart={(e) => handleFieldDragStart(idx, e)}
+                  onResizeStart={(e, pos) => handleFieldResizeStart(idx, e, pos)}
                 />
-
-                {/* Layout name input */}
-                <TextInput_
-                  placeholder="Layout name..."
-                  value={sLayoutName}
-                  onChangeText={(t) => { _setLayoutName(t); _setIsDirty(true); }}
-                  style={{ width: 160, marginRight: 8 }}
-                />
-
-                {/* Load layout dropdown */}
-                {templateEntries.length > 0 && (
-                  <DropdownMenu
-                    dataArr={templateEntries.map(([slug, t]) => t.name)}
-                    onSelect={(item, idx) => handleLoadLayout(templateEntries[idx][0], templateEntries[idx][1])}
-                    buttonText="Load Layout"
-                    buttonStyle={{ paddingHorizontal: 10, paddingVertical: 4, marginRight: 8 }}
-                    buttonTextStyle={{ fontSize: 12 }}
-                  />
-                )}
-
-                {/* Label size dropdown + set default */}
-                <View style={{ flexDirection: "row", alignItems: "center", marginRight: 8 }}>
-                  <DropdownMenu
-                    dataArr={LABEL_SIZES.map((s) => s.name)}
-                    onSelect={(item) => handleLabelSizeChange(item)}
-                    buttonText={sLabelSize.name}
-                    buttonStyle={{ paddingHorizontal: 10, paddingVertical: 4 }}
-                    buttonTextStyle={{ fontSize: 12 }}
-                  />
-                  {!isDefaultSize && (
-                    <TouchableOpacity onPress={handleSetDefaultSize} style={{ marginLeft: 4 }}>
-                      <Text style={{ fontSize: 10, color: C.blue, textDecorationLine: "underline" }}>Set Default</Text>
-                    </TouchableOpacity>
-                  )}
-                  {isDefaultSize && (
-                    <Text style={{ fontSize: 10, color: C.green, marginLeft: 4 }}>Default</Text>
-                  )}
-                </View>
-
-                {/* Delete */}
-                {sCurrentSlug && (
-                  <Button_
-                    text="Delete"
-                    onPress={handleDeleteLayout}
-                    icon={ICONS.trash}
-                    iconSize={14}
-                    colorGradientArr={COLOR_GRADIENTS.red}
-                    style={{ marginRight: 6, paddingHorizontal: 12 }}
-                    textStyle={{ fontSize: 12 }}
-                  />
-                )}
-
-                {/* Quick Print toggle */}
-                {sCurrentSlug && (
-                  <View style={{ flexDirection: "row", alignItems: "center", marginRight: 8 }}>
-                    <CheckBox
-                      isChecked={isQuickPrint}
-                      onPress={handleToggleQuickPrint}
-                    />
-                    <Text style={{ fontSize: 11, color: isQuickPrint ? C.green : gray(0.5), marginLeft: 4 }}>
-                      Quick Print
-                    </Text>
-                  </View>
-                )}
-
-              </View>
-
-              {/* ─── Main Area ─── */}
-              <View style={{ flex: 1, flexDirection: "row", overflow: "hidden" }}>
-                {/* Field palette */}
-                <FieldPalette
-                  fields={sFields}
-                  onAddField={handleAddField}
-                  onRemoveField={handleRemoveField}
-                />
-
-                {/* Canvas area */}
-                <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                  <Button_
-                    text={sIsDirty ? "Save Layout" : "Saved"}
-                    onPress={handleSaveLayout}
-                    colorGradientArr={sIsDirty ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
-                    style={{ paddingHorizontal: 40, paddingVertical: 10, marginBottom: 6 }}
-                    textStyle={{ fontSize: 18 }}
-                    disabled={!sIsDirty || sFields.length === 0}
-                  />
-                  <Text style={{ fontSize: 11, color: gray(0.5), marginBottom: 6 }}>
-                    {sLabelSize.name} - {sLabelSize.width} x {sLabelSize.height} dots
-                  </Text>
-                  <div
-                    ref={canvasRef}
-                    tabIndex={0}
-                    onKeyDown={handleKeyDown}
-                    onClick={() => { _setSelectedFieldIdx(null); canvasRef.current?.focus(); }}
-                    style={{
-                      width: canvasW,
-                      height: canvasH,
-                      backgroundColor: "white",
-                      border: "2px solid " + gray(0.3),
-                      borderRadius: 4,
-                      position: "relative",
-                      overflow: "hidden",
-                      boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-                      outline: "none",
-                    }}
-                  >
-                    {/* Printer margin guides */}
-                    <div style={{ position: "absolute", left: 30 * scale, top: 0, width: 0, height: "100%", borderLeft: "1px dashed " + gray(0.7), pointerEvents: "none" }} />
-                    <div style={{ position: "absolute", right: 30 * scale, top: 0, width: 0, height: "100%", borderLeft: "1px dashed " + gray(0.7), pointerEvents: "none" }} />
-                    <div style={{ position: "absolute", left: 0, top: 20 * scale, width: "100%", height: 0, borderTop: "1px dashed " + gray(0.7), pointerEvents: "none" }} />
-                    <div style={{ position: "absolute", left: 0, bottom: 20 * scale, width: "100%", height: 0, borderTop: "1px dashed " + gray(0.7), pointerEvents: "none" }} />
-                    {/* Vertical center line */}
-                    <div style={{ position: "absolute", left: "50%", top: 0, width: 0, height: "100%", borderLeft: "2px dashed rgba(70,150,255,0.8)", pointerEvents: "none" }} />
-
-                    {sFields.map((field, idx) => (
-                      <CanvasField
-                        key={field.name}
-                        field={field}
-                        scale={scale}
-                        canvasW={canvasW}
-                        isSelected={idx === sSelectedFieldIdx}
-                        onSelect={() => _setSelectedFieldIdx(idx)}
-                        onDragStart={(e) => handleFieldDragStart(idx, e)}
-                        onResizeStart={(e, pos) => handleFieldResizeStart(idx, e, pos)}
-                      />
-                    ))}
-                  </div>
-                </View>
-
-                {/* Properties panel */}
-                <PropertiesPanel
-                  field={selectedField}
-                  onUpdate={handleUpdateSelectedField}
-                  onRemove={() => {
-                    if (selectedField) handleRemoveField(selectedField.name);
-                  }}
-                  labelWidth={sLabelSize.width}
-                />
-              </View>
-
-              {/* ─── Bottom Bar ─── */}
-              <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: gray(0.85), paddingTop: 10 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Button_
-                      text="Test Print Label Design"
-                      onPress={handleTestPrint}
-                      colorGradientArr={COLOR_GRADIENTS.green}
-                      style={{ marginRight: 8, paddingHorizontal: 16 }}
-                      textStyle={{ fontSize: 12 }}
-                      disabled={sFields.length === 0}
-                    />
-                    {sPrintSuccess && (
-                      <Text style={{ fontSize: 12, color: C.green, fontWeight: "500" }}>Sent to printer!</Text>
-                    )}
-                  </View>
-
-                  {/* Exit */}
-                  <Button_
-                    text="Exit"
-                    onPress={handleExitPress}
-                    colorGradientArr={COLOR_GRADIENTS.grey}
-                    style={{ paddingHorizontal: 16 }}
-                    textStyle={{ fontSize: 12 }}
-                  />
-                </View>
-              </View>
+              ))}
             </div>
-          </TouchableWithoutFeedback>
-        </View>
-      </TouchableWithoutFeedback>
+          </div>
 
-    </View>,
-    document.body
+          <PropertiesPanel
+            field={selectedField}
+            onUpdate={handleUpdateSelectedField}
+            onRemove={() => {
+              if (selectedField) handleRemoveField(selectedField.name);
+            }}
+            labelWidth={sLabelSize.width}
+          />
+        </div>
+
+        {/* ─── Bottom Bar ─── */}
+        <div className={styles.bottomBar} style={{ borderTopColor: gray(0.85) }}>
+          <div className={styles.bottomBarInner}>
+            <div className={styles.bottomBarLeft}>
+              <Button
+                text="Test Print Label Design"
+                onPress={handleTestPrint}
+                colorGradientArr={COLOR_GRADIENTS.green}
+                buttonStyle={{ marginRight: 8, paddingLeft: 16, paddingRight: 16 }}
+                textStyle={{ fontSize: 12 }}
+                enabled={sFields.length > 0}
+              />
+              {sPrintSuccess && (
+                <span className={styles.printSuccessText} style={{ color: C.green }}>Sent to printer!</span>
+              )}
+            </div>
+
+            <Button
+              text="Exit"
+              onPress={handleExitPress}
+              colorGradientArr={COLOR_GRADIENTS.grey}
+              buttonStyle={{ paddingLeft: 16, paddingRight: 16 }}
+              textStyle={{ fontSize: 12 }}
+            />
+          </div>
+        </div>
+      </div>
+    </Dialog>
   );
 };

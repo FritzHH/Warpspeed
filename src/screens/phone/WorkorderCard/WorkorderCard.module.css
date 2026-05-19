@@ -1,0 +1,238 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 4px;
+  border-radius: 7px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgb(200, 228, 220);
+  background-color: rgb(254, 254, 255);
+  border-left-width: 4px;
+  padding: 3px 6px 3px 5px;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+  transition: opacity 120ms ease;
+}
+
+.card:active {
+  opacity: 0.7;
+}
+
+.topRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.leftCol {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  margin: 2px 0;
+  min-width: 0;
+}
+
+.nameRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.newSmsDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  margin-right: 5px;
+  flex-shrink: 0;
+  background-color: rgb(33, 148, 86);
+}
+
+.customerName {
+  font-size: 17px;
+  color: dimgray;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.brandRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  min-width: 0;
+}
+
+.brandText {
+  font-size: 13px;
+  font-weight: 500;
+  flex-shrink: 0;
+  color: rgb(71, 71, 71);
+}
+
+.dotSep {
+  width: 6px;
+  height: 2px;
+  margin: 0 4px;
+  background-color: lightgray;
+  flex-shrink: 0;
+}
+
+.descriptionText {
+  font-size: 13px;
+  flex-shrink: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  color: rgb(71, 71, 71);
+}
+
+.lineCountBadge {
+  background-color: gray;
+  border-radius: 10px;
+  padding: 1px 5px;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.lineCountText {
+  color: white;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.rightCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.dateText {
+  color: dimgray;
+  font-size: 12px;
+}
+
+.statusPill {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.wipUser {
+  font-size: 10px;
+  font-style: italic;
+  margin-right: 4px;
+  color: rgb(255, 26, 26);
+}
+
+.statusLabel {
+  font-size: 12px;
+}
+
+.badgeRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 2px;
+  padding-top: 2px;
+}
+
+.notHereBadge {
+  background-color: rgb(255, 243, 176);
+  border-radius: 10px;
+  padding: 1px 8px;
+  flex-shrink: 0;
+}
+
+.notHereText {
+  color: rgb(90, 75, 0);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.waitBadge {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgb(200, 228, 220);
+  background-color: rgb(232, 239, 245);
+  border-radius: 5px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
+.waitBadgeStacked {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgb(200, 228, 220);
+  background-color: rgb(232, 239, 245);
+  border-radius: 5px;
+  padding: 2px 6px;
+  flex-shrink: 0;
+}
+
+.waitDayItalic {
+  font-size: 11px;
+  font-style: italic;
+}
+
+.waitDayLine {
+  font-size: 12px;
+}
+
+.pickupTimeText {
+  font-size: 10px;
+  margin-left: 4px;
+  color: rgb(71, 71, 71);
+}
+
+.waitDayLineItalic {
+  font-size: 12px;
+  font-style: italic;
+}
+
+.partRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 2px;
+  padding-top: 2px;
+  border-top-width: 1px;
+  border-top-style: solid;
+  border-top-color: lightgray;
+  min-width: 0;
+}
+
+.partOrderedText {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  color: rgb(53, 135, 210);
+}
+
+.partSourceText {
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  color: rgb(230, 126, 34);
+}

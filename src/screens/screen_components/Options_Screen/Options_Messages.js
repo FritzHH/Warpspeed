@@ -1,15 +1,5 @@
 /* eslint-disable */
 
-import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  Image,
-  ActivityIndicator,
-} from "react-native-web";
 import { createPortal } from "react-dom";
 import {
   capitalizeFirstLetterOfString,
@@ -24,25 +14,17 @@ import {
   printBuilder,
 } from "../../../utils";
 import {
-  TabMenuDivider as Divider,
-  Button_,
-  DropdownMenu,
-  Image_,
-  PhoneNumberInput,
-  LoadingIndicator,
-  SmallLoadingIndicator,
-  Tooltip,
-  TouchableOpacity_,
-} from "../../../components";
-import {
   DropdownMenu as DropdownMenuDom,
   Image as ImageDom,
   TextInput as TextInputDom,
   TouchableOpacity as TouchableOpacityDom,
   Tooltip as TooltipDom,
+  LoadingIndicator as LoadingIndicatorDom,
+  SmallLoadingIndicator as SmallLoadingIndicatorDom,
+  PhoneNumberInput,
 } from "../../../dom_components";
 import { C, COLOR_GRADIENTS, Colors, ICONS, Fonts, Z } from "../../../styles";
-import hubStyles from "./MessagesHub.module.css";
+import hubStyles from "./Messages.module.css";
 import { useTranslation } from "../../../useTranslation";
 import {
   SMS_PROTO,
@@ -74,7 +56,9 @@ import { dbSendReceipt, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCu
 import { translateText } from "../../../db_calls";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { TransformWrapper, TransformComponent, useTransformEffect } from "react-zoom-pan-pinch";
-import { ReplyOptionsBar, scheduleAutoSend, clearAutoSend, buildForwardToPayload } from "./ReplyOptionsBar";
+import { scheduleAutoSend, clearAutoSend, buildForwardToPayload } from "./ReplyOptionsBar";
+import { ComposeArea } from "./ComposeArea";
+import { IncomingMessageComponent, OutgoingMessageComponent, MediaThumbnail } from "./MessageBubble";
 
 
 const TRANSLATION_LANGUAGES = [
@@ -86,6 +70,13 @@ const TRANSLATION_LANGUAGES = [
   { label: "Arabic", code: "ar" },
 ];
 const LANG_NAME_TO_CODE = { English: "en", Spanish: "es", French: "fr", German: "de", Creole: "ht", Arabic: "ar" };
+
+function scrollListToBottom(ref, animated) {
+  let el = ref?.current;
+  if (!el) return;
+  try { el.scrollTo({ top: el.scrollHeight, behavior: animated ? "smooth" : "auto" }); }
+  catch (e) { el.scrollTop = el.scrollHeight; }
+}
 
 const TEXT_TEMPLATE_VARIABLES = [
   { label: "First Name", variable: "{firstName}" },
@@ -148,7 +139,6 @@ export function MessagesComponent({}) {
 
   const [sNewMessage, _setNewMessage] = useState("");
   const [sCanRespond, _setCanRespond] = useState(false);
-  const [sInputHeight, _setInputHeight] = useState(36);
   const [sFromLang, _setFromLang] = useState("en");
   const [sToLang, _setToLang] = useState(() => LANG_NAME_TO_CODE[zWorkorderObj?.customerLanguage] || "en");
   const [sShowMediaPicker, _setShowMediaPicker] = useState(false);
@@ -237,15 +227,6 @@ export function MessagesComponent({}) {
     isUnmodifiedTemplateRef.current = false;
     if (sShowReplyModal) { _setShowReplyModal(false); clearAutoSend(); }
 
-    // Imperative height adjustment — reset to 0 then measure scrollHeight so it shrinks on delete
-    if (textInputRef.current) {
-      const node = textInputRef.current;
-      node.style.height = "0px";
-      const h = Math.max(36, Math.ceil(node.scrollHeight));
-      node.style.height = h + "px";
-      _setInputHeight(h);
-    }
-
     // Trigger translation if languages differ
     if (sFromLang && sToLang && sFromLang !== sToLang) {
       debouncedTranslate(val, sToLang);
@@ -320,31 +301,35 @@ export function MessagesComponent({}) {
       }
     } catch (e) {}
 
-    // Scroll: reset refs when messages clear, let onContentSizeChange handle initial
     if (zMessages.length === 0) {
       hasInitialScrolledRef.current = false;
       lastMsgIdRef.current = null;
       return;
     }
-    if (!hasInitialScrolledRef.current) return;
+    if (sCustomPhoneMode) return;
     let lastId = zMessages[zMessages.length - 1]?.id;
+    if (!hasInitialScrolledRef.current) {
+      hasInitialScrolledRef.current = true;
+      lastMsgIdRef.current = lastId;
+      setTimeout(() => scrollListToBottom(messageListRef, false), 100);
+      return;
+    }
     if (lastId === lastMsgIdRef.current) return;
     lastMsgIdRef.current = lastId;
-    try { messageListRef.current?.scrollToEnd({ animated: true }); } catch (e) {}
+    scrollListToBottom(messageListRef, true);
   }, [zMessages]);
 
   // Auto-scroll custom phone messages to bottom
   useEffect(() => {
     try {
       if (!sCustomPhoneMode || sCustomPhoneMessages.length < 1) return;
-
-      // canRespond is now read from thread parent doc (handled by hub mode redirect)
-
+      if (!hasInitialScrolledRef.current) {
+        hasInitialScrolledRef.current = true;
+        setTimeout(() => scrollListToBottom(messageListRef, false), 100);
+        return;
+      }
       if (sCustomPhoneMessages.length > 1) {
-        messageListRef.current?.scrollToIndex({
-          index: sCustomPhoneMessages.length - 1,
-          animated: true,
-        });
+        scrollListToBottom(messageListRef, true);
       }
     } catch (e) {}
   }, [sCustomPhoneMessages]);
@@ -427,7 +412,6 @@ export function MessagesComponent({}) {
       let translatedFromLang = isTranslated ? sFromLang : "";
 
       _setNewMessage("");
-      _setInputHeight(36);
       _setShowReplyModal(false);
       clearTranslation();
 
@@ -1099,41 +1083,44 @@ export function MessagesComponent({}) {
   const showHub = sHubMode || !hasCustomer;
   if (showHub) {
     return (
-      <View style={{ flex: 1, flexDirection: "row" }}>
+      <div className={hubStyles.hubLayoutRoot}>
         {/* Left panel: thread list */}
         {sHubSidebarCollapsed ? (
-          <View style={{ width: 36, borderRightWidth: 2, borderRightColor: gray(0.15), alignItems: "center", paddingTop: 10 }}>
-            <Tooltip text="Show conversations" position="right">
-              <TouchableOpacity onPress={() => _setHubSidebarCollapsed(false)} style={{ padding: 6 }}>
-                <Image_ icon={ICONS.greenRightArrow} size={30} />
-              </TouchableOpacity>
-            </Tooltip>
-          </View>
+          <div className={hubStyles.hubSidebarCollapsed}>
+            <TooltipDom text="Show conversations" position="right">
+              <TouchableOpacityDom onPress={() => _setHubSidebarCollapsed(false)} className={hubStyles.hubSidebarCollapsedBtn}>
+                <ImageDom icon={ICONS.greenRightArrow} size={30} />
+              </TouchableOpacityDom>
+            </TooltipDom>
+          </div>
         ) : (
-          <View style={{ width: sHubSidebarFullWidth ? "100%" : "30%", borderRightWidth: sHubSidebarFullWidth ? 0 : 2, borderRightColor: gray(0.15), flexDirection: "column" }}>
+          <div
+            className={hubStyles.hubSidebarExpanded}
+            style={{ width: sHubSidebarFullWidth ? "100%" : "30%", borderRightWidth: sHubSidebarFullWidth ? 0 : 2 }}
+          >
             {/* Header */}
-            <View style={{ padding: 10, borderBottomWidth: 1, borderBottomColor: gray(0.1) }}>
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
-                <Tooltip text="Collapse" position="right">
-                  <TouchableOpacity onPress={() => _setHubSidebarCollapsed(true)} style={{ padding: 4 }}>
-                    <Image_ icon={ICONS.greenLeftArrow} size={26} />
-                  </TouchableOpacity>
-                </Tooltip>
-                <View style={{ flex: 1, alignItems: "center" }}>
-                  <Text style={{ fontSize: 16, fontWeight: Fonts.weight.textHeavy, color: C.text }}>Messages</Text>
-                </View>
-                <Tooltip text={sHubSidebarFullWidth ? "Shrink sidebar" : "Expand sidebar"} position="left">
-                  <TouchableOpacity onPress={() => _setHubSidebarFullWidth(!sHubSidebarFullWidth)} style={{ padding: 4 }}>
-                    <Image_ icon={sHubSidebarFullWidth ? ICONS.greenLeftArrow : ICONS.greenRightArrow} size={26} />
-                  </TouchableOpacity>
-                </Tooltip>
-              </View>
-            </View>
+            <div className={hubStyles.hubSidebarHeader}>
+              <div className={hubStyles.hubSidebarHeaderRow}>
+                <TooltipDom text="Collapse" position="right">
+                  <TouchableOpacityDom onPress={() => _setHubSidebarCollapsed(true)} className={hubStyles.hubSidebarHeaderBtn}>
+                    <ImageDom icon={ICONS.greenLeftArrow} size={26} />
+                  </TouchableOpacityDom>
+                </TooltipDom>
+                <div className={hubStyles.hubSidebarHeaderCenter}>
+                  <span className={hubStyles.hubSidebarHeaderTitle} style={{ color: C.text }}>Messages</span>
+                </div>
+                <TooltipDom text={sHubSidebarFullWidth ? "Shrink sidebar" : "Expand sidebar"} position="left">
+                  <TouchableOpacityDom onPress={() => _setHubSidebarFullWidth(!sHubSidebarFullWidth)} className={hubStyles.hubSidebarHeaderBtn}>
+                    <ImageDom icon={sHubSidebarFullWidth ? ICONS.greenLeftArrow : ICONS.greenRightArrow} size={26} />
+                  </TouchableOpacityDom>
+                </TooltipDom>
+              </div>
+            </div>
             {/* Thread list */}
             {zSmsThreads.length < 1 ? (
-              <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-                <Text style={{ fontSize: 14, color: gray(0.3) }}>No conversations yet</Text>
-              </View>
+              <div className={hubStyles.hubEmpty}>
+                <span className={hubStyles.hubEmptyText} style={{ color: gray(0.3) }}>No conversations yet</span>
+              </div>
             ) : (
               <div className={hubStyles.threadList}>
                 {zSmsThreads.slice(0, sHubVisibleCount).map((item) => {
@@ -1161,11 +1148,11 @@ export function MessagesComponent({}) {
                 )}
               </div>
             )}
-          </View>
+          </div>
         )}
         {/* Right panel: conversation */}
         {!sHubSidebarFullWidth && (
-          <View style={{ flex: 1 }}>
+          <div className={hubStyles.hubRightPanel}>
             {(sHubHoverPhone || sHubSelectedPhone) ? (
               <HubConversationPanel
                 key={sHubHoverPhone || sHubSelectedPhone}
@@ -1181,11 +1168,11 @@ export function MessagesComponent({}) {
                 exitHubButton={null}
               />
             ) : (
-              <View style={{ flex: 1, flexDirection: "column" }}>
-                <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-                  <Text style={{ fontSize: 16, color: gray(0.25) }}>Select a conversation</Text>
-                </View>
-                <View style={{ flexDirection: "row", alignItems: "center", paddingTop: 8, paddingHorizontal: 8, paddingBottom: 8 }}>
+              <div className={hubStyles.hubPlaceholderCol}>
+                <div className={hubStyles.hubPlaceholderCenter}>
+                  <span className={hubStyles.hubPlaceholderText} style={{ color: gray(0.25) }}>Select a conversation</span>
+                </div>
+                <div className={hubStyles.hubPlaceholderEntryRow}>
                   <PhoneNumberInput
                     value={sHubNewPhone}
                     onChangeText={(val) => {
@@ -1207,64 +1194,42 @@ export function MessagesComponent({}) {
                     style={{ flex: 1 }}
                   />
                   {hasCustomer && (
-                    <Tooltip text="Back to customer" position="top" offsetX={-20}>
-                      <TouchableOpacity onPress={handleExitHubMode} style={{ marginLeft: 8, padding: 4 }}>
-                        <Image_ icon={ICONS.person} size={28} />
-                      </TouchableOpacity>
-                    </Tooltip>
+                    <TooltipDom text="Back to customer" position="top" offsetX={-20}>
+                      <TouchableOpacityDom onPress={handleExitHubMode} className={hubStyles.hubPlaceholderBackBtn}>
+                        <ImageDom icon={ICONS.person} size={28} />
+                      </TouchableOpacityDom>
+                    </TooltipDom>
                   )}
-                </View>
-              </View>
+                </div>
+              </div>
             )}
-          </View>
+          </div>
         )}
-      </View>
+      </div>
     );
   }
 
   return (
-    <View
-      style={{
-        flex: 1,
-        padding: 5,
-        justifyContent: "space-between",
-      }}
-    >
+    <div className={hubStyles.customerRoot}>
       {zCustomer?.customerCell && !sCustomPhoneMode && (
-        <View style={{ width: "100%", paddingVertical: 4, paddingHorizontal: 6, flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
-          <Text style={{ fontSize: 13, color: gray(0.4), fontStyle: "italic", textTransform: "capitalize" }}>
+        <div className={hubStyles.customerBanner}>
+          <span className={hubStyles.customerBannerName} style={{ color: gray(0.4) }}>
             {((zCustomer.first || "") + " " + (zCustomer.last || "")).trim()}
-          </Text>
-          <Text style={{ fontSize: 13, color: gray(0.4), marginLeft: 8 }}>
+          </span>
+          <span className={hubStyles.customerBannerPhone} style={{ color: gray(0.4) }}>
             {`(${zCustomer.customerCell.slice(0, 3)}) ${zCustomer.customerCell.slice(3, 6)}-${zCustomer.customerCell.slice(6)}`}
-          </Text>
-        </View>
+          </span>
+        </div>
       )}
-      <View
-        style={{
-          width: "100%",
-          flex: 1,
-          flexShrink: 1,
-          overflow: "hidden",
-        }}
-      >
+      <div className={hubStyles.messagesArea}>
         {zMessagesLoading && !sCustomPhoneMode && (
-          <View style={{ width: "100%", height: "100%", justifyContent: "center", alignItems: "center" }}>
-            <LoadingIndicator message="Loading messages..." />
-          </View>
+          <div className={hubStyles.messagesCenter}>
+            <LoadingIndicatorDom message="Loading messages..." />
+          </div>
         )}
         {(!zMessagesLoading || sCustomPhoneMode) && messagesArr.length < 1 && (
-          <View
-            style={{
-              width: "100%",
-              height: "100%",
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <Text
-              style={{ textAlign: "center", fontSize: 18, color: gray(0.25) }}
-            >
+          <div className={hubStyles.messagesCenter}>
+            <span className={hubStyles.messagesEmptyText} style={{ color: gray(0.25) }}>
               {sCustomPhoneMode
                 ? (sCustomPhone.length < 10
                   ? "Enter a phone number to message"
@@ -1274,53 +1239,58 @@ export function MessagesComponent({}) {
                   : zCustomer?.customerCell
                     ? "No messages to/from this cell phone #"
                     : "No cell phone on account\n\nText messaging deactivated"}
-            </Text>
-          </View>
+            </span>
+          </div>
         )}
         {(!zMessagesLoading || sCustomPhoneMode) && messagesArr.length > 0 && (
-          <View style={{ width: "100%", flex: 1 }}>
+          <div className={hubStyles.messagesListWrap}>
             {zMessagesLoadingMore && !sCustomPhoneMode && (
-              <View style={{ width: "100%", paddingVertical: 8, alignItems: "center" }}>
-                <SmallLoadingIndicator />
-              </View>
+              <div className={hubStyles.messagesLoadingMore}>
+                <SmallLoadingIndicatorDom />
+              </div>
             )}
-            <FlatList
-              onScrollToIndexFailed={(info) => {
-                setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: false }); }, 50);
-              }}
-              onContentSizeChange={() => {
-                if (!hasInitialScrolledRef.current && messagesArr.length > 0) {
-                  hasInitialScrolledRef.current = true;
-                  lastMsgIdRef.current = messagesArr[messagesArr.length - 1]?.id;
-                  setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: false }); }, 100);
-                }
-              }}
+            <div
               ref={messageListRef}
-              data={messagesArr}
-              renderItem={(item) => {
-                let idx = item.index;
-                item = item.item;
-                if (item.type === "incoming")
-                  return <IncomingMessageComponent msgObj={item} autoTranslateTo={sFromLang !== sToLang ? sToLang : ""} onScrollToBottom={() => { setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: true }); }, 50); }} />;
-                let isLast = (item.id || item.millis) === lastOutgoingID;
-                return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} thread={customerThread} onToggleBlock={handleToggleBlockResponses} onToggleForward={handleToggleForwardResponses} />;
-              }}
+              className={hubStyles.messageList}
               onScroll={(e) => {
                 if (sCustomPhoneMode) return;
-                let { contentOffset } = e.nativeEvent;
-                if (contentOffset.y <= 0 && zMessagesHasMore && !zMessagesLoadingMore) {
+                if (e.currentTarget.scrollTop <= 0 && zMessagesHasMore && !zMessagesLoadingMore) {
                   loadMoreMessages();
                 }
               }}
-              scrollEventThrottle={200}
-            />
-          </View>
+            >
+              {messagesArr.map((item) => {
+                let key = item.id || String(item.millis);
+                if (item.type === "incoming") {
+                  return (
+                    <IncomingMessageComponent
+                      key={key}
+                      msgObj={item}
+                      autoTranslateTo={sFromLang !== sToLang ? sToLang : ""}
+                      onScrollToBottom={() => { setTimeout(() => scrollListToBottom(messageListRef, true), 50); }}
+                    />
+                  );
+                }
+                let isLast = (item.id || item.millis) === lastOutgoingID;
+                return (
+                  <OutgoingMessageComponent
+                    key={key}
+                    msgObj={item}
+                    isLastOutgoing={isLast}
+                    thread={customerThread}
+                    onToggleBlock={handleToggleBlockResponses}
+                    onToggleForward={handleToggleForwardResponses}
+                  />
+                );
+              })}
+            </div>
+          </div>
         )}
-      </View>
+      </div>
       {!hasActivePhone ? (
-        <View style={{ width: "100%", paddingVertical: 10, paddingHorizontal: 10 }}>
+        <div className={hubStyles.phoneEntryWrap}>
           {(sCustomPhoneMode || !hasCustomer) ? (
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center" }}>
+            <div className={hubStyles.phoneEntryRow}>
               <PhoneNumberInput
                 value={sCustomPhone}
                 onChangeText={(val) => {
@@ -1338,207 +1308,156 @@ export function MessagesComponent({}) {
                 style={{ width: "auto" }}
               />
               {hasCustomer && (
-                <TouchableOpacity
+                <TouchableOpacityDom
                   onPress={handleExitCustomPhoneMode}
-                  style={{ marginLeft: 12, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: C.blue }}
+                  className={hubStyles.phoneEntryBackBtn}
+                  style={{ backgroundColor: C.blue }}
                 >
-                  <Text style={{ fontSize: 13, color: "white" }}>Back to customer</Text>
-                </TouchableOpacity>
+                  <span className={hubStyles.phoneEntryBackText}>Back to customer</span>
+                </TouchableOpacityDom>
               )}
-            </View>
-          ) : null}
-        </View>
-      ) : (
-        <View
-          style={{
-            paddingTop: 10,
-              flexDirection: "column",
-              width: "100%",
-          }}
-        >
-          {(sFromLang && sToLang && sFromLang !== sToLang) && sNewMessage.trim() ? (
-            <View style={{
-              padding: 6, marginBottom: 4, backgroundColor: "rgb(245,245,220)",
-              borderRadius: 5, borderWidth: 1, borderColor: gray(0.15),
-            }}>
-              {translatedText && !sTranslateLoading
-                ? <Text style={{ fontSize: 14, color: C.text }}>{translatedText}</Text>
-                : <Text style={{ fontSize: 13, color: gray(0.5), fontStyle: "italic" }}>Translating...</Text>
-              }
-            </View>
-          ) : null}
-            <View style={{ width: "100%" }}>
-
-              {sAudioUrl ? (
-                <View style={{ padding: 8, marginBottom: 4, backgroundColor: "rgb(245,245,220)", borderRadius: 5, borderWidth: 1, borderColor: gray(0.15) }}>
-                  <audio controls src={sAudioUrl} style={{ width: "100%" }} />
-                </View>
-              ) : null}
-              <ReplyOptionsBar
-                visible={sShowReplyModal}
-                forwardReplies={sForwardReplies}
-                hasActivePhone={hasActivePhone}
-                audioMode={pendingActionRef.current === "audio"}
-                audioUploading={sAudioUploading}
-                onSelectCanRespond={(canRespond) => {
-                  clearAutoSend();
-                  _setCanRespond(canRespond);
-                  _setShowReplyModal(false);
-                  if (pendingActionRef.current === "intake") { handleSendWorkorderTicket(canRespond); pendingActionRef.current = null; }
-                  else if (pendingActionRef.current === "finalized") { handleSendFinalizedTicket(canRespond); pendingActionRef.current = null; }
-                  else if (pendingActionRef.current === "media") { sendMediaMessage(canRespond); }
-                  else if (pendingActionRef.current === "audio") { handleSendAudio(canRespond); }
-                  else { sendMessage(sNewMessage, "", canRespond); }
-                }}
-                onSendAudio={() => handleSendAudio(sCanRespond)}
-                onDeleteAudio={handleDeleteAudio}
-                onToggleForward={handleToggleForwardReplies}
-              />
-              <div className={hubStyles.inputRow} style={{ borderColor: gray(0.15) }}>
-                <TextInputDom
-                  ref={textInputRef}
-                  value={sNewMessage}
-                  onChangeText={handleMessageChange}
-                  debounceMs={0}
-                  autoFocus={true}
-                  multiline={true}
-                  numberOfLines={0}
-                  placeholder={"Message..."}
-                  placeholderTextColor={"gray"}
-                  onSelect={(e) => {
-                    if (e?.target) cursorPositionRef.current = e.target.selectionStart;
-                  }}
-                  onContentSizeChange={(e) => {
-                    let h = e?.nativeEvent?.contentSize?.height;
-                    if (typeof h === "number" && h > 0) {
-                      _setInputHeight(Math.max(36, Math.ceil(h)));
-                    }
-                  }}
-                  className={hubStyles.inputField}
-                  style={{ color: C.text }}
-                />
-                <div className={hubStyles.sendColumn}>
-                  <TouchableOpacityDom
-                    onPress={() => { if (sNewMessage.trim() && !(sFromLang !== sToLang && sTranslateLoading)) { if (isUnmodifiedTemplateRef.current) { sendMessage(sNewMessage, "", false, false); isUnmodifiedTemplateRef.current = false; } else { _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); sendMessage(sNewMessage, "", sCanRespond); }); } } }}
-                    className={hubStyles.sendButton}
-                    style={{ opacity: (!sNewMessage.trim() || (sFromLang !== sToLang && sTranslateLoading)) ? 0.3 : 1 }}
-                  >
-                    <ImageDom icon={ICONS.airplane} size={41} />
-                  </TouchableOpacityDom>
-                </div>
-              </div>
-          </View>
-            <div className={hubStyles.footerRow}>
-              <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
-                <DropdownMenuDom
-                  dataArr={TRANSLATION_LANGUAGES}
-                  onSelect={(item) => {
-                    _setFromLang(item.code);
-                    if (item.code && sToLang && item.code !== sToLang && sNewMessage.trim()) debouncedTranslate(sNewMessage, sToLang);
-                    if (!item.code || item.code === sToLang) clearTranslation();
-                  }}
-                  buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}
-                  buttonStyle={{ paddingVertical: 5, paddingHorizontal: 10 }}
-                />
-                <ImageDom icon={ICONS.rightArrowBlue} size={16} style={{ marginLeft: 6, marginRight: 6 }} />
-                <DropdownMenuDom
-                  dataArr={TRANSLATION_LANGUAGES}
-                  onSelect={(item) => {
-                    _setToLang(item.code);
-                    if (sFromLang && item.code && sFromLang !== item.code && sNewMessage.trim()) debouncedTranslate(sNewMessage, item.code);
-                    if (!item.code || sFromLang === item.code) clearTranslation();
-                  }}
-                  buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sToLang)?.label || "English"}
-                  buttonStyle={{ paddingVertical: 5, paddingHorizontal: 10 }}
-                />
-              </div>
-              <DropdownMenuDom
-                dataArr={(zSettings?.smsTemplates || zSettings?.textTemplates || [])
-                  .filter((t) => t.showInChat !== false)
-                  .sort((a, b) => {
-                    let aOrd = a.order || 999;
-                    let bOrd = b.order || 999;
-                    return bOrd - aOrd;
-                  })
-                  .map((t) => ({ label: t.label || t.name || t.buttonLabel || "Untitled", message: t.content || t.message || t.text || "" }))}
-                onSelect={(item) => {
-                  let resolved = resolveTemplate(item.message);
-                  _setNewMessage(resolved);
-                  isUnmodifiedTemplateRef.current = true;
-                  if (sFromLang && sToLang && sFromLang !== sToLang) debouncedTranslate(resolved, sToLang);
-                }}
-                buttonText={"Templates"}
-                buttonStyle={{ paddingVertical: 5, backgroundColor: C.blue }}
-                buttonTextStyle={{ color: "white" }}
-              />
-              <div className={`${hubStyles.footerGroup} ${hubStyles.footerIconGroup}`}>
-                <TooltipDom text="Variables" position="top">
-                  <DropdownMenuDom
-                    dataArr={TEXT_TEMPLATE_VARIABLES.map((v) => ({ label: v.label, variable: v.variable }))}
-                    onSelect={(item) => handleInsertVariable(resolveTemplate(item.variable))}
-                    buttonIcon={ICONS.variable}
-                    buttonIconSize={40}
-                    buttonStyle={{ padding: 6, backgroundColor: "transparent", borderWidth: 0 }}
-                  />
-                </TooltipDom>
-                <TooltipDom text="Send Info" position="top">
-                  <DropdownMenuDom
-                    dataArr={(() => {
-                      let items = [
-                        { label: "Send intake/estimate ticket", key: "workorder" },
-                        { label: "Send finalized ticket", key: "finalized" },
-                      ];
-                      let paymentError = zWorkorderObj?.paymentComplete ? "Already paid" : (!zWorkorderObj?.workorderLines?.length ? "No line items" : "");
-                      if (paymentError) {
-                        items.push({ label: "Send Payment Link", key: "payment", textColor: C.text, strikethrough: true, subtitle: paymentError });
-                      } else {
-                        items.push({ label: "Send Payment Link", key: "payment" });
-                      }
-                      if (!zWorkorderObj?.media?.length) {
-                        items.push({ label: "Send Media", key: "media", textColor: C.text, strikethrough: true, subtitle: "No media attached" });
-                      } else {
-                        items.push({ label: "Send Media", key: "media" });
-                      }
-                      return items;
-                    })()}
-                    onSelect={(item) => {
-                      if (item.key === "workorder") { pendingActionRef.current = "intake"; _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); handleSendWorkorderTicket(sCanRespond); pendingActionRef.current = null; }); }
-                      else if (item.key === "finalized") { pendingActionRef.current = "finalized"; _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); handleSendFinalizedTicket(sCanRespond); pendingActionRef.current = null; }); }
-                      else if (item.key === "payment") handleSendSMSPayment();
-                      else if (item.key === "media") _setShowMediaPicker(true);
-                    }}
-                    buttonIcon={ICONS.paperPlane}
-                    buttonIconSize={35}
-                    buttonStyle={{ padding: 6, backgroundColor: "transparent", borderWidth: 0 }}
-                  />
-                </TooltipDom>
-                {hasCustomer && !sCustomPhoneMode ? (
-                  <TooltipDom text="Messages Hub" position="top">
-                    <TouchableOpacityDom
-                      onPress={handleEnterHubMode}
-                      style={{ display: "flex", alignItems: "center", justifyContent: "center", padding: 6 }}
-                    >
-                      <ImageDom icon={ICONS.cellPhone} size={35} />
-                    </TouchableOpacityDom>
-                  </TooltipDom>
-                ) : null}
-                {sCustomPhoneMode ? (
-                  <div className={hubStyles.customPhoneInfo}>
-                    <span className={hubStyles.customPhoneText} style={{ color: gray(0.45) }}>{formatPhoneWithDashes(sCustomPhone)}</span>
-                    {hasCustomer && (
-                      <TouchableOpacityDom
-                        onPress={handleExitCustomPhoneMode}
-                        className={hubStyles.customPhoneBackBtn}
-                        style={{ backgroundColor: C.blue }}
-                      >
-                        <span className={hubStyles.customPhoneBackText}>Back to customer</span>
-                      </TouchableOpacityDom>
-                    )}
-                  </div>
-                ) : null}
-              </div>
             </div>
-        </View>
+          ) : null}
+        </div>
+      ) : (
+        <ComposeArea
+          mode="customer"
+          value={sNewMessage}
+          onChange={handleMessageChange}
+          onSend={() => {
+            if (isUnmodifiedTemplateRef.current) {
+              sendMessage(sNewMessage, "", false, false);
+              isUnmodifiedTemplateRef.current = false;
+            } else {
+              _setShowReplyModal(true);
+              scheduleAutoSend(() => {
+                _setShowReplyModal(false);
+                sendMessage(sNewMessage, "", sCanRespond);
+              });
+            }
+          }}
+          sendDisabled={!sNewMessage.trim() || (sFromLang !== sToLang && sTranslateLoading)}
+          textInputRef={textInputRef}
+          onSelect={(e) => { if (e?.target) cursorPositionRef.current = e.target.selectionStart; }}
+          audioUrl={sAudioUrl}
+          audioUploading={sAudioUploading}
+          showReplyOptions={sShowReplyModal}
+          audioMode={pendingActionRef.current === "audio"}
+          onSelectCanRespond={(canRespond) => {
+            clearAutoSend();
+            _setCanRespond(canRespond);
+            _setShowReplyModal(false);
+            if (pendingActionRef.current === "intake") { handleSendWorkorderTicket(canRespond); pendingActionRef.current = null; }
+            else if (pendingActionRef.current === "finalized") { handleSendFinalizedTicket(canRespond); pendingActionRef.current = null; }
+            else if (pendingActionRef.current === "media") { sendMediaMessage(canRespond); }
+            else if (pendingActionRef.current === "audio") { handleSendAudio(canRespond); }
+            else { sendMessage(sNewMessage, "", canRespond); }
+          }}
+          onSendAudio={() => handleSendAudio(sCanRespond)}
+          onDeleteAudio={handleDeleteAudio}
+          forwardReplies={sForwardReplies}
+          onToggleForward={handleToggleForwardReplies}
+          hasActivePhone={hasActivePhone}
+          fromLang={sFromLang}
+          onFromLang={(code) => {
+            _setFromLang(code);
+            if (code && sToLang && code !== sToLang && sNewMessage.trim()) debouncedTranslate(sNewMessage, sToLang);
+            if (!code || code === sToLang) clearTranslation();
+          }}
+          toLang={sToLang}
+          onToLang={(code) => {
+            _setToLang(code);
+            if (sFromLang && code && sFromLang !== code && sNewMessage.trim()) debouncedTranslate(sNewMessage, code);
+            if (!code || sFromLang === code) clearTranslation();
+          }}
+          translatedText={translatedText}
+          translateLoading={sTranslateLoading}
+          centerSlot={
+            <DropdownMenuDom
+              dataArr={(zSettings?.smsTemplates || zSettings?.textTemplates || [])
+                .filter((t) => t.showInChat !== false)
+                .sort((a, b) => (b.order || 999) - (a.order || 999))
+                .map((t) => ({ label: t.label || t.name || t.buttonLabel || "Untitled", message: t.content || t.message || t.text || "" }))}
+              onSelect={(item) => {
+                let resolved = resolveTemplate(item.message);
+                _setNewMessage(resolved);
+                isUnmodifiedTemplateRef.current = true;
+                if (sFromLang && sToLang && sFromLang !== sToLang) debouncedTranslate(resolved, sToLang);
+              }}
+              buttonText="Templates"
+              buttonStyle={{ paddingVertical: 5, backgroundColor: C.blue }}
+              buttonTextStyle={{ color: "white" }}
+            />
+          }
+          rightSlot={
+            <>
+              <TooltipDom text="Variables" position="top">
+                <DropdownMenuDom
+                  dataArr={TEXT_TEMPLATE_VARIABLES.map((v) => ({ label: v.label, variable: v.variable }))}
+                  onSelect={(item) => handleInsertVariable(resolveTemplate(item.variable))}
+                  buttonIcon={ICONS.variable}
+                  buttonIconSize={40}
+                  buttonStyle={{ padding: 6, backgroundColor: "transparent", borderWidth: 0 }}
+                />
+              </TooltipDom>
+              <TooltipDom text="Send Info" position="top">
+                <DropdownMenuDom
+                  dataArr={(() => {
+                    let items = [
+                      { label: "Send intake/estimate ticket", key: "workorder" },
+                      { label: "Send finalized ticket", key: "finalized" },
+                    ];
+                    let paymentError = zWorkorderObj?.paymentComplete ? "Already paid" : (!zWorkorderObj?.workorderLines?.length ? "No line items" : "");
+                    if (paymentError) {
+                      items.push({ label: "Send Payment Link", key: "payment", textColor: C.text, strikethrough: true, subtitle: paymentError });
+                    } else {
+                      items.push({ label: "Send Payment Link", key: "payment" });
+                    }
+                    if (!zWorkorderObj?.media?.length) {
+                      items.push({ label: "Send Media", key: "media", textColor: C.text, strikethrough: true, subtitle: "No media attached" });
+                    } else {
+                      items.push({ label: "Send Media", key: "media" });
+                    }
+                    return items;
+                  })()}
+                  onSelect={(item) => {
+                    if (item.key === "workorder") { pendingActionRef.current = "intake"; _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); handleSendWorkorderTicket(sCanRespond); pendingActionRef.current = null; }); }
+                    else if (item.key === "finalized") { pendingActionRef.current = "finalized"; _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); handleSendFinalizedTicket(sCanRespond); pendingActionRef.current = null; }); }
+                    else if (item.key === "payment") handleSendSMSPayment();
+                    else if (item.key === "media") _setShowMediaPicker(true);
+                  }}
+                  buttonIcon={ICONS.paperPlane}
+                  buttonIconSize={35}
+                  buttonStyle={{ padding: 6, backgroundColor: "transparent", borderWidth: 0 }}
+                />
+              </TooltipDom>
+              {hasCustomer && !sCustomPhoneMode ? (
+                <TooltipDom text="Messages Hub" position="top">
+                  <TouchableOpacityDom
+                    onPress={handleEnterHubMode}
+                    className={hubStyles.iconBtn}
+                  >
+                    <ImageDom icon={ICONS.cellPhone} size={35} />
+                  </TouchableOpacityDom>
+                </TooltipDom>
+              ) : null}
+              {sCustomPhoneMode ? (
+                <div className={hubStyles.customPhoneInfo}>
+                  <span className={hubStyles.customPhoneText} style={{ color: gray(0.45) }}>{formatPhoneWithDashes(sCustomPhone)}</span>
+                  {hasCustomer && (
+                    <TouchableOpacityDom
+                      onPress={handleExitCustomPhoneMode}
+                      className={hubStyles.customPhoneBackBtn}
+                      style={{ backgroundColor: C.blue }}
+                    >
+                      <span className={hubStyles.customPhoneBackText}>Back to customer</span>
+                    </TouchableOpacityDom>
+                  )}
+                </div>
+              ) : null}
+            </>
+          }
+        />
       )}
       {sShowMediaPicker && zWorkorderObj?.id && (
         <WorkorderMediaModal
@@ -1550,7 +1469,7 @@ export function MessagesComponent({}) {
           onSendMedia={handleMediaMultiSelect}
         />
       )}
-    </View>
+    </div>
   );
 }
 
@@ -1609,7 +1528,7 @@ function ThreadCard({ thread, isSelected, isHovered, isUnread, activeWO, onPress
       <div className={hubStyles.threadRow}>
         <div className={hubStyles.threadLeft}>
           <div className={hubStyles.phoneLine}>
-            {!activeWO && <img src={ICONS.questionMark} alt="" className={hubStyles.questionIcon} />}
+            {thread.lastType !== "incoming" && <img src={ICONS.forwardGreen} alt="" className={hubStyles.questionIcon} />}
             <span className={hubStyles.phoneText} style={{ color: textColor }}>{formattedPhone}</span>
           </div>
           {customerName ? (
@@ -1663,7 +1582,6 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
   const [sShowReplyModal, _setShowReplyModal] = useState(false);
   const [sForwardReplies, _setForwardReplies] = useState(false);
   const [sHubMediaUploading, _setHubMediaUploading] = useState(false);
-  const [sHubInputHeight, _setHubInputHeight] = useState(36);
   const [sAudioRecording, _setAudioRecording] = useState(false);
   const [sAudioBlob, _setAudioBlob] = useState(null);
   const [sAudioUrl, _setAudioUrl] = useState("");
@@ -1679,6 +1597,8 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
   const lastMsgIdRef = useRef(null);
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+  const longPressTimerRef = useRef(null);
+  const longPressFiredRef = useRef(false);
 
   const {
     translatedText, isLoading: sTranslateLoading,
@@ -1703,7 +1623,6 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     if (!phone || phone.length !== 10) { _setMessages([]); _setListenerConnecting(false); return; }
     let cancelled = false;
     _setNewMessage("");
-    _setHubInputHeight(36);
     _setShowReplyModal(false);
     _setForwardReplies(false);
     _setLoadingMore(false);
@@ -1832,11 +1751,16 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
       lastMsgIdRef.current = null;
       return;
     }
-    if (!hasInitialScrolledRef.current) return;
     let lastId = sMessages[sMessages.length - 1]?.id;
+    if (!hasInitialScrolledRef.current) {
+      hasInitialScrolledRef.current = true;
+      lastMsgIdRef.current = lastId;
+      setTimeout(() => scrollListToBottom(messageListRef, false), 100);
+      return;
+    }
     if (lastId === lastMsgIdRef.current) return;
     lastMsgIdRef.current = lastId;
-    try { messageListRef.current?.scrollToEnd({ animated: true }); } catch (e) {}
+    scrollListToBottom(messageListRef, true);
   }, [sMessages]);
 
   function handleSend() {
@@ -1858,7 +1782,6 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     let translatedFromLang = isTranslated ? sFromLang : "";
 
     _setNewMessage("");
-    _setHubInputHeight(36);
     clearTranslation();
     useLoginStore.getState().requireLogin(async () => {
       let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
@@ -2152,112 +2075,124 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
   let customerName = ((thread?.customerFirst || "") + " " + (thread?.customerLast || "")).trim();
 
   return (
-    <View style={{ flex: 1, flexDirection: "column" }}>
+    <div className={hubStyles.hubPanelRoot}>
       {/* Header */}
-      <View style={{ paddingVertical: 8, paddingHorizontal: 12, borderBottomWidth: 1, borderBottomColor: gray(0.1), flexDirection: "row", alignItems: "center" }}>
-        <Text style={{ fontSize: 16, fontWeight: Fonts.weight.textHeavy, color: C.text }}>{formatPhoneWithDashes(phone)}</Text>
-        <View style={{ flex: 1, alignItems: "center" }}>
-          {customerName ? <Text style={{ fontSize: 13, color: C.blue }} numberOfLines={1}>{customerName}</Text>
-          : !thread && !sListenerConnecting ? (
-            <View style={{ backgroundColor: C.green, paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4 }}>
-              <Text style={{ fontSize: 12, color: "white", fontWeight: Fonts.weight.textHeavy }}>New Thread</Text>
-            </View>
-          ) : sListenerConnecting ? <ActivityIndicator size={16} color="#007bff" /> : null}
-        </View>
-        <TouchableOpacity
+      <div className={hubStyles.hubPanelHeader}>
+        <span className={hubStyles.hubPanelHeaderPhone} style={{ color: C.text }}>{formatPhoneWithDashes(phone)}</span>
+        <div className={hubStyles.hubPanelHeaderCenter}>
+          {customerName ? (
+            <span className={hubStyles.hubPanelCustomerName} style={{ color: C.blue }}>{customerName}</span>
+          ) : !thread && !sListenerConnecting ? (
+            <div className={hubStyles.hubPanelNewThreadBadge} style={{ backgroundColor: C.green }}>
+              <span className={hubStyles.hubPanelNewThreadText}>New Thread</span>
+            </div>
+          ) : sListenerConnecting ? <SmallLoadingIndicatorDom /> : null}
+        </div>
+        <TouchableOpacityDom
           onPress={(e) => {
             if (matchingWorkorders.length < 1) return;
             if (matchingWorkorders.length === 1) {
               onOpenWorkorderKeepHub(matchingWorkorders[0]);
             } else {
-              let nativeEvent = e.nativeEvent || e;
+              let nativeEvent = e?.nativeEvent || e;
               _setWoDropdown({ x: nativeEvent.pageX || nativeEvent.clientX || 0, y: nativeEvent.pageY || nativeEvent.clientY || 0 });
             }
           }}
           disabled={matchingWorkorders.length < 1}
-          style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, marginRight: 6, backgroundColor: C.orange, opacity: matchingWorkorders.length > 0 ? 1 : 0 }}
+          className={`${hubStyles.hubPanelHeaderBtn} ${hubStyles["hubPanelHeaderBtn--openWO"]}`}
+          style={{ backgroundColor: C.orange, opacity: matchingWorkorders.length > 0 ? 1 : 0 }}
         >
-          <Text style={{ fontSize: 12, color: "white", fontWeight: Fonts.weight.textHeavy }}>Open Workorder</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleLoadMore} disabled={sLoadingMore || sNoMoreHistory} style={{ paddingVertical: 4, paddingHorizontal: 10, borderRadius: 4, backgroundColor: (sLoadingMore || sNoMoreHistory) ? gray(0.15) : C.blue, opacity: sNoMoreHistory ? 0.4 : 1 }}>
-          {sLoadingMore ? <SmallLoadingIndicator /> : <Text style={{ fontSize: 12, color: "white", fontWeight: Fonts.weight.textHeavy }}>Load more</Text>}
-        </TouchableOpacity>
-      </View>
+          <span className={hubStyles.hubPanelHeaderBtnText}>Open Workorder</span>
+        </TouchableOpacityDom>
+        <TouchableOpacityDom
+          onPress={handleLoadMore}
+          disabled={sLoadingMore || sNoMoreHistory}
+          className={hubStyles.hubPanelHeaderBtn}
+          style={{ backgroundColor: (sLoadingMore || sNoMoreHistory) ? gray(0.15) : C.blue, opacity: sNoMoreHistory ? 0.4 : 1 }}
+        >
+          {sLoadingMore ? <SmallLoadingIndicatorDom /> : <span className={hubStyles.hubPanelHeaderBtnText}>Load more</span>}
+        </TouchableOpacityDom>
+      </div>
       {sWoDropdown && createPortal(
-        <TouchableWithoutFeedback onPress={() => _setWoDropdown(null)}>
-          <View style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: Z.dropdown }}>
-            <View style={{ position: "absolute", top: sWoDropdown.y, left: sWoDropdown.x, backgroundColor: C.listItemWhite, borderRadius: 8, borderWidth: 2, borderColor: C.buttonLightGreenOutline, minWidth: 240, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 10, overflow: "hidden" }}>
-              {matchingWorkorders.map((wo) => (
-                <TouchableOpacity
-                  key={wo.id}
-                  onPress={() => { _setWoDropdown(null); onOpenWorkorderKeepHub(wo); }}
-                  style={{ paddingVertical: 10, paddingHorizontal: 14, borderBottomWidth: 1, borderBottomColor: gray(0.1), flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
-                >
-                  <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.text, flex: 1 }} numberOfLines={1}>
-                    {[wo.brand, wo.description].filter(Boolean).join(" ") || "Untitled"}
-                  </Text>
-                  <View style={{ backgroundColor: C.blue, paddingVertical: 2, paddingHorizontal: 8, borderRadius: 4, marginLeft: 10 }}>
-                    <Text style={{ fontSize: 11, color: "white", fontWeight: Fonts.weight.textHeavy }}>{wo.status || "No status"}</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
-        </TouchableWithoutFeedback>,
+        <div className={hubStyles.woDropdownBackdrop} style={{ zIndex: Z.dropdown }} onClick={() => _setWoDropdown(null)}>
+          <div
+            className={hubStyles.woDropdownMenu}
+            style={{ top: sWoDropdown.y, left: sWoDropdown.x, backgroundColor: C.listItemWhite, borderColor: C.buttonLightGreenOutline }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {matchingWorkorders.map((wo) => (
+              <div
+                key={wo.id}
+                className={hubStyles.woDropdownItem}
+                onClick={() => { _setWoDropdown(null); onOpenWorkorderKeepHub(wo); }}
+              >
+                <span className={hubStyles.woDropdownItemTitle} style={{ color: C.text }}>
+                  {[wo.brand, wo.description].filter(Boolean).join(" ") || "Untitled"}
+                </span>
+                <div className={hubStyles.woDropdownStatusBadge} style={{ backgroundColor: C.blue }}>
+                  <span className={hubStyles.woDropdownStatusText}>{wo.status || "No status"}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>,
         document.body
       )}
       {/* Messages */}
-      <View style={{ flex: 1, overflow: "hidden" }}>
+      <div className={hubStyles.hubMessagesArea}>
         {sMessages.length < 1 && !sListenerConnecting ? (
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-            <Text style={{ fontSize: 16, color: gray(0.25) }}>No messages yet</Text>
-          </View>
+          <div className={hubStyles.messagesCenter}>
+            <span className={hubStyles.hubMessagesEmptyText} style={{ color: gray(0.25) }}>No messages yet</span>
+          </div>
         ) : sMessages.length < 1 ? null : (
-          <FlatList
+          <div
             ref={messageListRef}
-            data={sMessages}
-            keyExtractor={(item) => item.id || String(item.millis)}
-            renderItem={({ item }) => {
-              if (item.type === "incoming") return <IncomingMessageComponent msgObj={item} autoTranslateTo={sFromLang !== sToLang ? sToLang : ""} onScrollToBottom={() => { setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: true }); }, 50); }} />;
-              let isLast = (item.id || item.millis) === lastOutgoingID;
-              return <OutgoingMessageComponent msgObj={item} isLastOutgoing={isLast} thread={thread} onToggleBlock={handleToggleBlock} onToggleForward={handleHubToggleForward} />;
-            }}
-            onScrollToIndexFailed={(info) => {
-              setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: false }); }, 50);
-            }}
-            onContentSizeChange={() => {
-              if (!hasInitialScrolledRef.current && sMessages.length > 0) {
-                hasInitialScrolledRef.current = true;
-                lastMsgIdRef.current = sMessages[sMessages.length - 1]?.id;
-                setTimeout(() => { messageListRef.current?.scrollToEnd({ animated: false }); }, 100);
+            className={hubStyles.messageList}
+            style={previewMode ? { overflowY: "hidden", pointerEvents: "none" } : undefined}
+          >
+            {sMessages.map((item) => {
+              let key = item.id || String(item.millis);
+              if (item.type === "incoming") {
+                return (
+                  <IncomingMessageComponent
+                    key={key}
+                    msgObj={item}
+                    autoTranslateTo={sFromLang !== sToLang ? sToLang : ""}
+                    onScrollToBottom={() => { setTimeout(() => scrollListToBottom(messageListRef, true), 50); }}
+                  />
+                );
               }
-            }}
-            scrollEnabled={!previewMode}
-            scrollEventThrottle={200}
-          />
+              let isLast = (item.id || item.millis) === lastOutgoingID;
+              return (
+                <OutgoingMessageComponent
+                  key={key}
+                  msgObj={item}
+                  isLastOutgoing={isLast}
+                  thread={thread}
+                  onToggleBlock={handleToggleBlock}
+                  onToggleForward={handleHubToggleForward}
+                />
+              );
+            })}
+          </div>
         )}
-      </View>
+      </div>
       {/* Compose — hidden in preview mode */}
-      {!previewMode && <View style={{ paddingTop: 8, paddingHorizontal: 8 }}>
-        {(sFromLang && sToLang && sFromLang !== sToLang) && sNewMessage.trim() ? (
-          <View style={{ padding: 6, marginBottom: 4, backgroundColor: "rgb(245,245,220)", borderRadius: 5, borderWidth: 1, borderColor: gray(0.15) }}>
-            {translatedText && !sTranslateLoading
-              ? <Text style={{ fontSize: 14, color: C.text }}>{translatedText}</Text>
-              : <Text style={{ fontSize: 13, color: gray(0.5), fontStyle: "italic" }}>Translating...</Text>
-            }
-          </View>
-        ) : null}
-        {sAudioUrl ? (
-          <View style={{ padding: 8, marginBottom: 4, backgroundColor: "rgb(245,245,220)", borderRadius: 5, borderWidth: 1, borderColor: gray(0.15) }}>
-            <audio controls src={sAudioUrl} style={{ width: "100%" }} />
-          </View>
-        ) : null}
-        <ReplyOptionsBar
-          visible={sShowReplyModal}
-          forwardReplies={sForwardReplies}
-          hasActivePhone={!!phone && phone.length === 10}
-          audioMode={pendingActionRef.current === "audio"}
+      {!previewMode && (
+        <ComposeArea
+          mode="hub"
+          value={sNewMessage}
+          onChange={(val) => {
+            val = autoCapitalize(val);
+            _setNewMessage(val);
+            if (sFromLang && sToLang && sFromLang !== sToLang) debouncedTranslate(val, sToLang);
+          }}
+          onSend={() => handleSend()}
+          sendDisabled={!sNewMessage.trim() || sHubMediaUploading || (sFromLang !== sToLang && sTranslateLoading)}
+          audioUrl={sAudioUrl}
           audioUploading={sAudioUploading}
+          showReplyOptions={sShowReplyModal}
+          audioMode={pendingActionRef.current === "audio"}
           onSelectCanRespond={(canRespond) => {
             clearAutoSend();
             _setCanRespond(canRespond);
@@ -2267,545 +2202,97 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
           }}
           onSendAudio={() => handleSendAudio(sCanRespond)}
           onDeleteAudio={handleDeleteAudio}
+          forwardReplies={sForwardReplies}
           onToggleForward={handleToggleForwardReplies}
-        />
-        <View style={{ flexDirection: "row", alignItems: "flex-end", borderWidth: 2, borderRadius: 5, borderColor: gray(0.15), backgroundColor: "white" }}>
-          <TextInput
-            onChangeText={(val) => {
-              val = autoCapitalize(val);
-              _setNewMessage(val);
-              if (sFromLang && sToLang && sFromLang !== sToLang) debouncedTranslate(val, sToLang);
-            }}
-            multiline={true}
-            placeholder="Message..."
-            placeholderTextColor="gray"
-            onContentSizeChange={(e) => {
-              let h = e?.nativeEvent?.contentSize?.height;
-              if (typeof h === "number" && h > 0) {
-                _setHubInputHeight(Math.max(36, Math.ceil(h)));
-              }
-            }}
-            style={{
-              outlineStyle: "none",
-              outlineColor: "transparent",
-              outlineWidth: 0,
-              borderWidth: 0,
-              borderColor: "transparent",
-              color: C.text,
-              paddingTop: 0,
-              paddingBottom: 0,
-              paddingLeft: 5,
-              paddingRight: 4,
-              marginVertical: 8,
-              fontSize: 15,
-              lineHeight: 20,
-              height: sHubInputHeight,
-              overflow: "hidden",
-              flex: 1,
-              textAlignVertical: "top",
-            }}
-            value={sNewMessage}
-          />
-          <View style={{ flexDirection: "column", alignItems: "center", justifyContent: "flex-end", marginRight: 4, marginBottom: 4 }}>
-            <TouchableOpacity onPress={() => !sHubMediaUploading && !(sFromLang !== sToLang && sTranslateLoading) && handleSend()} style={{ padding: 6, opacity: (sHubMediaUploading || (sFromLang !== sToLang && sTranslateLoading)) ? 0.3 : (sNewMessage.trim() ? 1 : 0.3) }}>
-              <Image_ icon={ICONS.airplane} size={41} />
-            </TouchableOpacity>
-          </View>
-        </View>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 8, marginBottom: 8, paddingHorizontal: 4 }}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <DropdownMenu
-              dataArr={TRANSLATION_LANGUAGES}
-              onSelect={(item) => {
-                _setFromLang(item.code);
-                if (item.code && sToLang && item.code !== sToLang && sNewMessage.trim()) debouncedTranslate(sNewMessage, sToLang);
-                if (!item.code || item.code === sToLang) clearTranslation();
-              }}
-              buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sFromLang)?.label || "English"}
-              buttonStyle={{ paddingVertical: 5 }}
-              openUpward={true}
-            />
-            <Image_ icon={ICONS.rightArrowBlue} size={16} style={{ marginHorizontal: 6 }} />
-            <DropdownMenu
-              dataArr={TRANSLATION_LANGUAGES}
-              onSelect={(item) => {
-                _setToLang(item.code);
-                if (sFromLang && item.code && sFromLang !== item.code && sNewMessage.trim()) debouncedTranslate(sNewMessage, item.code);
-                if (!item.code || sFromLang === item.code) clearTranslation();
-              }}
-              buttonText={TRANSLATION_LANGUAGES.find(l => l.code === sToLang)?.label || "Spanish"}
-              buttonStyle={{ paddingVertical: 5 }}
-              openUpward={true}
-            />
-          </View>
-          <input
-            ref={hubFileInputRef}
-            type="file"
-            accept="image/*,video/*"
-            multiple
-            onChange={handleHubFilesSelected}
-            style={{ display: "none" }}
-          />
-          {matchingWorkorders.length < 1 && (
-            <Tooltip text={sHubMediaUploading ? "Uploading..." : "Send photo/video"} position="top">
-              <TouchableOpacity
-                onPress={() => !sHubMediaUploading && hubFileInputRef.current?.click()}
-                style={{ alignItems: "center", justifyContent: "center", padding: 6, opacity: sHubMediaUploading ? 0.4 : 1 }}
-              >
-                {sHubMediaUploading
-                  ? <SmallLoadingIndicator />
-                  : <Image_ icon={ICONS.uploadCamera} size={35} />
-                }
-              </TouchableOpacity>
-            </Tooltip>
-          )}
-          {onSendPaymentLink && (
-            <Tooltip text="Send Payment Link" position="top" hideOnPress>
-              <TouchableOpacity
-                onPress={() => onSendPaymentLink(phone)}
-                style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-              >
-                <Image_ icon={ICONS.paperPlane} size={35} />
-              </TouchableOpacity>
-            </Tooltip>
-          )}
-          {onShowPhoneEntry && (
-            <Tooltip text="New number" position="top">
-              <TouchableOpacity
-                onPress={() => !sHubMediaUploading && onShowPhoneEntry()}
-                onLongPress={async () => {
-                  if (sHubMediaUploading) return;
-                  const { clearAll } = await import("../../../hubMessageDB");
-                  await clearAll();
-                  useCustMessagesStore.getState().clearHubConversationCache();
-                  log("Hub message cache cleared");
-                  alert("Message cache cleared. Refresh to reload.");
-                }}
-                delayLongPress={1000}
-                style={{ padding: 6, opacity: sHubMediaUploading ? 0.3 : 1 }}
-              >
-                <Image_ icon={ICONS.cellPhone} size={35} />
-              </TouchableOpacity>
-            </Tooltip>
-          )}
-          {matchingWorkorders.length > 0 && (
-            <Tooltip text="Go to customer" position="top" offsetX={-15}>
-              <TouchableOpacity onPress={() => onOpenWorkorder(phone)} style={{ padding: 6 }}>
-                <Image_ icon={ICONS.person} size={35} />
-              </TouchableOpacity>
-            </Tooltip>
-          )}
-          {exitHubButton}
-        </View>
-      </View>}
-    </View>
-  );
-}
-
-const INNER_MSG_BOX_STYLE = {
-  width: "100%",
-  borderRadius: 5,
-  paddingHorizontal: 5,
-  paddingVertical: 5,
-};
-const OUTER_MSG_BOX_STYLE = {
-  width: "75%",
-  marginVertical: 10,
-  marginHorizontal: 4,
-  // padding: 5,
-};
-
-function ZoomCursorHelper({ wrapperRef }) {
-  useTransformEffect(({ state }) => {
-    if (wrapperRef.current) wrapperRef.current.style.cursor = state.scale > 1 ? "grab" : "default";
-  });
-  return null;
-}
-
-const MESSAGE_TEXT_STYLE = {
-  fontSize: 14,
-};
-
-const URL_REGEX = /(https?:\/\/[^\s]+)/;
-function LinkifiedText({ text, style }) {
-  let parts = text.split(URL_REGEX);
-  if (parts.length === 1) return <Text style={style}>{text}</Text>;
-  return (
-    <Text style={style}>
-      {parts.map((part, i) =>
-        URL_REGEX.test(part) ? (
-          <Text key={i} onPress={() => window.open(part, "_blank")} style={{ textDecorationLine: "underline" }}>{part}</Text>
-        ) : part
-      )}
-    </Text>
-  );
-}
-
-const INFO_TEXT_STYLE = {
-  fontSize: 11,
-  marginTop: 2,
-  color: gray(0.6),
-};
-
-const MediaThumbnail = memo(({ url, thumbnailUrl, contentType }) => {
-  const [sLoading, _setLoading] = useState(true);
-  const [sError, _setError] = useState(false);
-  const [sFullView, _setFullView] = useState(false);
-  const [sFullLoading, _setFullLoading] = useState(true);
-  const [sFullDims, _setFullDims] = useState(null);
-  const wrapperDivRef = useRef(null);
-  const isVideo = (contentType || "").startsWith("video/");
-
-  function handleDownload() {
-    fetch(url)
-      .then((res) => res.blob())
-      .then((blob) => {
-        const blobUrl = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = blobUrl;
-        a.download = url.split("/").pop()?.split("?")[0] || "download";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(blobUrl);
-      })
-      .catch(() => {
-        window.open(url, "_blank");
-      });
-  }
-
-  return (
-    <>
-      <TouchableOpacity
-        onPress={() => { _setFullView(true); _setFullLoading(true); _setFullDims(null); }}
-        style={{ width: 300, height: 300, borderRadius: 4, overflow: "hidden", marginBottom: 4, marginRight: 4, backgroundColor: "rgba(0,0,0,0.05)" }}
-      >
-        {sError ? (
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-            <Text style={{ fontSize: 11, color: gray(0.5) }}>Image unavailable</Text>
-          </View>
-        ) : isVideo ? (
-          <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-            <Text style={{ fontSize: 24 }}>&#9654;</Text>
-            <Text style={{ fontSize: 11, color: gray(0.4), marginTop: 4 }}>Video</Text>
-          </View>
-        ) : (
-          <>
-            <Image
-              source={{ uri: thumbnailUrl || url }}
-              style={{ width: "100%", height: "100%" }}
-              resizeMode="cover"
-              onLoad={() => _setLoading(false)}
-              onError={() => { _setLoading(false); _setError(true); }}
-            />
-            {sLoading && (
-              <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center" }}>
-                <ActivityIndicator size="small" color={gray(0.5)} />
-              </View>
-            )}
-          </>
-        )}
-      </TouchableOpacity>
-      {sFullView && createPortal(
-        <div
-          onClick={() => _setFullView(false)}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(0,0,0,0.85)",
-            zIndex: Z.modal + 100,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
+          hasActivePhone={!!phone && phone.length === 10}
+          fromLang={sFromLang}
+          onFromLang={(code) => {
+            _setFromLang(code);
+            if (code && sToLang && code !== sToLang && sNewMessage.trim()) debouncedTranslate(sNewMessage, sToLang);
+            if (!code || code === sToLang) clearTranslation();
           }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: sFullDims ? sFullDims.width : "80%",
-              height: sFullDims ? sFullDims.height : "80%",
-              position: "relative",
-              borderRadius: 8,
-            }}
-          >
-            {/* Download button */}
-            <div
-              onClick={(e) => { e.stopPropagation(); handleDownload(); }}
-              style={{
-                position: "absolute", top: 8, right: 8, width: 36, height: 36,
-                borderRadius: 18, backgroundColor: C.green,
-                display: "flex", justifyContent: "center", alignItems: "center",
-                cursor: "pointer", zIndex: 2,
-              }}
-            >
-              <span style={{ color: "white", fontSize: 16, fontWeight: "bold", lineHeight: 1 }}>&#8681;</span>
-            </div>
-            {isVideo ? (
-              <video
-                src={url}
-                controls
-                autoPlay
-                style={{ width: "100%", height: "100%", objectFit: "contain" }}
+          toLang={sToLang}
+          onToLang={(code) => {
+            _setToLang(code);
+            if (sFromLang && code && sFromLang !== code && sNewMessage.trim()) debouncedTranslate(sNewMessage, code);
+            if (!code || sFromLang === code) clearTranslation();
+          }}
+          translatedText={translatedText}
+          translateLoading={sTranslateLoading}
+          rightSlot={
+            <>
+              <input
+                ref={hubFileInputRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                onChange={handleHubFilesSelected}
+                style={{ display: "none" }}
               />
-            ) : (
-              <div ref={wrapperDivRef} style={{ width: "100%", height: "100%" }}>
-                <TransformWrapper
-                  initialScale={1}
-                  minScale={1}
-                  maxScale={8}
-                  centerOnInit={true}
-                  wheel={{ step: 0.3 }}
-                  panning={{ velocityDisabled: true }}
-                  doubleClick={{ disabled: true }}
-                >
-                  <ZoomCursorHelper wrapperRef={wrapperDivRef} />
-                  <TransformComponent
-                    wrapperStyle={{ width: "100%", height: "100%" }}
-                    contentStyle={{ width: "100%", height: "100%" }}
+              {matchingWorkorders.length < 1 && (
+                <TooltipDom text={sHubMediaUploading ? "Uploading..." : "Send photo/video"} position="top">
+                  <TouchableOpacityDom
+                    onPress={() => !sHubMediaUploading && hubFileInputRef.current?.click()}
+                    className={hubStyles.iconBtn}
+                    style={{ opacity: sHubMediaUploading ? 0.4 : 1 }}
                   >
-                    <img
-                      src={url}
-                      onLoad={(e) => {
-                        _setFullLoading(false);
-                        const { naturalWidth, naturalHeight } = e.target;
-                        const maxW = window.innerWidth * 0.8;
-                        const maxH = window.innerHeight * 0.8;
-                        const scale = Math.min(maxW / naturalWidth, maxH / naturalHeight, 1);
-                        _setFullDims({ width: Math.round(naturalWidth * scale), height: Math.round(naturalHeight * scale) });
-                      }}
-                      style={{ width: "100%", height: "100%", objectFit: "contain", userSelect: "none" }}
-                      draggable={false}
-                    />
-                  </TransformComponent>
-                </TransformWrapper>
-              </div>
-            )}
-            {sFullLoading && !isVideo && (
-              <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center", alignItems: "center", pointerEvents: "none" }}>
-                <ActivityIndicator size="large" color="white" />
-              </div>
-            )}
-          </div>
-        </div>,
-        document.body
-      )}
-    </>
-  );
-});
-
-const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom, autoTranslateTo }) => {
-  const cached = msgObj.translated;
-  const [sTranslation, _setTranslation] = useState(cached ? { text: cached.text, loading: false, langCode: cached.langCode, detectedFrom: cached.detectedFrom || "" } : { text: "", loading: false, langCode: "" });
-  const [sContextMenu, _setContextMenu] = useState({ x: 0, y: 0, visible: false });
-  const autoTranslatedRef = useRef(false);
-
-  useEffect(() => {
-    if (!sContextMenu.visible) return;
-    function dismiss() { _setContextMenu(prev => ({ ...prev, visible: false })); }
-    document.addEventListener("mousedown", dismiss);
-    return () => document.removeEventListener("mousedown", dismiss);
-  }, [sContextMenu.visible]);
-
-  useEffect(() => {
-    if (autoTranslatedRef.current || !autoTranslateTo || !msgObj.message) return;
-    autoTranslatedRef.current = true;
-    if (cached?.text && cached.langCode === autoTranslateTo) return;
-    doTranslate("en", autoTranslateTo);
-  }, [autoTranslateTo]);
-
-  function handleContextMenu(e) {
-    if (!msgObj.message) return;
-    e.preventDefault();
-    _setContextMenu({ x: e.clientX, y: e.clientY, visible: true });
-  }
-
-  function saveTranslation(translated) {
-    if (!msgObj.id || !msgObj.phoneNumber) return;
-    msgObj.translated = translated;
-    dbSaveMessageTranslation(msgObj.phoneNumber, msgObj.id, translated);
-  }
-
-  function doTranslate(langCode, sourceLang) {
-    _setContextMenu(prev => ({ ...prev, visible: false }));
-    _setTranslation({ text: "", loading: true, langCode });
-    if (onScrollToBottom) onScrollToBottom();
-    translateText({ text: msgObj.message, targetLanguage: langCode, ...(sourceLang ? { sourceLanguage: sourceLang } : {}) })
-      .then((result) => {
-        if (result.success) {
-          let translated = result.data?.data?.translatedText || result.data?.translatedText || "";
-          let detected = result.data?.data?.detectedSourceLanguage || result.data?.detectedSourceLanguage || sourceLang || "";
-          if (detected === langCode) {
-            _setTranslation({ text: "", loading: false, langCode });
-          } else {
-            _setTranslation({ text: translated, loading: false, langCode, detectedFrom: detected });
-            saveTranslation({ text: translated, langCode, detectedFrom: detected });
+                    {sHubMediaUploading
+                      ? <LoadingIndicatorDom />
+                      : <ImageDom icon={ICONS.uploadCamera} size={35} />
+                    }
+                  </TouchableOpacityDom>
+                </TooltipDom>
+              )}
+              {onSendPaymentLink && (
+                <TooltipDom text="Send Payment Link" position="top" hideOnPress>
+                  <TouchableOpacityDom
+                    onPress={() => onSendPaymentLink(phone)}
+                    className={hubStyles.iconBtn}
+                  >
+                    <ImageDom icon={ICONS.paperPlane} size={35} />
+                  </TouchableOpacityDom>
+                </TooltipDom>
+              )}
+              {onShowPhoneEntry && (
+                <TooltipDom text="New number" position="top">
+                  <div
+                    onClick={() => {
+                      if (longPressFiredRef.current) { longPressFiredRef.current = false; return; }
+                      if (!sHubMediaUploading) onShowPhoneEntry();
+                    }}
+                    onPointerDown={() => {
+                      if (sHubMediaUploading) return;
+                      longPressFiredRef.current = false;
+                      longPressTimerRef.current = setTimeout(async () => {
+                        longPressFiredRef.current = true;
+                        const { clearAll } = await import("../../../hubMessageDB");
+                        await clearAll();
+                        useCustMessagesStore.getState().clearHubConversationCache();
+                        log("Hub message cache cleared");
+                        alert("Message cache cleared. Refresh to reload.");
+                      }, 1000);
+                    }}
+                    onPointerUp={() => { if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; } }}
+                    onPointerLeave={() => { if (longPressTimerRef.current) { clearTimeout(longPressTimerRef.current); longPressTimerRef.current = null; } }}
+                    className={hubStyles.iconBtn}
+                    style={{ opacity: sHubMediaUploading ? 0.3 : 1, cursor: "pointer" }}
+                  >
+                    <ImageDom icon={ICONS.cellPhone} size={35} />
+                  </div>
+                </TooltipDom>
+              )}
+              {matchingWorkorders.length > 0 && (
+                <TooltipDom text="Go to customer" position="top" offsetX={-15}>
+                  <TouchableOpacityDom onPress={() => onOpenWorkorder(phone)} className={hubStyles.iconBtn}>
+                    <ImageDom icon={ICONS.person} size={35} />
+                  </TouchableOpacityDom>
+                </TooltipDom>
+              )}
+              {exitHubButton}
+            </>
           }
-        } else {
-          _setTranslation({ text: "", loading: false, langCode });
-        }
-        if (onScrollToBottom) onScrollToBottom();
-      })
-      .catch(() => { _setTranslation({ text: "", loading: false, langCode }); });
-  }
-
-  let dateObj = formatDateTimeForReceipt(null, msgObj.millis);
-  let hasMedia = msgObj.mediaUrls?.length > 0 || !!msgObj.imageUrl;
-  let backgroundColor = hasMedia ? "transparent" : "rgb(230,230,230)";
-  let fromLangLabel = sTranslation.detectedFrom
-    ? (TRANSLATION_LANGUAGES.find(l => l.code === sTranslation.detectedFrom)?.label || sTranslation.detectedFrom)
-    : "";
-
-  return (
-    <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-start", marginLeft: 12, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "75%" }}>
-      <View style={{ position: "relative" }}>
-        <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, borderBottomLeftRadius: 2, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
-          {msgObj.mediaUrls?.length > 0 ? (
-            <View style={{ flexDirection: "column", marginBottom: msgObj.message ? 4 : 0 }}>
-              {msgObj.mediaUrls.map((media, i) => (
-                <MediaThumbnail key={i} url={media.url} thumbnailUrl={media.thumbnailUrl} contentType={media.contentType} />
-              ))}
-            </View>
-          ) : msgObj.imageUrl ? (
-            <MediaThumbnail url={msgObj.imageUrl} contentType="image/" />
-          ) : null}
-          {msgObj.message ? (
-            <Tooltip text="Right click for translation" position="top">
-              <View onContextMenu={handleContextMenu} style={{ cursor: "context-menu" }}>
-                {sTranslation.loading ? (
-                  <>
-                    <Text style={{ ...MESSAGE_TEXT_STYLE, color: gray(0.5), fontStyle: "italic" }}>Translating...</Text>
-                    <Text style={{ fontSize: 12, color: gray(0.45), fontStyle: "italic", marginTop: 3 }}>{msgObj.message}</Text>
-                  </>
-                ) : sTranslation.text ? (
-                  <>
-                    <LinkifiedText text={sTranslation.text} style={{ ...MESSAGE_TEXT_STYLE }} />
-                    <Text style={{ fontSize: 12, color: gray(0.45), fontStyle: "italic", marginTop: 3 }}>
-                      {"Original" + (fromLangLabel ? " (" + fromLangLabel + ")" : "") + ": " + msgObj.message}
-                    </Text>
-                  </>
-                ) : (
-                  <LinkifiedText text={msgObj.message} style={{ ...MESSAGE_TEXT_STYLE }} />
-                )}
-              </View>
-            </Tooltip>
-          ) : null}
-        </View>
-        {!hasMedia && <View style={{ position: "absolute", bottom: 0, left: -8, width: 0, height: 0, borderTopWidth: 8, borderTopColor: backgroundColor, borderLeftWidth: 8, borderLeftColor: "transparent" }} />}
-      </View>
-      <View style={{ width: "100%", flexDirection: "row", justifyContent: "space-between" }}>
-        <Text style={{ ...INFO_TEXT_STYLE }}>{dateObj.date}</Text>
-        <Text style={{ ...INFO_TEXT_STYLE }}>{dateObj.dayOfWeek + ", " + dateObj.time}</Text>
-      </View>
-      {msgObj.autoResponseSent && (
-        <Text style={{ fontSize: 10, color: gray(0.5), fontStyle: "italic" }}>Auto-response sent (thread was closed)</Text>
+        />
       )}
-      {sContextMenu.visible && createPortal(
-        <div onMouseDown={(e) => e.stopPropagation()} style={{ position: "fixed", left: sContextMenu.x, bottom: window.innerHeight - sContextMenu.y, zIndex: Z.dropdown, backgroundColor: "white", borderRadius: 8, boxShadow: "0 3px 16px rgba(0,0,0,0.22)", padding: 6, minWidth: 160 }}>
-          <div style={{ padding: "5px 12px", fontSize: 11, fontWeight: "600", color: gray(0.45), textTransform: "uppercase", letterSpacing: 0.5 }}>Translate to</div>
-          {TRANSLATION_LANGUAGES.map((lang) => (
-            <div
-              key={lang.code}
-              onClick={() => doTranslate(lang.code)}
-              style={{ padding: "9px 14px", cursor: "pointer", borderRadius: 5, fontSize: 15, fontWeight: "500", color: C.text }}
-              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = C.blue; e.currentTarget.style.color = "white"; }}
-              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; e.currentTarget.style.color = C.text; }}
-            >
-              {lang.label}
-            </div>
-          ))}
-        </div>,
-        document.body
-      )}
-    </View>
+    </div>
   );
-});
-
-const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing, thread, onToggleBlock, onToggleForward }) => {
-  // Use live delivery status from thread parent doc for the last outgoing message
-  let displayStatus = msgObj.status;
-  if (isLastOutgoing && thread?.lastOutgoingMessageID === msgObj.id && thread?.lastOutgoingMessageStatus) {
-    displayStatus = thread.lastOutgoingMessageStatus;
-  }
-  let dateObj = formatDateTimeForReceipt(null, msgObj.millis);
-  let isFailed = displayStatus === "failed" || displayStatus === "undelivered";
-  let hasMedia = msgObj.mediaUrls?.length > 0 || !!msgObj.imageUrl;
-  let backgroundColor = hasMedia ? "transparent" : (isFailed ? "rgb(200,80,80)" : "rgb(0,122,255)");
-  let showStatusIcons = isLastOutgoing;
-  // Check if current user has forwarding enabled on the thread parent doc
-  let currentUserID = useLoginStore.getState().getCurrentUser()?.id;
-  let isForwarding = !!(currentUserID && thread?.forwardTo?.[currentUserID]);
-  let isResponding = (thread?.canRespond !== undefined ? thread.canRespond : msgObj.canRespond);
-  return (
-    <View style={{ ...OUTER_MSG_BOX_STYLE, alignSelf: "flex-end", marginRight: 12, width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "75%" }}>
-      <View style={{ position: "relative" }}>
-        <View style={{ backgroundColor, ...INNER_MSG_BOX_STYLE, borderBottomRightRadius: 2, flexDirection: "row", alignItems: "flex-start", width: (msgObj.mediaUrls?.length > 0 || msgObj.imageUrl) && !msgObj.message ? undefined : "100%" }}>
-          {showStatusIcons && (
-            <View style={{ flexDirection: "column", alignItems: "center", marginRight: 5, marginTop: 2 }}>
-              <Tooltip text={isResponding ? "Block responses from user" : "Allow responses"} position="top">
-                <TouchableOpacity onPress={onToggleBlock} style={{ alignItems: "center", justifyContent: "center" }}>
-                  <Image source={isResponding ? ICONS.unblock : ICONS.blocked} style={{ width: 35, height: 35 }} />
-                </TouchableOpacity>
-              </Tooltip>
-              <Tooltip text={isForwarding ? "Stop forwarding replies to me" : "Forward replies to me"} position="top">
-                <TouchableOpacity onPress={onToggleForward} style={{ alignItems: "center", justifyContent: "center", marginTop: 4 }}>
-                  <Image source={isForwarding ? ICONS.allowNotif : ICONS.blockNotif} style={{ width: 28, height: 28 }} />
-                </TouchableOpacity>
-              </Tooltip>
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            {msgObj.mediaUrls?.length > 0 ? (
-              <View style={{ flexDirection: "column", marginBottom: msgObj.message ? 4 : 0 }}>
-                {msgObj.mediaUrls.map((media, i) => (
-                  <MediaThumbnail key={i} url={media.url} thumbnailUrl={media.thumbnailUrl} contentType={media.contentType} />
-                ))}
-              </View>
-            ) : msgObj.imageUrl ? (
-              <MediaThumbnail url={msgObj.imageUrl} contentType="image/" />
-            ) : null}
-            {msgObj.message ? (
-              <LinkifiedText text={msgObj.message} style={{ ...MESSAGE_TEXT_STYLE, color: "white" }} />
-            ) : null}
-            {msgObj.originalMessage ? (
-              <Text style={{ fontSize: 12, color: "rgba(255,255,255,0.6)", fontStyle: "italic", marginTop: 3 }}>
-                {"Original" + (msgObj.translatedFrom ? " (" + (TRANSLATION_LANGUAGES.find(l => l.code === msgObj.translatedFrom)?.label || msgObj.translatedFrom) + ")" : "") + ": " + msgObj.originalMessage}
-              </Text>
-            ) : null}
-          </View>
-        </View>
-        {!hasMedia && <View style={{ position: "absolute", bottom: 0, right: -8, width: 0, height: 0, borderTopWidth: 8, borderTopColor: backgroundColor, borderRightWidth: 8, borderRightColor: "transparent" }} />}
-      </View>
-      <View
-        style={{
-          width: "100%",
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Text style={{ ...INFO_TEXT_STYLE }}>
-          {dateObj.dayOfWeek + ", " + dateObj.time}
-        </Text>
-        {(displayStatus === "sending" || displayStatus === "queued" || displayStatus === "accepted") && (
-          <Text style={{ fontSize: 10, color: gray(0.5), fontStyle: "italic" }}>Sending...</Text>
-        )}
-        {displayStatus === "sent" && (
-          <Text style={{ fontSize: 10, color: C.blue }}>Sent</Text>
-        )}
-        {displayStatus === "delivered" && (
-          <Text style={{ fontSize: 10, color: C.green }}>Delivered</Text>
-        )}
-        {displayStatus === "undelivered" && (
-          <Text style={{ fontSize: 10, color: C.red }}>Not Delivered</Text>
-        )}
-        {displayStatus === "failed" && (
-          <Text style={{ fontSize: 10, color: C.red }}>Failed{msgObj.errorMessage ? ": " + msgObj.errorMessage : ""}</Text>
-        )}
-        <Text style={{ ...INFO_TEXT_STYLE }}>{dateObj.date}</Text>
-      </View>
-    </View>
-  );
-});
+}

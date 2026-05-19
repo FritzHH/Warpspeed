@@ -1,0 +1,117 @@
+.container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 5px 0 5px;
+  border-radius: 7px;
+  box-sizing: border-box;
+}
+
+.actionBar {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 0 3px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.uploadWrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.topSection {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.customerCard {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 11px 0;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 7px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.depositRow {
+  width: 95%;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  padding: 1px 5px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.depositGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+
+.depositChip {
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+
+.depositChipText {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.depositAmount {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.langText {
+  font-size: 12px;
+  text-align: center;
+  font-style: italic;
+}
+
+.contactRow {
+  width: 95%;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 15px;
+  margin-top: 5px;
+  padding: 5px 8px 5px 5px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.contactItem {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.contactText {
+  font-size: 12px;
+}
+
+.restrictionText {
+  font-size: 13px;
+}

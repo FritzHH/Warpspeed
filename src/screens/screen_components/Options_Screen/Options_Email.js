@@ -1,15 +1,16 @@
 /* eslint-disable */
 
-import { View, Text, TouchableOpacity, FlatList, ActivityIndicator } from "react-native-web";
 import React, { useState, useCallback, useMemo } from "react";
-import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../styles";
-import { Button_, Image_, TabMenuButton, Tooltip } from "../../../components";
+import { C, Fonts, ICONS } from "../../../styles";
+import { Tooltip } from "../../../components";
+import { TabMenuButton } from "../../../dom_components/TabMenuButton/TabMenuButton";
 import { useEmailStore, useLoginStore, useSettingsStore, useTabNamesStore } from "../../../stores";
 import { TAB_NAMES } from "../../../data";
 import { dbGmailDisconnect, dbGmailModifyLabels } from "../../../db_calls_wrapper";
 import { buildSignOffHtml } from "../Items_Screen/Items_EmailView";
 import { log, gray, lightenRGBByPercent } from "../../../utils";
 import dayjs from "dayjs";
+import styles from "./OptionsEmail.module.css";
 
 const FOLDERS = [
   { key: "INBOX", label: "Inbox" },
@@ -137,7 +138,7 @@ export const EmailOptionsPanel = React.memo(() => {
     useEmailStore.getState().setActiveAccountKey(accountKey);
   }
 
-  const renderEmailItem = useCallback(({ item }) => {
+  const renderEmailItem = useCallback((item) => {
     const isSelected = item.threadId === zSelectedThreadId;
     const dateStr = item.internalDate
       ? dayjs(item.internalDate).format(
@@ -146,131 +147,103 @@ export const EmailOptionsPanel = React.memo(() => {
       : "";
     const isHovered = sHoveredThreadId === item.threadId;
     return (
-      <View
+      <div
+        key={item.threadId}
+        className={styles.emailRow}
         onMouseEnter={() => _sSetHoveredThreadId(item.threadId)}
         onMouseLeave={() => _sSetHoveredThreadId(null)}
         style={{
-          flexDirection: "row",
-          borderBottomWidth: 1,
-          borderBottomColor: gray(0.12),
-          backgroundColor: isSelected ? lightenColor(C.orange, 0.85) : "transparent",
+          background: isSelected ? lightenColor(C.orange, 0.85) : "transparent",
           opacity: isHovered && !isSelected ? 0.6 : 1,
         }}
       >
-        <TouchableOpacity
-          onPress={() => handleSelectThread(item.threadId)}
-          style={{ flex: 1, paddingVertical: 10, paddingLeft: 12 }}
+        <button
+          type="button"
+          className={styles.emailRowBody}
+          onClick={() => handleSelectThread(item.threadId)}
         >
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-            <Text
-              numberOfLines={1}
-              style={{
-                fontSize: 13,
-                fontWeight: item.isUnread ? Fonts.weight.textSuperheavy : Fonts.weight.textRegular,
-                color: C.text,
-                flex: 1,
-                marginRight: 8,
-              }}
+          <div className={styles.emailRowTopLine}>
+            <span
+              className={`${styles.emailRowFrom} ${item.isUnread ? styles.emailRowFromUnread : ""}`}
+              style={{ color: C.text }}
             >
               {item.fromName || item.from || "Unknown"}
-            </Text>
-            <Text style={{ fontSize: 11, color: gray(0.5), flexShrink: 0 }}>{dateStr}</Text>
-          </View>
-          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 2 }}>
+            </span>
+            <span className={styles.emailRowDate}>{dateStr}</span>
+          </div>
+          <div className={styles.emailRowMidLine}>
             {item.isUnread && (
-              <View
-                style={{
-                  width: 8,
-                  height: 8,
-                  borderRadius: 4,
-                  backgroundColor: C.blue,
-                  marginRight: 6,
-                  flexShrink: 0,
-                }}
-              />
+              <span className={styles.unreadDot} style={{ background: C.blue }} />
             )}
-            <Text
-              numberOfLines={1}
-              style={{
-                fontSize: 13,
-                fontWeight: item.isUnread ? Fonts.weight.textHeavy : Fonts.weight.textRegular,
-                color: C.text,
-                flex: 1,
-              }}
+            <span
+              className={`${styles.emailRowSubject} ${item.isUnread ? styles.emailRowSubjectUnread : ""}`}
+              style={{ color: C.text }}
             >
               {item.subject || "(no subject)"}
-            </Text>
+            </span>
             {item.messageCount > 1 && (
-              <View
-                style={{
-                  backgroundColor: gray(0.15),
-                  borderRadius: 8,
-                  paddingHorizontal: 5,
-                  paddingVertical: 1,
-                  marginLeft: 6,
-                }}
-              >
-                <Text style={{ fontSize: 10, color: gray(0.4) }}>{item.messageCount}</Text>
-              </View>
+              <span className={styles.msgCountChip}>
+                <span className={styles.msgCountChipText}>{item.messageCount}</span>
+              </span>
             )}
-          </View>
-          <Text
-            numberOfLines={1}
-            style={{ fontSize: 12, color: gray(0.5), marginTop: 2 }}
-          >
-            {item.snippet || ""}
-          </Text>
-        </TouchableOpacity>
-        <View style={{ justifyContent: "center", alignItems: "center", paddingHorizontal: 6 }}>
+          </div>
+          <span className={styles.emailRowSnippet}>{item.snippet || ""}</span>
+        </button>
+        <div className={styles.emailRowActions}>
           <Tooltip text="Trash" position="left">
-            <TouchableOpacity
-              onPress={() => handleTrashThread(item.threadId)}
-              style={{ padding: 4 }}
+            <button
+              type="button"
+              className={styles.actionIconBtn}
+              onClick={() => handleTrashThread(item.threadId)}
             >
-              <Image_ icon={ICONS.trash} size={18} />
-            </TouchableOpacity>
+              <img src={ICONS.trash} alt="" className={styles.actionIcon} />
+            </button>
           </Tooltip>
           <Tooltip text="Archive" position="left">
-            <TouchableOpacity
-              onPress={() => handleArchiveThread(item.threadId)}
-              style={{ padding: 4, marginTop: 4 }}
+            <button
+              type="button"
+              className={styles.actionIconBtn}
+              onClick={() => handleArchiveThread(item.threadId)}
             >
-              <Image_ icon={ICONS.archive} size={18} />
-            </TouchableOpacity>
+              <img src={ICONS.archive} alt="" className={styles.actionIcon} />
+            </button>
           </Tooltip>
-        </View>
-      </View>
+        </div>
+      </div>
     );
   }, [zSelectedThreadId, zEmails, zActiveAccountKey, sHoveredThreadId]);
 
   if (zEmailAuth === null) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator size="large" color={C.blue} />
-      </View>
+      <div className={styles.centerState}>
+        <span
+          className={styles.spinner}
+          style={{ width: 40, height: 40, borderWidth: 4, color: C.blue }}
+        />
+      </div>
     );
   }
 
   if (!anyConnected) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
-        <Image_ icon={ICONS.paperPlane} size={48} style={{ marginBottom: 16, opacity: 0.4 }} />
-        <Text style={{ fontSize: 16, fontWeight: Fonts.weight.textHeavy, color: C.text, marginBottom: 8 }}>
+      <div className={styles.centerState}>
+        <img src={ICONS.paperPlane} alt="" className={styles.centerStateIcon} />
+        <span className={styles.centerStateTitle} style={{ color: C.text }}>
           No Connected Inboxes
-        </Text>
-        <Text style={{ fontSize: 13, color: gray(0.5), textAlign: "center" }}>
+        </span>
+        <span className={styles.centerStateText}>
           {emailAccounts.length > 0
             ? "Your assigned email accounts have not been authorized yet. Authorize them in Dashboard → Email Options."
             : "No email accounts have been assigned to you. Contact an admin to configure access in Dashboard → Email Options."}
-        </Text>
-      </View>
+        </span>
+      </div>
     );
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <div className={styles.container}>
       {/* Account switcher */}
-      <View style={{ flexDirection: "row", marginTop: 8, marginBottom: 8 }}>
+      <div className={styles.accountRow}>
         {connectedAccounts.map((acct) => (
           <AccountTabButton
             key={acct.accountKey}
@@ -280,11 +253,11 @@ export const EmailOptionsPanel = React.memo(() => {
             onPress={() => handleAccountSwitch(acct.accountKey)}
           />
         ))}
-      </View>
+      </div>
 
       {/* Folder buttons + action buttons */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-        <View style={{ flexDirection: "row", flexWrap: "wrap" }}>
+      <div className={styles.toolbarRow}>
+        <div className={styles.folderGroup}>
           {FOLDERS.map((folder) => {
             const isActive = zActiveFolder === folder.key;
             const unreadCount =
@@ -299,88 +272,62 @@ export const EmailOptionsPanel = React.memo(() => {
               />
             );
           })}
-        </View>
-        <View style={{ flexDirection: "row", alignItems: "center", paddingRight: 8 }}>
-          <TouchableOpacity
-            onPress={handleCompose}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: C.green,
-              paddingVertical: 6,
-              paddingHorizontal: 14,
-              borderRadius: 8,
-            }}
+        </div>
+        <div className={styles.actionGroup}>
+          <button
+            type="button"
+            className={styles.composeBtn}
+            onClick={handleCompose}
+            style={{ background: C.green }}
           >
-            <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.textWhite }}>
-              + Compose
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+            <span className={styles.composeBtnText}>+ Compose</span>
+          </button>
+        </div>
+      </div>
 
       {/* Divider */}
-      <View style={{ height: 1, backgroundColor: gray(0.12) }} />
+      <div className={styles.divider} />
 
       {/* Email list */}
       {zEmailsLoading ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-          <ActivityIndicator size="large" color={C.blue} />
-        </View>
+        <div className={styles.centerState}>
+          <span
+            className={styles.spinner}
+            style={{ width: 40, height: 40, borderWidth: 4, color: C.blue }}
+          />
+        </div>
       ) : zThreadedEmails.length === 0 ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 20 }}>
-          <Text style={{ fontSize: 14, color: gray(0.5) }}>No emails in this folder</Text>
-        </View>
+        <div className={styles.centerState}>
+          <span className={styles.centerStateText}>No emails in this folder</span>
+        </div>
       ) : (
-        <FlatList
-          data={zThreadedEmails}
-          renderItem={renderEmailItem}
-          keyExtractor={(item) => item.threadId}
-          style={{ flex: 1 }}
-        />
+        <div className={styles.listScroll}>
+          {zThreadedEmails.map((item) => renderEmailItem(item))}
+        </div>
       )}
-    </View>
+    </div>
   );
 });
 
 const AccountTabButton = ({ label, isSelected, unreadCount, onPress }) => {
-  const [sHovered, _sSetHovered] = useState(false);
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      onMouseEnter={() => _sSetHovered(true)}
-      onMouseLeave={() => _sSetHovered(false)}
-      activeOpacity={0.8}
+    <button
+      type="button"
+      className={`${styles.acctTab} ${isSelected ? styles.acctTabSelected : ""}`}
+      onClick={onPress}
       style={{
-        flex: 1,
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "center",
-        paddingVertical: 8,
-        backgroundColor: isSelected ? C.orange : lightenRGBByPercent(C.orange, 60),
-        opacity: sHovered && !isSelected ? 0.7 : 1,
+        background: isSelected ? C.orange : lightenRGBByPercent(C.orange, 60),
       }}
     >
-      <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.textWhite }}>{label}</Text>
+      <span className={styles.acctTabText}>{label}</span>
       {unreadCount > 0 && (
-        <View
-          style={{
-            backgroundColor: "white",
-            borderRadius: 9,
-            minWidth: 18,
-            height: 18,
-            justifyContent: "center",
-            alignItems: "center",
-            paddingHorizontal: 5,
-            marginLeft: 6,
-          }}
-        >
-          <Text style={{ fontSize: 11, color: gray(0.4), fontWeight: Fonts.weight.textHeavy }}>
+        <span className={styles.acctBadge}>
+          <span className={styles.acctBadgeText}>
             {unreadCount > 99 ? "99+" : unreadCount}
-          </Text>
-        </View>
+          </span>
+        </span>
       )}
-    </TouchableOpacity>
+    </button>
   );
 };
 

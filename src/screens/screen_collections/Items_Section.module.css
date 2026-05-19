@@ -1,0 +1,124 @@
+.tabBar {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  justify-content: space-between;
+  transition: background-color 0.2s ease;
+}
+
+.leftGroup {
+  display: flex;
+  flex-direction: row;
+}
+
+.rightGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.iconButton {
+  background: none;
+  border: none;
+  padding: 0 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+}
+
+.iconButton:disabled {
+  cursor: default;
+}
+
+.homeButton {
+  margin-top: 4px;
+}
+
+.translateCard {
+  width: 500px;
+  background-color: var(--card-bg);
+  border-radius: 12px;
+  border: 2px solid var(--card-border);
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.translateHeader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.translateTitle {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.closeButton {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.langRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 14px;
+}
+
+.langArrow {
+  margin: 0 10px;
+}
+
+.startersRow {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.inputRow {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+
+.resetButton {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 8px;
+  margin-top: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.outputBox {
+  border-radius: 10px;
+  border-width: 2px;
+  border-style: solid;
+  padding: 10px;
+  min-height: 80px;
+  box-sizing: border-box;
+}
+
+.outputLoading {
+  font-size: 14px;
+  font-style: italic;
+}
+
+.outputText {
+  font-size: 16px;
+}

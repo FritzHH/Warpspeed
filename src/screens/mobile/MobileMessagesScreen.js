@@ -1,23 +1,12 @@
-/* eslint-disable */
-import React, { useEffect, useState, useRef, memo } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-} from "react-native-web";
+import { useEffect, useState, useRef, memo } from "react";
 import { useParams } from "react-router-dom";
-import { C, ICONS } from "../../styles";
-import { Button_, Image_, AlertBox_ } from "../../components";
-import { CheckBox } from "../../dom_components";
+import { ICONS } from "../../styles";
+import { AlertBox, CheckBox, Image, TouchableOpacity } from "../../dom_components";
 import {
   formatPhoneWithDashes,
   formatDateTimeForReceipt,
   capitalizeFirstLetterOfString,
   calculateRunningTotals,
-  gray,
-  log,
 } from "../../utils";
 import {
   useOpenWorkordersStore,
@@ -26,18 +15,28 @@ import {
   useSettingsStore,
   useActiveSalesStore,
 } from "../../stores";
-import { dbListenToCustomerMessages, dbUpdateMessageCanRespond, dbCreateTextToPayInvoice } from "../../db_calls_wrapper";
+import {
+  dbListenToCustomerMessages,
+  dbUpdateMessageCanRespond,
+  dbCreateTextToPayInvoice,
+} from "../../db_calls_wrapper";
 import { firestoreRead } from "../../db_calls";
 import { smsService } from "../../data_service_modules";
-import { ReplyOptionsBar, scheduleAutoSend, clearAutoSend, buildForwardToPayload } from "../screen_components/Options_Screen/ReplyOptionsBar";
+import {
+  ReplyOptionsBar,
+  scheduleAutoSend,
+  clearAutoSend,
+  buildForwardToPayload,
+} from "../screen_components/Options_Screen/ReplyOptionsBar";
 import { WorkorderMediaModal } from "../screen_components/modal_screens/WorkorderMediaModal";
 import { SMS_PROTO } from "../../data";
+import styles from "./MobileMessagesScreen.module.css";
 
 export function MobileMessagesScreen({ workorderID, onBack }) {
   const params = useParams();
   const woID = workorderID || params?.id;
-  const zWorkorder = useOpenWorkordersStore((state) =>
-    state.workorders.find((o) => o.id === woID) || null
+  const zWorkorder = useOpenWorkordersStore(
+    (state) => state.workorders.find((o) => o.id === woID) || null
   );
 
   const zShowAlert = useAlertScreenStore((s) => s.showAlert);
@@ -45,13 +44,13 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
   const [sMessages, _setMessages] = useState([]);
   const [sNewMessage, _setNewMessage] = useState("");
   const [sSending, _setSending] = useState(false);
-  const [sInputHeight, _setInputHeight] = useState(36);
   const [sCanRespond, _setCanRespond] = useState(true);
   const [sNotifyMe, _setNotifyMe] = useState(false);
   const [sActionsOpen, _setActionsOpen] = useState(false);
-  const scrollRef = useRef(null);
   const [sShowMediaPicker, _setShowMediaPicker] = useState(false);
   const [sShowReplyModal, _setShowReplyModal] = useState(false);
+  const scrollRef = useRef(null);
+  const inputRef = useRef(null);
   const pendingMediaRef = useRef(null);
   const pendingActionRef = useRef(null);
 
@@ -60,7 +59,6 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
   const customerLast = zWorkorder?.customerLast || "";
   const customerID = zWorkorder?.customerID || "";
 
-  // Listen to customer messages + load canRespond from thread parent doc
   useEffect(() => {
     if (!customerPhone) return;
     const cleanPhone = customerPhone.replace(/\D/g, "");
@@ -77,23 +75,33 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
         })
         .catch(() => {});
     }
-    return () => { if (unsubscribe) unsubscribe(); };
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, [customerPhone]);
 
-  // Auto-scroll to bottom when messages change
   useEffect(() => {
     if (scrollRef.current) {
       setTimeout(() => {
-        scrollRef.current?.scrollToEnd?.({ animated: true });
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }
       }, 100);
     }
   }, [sMessages.length]);
 
+  function autoResizeInput() {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.max(36, el.scrollHeight) + "px";
+  }
+
   async function handleSend() {
     if (!sNewMessage.trim() || sSending) return;
     _setSending(true);
-    let currentUser = useLoginStore.getState().getCurrentUser();
-    let msg = { ...SMS_PROTO };
+    const currentUser = useLoginStore.getState().getCurrentUser();
+    const msg = { ...SMS_PROTO };
     msg.message = sNewMessage.trim();
     msg.phoneNumber = customerPhone;
     if (customerFirst) msg.customerFirst = customerFirst;
@@ -105,12 +113,13 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
     msg.type = "outgoing";
     msg.senderUserObj = currentUser;
     msg.sentByUser = currentUser?.id;
-    let forwardTo = buildForwardToPayload(sNotifyMe);
+    const forwardTo = buildForwardToPayload(sNotifyMe);
     if (forwardTo) msg.forwardTo = forwardTo;
     _setNewMessage("");
-    let result = await smsService.send(msg);
+    if (inputRef.current) inputRef.current.style.height = "36px";
+    const result = await smsService.send(msg);
     if (result.success) {
-      let allWOs = useOpenWorkordersStore.getState().workorders;
+      const allWOs = useOpenWorkordersStore.getState().workorders;
       allWOs
         .filter((wo) => wo.customerID === customerID)
         .forEach((wo) => {
@@ -118,8 +127,7 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
             .getState()
             .setField("lastSMSSenderUserID", currentUser?.id, wo.id);
         });
-    }
-    if (!result.success) {
+    } else {
       useAlertScreenStore.getState().setValues({
         title: "Message Failed",
         message: result.error || "Failed to send message",
@@ -133,7 +141,7 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
   }
 
   async function handleToggleCanRespond() {
-    let newVal = !sCanRespond;
+    const newVal = !sCanRespond;
     _setCanRespond(newVal);
     await dbUpdateMessageCanRespond(customerPhone, null, newVal);
   }
@@ -167,26 +175,30 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
   }
 
   async function sendMediaMessage(canRespondVal, forwardOverride) {
-    let mediaItems = pendingMediaRef.current;
+    const mediaItems = pendingMediaRef.current;
     if (!mediaItems || !mediaItems.length) return;
     if (!customerPhone || customerPhone.replace(/\D/g, "").length !== 10) return;
-    let currentUser = useLoginStore.getState().getCurrentUser();
-    let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-    let forwardTo = buildForwardToPayload(forwardOverride, sNotifyMe);
+    const currentUser = useLoginStore.getState().getCurrentUser();
+    const useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
+    const forwardTo = buildForwardToPayload(forwardOverride, sNotifyMe);
     _setShowReplyModal(false);
-    let zSettings = useSettingsStore.getState().getSettings();
-    let storeName = zSettings?.storeInfo?.displayName || "Our store";
-    let hasImages = mediaItems.some((m) => m.type === "image");
-    let hasVideos = mediaItems.some((m) => m.type === "video");
-    let imageCount = mediaItems.filter((m) => m.type === "image").length;
-    let videoCount = mediaItems.filter((m) => m.type === "video").length;
-    let parts = [];
+    const zSettings = useSettingsStore.getState().getSettings();
+    const storeName = zSettings?.storeInfo?.displayName || "Our store";
+    const hasImages = mediaItems.some((m) => m.type === "image");
+    const hasVideos = mediaItems.some((m) => m.type === "video");
+    const imageCount = mediaItems.filter((m) => m.type === "image").length;
+    const videoCount = mediaItems.filter((m) => m.type === "video").length;
+    const parts = [];
     if (hasImages) parts.push(imageCount === 1 ? "a photo" : imageCount + " photos");
     if (hasVideos) parts.push(videoCount === 1 ? "a video" : videoCount + " videos");
-    let mediaText = storeName + " has sent you " + parts.join(" and ");
-    let msg = { ...SMS_PROTO };
+    const mediaText = storeName + " has sent you " + parts.join(" and ");
+    const msg = { ...SMS_PROTO };
     msg.message = mediaText;
-    msg.mediaUrls = mediaItems.map((m) => ({ url: m.url, thumbnailUrl: m.thumbnailUrl || "", contentType: m.type === "video" ? "video/mp4" : "image/jpeg" }));
+    msg.mediaUrls = mediaItems.map((m) => ({
+      url: m.url,
+      thumbnailUrl: m.thumbnailUrl || "",
+      contentType: m.type === "video" ? "video/mp4" : "image/jpeg",
+    }));
     msg.phoneNumber = customerPhone;
     msg.canRespond = useCanRespond ? true : null;
     msg.millis = new Date().getTime();
@@ -198,14 +210,17 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
     msg.senderUserObj = currentUser;
     msg.sentByUser = currentUser?.id;
     if (forwardTo) msg.forwardTo = forwardTo;
-    let result = await smsService.send(msg);
+    const result = await smsService.send(msg);
     if (result.success) {
-      let allWOs = useOpenWorkordersStore.getState().workorders;
-      allWOs.filter((wo) => wo.customerID === customerID).forEach((wo) => {
-        useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", currentUser?.id, wo.id);
-      });
-    }
-    if (!result.success) {
+      const allWOs = useOpenWorkordersStore.getState().workorders;
+      allWOs
+        .filter((wo) => wo.customerID === customerID)
+        .forEach((wo) => {
+          useOpenWorkordersStore
+            .getState()
+            .setField("lastSMSSenderUserID", currentUser?.id, wo.id);
+        });
+    } else {
       useAlertScreenStore.getState().setValues({
         title: "Message Failed",
         message: result.error || "Failed to send media",
@@ -220,11 +235,12 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
   }
 
   function handleToggleForward() {
-    let currentUser = useLoginStore.getState().getCurrentUser();
+    const currentUser = useLoginStore.getState().getCurrentUser();
     if (!currentUser?.phone) {
       useAlertScreenStore.getState().setValues({
         title: "No Phone Number",
-        message: "Your user profile does not have a phone number. Add one in settings to receive forwarded replies.",
+        message:
+          "Your user profile does not have a phone number. Add one in settings to receive forwarded replies.",
         btn1Text: "OK",
         handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
         showAlert: true,
@@ -261,7 +277,8 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
     if (zWorkorder.activeSaleID) {
       useAlertScreenStore.getState().setValues({
         title: "Active Sale In Progress",
-        message: "This workorder has an active sale. Complete or cancel the sale before sending a payment link.",
+        message:
+          "This workorder has an active sale. Complete or cancel the sale before sending a payment link.",
         btn1Text: "OK",
         handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
         showAlert: true,
@@ -269,26 +286,44 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
       });
       return;
     }
-    let zSettings = useSettingsStore.getState().getSettings();
+    const zSettings = useSettingsStore.getState().getSettings();
     let amountDue = 0;
-    let activeSale = zWorkorder.activeSaleID
+    const activeSale = zWorkorder.activeSaleID
       ? useActiveSalesStore.getState().getActiveSale(zWorkorder.activeSaleID)
       : null;
     if (activeSale) {
       amountDue = (activeSale.total || 0) - (activeSale.amountCaptured || 0);
     } else {
-      let totals = calculateRunningTotals(zWorkorder, zSettings?.salesTaxPercent, [], false, !!zWorkorder.taxFree);
+      const totals = calculateRunningTotals(
+        zWorkorder,
+        zSettings?.salesTaxPercent,
+        [],
+        false,
+        !!zWorkorder.taxFree
+      );
       amountDue = totals.finalTotal;
     }
-    let displayAmount = "$" + (amountDue / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const displayAmount =
+      "$" +
+      (amountDue / 100).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      });
     useAlertScreenStore.getState().setValues({
       title: "Send SMS Payment",
-      message: "Send a payment link for " + displayAmount + " to " + customerFirst + " at " + customerPhone + "?",
+      message:
+        "Send a payment link for " +
+        displayAmount +
+        " to " +
+        customerFirst +
+        " at " +
+        customerPhone +
+        "?",
       btn1Text: "Send",
       btn2Text: "Cancel",
       handleBtn1Press: async () => {
         useAlertScreenStore.getState().resetAll();
-        let result = await dbCreateTextToPayInvoice(zWorkorder.id, "sms");
+        const result = await dbCreateTextToPayInvoice(zWorkorder.id, "sms");
         if (result && result.success) {
           useAlertScreenStore.getState().setValues({
             title: "Payment Link Sent",
@@ -317,147 +352,101 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
 
   if (!zWorkorder) {
     return (
-      <View
-        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-      >
-        <Text style={{ color: C.lightText, fontSize: 16 }}>
-          Workorder not found
-        </Text>
-      </View>
+      <div className={styles.notFoundWrap}>
+        <span className={styles.notFoundText}>Workorder not found</span>
+      </div>
     );
   }
 
   if (!customerPhone) {
     return (
-      <View
-        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-      >
-        <Text style={{ color: C.lightText, fontSize: 16 }}>
-          No phone number on file
-        </Text>
-      </View>
+      <div className={styles.notFoundWrap}>
+        <span className={styles.notFoundText}>No phone number on file</span>
+      </div>
     );
   }
 
+  const sendEnabled = !!sNewMessage.trim() && !sSending;
+
   return (
-    <View style={{ flex: 1, backgroundColor: C.backgroundWhite }}>
-      {/* Header */}
-      <View
-        style={{
-          backgroundColor: C.buttonLightGreen,
-          borderBottomWidth: 1,
-          borderBottomColor: C.buttonLightGreenOutline,
-          paddingHorizontal: 16,
-          paddingVertical: 10,
-          flexDirection: "row",
-          alignItems: "center",
-        }}
-      >
-        <TouchableOpacity onPress={onBack} style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+    <div className={styles.root}>
+      <div className={styles.header}>
+        <TouchableOpacity onPress={onBack} style={{ display: "flex", flexDirection: "row", alignItems: "center", flex: 1, padding: 4 }}>
           {onBack ? (
-            <Image_ icon={ICONS.downChevron} size={16} style={{ transform: [{ rotate: "90deg" }], marginRight: 10 }} />
+            <Image icon={ICONS.downChevron} size={16} style={{ transform: "rotate(90deg)", marginRight: 10 }} />
           ) : null}
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>
+          <div className={styles.headerTextWrap}>
+            <span className={styles.headerName}>
               {capitalizeFirstLetterOfString(customerFirst) +
                 " " +
                 capitalizeFirstLetterOfString(customerLast)}
-            </Text>
-            <Text style={{ fontSize: 13, color: C.lightText, marginTop: 2 }}>
+            </span>
+            <span className={styles.headerPhone}>
               {formatPhoneWithDashes(customerPhone)}
-            </Text>
-          </View>
+            </span>
+          </div>
         </TouchableOpacity>
-      </View>
+      </div>
 
-      {/* Messages list */}
-      <View style={{ flex: 1, overflow: "hidden" }}>
-      <ScrollView
-        ref={scrollRef}
-        style={{ flex: 1 }}
-        contentContainerStyle={{
-          paddingHorizontal: 12,
-          paddingVertical: 8,
-        }}
-      >
-        {sMessages.length === 0 && (
-          <View
-            style={{
-              justifyContent: "center",
-              alignItems: "center",
-              paddingVertical: 40,
-            }}
-          >
-            <Text style={{ fontSize: 15, color: C.lightText }}>
-              No messages yet
-            </Text>
-          </View>
-        )}
-        {sMessages.map((msg) => {
-          if (msg.type === "incoming") {
-            return <IncomingBubble key={msg.id} msgObj={msg} />;
-          }
-          return <OutgoingBubble key={msg.id} msgObj={msg} />;
-        })}
-        <View style={{ height: 10 }} />
-      </ScrollView>
-      </View>
+      <div className={styles.messagesWrap}>
+        <div ref={scrollRef} className={styles.messagesScroll}>
+          {sMessages.length === 0 && (
+            <div className={styles.emptyState}>
+              <span className={styles.emptyText}>No messages yet</span>
+            </div>
+          )}
+          {sMessages.map((msg) => {
+            if (msg.type === "incoming") {
+              return <IncomingBubble key={msg.id} msgObj={msg} />;
+            }
+            return <OutgoingBubble key={msg.id} msgObj={msg} />;
+          })}
+          <div className={styles.bottomSpacer} />
+        </div>
+      </div>
 
-      {/* Input area */}
-      <View
-        style={{
-          borderTopWidth: 1,
-          borderTopColor: "lightgray",
-          backgroundColor: C.listItemWhite,
-          paddingHorizontal: 12,
-          paddingBottom: 10,
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginVertical: 2 }}>
-          <View>
-            <TouchableOpacity onPress={() => _setActionsOpen(!sActionsOpen)} style={{ padding: 6 }}>
-              <Image_ icon={ICONS.menu2} size={22} />
+      <div className={styles.inputArea}>
+        <div className={styles.topBar}>
+          <div className={styles.menuWrap}>
+            <TouchableOpacity
+              onPress={() => _setActionsOpen(!sActionsOpen)}
+              style={{ padding: 6 }}
+            >
+              <Image icon={ICONS.menu2} size={22} />
             </TouchableOpacity>
             {sActionsOpen ? (
-              <View style={{
-                position: "absolute",
-                bottom: "100%",
-                left: 0,
-                backgroundColor: C.listItemWhite,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: "lightgray",
-                shadowColor: "#000",
-                shadowOffset: { width: 0, height: 2 },
-                shadowOpacity: 0.15,
-                shadowRadius: 6,
-                elevation: 5,
-                minWidth: 160,
-              }}>
-                <TouchableOpacity
-                  onPress={() => { _setActionsOpen(false); handleSendPaymentLink(); }}
-                  style={{ paddingVertical: 12, paddingHorizontal: 14 }}
+              <div className={styles.menuDropdown}>
+                <div
+                  className={styles.menuItem}
+                  onClick={() => {
+                    _setActionsOpen(false);
+                    handleSendPaymentLink();
+                  }}
                 >
-                  <Text style={{ fontSize: 14, color: C.text }}>Send invoice</Text>
-                </TouchableOpacity>
-                <View style={{ height: 1, backgroundColor: gray(0.85) }} />
-                <TouchableOpacity
-                  onPress={() => { _setActionsOpen(false); _setShowMediaPicker(true); }}
-                  style={{ paddingVertical: 12, paddingHorizontal: 14 }}
+                  <span className={styles.menuItemText}>Send invoice</span>
+                </div>
+                <div className={styles.menuDivider} />
+                <div
+                  className={styles.menuItem}
+                  onClick={() => {
+                    _setActionsOpen(false);
+                    _setShowMediaPicker(true);
+                  }}
                 >
-                  <Text style={{ fontSize: 14, color: C.text }}>Send media</Text>
-                </TouchableOpacity>
-              </View>
+                  <span className={styles.menuItemText}>Send media</span>
+                </div>
+              </div>
             ) : null}
-          </View>
+          </div>
           <CheckBox
             isChecked={sNotifyMe}
             onCheck={() => {
-              let currentUser = useLoginStore.getState().getCurrentUser();
+              const currentUser = useLoginStore.getState().getCurrentUser();
               if (!currentUser?.phone) {
                 useAlertScreenStore.getState().setValues({
                   title: "No Phone Number",
-                  message: "Your user profile does not have a phone number. Add one in settings to receive forwarded replies.",
+                  message:
+                    "Your user profile does not have a phone number. Add one in settings to receive forwarded replies.",
                   btn1Text: "OK",
                   handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
                   showAlert: true,
@@ -474,7 +463,7 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
             onCheck={handleToggleCanRespond}
             text="User can respond"
           />
-        </View>
+        </div>
         <ReplyOptionsBar
           visible={sShowReplyModal}
           forwardReplies={sNotifyMe}
@@ -483,73 +472,43 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
             clearAutoSend();
             _setCanRespond(canRespond);
             _setShowReplyModal(false);
-            if (pendingActionRef.current === "media") { sendMediaMessage(canRespond); }
+            if (pendingActionRef.current === "media") {
+              sendMediaMessage(canRespond);
+            }
           }}
           onToggleForward={handleToggleForward}
         />
-        <View style={{ flexDirection: "row", alignItems: "flex-end" }}>
-          <TextInput
+        <div className={styles.inputRow}>
+          <textarea
+            ref={inputRef}
             value={sNewMessage}
-            onChangeText={(val) => {
+            onChange={(e) => {
+              let val = e.target.value;
               if (val.length === 1) val = val.toUpperCase();
               _setNewMessage(val);
-              if (sShowReplyModal) { _setShowReplyModal(false); clearAutoSend(); }
+              if (sShowReplyModal) {
+                _setShowReplyModal(false);
+                clearAutoSend();
+              }
+              autoResizeInput();
             }}
             placeholder="Type a message..."
-            autoCapitalize="sentences"
-            placeholderTextColor={gray(0.5)}
-            multiline={true}
-            onContentSizeChange={(e) => {
-              let h = e?.nativeEvent?.contentSize?.height;
-              if (typeof h === "number" && h > 0) {
-                _setInputHeight(Math.max(36, Math.ceil(h)));
-              }
-            }}
-            style={{
-              flex: 1,
-              borderWidth: 1,
-              borderColor: gray(0.82),
-              borderRadius: 20,
-              paddingHorizontal: 14,
-              paddingVertical: 10,
-              fontSize: 16,
-              lineHeight: 20,
-              color: C.text,
-              height: sInputHeight,
-              outlineWidth: 0,
-              overflow: "hidden",
-              backgroundColor: C.backgroundWhite,
-              textAlignVertical: "top",
-            }}
+            rows={1}
+            className={styles.textInput}
           />
-          <TouchableOpacity
-            onPress={handleSend}
-            disabled={!sNewMessage.trim() || sSending}
-            style={{
-              marginLeft: 10,
-              width: 40,
-              height: 40,
-              borderRadius: 20,
-              backgroundColor:
-                sNewMessage.trim() && !sSending ? C.blue : gray(0.8),
-              justifyContent: "center",
-              alignItems: "center",
-            }}
+          <button
+            type="button"
+            onClick={handleSend}
+            disabled={!sendEnabled}
+            className={`${styles.sendBtn} ${
+              sendEnabled ? styles.sendBtnEnabled : styles.sendBtnDisabled
+            }`}
           >
-            <Text
-              style={{
-                color: "white",
-                fontSize: 18,
-                fontWeight: "700",
-                marginLeft: 2,
-              }}
-            >
-              ↑
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-      <AlertBox_ showAlert={zShowAlert} />
+            <span className={styles.sendBtnIcon}>{"\u2191"}</span>
+          </button>
+        </div>
+      </div>
+      <AlertBox showAlert={zShowAlert} />
       {sShowMediaPicker && woID && (
         <WorkorderMediaModal
           visible={true}
@@ -560,108 +519,47 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
           onSendMedia={handleMediaMultiSelect}
         />
       )}
-    </View>
+    </div>
   );
 }
 
-////////////////////////////////////////////////////////////
-// Message bubble components
-////////////////////////////////////////////////////////////
-
 const IncomingBubble = memo(({ msgObj }) => {
-  let dateObj = formatDateTimeForReceipt(null, msgObj.millis);
+  const dateObj = formatDateTimeForReceipt(null, msgObj.millis);
   return (
-    <View
-      style={{
-        maxWidth: "78%",
-        alignSelf: "flex-start",
-        marginVertical: 4,
-      }}
-    >
-      <View
-        style={{
-          backgroundColor: "lightgray",
-          borderRadius: 16,
-          borderBottomLeftRadius: 4,
-          paddingHorizontal: 12,
-          paddingVertical: 8,
-        }}
-      >
-        <Text style={{ fontSize: 15, color: C.text }}>{msgObj.message}</Text>
-      </View>
-      <Text
-        style={{
-          fontSize: 11,
-          color: gray(0.5),
-          marginTop: 2,
-          marginLeft: 4,
-        }}
-      >
+    <div className={styles.bubbleWrapIncoming}>
+      <div className={styles.bubbleIncoming}>
+        <span className={styles.bubbleTextIncoming}>{msgObj.message}</span>
+      </div>
+      <span className={styles.timestampIncoming}>
         {dateObj.dayOfWeek + ", " + dateObj.time}
-      </Text>
-    </View>
+      </span>
+    </div>
   );
 });
 
 const OutgoingBubble = memo(({ msgObj }) => {
-  let dateObj = formatDateTimeForReceipt(null, msgObj.millis);
-  let bgColor =
-    msgObj.status === "failed" ? "rgb(200,80,80)" : "rgb(0,122,255)";
+  const dateObj = formatDateTimeForReceipt(null, msgObj.millis);
+  const bubbleClass =
+    msgObj.status === "failed"
+      ? styles.bubbleOutgoingFailed
+      : styles.bubbleOutgoingNormal;
   return (
-    <View
-      style={{
-        maxWidth: "78%",
-        alignSelf: "flex-end",
-        marginVertical: 4,
-      }}
-    >
-      <View
-        style={{
-          backgroundColor: bgColor,
-          borderRadius: 16,
-          borderBottomRightRadius: 4,
-          paddingHorizontal: 12,
-          paddingVertical: 8,
-        }}
-      >
-        <Text style={{ fontSize: 15, color: "white" }}>{msgObj.message}</Text>
-      </View>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "flex-end",
-          marginTop: 2,
-          marginRight: 4,
-        }}
-      >
-        <Text style={{ fontSize: 11, color: gray(0.5) }}>
-          {dateObj.dayOfWeek + ", " + dateObj.time}
-        </Text>
-      </View>
+    <div className={styles.bubbleWrapOutgoing}>
+      <div className={bubbleClass}>
+        <span className={styles.bubbleTextOutgoing}>{msgObj.message}</span>
+      </div>
+      <span className={styles.timestampOutgoing}>
+        {dateObj.dayOfWeek + ", " + dateObj.time}
+      </span>
       {msgObj.status === "sending" && (
-        <Text
-          style={{
-            fontSize: 10,
-            color: gray(0.5),
-            fontStyle: "italic",
-            alignSelf: "flex-end",
-          }}
-        >
-          Sending...
-        </Text>
+        <span className={styles.statusSending}>Sending...</span>
       )}
       {msgObj.status === "failed" && (
-        <Text
-          style={{
-            fontSize: 10,
-            color: C.red,
-            alignSelf: "flex-end",
-          }}
-        >
+        <span className={styles.statusFailed}>
           Failed to send
           {msgObj.errorMessage ? ": " + msgObj.errorMessage : ""}
-        </Text>
+        </span>
       )}
-    </View>
+    </div>
   );
 });

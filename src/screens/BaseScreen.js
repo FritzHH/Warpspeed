@@ -10,6 +10,7 @@ import {
   SHADOW_RADIUS_PROTO,
 } from "../components";
 import { Info_Section } from "./screen_collections/Info_Section";
+import styles from "./BaseScreen.module.css";
 import { Items_Section } from "./screen_collections/Items_Section";
 import { Options_Section } from "./screen_collections/Options_Section";
 import { Notes_Section } from "./screen_collections/Notes_Section";
@@ -674,67 +675,37 @@ export function BaseScreen() {
           }}
         >
           {/*Info Section */}
-          <View
+          <div
+            className={styles.infoShell}
             style={{
-              width: "33%",
-              height: "100%",
               backgroundColor: C.backgroundWhite,
               borderColor: C.buttonLightGreen,
-              borderWidth: 1,
-              borderRadius: 15,
-              shadowColor: C.green,
-              shadowOffset: {
-                width: 1,
-                height: 1,
-              },
-              shadowOpacity: 0.5,
-              shadowRadius: 10,
+              boxShadow: `1px 1px 10px ${C.green.replace("rgb", "rgba").replace(")", ", 0.5)")}`,
             }}
           >
             <Info_Section />
-          </View>
-          <View
+          </div>
+          <div
+            className={styles.itemsShell}
             style={{
-              width: "65%",
-              height: "100%",
               backgroundColor: C.backgroundWhite,
               borderColor: C.buttonLightGreen,
-              borderWidth: 1,
-              borderRadius: 15,
-              // backgroundColor: "red",
-              shadowColor: C.green,
-              shadowOffset: {
-                width: 1,
-                height: 1,
-              },
-              shadowOpacity: 0.5,
-              shadowRadius: 10,
+              boxShadow: `1px 1px 10px ${C.green.replace("rgb", "rgba").replace(")", ", 0.5)")}`,
             }}
           >
             <Items_Section />
-          </View>
+          </div>
         </View>
-        <View
+        <div
+          className={styles.notesShell}
           style={{
-            marginLeft: 6,
-            width: "99%",
-            height: "33%",
             backgroundColor: C.backgroundWhite,
             borderColor: C.buttonLightGreen,
-            borderWidth: 1,
-            borderRadius: 15,
-            // backgroundColor: "red",
-            shadowColor: C.green,
-            shadowOffset: {
-              width: 1,
-              height: 1,
-            },
-            shadowOpacity: 0.5,
-            shadowRadius: 10,
+            boxShadow: `1px 1px 10px ${C.green.replace("rgb", "rgba").replace(")", ", 0.5)")}`,
           }}
         >
           <Notes_Section />
-        </View>
+        </div>
       </View>
       <View
         style={{

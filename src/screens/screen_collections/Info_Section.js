@@ -1,6 +1,5 @@
 /* eslint-disable */
 
-import { FlatList, View } from "react-native-web";
 import {} from "../../components";
 import { AnimatedComponentSwitch } from "../../components/AnimatedComponentSwitch";
 import { Colors } from "../../styles";

@@ -1,0 +1,361 @@
+.tabBarScroll {
+  width: 30%;
+  flex-shrink: 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.tabBarInner {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  border-radius: 5px;
+  padding: 13px 10px 13px 5px;
+  background-color: var(--tab-bar-bg);
+  border: 1px solid var(--tab-bar-border);
+  box-sizing: border-box;
+}
+
+.tabBarSpacer {
+  height: 1px;
+  width: 100%;
+  margin: 7px 0;
+  background-color: var(--tab-bar-spacer);
+  flex-shrink: 0;
+}
+
+.tabBarRow {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  background-color: transparent;
+  border: none;
+  border-radius: 5px;
+  padding: 4px 6px;
+  cursor: pointer;
+  transition: opacity 100ms ease-out;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.tabBarRow:hover:not(:disabled) {
+  opacity: 0.6;
+}
+
+.tabBarRow:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tabBarRowSelected {
+  background-color: var(--tab-bar-row-selected-bg);
+}
+
+.tabBarRowText {
+  font-size: 16px;
+  font-weight: 500;
+  text-align: left;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   Box Containers — shared scaffolding for every tab section
+   ═══════════════════════════════════════════════════════════ */
+.boxContainerOuter {
+  width: 97%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.boxContainerInner {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding: 15px;
+  border: 1px solid var(--box-inner-border);
+  background-color: var(--box-inner-bg);
+  border-radius: 10px;
+  box-sizing: border-box;
+}
+
+/* ═══════════════════════════════════════════════════════════
+   User Control tab
+   ═══════════════════════════════════════════════════════════ */
+.ucSettingRow {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.ucSettingRowFirst {
+  margin-top: 0;
+}
+
+.ucSettingLabel {
+  color: var(--uc-text);
+}
+
+.ucSettingInput {
+  width: 50px;
+  margin-left: 10px;
+  border: 1px solid var(--uc-input-border);
+  border-radius: 5px;
+  padding-left: 3px;
+  outline: none;
+  color: var(--uc-text);
+  box-sizing: border-box;
+}
+
+.ucCheckRow {
+  width: 100%;
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+  flex-shrink: 0;
+}
+
+.ucSensitivityBlock {
+  width: 100%;
+  margin-top: 10px;
+  padding: 0 5px;
+  box-sizing: border-box;
+}
+
+.ucSensitivityHeader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.ucSensitivityRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.ucDivider {
+  width: 100%;
+  height: 1px;
+  margin: 20px 0;
+  flex-shrink: 0;
+}
+
+.ucAddUserWrap {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+}
+
+.ucUserList {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.ucUserListItem {
+  height: 5px;
+  flex-shrink: 0;
+}
+
+.ucUserRow {
+  display: flex;
+  flex-direction: row;
+  border: 1px solid var(--uc-row-border);
+  border-radius: 5px;
+  padding: 3px 10px 3px 3px;
+  box-sizing: border-box;
+}
+
+.ucUserLeftCol {
+  width: 16%;
+  margin-right: 5px;
+  flex-shrink: 0;
+}
+
+.ucUserRightCol {
+  width: 84%;
+  margin-top: 2px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ucIconCell {
+  height: 25px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.ucActionCell {
+  height: 25px;
+  display: flex;
+  justify-content: center;
+  margin-top: 7px;
+}
+
+.ucRowSpacer {
+  margin-top: 7px;
+}
+
+.ucNameRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.ucNameInput {
+  width: 49%;
+  height: 25px;
+  font-size: 14px;
+  border-width: 1px;
+  border-style: solid;
+  padding: 1px 5px;
+  outline: none;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.ucContactRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-top: 7px;
+}
+
+.ucPhoneInput {
+  width: 120px;
+  height: 25px;
+  font-size: 14px;
+  border-width: 1px;
+  border-style: solid;
+  padding: 1px 5px;
+  outline: none;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.ucEmailInput {
+  flex: 1;
+  margin-left: 5px;
+  height: 25px;
+  font-size: 14px;
+  border-width: 1px;
+  border-style: solid;
+  padding: 1px 5px;
+  background-color: transparent;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.ucCredsRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
+  width: 100%;
+  margin-top: 7px;
+}
+
+.ucCredBox {
+  width: 22%;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  height: 25px;
+  border-width: 1px;
+  border-style: solid;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.ucCredInput {
+  width: 80%;
+  font-size: 14px;
+  padding: 1px 5px;
+  outline: none;
+  border: none;
+  background-color: transparent;
+  box-sizing: border-box;
+}
+
+.ucCredPlaceholder {
+  width: 15px;
+  flex-shrink: 0;
+}
+
+.ucRoleWrap {
+  width: 40%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ucChipRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 7px;
+}
+
+.ucChip {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.ucChipLabel {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ucChipRemove {
+  margin-left: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+
+.ucEnrollBtn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  border: 1px solid var(--uc-enroll-border);
+  background-color: var(--uc-enroll-bg);
+  border-radius: 5px;
+  padding: 2px 4px;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.ucEnrollText {
+  font-size: 11px;
+  font-weight: 600;
+  margin-left: 4px;
+}

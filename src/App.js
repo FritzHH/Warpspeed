@@ -13,7 +13,7 @@ const BikeStandScreen = lazy(() =>
     default: m.BikeStandScreen,
   }))
 );
-import { PhoneScreen } from "./screens/PhoneScreen";
+import { PhoneScreen } from "./screens/phone/PhoneScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { DatabaseViewerScreen } from "./screens/DatabaseViewerScreen";
 import {

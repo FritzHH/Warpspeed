@@ -1,6 +1,5 @@
 /* eslint-disable */
 
-import { View, Text, TextInput, TouchableOpacity, TouchableWithoutFeedback } from "react-native-web";
 import {
   capitalizeFirstLetterOfString,
   checkInputForNumbersOnly,
@@ -24,20 +23,18 @@ import {
   localStorageWrapper,
 } from "../../../utils";
 import {
-  ScreenModal,
-  SHADOW_RADIUS_NOTHING,
-  Button_,
-  Image_,
-  TextInput_,
-  Tooltip,
-  Pressable_,
-  StaleBanner,
+  Button as Button_,
+  CheckBox,
+  DatePicker as DatePicker_,
+  DropdownMenu,
+  Image as Image_,
+  Pressable as Pressable_,
   PrinterAlert,
-  WebPageModal,
-  TimePicker_,
-  DatePicker_,
-} from "../../../components";
-import { CheckBox, DropdownMenu } from "../../../dom_components";
+  ScreenModal,
+  TextInput as TextInput_,
+  TimePicker as TimePicker_,
+  Tooltip,
+} from "../../../dom_components";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { C, COLOR_GRADIENTS, Colors, ICONS, Z } from "../../../styles";
 import {
@@ -70,6 +67,7 @@ import {
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { dbSavePrintObj, dbSendReceipt, startNewWorkorder } from "../../../db_calls_wrapper";
+import styles from "./Info_ActiveWorkorder.module.css";
 
 // --- Dimming when field has text (easy to adjust) ---
 const FILLED_DROPDOWN_OPACITY = 0.3;                          // dropdown button opacity when text present
@@ -85,10 +83,11 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
   const [sShowEndPicker, _sSetShowEndPicker] = useState(false);
 
   const pillStyle = {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    padding: "4px 8px",
     borderRadius: 5,
     backgroundColor: C.blue,
+    border: "none",
+    cursor: "pointer",
   };
   const pillText = { fontSize: 12, color: "white", fontWeight: "600" };
   const labelText = { fontSize: 11, color: gray(0.5), fontStyle: "italic", marginRight: 4 };
@@ -100,17 +99,18 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
     <>
       <PopoverPrimitive.Root open={sShowDatePicker} onOpenChange={_sSetShowDatePicker}>
         <PopoverPrimitive.Anchor asChild>
-          <TouchableOpacity
+          <button
+            type="button"
             disabled={isDonePaid}
-            onPress={() => _sSetShowDatePicker(v => !v)}
+            onClick={() => _sSetShowDatePicker(v => !v)}
             style={{ ...pillStyle, backgroundColor: C.green }}
           >
-            <Text style={pillText}>{dateLabel}</Text>
-          </TouchableOpacity>
+            <span style={pillText}>{dateLabel}</span>
+          </button>
         </PopoverPrimitive.Anchor>
         <PopoverPrimitive.Portal>
           <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: Z.dropdown }}>
-            <View>
+            <div>
               <DatePicker_
                 initialMonth={Number(pd.month) || new Date().getMonth() + 1}
                 initialDay={Number(pd.day) || new Date().getDate()}
@@ -120,21 +120,21 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
                 }}
                 onCancel={() => _sSetShowDatePicker(false)}
               />
-            </View>
+            </div>
           </PopoverPrimitive.Content>
         </PopoverPrimitive.Portal>
       </PopoverPrimitive.Root>
 
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
+      <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
         <PopoverPrimitive.Root open={sShowStartPicker} onOpenChange={_sSetShowStartPicker}>
           <PopoverPrimitive.Anchor asChild>
-            <TouchableOpacity disabled={isDonePaid} onPress={() => _sSetShowStartPicker(v => !v)} style={pillStyle}>
-              <Text style={pillText}>{formatTime12(pd.startTime)}</Text>
-            </TouchableOpacity>
+            <button type="button" disabled={isDonePaid} onClick={() => _sSetShowStartPicker(v => !v)} style={pillStyle}>
+              <span style={pillText}>{formatTime12(pd.startTime)}</span>
+            </button>
           </PopoverPrimitive.Anchor>
           <PopoverPrimitive.Portal>
             <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: Z.dropdown }}>
-              <View>
+              <div>
                 <TimePicker_
                   initialHour={startParts.hour}
                   initialMinute={startParts.minute}
@@ -145,22 +145,22 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
                   }}
                   onCancel={() => _sSetShowStartPicker(false)}
                 />
-              </View>
+              </div>
             </PopoverPrimitive.Content>
           </PopoverPrimitive.Portal>
         </PopoverPrimitive.Root>
 
-        <Text style={[labelText, { marginLeft: 7 }]}>to</Text>
+        <span style={{ ...labelText, marginLeft: 7 }}>to</span>
 
         <PopoverPrimitive.Root open={sShowEndPicker} onOpenChange={_sSetShowEndPicker}>
           <PopoverPrimitive.Anchor asChild>
-            <TouchableOpacity disabled={isDonePaid} onPress={() => _sSetShowEndPicker(v => !v)} style={pillStyle}>
-              <Text style={pillText}>{formatTime12(pd.endTime)}</Text>
-            </TouchableOpacity>
+            <button type="button" disabled={isDonePaid} onClick={() => _sSetShowEndPicker(v => !v)} style={pillStyle}>
+              <span style={pillText}>{formatTime12(pd.endTime)}</span>
+            </button>
           </PopoverPrimitive.Anchor>
           <PopoverPrimitive.Portal>
             <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: Z.dropdown }}>
-              <View>
+              <div>
                 <TimePicker_
                   initialHour={endParts.hour}
                   initialMinute={endParts.minute}
@@ -171,11 +171,11 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
                   }}
                   onCancel={() => _sSetShowEndPicker(false)}
                 />
-              </View>
+              </div>
             </PopoverPrimitive.Content>
           </PopoverPrimitive.Portal>
         </PopoverPrimitive.Root>
-      </View>
+      </div>
     </>
   );
 };
@@ -235,6 +235,7 @@ export const ActiveWorkorderComponent = ({}) => {
       _sSetActiveOrderedIndex(nextIndex);
       hasCommittedRef.current = false;
       _setWaitDays(0);
+      setTimeout(() => partOrderedInputRef.current?.focus(), 0);
     });
   }
 
@@ -420,6 +421,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const waitTimesRef = useRef();
   const statusRef = useRef();
   const partSourcesRef = useRef();
+  const partOrderedInputRef = useRef();
 
   const isDonePaid = resolveStatus(zOpenWorkorder?.status, zSettings?.statuses)?.label?.toLowerCase() === "done & paid";
 
@@ -613,37 +615,22 @@ export const ActiveWorkorderComponent = ({}) => {
   }
 
   return (
-    <View
+    <div
+      className={styles.container}
       style={{
-        flex: 1,
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingBottom: 0,
-        paddingTop: 5,
-        paddingHorizontal: 5,
-        backgroundImage: (zIsPreview || zIsLocked)
-              ? `repeating-linear-gradient(135deg, ${lightenRGBByPercent(C.lightred, 92)}, ${lightenRGBByPercent(C.lightred, 92)} 10px, transparent 10px, transparent 20px)`
-              : undefined,
         backgroundColor: C.backgroundWhite,
-        borderRadius: 7,
+        backgroundImage:
+          zIsPreview || zIsLocked
+            ? `repeating-linear-gradient(135deg, ${lightenRGBByPercent(C.lightred, 92)}, ${lightenRGBByPercent(C.lightred, 92)} 10px, transparent 10px, transparent 20px)`
+            : undefined,
       }}
     >
-      <View
-        style={{
-          width: "100%",
-          alignItems: "center",
-        }}
-      >
-        <View
+      <div className={styles.topSection}>
+        <div
+          className={styles.customerCard}
           style={{
-            width: "100%",
-            justifyContent: "center",
-            alignItems: "center",
-            paddingVertical: 11,
             backgroundColor: C.buttonLightGreen,
             borderColor: C.buttonLightGreenOutline,
-            borderWidth: 1,
-            borderRadius: 7,
           }}
         >
           {/* Deposits / Credits on file */}
@@ -654,24 +641,24 @@ export const ActiveWorkorderComponent = ({}) => {
             let totalCredit = activeCreds.reduce((s, d) => s + d.amountCents, 0);
             if (totalDeposit === 0 && totalCredit === 0) return null;
             return (
-              <View style={{ flexDirection: "row", justifyContent: "space-between", width: "95%", paddingHorizontal: 5, paddingVertical: 1 }}>
+              <div className={styles.depositRow}>
                 {totalDeposit > 0 ? (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                    <View style={{ backgroundColor: lightenRGBByPercent(C.green, 70), paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                      <Text style={{ fontSize: 10, fontWeight: "600", color: C.green }}>{activeDeps.length > 1 ? "Deposits" : "Deposit"}</Text>
-                    </View>
-                    <Text style={{ fontSize: 11, fontWeight: "600", color: C.green }}>{formatCurrencyDisp(totalDeposit, true)}</Text>
-                  </View>
-                ) : <View />}
+                  <div className={styles.depositGroup}>
+                    <div className={styles.depositChip} style={{ backgroundColor: lightenRGBByPercent(C.green, 70) }}>
+                      <span className={styles.depositChipText} style={{ color: C.green }}>{activeDeps.length > 1 ? "Deposits" : "Deposit"}</span>
+                    </div>
+                    <span className={styles.depositAmount} style={{ color: C.green }}>{formatCurrencyDisp(totalDeposit, true)}</span>
+                  </div>
+                ) : <div />}
                 {totalCredit > 0 ? (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 4 }}>
-                    <View style={{ backgroundColor: lightenRGBByPercent(C.blue, 70), paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
-                      <Text style={{ fontSize: 10, fontWeight: "600", color: C.blue }}>{activeCreds.length > 1 ? "Credits" : "Credit"}</Text>
-                    </View>
-                    <Text style={{ fontSize: 11, fontWeight: "600", color: C.blue }}>{formatCurrencyDisp(totalCredit, true)}</Text>
-                  </View>
-                ) : <View />}
-              </View>
+                  <div className={styles.depositGroup}>
+                    <div className={styles.depositChip} style={{ backgroundColor: lightenRGBByPercent(C.blue, 70) }}>
+                      <span className={styles.depositChipText} style={{ color: C.blue }}>{activeCreds.length > 1 ? "Credits" : "Credit"}</span>
+                    </div>
+                    <span className={styles.depositAmount} style={{ color: C.blue }}>{formatCurrencyDisp(totalCredit, true)}</span>
+                  </div>
+                ) : <div />}
+              </div>
             );
           })()}
           <Tooltip text="View/edit customer" position="top">
@@ -700,62 +687,46 @@ export const ActiveWorkorderComponent = ({}) => {
             />
           </Tooltip>
           {!!zCustomerLanguage && zCustomerLanguage !== CUSTOMER_LANGUAGES.english && (
-            <Text style={{ fontSize: 12, color: gray(0.5), textAlign: "center", fontStyle: "italic" }}>
+            <span className={styles.langText} style={{ color: gray(0.5) }}>
               {zCustomerLanguage}
-            </Text>
+            </span>
           )}
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              borderColor: C.buttonLightGreenOutline,
-              borderRadius: 15,
-              borderWidth: 1,
-              marginTop: 5,
-              padding: 5,
-              paddingRight: 8,
-              width: "95%",
-            }}
+          <div
+            className={styles.contactRow}
+            style={{ borderColor: C.buttonLightGreenOutline }}
           >
             {(zCustomer?.customerCell?.length > 0 || zOpenWorkorder?.customerCell?.length > 0) && (
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <div className={styles.contactItem}>
                 <Image_
                   icon={ICONS.cellPhone}
                   size={20}
                   style={{ marginRight: 5 }}
                 />
-                <Text style={{ color: C.text, fontSize: 12 }}>
+                <span className={styles.contactText} style={{ color: C.text }}>
                   {formatPhoneWithParens(zCustomer?.customerCell || zOpenWorkorder?.customerCell)}
-                </Text>
-              </View>
+                </span>
+              </div>
             )}
             {zCustomer?.customerLandline?.length > 0 && (
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  fontSize: 12,
-                }}
-              >
+              <div className={styles.contactItem}>
                 <Image_
                   icon={ICONS.home}
                   size={18}
                   style={{ marginRight: 7 }}
                 />
-                <Text style={{ color: C.text, fontSize: 12 }}>
+                <span className={styles.contactText} style={{ color: C.text }}>
                   {formatPhoneWithParens(zCustomer.customerLandline)}
-                </Text>
-              </View>
+                </span>
+              </div>
             )}
             {zCustomer?.contactRestriction === CONTACT_RESTRICTIONS.call && (
-              <Text style={{ color: C.text, fontSize: 13 }}>CALL ONLY</Text>
+              <span className={styles.restrictionText} style={{ color: C.text }}>CALL ONLY</span>
             )}
             {zCustomer?.contactRestriction === CONTACT_RESTRICTIONS.email && (
-              <Text style={{ color: C.text, fontSize: 13 }}>EMAIL ONLY</Text>
+              <span className={styles.restrictionText} style={{ color: C.text }}>EMAIL ONLY</span>
             )}
-          </View>
-        </View>
+          </div>
+        </div>
 
         {/* {(!zWorkordersLoaded || !zCustomerRefreshed) && zOpenWorkorder && (
           <StaleBanner
@@ -764,34 +735,33 @@ export const ActiveWorkorderComponent = ({}) => {
           />
         )} */}
 
-        <View pointerEvents={isDonePaid ? "none" : "auto"} style={{ width: "100%" }}>
-          <View
+        <div style={{ width: "100%", pointerEvents: isDonePaid ? "none" : "auto" }}>
+          <div
             style={{
               marginTop: 10,
               borderColor: gray(0.05),
-              paddingHorizontal: 8,
-              paddingVertical: 8,
-              // backgroundColor: C.backgroundListWhite,
+              padding: "8px 8px",
               backgroundColor: gray(0.05),
-
               borderWidth: 1,
+              borderStyle: "solid",
               borderRadius: 5,
               zIndex: 10,
               overflow: "visible",
+              boxSizing: "border-box",
             }}
           >
-            <View
+            <div
               style={{
+                display: "flex",
                 flexDirection: "row",
                 justifyContent: "flex-start",
                 alignItems: "center",
                 width: "100%",
                 zIndex: 10,
                 overflow: "visible",
-                // backgroundColor: "blue",
               }}
             >
-              <View ref={brandWrapperRef} style={{ width: "45%", zIndex: 10 }}>
+              <div ref={brandWrapperRef} style={{ width: "45%", zIndex: 10, flexShrink: 0 }}>
                 <TextInput_
                   placeholder={"Brand"}
                   editable={!isDonePaid}
@@ -834,7 +804,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   }}
                 />
                 {brandSuggestions.length > 0 && (
-                  <View
+                  <div
                     style={{
                       position: "absolute",
                       top: "100%",
@@ -842,53 +812,57 @@ export const ActiveWorkorderComponent = ({}) => {
                       right: 0,
                       backgroundColor: C.listItemWhite,
                       borderWidth: 1,
+                      borderStyle: "solid",
                       borderColor: C.buttonLightGreenOutline,
                       borderRadius: 5,
                       maxHeight: 200,
                       overflow: "auto",
                       zIndex: 999,
+                      boxSizing: "border-box",
                     }}
                   >
                     {brandSuggestions.map((item) => (
-                      <View
+                      <div
                         key={item}
                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                        style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, paddingHorizontal: 8 }}
+                        style={{ display: "flex", flexDirection: "row", alignItems: "center", padding: "6px 8px" }}
                       >
-                        <TouchableOpacity
-                          onPress={() => {
+                        <button
+                          type="button"
+                          onClick={() => {
                             useOpenWorkordersStore.getState().setField("brand", item, zOpenWorkorder.id);
                             _setBrandFocused(false);
                           }}
-                          style={{ flex: 1, cursor: "pointer" }}
+                          style={{ flex: 1, cursor: "pointer", background: "none", border: "none", padding: 0, textAlign: "left", font: "inherit" }}
                         >
-                          <Text style={{ fontSize: 14, color: C.text }}>{item}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => {
+                          <span style={{ fontSize: 14, color: C.text }}>{item}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
                             const updated = (zSettings.allBrands || []).filter((b) => b !== item);
                             useSettingsStore.getState().setField("allBrands", updated);
                           }}
-                          style={{ paddingLeft: 8, cursor: "pointer" }}
+                          style={{ paddingLeft: 8, cursor: "pointer", background: "none", border: "none", font: "inherit" }}
                         >
-                          <Text style={{ fontSize: 12, color: gray(0.55) }}>✕</Text>
-                        </TouchableOpacity>
-                      </View>
+                          <span style={{ fontSize: 12, color: gray(0.55) }}>✕</span>
+                        </button>
+                      </div>
                     ))}
-                  </View>
+                  </div>
                 )}
-              </View>
-              <View
+              </div>
+              <div
                 style={{
-                  // marginTop: 11,
                   width: "55%",
+                  display: "flex",
                   flexDirection: "row",
                   paddingLeft: 5,
-                  justifyContent: "flex-start",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  // backgroundColor: "green",
+                  flexShrink: 0,
+                  boxSizing: "border-box",
                 }}
               >
                 <div
@@ -914,7 +888,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     matchValue={zOpenWorkorder?.brand}
                   />
                 </div>
-                <View style={{ width: 5 }} />
+                <div style={{ width: 5, flexShrink: 0 }} />
                 <div
                   onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
                   onMouseLeave={(e) => { e.currentTarget.style.opacity = zOpenWorkorder?.brand ? String(FILLED_DROPDOWN_OPACITY) : "1"; }}
@@ -938,10 +912,11 @@ export const ActiveWorkorderComponent = ({}) => {
                     matchValue={zOpenWorkorder?.brand}
                   />
                 </div>
-              </View>
-            </View>
-            <View
+              </div>
+            </div>
+            <div
               style={{
+                display: "flex",
                 flexDirection: "row",
                 justifyContent: "flex-start",
                 width: "100%",
@@ -952,7 +927,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 // backgroundColor: "blue",
               }}
             >
-              <View ref={descInputRef} style={{ width: "45%", zIndex: 10 }}>
+              <div ref={descInputRef} style={{ width: "45%", zIndex: 10, flexShrink: 0 }}>
                 <TextInput_
                   placeholder={"Model / description"}
                   editable={!isDonePaid}
@@ -995,7 +970,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   }}
                 />
                 {descSuggestions.length > 0 && (
-                  <View
+                  <div
                     style={{
                       position: "absolute",
                       top: "100%",
@@ -1003,52 +978,57 @@ export const ActiveWorkorderComponent = ({}) => {
                       right: 0,
                       backgroundColor: C.listItemWhite,
                       borderWidth: 1,
+                      borderStyle: "solid",
                       borderColor: C.buttonLightGreenOutline,
                       borderRadius: 5,
                       maxHeight: 200,
                       overflow: "auto",
                       zIndex: 999,
+                      boxSizing: "border-box",
                     }}
                   >
                     {descSuggestions.map((item) => (
-                      <View
+                      <div
                         key={item}
                         onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                        style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, paddingHorizontal: 8 }}
+                        style={{ display: "flex", flexDirection: "row", alignItems: "center", padding: "6px 8px" }}
                       >
-                        <TouchableOpacity
-                          onPress={() => {
+                        <button
+                          type="button"
+                          onClick={() => {
                             useOpenWorkordersStore.getState().setField("description", item, zOpenWorkorder.id);
                             _setDescFocused(false);
                           }}
-                          style={{ flex: 1, cursor: "pointer" }}
+                          style={{ flex: 1, cursor: "pointer", background: "none", border: "none", padding: 0, textAlign: "left", font: "inherit" }}
                         >
-                          <Text style={{ fontSize: 14, color: C.text }}>{item}</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() => {
+                          <span style={{ fontSize: 14, color: C.text }}>{item}</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
                             const updated = (zSettings.allDescriptions || []).filter((d) => d !== item);
                             useSettingsStore.getState().setField("allDescriptions", updated);
                           }}
-                          style={{ paddingLeft: 8, cursor: "pointer" }}
+                          style={{ paddingLeft: 8, cursor: "pointer", background: "none", border: "none", font: "inherit" }}
                         >
-                          <Text style={{ fontSize: 12, color: gray(0.55) }}>✕</Text>
-                        </TouchableOpacity>
-                      </View>
+                          <span style={{ fontSize: 12, color: gray(0.55) }}>✕</span>
+                        </button>
+                      </div>
                     ))}
-                  </View>
+                  </div>
                 )}
-              </View>
-              <View
+              </div>
+              <div
                 style={{
-                  // marginTop: 11,
                   width: "55%",
+                  display: "flex",
                   flexDirection: "row",
                   paddingLeft: 5,
                   justifyContent: "center",
                   alignItems: "center",
-                  // backgroundColor: "green",
+                  flexShrink: 0,
+                  boxSizing: "border-box",
                 }}
               >
                 <div
@@ -1073,12 +1053,13 @@ export const ActiveWorkorderComponent = ({}) => {
                     matchValue={zOpenWorkorder?.description}
                   />
                 </div>
-              </View>
-            </View>
+              </div>
+            </div>
 
-            <View
+            <div
               ref={color1InputRef}
               style={{
+                display: "flex",
                 flexDirection: "row",
                 justifyContent: "space-between",
                 width: "100%",
@@ -1086,10 +1067,11 @@ export const ActiveWorkorderComponent = ({}) => {
                 zIndex: 8,
                 overflow: "visible",
                 marginTop: 11,
+                boxSizing: "border-box",
               }}
             >
-              <View style={{ width: "45%", flexDirection: "row", zIndex: 10 }}>
-                <View ref={color1WrapperRef} style={{ width: "48%", zIndex: 10 }}>
+              <div style={{ width: "45%", display: "flex", flexDirection: "row", zIndex: 10, flexShrink: 0 }}>
+                <div ref={color1WrapperRef} style={{ width: "48%", zIndex: 10, flexShrink: 0 }}>
                   <TextInput_
                     placeholder={"Color 1"}
                     editable={!isDonePaid}
@@ -1132,7 +1114,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                   />
                   {color1Suggestions.length > 0 && (
-                    <View
+                    <div
                       style={{
                         position: "absolute",
                         top: "100%",
@@ -1140,36 +1122,39 @@ export const ActiveWorkorderComponent = ({}) => {
                         right: 0,
                         backgroundColor: C.listItemWhite,
                         borderWidth: 1,
+                        borderStyle: "solid",
                         borderColor: C.buttonLightGreenOutline,
                         borderRadius: 5,
                         maxHeight: 200,
                         overflow: "auto",
                         zIndex: 999,
+                        boxSizing: "border-box",
                       }}
                     >
                       {color1Suggestions.map((item) => (
-                        <View
+                        <div
                           key={item}
                           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
                           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                          style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, paddingHorizontal: 8 }}
+                          style={{ display: "flex", flexDirection: "row", alignItems: "center", padding: "6px 8px" }}
                         >
-                          <TouchableOpacity
-                            onPress={() => {
+                          <button
+                            type="button"
+                            onClick={() => {
                               setBikeColor(item, "color1");
                               _setColor1Focused(false);
                             }}
-                            style={{ flex: 1, cursor: "pointer" }}
+                            style={{ flex: 1, cursor: "pointer", background: "none", border: "none", padding: 0, textAlign: "left", font: "inherit" }}
                           >
-                            <Text style={{ fontSize: 14, color: C.text }}>{item}</Text>
-                          </TouchableOpacity>
-                        </View>
+                            <span style={{ fontSize: 14, color: C.text }}>{item}</span>
+                          </button>
+                        </div>
                       ))}
-                    </View>
+                    </div>
                   )}
-                </View>
-                <View style={{ width: 5 }} />
-                <View ref={color2InputRef} style={{ width: "48%", zIndex: 10 }}>
+                </div>
+                <div style={{ width: 5, flexShrink: 0 }} />
+                <div ref={color2InputRef} style={{ width: "48%", zIndex: 10, flexShrink: 0 }}>
                   <TextInput_
                     placeholder={"Color 2"}
                     editable={!isDonePaid}
@@ -1211,7 +1196,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                   />
                   {color2Suggestions.length > 0 && (
-                    <View
+                    <div
                       style={{
                         position: "absolute",
                         top: "100%",
@@ -1219,43 +1204,48 @@ export const ActiveWorkorderComponent = ({}) => {
                         right: 0,
                         backgroundColor: C.listItemWhite,
                         borderWidth: 1,
+                        borderStyle: "solid",
                         borderColor: C.buttonLightGreenOutline,
                         borderRadius: 5,
                         maxHeight: 200,
                         overflow: "auto",
                         zIndex: 999,
+                        boxSizing: "border-box",
                       }}
                     >
                       {color2Suggestions.map((item) => (
-                        <View
+                        <div
                           key={item}
                           onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
                           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
-                          style={{ flexDirection: "row", alignItems: "center", paddingVertical: 6, paddingHorizontal: 8 }}
+                          style={{ display: "flex", flexDirection: "row", alignItems: "center", padding: "6px 8px" }}
                         >
-                          <TouchableOpacity
-                            onPress={() => {
+                          <button
+                            type="button"
+                            onClick={() => {
                               setBikeColor(item, "color2");
                               _setColor2Focused(false);
                             }}
-                            style={{ flex: 1, cursor: "pointer" }}
+                            style={{ flex: 1, cursor: "pointer", background: "none", border: "none", padding: 0, textAlign: "left", font: "inherit" }}
                           >
-                            <Text style={{ fontSize: 14, color: C.text }}>{item}</Text>
-                          </TouchableOpacity>
-                        </View>
+                            <span style={{ fontSize: 14, color: C.text }}>{item}</span>
+                          </button>
+                        </div>
                       ))}
-                    </View>
+                    </div>
                   )}
-                </View>
-              </View>
-              <View
+                </div>
+              </div>
+              <div
                 style={{
-                  // marginTop: 11,
                   width: "55%",
+                  display: "flex",
                   flexDirection: "row",
                   paddingLeft: 5,
                   alignItems: "center",
                   justifyContent: "space-between",
+                  flexShrink: 0,
+                  boxSizing: "border-box",
                 }}
               >
                 <div
@@ -1285,7 +1275,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     preserveItemBackground={true}
                   />
                 </div>
-                <View style={{ width: 5 }} />
+                <div style={{ width: 5, flexShrink: 0 }} />
 
                 <div
                   onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
@@ -1313,8 +1303,8 @@ export const ActiveWorkorderComponent = ({}) => {
                     preserveItemBackground={true}
                   />
                 </div>
-              </View>
-            </View>
+              </div>
+            </div>
             {(() => {
               const rs = resolveStatus(zOpenWorkorder?.status, zSettings?.statuses);
               const isPickupDelivery = zOpenWorkorder?.status === "pickup" || zOpenWorkorder?.status === "delivery";
@@ -1447,8 +1437,8 @@ export const ActiveWorkorderComponent = ({}) => {
               };
 
               return (
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: isPickupDelivery ? "space-between" : undefined, marginTop: 11, width: "100%" }}>
-                  <div style={{ display: "flex", width: isPickupDelivery ? "33%" : "100%" }}>
+                <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: isPickupDelivery ? "space-between" : undefined, marginTop: 11, width: "100%", boxSizing: "border-box" }}>
+                  <div style={{ display: "flex", width: isPickupDelivery ? "33%" : "100%", flexShrink: 0 }}>
                     <DropdownMenu
                       dataArr={(zSettings.statuses || []).filter((s) => !s.systemOwned && !s.hidden)}
                       enabled={!isDonePaid}
@@ -1496,23 +1486,25 @@ export const ActiveWorkorderComponent = ({}) => {
                       updatePickupFields={updatePickupFields}
                     />
                   )}
-                </View>
+                </div>
               );
             })()}
-            <View
-              pointerEvents={(zOpenWorkorder?.status === "pickup" || zOpenWorkorder?.status === "delivery") ? "none" : "auto"}
+            <div
               style={{
+                pointerEvents: (zOpenWorkorder?.status === "pickup" || zOpenWorkorder?.status === "delivery") ? "none" : "auto",
+                display: "flex",
                 flexDirection: "row",
                 justifyContent: "space-between",
                 width: "100%",
                 alignItems: "center",
                 marginTop: 11,
                 opacity: (zOpenWorkorder?.status === "pickup" || zOpenWorkorder?.status === "delivery") ? 0.35 : 1,
+                boxSizing: "border-box",
               }}
             >
-              <Text style={{ color: gray(0.5), fontSize: 13, marginRight: 4 }}>
+              <span style={{ color: gray(0.5), fontSize: 13, marginRight: 4 }}>
                 Max wait days:
-              </Text>
+              </span>
               <TextInput_
                 placeholder={"0"}
                 editable={!isDonePaid}
@@ -1544,13 +1536,15 @@ export const ActiveWorkorderComponent = ({}) => {
                   useOpenWorkordersStore.getState().setField("waitTime", waitObj, zOpenWorkorder.id);
                 }}
               />
-              <View
+              <div
                 style={{
                   flex: 1,
+                  display: "flex",
                   flexDirection: "row",
                   paddingLeft: 5,
                   justifyContent: "flex-start",
                   alignItems: "center",
+                  boxSizing: "border-box",
                 }}
               >
                 <div
@@ -1572,9 +1566,9 @@ export const ActiveWorkorderComponent = ({}) => {
                     buttonText={zOpenWorkorder?.waitTime?.label || "Wait Times"}
                   />
                 </div>
-              </View>
-            </View>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginTop: 4 }}>
+              </div>
+            </div>
+            <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginTop: 4, boxSizing: "border-box" }}>
               {(() => {
                 let estimateLabel = calculateWaitEstimateLabel(zOpenWorkorder, useSettingsStore.getState().getSettings());
                 let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
@@ -1584,7 +1578,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 else if (/tomorrow/i.test(estimateLabel)) estimateColor = C.green;
                 else if (estimateLabel) estimateColor = C.blue;
                 return estimateLabel ? (
-                  <Text
+                  <span
                     style={{
                       color: estimateColor,
                       fontSize: 13,
@@ -1592,14 +1586,13 @@ export const ActiveWorkorderComponent = ({}) => {
                       backgroundColor: sWaitTimeBlink && isMissing ? "rgba(255, 255, 0, 0.35)" : "transparent",
                       transition: "background-color 300ms ease",
                       borderRadius: 3,
-                      paddingHorizontal: 4,
-                      paddingVertical: 2,
+                      padding: "2px 4px",
                       opacity: (zOpenWorkorder?.status === "pickup" || zOpenWorkorder?.status === "delivery") ? 0.35 : 1,
                     }}
                   >
                     {estimateLabel}
-                  </Text>
-                ) : <View />;
+                  </span>
+                ) : <div />;
               })()}
               <CheckBox
                 isChecked={!!zOpenWorkorder?.itemNotHere}
@@ -1611,52 +1604,51 @@ export const ActiveWorkorderComponent = ({}) => {
                   useOpenWorkordersStore.getState().setField("itemNotHere", !zOpenWorkorder?.itemNotHere, zOpenWorkorder.id);
                 }}
               />
-            </View>
-          </View>
+            </div>
+          </div>
 
-          <View
+          <div
             style={{
               marginTop: 0,
               width: "100%",
-
-              // borderColor: gray(0.05),
-              paddingHorizontal: 8,
-              paddingVertical: 8,
+              padding: "8px 8px",
               backgroundColor: gray(0.05),
-              // borderWidth: 1,
               borderRadius: 5,
-
+              boxSizing: "border-box",
             }}
           >
-            <View style={{ width: '100%', flexDirection: 'row', alignItems: 'center', marginBottom: (sShowItemOrdering || hasItemOrderingData) ? 7 : 0, opacity: .5 }}>
-              <View style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: gray(0.25) }} />
-              <TouchableOpacity
+            <div style={{ width: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', marginBottom: (sShowItemOrdering || hasItemOrderingData) ? 7 : 0, opacity: .5 }}>
+              <div style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: gray(0.25) }} />
+              <button
+                type="button"
                 disabled={hasItemOrderingData}
-                onPress={() => {
+                onClick={() => {
                   _sSetShowItemOrdering((v) => !v);
                 }}
-                style={{ flexDirection: 'row', alignItems: 'center', marginHorizontal: 8 }}
-                activeOpacity={hasItemOrderingData ? 1 : 0.6}
+                style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', margin: '0 8px', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: hasItemOrderingData ? 'default' : 'pointer' }}
               >
-                <Text style={{ fontSize: 12, fontWeight: '600', fontStyle: 'italic', color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : gray(0.5), marginRight: 5 }}>Ordering Info</Text>
-                <Text style={{ fontSize: 10, color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : gray(0.5), transform: [{ rotate: (sShowItemOrdering || hasItemOrderingData) ? '90deg' : '0deg' }] }}>▶</Text>
-              </TouchableOpacity>
-              <View style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: gray(0.25) }} />
-            </View>
+                <span style={{ fontSize: 12, fontWeight: '600', fontStyle: 'italic', color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : gray(0.5), marginRight: 5 }}>Ordering Info</span>
+                <span style={{ fontSize: 10, color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : gray(0.5), display: 'inline-block', transform: (sShowItemOrdering || hasItemOrderingData) ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+              </button>
+              <div style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: gray(0.25) }} />
+            </div>
             {(sShowItemOrdering || hasItemOrderingData) && (
-              <View style={{ flexDirection: "row", width: "100%", marginTop: 5 }}>
+              <div style={{ display: "flex", flexDirection: "row", width: "100%", marginTop: 5, boxSizing: "border-box" }}>
 
                 {/* Fields — 87% */}
-                <View style={{ width: "87%", flexShrink: 0, paddingRight: 15, opacity: hasActiveItem ? 1 : 0.35 }}>
-                  <View
+                <div style={{ width: "87%", flexShrink: 0, paddingRight: 15, opacity: hasActiveItem ? 1 : 0.35, boxSizing: "border-box" }}>
+                  <div
                     style={{
+                      display: "flex",
                       flexDirection: "row",
                       justifyContent: "flex-start",
                       alignItems: "center",
                       width: "100%",
+                      boxSizing: "border-box",
                     }}
                   >
                     <TextInput_
+                      inputRef={partOrderedInputRef}
                       placeholder={"Item names/descriptions"}
                       placeholderTextColor={gray(0.2)}
                       editable={!isDonePaid && hasActiveItem}
@@ -1680,15 +1672,17 @@ export const ActiveWorkorderComponent = ({}) => {
                         updateActiveItemField("partOrdered", val);
                       }}
                     />
-                  </View>
+                  </div>
 
-                  <View
+                  <div
                     style={{
+                      display: "flex",
                       flexDirection: "row",
                       justifyContent: "flex-start",
                       alignItems: "center",
                       width: "100%",
                       marginTop: 11,
+                      boxSizing: "border-box",
                     }}
                   >
                     <TextInput_
@@ -1715,16 +1709,19 @@ export const ActiveWorkorderComponent = ({}) => {
                         updateActiveItemField("partSource", val);
                       }}
                     />
-                    <View
+                    <div
                       style={{
                         width: "50%",
+                        display: "flex",
                         flexDirection: "row",
                         paddingLeft: 5,
                         alignItems: "center",
                         justifyContent: "center",
+                        flexShrink: 0,
+                        boxSizing: "border-box",
                       }}
                     >
-                      <View
+                      <div
                         onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
                         onMouseLeave={(e) => { e.currentTarget.style.opacity = sActiveOrderedItem?.partSource ? FILLED_DROPDOWN_OPACITY : 1; }}
                         style={{ opacity: sActiveOrderedItem?.partSource ? FILLED_DROPDOWN_OPACITY : 1 }}
@@ -1741,39 +1738,46 @@ export const ActiveWorkorderComponent = ({}) => {
                           matchValue={sActiveOrderedItem?.partSource || ""}
                           buttonText={sActiveOrderedItem?.partSource || "Sources"}
                         />
-                      </View>
-                    </View>
-                  </View>
+                      </div>
+                    </div>
+                  </div>
 
                   {/* Estimated wait days picker + To be ordered toggle */}
-                  <View
+                  <div
                     style={{
+                      display: "flex",
                       flexDirection: "row",
                       alignItems: "center",
                       justifyContent: "space-between",
                       width: "100%",
                       marginTop: 11,
+                      boxSizing: "border-box",
                     }}
                   >
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <Text style={{ fontSize: 11, color: gray(0.45), marginRight: 8, fontStyle: "italic" }}>
+                    <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
+                      <span style={{ fontSize: 11, color: gray(0.45), marginRight: 8, fontStyle: "italic" }}>
                         Est. delivery
-                      </Text>
-                      <TouchableOpacity
+                      </span>
+                      <button
+                        type="button"
                         disabled={isDonePaid || !hasActiveItem}
-                        onPress={() => updateWaitDays(Math.max(0, sWaitDays - 1))}
+                        onClick={() => updateWaitDays(Math.max(0, sWaitDays - 1))}
                         style={{
                           width: 20,
                           height: 20,
                           borderRadius: 4,
                           backgroundColor: (isDonePaid || !hasActiveItem) ? gray(0.85) : C.buttonLightGreen,
+                          display: "flex",
                           justifyContent: "center",
                           alignItems: "center",
+                          border: "none",
+                          padding: 0,
+                          cursor: (isDonePaid || !hasActiveItem) ? "default" : "pointer",
                         }}
                       >
-                        <Text style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>−</Text>
-                      </TouchableOpacity>
-                      <Text
+                        <span style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>−</span>
+                      </button>
+                      <span
                         style={{
                           fontSize: 13,
                           fontWeight: "400",
@@ -1783,43 +1787,48 @@ export const ActiveWorkorderComponent = ({}) => {
                         }}
                       >
                         {sWaitDays + " days"}
-                      </Text>
-                      <TouchableOpacity
+                      </span>
+                      <button
+                        type="button"
                         disabled={isDonePaid || !hasActiveItem}
-                        onPress={() => updateWaitDays(sWaitDays + 1)}
+                        onClick={() => updateWaitDays(sWaitDays + 1)}
                         style={{
                           width: 20,
                           height: 20,
                           borderRadius: 4,
                           backgroundColor: (isDonePaid || !hasActiveItem) ? gray(0.85) : C.buttonLightGreen,
+                          display: "flex",
                           justifyContent: "center",
                           alignItems: "center",
+                          border: "none",
+                          padding: 0,
+                          cursor: (isDonePaid || !hasActiveItem) ? "default" : "pointer",
                         }}
                       >
-                        <Text style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>+</Text>
-                      </TouchableOpacity>
-                    </View>
+                        <span style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>+</span>
+                      </button>
+                    </div>
                     {!!sActiveOrderedItem?.partOrderEstimateMillis && (
-                      <Text style={{ fontSize: 12, color: sWaitDays > 0 ? gray(0.45) : "transparent" }}>
+                      <span style={{ fontSize: 12, color: sWaitDays > 0 ? gray(0.45) : "transparent" }}>
                         {formatMillisForDisplay(sActiveOrderedItem.partOrderEstimateMillis)}
-                      </Text>
+                      </span>
                     )}
-                    <TouchableOpacity
+                    <button
+                      type="button"
                       disabled={isDonePaid || !hasActiveItem}
-                      activeOpacity={0.7}
-                      onPress={() => {
+                      onClick={() => {
                         const newVal = !sActiveOrderedItem?.partToBeOrdered;
                         updateActiveItemField("partToBeOrdered", newVal);
                         useOpenWorkordersStore.getState().setField("status", newVal ? "is_order_part_for_customer" : "part_ordered", zOpenWorkorder.id);
                       }}
-                      style={{ flexDirection: 'row', alignItems: 'center' }}
+                      style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: (isDonePaid || !hasActiveItem) ? 'default' : 'pointer' }}
                     >
-                      <View style={{ width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderColor: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green, justifyContent: 'center', alignItems: 'center', marginRight: 4 }}>
-                        <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green }} />
-                      </View>
-                      <Text style={{ fontSize: 11, fontWeight: '600', color: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green }}>{sActiveOrderedItem?.partToBeOrdered ? "Not ordered" : "Ordered"}</Text>
-                    </TouchableOpacity>
-                  </View>
+                      <span style={{ display: 'flex', width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderStyle: 'solid', borderColor: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green, justifyContent: 'center', alignItems: 'center', marginRight: 4, boxSizing: 'border-box' }}>
+                        <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 3, backgroundColor: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green }} />
+                      </span>
+                      <span style={{ fontSize: 11, fontWeight: '600', color: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green }}>{sActiveOrderedItem?.partToBeOrdered ? "Not ordered" : "Ordered"}</span>
+                    </button>
+                  </div>
 
                   <div style={{ width: '100%', display: 'flex', flexDirection: 'row', alignItems: 'stretch', marginTop: 8, height: 22 }}>
                     <TextInput_
@@ -1832,7 +1841,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       }}
                       multiline={false}
                       numberOfLines={1}
-                      style={{ height: '100%', boxSizing: 'border-box', fontSize: 11, flex: 1, paddingHorizontal: 5, paddingVertical: 0, borderWidth: 1, borderColor: gray(.15), borderRadius: 6, resize: "none", overflow: "hidden", color: C.text, outlineStyle: "none" }}
+                      style={{ height: '100%', boxSizing: 'border-box', fontSize: 11, flex: 1, padding: "0 5px", border: `1px solid ${gray(.15)}`, borderRadius: 6, resize: "none", overflow: "hidden", color: C.text, outline: "none" }}
                     />
                     {sActiveOrderedItem?.trackingNumber ? (() => {
                       const inputVal = sActiveOrderedItem.trackingNumber.trim();
@@ -1872,26 +1881,26 @@ export const ActiveWorkorderComponent = ({}) => {
                       buttonVisible={false}
                       handleOuterClick={() => _sSetShowTracker(false)}
                       Component={() => (
-                        <View style={{ width: "80vw", height: "85vh", backgroundColor: C.backgroundWhite, borderRadius: 12, overflow: "hidden", flexDirection: "column" }}>
-                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 15, paddingVertical: 10, backgroundColor: C.green }}>
-                            <Text style={{ fontSize: 16, fontWeight: "600", color: "white" }}>Package Tracking</Text>
-                            <Text style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", flex: 1, marginLeft: 10 }} numberOfLines={1}>{sActiveOrderedItem.trackingNumber.trim()}</Text>
-                            <TouchableOpacity onPress={() => _sSetShowTracker(false)} style={{ width: 30, height: 30, borderRadius: 15, justifyContent: "center", alignItems: "center" }}>
-                              <Text style={{ fontSize: 18, fontWeight: "700", color: "white" }}>✕</Text>
-                            </TouchableOpacity>
-                          </View>
-                          <View style={{ flex: 1, padding: 10 }}>
+                        <div style={{ width: "80vw", height: "85vh", backgroundColor: C.backgroundWhite, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                          <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: "10px 15px", backgroundColor: C.green, boxSizing: "border-box" }}>
+                            <span style={{ fontSize: 16, fontWeight: "600", color: "white" }}>Package Tracking</span>
+                            <span style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", flex: 1, marginLeft: 10, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sActiveOrderedItem.trackingNumber.trim()}</span>
+                            <button type="button" onClick={() => _sSetShowTracker(false)} style={{ width: 30, height: 30, borderRadius: 15, display: "flex", justifyContent: "center", alignItems: "center", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
+                              <span style={{ fontSize: 18, fontWeight: "700", color: "white" }}>✕</span>
+                            </button>
+                          </div>
+                          <div style={{ flex: 1, padding: 10 }}>
                             <iframe
                               src={"https://parcelsapp.com/en/tracking/" + sActiveOrderedItem.trackingNumber.trim()}
                               style={{ width: "100%", height: "100%", border: "none", borderRadius: 6 }}
                               title="Package Tracking"
                             />
-                          </View>
-                        </View>
+                          </div>
+                        </div>
                       )}
                     />
                   ) : null}
-                </View>
+                </div>
 
                 {/* Button column — 13% */}
                 {(() => {
@@ -1906,57 +1915,43 @@ export const ActiveWorkorderComponent = ({}) => {
                     ? `Previous item (${sActiveOrderedIndex} of ${items.length})`
                     : "Already at first item";
                   return (
-                    <View style={{ width: "13%", flexShrink: 0, flexDirection: "column", paddingLeft: 5, borderLeftWidth: 1, borderLeftColor: gray(0.12) }}>
+                    <div style={{ width: "13%", flexShrink: 0, display: "flex", flexDirection: "column", paddingLeft: 5, borderLeftWidth: 1, borderLeftStyle: "solid", borderLeftColor: gray(0.12), boxSizing: "border-box" }}>
                       {/* Plus button */}
                       <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
                         <Tooltip text={addTooltip} position="left">
-                          <TouchableOpacity disabled={isDonePaid} onPress={handleAddOrderedItem}>
+                          <button type="button" disabled={isDonePaid} onClick={handleAddOrderedItem} style={{ background: "none", border: "none", padding: 0, cursor: isDonePaid ? "default" : "pointer" }}>
                             <Image_ icon={ICONS.add} size={32} />
-                          </TouchableOpacity>
+                          </button>
                         </Tooltip>
                       </div>
                       {/* Caret navigation */}
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
                         <div style={{ opacity: canGoRight ? 1 : 0.2 }}>
                           <Tooltip text={rightTooltip} position="left">
-                            <TouchableOpacity disabled={!canGoRight} onPress={handleNavigateRight}>
+                            <button type="button" disabled={!canGoRight} onClick={handleNavigateRight} style={{ background: "none", border: "none", padding: 0, cursor: canGoRight ? "pointer" : "default" }}>
                               <Image_ icon={ICONS.caretRight} size={22} />
-                            </TouchableOpacity>
+                            </button>
                           </Tooltip>
                         </div>
                         <div style={{ opacity: canGoLeft ? 1 : 0.2 }}>
                           <Tooltip text={leftTooltip} position="left">
-                            <TouchableOpacity disabled={!canGoLeft} onPress={handleNavigateLeft}>
+                            <button type="button" disabled={!canGoLeft} onClick={handleNavigateLeft} style={{ background: "none", border: "none", padding: 0, cursor: canGoLeft ? "pointer" : "default" }}>
                               <Image_ icon={ICONS.caretLeft} size={22} />
-                            </TouchableOpacity>
+                            </button>
                           </Tooltip>
                         </div>
                       </div>
-                    </View>
+                    </div>
                   );
                 })()}
 
-              </View>
+              </div>
             )}
-          </View>
-        </View>
-      </View>
+          </div>
+        </div>
+      </div>
 
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          width: "100%",
-          alignItems: "center",
-          borderRadius: 5,
-          borderWidth: 0,
-          borderColor: 'transparent',
-          // backgroundColor: C.backgroundListWhite,
-
-          borderWidth: 1,
-          paddingHorizontal: 3,
-        }}
-      >
+      <div className={styles.actionBar}>
         <Tooltip text="New workorder / customer lookup" position="top" offsetX={63}>
           <Button_
             icon={ICONS.bicycle}
@@ -1996,7 +1991,7 @@ export const ActiveWorkorderComponent = ({}) => {
         </Tooltip>
 
         <Tooltip text={sUploadProgress && !sUploadProgress.done ? "Upload in progress, you may continue work safely" : "View & upload photos to workorder"} position="top">
-          <View>
+          <div className={styles.uploadWrap}>
             <Button_
               icon={ICONS.uploadCamera}
               iconSize={35}
@@ -2007,21 +2002,22 @@ export const ActiveWorkorderComponent = ({}) => {
                 paddingVertical: 0,
               }}
             />
-            <View
-              pointerEvents="none"
+            <div
               style={{
+                pointerEvents: "none",
                 position: "absolute",
                 top: -3,
                 right: -10,
                 borderRadius: 8,
                 minWidth: 16,
                 height: 16,
+                display: "flex",
                 justifyContent: "center",
                 alignItems: "center",
-                paddingHorizontal: 3,
+                padding: "0 3px",
               }}
             >
-              <Text
+              <span
                 style={{
                   color: zOpenWorkorder?.media?.length > 0 ? C.red : 'gray',
                   fontSize: 15,
@@ -2029,10 +2025,10 @@ export const ActiveWorkorderComponent = ({}) => {
                 }}
               >
                 {zOpenWorkorder?.media?.length || 0}
-              </Text>
-            </View>
+              </span>
+            </div>
             {sUploadProgress && (
-              <View style={{ position: "absolute", bottom: -2, left: 0, right: 0, height: 4, backgroundColor: gray(0.88), borderRadius: 2, overflow: "hidden" }}>
+              <div style={{ position: "absolute", bottom: -2, left: 0, right: 0, height: 4, backgroundColor: gray(0.88), borderRadius: 2, overflow: "hidden" }}>
                 {!sUploadProgress.done ? (
                   <div
                     style={{
@@ -2044,7 +2040,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                   />
                 ) : (
-                  <View
+                  <div
                     style={{
                       width: "100%",
                       height: "100%",
@@ -2053,9 +2049,9 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                   />
                 )}
-              </View>
+              </div>
             )}
-          </View>
+          </div>
         </Tooltip>
         <Tooltip text="New sale" position="top">
           <Button_
@@ -2069,7 +2065,7 @@ export const ActiveWorkorderComponent = ({}) => {
             onPress={handleStartStandaloneSalePress}
           />
         </Tooltip>
-      </View>
+      </div>
       {sShowMediaModal && (
         <WorkorderMediaModal
           visible={sShowMediaModal}
@@ -2085,7 +2081,7 @@ export const ActiveWorkorderComponent = ({}) => {
         y={sPrinterAlert?.y}
         onDone={() => _setPrinterAlert(null)}
       />
-    </View>
+    </div>
   );
 };
 

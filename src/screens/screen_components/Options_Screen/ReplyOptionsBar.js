@@ -1,11 +1,10 @@
 /* eslint-disable */
 
-import { View, Text, TouchableOpacity } from "react-native-web";
-import React, { useRef, useEffect } from "react";
-import { gray } from "../../../utils";
-import { Image_, TouchableOpacity_, Tooltip } from "../../../components";
+import React from "react";
+import { Image as ImageDom, TouchableOpacity as TouchableOpacityDom } from "../../../dom_components";
 import { C, ICONS } from "../../../styles";
-import { useLoginStore, useAlertScreenStore } from "../../../stores";
+import { useLoginStore } from "../../../stores";
+import s from "./Messages.module.css";
 
 // Module-level auto-send timer
 let _autoSendTimer = null;
@@ -44,81 +43,91 @@ export function buildForwardToPayload(forwardOverride, forwardReplies) {
   return { userID: currentUser.id, enable: false };
 }
 
+function ForwardCheckboxRow({ checked, disabled, onToggle, label }) {
+  let rowClass = s.replyOptionsForwardRow + (disabled ? " " + s["replyOptionsForwardRow--disabled"] : "");
+  let boxClass = s.replyOptionsForwardCheckbox + (checked ? " " + s["replyOptionsForwardCheckbox--checked"] : "");
+  return (
+    <div className={rowClass} onClick={disabled ? undefined : onToggle}>
+      <div className={boxClass}>
+        {checked && <span className={s.replyOptionsForwardCheckmark}>✓</span>}
+      </div>
+      <span className={s.replyOptionsForwardLabel}>{label}</span>
+    </div>
+  );
+}
+
 /**
  * Orange reply options bar that appears after pressing send.
  * Shows: auto-send countdown, can reply yes/no, forward replies checkbox.
- *
- * Props:
- *  - visible: boolean
- *  - forwardReplies: boolean
- *  - hasActivePhone: boolean - whether forward toggle should be enabled
- *  - onSelectCanRespond(canRespond: boolean): called when user picks yes/no
- *  - onToggleForward(): called when forward checkbox is toggled
  */
 export function ReplyOptionsBar({ visible, forwardReplies, hasActivePhone, onSelectCanRespond, onToggleForward, audioMode, audioUploading, onSendAudio, onDeleteAudio }) {
   if (!visible) return null;
 
   if (audioMode) {
+    let sendBtnClass = s.replyOptionsAudioSendBtn + (audioUploading ? " " + s["replyOptionsAudioSendBtn--uploading"] : "");
+    let deleteBtnClass = s.replyOptionsAudioDeleteBtn + (audioUploading ? " " + s["replyOptionsAudioDeleteBtn--disabled"] : "");
     return (
-      <View style={{ width: '100%', justifyContent: "space-between", flexDirection: 'row', alignItems: "center", marginBottom: 4, backgroundColor: 'orange', padding: 10, borderRadius: 6 }}>
-        <View style={{ alignItems: 'flex-start' }}>
-          <Text style={{ color: 'dimgray', fontWeight: "500" }}>Audio ready to send</Text>
-        </View>
-        <View style={{ alignItems: 'flex-end' }}>
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
-            <TouchableOpacity_
-              onPress={audioUploading ? undefined : onSendAudio}
-              style={{ paddingVertical: 8, paddingHorizontal: 16, marginRight: 8, backgroundColor: audioUploading ? gray(0.6) : C.green, borderRadius: 5 }}
-              hoverOpacity={0.7}
+      <div className={`${s.replyOptionsBar} ${s["replyOptionsBar--audio"]}`}>
+        <div className={s.replyOptionsAudioLeft}>
+          <span className={s.replyOptionsLabel}>Audio ready to send</span>
+        </div>
+        <div className={s.replyOptionsAudioRight}>
+          <div className={s.replyOptionsAudioButtons}>
+            <button
+              type="button"
+              className={sendBtnClass}
+              onClick={audioUploading ? undefined : onSendAudio}
+              disabled={!!audioUploading}
             >
-              <Text style={{ color: "white", fontWeight: "600", fontSize: 15 }}>{audioUploading ? "Sending..." : "Send"}</Text>
-            </TouchableOpacity_>
-            <TouchableOpacity_
-              onPress={audioUploading ? undefined : onDeleteAudio}
-              style={{ paddingVertical: 8, paddingHorizontal: 16, backgroundColor: C.red, borderRadius: 5, opacity: audioUploading ? 0.4 : 1, flexDirection: "row", alignItems: "center" }}
-              hoverOpacity={0.7}
+              {audioUploading ? "Sending..." : "Send"}
+            </button>
+            <button
+              type="button"
+              className={deleteBtnClass}
+              onClick={audioUploading ? undefined : onDeleteAudio}
+              disabled={!!audioUploading}
             >
-              <Image_ icon={ICONS.trash} size={14} style={{ marginRight: 6 }} />
-              <Text style={{ color: "white", fontWeight: "600", fontSize: 15 }}>Delete</Text>
-            </TouchableOpacity_>
-          </View>
-          <TouchableOpacity onPress={hasActivePhone ? onToggleForward : undefined} style={{ flexDirection: "row", alignItems: "center", opacity: hasActivePhone ? 1 : 0.4 }}>
-            <View style={{ width: 22, height: 22, borderRadius: 4, backgroundColor: forwardReplies ? C.red : "transparent", borderWidth: 2, borderColor: forwardReplies ? C.red : gray(0.15), alignItems: "center", justifyContent: "center" }}>
-              {forwardReplies && <Text style={{ color: "white", fontSize: 14, fontWeight: "bold" }}>✓</Text>}
-            </View>
-            <Text style={{ fontSize: 17, color: C.text, marginLeft: 8 }}>Forward replies to me</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+              <ImageDom icon={ICONS.trash} size={14} style={{ marginRight: 6 }} />
+              Delete
+            </button>
+          </div>
+          <ForwardCheckboxRow
+            checked={forwardReplies}
+            disabled={!hasActivePhone}
+            onToggle={onToggleForward}
+            label="Forward replies to me"
+          />
+        </div>
+      </div>
     );
   }
 
   return (
-    <View style={{ width: '100%', marginBottom: 4, backgroundColor: 'orange', padding: 10, borderRadius: 6 }}>
-      <Text style={{ color: 'dimgray' }}>Auto-sending in 10 seconds</Text>
-      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 10, flexWrap: "wrap" }}>
-        <Text style={{ fontSize: 15, color: 'dimgray', fontWeight: "500", marginRight: 10 }}>Can reply?</Text>
-        <TouchableOpacity_
+    <div className={s.replyOptionsBar}>
+      <span className={s.replyOptionsCountdown}>Auto-sending in 10 seconds</span>
+      <div className={s.replyOptionsCanReplyRow}>
+        <span className={s.replyOptionsCanReplyLabel}>Can reply?</span>
+        <TouchableOpacityDom
           onPress={() => onSelectCanRespond(true)}
-          style={{ padding: 10, marginRight: 6 }}
+          className={`${s.replyOptionsYesNoBtn} ${s.replyOptionsYesBtn}`}
           hoverOpacity={0.5}
         >
-          <Image_ icon={ICONS.check} size={50} />
-        </TouchableOpacity_>
-        <TouchableOpacity_
+          <ImageDom icon={ICONS.check} size={50} />
+        </TouchableOpacityDom>
+        <TouchableOpacityDom
           onPress={() => onSelectCanRespond(false)}
-          style={{ padding: 10 }}
+          className={s.replyOptionsYesNoBtn}
           hoverOpacity={0.5}
         >
-          <Image_ icon={ICONS.redx} size={50} />
-        </TouchableOpacity_>
-      </View>
-      <TouchableOpacity onPress={hasActivePhone ? onToggleForward : undefined} style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", marginTop: 6, opacity: hasActivePhone ? 1 : 0.4 }}>
-        <View style={{ width: 22, height: 22, borderRadius: 4, backgroundColor: forwardReplies ? C.red : "transparent", borderWidth: 2, borderColor: forwardReplies ? C.red : gray(0.15), alignItems: "center", justifyContent: "center" }}>
-          {forwardReplies && <Text style={{ color: "white", fontSize: 14, fontWeight: "bold" }}>✓</Text>}
-        </View>
-        <Text style={{ fontSize: 17, color: C.text, marginLeft: 8 }}>Forward replies</Text>
-      </TouchableOpacity>
-    </View>
+          <ImageDom icon={ICONS.redx} size={50} />
+        </TouchableOpacityDom>
+      </div>
+      <ForwardCheckboxRow
+        checked={forwardReplies}
+        disabled={!hasActivePhone}
+        onToggle={onToggleForward}
+        label="Forward replies"
+      />
+    </div>
   );
 }

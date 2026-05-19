@@ -1,0 +1,24 @@
+.card {
+  background-color: rgb(254, 254, 255);
+  border-radius: 10px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: rgb(200, 228, 220);
+  padding: 12px;
+  margin-bottom: 12px;
+  box-sizing: border-box;
+}
+
+.label {
+  font-size: 14px;
+  font-weight: 600;
+  color: rgb(140, 140, 140);
+  margin-bottom: 4px;
+  display: block;
+}
+
+.body {
+  font-size: 15px;
+  display: block;
+  white-space: pre-wrap;
+}

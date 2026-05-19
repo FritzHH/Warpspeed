@@ -240,3 +240,905 @@
   font-size: 13px;
   color: white;
 }
+
+/* ============================================================
+   Compose Area — shared by customer + hub tabs
+   ============================================================ */
+
+.composeRoot {
+  padding-top: 10px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+}
+
+.composeRoot--hub {
+  padding-top: 8px;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+.translationBanner {
+  padding: 6px;
+  margin-bottom: 4px;
+  background-color: rgb(245, 245, 220);
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.translationText {
+  font-size: 14px;
+  color: rgb(50, 50, 50);
+}
+
+.translationLoading {
+  font-size: 13px;
+  color: rgba(0, 0, 0, 0.5);
+  font-style: italic;
+}
+
+.audioBanner {
+  padding: 8px;
+  margin-bottom: 4px;
+  background-color: rgb(245, 245, 220);
+  border-radius: 5px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+
+.audioBanner audio {
+  width: 100%;
+  display: block;
+}
+
+/* ============================================================
+   ReplyOptionsBar — orange auto-send confirmation strip
+   ============================================================ */
+
+.replyOptionsBar {
+  width: 100%;
+  margin-bottom: 4px;
+  background-color: orange;
+  padding: 10px;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.replyOptionsBar--audio {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.replyOptionsAudioLeft {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.replyOptionsAudioRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.replyOptionsAudioButtons {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.replyOptionsLabel {
+  color: dimgray;
+  font-weight: 500;
+}
+
+.replyOptionsCountdown {
+  color: dimgray;
+}
+
+.replyOptionsCanReplyRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.replyOptionsCanReplyLabel {
+  font-size: 15px;
+  color: dimgray;
+  font-weight: 500;
+  margin-right: 10px;
+}
+
+.replyOptionsYesNoBtn {
+  padding: 10px;
+}
+
+.replyOptionsYesBtn {
+  margin-right: 6px;
+}
+
+.replyOptionsAudioSendBtn {
+  padding: 8px 16px;
+  margin-right: 8px;
+  background-color: rgb(40, 167, 69);
+  border-radius: 5px;
+  color: white;
+  font-weight: 600;
+  font-size: 15px;
+  border: none;
+  cursor: pointer;
+}
+
+.replyOptionsAudioSendBtn--uploading {
+  background-color: rgba(0, 0, 0, 0.4);
+  cursor: default;
+}
+
+.replyOptionsAudioDeleteBtn {
+  padding: 8px 16px;
+  background-color: rgb(220, 53, 69);
+  border-radius: 5px;
+  color: white;
+  font-weight: 600;
+  font-size: 15px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border: none;
+  cursor: pointer;
+}
+
+.replyOptionsAudioDeleteBtn--disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.replyOptionsForwardRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  margin-top: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.replyOptionsForwardRow--disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.replyOptionsForwardCheckbox {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 2px solid rgba(0, 0, 0, 0.15);
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.replyOptionsForwardCheckbox--checked {
+  background-color: rgb(220, 53, 69);
+  border-color: rgb(220, 53, 69);
+}
+
+.replyOptionsForwardCheckmark {
+  color: white;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.replyOptionsForwardLabel {
+  font-size: 17px;
+  color: rgb(50, 50, 50);
+  margin-left: 8px;
+}
+
+/* ============================================================
+   Message Bubbles — incoming + outgoing
+   ============================================================ */
+
+.bubbleOuter {
+  width: 75%;
+  margin: 10px 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.bubbleOuter--incoming {
+  align-self: flex-start;
+  margin-left: 12px;
+}
+
+.bubbleOuter--outgoing {
+  align-self: flex-end;
+  margin-right: 12px;
+}
+
+.bubbleOuter--mediaOnly {
+  width: auto;
+}
+
+.bubbleInnerWrap {
+  position: relative;
+}
+
+.bubbleInner {
+  width: 100%;
+  border-radius: 5px;
+  padding: 5px;
+  box-sizing: border-box;
+}
+
+.bubbleInner--incoming {
+  background-color: rgb(230, 230, 230);
+  border-bottom-left-radius: 2px;
+}
+
+.bubbleInner--outgoing {
+  background-color: rgb(0, 122, 255);
+  border-bottom-right-radius: 2px;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.bubbleInner--outgoingFailed {
+  background-color: rgb(200, 80, 80);
+}
+
+.bubbleInner--media {
+  background-color: transparent;
+}
+
+.bubbleInner--mediaOnly {
+  width: auto;
+}
+
+.bubbleTail {
+  position: absolute;
+  bottom: 0;
+  width: 0;
+  height: 0;
+}
+
+.bubbleTail--incoming {
+  left: -8px;
+  border-top: 8px solid rgb(230, 230, 230);
+  border-left: 8px solid transparent;
+}
+
+.bubbleTail--outgoing {
+  right: -8px;
+  border-top: 8px solid rgb(0, 122, 255);
+  border-right: 8px solid transparent;
+}
+
+.bubbleTail--outgoingFailed {
+  border-top-color: rgb(200, 80, 80);
+}
+
+.bubbleContent {
+  flex: 1;
+  min-width: 0;
+}
+
+.bubbleText {
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bubbleTextOutgoing {
+  color: white;
+}
+
+.bubbleText a {
+  text-decoration: underline;
+  color: inherit;
+}
+
+.bubbleOriginalText {
+  font-size: 12px;
+  font-style: italic;
+  margin-top: 3px;
+  color: rgba(0, 0, 0, 0.45);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.bubbleOriginalText--outgoing {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.bubbleTranslatingText {
+  font-size: 14px;
+  font-style: italic;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.bubbleInfoRow {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.bubbleInfoText {
+  font-size: 11px;
+  margin-top: 2px;
+  color: rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+}
+
+.bubbleAutoResponseText {
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.5);
+  font-style: italic;
+}
+
+.bubbleStatusText {
+  font-size: 10px;
+}
+
+.bubbleStatusText--sending {
+  color: rgba(0, 0, 0, 0.5);
+  font-style: italic;
+}
+
+.bubbleStatusSidebar {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-right: 5px;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.bubbleStatusSidebarBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bubbleContextWrap {
+  cursor: context-menu;
+}
+
+/* ============================================================
+   Translate context menu (right-click in incoming bubble)
+   ============================================================ */
+
+.translateContextMenu {
+  position: fixed;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 3px 16px rgba(0, 0, 0, 0.22);
+  padding: 6px;
+  min-width: 160px;
+}
+
+.translateContextHeader {
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(0, 0, 0, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.translateContextItem {
+  padding: 9px 14px;
+  cursor: pointer;
+  border-radius: 5px;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.translateContextItem:hover {
+  background-color: rgb(0, 122, 255);
+  color: white;
+}
+
+/* ============================================================
+   Media thumbnails + lightbox
+   ============================================================ */
+
+.mediaThumbBtn {
+  width: 300px;
+  height: 300px;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 4px;
+  margin-right: 4px;
+  background-color: rgba(0, 0, 0, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.mediaThumbImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.mediaThumbVideoIcon {
+  font-size: 24px;
+}
+
+.mediaThumbVideoLabel {
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.4);
+  margin-top: 4px;
+}
+
+.mediaThumbError {
+  font-size: 11px;
+  color: rgba(0, 0, 0, 0.5);
+}
+
+.mediaThumbLoadingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.mediaFullOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.mediaFullContent {
+  position: relative;
+  border-radius: 8px;
+}
+
+.mediaDownloadBtn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: 18px;
+  background-color: rgb(40, 167, 69);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 2;
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.mediaFullImgWrap {
+  width: 100%;
+  height: 100%;
+}
+
+.mediaFullImg {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+}
+
+.mediaFullVideo {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.mediaFullLoadingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+}
+
+/* ----- Customer-mode wrapper (Region B) ----- */
+
+.customerRoot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 5px;
+  min-height: 0;
+}
+
+.customerBanner {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 6px;
+  flex-shrink: 0;
+}
+
+.customerBannerName {
+  font-size: 13px;
+  font-style: italic;
+  text-transform: capitalize;
+}
+
+.customerBannerPhone {
+  font-size: 13px;
+  margin-left: 8px;
+}
+
+.messagesArea {
+  width: 100%;
+  flex: 1;
+  flex-shrink: 1;
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.messagesCenter {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.messagesEmptyText {
+  text-align: center;
+  font-size: 18px;
+  white-space: pre-line;
+}
+
+.messagesListWrap {
+  width: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.messagesLoadingMore {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 0;
+  flex-shrink: 0;
+}
+
+.messageList {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  flex-shrink: 0;
+}
+
+.phoneEntryWrap {
+  width: 100%;
+  padding: 10px;
+  flex-shrink: 0;
+}
+
+.phoneEntryRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.phoneEntryBackBtn {
+  margin-left: 12px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.phoneEntryBackText {
+  font-size: 13px;
+  color: white;
+}
+
+/* ----- HubConversationPanel (Region C) ----- */
+
+.hubPanelRoot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.hubPanelHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid rgb(230, 230, 230);
+  flex-shrink: 0;
+}
+
+.hubPanelHeaderPhone {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.hubPanelHeaderCenter {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hubPanelCustomerName {
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.hubPanelNewThreadBadge {
+  padding: 4px 10px;
+  border-radius: 4px;
+}
+
+.hubPanelNewThreadText {
+  font-size: 12px;
+  color: white;
+  font-weight: 700;
+}
+
+.hubPanelHeaderBtn {
+  padding: 4px 10px;
+  border-radius: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.hubPanelHeaderBtn--openWO {
+  margin-right: 6px;
+}
+
+.hubPanelHeaderBtnText {
+  font-size: 12px;
+  color: white;
+  font-weight: 700;
+}
+
+.woDropdownBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.woDropdownMenu {
+  position: absolute;
+  border-radius: 8px;
+  border-width: 2px;
+  border-style: solid;
+  min-width: 240px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
+  overflow: hidden;
+}
+
+.woDropdownItem {
+  padding: 10px 14px;
+  border-bottom: 1px solid rgb(230, 230, 230);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.woDropdownItem:last-child {
+  border-bottom: none;
+}
+
+.woDropdownItemTitle {
+  font-size: 13px;
+  font-weight: 700;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.woDropdownStatusBadge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+
+.woDropdownStatusText {
+  font-size: 11px;
+  color: white;
+  font-weight: 700;
+}
+
+.hubMessagesArea {
+  flex: 1;
+  overflow: hidden;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.hubMessagesEmptyText {
+  font-size: 16px;
+}
+
+/* ----- Hub layout shell (Region A) ----- */
+
+.hubLayoutRoot {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+}
+
+.hubSidebarCollapsed {
+  width: 36px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 10px;
+  border-right: 2px solid rgb(217, 217, 217);
+  flex-shrink: 0;
+}
+
+.hubSidebarCollapsedBtn {
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.hubSidebarExpanded {
+  display: flex;
+  flex-direction: column;
+  border-right-color: rgb(217, 217, 217);
+  border-right-style: solid;
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+.hubSidebarHeader {
+  padding: 10px;
+  border-bottom: 1px solid rgb(230, 230, 230);
+  flex-shrink: 0;
+}
+
+.hubSidebarHeaderRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.hubSidebarHeaderBtn {
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.hubSidebarHeaderCenter {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.hubSidebarHeaderTitle {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.hubEmpty {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.hubEmptyText {
+  font-size: 14px;
+}
+
+.hubRightPanel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.hubPlaceholderCol {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.hubPlaceholderCenter {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.hubPlaceholderText {
+  font-size: 16px;
+}
+
+.hubPlaceholderEntryRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px;
+  flex-shrink: 0;
+}
+
+.hubPlaceholderBackBtn {
+  margin-left: 8px;
+  padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}

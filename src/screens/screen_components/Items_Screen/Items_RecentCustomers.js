@@ -1,8 +1,7 @@
 /* eslint-disable */
 
 import { useMemo, useState } from "react";
-import { View, Text, FlatList } from "react-native-web";
-import { Button_, Image_, ScreenModal, Tooltip, TouchableOpacity_ } from "../../../components";
+import { Button, Image, ScreenModal } from "../../../dom_components";
 import {
   useRecentCustomersStore,
   useCurrentCustomerStore,
@@ -21,6 +20,7 @@ import {
 } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
+import styles from "./Items_RecentCustomers.module.css";
 
 export function RecentCustomersComponent() {
   const zRecentCustomers = useRecentCustomersStore((s) => s.recentCustomers);
@@ -45,93 +45,43 @@ export function RecentCustomersComponent() {
     });
   }
 
-  async function handleInfoPress(slimCustomer) {
-    let customer = await dbGetCustomer(slimCustomer.id);
-    if (customer) {
-      useRecentCustomersStore.getState().addRecentCustomer(customer);
-      _setCustomerInfo(customer);
-    }
-  }
-
   if (zRecentCustomers.length === 0) {
     return (
-      <View
-        style={{
-          width: "100%",
-          height: "100%",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <Image_
-          icon={defaultLogo}
-          style={{ opacity: 0.1, width: "90%", height: "90%" }}
-        />
-      </View>
+      <div className={styles.emptyRoot}>
+        <img src={defaultLogo} alt="" className={styles.emptyLogo} draggable={false} />
+      </div>
     );
   }
 
   return (
-    <View style={{ width: "100%", height: "100%", alignItems: "flex-start" }}>
-      <Image_
-        icon={defaultLogo}
-        style={{
-          opacity: 0.1,
-          width: "90%",
-          height: "90%",
-          position: "absolute",
-          alignSelf: "center",
-          top: "5%",
-        }}
-      />
-      <View style={{ width: "35%", height: "100%", justifyContent: "center", marginLeft: 20 }}>
-        <FlatList
-          style={{ width: "100%", flexGrow: 0, maxHeight: "90%" }}
-          contentContainerStyle={{ flexGrow: 1, justifyContent: "center" }}
-          data={zRecentCustomers}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <View
-              style={{
-                flexDirection: "row",
-                width: "100%",
-                height: 60,
-                paddingHorizontal: 10,
-                backgroundColor: "transparent",
-                borderBottomWidth: 1,
-                borderColor: gray(0.1),
+    <div className={styles.root}>
+      <img src={defaultLogo} alt="" className={styles.logo} draggable={false} />
+      <div className={styles.listColumn}>
+        {zRecentCustomers.map((item) => (
+          <div key={item.id} className={styles.row}>
+            <button
+              type="button"
+              className={styles.rowButton}
+              onClick={(e) => {
+                _setModalY(e.clientY ?? 0);
+                _setModalX(e.clientX ?? 0);
+                _setSelectedCustomer(item);
               }}
             >
-              <TouchableOpacity_
-                  style={{ flex: 1, height: "100%", justifyContent: "center", marginLeft: 10 }}
-                  onPress={(e) => {
-                    _setModalY(e.nativeEvent?.clientY ?? e.nativeEvent?.pageY ?? 0);
-                    _setModalX(e.nativeEvent?.clientX ?? e.nativeEvent?.pageX ?? 0);
-                    _setSelectedCustomer(item);
-                  }}
-                >
-                  <Text style={{ fontSize: 16, color: C.text }}>
-                    {capitalizeFirstLetterOfString(item.first) +
-                      " " +
-                      capitalizeFirstLetterOfString(item.last)}
-                  </Text>
-                  {!!item.customerCell && (
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        color: gray(0.45),
-                        fontStyle: "italic",
-                        marginTop: 3,
-                      }}
-                    >
-                      {formatPhoneForDisplay(item.customerCell)}
-                    </Text>
-                  )}
-                </TouchableOpacity_>
-            </View>
-          )}
-        />
-      </View>
+              <span className={styles.name} style={{ color: C.text }}>
+                {capitalizeFirstLetterOfString(item.first) +
+                  " " +
+                  capitalizeFirstLetterOfString(item.last)}
+              </span>
+              {!!item.customerCell && (
+                <span className={styles.phone} style={{ color: gray(0.45) }}>
+                  {formatPhoneForDisplay(item.customerCell)}
+                </span>
+              )}
+            </button>
+          </div>
+        ))}
+      </div>
       {useMemo(
         () => (
           <ScreenModal
@@ -155,41 +105,30 @@ export function RecentCustomersComponent() {
         [sCustomerInfo]
       )}
       {sSelectedCustomer && (
-        <View
+        <div
+          className={styles.actionOverlay}
           onClick={() => _setSelectedCustomer(null)}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 999,
-          }}
         >
-          <View
+          <div
+            className={styles.actionPopup}
             onClick={(e) => e.stopPropagation()}
             style={{
-              position: "absolute",
               top: sModalY,
               left: sModalX,
               backgroundColor: C.backgroundWhite,
-              borderRadius: 10,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 4,
-              elevation: 5,
             }}
           >
-            <View style={{ flexDirection: "row", justifyContent: "flex-end", padding: 10 }}>
-              <TouchableOpacity_
-                onPress={() => _setSelectedCustomer(null)}
+            <div className={styles.actionPopupHeader}>
+              <button
+                type="button"
+                className={styles.closeButton}
+                onClick={() => _setSelectedCustomer(null)}
               >
-                <Image_ icon={ICONS.close1} style={{ width: 28, height: 28 }} />
-              </TouchableOpacity_>
-            </View>
-            <View style={{ alignItems: "center", paddingHorizontal: 25, paddingBottom: 25 }}>
-              <Button_
+                <Image icon={ICONS.close1} className={styles.closeIcon} />
+              </button>
+            </div>
+            <div className={styles.actionPopupBody}>
+              <Button
                 text="New Workorder"
                 colorGradientArr={COLOR_GRADIENTS.green}
                 onPress={async () => {
@@ -200,7 +139,7 @@ export function RecentCustomersComponent() {
                 buttonStyle={{ width: 200, height: 45 }}
                 textStyle={{ fontSize: 16 }}
               />
-              <Button_
+              <Button
                 text="Customer Info"
                 colorGradientArr={COLOR_GRADIENTS.blue}
                 onPress={async () => {
@@ -213,11 +152,11 @@ export function RecentCustomersComponent() {
                 }}
                 buttonStyle={{ width: 200, height: 45, marginTop: 15 }}
                 textStyle={{ fontSize: 16 }}
-            />
-            </View>
-          </View>
-        </View>
+              />
+            </div>
+          </div>
+        </div>
       )}
-    </View>
+    </div>
   );
 }

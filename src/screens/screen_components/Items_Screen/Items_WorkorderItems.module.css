@@ -1,0 +1,194 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: center;
+  min-height: 0;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.emptyTextWrap {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.emptyText {
+  font-size: 100px;
+  text-align: center;
+  white-space: pre-line;
+}
+
+.donePaidBanner {
+  padding: 5px 12px;
+  margin: 3px 8px 0;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.donePaidText {
+  color: white;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.combinedSaleBanner {
+  padding: 5px 12px;
+  margin: 3px 8px 0;
+  border-radius: 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #ffd600;
+  animation: combinedSalePulse 2.4s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+.combinedSaleText {
+  color: black;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@keyframes combinedSalePulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+
+.castingBanner {
+  background-color: #ffd600;
+  margin: 3px 8px 0;
+  border-radius: 5px;
+  overflow: hidden;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  border: none;
+  padding: 0;
+  width: calc(100% - 16px);
+  align-self: center;
+}
+
+.castingScroll {
+  white-space: nowrap;
+  animation: castScroll 8s linear infinite;
+}
+
+.castingText {
+  color: red;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+@keyframes castScroll {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+.list {
+  margin-top: 3px;
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  min-height: 0;
+  min-width: 0;
+}
+
+.totalsBar {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-evenly;
+  align-items: center;
+  width: calc(100% - 10px);
+  margin: 5px;
+  border-radius: 15px;
+  border-width: 1px;
+  border-style: solid;
+  padding: 3px;
+  align-self: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.divider {
+  width: 1px;
+  align-self: stretch;
+  flex-shrink: 0;
+}
+
+.totalLabel {
+  font-size: 13px;
+  color: gray;
+}
+
+.discountLabel {
+  font-size: 13px;
+}
+
+.totalValue {
+  margin-right: 10px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.struck {
+  text-decoration: line-through;
+}
+
+.totalBox {
+  border-radius: 15px;
+  border-width: 1px;
+  border-style: solid;
+  padding: 3px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.totalBoxRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.totalBoxLabel {
+  font-size: 13px;
+  color: gray;
+}
+
+.totalBoxValue {
+  font-weight: 500;
+  font-size: 15px;
+}
+
+.totalBoxValueWithPayments {
+  font-size: 14px;
+}
+
+.balanceLabel {
+  font-size: 12px;
+  color: gray;
+}
+
+.balanceValue {
+  font-weight: 500;
+  font-size: 14px;
+}

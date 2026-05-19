@@ -1,0 +1,87 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.headerBar {
+  display: flex;
+  flex-direction: row;
+  padding: 8px 10px;
+  align-items: center;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  flex-shrink: 0;
+}
+
+.headerLabel {
+  font-size: 13px;
+}
+
+.headerValue {
+  font-weight: 700;
+}
+
+.columnHeaderRow {
+  display: flex;
+  flex-direction: row;
+  padding: 6px 10px;
+  border-bottom-width: 2px;
+  border-bottom-style: solid;
+  flex-shrink: 0;
+}
+
+.colTime {
+  width: 170px;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.colChange {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.list {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  padding: 6px 10px;
+  align-items: flex-start;
+}
+
+.timeCell {
+  font-size: 12px;
+  width: 170px;
+  flex-shrink: 0;
+}
+
+.changeCell {
+  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+}
+
+.userName {
+  font-weight: 700;
+}
+
+.emptyWrap {
+  display: flex;
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+}
+
+.emptyText {
+  font-size: 14px;
+}

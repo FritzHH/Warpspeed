@@ -1,5 +1,4 @@
 /*eslint-disable*/
-import { View, Text, FlatList, Image, TouchableOpacity, Animated, TouchableWithoutFeedback } from "react-native-web";
 import {
   applyDiscountToWorkorderItem,
   calculateRunningTotals,
@@ -14,15 +13,15 @@ import {
 } from "../../../utils";
 import { DISCOUNT_TYPES } from "../../../constants";
 import {
+  Button,
+  CheckBox,
   GradientView,
-  Button_,
-  Image_,
+  LineActionsDropdown,
   NoteHelper,
-  TextInput_,
-  Tooltip,
   StaleBanner,
-} from "../../../components";
-import { CheckBox, LineActionsDropdown } from "../../../dom_components";
+  TextInput,
+  Tooltip,
+} from "../../../dom_components";
 import { C, ICONS } from "../../../styles";
 import { EmptyItemsComponent } from "./Items_Empty";
 import {
@@ -51,6 +50,10 @@ import { CustomItemModal } from "../modal_screens/CustomItemModal";
 import { calculateSaleTotals } from "../modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { deleteActiveSale, writeActiveSale } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { DeliveryReceiptInstance } from "twilio/lib/rest/conversations/v1/conversation/message/deliveryReceipt";
+import styles from "./Items_WorkorderItems.module.css";
+import lineStyles from "./LineItemComponent.module.css";
+
+const cx = (...classes) => classes.filter(Boolean).join(" ");
 
 export const Items_WorkorderItemsTab = ({}) => {
   // store getters ///////////////////////////////////////////////////////////////
@@ -104,19 +107,6 @@ export const Items_WorkorderItemsTab = ({}) => {
   const hasActiveSale = !!activeSale && ((activeSale.amountCaptured || 0) - depositOnlyTotal) > 0;
   const hasAppliedCredits = (activeSale?.creditsApplied || []).some(c => (c.amount || 0) > 0);
 
-  const fadeAnim = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    if (!hasActiveSale) { fadeAnim.setValue(1); return; }
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(fadeAnim, { toValue: 0.3, duration: 1200, useNativeDriver: false }),
-        Animated.timing(fadeAnim, { toValue: 1, duration: 1200, useNativeDriver: false }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [hasActiveSale]);
-
   ///////////////////////////////////////////////////////////////////////////
   const [sTotalDiscount, _setTotalDiscount] = useState("");
   const [sTotals, _setTotals] = useState({
@@ -161,31 +151,24 @@ export const Items_WorkorderItemsTab = ({}) => {
 
     let invIdxArr = [];
     zOpenWorkorder.workorderLines.forEach((line, idx) => {
-      // log("line", line);
       let curInvItem = zInventoryArr.find(
         (o) => o.id === line.inventoryItem.id
       );
       if (!curInvItem) return;
       if (!deepEqual(curInvItem, line.inventoryItem)) {
-        // clog("cur inv", curInvItem.price);
-        // clog("previous", line.inventoryItem.price);
         linesToChange.push({ ...curInvItem });
         invIdxArr.push({ idx, curInvItem });
       }
-      // let curDiscount = line.discountObj?;
     });
 
     // the price has changed. now reset the discount object to reflect the new price as well
     if (invIdxArr.length > 0) {
       let wo = cloneDeep(zOpenWorkorder);
       invIdxArr.forEach((obj) => {
-        // log("changing");
         wo.workorderLines[obj.idx].inventoryItem = obj.curInvItem;
-        // clog("old line", wo.workorderLines[obj.idx].discountObj?);
         let discountedLine = applyDiscountToWorkorderItem(
           wo.workorderLines[obj.idx]
         );
-        // clog("new line", discountedLine.discountObj?);
         wo.workorderLines[obj.idx] = discountedLine;
       });
       useOpenWorkordersStore.getState().setWorkorder(wo);
@@ -524,35 +507,31 @@ export const Items_WorkorderItemsTab = ({}) => {
     });
   }
 
-  // log("here", zOpenWorkorder);
+  const previewBgStyle = zIsPreview
+    ? {
+        backgroundImage: `repeating-linear-gradient(135deg, ${lightenRGBByPercent(C.lightred, 92)}, ${lightenRGBByPercent(C.lightred, 92)} 10px, transparent 10px, transparent 20px)`,
+      }
+    : undefined;
+
   if (!zOpenWorkorder) return <EmptyItemsComponent />;
   let hasItems = zOpenWorkorder?.workorderLines?.length > 0;
   if (!hasItems)
     return (
-      <View style={{ flex: 1, backgroundImage: zIsPreview ? `repeating-linear-gradient(135deg, ${lightenRGBByPercent(C.lightred, 92)}, ${lightenRGBByPercent(C.lightred, 92)} 10px, transparent 10px, transparent 20px)` : undefined }}>
-        <View style={{ flex: 1, justifyContent: "center" }}>
-          <Text style={{ fontSize: 100, color: gray(0.07), textAlign: "center" }}>
+      <div className={styles.container} style={previewBgStyle}>
+        <div className={styles.emptyTextWrap}>
+          <div className={styles.emptyText} style={{ color: gray(0.07) }}>
             {zOpenWorkorder.customerID ? "Empty\nWorkorder" : "Empty\nSale"}
-          </Text>
-        </View>
-        <View
+          </div>
+        </div>
+        <div
+          className={styles.totalsBar}
           style={{
-            flexDirection: "row",
-            justifyContent: "space-evenly",
-            alignItems: "center",
-            width: "99%",
             backgroundColor: C.buttonLightGreen,
-            marginVertical: 5,
-            marginHorizontal: 5,
-            borderRadius: 15,
             borderColor: C.buttonLightGreenOutline,
-            borderWidth: 1,
-            padding: 3,
-            alignSelf: "center",
           }}
         >
           <Tooltip text={(hasActiveSale || hasAppliedCredits) ? "Sale in progress, cannot delete workorder" : "Delete workorder"} position="top" alert={hasActiveSale || hasAppliedCredits}>
-            <Button_
+            <Button
               icon={ICONS.trash}
               iconSize={22}
               enabled={!(hasActiveSale || hasAppliedCredits)}
@@ -560,50 +539,45 @@ export const Items_WorkorderItemsTab = ({}) => {
               buttonStyle={{ opacity: (hasActiveSale || hasAppliedCredits) ? 0.3 : 1 }}
             />
           </Tooltip>
-          <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
+          <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
           <CheckBox
             text="Tax-Free"
             isChecked={!!zOpenWorkorder.taxFree}
             onCheck={handleTaxFreeToggle}
             textStyle={{ fontSize: 12, color: zOpenWorkorder.taxFree ? C.green : gray(0.5) }}
           />
-          <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
-          <Text style={{ fontSize: 13, color: gray(0.65) }}>
+          <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
+          <span className={styles.totalLabel}>
             {"SUBTOTAL: "}
-            <Text style={{ fontWeight: 500, fontSize: 14, color: gray(0.65) }}>$0.00</Text>
-          </Text>
-          <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
-          <Text style={{ fontSize: 13, color: gray(0.65) }}>
+            <span className={styles.totalValue} style={{ color: gray(0.65) }}>$0.00</span>
+          </span>
+          <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
+          <span className={styles.totalLabel}>
             {"TAX: "}
-            <Text style={{ fontWeight: 500, fontSize: 14, color: gray(0.65) }}>$0.00</Text>
-          </Text>
-          <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline }} />
-          <Text
-            style={{
-              fontSize: 13,
-              borderColor: C.buttonLightGreenOutline,
-              borderRadius: 15,
-              borderWidth: 1,
-              paddingHorizontal: 14,
-              paddingVertical: 3,
-              color: gray(0.65),
-            }}
+            <span className={styles.totalValue} style={{ color: gray(0.65) }}>$0.00</span>
+          </span>
+          <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
+          <div
+            className={styles.totalBox}
+            style={{ borderColor: C.buttonLightGreenOutline }}
           >
-            {"TOTAL: "}
-            <Text style={{ fontWeight: 500, fontSize: 15, color: gray(0.65) }}>$0.00</Text>
-          </Text>
-          <View style={{ width: 1, height: "100%", backgroundColor: C.buttonLightGreenOutline, justifyContent: "center" }} />
+            <div className={styles.totalBoxRow}>
+              <span className={styles.totalBoxLabel} style={{ color: gray(0.65) }}>{"TOTAL: "}</span>
+              <span className={styles.totalBoxValue} style={{ color: gray(0.65) }}>$0.00</span>
+            </div>
+          </div>
+          <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
           <Tooltip text="Check out workorder" position="top">
-            <Button_
+            <Button
               ref={checkoutBtnRef}
               icon={ICONS.shoppingCart}
               iconSize={34}
               buttonStyle={{ paddingVertical: 0, opacity: 0.3 }}
-              disabled={true}
+              enabled={false}
             />
           </Tooltip>
-        </View>
-      </View>
+        </div>
+      </div>
     );
 
   function openNoteHelperForLine(workorderLine, anchorX, anchorY) {
@@ -621,105 +595,60 @@ export const Items_WorkorderItemsTab = ({}) => {
     _setNoteHelperDropdown((prev) => prev ? { ...prev, workorderLine: updatedLine } : null);
   }
 
-  // log("main");
+  const activeSaleForFooter = zOpenWorkorder?.activeSaleID ? zActiveSales.find((s) => s.id === zOpenWorkorder.activeSaleID) : null;
+  const paidForFooter = activeSaleForFooter ? (activeSaleForFooter.amountCaptured || 0) - (activeSaleForFooter.amountRefunded || 0) : 0;
+  const hasPaymentsForFooter = paidForFooter > 0;
+  const woCountForFooter = activeSaleForFooter?.workorderIDs?.length || 1;
+  const currentTotalForFooter = woCountForFooter > 1 ? (activeSaleForFooter?.total || sTotals.finalTotal) : sTotals.finalTotal;
+  const saleBalanceForFooter = Math.max(0, currentTotalForFooter - paidForFooter);
+  const remainingForFooter = hasPaymentsForFooter ? Math.round(saleBalanceForFooter / woCountForFooter) : 0;
+
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        backgroundImage: zIsPreview
-          ? `repeating-linear-gradient(135deg, ${lightenRGBByPercent(C.lightred, 92)}, ${lightenRGBByPercent(C.lightred, 92)} 10px, transparent 10px, transparent 20px)`
-          : undefined,
-      }}
-    >
+    <div className={styles.container} style={previewBgStyle}>
       {isDonePaid && (
-        <View
-          style={{
-            backgroundColor: C.red,
-            paddingVertical: 5,
-            paddingHorizontal: 12,
-            marginHorizontal: 8,
-            marginTop: 3,
-            borderRadius: 5,
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ color: "white", fontSize: 12, fontWeight: "600" }}>
-            Finished - No Edits Allowed
-          </Text>
-        </View>
+        <div className={styles.donePaidBanner} style={{ backgroundColor: C.red }}>
+          <span className={styles.donePaidText}>Finished - No Edits Allowed</span>
+        </div>
       )}
 
       {!zWorkordersLoaded && zOpenWorkorder && (
         <StaleBanner
           text="Waiting on workorder refresh...."
-          style={{ marginHorizontal: 8, marginTop: 3 }}
+          style={{ marginLeft: 8, marginRight: 8, marginTop: 3 }}
         />
       )}
 
       {hasActiveSale && (activeSale?.workorderIDs?.length || 0) > 1 && (
-        <Animated.View
-          style={{
-            opacity: fadeAnim,
-            backgroundColor: "#FFD600",
-            paddingVertical: 5,
-            paddingHorizontal: 12,
-            marginHorizontal: 8,
-            marginTop: 3,
-            borderRadius: 5,
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ color: "black", fontSize: 12, fontWeight: "600" }}>
+        <div className={styles.combinedSaleBanner}>
+          <span className={styles.combinedSaleText}>
             {"Combined Sale in Progress - $" + formatCurrencyDisp((activeSale?.amountCaptured || 0) - (activeSale?.amountRefunded || 0)) + " Paid"}
-          </Text>
-        </Animated.View>
+          </span>
+        </div>
       )}
 
       {zCasting && (
-        <TouchableOpacity
-          activeOpacity={0.7}
-          onPress={() => {
+        <button
+          type="button"
+          className={styles.castingBanner}
+          onClick={() => {
             broadcastClear();
             useOpenWorkordersStore.setState({ castingToDisplay: false });
           }}
-          style={{
-            backgroundColor: "#FFD600",
-            marginHorizontal: 8,
-            marginTop: 3,
-            borderRadius: 5,
-            overflow: "hidden",
-            height: 24,
-            justifyContent: "center",
-            cursor: "pointer",
-          }}
         >
-          <style>{`
-            @keyframes castScroll {
-              from { transform: translateX(100%); }
-              to { transform: translateX(-100%); }
-            }
-          `}</style>
-          <div style={{ whiteSpace: "nowrap", animation: "castScroll 8s linear infinite" }}>
-            <Text style={{ color: "red", fontSize: 12, fontWeight: "700" }}>
+          <div className={styles.castingScroll}>
+            <span className={styles.castingText}>
               Workorder casting to customer screen — tap to stop
-            </Text>
+            </span>
           </div>
-        </TouchableOpacity>
+        </button>
       )}
 
-      <FlatList
-        style={{ marginTop: 3, marginRight: 5 }}
-        data={zOpenWorkorder.workorderLines}
-        keyExtractor={(item, idx) => idx}
-        renderItem={(item) => {
-          let idx = item.index;
-          item = item.item;
+      <div className={styles.list}>
+        {zOpenWorkorder.workorderLines.map((item, idx) => {
           let invItem = item.inventoryItem;
-
-          // log("item", item);
           return (
             <LineItemComponent
+              key={item.id || idx}
               __deleteWorkorderLine={deleteWorkorderLineItem}
               __setWorkorderLineItem={editWorkorderLine}
               inventoryItem={invItem}
@@ -738,26 +667,17 @@ export const Items_WorkorderItemsTab = ({}) => {
               onOpenNoteHelper={openNoteHelperForLine}
             />
           );
-        }}
-      />
-      <View
+        })}
+      </div>
+      <div
+        className={styles.totalsBar}
         style={{
-          flexDirection: "row",
-          justifyContent: "space-evenly",
-          alignItems: "center",
-          width: "99%",
           backgroundColor: C.buttonLightGreen,
-          marginVertical: 5,
-          marginHorizontal: 5,
-          borderRadius: 15,
           borderColor: C.buttonLightGreenOutline,
-          borderWidth: 1,
-          padding: 3,
-          alignSelf: "center",
         }}
       >
         <Tooltip text={(hasActiveSale || hasAppliedCredits) ? "Sale in progress, cannot delete workorder" : "Delete workorder"} position="top" alert={hasActiveSale || hasAppliedCredits}>
-          <Button_
+          <Button
             icon={ICONS.trash}
             iconSize={22}
             enabled={!isLocked && !(hasActiveSale || hasAppliedCredits)}
@@ -765,13 +685,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             buttonStyle={{ opacity: (isLocked || hasActiveSale || hasAppliedCredits) ? 0.3 : 1 }}
           />
         </Tooltip>
-        <View
-          style={{
-            width: 1,
-            height: "100%",
-            backgroundColor: C.buttonLightGreenOutline,
-          }}
-        />
+        <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
         <CheckBox
           text="Tax-Free"
           isChecked={!!zOpenWorkorder.taxFree}
@@ -779,139 +693,72 @@ export const Items_WorkorderItemsTab = ({}) => {
           enabled={!isLocked}
           textStyle={{ fontSize: 12, color: zOpenWorkorder.taxFree ? C.green : gray(0.5) }}
         />
-        <View
-          style={{
-            width: 1,
-            height: "100%",
-            backgroundColor: C.buttonLightGreenOutline,
-          }}
-        />
+        <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
 
-        <Text style={{ fontSize: 13, color: "gray" }}>
+        <span className={styles.totalLabel}>
           {"SUBTOTAL: "}
-          <Text
-            style={{
-              marginRight: 10,
-              color: C.text,
-              fontWeight: 500,
-              fontSize: 14,
-            }}
-          >
+          <span className={styles.totalValue} style={{ color: C.text }}>
             {"$" + formatCurrencyDisp(sTotals.runningSubtotal)}
-          </Text>
-        </Text>
-        <View
-          style={{
-            width: 1,
-            height: "100%",
-            backgroundColor: C.buttonLightGreenOutline,
-          }}
-        />
+          </span>
+        </span>
+        <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
+
         {sTotals.runningDiscount > 0 && (
-          <Text style={{ fontSize: 13, color: C.green }}>
+          <span className={styles.discountLabel} style={{ color: C.green }}>
             {"DISCOUNT: "}
-            <Text
-              style={{
-                marginRight: 10,
-                fontWeight: 500,
-                color: C.green,
-                fontSize: 14,
-              }}
-            >
+            <span className={styles.totalValue} style={{ color: C.green }}>
               {"$" + formatCurrencyDisp(sTotals.runningDiscount)}
-            </Text>
-          </Text>
+            </span>
+          </span>
         )}
         {sTotals.runningDiscount > 0 && (
-          <View
-            style={{
-              width: 1,
-              height: "100%",
-              backgroundColor: C.buttonLightGreenOutline,
-            }}
-          />
+          <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
         )}
-        <Text style={{ fontSize: 13, color: "gray" }}>
+
+        <span className={styles.totalLabel}>
           {"TAX: "}
-          <Text
-            style={{
-              marginRight: 10,
-              fontWeight: 500,
-              color: zOpenWorkorder.taxFree ? C.lightText : C.text,
-              fontSize: 14,
-              textDecorationLine: zOpenWorkorder.taxFree ? "line-through" : "none",
-            }}
+          <span
+            className={cx(styles.totalValue, zOpenWorkorder.taxFree && styles.struck)}
+            style={{ color: zOpenWorkorder.taxFree ? C.lightText : C.text }}
           >
             {"$" + formatCurrencyDisp(sTotals.runningTax)}
-          </Text>
-        </Text>
-        <View
-          style={{
-            width: 1,
-            height: "100%",
-            backgroundColor: C.buttonLightGreenOutline,
-          }}
-        />
+          </span>
+        </span>
+        <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
 
-        {(() => {
-          let activeSale = zOpenWorkorder?.activeSaleID ? zActiveSales.find((s) => s.id === zOpenWorkorder.activeSaleID) : null;
-          let paid = activeSale ? (activeSale.amountCaptured || 0) - (activeSale.amountRefunded || 0) : 0;
-          let hasPayments = paid > 0;
-          let woCount = activeSale?.workorderIDs?.length || 1;
-          let currentTotal = woCount > 1 ? (activeSale?.total || sTotals.finalTotal) : sTotals.finalTotal;
-          let saleBalance = Math.max(0, currentTotal - paid);
-          let remaining = hasPayments ? Math.round(saleBalance / woCount) : 0;
-          return (
-            <View
-              style={{
-                borderColor: C.buttonLightGreenOutline,
-                borderRadius: 15,
-                borderWidth: 1,
-                paddingHorizontal: 14,
-                paddingVertical: 3,
-                alignItems: "center",
-                backgroundColor: hasPayments ? "rgba(255, 235, 59, 0.25)" : "transparent",
-              }}
-            >
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <Text style={{ fontSize: hasPayments ? 13 : 13, color: "gray" }}>{"TOTAL: "}</Text>
-                <Text
-                  style={{
-                    fontWeight: 500,
-                    color: hasPayments ? gray(0.5) : C.text,
-                    fontSize: hasPayments ? 14 : 15,
-                    textDecorationLine: hasPayments ? "line-through" : "none",
-                  }}
-                >
-                  {"$" + formatCurrencyDisp(sTotals.finalTotal)}
-                </Text>
-              </View>
-              {hasPayments && (
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <Text style={{ fontSize: 12, color: "gray" }}>{"BALANCE: "}</Text>
-                  <Text
-                    style={{
-                      fontWeight: 500,
-                      color: C.green,
-                      fontSize: 14,
-                    }}
-                  >
-                    {"$" + formatCurrencyDisp(remaining)}
-                  </Text>
-                </View>
-              )}
-            </View>
-          );
-        })()}
-        <View
+        <div
+          className={styles.totalBox}
           style={{
-            width: 1,
-            height: "100%",
-            backgroundColor: C.buttonLightGreenOutline,
+            borderColor: C.buttonLightGreenOutline,
+            backgroundColor: hasPaymentsForFooter ? "rgba(255, 235, 59, 0.25)" : "transparent",
           }}
-        />
+        >
+          <div className={styles.totalBoxRow}>
+            <span className={styles.totalBoxLabel}>{"TOTAL: "}</span>
+            <span
+              className={cx(
+                styles.totalBoxValue,
+                hasPaymentsForFooter && styles.totalBoxValueWithPayments,
+                hasPaymentsForFooter && styles.struck
+              )}
+              style={{ color: hasPaymentsForFooter ? gray(0.5) : C.text }}
+            >
+              {"$" + formatCurrencyDisp(sTotals.finalTotal)}
+            </span>
+          </div>
+          {hasPaymentsForFooter && (
+            <div className={styles.totalBoxRow}>
+              <span className={styles.balanceLabel}>{"BALANCE: "}</span>
+              <span className={styles.balanceValue} style={{ color: C.green }}>
+                {"$" + formatCurrencyDisp(remainingForFooter)}
+              </span>
+            </div>
+          )}
+        </div>
+        <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
+
         <Tooltip text={hasPlaceholderItems ? "Replace placeholder items with real items before checking out" : hasMissingReceiptNotes ? "Enter the required receipt note info to check out" : "Check out workorder"} position="top">
-          <Button_
+          <Button
             ref={checkoutBtnRef}
             textStyle={{ color: C.textWhite, fontSize: 16 }}
             icon={ICONS.shoppingCart}
@@ -927,7 +774,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             })}
           />
         </Tooltip>
-      </View>
+      </div>
       {sEditingCustomLine && (
         <CustomItemModal
           visible={!!sEditingCustomLine}
@@ -948,7 +795,7 @@ export const Items_WorkorderItemsTab = ({}) => {
         anchorY={sNoteHelperDropdown?.anchorY || 0}
         noteHelpers={zNoteHelpers || []}
       />
-    </View>
+    </div>
   );
 };
 
@@ -978,372 +825,314 @@ export const LineItemComponent = ({
   const [sQtyFocused, _setQtyFocused] = useState(false);
   const [sQtyInputVal, _setQtyInputVal] = useState("");
   const qtyBlurredRef = useRef(false);
-  const pencilRef = useRef(null);
 
   const qtyDisplayStr = sQtyFocused ? sQtyInputVal : String(effectiveQty);
   const qtyDigits = qtyDisplayStr.length || 1;
   const qtyBoxWidth = qtyDigits <= 2 ? 31 : 31 + (qtyDigits - 2) * 10;
 
-  /////////////////////////////////////////////////////////////////////
-  //////////////////////////////////////////////////////////////////////
+  const placeholderInteractive = isPlaceholder && !isLocked;
+  const rowBg = isInReplaceMode
+    ? lightenRGBByPercent(C.orange, 75)
+    : inventoryItem.customLabor
+      ? lightenRGBByPercent(C.blue, 80)
+      : inventoryItem.customPart
+        ? lightenRGBByPercent(C.green, 80)
+        : C.backgroundListWhite;
+  const rowBorderColor = isInReplaceMode ? C.orange : C.listItemBorder;
+  const rowLeftBorderColor = isInReplaceMode
+    ? C.orange
+    : workorderLine.discountObj?.name
+      ? C.lightred
+      : lightenRGBByPercent(C.green, 60);
 
-  function formatDiscountsArr(discountArr) {
-    if (discountArr[discountArr.length - 1].name === "No Discount")
-      return discountArr;
-    discountArr.push({
-      name: "No Discount",
+  function handleWrapperClick() {
+    if (!placeholderInteractive) return;
+    useOpenWorkordersStore.setState({
+      placeholderReplaceLineID: isInReplaceMode ? null : workorderLine.id,
     });
-    return discountArr;
   }
 
-  // log("INTAKE NOTES", sIntakeNotes);
-  // log("WORKORDER NOTES", workorderLine.intakeNotes);
-  // console.log("RECEIPT NOTES", sReceiptNotes);
   return (
-    <TouchableOpacity
-      disabled={!isPlaceholder || isLocked}
-      activeOpacity={isPlaceholder ? 0.7 : 1}
-      onPress={() => {
-        if (!isPlaceholder) return;
-        useOpenWorkordersStore.setState({
-          placeholderReplaceLineID: isInReplaceMode ? null : workorderLine.id,
-        });
-      }}
-      style={{
-        width: "100%",
-      }}
+    <div
+      className={cx(lineStyles.wrapper, placeholderInteractive && lineStyles.wrapperPlaceholder)}
+      onClick={handleWrapperClick}
     >
       {isInReplaceMode && (
-        <View style={{ backgroundColor: C.orange, borderTopLeftRadius: 15, borderTopRightRadius: 15, marginHorizontal: 8, marginTop: 3, paddingVertical: 3, alignItems: "center" }}>
-          <Text style={{ color: "white", fontSize: 12, fontWeight: "700" }}>Placeholder Replace Mode - Select an item from inventory</Text>
-        </View>
+        <div className={lineStyles.replaceModeBanner} style={{ backgroundColor: C.orange }}>
+          <span className={lineStyles.replaceModeBannerText}>Placeholder Replace Mode - Select an item from inventory</span>
+        </div>
       )}
-      <View
+      <div
+        className={cx(lineStyles.row, isInReplaceMode && lineStyles.rowReplaceMode)}
         style={{
-          flexDirection: "column",
-          width: "100%",
-          backgroundColor: isInReplaceMode ? lightenRGBByPercent(C.orange, 75) : inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 80) : inventoryItem.customPart ? lightenRGBByPercent(C.green, 80) : C.backgroundListWhite,
-          paddingVertical: 3,
-          marginVertical: isInReplaceMode ? 0 : 3,
-          marginHorizontal: 8,
-          borderColor: isInReplaceMode ? C.orange : C.listItemBorder,
-          borderLeftColor: isInReplaceMode ? C.orange : workorderLine.discountObj?.name ? C.lightred : lightenRGBByPercent(C.green, 60),
-          borderWidth: isInReplaceMode ? 2 : 1,
-          borderRadius: isInReplaceMode ? 0 : 15,
-          borderBottomLeftRadius: 15,
-          borderBottomRightRadius: 15,
-          borderTopLeftRadius: isInReplaceMode ? 0 : 15,
-          borderTopRightRadius: isInReplaceMode ? 0 : 15,
-          borderLeftWidth: isInReplaceMode ? 2 : 3,
+          backgroundColor: rowBg,
+          borderColor: rowBorderColor,
+          borderLeftColor: rowLeftBorderColor,
         }}
       >
         {!!(workorderLine.discountObj?.name || workorderLine.discountObj?.discountName) && (
-          <View style={{ flexDirection: "row", justifyContent: "flex-end", paddingLeft: 5, paddingRight: 15 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: C.lightred, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2, gap: 6 }}>
-              <Text style={{ color: "white", fontSize: 13 }}>
+          <div className={lineStyles.discountBadgeRow}>
+            <div className={lineStyles.discountBadge} style={{ backgroundColor: C.lightred }}>
+              <span className={lineStyles.discountBadgeText}>
                 {workorderLine.discountObj.name || workorderLine.discountObj.discountName}
-              </Text>
+              </span>
               {!!workorderLine.discountObj?.savings && (
-                <Text style={{ color: "white", fontSize: 13 }}>
+                <span className={lineStyles.discountBadgeText}>
                   {"-$" + formatCurrencyDisp(workorderLine.discountObj.savings)}
-                </Text>
+                </span>
               )}
-            </View>
-          </View>
+            </div>
+          </div>
         )}
-        <View style={{ flexDirection: "row", width: "100%", alignItems: "center", paddingRight: 5, paddingLeft: 4 }}>
-        <View
-          style={{
-            width: "60%",
-            justifyContent: "center",
-            flexDirection: "column",
-          }}
-        >
-          <View style={{ width: "100%" }}>
-            {(() => {
-              const hasIntake = !!(workorderLine.intakeNotes || "").trim();
-              const hasReceipt = !!(workorderLine.receiptNotes || "").trim();
-              const receiptNoteRequired = !!inventoryItem.receiptNoteRequired;
-              const showReceiptNote = hasReceipt || receiptNoteRequired;
+        <div className={lineStyles.mainRow}>
+          <div className={lineStyles.leftCol}>
+            <div className={lineStyles.leftColInner}>
+              {(() => {
+                const hasIntake = !!(workorderLine.intakeNotes || "").trim();
+                const hasReceipt = !!(workorderLine.receiptNotes || "").trim();
+                const receiptNoteRequired = !!inventoryItem.receiptNoteRequired;
+                const showReceiptNote = hasReceipt || receiptNoteRequired;
 
-              return (
-                <>
-                  <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
-                    <Tooltip text="Notes" position="top">
-                      <TouchableOpacity
-                        onPress={(e) => {
-                          useLoginStore.getState().requireLogin(() => {
-                            const x = e?.nativeEvent?.pageX || e?.pageX || 0;
-                            const y = e?.nativeEvent?.pageY || e?.pageY || 0;
-                            onOpenNoteHelper?.(workorderLine, x, y);
-                          });
-                        }}
-                        style={{ marginRight: 4 }}
-                      >
-                        <Image source={ICONS.editPencil} style={{ width: 15, height: 15, opacity: 0.5 }} />
-                      </TouchableOpacity>
-                    </Tooltip>
-                    <TouchableOpacity
-                      disabled={!isCustom || isLocked}
-                      onPress={(e) => {
-                        if (!isCustom) return;
-                        const x = e?.nativeEvent?.pageX || e?.pageX || 0;
-                        const y = e?.nativeEvent?.pageY || e?.pageY || 0;
-                        onEditCustomItem?.(workorderLine, x, y);
-                      }}
-                      activeOpacity={isCustom ? 0.6 : 1}
-                      style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
-                    >
-                      {(inventoryItem.customPart || inventoryItem.customLabor) && (
-                        <Tooltip text={inventoryItem.customPart ? "Edit item" : "Edit labor charge"} position="top">
-                          <View style={{ backgroundColor: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 55) : lightenRGBByPercent(C.green, 55), borderRadius: 15, paddingHorizontal: 7, paddingVertical: 3, marginRight: 5 }}>
-                            <Text style={{ fontSize: 12, fontWeight: "700", color: inventoryItem.customLabor ? lightenRGBByPercent(C.blue, 15) : lightenRGBByPercent(C.green, 15) }}>{inventoryItem.customPart ? "ITEM" : inventoryItem.minutes ? inventoryItem.minutes + " MINS" : "LABOR"}</Text>
-                          </View>
-                        </Tooltip>
-                      )}
-                      {isPlaceholder ? (
-                        <View style={{ backgroundColor: lightenRGBByPercent(C.red, 85), borderRadius: 15, paddingHorizontal: 8, paddingVertical: 3, shadowColor: "black", shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.15, shadowRadius: 3 }}>
-                          <Text
-                            style={{ fontSize: 16, color: C.red, fontWeight: "500" }}
-                            numberOfLines={2}
-                          >
-                            {inventoryItem.formalName || ""}
-                          </Text>
-                        </View>
-                      ) : (
-                        <Text
-                          style={{
-                            fontSize: 16,
-                            color: C.text,
-                            fontWeight: "400",
-                            textDecorationLine: "none",
-                            flex: 1,
+                return (
+                  <>
+                    <div className={lineStyles.nameRow}>
+                      <Tooltip text="Notes" position="top">
+                        <button
+                          type="button"
+                          className={lineStyles.pencilButton}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            useLoginStore.getState().requireLogin(() => {
+                              onOpenNoteHelper?.(workorderLine, e.pageX || 0, e.pageY || 0);
+                            });
                           }}
-                          numberOfLines={2}
                         >
-                          {inventoryItem.formalName ? inventoryItem.formalName : (isCustom ? "(tap to edit)" : "")}
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                  {hasIntake && (
-                    <View style={{ flexDirection: "row", alignItems: "flex-start", width: "100%" }}>
-                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "orange", marginTop: 8, marginLeft: 4, marginRight: 3 }} />
-                      <TextInput_
-                        multiline={true}
-                        numberOfLines={5}
-                        debounceMs={500}
-                        capitalize={true}
-                        editable={!isLocked}
-                        style={{ outlineWidth: 0, color: "orange", flex: 1, paddingHorizontal: 3, fontSize: 16 }}
-                        onFocus={() => useLoginStore.getState().requireLogin(() => {})}
-                        onChangeText={(val) => {
-                          useLoginStore.getState().requireLogin(() => {
-                            __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
-                          });
+                          <img src={ICONS.editPencil} alt="" className={lineStyles.pencilIcon} />
+                        </button>
+                      </Tooltip>
+                      <div
+                        className={cx(lineStyles.nameTapArea, isCustom && !isLocked && lineStyles.nameTapAreaEditable)}
+                        onClick={(e) => {
+                          if (!isCustom || isLocked) return;
+                          e.stopPropagation();
+                          onEditCustomItem?.(workorderLine, e.pageX || 0, e.pageY || 0);
                         }}
-                        placeholder="Intake notes..."
-                        placeholderTextColor={gray(0.2)}
-                        value={workorderLine.intakeNotes || ""}
-                      />
-                    </View>
-                  )}
-                  {showReceiptNote && (
-                    <View style={{ flexDirection: "row", alignItems: "flex-start", width: "100%" }}>
-                      <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "green", marginTop: 7, marginLeft: 4, marginRight: 3 }} />
-                      <TextInput_
-                        capitalize
-                        multiline={true}
-                        numberOfLines={5}
-                        debounceMs={500}
-                        editable={!isLocked}
-                        style={{ outlineWidth: 0, color: "green", flex: 1, paddingHorizontal: 3, fontSize: 14 }}
-                        onFocus={() => useLoginStore.getState().requireLogin(() => {})}
-                        onChangeText={(val) => {
-                          useLoginStore.getState().requireLogin(() => {
-                            __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
-                          });
-                        }}
-                        placeholder={receiptNoteRequired ? "Receipt note required for this item before checkout" : "Receipt notes..."}
-                        placeholderTextColor={receiptNoteRequired ? C.lightred : gray(0.2)}
-                        value={workorderLine.receiptNotes || ""}
-                      />
-                    </View>
-                  )}
-                </>
-              );
-            })()}
-          </View>
-        </View>
-        <View
-          style={{
-            width: "40%",
-            flexDirection: "row",
-            justifyContent: "flex-end",
-            alignItems: "center",
-            height: "100%",
-            // backgroundColor: "green",
-          }}
-        >
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              // marginRight: 5,
-            }}
-          >
-            <Button_
-              enabled={!isLocked}
-              onPress={() => __modQtyPressed(workorderLine, "up", index)}
-              buttonStyle={{
-                backgroundColor: "transparent",
-                paddingHorizontal: 3,
-              }}
-              icon={ICONS.upArrowOrange}
-              iconSize={23}
-            />
-            <Button_
-              enabled={!isLocked && effectiveQty > 1}
-              onPress={() => __modQtyPressed(workorderLine, "down", index)}
-              buttonStyle={{
-                paddingHorizontal: 4,
-                backgroundColor: "transparent",
-              }}
-              icon={ICONS.downArrowOrange}
-              iconSize={23}
-            />
-            <GradientView
-              style={{
-                marginLeft: 7,
-                borderRadius: 15,
-                width: qtyBoxWidth,
-                height: 23,
-              }}
-            >
-              <TextInput_
-                editable={!isLocked}
-                debounceMs={0}
-                maxLength={4}
-                style={{
-                  fontSize: 16,
-                  fontWeight: 500,
-                  textAlign: "center",
-                  color: C.textWhite,
-                  outlineWidth: 0,
-                  width: "100%",
-                  height: "100%",
-                }}
-                value={qtyDisplayStr}
-                onFocus={() => {
-                  qtyBlurredRef.current = false;
-                  _setQtyFocused(true);
-                  _setQtyInputVal("");
-                }}
-                onBlur={(e) => {
-                  qtyBlurredRef.current = true;
-                  let rawVal = (e?.target?.value || "").replace(/\D/g, "").slice(0, 4);
-                  _setQtyFocused(false);
-                  __handleQtyBlurSave(workorderLine, rawVal);
-                }}
-                onChangeText={(val) => {
-                  if (qtyBlurredRef.current) return;
-                  val = val.replace(/\D/g, "").slice(0, 4);
-                  _setQtyInputVal(val);
-                  __handleQtyTextInput(workorderLine, Number(val) || 0);
-                }}
-              />
-            </GradientView>
-          </View>
-          <View
-            style={{
-              alignItems: "flex-end",
-              minWidth: 85,
-              marginHorizontal: 5,
-              borderWidth: 1,
-              borderRadius: 7,
-              borderColor: C.listItemBorder,
-              height: "100%",
-              paddingRight: 2,
-              backgroundColor: C.backgroundWhite,
-              justifyContent: "center",
-            }}
-          >
-            {(effectiveQty > 1 || workorderLine.discountObj?.newPrice != null) && (
-              <Text
-                style={{
-                  fontSize: 13,
-                  paddingHorizontal: 0,
-                  color: C.text,
-                  textDecorationLine: workorderLine.discountObj?.newPrice != null ? "line-through" : "none",
-                }}
-              >
-                {"$ " +
-                  formatCurrencyDisp(
-                    workorderLine.useSalePrice
-                      ? inventoryItem.salePrice
-                      : inventoryItem.price
-                  )}
-              </Text>
-            )}
-            <Text
-              style={{
-                fontSize: 15,
-                fontWeight: "500",
-                minWidth: 30,
-                marginTop: 0,
-                paddingHorizontal: 0,
-                color: C.text,
-              }}
-            >
-              {workorderLine.discountObj?.newPrice != null
-                ? "$ " + formatCurrencyDisp(workorderLine.discountObj?.newPrice)
-                : "$" +
-                  formatCurrencyDisp(
-                    workorderLine.useSalePrice
-                      ? inventoryItem.salePrice
-                      : inventoryItem.price * effectiveQty
-                  )}
-            </Text>
-          </View>
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "flex-end",
-              marginLeft: 4,
-              alignItems: "center",
-            }}
-          >
-            <Tooltip text="Actions" position="top">
-              <LineActionsDropdown
+                      >
+                        {(inventoryItem.customPart || inventoryItem.customLabor) && (
+                          <Tooltip text={inventoryItem.customPart ? "Edit item" : "Edit labor charge"} position="top">
+                            <div
+                              className={lineStyles.customBadge}
+                              style={{
+                                backgroundColor: inventoryItem.customLabor
+                                  ? lightenRGBByPercent(C.blue, 55)
+                                  : lightenRGBByPercent(C.green, 55),
+                              }}
+                            >
+                              <span
+                                className={lineStyles.customBadgeText}
+                                style={{
+                                  color: inventoryItem.customLabor
+                                    ? lightenRGBByPercent(C.blue, 15)
+                                    : lightenRGBByPercent(C.green, 15),
+                                }}
+                              >
+                                {inventoryItem.customPart ? "ITEM" : inventoryItem.minutes ? inventoryItem.minutes + " MINS" : "LABOR"}
+                              </span>
+                            </div>
+                          </Tooltip>
+                        )}
+                        {isPlaceholder ? (
+                          <div
+                            className={lineStyles.placeholderPill}
+                            style={{ backgroundColor: lightenRGBByPercent(C.red, 85) }}
+                          >
+                            <span className={lineStyles.placeholderText} style={{ color: C.red }}>
+                              {inventoryItem.formalName || ""}
+                            </span>
+                          </div>
+                        ) : (
+                          <span className={lineStyles.itemName} style={{ color: C.text }}>
+                            {inventoryItem.formalName ? inventoryItem.formalName : (isCustom ? "(tap to edit)" : "")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {hasIntake && (
+                      <div className={lineStyles.noteRow}>
+                        <div className={lineStyles.noteDot} style={{ backgroundColor: "orange" }} />
+                        <TextInput
+                          multiline={true}
+                          numberOfLines={5}
+                          debounceMs={500}
+                          capitalize={true}
+                          editable={!isLocked}
+                          style={{ color: "orange", flex: 1, paddingLeft: 3, paddingRight: 3, fontSize: 16 }}
+                          onFocus={() => useLoginStore.getState().requireLogin(() => {})}
+                          onChangeText={(val) => {
+                            useLoginStore.getState().requireLogin(() => {
+                              __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
+                            });
+                          }}
+                          placeholder="Intake notes..."
+                          placeholderTextColor={gray(0.2)}
+                          value={workorderLine.intakeNotes || ""}
+                        />
+                      </div>
+                    )}
+                    {showReceiptNote && (
+                      <div className={lineStyles.noteRow}>
+                        <div
+                          className={cx(lineStyles.noteDot, lineStyles.noteDotReceipt)}
+                          style={{ backgroundColor: "green" }}
+                        />
+                        <TextInput
+                          capitalize
+                          multiline={true}
+                          numberOfLines={5}
+                          debounceMs={500}
+                          editable={!isLocked}
+                          style={{ color: "green", flex: 1, paddingLeft: 3, paddingRight: 3, fontSize: 14 }}
+                          onFocus={() => useLoginStore.getState().requireLogin(() => {})}
+                          onChangeText={(val) => {
+                            useLoginStore.getState().requireLogin(() => {
+                              __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
+                            });
+                          }}
+                          placeholder={receiptNoteRequired ? "Receipt note required for this item before checkout" : "Receipt notes..."}
+                          placeholderTextColor={receiptNoteRequired ? C.lightred : gray(0.2)}
+                          value={workorderLine.receiptNotes || ""}
+                        />
+                      </div>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
+          <div className={lineStyles.rightCol}>
+            <div className={lineStyles.qtyCluster}>
+              <Button
                 enabled={!isLocked}
-                showSplit={effectiveQty > 1}
-                onSplit={() => __splitItems(workorderLine, index)}
-                onRemove={() => __deleteWorkorderLine(index)}
-                discounts={zSettingsObj.discounts || []}
-                currentDiscount={workorderLine.discountObj}
-                maxDiscountCents={workorderLine.inventoryItem.price * (workorderLine.qty || 1)}
-                onSelectDiscount={(discount) => {
-                  if (!discount) {
-                    __setWorkorderLineItem({ ...workorderLine, discountObj: null });
-                  } else {
-                    applyDiscount(workorderLine, discount);
-                  }
+                onPress={() => __modQtyPressed(workorderLine, "up", index)}
+                buttonStyle={{
+                  backgroundColor: "transparent",
+                  paddingHorizontal: 3,
                 }}
-                onCustomPercent={(num) => {
-                  applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
-                }}
-                onCustomDollar={(cents) => {
-                  const dollars = (cents / 100).toFixed(2);
-                  applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(cents), type: DISCOUNT_TYPES.dollar, custom: true });
-                }}
-                triggerStyle={{ marginRight: 3 }}
+                icon={ICONS.upArrowOrange}
+                iconSize={23}
               />
-            </Tooltip>
-          </View>
-        </View>
-        </View>
-      </View>
-    </TouchableOpacity>
+              <Button
+                enabled={!isLocked && effectiveQty > 1}
+                onPress={() => __modQtyPressed(workorderLine, "down", index)}
+                buttonStyle={{
+                  paddingHorizontal: 4,
+                  backgroundColor: "transparent",
+                }}
+                icon={ICONS.downArrowOrange}
+                iconSize={23}
+              />
+              <GradientView
+                className={lineStyles.qtyGradientWrap}
+                style={{ width: qtyBoxWidth }}
+              >
+                <TextInput
+                  editable={!isLocked}
+                  debounceMs={0}
+                  maxLength={4}
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 500,
+                    textAlign: "center",
+                    color: C.textWhite,
+                    width: "100%",
+                    height: "100%",
+                  }}
+                  value={qtyDisplayStr}
+                  onFocus={() => {
+                    qtyBlurredRef.current = false;
+                    _setQtyFocused(true);
+                    _setQtyInputVal("");
+                  }}
+                  onBlur={(e) => {
+                    qtyBlurredRef.current = true;
+                    let rawVal = (e?.target?.value || "").replace(/\D/g, "").slice(0, 4);
+                    _setQtyFocused(false);
+                    __handleQtyBlurSave(workorderLine, rawVal);
+                  }}
+                  onChangeText={(val) => {
+                    if (qtyBlurredRef.current) return;
+                    val = val.replace(/\D/g, "").slice(0, 4);
+                    _setQtyInputVal(val);
+                    __handleQtyTextInput(workorderLine, Number(val) || 0);
+                  }}
+                />
+              </GradientView>
+            </div>
+            <div
+              className={lineStyles.priceBox}
+              style={{
+                borderColor: C.listItemBorder,
+                backgroundColor: C.backgroundWhite,
+              }}
+            >
+              {(effectiveQty > 1 || workorderLine.discountObj?.newPrice != null) && (
+                <span
+                  className={cx(
+                    lineStyles.priceUnit,
+                    workorderLine.discountObj?.newPrice != null && lineStyles.priceUnitStruck
+                  )}
+                  style={{ color: C.text }}
+                >
+                  {"$ " +
+                    formatCurrencyDisp(
+                      workorderLine.useSalePrice
+                        ? inventoryItem.salePrice
+                        : inventoryItem.price
+                    )}
+                </span>
+              )}
+              <span className={lineStyles.priceTotal} style={{ color: C.text }}>
+                {workorderLine.discountObj?.newPrice != null
+                  ? "$ " + formatCurrencyDisp(workorderLine.discountObj?.newPrice)
+                  : "$" +
+                    formatCurrencyDisp(
+                      workorderLine.useSalePrice
+                        ? inventoryItem.salePrice
+                        : inventoryItem.price * effectiveQty
+                    )}
+              </span>
+            </div>
+            <div className={lineStyles.actionsCol}>
+              <Tooltip text="Actions" position="top">
+                <LineActionsDropdown
+                  enabled={!isLocked}
+                  showSplit={effectiveQty > 1}
+                  onSplit={() => __splitItems(workorderLine, index)}
+                  onRemove={() => __deleteWorkorderLine(index)}
+                  discounts={zSettingsObj.discounts || []}
+                  currentDiscount={workorderLine.discountObj}
+                  maxDiscountCents={workorderLine.inventoryItem.price * (workorderLine.qty || 1)}
+                  onSelectDiscount={(discount) => {
+                    if (!discount) {
+                      __setWorkorderLineItem({ ...workorderLine, discountObj: null });
+                    } else {
+                      applyDiscount(workorderLine, discount);
+                    }
+                  }}
+                  onCustomPercent={(num) => {
+                    applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
+                  }}
+                  onCustomDollar={(cents) => {
+                    const dollars = (cents / 100).toFixed(2);
+                    applyDiscount(workorderLine, { id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(cents), type: DISCOUNT_TYPES.dollar, custom: true });
+                  }}
+                  triggerStyle={{ marginRight: 3 }}
+                />
+              </Tooltip>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };

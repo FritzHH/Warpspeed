@@ -8,9 +8,11 @@ import {
   localStorageWrapper,
   log,
 } from "../../utils";
-import { TabMenuButton, Image_, Button_, Tooltip } from "../../components";
+import { Image_, Button_, Tooltip } from "../../components";
+import { TabMenuButton } from "../../dom_components/TabMenuButton/TabMenuButton";
 import { C, COLOR_GRADIENTS, Fonts, ICONS, Z } from "../../styles";
 import { TAB_NAMES } from "../../data";
+import tabBarStyles from "./OptionsTabBar.module.css";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
 import ReactDOM from "react-dom";
 import React, { useEffect, useRef, useState, useCallback, Suspense, lazy } from "react";
@@ -139,84 +141,74 @@ export const TabBar = ({
 
   function UserButton() {
     return (
-      <View
-        title="Right click to log out"
-        onContextMenu={(e) => {
-          e.preventDefault();
-          useLoginStore.getState().setCurrentUser(null);
-          useLoginStore.getState().setLastActionMillis();
-        }}
-      >
-        <Tooltip text="Press for user, right-click to log out" position="bottom" hideOnPress>
-          <Button_
-            onPress={() => handleUserPress(zCurrentUser)}
-            icon={isClockedIn ? ICONS.check : ICONS.redx}
-            text={
-              zCurrentUser.first +
-              " " +
-              (zCurrentUser?.last?.length >= 0 ? zCurrentUser.last[0] : "") +
-              "."
-            }
-            textStyle={{ fontSize: 13, color: C.text }}
-            iconSize={13}
-            buttonStyle={{
-              paddingHorizontal: 7,
-              paddingVertical: 2,
-              marginRight: 5,
-              borderWidth: 1,
-              borderColor: C.buttonLightGreenOutline,
-              backgroundColor: C.buttonLightGreen,
-              borderRadius: 5,
-            }}
-          />
-        </Tooltip>
-      </View>
+      <Tooltip text="Press for user, right-click to log out" position="bottom" hideOnPress>
+        <div
+          className={tabBarStyles.userBtnWrap}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            useLoginStore.getState().setCurrentUser(null);
+            useLoginStore.getState().setLastActionMillis();
+          }}
+        >
+          <button
+            type="button"
+            className={tabBarStyles.userBtn}
+            onClick={() => handleUserPress(zCurrentUser)}
+          >
+            <img
+              src={isClockedIn ? ICONS.check : ICONS.redx}
+              alt=""
+              className={tabBarStyles.btnIcon}
+            />
+            <span className={tabBarStyles.btnText} style={{ color: C.text }}>
+              {zCurrentUser.first +
+                " " +
+                (zCurrentUser?.last?.length >= 0 ? zCurrentUser.last[0] : "") +
+                "."}
+            </span>
+          </button>
+        </div>
+      </Tooltip>
     );
   }
 
   function LoginButton({ showSpinner } = {}) {
     return (
-      <Button_
-        onPress={() => useLoginStore.getState().setShowLoginScreen(true)}
-        icon={showSpinner ? null : ICONS.userControl}
-        iconSize={13}
-        TextComponent={showSpinner ? () => (
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <ActivityIndicator size={12} color={C.green} style={{ marginRight: 5 }} />
-            <Text style={{ fontSize: 13, color: C.text }}>User</Text>
-          </View>
-        ) : undefined}
-        text={showSpinner ? undefined : "User"}
-        textStyle={{ fontSize: 13, color: C.text }}
-        buttonStyle={{
-          paddingHorizontal: 7,
-          paddingVertical: 2,
-          marginRight: 5,
-          borderWidth: 1,
-          borderColor: C.buttonLightGreenOutline,
-          backgroundColor: C.buttonLightGreen,
-          borderRadius: 15,
-        }}
-      />
+      <button
+        type="button"
+        className={tabBarStyles.loginBtn}
+        onClick={() => useLoginStore.getState().setShowLoginScreen(true)}
+      >
+        {showSpinner ? (
+          <span className={tabBarStyles.spinner} style={{ color: C.green }} />
+        ) : (
+          <img src={ICONS.userControl} alt="" className={tabBarStyles.btnIcon} />
+        )}
+        <span className={tabBarStyles.btnText} style={{ color: C.text }}>
+          User
+        </span>
+      </button>
     );
   }
 
   function CameraIcon() {
     const showError = zCameraStatus === "failed";
     return (
-      <View style={{ width: 19, height: 19 }}>
-        <TouchableOpacity
+      <div className={tabBarStyles.cameraBtnWrap}>
+        <button
+          type="button"
           title="Camera on and identifying"
-          onPress={showError ? showCameraError : () => _sSetShowCameraPreview(true)}
+          className={tabBarStyles.cameraBtn}
+          onClick={showError ? showCameraError : () => _sSetShowCameraPreview(true)}
         >
-          <Image_ style={{ width: 19, height: 19 }} icon={ICONS.camera} />
+          <img src={ICONS.camera} alt="" className={tabBarStyles.cameraIcon} />
           {showError && (
-            <View style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, justifyContent: "center", alignItems: "center" }}>
-              <Image_ style={{ width: 19, height: 19 }} icon={ICONS.redx} />
-            </View>
+            <span className={tabBarStyles.cameraErrorOverlay}>
+              <img src={ICONS.redx} alt="" className={tabBarStyles.cameraIcon} />
+            </span>
           )}
-        </TouchableOpacity>
-      </View>
+        </button>
+      </div>
     );
   }
 
@@ -230,7 +222,7 @@ export const TabBar = ({
       return (
         <>
           <LoginButton showSpinner />
-          {zCameraStatus === "ready" && <><View style={{ width: 5 }} /><CameraIcon /></>}
+          {zCameraStatus === "ready" && <><div className={tabBarStyles.spacer5} /><CameraIcon /></>}
         </>
       );
     }
@@ -250,7 +242,7 @@ export const TabBar = ({
       return (
         <>
           <UserButton />
-          <View style={{ width: 5 }} />
+          <div className={tabBarStyles.spacer5} />
           <CameraIcon />
         </>
       );
@@ -266,17 +258,10 @@ export const TabBar = ({
   }
 
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        width: "100%",
-        justifyContent: "space-between",
-        paddingRight: 5,
-      }}
-    >
-      <View style={{ flexDirection: "row", justifyContent: "flex-start" }}>
+    <div className={tabBarStyles.tabBarRoot}>
+      <div className={tabBarStyles.tabBarLeft}>
         <TabMenuButton
-          buttonStyle={{ borderTopLeftRadius: 15 }}
+          style={{ borderTopLeftRadius: 15 }}
           onPress={() => useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.inventory)}
           text={TAB_NAMES.optionsTab.inventory}
           isSelected={zOptionsTabName === TAB_NAMES.optionsTab.inventory}
@@ -292,39 +277,41 @@ export const TabBar = ({
           isSelected={zOptionsTabName === TAB_NAMES.optionsTab.messages}
         />
         <EmailTabButton zOptionsTabName={zOptionsTabName} />
-      </View>
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
+      </div>
+      <div className={tabBarStyles.tabBarRight}>
         {renderUserArea()}
-        <View style={{ width: 5 }} />
+        <div className={tabBarStyles.spacer5} />
         {(() => {
           let selectedID = localStorageWrapper.getItem("selectedPrinterID");
           let selectedPrinter = selectedID && zPrinters?.[selectedID];
           if (selectedPrinter && selectedPrinter.active !== true) {
             return (
-              <TouchableOpacity
-                onPress={() => {
+              <button
+                type="button"
+                className={tabBarStyles.printerOfflineBtn}
+                onClick={() => {
                   useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.dashboard);
                   useTabNamesStore.getState().setDashboardExpand("Readers/Printers");
                 }}
-                style={{ flexDirection: "row", alignItems: "center", backgroundColor: "yellow", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6, marginRight: 5 }}
               >
-                <Image_ icon={ICONS.print} size={14} style={{ marginRight: 4 }} />
-                <Text style={{ fontSize: 12, fontWeight: "700", color: "red" }}>Offline</Text>
-              </TouchableOpacity>
+                <img src={ICONS.print} alt="" className={tabBarStyles.printerOfflineIcon} />
+                <span className={tabBarStyles.printerOfflineText}>Offline</span>
+              </button>
             );
           }
           return null;
         })()}
-        <Image_
-          style={{ width: 28, height: 28 }}
-          icon={sIsOnline ? ICONS.wifi : ICONS.internetOfflineGIF}
+        <img
+          src={sIsOnline ? ICONS.wifi : ICONS.internetOfflineGIF}
+          alt=""
+          className={tabBarStyles.wifiIcon}
         />
-      </View>
+      </div>
       <CameraPreviewModal
         visible={sShowCameraPreview}
         onClose={() => _sSetShowCameraPreview(false)}
       />
-    </View>
+    </div>
   );
 };
 
@@ -337,7 +324,7 @@ const EmailTabButton = ({ zOptionsTabName }) => {
   if (userInboxes.length === 0) return null;
 
   return (
-    <View style={{ position: "relative" }}>
+    <div className={tabBarStyles.emailTabWrap}>
       <TabMenuButton
         onPress={() => {
           useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.email);
@@ -347,27 +334,13 @@ const EmailTabButton = ({ zOptionsTabName }) => {
         isSelected={isSelected}
       />
       {zUnreadCount > 0 && (
-        <View
-          style={{
-            position: "absolute",
-            top: -4,
-            right: -4,
-            backgroundColor: C.red,
-            borderRadius: 10,
-            minWidth: 18,
-            height: 18,
-            justifyContent: "center",
-            alignItems: "center",
-            paddingHorizontal: 4,
-            pointerEvents: "none",
-          }}
-        >
-          <Text style={{ color: C.textWhite, fontSize: 10, fontWeight: "700" }}>
+        <div className={tabBarStyles.emailBadge} style={{ background: C.red }}>
+          <span className={tabBarStyles.emailBadgeText}>
             {zUnreadCount > 99 ? "99+" : zUnreadCount}
-          </Text>
-        </View>
+          </span>
+        </div>
       )}
-    </View>
+    </div>
   );
 };
 

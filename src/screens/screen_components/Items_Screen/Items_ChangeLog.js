@@ -1,9 +1,9 @@
 /* eslint-disable */
 
-import { View, Text, FlatList } from "react-native-web";
 import { gray, deepEqual } from "../../../utils";
 import { C, Fonts } from "../../../styles";
 import { useOpenWorkordersStore } from "../../../stores";
+import styles from "./Items_ChangeLog.module.css";
 
 const DAY_NAMES = ["Sun", "Mon", "Tues", "Wed", "Thurs", "Fri", "Sat"];
 const MONTH_NAMES = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -60,37 +60,23 @@ function describeEntry(entry) {
 
 function ChangeLogRow({ entry, index }) {
   return (
-    <View
+    <div
+      className={styles.row}
       style={{
-        flexDirection: "row",
-        paddingVertical: 6,
-        paddingHorizontal: 10,
         backgroundColor: index % 2 === 0 ? C.listItemWhite : gray(0.06),
-        alignItems: "flex-start",
       }}
     >
-      <Text
-        style={{
-          fontSize: 12,
-          color: gray(0.45),
-          width: 170,
-          flexShrink: 0,
-        }}
-      >
+      <div className={styles.timeCell} style={{ color: gray(0.45) }}>
         {formatTimestamp(entry.timestamp)}
-      </Text>
-      <Text
-        style={{
-          fontSize: 13,
-          color: C.text,
-          flex: 1,
-        }}
-      >
-        <Text style={{ fontWeight: Fonts.weight.textHeavy }}>{entry.user}</Text>
+      </div>
+      <div className={styles.changeCell} style={{ color: C.text }}>
+        <span className={styles.userName} style={{ fontWeight: Fonts.weight.textHeavy }}>
+          {entry.user}
+        </span>
         {"  "}
         {describeEntry(entry)}
-      </Text>
-    </View>
+      </div>
+    </div>
   );
 }
 
@@ -106,56 +92,71 @@ export function Items_ChangeLog() {
 
   if (sorted.length === 0) {
     return (
-      <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-        <Text style={{ fontSize: 14, color: gray(0.5) }}>No changes recorded</Text>
-      </View>
+      <div className={styles.emptyWrap}>
+        <div className={styles.emptyText} style={{ color: gray(0.5) }}>
+          No changes recorded
+        </div>
+      </div>
     );
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <div className={styles.container}>
       {/* Started info */}
-      <View
+      <div
+        className={styles.headerBar}
         style={{
-          flexDirection: "row",
-          paddingVertical: 8,
-          paddingHorizontal: 10,
           backgroundColor: C.backgroundListWhite,
-          borderBottomWidth: 1,
           borderBottomColor: C.buttonLightGreenOutline,
-          alignItems: "center",
         }}
       >
-        <Text style={{ fontSize: 13, color: gray(0.5) }}>
+        <div className={styles.headerLabel} style={{ color: gray(0.5) }}>
           {"Started: "}
-          <Text style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}>
+          <span
+            className={styles.headerValue}
+            style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}
+          >
             {zWorkorder?.startedOnMillis ? formatTimestampFull(zWorkorder.startedOnMillis) : "N/A"}
-          </Text>
+          </span>
           {"   by "}
-          <Text style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}>
+          <span
+            className={styles.headerValue}
+            style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}
+          >
             {zWorkorder?.startedBy || "Unknown"}
-          </Text>
-        </Text>
-      </View>
+          </span>
+        </div>
+      </div>
       {/* Column headers */}
-      <View
+      <div
+        className={styles.columnHeaderRow}
         style={{
-          flexDirection: "row",
-          paddingVertical: 6,
-          paddingHorizontal: 10,
-          borderBottomWidth: 2,
-          borderBottomColor: C.buttonLightGreenOutline,
           backgroundColor: C.listItemWhite,
+          borderBottomColor: C.buttonLightGreenOutline,
         }}
       >
-        <Text style={{ fontSize: 12, color: gray(0.45), width: 170, fontWeight: Fonts.weight.textHeavy }}>Time</Text>
-        <Text style={{ fontSize: 12, color: gray(0.45), flex: 1, fontWeight: Fonts.weight.textHeavy }}>Change</Text>
-      </View>
-      <FlatList
-        data={sorted}
-        keyExtractor={(item, index) => item.timestamp + "-" + index}
-        renderItem={({ item, index }) => <ChangeLogRow entry={item} index={index} />}
-      />
-    </View>
+        <div
+          className={styles.colTime}
+          style={{ color: gray(0.45), fontWeight: Fonts.weight.textHeavy }}
+        >
+          Time
+        </div>
+        <div
+          className={styles.colChange}
+          style={{ color: gray(0.45), fontWeight: Fonts.weight.textHeavy }}
+        >
+          Change
+        </div>
+      </div>
+      <div className={styles.list}>
+        {sorted.map((item, index) => (
+          <ChangeLogRow
+            key={item.timestamp + "-" + index}
+            entry={item}
+            index={index}
+          />
+        ))}
+      </div>
+    </div>
   );
 }

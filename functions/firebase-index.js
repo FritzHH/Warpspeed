@@ -1343,7 +1343,7 @@ exports.incomingSMSEnhanced = onRequest(
       }
 
       // ============================================================================
-      // STEP 4: CHECK THREAD STATUS, TIMEOUT, & BLOCKLIST
+      // STEP 4: CHECK THREAD STATUS & TIMEOUT
       // ============================================================================
 
       let canRespond = false;
@@ -1352,34 +1352,13 @@ exports.incomingSMSEnhanced = onRequest(
       let storeSettings = {};
 
       try {
-        // Fetch settings for timeout and blocklist
+        // Fetch settings for timeout
         const settingsDoc = await db
           .collection("tenants").doc(tenantID)
           .collection("stores").doc(storeID)
           .collection("settings").doc("settings")
           .get();
         storeSettings = settingsDoc.exists ? settingsDoc.data() : {};
-
-        // Check blocklist
-        const blockedNumbers = storeSettings.smsBlockedNumbers || [];
-        if (blockedNumbers.includes(normalizedPhone)) {
-          log("Blocked number detected", { phone: normalizedPhone, tenantID, storeID });
-
-          await db.collection("sms-analytics").doc("blocked-numbers").collection("messages").add({
-            phoneNumber: normalizedPhone,
-            message: incomingMessage,
-            messageSid,
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
-            tenantID,
-            storeID,
-          });
-
-          const blockedResponse = `<?xml version="1.0" encoding="UTF-8"?>
-<Response>
-  <Message>This number is no longer able to receive messages at this number. If you believe this is an error, please call us directly.</Message>
-</Response>`;
-          return response.status(200).type("text/xml").send(blockedResponse);
-        }
 
         // Read thread state from parent doc (canonical source for canRespond and forwardTo)
         const parentDoc = await conversationRef.get();

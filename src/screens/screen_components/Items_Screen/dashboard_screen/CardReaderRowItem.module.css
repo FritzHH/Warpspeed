@@ -1,0 +1,59 @@
+.row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-radius: 6px;
+  padding: 6px 10px;
+  border: 1px solid;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.statusDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.readerInfo {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.readerSubtitle {
+  font-size: 11px;
+}
+
+.labelRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.labelText {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.deleteButton {
+  padding: 6px;
+  margin-left: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.deleteButton:hover {
+  opacity: 0.6;
+}

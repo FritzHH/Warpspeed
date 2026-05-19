@@ -15,7 +15,7 @@ import {
   useSettingsStore,
   useAlertScreenStore,
 } from "../../../../stores";
-import { NUM_MILLIS_IN_DAY } from "./utils";
+import { NUM_MILLIS_IN_DAY, isFinishedStatus } from "./utils";
 import WaitTimeIndicator from "./WaitTimeIndicator";
 import styles from "./WorkorderRowItem.module.css";
 
@@ -23,6 +23,7 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
   workorder, isSelected, isPreviewed, paidAmount, isLinkedSale, onSelect, onHoverEnter, onHoverExit
 }) {
   const rs = resolveStatus(workorder.status, useSettingsStore.getState().settings?.statuses);
+  const isFinished = isFinishedStatus(workorder);
   let wipUser = "";
   if (workorder.status === "work_in_progress" && workorder.changeLog?.length) {
     for (let i = workorder.changeLog.length - 1; i >= 0; i--) {
@@ -48,7 +49,7 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
           borderLeftWidth: 4,
           backgroundColor: isSelected
             ? lightenRGBByPercent(C.lightred, 85)
-            : rs.label?.toLowerCase().includes("finished")
+            : isFinished
               ? lightenRGBByPercent(C.green, 85)
               : C.listItemWhite,
         }}
@@ -183,10 +184,10 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
                   </div>
                 ) : (
                   <div
-                    className={`${styles.statusPill}${workorder.status === "finished" ? " " + styles.clickable : ""}`}
-                    role={workorder.status === "finished" ? "button" : undefined}
+                    className={`${styles.statusPill}${isFinished ? " " + styles.clickable : ""}`}
+                    role={isFinished ? "button" : undefined}
                     onClick={(e) => {
-                      if (workorder.status !== "finished") return;
+                      if (!isFinished) return;
                       e.stopPropagation();
                       useAlertScreenStore.getState().setValues({
                         title: "Customer Contacted",
@@ -206,10 +207,10 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
                     }}
                     style={{
                       backgroundColor: rs.backgroundColor,
-                      cursor: workorder.status === "finished" ? "pointer" : "default",
+                      cursor: isFinished ? "pointer" : "default",
                     }}
                   >
-                    {workorder.status === "finished" && (
+                    {isFinished && (
                       <span className={styles.contactedIcon} style={{ color: workorder.contacted ? rs.textColor : C.red }}>
                         {workorder.contacted ? "\u2713" : "\u2717"}
                       </span>
@@ -223,7 +224,7 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
             </div>
           </div>
 
-          {(workorder.orderedItems || []).map((item) => (
+          {!isFinished && (workorder.orderedItems || []).map((item) => (
             <div key={item.id} className={styles.partRow}>
               {!!item.partOrdered && (
                 <span className={styles.truncate} style={{ fontSize: 14, color: C.blue, fontWeight: "500" }}>

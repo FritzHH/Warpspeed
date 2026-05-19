@@ -458,14 +458,36 @@ const UserClockModal = ({ user, handleExit, handleViewHistory }) => {
   }
 
   function handleClockPress() {
-    useLoginStore.getState().setCreateUserClock(user.id, millis, option);
-    if (option === "out") {
-      let clockPauseObj = localStorageWrapper.getItem(LOCAL_DB_KEYS.userClockCheckPauseObj);
-      if (!clockPauseObj) clockPauseObj = {};
-      clockPauseObj[user.id] = new Date().getTime();
-      localStorageWrapper.setItem(LOCAL_DB_KEYS.userClockCheckPauseObj, clockPauseObj);
-    }
+    let lastInitial = user?.last?.length ? user.last[0].toUpperCase() + "." : "";
+    let displayName = (user?.first || "") + (lastInitial ? " " + lastInitial : "");
+    let actionWord = option === "in" ? "CLOCK IN" : "CLOCK OUT";
+
     handleExit();
+
+    useAlertScreenStore.getState().setValues({
+      title: "CONFIRM IDENTITY",
+      message:
+        "Are you " +
+        displayName.trim() +
+        "?\n\nThis will " +
+        actionWord +
+        " this user. Do NOT press YES if you are not " +
+        (user?.first || "this user") +
+        ".",
+      btn1Text: "YES, I AM " + (user?.first ? user.first.toUpperCase() : "THIS USER"),
+      btn2Text: "NO",
+      handleBtn1Press: () => {
+        useLoginStore.getState().setCreateUserClock(user.id, millis, option);
+        if (option === "out") {
+          let clockPauseObj = localStorageWrapper.getItem(LOCAL_DB_KEYS.userClockCheckPauseObj);
+          if (!clockPauseObj) clockPauseObj = {};
+          clockPauseObj[user.id] = new Date().getTime();
+          localStorageWrapper.setItem(LOCAL_DB_KEYS.userClockCheckPauseObj, clockPauseObj);
+        }
+      },
+      handleBtn2Press: () => {},
+      showAlert: true,
+    });
   }
 
   useEffect(() => {

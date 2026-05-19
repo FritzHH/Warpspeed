@@ -1,0 +1,437 @@
+/* ─── Backdrop + modal shell ───────────────────────────────────────── */
+.backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 999;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.modal {
+  width: 92%;
+  max-width: 1000px;
+  height: 88%;
+  border-radius: 15px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  outline: none;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* ─── Top bar ──────────────────────────────────────────────────────── */
+.topBar {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 16px;
+  margin-right: 15px;
+}
+
+.layoutNameInput {
+  width: 160px;
+  margin-right: 8px;
+}
+
+.sizePickerWrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-right: 8px;
+}
+
+.setDefaultLink {
+  margin-left: 4px;
+  font-size: 10px;
+  cursor: pointer;
+  text-decoration: underline;
+  user-select: none;
+}
+
+.defaultLabel {
+  margin-left: 4px;
+  font-size: 10px;
+}
+
+.quickPrintWrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-right: 8px;
+}
+
+.quickPrintLabel {
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+/* ─── Main area ────────────────────────────────────────────────────── */
+.mainArea {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ─── Field palette (left sidebar) ─────────────────────────────────── */
+.fieldPalette {
+  width: 15%;
+  min-width: 120px;
+  padding-right: 10px;
+  flex-shrink: 0;
+  overflow-y: auto;
+}
+
+.fieldPaletteHeader {
+  font-size: 13px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.fieldPaletteItem {
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-radius: 5px;
+  border-width: 1px;
+  border-style: solid;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.fieldPaletteItemLabel {
+  font-size: 12px;
+}
+
+.fieldPaletteRemoveBtn {
+  padding-left: 6px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* ─── Canvas area (center) ─────────────────────────────────────────── */
+.canvasArea {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.canvasInfoText {
+  font-size: 11px;
+  margin-bottom: 6px;
+}
+
+.canvas {
+  background-color: white;
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  outline: none;
+  flex-shrink: 0;
+}
+
+.marginGuideV {
+  position: absolute;
+  top: 0;
+  width: 0;
+  height: 100%;
+  border-left-width: 1px;
+  border-left-style: dashed;
+  pointer-events: none;
+}
+
+.marginGuideH {
+  position: absolute;
+  left: 0;
+  width: 100%;
+  height: 0;
+  border-top-width: 1px;
+  border-top-style: dashed;
+  pointer-events: none;
+}
+
+.centerLine {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 0;
+  height: 100%;
+  border-left: 2px dashed rgba(70, 150, 255, 0.8);
+  pointer-events: none;
+}
+
+/* ─── Properties panel (right sidebar) ─────────────────────────────── */
+.propertiesPanel {
+  width: 22%;
+  min-width: 160px;
+  padding-left: 15px;
+  flex-shrink: 0;
+  overflow-y: auto;
+  box-sizing: border-box;
+}
+
+.propertiesEmpty {
+  width: 22%;
+  min-width: 160px;
+  padding-left: 15px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.propertiesEmptyText {
+  font-size: 12px;
+  text-align: center;
+}
+
+.propertiesTitle {
+  font-size: 13px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.propertiesSection {
+  margin-bottom: 10px;
+}
+
+.propertiesPositionLabel {
+  font-size: 11px;
+  margin-bottom: 2px;
+  display: block;
+}
+
+.propertiesPositionRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.propertiesPositionValue {
+  font-size: 12px;
+}
+
+.propertiesHint {
+  font-size: 10px;
+  margin-top: 2px;
+  display: block;
+}
+
+/* ─── Prop row + stepper ───────────────────────────────────────────── */
+.propRow {
+  margin-bottom: 10px;
+}
+
+.propRowLabel {
+  font-size: 11px;
+  margin-bottom: 2px;
+  display: block;
+}
+
+.propRowValueRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.propRowValue {
+  font-size: 13px;
+  margin-left: 8px;
+  font-weight: 500;
+}
+
+.stepperRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.stepperBtn {
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  border-width: 1px;
+  border-style: solid;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 4px;
+  cursor: pointer;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.stepperBtnText {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+/* ─── Bold + align controls ────────────────────────────────────────── */
+.boldRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.boldLabel {
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.alignSection {
+  margin-bottom: 10px;
+}
+
+.alignLabel {
+  font-size: 11px;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.alignRow {
+  display: flex;
+  flex-direction: row;
+}
+
+.alignBtn {
+  flex: 1;
+  padding-top: 5px;
+  padding-bottom: 5px;
+  border-radius: 4px;
+  border-width: 1px;
+  border-style: solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.alignBtnText {
+  font-size: 11px;
+}
+
+/* ─── Bottom bar ───────────────────────────────────────────────────── */
+.bottomBar {
+  margin-top: 12px;
+  border-top-width: 1px;
+  border-top-style: solid;
+  padding-top: 10px;
+  flex-shrink: 0;
+}
+
+.bottomBarInner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bottomBarLeft {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.printSuccessText {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+/* ─── Print search overlay ─────────────────────────────────────────── */
+.searchOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1001;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.searchModal {
+  width: 450px;
+  max-height: 70%;
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.searchTitle {
+  font-size: 15px;
+  margin-bottom: 10px;
+}
+
+.searchInput {
+  margin-bottom: 10px;
+}
+
+.searchListWrapper {
+  flex: 1;
+  overflow-y: auto;
+  max-height: 350px;
+}
+
+.searchResultRow {
+  padding: 8px 10px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+}
+
+.searchResultMain {
+  flex: 1;
+}
+
+.searchResultName {
+  font-size: 13px;
+}
+
+.searchResultMeta {
+  font-size: 11px;
+}
+
+.searchResultPrice {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.searchNoResults {
+  font-size: 12px;
+  text-align: center;
+  margin-top: 20px;
+}

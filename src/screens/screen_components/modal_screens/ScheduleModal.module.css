@@ -1,0 +1,343 @@
+/* ─── overlay + container ──────────────────────────────────────────────── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.contentWrapper {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+}
+
+.container {
+  width: 92%;
+  height: 94%;
+  border-radius: 15px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  pointer-events: auto;
+}
+
+/* ─── header ───────────────────────────────────────────────────────────── */
+
+.header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  border-bottom: 1px solid rgb(220, 220, 220);
+  background-color: white;
+  flex-shrink: 0;
+}
+
+.headerLeft,
+.headerRight {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.navBtn {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgb(230, 230, 230);
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.weekLabel {
+  font-size: 20px;
+  font-weight: 700;
+  margin: 0 16px;
+  min-width: 220px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.closeBtn {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ─── grid scroll area ─────────────────────────────────────────────────── */
+
+.gridScroll {
+  flex: 1 1 0;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+/* ─── day header row ───────────────────────────────────────────────────── */
+
+.dayHeaderRow {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 6px;
+}
+
+.dayHeaderSpacer {
+  width: 12%;
+  flex-shrink: 0;
+  padding-right: 8px;
+}
+
+.dayHeaderCell {
+  flex: 1 1 0;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 0;
+  margin: 2px;
+  border-radius: 8px;
+}
+
+.dayHeaderCellClosed {
+  opacity: 0.6;
+}
+
+.dayHeaderName {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.dayHeaderHours {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.payCol {
+  width: 10%;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 2px;
+}
+
+.payColHeaderText {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ─── employee row ─────────────────────────────────────────────────────── */
+
+.employeeRow {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  margin-bottom: 4px;
+  min-height: 64px;
+}
+
+.employeeNameCol {
+  width: 12%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-right: 6px;
+  padding-left: 4px;
+}
+
+.employeeFirst {
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.employeeLast {
+  font-size: 11px;
+  color: rgb(140, 140, 140);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.employeeHours {
+  font-size: 10px;
+  color: rgb(160, 160, 160);
+  font-weight: 500;
+  margin-top: 1px;
+}
+
+/* ─── shift cell ───────────────────────────────────────────────────────── */
+
+.shiftCell {
+  flex: 1 1 0;
+  flex-shrink: 0;
+  min-height: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 6px;
+  margin: 2px;
+  position: relative;
+}
+
+.shiftCellClosed {
+  background-color: rgb(235, 235, 235);
+}
+
+.shiftCellClosedText {
+  font-size: 11px;
+  color: rgb(140, 140, 140);
+  font-weight: 500;
+}
+
+.shiftCellEmpty {
+  background-color: rgb(240, 240, 240);
+}
+
+.shiftCellPastFilled {
+  background-color: rgb(240, 240, 240);
+}
+
+.shiftCellEditable {
+  background-color: rgb(240, 240, 240);
+}
+
+.shiftCellHasShift {
+  background-color: #e8f5e9;
+  border-width: 1px;
+  border-style: solid;
+}
+
+.pastEmptyText {
+  font-size: 12px;
+  color: rgb(190, 190, 190);
+}
+
+.timeBox {
+  border-radius: 5px;
+  padding: 4px 6px;
+  margin-bottom: 3px;
+  width: 90%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: none;
+  cursor: default;
+}
+
+.timeBoxLast {
+  margin-bottom: 0;
+}
+
+.timeBtn {
+  cursor: pointer;
+}
+
+.timeBtnText {
+  font-size: 12px;
+  color: white;
+  font-weight: 700;
+}
+
+.removeBtn {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 9px;
+  background-color: rgb(210, 210, 210);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1;
+  border: none;
+  cursor: pointer;
+}
+
+.removeBtnText {
+  font-size: 11px;
+  font-weight: 700;
+  color: rgb(100, 100, 100);
+  margin-top: -1px;
+  line-height: 1;
+}
+
+/* ─── time picker portal ───────────────────────────────────────────────── */
+
+.pickerBackdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.25);
+}
+
+.pickerWrap {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pickerTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 6px;
+}
+
+/* ─── summary row ──────────────────────────────────────────────────────── */
+
+.summaryRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 10px;
+  border-top: 1px solid rgb(220, 220, 220);
+}
+
+.summaryLabelCol {
+  width: 12%;
+  padding-left: 4px;
+}
+
+.summaryLabel {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.summaryHoursCol {
+  flex: 1 1 0;
+}
+
+.summaryHoursText {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgb(100, 100, 100);
+}
+
+.summaryPay {
+  font-size: 14px;
+  font-weight: 700;
+}

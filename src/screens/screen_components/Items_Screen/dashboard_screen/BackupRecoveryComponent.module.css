@@ -1,0 +1,145 @@
+.outerBox {
+  width: 97%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.innerBox {
+  width: 100%;
+  border: 1px solid var(--backup-border, #b6dab6);
+  background-color: var(--backup-bg, #f7fbf7);
+  border-radius: 10px;
+  padding: 15px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.sectionGap {
+  height: 20px;
+  flex-shrink: 0;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  align-self: flex-start;
+}
+
+.sectionDescription {
+  font-size: 12px;
+  margin-bottom: 15px;
+  align-self: flex-start;
+}
+
+.resultBox {
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.resultBoxSuccess {
+  background-color: rgba(0, 180, 0, 0.08);
+}
+
+.resultBoxFailure {
+  background-color: rgba(220, 0, 0, 0.08);
+}
+
+.resultTitle {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.resultLine {
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+
+.resultLineExtra {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+.confirmBlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.confirmWarning {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.confirmRow {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  flex-shrink: 0;
+}
+
+.loadingText {
+  font-size: 12px;
+  margin-top: 10px;
+  margin-bottom: 10px;
+}
+
+.logCard {
+  width: 100%;
+  border: 1px solid var(--backup-border, #b6dab6);
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.logCardHeader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.logCardDate {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.logCardMillis {
+  font-size: 11px;
+}
+
+.logCardType {
+  font-size: 11px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.logCardLine {
+  font-size: 11px;
+  margin-bottom: 1px;
+}
+
+.logCardMediaLine {
+  font-size: 11px;
+  margin-top: 2px;
+}

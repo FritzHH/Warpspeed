@@ -1,0 +1,117 @@
+.row {
+  width: 100%;
+  margin-bottom: 15px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.headerRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 8px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+/* deliberate flex-only case: label fills the remaining space in the header row */
+.labelInput {
+  flex: 1;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 5px;
+  padding: 5px;
+  outline: none;
+  font-weight: 500;
+  font-size: 14px;
+  background-color: transparent;
+  box-sizing: border-box;
+}
+
+.orderGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+
+.orderLabel {
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.checkGroup {
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+
+.deleteBtnWrap {
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.bodyInput {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 5px;
+  padding: 8px;
+  outline: none;
+  font-size: 14px;
+  /* override inline min-height injected by dom_components/TextInput */
+  min-height: 80px !important;
+  text-align: start;
+  overflow: hidden;
+  resize: none;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.variableBar {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  align-items: center;
+  transition: opacity 120ms ease;
+}
+
+.variableBarHidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pillButton {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 5px;
+  padding: 4px 8px;
+  margin-right: 5px;
+  margin-bottom: 5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+}
+
+.emojiPill {
+  font-size: 14px;
+}
+
+.variablePill {
+  font-size: 12px;
+}
+
+.saveBtnWrap {
+  align-self: flex-end;
+  margin-top: 8px;
+  width: 100px;
+  flex-shrink: 0;
+}

@@ -11,7 +11,7 @@ export const TextInput = forwardRef(function TextInput(
     placeholder = "",
     placeholderTextColor = "gray",
     multiline = false,
-    numberOfLines = 1,
+    numberOfLines,
     autoFocus = false,
     editable = true,
     disabled = false,
@@ -120,8 +120,13 @@ export const TextInput = forwardRef(function TextInput(
 
   const computedStyle = {
     "--placeholder-color": placeholderTextColor,
+    ...(multiline
+      ? {
+          minHeight,
+          textAlign: "start",
+        }
+      : {}),
     ...style,
-    ...(multiline ? { minHeight, textAlign: "start" } : {}),
   };
 
   const classNames = [
@@ -154,7 +159,7 @@ export const TextInput = forwardRef(function TextInput(
         placeholder={placeholder}
         autoFocus={autoFocus}
         disabled={isDisabled}
-        rows={multiline ? 1 : undefined}
+        rows={multiline ? (numberOfLines || 1) : undefined}
         aria-label={ariaLabel || label}
         aria-invalid={!!error || undefined}
         aria-required={required || undefined}

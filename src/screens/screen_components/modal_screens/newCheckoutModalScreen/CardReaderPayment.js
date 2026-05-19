@@ -1,9 +1,16 @@
 /* eslint-disable */
-import { View, Text, TextInput, Animated, Image } from "react-native-web";
 import { useState, useRef, useEffect, memo } from "react";
-import { Button_, SHADOW_RADIUS_PROTO, SmallLoadingIndicator, Tooltip } from "../../../../components";
-import { DropdownMenu } from "../../../../dom_components/DropdownMenu/DropdownMenu";
-import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
+import styles from "./CardReaderPayment.module.css";
+import {
+  Button,
+  DropdownMenu,
+  Image,
+  SHADOW_PROTO,
+  SmallLoadingIndicator,
+  TextInput,
+  Tooltip,
+} from "../../../../dom_components";
+import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
 import {
   usdTypeMask,
   formatCurrencyDisp,
@@ -22,29 +29,10 @@ import {
 import { dlog, DCAT } from "./checkoutDebugLog";
 
 function PulsingText({ text }) {
-  const opacity = useRef(new Animated.Value(0.3)).current;
-  const started = useRef(false);
-  if (!started.current) {
-    started.current = true;
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(opacity, { toValue: 1, duration: 900, useNativeDriver: false }),
-        Animated.timing(opacity, { toValue: 0.3, duration: 900, useNativeDriver: false }),
-      ])
-    ).start();
-  }
   return (
-    <Animated.Text
-      style={{
-        fontSize: 11,
-        color: C.lightText,
-        fontStyle: "italic",
-        marginTop: 6,
-        opacity,
-      }}
-    >
+    <span className={styles.pulsingText} style={{ color: C.lightText }}>
       {text}
-    </Animated.Text>
+    </span>
   );
 }
 
@@ -60,28 +48,28 @@ function formatStripeError(code) {
     expired_card: "Card is expired",
     incorrect_cvc: "Incorrect CVC",
     card_declined: "Card declined by issuer",
-    processing_error: "Processing error — try again",
-    do_not_honor: "Card declined — customer should contact their bank",
+    processing_error: "Processing error - try again",
+    do_not_honor: "Card declined - customer should contact their bank",
     generic_decline: "Card declined",
     card_not_supported: "Card not supported",
-    try_again_later: "Card issuer unavailable — try again",
-    pickup_card: "Card cannot be used — customer should contact their bank",
+    try_again_later: "Card issuer unavailable - try again",
+    pickup_card: "Card cannot be used - customer should contact their bank",
     not_permitted: "Payment not permitted on this card",
     withdrawal_count_limit_exceeded: "Card has exceeded withdrawal limit",
     invalid_account: "Card account is invalid",
-    new_account_information_available: "Card info has changed — try again",
+    new_account_information_available: "Card info has changed - try again",
     currency_not_supported: "Card does not support USD",
-    duplicate_transaction: "Duplicate transaction — already processed",
-    reenter_transaction: "Could not process — try again",
-    timed_out: "Reader timed out waiting for card — try again",
-    card_removed: "Card removed too early — reinsert and hold until done",
+    duplicate_transaction: "Duplicate transaction - already processed",
+    reenter_transaction: "Could not process - try again",
+    timed_out: "Reader timed out waiting for card - try again",
+    card_removed: "Card removed too early - reinsert and hold until done",
     canceled: "Payment was cancelled",
-    card_swipe_not_supported: "Card swipe not supported — use chip or tap",
-    chip_read_failed: "Chip read failed — try again or use tap",
-    contactless_not_supported: "Tap not supported — use chip",
-    pin_required: "PIN required — reinsert card and enter PIN",
+    card_swipe_not_supported: "Card swipe not supported - use chip or tap",
+    chip_read_failed: "Chip read failed - try again or use tap",
+    contactless_not_supported: "Tap not supported - use chip",
+    pin_required: "PIN required - reinsert card and enter PIN",
     offline_pin_required: "Offline PIN required",
-    online_or_offline_pin_required: "PIN required — reinsert card and enter PIN",
+    online_or_offline_pin_required: "PIN required - reinsert card and enter PIN",
     no_common_application: "Card not compatible with this reader",
   };
   return messages[code] || null;
@@ -238,7 +226,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
       let s = useStripePaymentStore.getState();
       let failedID = pendingTransactionIDRef.current;
       pendingTransactionIDRef.current = null;
-      s.setCardError("Payment timed out — card reader may be unresponsive");
+      s.setCardError("Payment timed out - card reader may be unresponsive");
       s.setCardMessage("");
       s.setCardStatus("idle");
       s.setPaymentIntentID(null);
@@ -397,7 +385,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
         _zSetCardError(msg);
       } else if (code === "functions/unavailable" || msg.includes("offline")) {
         _zSetCardStatus("idle");
-        _zSetCardError("Reader is offline — check power and network (" + msg + ")");
+        _zSetCardError("Reader is offline - check power and network (" + msg + ")");
       } else {
         _zSetCardStatus("idle");
         _zSetCardError(msg);
@@ -428,7 +416,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
       if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
     } catch (error) {
       let msg = error?.message || "";
-      // "not currently processing" means the reader is already clear — treat as success
+      // "not currently processing" means the reader is already clear - treat as success
       if (msg.includes("not currently processing")) {
         dlog(DCAT.ACTION, "clearReaderAlreadyClear", "CardReaderPayment", { readerId: activeReader?.id });
         let failedID = pendingTransactionIDRef.current;
@@ -447,7 +435,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
     }
   }
 
-  // ── Derived values ──
+  // -- Derived values --
   let savedCardReaders = settings?.cardReaders || [];
   let readerDropdownData = stripeReaders
     .filter((r) => r.status === "online")
@@ -481,59 +469,41 @@ export const CardReaderPayment = memo(function CardReaderPayment({
 
   if (sDone) {
     return (
-      <View
-        style={{
-          alignItems: "center",
-          width: "100%",
-          height: "48%",
-          borderRadius: 15,
-          ...SHADOW_RADIUS_PROTO,
-          justifyContent: "center",
-        }}
-      >
-        <View style={{ alignItems: "center" }}>
+      <div className={styles.containerCentered} style={SHADOW_PROTO}>
+        <div className={styles.celebrationInner}>
           <Image
-            source={celebrationGif}
-            style={{ width: 100, height: 100, marginBottom: 14, backgroundColor: "transparent" }}
+            icon={celebrationGif}
+            width={100}
+            height={100}
             resizeMode="contain"
+            className={styles.celebrationImage}
           />
-          <Text style={{ fontSize: 15, color: C.green, fontWeight: "600", textAlign: "center" }}>
+          <span className={styles.successText} style={{ color: C.green }}>
             {saleComplete ? "Full payment complete!" : sSuccessMsg}
-          </Text>
-        </View>
-      </View>
+          </span>
+        </div>
+      </div>
     );
   }
 
   if (!hasOnlineReaders) {
     return (
-      <View
-        style={{
-          alignItems: "center",
-          paddingTop: 20,
-          width: "100%",
-          height: "48%",
-          borderRadius: 15,
-          ...SHADOW_RADIUS_PROTO,
-          justifyContent: "center",
-          paddingBottom: 20,
-        }}
-      >
-        <Text style={{ position: "absolute", top: 8, left: 10, fontSize: 11, color: gray(0.55), fontStyle: "italic" }}>
+      <div className={styles.containerNoReaders} style={SHADOW_PROTO}>
+        <span className={styles.scanningLabel} style={{ color: gray(0.55) }}>
           Scanning for readers
-        </Text>
-        <Text style={{ fontSize: 25, color: C.blue, fontWeight: 500 }}>
+        </span>
+        <span className={styles.titleText} style={{ color: C.blue }}>
           CARD SALE
-        </Text>
+        </span>
         {!!readerError && (
-          <Text style={{ fontSize: 13, color: C.lightred, fontStyle: "italic", marginTop: 10 }}>
+          <span className={styles.readerErrorText} style={{ color: C.lightred }}>
             {readerError}
-          </Text>
+          </span>
         )}
         <PulsingText text="watching for new readers..." />
         {onSwitchToManual && (
-          <View style={{ marginTop: 12 }}>
-            <Button_
+          <div className={styles.manualEntryWrapNoReaders}>
+            <Button
               text="Manual Entry"
               onPress={() => { dlog(DCAT.BUTTON, "manualEntryNoReaders", "CardReaderPayment"); onSwitchToManual(); }}
               enabled={true}
@@ -541,9 +511,9 @@ export const CardReaderPayment = memo(function CardReaderPayment({
               textStyle={{ color: C.textWhite, fontSize: 11 }}
               buttonStyle={{ paddingVertical: 2, paddingHorizontal: 14 }}
             />
-          </View>
+          </div>
         )}
-      </View>
+      </div>
     );
   }
 
@@ -556,34 +526,16 @@ export const CardReaderPayment = memo(function CardReaderPayment({
     || zCardStatus === "readerBusy";
 
   return (
-    <View
-      pointerEvents={boxEnabled ? "auto" : "none"}
-      style={{
-        alignItems: "center",
-        paddingTop: 15,
-        width: "100%",
-        height: "48%",
-        borderRadius: 15,
-        ...SHADOW_RADIUS_PROTO,
-        justifyContent: "space-between",
-        paddingBottom: 20,
-        opacity: boxEnabled ? 1 : 0.2,
-      }}
+    <div
+      className={`${styles.container} ${boxEnabled ? "" : styles.disabled}`}
+      style={SHADOW_PROTO}
     >
       {/* Title + Reader Selector Row */}
-      <View
-        style={{
-          flexDirection: "column",
-          alignItems: "center",
-          width: "100%",
-          justifyContent: "center",
-          // paddingHorizontal: 30,
-        }}
-      >
-        <Text style={{ fontSize: 25, color: C.blue, fontWeight: 600, marginBottom: 8 }}>
+      <div className={styles.titleRow}>
+        <span className={styles.titleBold} style={{ color: C.blue }}>
           CARD SALE
-        </Text>
-        <View style={{ flex: 1, alignItems: "flex-end" }}>
+        </span>
+        <div className={styles.dropdownWrap}>
           <DropdownMenu
             dataArr={readerDropdownData}
             onSelect={handleReaderSelect}
@@ -601,38 +553,26 @@ export const CardReaderPayment = memo(function CardReaderPayment({
               borderWidth: 1,
               borderColor: C.buttonLightGreenOutline,
               backgroundColor: C.listItemWhite,
-              // width: 150
             }}
-            buttonTextStyle={{ fontSize: 11, width: '100%' }}
+            buttonTextStyle={{ fontSize: 11, width: "100%" }}
           />
-        </View>
-      </View>
+        </div>
+      </div>
 
       {!!readerError && (
-        <Text style={{ fontSize: 11, color: C.lightred, fontStyle: "italic" }}>
+        <span className={styles.readerErrorTextSmall} style={{ color: C.lightred }}>
           {readerError}
-        </Text>
+        </span>
       )}
 
       {/* Payment Amount Input */}
-      <View style={{ marginTop: 5 }}>
-        <View
-          style={{
-            borderColor: C.buttonLightGreenOutline,
-            borderRadius: 10,
-            borderWidth: 2,
-            backgroundColor: C.listItemWhite,
-            paddingVertical: 10,
-            paddingHorizontal: 10,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            paddingBottom: 6,
-            paddingRight: 7,
-          }}
+      <div className={styles.amountSection}>
+        <div
+          className={styles.amountBox}
+          style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
         >
-          <Text style={{ fontSize: 15 }}>$</Text>
-          <View style={{ width: 100, alignItems: "flex-end", paddingRight: 5 }}>
+          <span className={styles.dollarSign}>$</span>
+          <div className={styles.amountInputWrap}>
             <TextInput
               onFocus={() => {
                 dlog(DCAT.INPUT, "amountFocus", "CardReaderPayment", { lockAmount });
@@ -655,10 +595,10 @@ export const CardReaderPayment = memo(function CardReaderPayment({
               onChangeText={handleAmountChange}
               editable={isEnabled && !lockAmount}
             />
-          </View>
-        </View>
-        <View style={{ alignItems: "flex-end", marginTop: 3 }}>
-          <Button_
+          </div>
+        </div>
+        <div className={styles.maxButtonWrap}>
+          <Button
             text="MAX"
             onPress={() => {
               dlog(DCAT.BUTTON, "maxAmount", "CardReaderPayment", { amountLeftToPay });
@@ -670,36 +610,36 @@ export const CardReaderPayment = memo(function CardReaderPayment({
             textStyle={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}
             buttonStyle={{ height: 18, borderRadius: 4, paddingHorizontal: 5 }}
           />
-        </View>
-      </View>
+        </div>
+      </div>
 
       {/* Status Messages */}
-      <View style={{ alignItems: "center", justifyContent: "center", minHeight: 30 }}>
+      <div className={styles.statusRow}>
         {isProcessing && (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <div className={styles.processingRow}>
             <SmallLoadingIndicator color={C.green} text="" message="" containerStyle={{ padding: 2 }} />
             {!!zCardMessage && (
-              <Text style={{ fontSize: 13, color: gray(0.5), fontWeight: "600" }}>{zCardMessage}</Text>
+              <span className={styles.processingMessage} style={{ color: gray(0.5) }}>{zCardMessage}</span>
             )}
-          </View>
+          </div>
         )}
         {!isProcessing && !!zCardError && (
-          <Text style={{ fontSize: 13, color: C.lightred, fontWeight: "600", textAlign: "center" }}>
+          <span className={styles.errorMessage} style={{ color: C.lightred }}>
             {zCardError}
-          </Text>
+          </span>
         )}
         {!isProcessing && !!zCardMessage && (
-          <Text style={{ fontSize: 13, color: C.green, fontWeight: "600", textAlign: "center" }}>
+          <span className={styles.successMessage} style={{ color: C.green }}>
             {zCardMessage}
-          </Text>
+          </span>
         )}
-      </View>
+      </div>
 
       {/* Action Buttons */}
-      <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
-        <View style={{ width: "33%", alignItems: "flex-start", justifyContent: "flex-end", paddingLeft: 7 }}>
+      <div className={styles.actionRow}>
+        <div className={styles.actionLeft}>
           <Tooltip text="Clearing the reader will cancel the transaction for all users, be careful!" position="top">
-            <Button_
+            <Button
               text="Clear Reader"
               onPress={clearReader}
               enabled={zCardStatus !== "clearing"}
@@ -708,9 +648,9 @@ export const CardReaderPayment = memo(function CardReaderPayment({
               buttonStyle={{ paddingRight: 10, width: 90, borderRadius: 3 }}
             />
           </Tooltip>
-        </View>
-        <View style={{ width: "33%", alignItems: "center" }}>
-          <Button_
+        </div>
+        <div className={styles.actionCenter}>
+          <Button
             text="START CARD SALE"
             onPress={startPayment}
             enabled={!startDisabled}
@@ -718,10 +658,10 @@ export const CardReaderPayment = memo(function CardReaderPayment({
             textStyle={{ color: C.textWhite, fontSize: 16, fontWeight: 600 }}
             buttonStyle={{ paddingVertical: 10, cursor: startDisabled ? "default" : "inherit", borderRadius: 5 }}
           />
-        </View>
-        <View style={{ width: "33%", alignItems: "flex-end", paddingRight: 7 }}>
+        </div>
+        <div className={styles.actionRight}>
           {onSwitchToManual && (
-            <Button_
+            <Button
               text="Manual Entry"
               onPress={() => { dlog(DCAT.BUTTON, "manualEntry", "CardReaderPayment", { isProcessing, zCardStatus }); onSwitchToManual(); }}
               enabled={!isProcessing && zCardStatus !== "waitingForCard"}
@@ -730,8 +670,8 @@ export const CardReaderPayment = memo(function CardReaderPayment({
               buttonStyle={{ paddingRight: 10, width: 90, cursor: (isProcessing || zCardStatus === "waitingForCard") ? "default" : "inherit", borderRadius: 3 }}
             />
           )}
-        </View>
-      </View>
-    </View>
+        </div>
+      </div>
+    </div>
   );
 });

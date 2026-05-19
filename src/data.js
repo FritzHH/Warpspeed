@@ -981,7 +981,6 @@ export const SETTINGS_OBJ = {
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   smsConversationLockTimeout: 2, //days
-  smsBlockedNumbers: [], // array of 10-digit phone strings
   activeLoginTimeoutSeconds: 7,
   userInactivityTimeout: 120,
   idleLoginTimeoutHours: 24,

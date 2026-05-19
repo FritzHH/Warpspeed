@@ -1,0 +1,629 @@
+/* ────────────────────────────────────────────────────────────────────────
+   SalesReports — DOM/CSS migration of the RN-web original.
+   Layout: three columns inside a centered card.
+   Sizing: percentages of the parent card; flex-shrink: 0 locks them.
+   ──────────────────────────────────────────────────────────────────────── */
+
+/* Radix Dialog primitives */
+.radixOverlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+}
+
+.radixContent {
+  position: fixed;
+  inset: 0;
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The card that holds the three columns */
+.card {
+  width: 92%;
+  height: 94%;
+  flex-shrink: 0;
+  background-color: var(--reports-bg, #ffffff);
+  border-radius: 15px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: row;
+}
+
+/* ════════════ LEFT RAIL ════════════ */
+.leftRail {
+  width: 16%;
+  flex-shrink: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 8px 6px;
+  box-sizing: border-box;
+}
+
+.leftRailTop {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.leftRailBottom {
+  width: 100%;
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: 8px;
+  display: flex;
+  justify-content: center;
+}
+
+.title {
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.shortcutRow {
+  width: 100%;
+  flex-shrink: 0;
+  border-radius: 5px;
+  padding: 8px 0;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.shortcutRowText {
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ════════════ MIDDLE COLUMN ════════════ */
+.middleColumn {
+  width: 28%;
+  flex-shrink: 0;
+  height: 100%;
+  overflow-y: auto;
+  padding: 8px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendarCard {
+  width: 100%;
+  flex-shrink: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  border-radius: 10px;
+  padding: 6px 4px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.calendarHeader {
+  font-size: 10px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.dateSummary {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.dateSummaryText {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.endCalNavRow {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  box-sizing: border-box;
+}
+
+.endCalNavText {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.endCalNavBtn {
+  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.endCalNavArrow {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.actionRow {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+/* ════════════ RIGHT COLUMN ════════════ */
+.rightColumn {
+  width: 56%;
+  flex-shrink: 0;
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.resultsHeader {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 10px;
+  box-sizing: border-box;
+}
+
+.resultsCount {
+  font-size: 12px;
+}
+
+.pageOf {
+  font-size: 12px;
+}
+
+.searchRow {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px 5px 10px;
+  box-sizing: border-box;
+}
+
+.viewModeToggle {
+  display: flex;
+  flex-direction: row;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.viewModeBtn {
+  padding: 6px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewModeBtnLeft {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.viewModeBtnRight {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.viewModeText {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.searchInput {
+  width: 50%;
+  flex-shrink: 0;
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 13px;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.clearBtn {
+  margin-left: 8px;
+  border-radius: 5px;
+  padding: 6px 12px;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clearBtnText {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ════════════ TABLE ════════════ */
+.tableHeader {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6px 10px;
+  background-color: rgba(0, 0, 0, 0.75);
+  border-bottom-width: 2px;
+  border-bottom-style: solid;
+  box-sizing: border-box;
+}
+
+.thCell {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.thType   { width: 23%; justify-content: flex-start; padding-left: 10px; }
+.thMethod { width: 18%; justify-content: center; }
+.thAmount { width: 23%; justify-content: flex-end; }
+.thDate   { width: 36%; justify-content: flex-end; padding-right: 5px; }
+
+.thText {
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.thCaret {
+  font-size: 9px;
+  font-weight: 700;
+  margin-left: 4px;
+}
+
+.listWrap {
+  width: 100%;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.listScroll {
+  width: 100%;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.groupHeader {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6px 10px;
+  box-sizing: border-box;
+}
+
+.groupHeaderText {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.activeBadge {
+  margin-left: 8px;
+  border-radius: 4px;
+  padding: 2px 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.activeBadgeText {
+  font-size: 10px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.row {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 10px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  box-sizing: border-box;
+}
+
+.activeDot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 3px;
+  margin-right: 4px;
+}
+
+.cell {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  overflow: hidden;
+}
+
+.cellType    { width: 23%; justify-content: flex-start; }
+.cellMethod  { width: 18%; justify-content: center; }
+.cellAmount  { width: 23%; justify-content: flex-end; }
+.cellDate    { width: 36%; justify-content: flex-end; padding-right: 5px; }
+
+.cellTypeText {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cellMethodText {
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cellAmountText {
+  font-size: 15px;
+  font-weight: 600;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.cellDateText {
+  font-size: 13px;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.emptyState {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 0;
+}
+
+.emptyStateText {
+  font-size: 14px;
+}
+
+/* Pagination */
+.pagination {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0;
+  border-top-width: 1px;
+  border-top-style: solid;
+}
+
+.pagBtn {
+  padding: 4px 12px;
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pagBtnRight {
+  margin-left: 8px;
+}
+
+.pagBtnText {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.pagInfo {
+  font-size: 11px;
+  margin: 0 8px;
+}
+
+/* Summary footer */
+.footer {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-evenly;
+  align-items: center;
+  padding: 8px 10px;
+  background-color: rgba(0, 0, 0, 0.75);
+  border-top-width: 2px;
+  border-top-style: solid;
+  box-sizing: border-box;
+}
+
+.summaryItem {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 2px 8px;
+}
+
+.summaryLabel {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+}
+
+.summaryValue {
+  font-size: 16px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.txModeNote {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  font-weight: 500;
+  font-style: italic;
+  padding: 4px 0;
+  text-align: center;
+}
+
+/* ════════════ TRANSACTION VIEWER MODAL ════════════ */
+.txModalCard {
+  width: 400px;
+  flex-shrink: 0;
+  background-color: var(--reports-bg, #ffffff);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.txModalHeader {
+  width: 100%;
+  flex-shrink: 0;
+  background-color: rgba(0, 0, 0, 0.75);
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.txModalHeaderText {
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+}
+
+.txModalBody {
+  width: 100%;
+  flex-shrink: 0;
+  padding: 16px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.txModalRow {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+}
+
+.txModalRowLast {
+  border-bottom-width: 0;
+}
+
+.txModalLabel {
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.txModalValue {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: right;
+  margin-left: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.txModalFooter {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 0 14px 0;
+}
+
+/* ════════════ LOADING OVERLAY ════════════ */
+.loadingOverlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1100;
+}
+
+.loadingCard {
+  flex-shrink: 0;
+  background-color: var(--reports-bg, #ffffff);
+  border-radius: 15px;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.loadingTitle {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 15px;
+}

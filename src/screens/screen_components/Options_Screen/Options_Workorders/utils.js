@@ -3,9 +3,16 @@ import {
   calculateWaitEstimateLabel,
   capitalizeFirstLetterOfString,
   gray,
+  resolveStatus,
 } from "../../../../utils";
 import { C } from "../../../../styles";
 import { useSettingsStore } from "../../../../stores";
+
+export function isFinishedStatus(workorder) {
+  const settings = useSettingsStore.getState().getSettings();
+  const rs = resolveStatus(workorder.status, settings?.statuses);
+  return !!rs?.label?.toLowerCase().includes("finished");
+}
 
 export const NUM_MILLIS_IN_DAY = 86400000;
 
@@ -25,12 +32,14 @@ export function computeWaitInfo(workorder) {
 
   if (label === "No estimate") {
     result.waitEndDay = label;
+    result.textColor = gray(0.4);
     return result;
   }
 
   let lowerLabel = label.toLowerCase();
+  const finished = isFinishedStatus(workorder);
 
-  if (workorder.status === "finished") {
+  if (finished) {
     result.textColor = gray(0.4);
   } else if (lowerLabel === "waiting" || lowerLabel === "today") {
     result.waitEndDay = label;
@@ -39,7 +48,7 @@ export function computeWaitInfo(workorder) {
     return result;
   }
 
-  if (workorder.status !== "finished") {
+  if (!finished) {
     if (lowerLabel.includes("today") || lowerLabel.includes("overdue")) {
       result.textColor = "red";
     } else if (lowerLabel.includes("tomorrow")) {

@@ -1,0 +1,60 @@
+.innerBox {
+  width: 100%;
+  border: 1px solid var(--settings-csv-border, #b6dab6);
+  background-color: var(--settings-csv-bg, #f7fbf7);
+  border-radius: 10px;
+  padding: 15px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.sectionTitle {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 10px;
+  align-self: flex-start;
+}
+
+.sectionDescription {
+  font-size: 12px;
+  margin-bottom: 15px;
+  align-self: flex-start;
+}
+
+.buttonRow {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.hiddenFileInput {
+  display: none;
+}
+
+.resultBox {
+  margin-top: 15px;
+  padding: 10px;
+  border-radius: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.resultBoxSuccess {
+  background-color: rgba(0, 180, 0, 0.08);
+}
+
+.resultBoxFailure {
+  background-color: rgba(220, 0, 0, 0.08);
+}
+
+.resultTitle {
+  font-size: 13px;
+  font-weight: 700;
+}

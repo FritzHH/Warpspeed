@@ -1,0 +1,317 @@
+/* Layout/visual classes for the Email Options dashboard tab.
+   Theme colors are applied inline via C from styles.js for consistency
+   with the rest of the codebase. */
+
+.inboxRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+  padding: 8px 10px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.inboxRowLeft {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+}
+
+.inboxRowActions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.inboxNameRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.inboxStatusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.tabRow {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  margin-bottom: 15px;
+  flex-shrink: 0;
+}
+
+.tabButton {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+  cursor: pointer;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.varButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 5px;
+  padding: 4px 8px;
+  margin-right: 5px;
+  margin-bottom: 5px;
+  cursor: pointer;
+  user-select: none;
+  background: none;
+}
+
+.colorSwatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 13px;
+  border-style: solid;
+  margin-right: 4px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  user-select: none;
+  background: none;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.emojiCell {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  background: none;
+  border: none;
+}
+
+.emojiCell:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.templateCard {
+  width: 100%;
+  margin-bottom: 20px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 10px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.templateHeaderRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 10px;
+  padding-bottom: 8px;
+}
+
+.templateSubjectRow {
+  padding: 0 10px 8px 10px;
+}
+
+.templateVarRow {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 6px;
+  padding: 0 10px;
+}
+
+.actionSection {
+  background-color: #E8F5E9;
+  padding: 16px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.bannerContainer {
+  width: 100%;
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.bannerControlsRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 6px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.bannerControlsLeft {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  flex: 1;
+}
+
+.alignToggleRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 8px;
+}
+
+.alignBtn {
+  padding: 5px 12px;
+  border-radius: 5px;
+  border-width: 1px;
+  border-style: solid;
+  cursor: pointer;
+  user-select: none;
+  background: none;
+  margin-right: 6px;
+}
+
+.fontControlsRow {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  margin-bottom: 10px;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.fontSizeBox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.fontSizeBtn {
+  padding: 3px 7px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  background: none;
+  border: none;
+}
+
+.italicToggle {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border-width: 1px;
+  border-style: solid;
+  cursor: pointer;
+  user-select: none;
+  background: none;
+}
+
+.editorBox {
+  width: 100%;
+  min-height: 80px;
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 10px;
+  padding: 10px;
+  outline: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  cursor: text;
+  box-sizing: border-box;
+}
+
+.editorPlaceholder {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: gray;
+  pointer-events: none;
+  user-select: none;
+  font-size: 14px;
+}
+
+.imageScaleCol {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  align-items: center;
+}
+
+.imageScaleBtn {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border-width: 1px;
+  border-style: solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  background: none;
+}
+
+.emojiModalBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(0, 0, 0, 0.4);
+}
+
+.emojiModalCloseLayer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+
+.emojiModalCard {
+  border-radius: 12px;
+  padding: 15px;
+  width: 320px;
+  z-index: 1;
+}
+
+.logoSizeBtn {
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  user-select: none;
+  border: none;
+}

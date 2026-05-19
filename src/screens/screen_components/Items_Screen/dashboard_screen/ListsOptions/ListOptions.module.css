@@ -1,0 +1,511 @@
+/* Layout-only classes. Theme colors are applied inline using C from styles.js
+   so they stay in sync with the rest of the codebase. */
+
+.boxOuter {
+  width: 97%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.boxInner {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 10px;
+  padding: 15px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.boxInnerBorderless {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 10px;
+  padding: 15px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.sectionHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  padding: 5px 20px;
+  width: 95%;
+  flex-shrink: 0;
+}
+
+.sectionHeaderEnd {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  border-radius: 5px;
+  padding: 5px;
+  width: 95%;
+  flex-shrink: 0;
+}
+
+.sectionHeaderFull {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  padding: 5px 20px;
+  margin-top: 20px;
+  margin-bottom: 10px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.sectionWrapper {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  border-radius: 5px;
+  padding: 0 5px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.sectionWrapperDiscounts {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  border-radius: 10px;
+  padding: 0 5px;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.listContainer {
+  margin-top: 10px;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.rowSpaced {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.rowLeft {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.colHeaderRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.colHeader66 {
+  width: 66%;
+  font-size: 12px;
+  background-color: transparent;
+  flex-shrink: 0;
+}
+
+.colHeader10Center {
+  width: 10%;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.colHeader20 {
+  width: 20%;
+  flex-shrink: 0;
+}
+
+.actionsGroup20 {
+  width: 20%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.actionsGroup40 {
+  width: 40%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.greenInput {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 5px;
+  padding: 5px;
+  text-align: center;
+  outline-width: 0;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.brandInput {
+  margin-bottom: 5px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 5px;
+  padding: 5px;
+  width: 80%;
+  text-align: center;
+  outline-width: 0;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.smallInput {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 5px;
+  padding: 5px;
+  text-align: center;
+  outline-width: 0;
+  outline: none;
+  font-size: 13px;
+  margin-right: 20px;
+  box-sizing: border-box;
+}
+
+.discountInput {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 5px;
+  padding: 5px;
+  text-align: center;
+  outline-width: 0;
+  outline: none;
+  font-size: 12px;
+  margin-right: 10px;
+  box-sizing: border-box;
+}
+
+.discountTypeToggle {
+  border-radius: 5px;
+  border-width: 1px;
+  border-style: solid;
+  padding: 3px 10px;
+  cursor: pointer;
+  user-select: none;
+  background: none;
+}
+
+.discountTypeToggleText {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.categoryRow {
+  border-style: solid;
+  border-radius: 8px;
+  padding: 8px;
+  margin-bottom: 6px;
+  cursor: grab;
+  box-sizing: border-box;
+}
+
+.categoryRowTop {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.categoryLabel {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.categoryItemCount {
+  font-size: 12px;
+  margin-right: 8px;
+}
+
+.categoryTargetRow {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.categoryItemPreviewRow {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.categoryItemPreview {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 6px;
+  background-color: white;
+  padding: 3px 8px;
+  font-size: 13px;
+}
+
+.iconButton {
+  padding: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.iconButtonInline {
+  padding: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 4px;
+}
+
+.targetCheckboxRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.targetCheckboxBox {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border-width: 2px;
+  border-style: solid;
+  margin-right: 4px;
+  box-sizing: border-box;
+}
+
+.targetCheckboxLabel {
+  font-size: 12px;
+}
+
+/* ============ Editor modal ============ */
+.modalShell {
+  width: 500px;
+  height: 75vh;
+  background-color: white;
+  border-radius: 12px;
+  border-width: 2px;
+  border-style: solid;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.modalHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  flex-shrink: 0;
+}
+
+.modalHeaderTitleRow {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.modalHeaderTitle {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.modalHeaderInput {
+  flex: 1;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 5px;
+  padding: 5px;
+  font-size: 15px;
+  font-weight: 600;
+  outline-width: 0;
+  outline: none;
+  background-color: white;
+  box-sizing: border-box;
+}
+
+.modalTargetRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 14px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  flex-shrink: 0;
+}
+
+.modalTargetRowLabel {
+  font-size: 12px;
+  margin-right: 4px;
+}
+
+.modalTargetCheckboxBox {
+  width: 15px;
+  height: 15px;
+  border-radius: 3px;
+  border-width: 2px;
+  border-style: solid;
+  margin-right: 5px;
+  box-sizing: border-box;
+}
+
+.modalTargetCheckboxLabel {
+  font-size: 13px;
+}
+
+.modalScrollArea {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px;
+  box-sizing: border-box;
+}
+
+.modalItemBox {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+}
+
+.modalItemFieldRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.modalItemFieldRowMulti {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+.modalItemFieldLabel {
+  font-size: 12px;
+  width: 50px;
+  flex-shrink: 0;
+}
+
+.modalItemFieldLabelMulti {
+  font-size: 12px;
+  width: 50px;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.modalItemFieldInput {
+  flex: 1;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 5px;
+  padding: 5px 8px;
+  font-size: 13px;
+  outline-width: 0;
+  outline: none;
+  background-color: white;
+  box-sizing: border-box;
+}
+
+.modalAddItemBtn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  border-width: 1px;
+  border-radius: 8px;
+  border-style: dashed;
+  padding: 10px 0;
+  width: 100%;
+  background: none;
+  cursor: pointer;
+}
+
+.modalAddItemBtnText {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.modalFooter {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 10px 14px;
+  border-top-width: 1px;
+  border-top-style: solid;
+  flex-shrink: 0;
+}
+
+.modalFooterError {
+  font-size: 12px;
+  margin-right: 10px;
+}
+
+.spacer20 {
+  width: 20%;
+  flex-shrink: 0;
+}

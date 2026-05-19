@@ -1,0 +1,46 @@
+export const TEMPLATE_EMOJIS = [
+  { id: "🎉", label: "🎉  Party" },
+  { id: "✅", label: "✅  Checkmark" },
+  { id: "🔧", label: "🔧  Wrench" },
+  { id: "🛠️", label: "🛠️  Tools" },
+  { id: "⚙️", label: "⚙️  Gear" },
+  { id: "🔩", label: "🔩  Bolt" },
+  { id: "🚲", label: "🚲  Bicycle" },
+  { id: "🚴", label: "🚴  Cyclist" },
+  { id: "💰", label: "💰  Money Bag" },
+  { id: "💳", label: "💳  Credit Card" },
+  { id: "🧾", label: "🧾  Receipt" },
+  { id: "🏷️", label: "🏷️  Price Tag" },
+  { id: "🛒", label: "🛒  Cart" },
+  { id: "🎁", label: "🎁  Gift" },
+  { id: "📋", label: "📋  Clipboard" },
+  { id: "📝", label: "📝  Memo" },
+  { id: "📱", label: "📱  Phone" },
+  { id: "📧", label: "📧  Email" },
+  { id: "🔔", label: "🔔  Bell" },
+  { id: "⭐", label: "⭐  Star" },
+  { id: "🌟", label: "🌟  Glowing Star" },
+  { id: "❤️", label: "❤️  Heart" },
+  { id: "👋", label: "👋  Wave" },
+  { id: "👍", label: "👍  Thumbs Up" },
+  { id: "🙏", label: "🙏  Thank You" },
+  { id: "😊", label: "😊  Smile" },
+  { id: "🤝", label: "🤝  Handshake" },
+  { id: "💪", label: "💪  Strong" },
+  { id: "🏆", label: "🏆  Trophy" },
+  { id: "🔥", label: "🔥  Fire" },
+];
+
+export const TEXT_TEMPLATE_VARIABLES = [
+  { label: "First Name", variable: "{firstName}" },
+  { label: "Brand", variable: "{brand}" },
+  { label: "Brands", variable: "{brands}" },
+  { label: "Store Phone", variable: "{storePhone}" },
+  { label: "Support Email", variable: "{supportEmail}" },
+];
+
+export const TEXT_TEMPLATE_TYPE_VARIABLES = {
+  saleReceipt: [{ label: "Sale Receipt Link", variable: "{salesReceipt}" }],
+  refundReceipt: [{ label: "Refund Receipt Link", variable: "{refundReceipt}" }],
+  intakeReceipt: [{ label: "Intake Receipt Link", variable: "{intakeReceipt}" }],
+};

@@ -2468,3 +2468,348 @@
   font-size: 28px;
   font-weight: 600;
 }
+
+/* ============================================================
+   Phase 3h — StandWaitTimeIndicator + Workorder List Modal
+   ============================================================ */
+
+.swtBox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  height: 100%;
+  width: 135px;
+  padding-right: 2px;
+  border: 1px solid;
+  border-radius: 5px;
+  margin-left: 5px;
+  flex-shrink: 0;
+}
+
+.swtCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.swtTextLg {
+  font-size: 14px;
+  text-align: right;
+}
+
+.swtTextMd {
+  font-size: 13px;
+  text-align: right;
+}
+
+.swtTextSm {
+  font-size: 11px;
+  text-align: right;
+}
+
+.swtTextItalic {
+  font-size: 12px;
+  text-align: right;
+  font-style: italic;
+}
+
+.wlmBackdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wlmDialog {
+  width: 95%;
+  height: 90%;
+  background-color: white;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.wlmHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 16px 20px;
+  border-bottom: 1px solid;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.wlmTitle {
+  font-size: 22px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.wlmSearchBox {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border: 1px solid;
+  border-radius: 8px;
+  padding: 0 10px;
+  height: 40px;
+}
+
+.wlmSearchInput {
+  flex: 1;
+  font-size: 16px;
+  outline: none;
+  border: none;
+  background: transparent;
+  height: 100%;
+}
+
+.wlmSearchClearBtn {
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wlmNewBtn {
+  flex-shrink: 0;
+  border-radius: 8px;
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wlmNewBtnText {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.wlmCloseBtn {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.wlmCloseBtnText {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.wlmScroll {
+  flex: 1;
+  padding: 8px 12px 0 12px;
+  overflow-y: auto;
+}
+
+.wlmEmpty {
+  font-size: 16px;
+  text-align: center;
+  padding: 20px 0;
+  display: block;
+}
+
+.wlmItem {
+  margin-bottom: 4px;
+  border-radius: 7px;
+  border: 1px solid;
+  border-left-width: 4px;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  padding: 8px 2px 8px 5px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+
+.wlmItemTop {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.wlmItemLeft {
+  margin: 2px 0;
+  display: flex;
+  flex-direction: column;
+  width: 65%;
+  flex-shrink: 0;
+  justify-content: center;
+}
+
+.wlmItemCustRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.wlmItemSmsDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  margin-right: 5px;
+  flex-shrink: 0;
+}
+
+.wlmItemCustName {
+  font-size: 21px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wlmItemDescRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.wlmItemColorDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 5px;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.wlmItemBrand {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.wlmItemSep {
+  width: 7px;
+  height: 2px;
+  margin: 0 5px;
+  background-color: lightgray;
+  flex-shrink: 0;
+}
+
+.wlmItemDesc {
+  font-size: 16px;
+}
+
+.wlmItemLineCount {
+  background-color: gray;
+  border-radius: 10px;
+  padding: 1px 6px;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.wlmItemLineCountText {
+  color: white;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.wlmItemRight {
+  width: 35%;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-direction: row;
+  height: 100%;
+}
+
+.wlmItemRightInner {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 100%;
+}
+
+.wlmItemDate {
+  color: dimgray;
+  font-size: 15px;
+}
+
+.wlmItemDateSpacer {
+  width: 8px;
+  height: 1px;
+}
+
+.wlmItemStatus {
+  display: flex;
+  flex-direction: row;
+  padding: 2px 11px;
+  align-items: center;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+
+.wlmItemWipUser {
+  color: rgb(204, 0, 0);
+  font-size: 13px;
+  font-style: italic;
+  margin-right: 5px;
+}
+
+.wlmItemStatusText {
+  font-size: 15px;
+  font-weight: normal;
+}
+
+.wlmItemPartRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 2px 0 1px 0;
+  margin-top: 2px;
+}
+
+.wlmItemPart {
+  font-size: 16px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wlmItemPartSep {
+  width: 5px;
+  height: 2px;
+  margin: 0 5px;
+  background-color: lightgray;
+  flex-shrink: 0;
+}
+
+.wlmItemPartSource {
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wlmItemPartDate {
+  font-size: 14px;
+  color: dimgray;
+  margin-left: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wlmItemPartTracking {
+  font-size: 14px;
+  margin-left: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

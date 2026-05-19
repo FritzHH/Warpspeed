@@ -1,5 +1,4 @@
 /* eslint-disable */
-import { View, Text, ScrollView, TouchableOpacity, TextInput } from "react-native-web";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { useState, useEffect, useRef, forwardRef } from "react";
 import { createPortal } from "react-dom";
@@ -3635,79 +3634,57 @@ const StandWaitTimeIndicator = ({ workorder }) => {
     const textColor = isToday ? C.red : isTomorrow ? C.green : C.text;
 
     return (
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          height: "100%",
-          width: 135,
-          paddingRight: 2,
-          backgroundColor: C.buttonLightGreen,
-          borderWidth: 1,
-          borderColor: C.buttonLightGreenOutline,
-          borderRadius: 5,
-          marginLeft: 5,
-        }}
+      <div
+        className={styles.swtBox}
+        style={{ backgroundColor: C.buttonLightGreen, borderColor: C.buttonLightGreenOutline }}
       >
-        <View style={{ flexDirection: "column", alignItems: "flex-end", justifyContent: "center" }}>
+        <div className={styles.swtCol}>
           {hasDate ? (
             <>
               {isToday ? (
-                <Text style={{ color: textColor, fontSize: 14, textAlign: "right" }}>Today</Text>
+                <span className={styles.swtTextLg} style={{ color: textColor }}>Today</span>
               ) : isTomorrow ? (
-                <Text style={{ color: textColor, fontSize: 14, textAlign: "right" }}>Tomorrow</Text>
+                <span className={styles.swtTextLg} style={{ color: textColor }}>Tomorrow</span>
               ) : (
-                <Text style={{ color: textColor, fontSize: 13, textAlign: "right" }}>
+                <span className={styles.swtTextMd} style={{ color: textColor }}>
                   {dateStr}
-                </Text>
+                </span>
               )}
               {!!timeStr && (
-                <Text style={{ color: C.text, fontSize: 11, textAlign: "right" }}>
+                <span className={styles.swtTextSm} style={{ color: C.text }}>
                   {timeStr}
-                </Text>
+                </span>
               )}
             </>
           ) : null}
-        </View>
-      </View>
+        </div>
+      </div>
     );
   }
 
   const info = computeWaitInfo(workorder);
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "flex-end",
-        height: "100%",
-        width: 135,
-        paddingRight: 2,
-        backgroundColor: C.buttonLightGreen,
-        borderWidth: 1,
-        borderColor: C.buttonLightGreenOutline,
-        borderRadius: 5,
-        marginLeft: 5,
-      }}
+    <div
+      className={styles.swtBox}
+      style={{ backgroundColor: C.buttonLightGreen, borderColor: C.buttonLightGreenOutline }}
     >
-      <View style={{ flexDirection: "column", alignItems: "flex-end", justifyContent: "center" }}>
+      <div className={styles.swtCol}>
         {info.isMissing ? null : !!info.waitEndDay && info.waitEndDay.includes("\n") ? (
           <>
-            <Text style={{ color: info.textColor, fontSize: 12, textAlign: "right", fontStyle: "italic" }}>
+            <span className={styles.swtTextItalic} style={{ color: info.textColor }}>
               {capitalizeFirstLetterOfString(info.waitEndDay.split("\n")[0])}
-            </Text>
-            <Text style={{ color: info.textColor, fontSize: 14, textAlign: "right" }}>
+            </span>
+            <span className={styles.swtTextLg} style={{ color: info.textColor, whiteSpace: "pre" }}>
               {info.waitEndDay.split("\n")[1]}
-            </Text>
+            </span>
           </>
         ) : !!info.waitEndDay ? (
-          <Text style={{ color: info.textColor, fontSize: 14, textAlign: "right" }}>
+          <span className={styles.swtTextLg} style={{ color: info.textColor }}>
             {capitalizeFirstLetterOfString(info.waitEndDay)}
-          </Text>
+          </span>
         ) : null}
-      </View>
-    </View>
+      </div>
+    </div>
   );
 };
 
@@ -3783,113 +3760,65 @@ const WorkorderListModal = ({ onSelect, onClose, onNewWorkorder, activeWorkorder
   let sortedWorkorders = sortWorkordersForStand(filtered);
 
   return (
-    <StandTouch touchStart={false} onPress={onClose}>
-    <div
-      onClick={onClose}
-      style={{
-        position: "absolute",
-        top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: Z.modal,
-      }}
-    >
+    <StandTouch touchStart={false} className={styles.wlmBackdrop} style={{ zIndex: Z.modal }} onPress={onClose}>
       <div
+        className={styles.wlmDialog}
         onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "95%",
-          height: "90%",
-          backgroundColor: "white",
-          borderRadius: 12,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
       >
         {/* Header — title, search, new workorder */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 20,
-            paddingVertical: 16,
-            borderBottomWidth: 1,
-            borderBottomColor: gray(0.1),
-            gap: 12,
-          }}
-        >
-          <Text style={{ fontSize: 22, fontWeight: "600", color: C.text, flexShrink: 0 }}>Open Workorders</Text>
-          <View
-            style={{
-              flex: 1,
-              flexDirection: "row",
-              alignItems: "center",
-              borderWidth: 1,
-              borderColor: C.buttonLightGreenOutline,
-              borderRadius: 8,
-              backgroundColor: C.listItemWhite,
-              paddingHorizontal: 10,
-              height: 40,
-            }}
+        <div className={styles.wlmHeader} style={{ borderBottomColor: gray(0.1) }}>
+          <span className={styles.wlmTitle} style={{ color: C.text }}>Open Workorders</span>
+          <div
+            className={styles.wlmSearchBox}
+            style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
           >
             <Image_ icon={ICONS.search} size={16} style={{ marginRight: 6, opacity: 0.4 }} />
-            <TextInput
+            <input
+              type="text"
               value={sSearch}
-              onChangeText={_setSearch}
+              onChange={(e) => _setSearch(e.target.value)}
               placeholder="Search name, brand, description..."
-              placeholderTextColor={gray(0.6)}
-              style={{ flex: 1, fontSize: 16, color: C.text, outlineStyle: "none" }}
+              className={styles.wlmSearchInput}
+              style={{ color: C.text }}
             />
             {!!sSearch && (
-              <TouchableOpacity onPress={() => _setSearch("")} style={{ padding: 4 }}>
+              <StandTouch className={styles.wlmSearchClearBtn} onPress={() => _setSearch("")}>
                 <Image_ icon={ICONS.close1} size={18} />
-              </TouchableOpacity>
+              </StandTouch>
             )}
-          </View>
-          <StandTouch onPress={onNewWorkorder}>
-          <TouchableOpacity
+          </div>
+          <StandTouch
+            className={styles.wlmNewBtn}
+            style={{ backgroundColor: C.green }}
             onPress={onNewWorkorder}
-            style={{
-              flexShrink: 0,
-              backgroundColor: C.green,
-              borderRadius: 8,
-              paddingVertical: 10,
-              paddingHorizontal: 18,
-            }}
           >
-            <Text style={{ fontSize: 16, fontWeight: "700", color: C.textWhite }}>+ New Workorder</Text>
-          </TouchableOpacity>
+            <span className={styles.wlmNewBtnText} style={{ color: C.textWhite }}>+ New Workorder</span>
           </StandTouch>
-          <StandTouch onPress={onClose}>
-          <TouchableOpacity
+          <StandTouch
+            className={styles.wlmCloseBtn}
+            style={{ backgroundColor: gray(0.08) }}
             onPress={onClose}
-            onTouchStart={(e) => { _swipeRef.current = e.touches[0].clientY; }}
-            onTouchEnd={(e) => {
-              if (_swipeRef.current !== null) {
-                let diff = e.changedTouches[0].clientY - _swipeRef.current;
-                if (diff > 20) onClose();
-                _swipeRef.current = null;
-              }
-            }}
-            style={{
-              flexShrink: 0,
-              paddingVertical: 10,
-              paddingHorizontal: 14,
-              borderRadius: 8,
-              backgroundColor: gray(0.08),
-            }}
+            touchStart={false}
           >
-            <Text style={{ fontSize: 16, fontWeight: "600", color: gray(0.5) }}>Close</Text>
-          </TouchableOpacity>
+            <span
+              className={styles.wlmCloseBtnText}
+              style={{ color: gray(0.5) }}
+              onTouchStart={(e) => { _swipeRef.current = e.touches[0].clientY; }}
+              onTouchEnd={(e) => {
+                if (_swipeRef.current !== null) {
+                  let diff = e.changedTouches[0].clientY - _swipeRef.current;
+                  if (diff > 20) onClose();
+                  _swipeRef.current = null;
+                }
+              }}
+            >Close</span>
           </StandTouch>
-        </View>
+        </div>
 
         {/* Workorder list */}
-        <ScrollView style={{ flex: 1, paddingHorizontal: 12, paddingTop: 8 }}>
+        <div className={styles.wlmScroll}>
           {sortedWorkorders.length === 0 ? (
-            <Text style={{ fontSize: 16, color: gray(0.4), textAlign: "center", paddingVertical: 20 }}>No open workorders.</Text>
+            <span className={styles.wlmEmpty} style={{ color: gray(0.4) }}>No open workorders.</span>
           ) : (
             sortedWorkorders.map((workorder) => {
               const rs = resolveStatus(workorder.status, zStatuses);
@@ -3902,201 +3831,124 @@ const WorkorderListModal = ({ onSelect, onClose, onNewWorkorder, activeWorkorder
               }
               let isActive = workorder.id === activeWorkorderID;
               return (
-                <StandTouch key={workorder.id} onPress={() => onSelect(workorder)}>
-                <TouchableOpacity
+                <StandTouch
+                  key={workorder.id}
+                  className={styles.wlmItem}
+                  style={{
+                    borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
+                    borderColor: C.buttonLightGreenOutline,
+                    backgroundColor: isActive ? lightenRGBByPercent(C.lightred, 85) : C.listItemWhite,
+                  }}
                   onPress={() => onSelect(workorder)}
                 >
-                  <View
-                    style={{
-                      marginBottom: 4,
-                      borderRadius: 7,
-                      borderWidth: 1,
-                      borderLeftWidth: 4,
-                      borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
-                      borderColor: C.buttonLightGreenOutline,
-                      backgroundColor: isActive ? lightenRGBByPercent(C.lightred, 85) : C.listItemWhite,
-                      flexDirection: "column",
-                      width: "100%",
-                      paddingLeft: 5,
-                      paddingRight: 2,
-                      paddingVertical: 8,
-                    }}
-                  >
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        width: "100%",
-                        justifyContent: "flex-start",
-                        alignItems: "center",
-                      }}
-                    >
-                      {/* Left: customer + description */}
-                      <View
-                        style={{
-                          marginVertical: 2,
-                          flexDirection: "column",
-                          width: "65%",
-                          justifyContent: "center",
-                        }}
-                      >
-                        {/* Customer name row */}
-                        <View style={{ flexDirection: "row", alignItems: "center" }}>
-                          {workorder.hasNewSMS && (
-                            <View
-                              style={{
-                                width: 8,
-                                height: 8,
-                                borderRadius: 4,
-                                backgroundColor: C.green,
-                                marginRight: 5,
-                              }}
-                            />
-                          )}
-                          <Text
-                            numberOfLines={1}
-                            style={{ fontSize: 21, color: "dimgray" }}
-                          >
-                            {capitalizeFirstLetterOfString(workorder.customerFirst) + " " + capitalizeFirstLetterOfString(workorder.customerLast)}
-                          </Text>
-                        </View>
+                  <div className={styles.wlmItemTop}>
+                    {/* Left: customer + description */}
+                    <div className={styles.wlmItemLeft}>
+                      {/* Customer name row */}
+                      <div className={styles.wlmItemCustRow}>
+                        {workorder.hasNewSMS && (
+                          <div className={styles.wlmItemSmsDot} style={{ backgroundColor: C.green }} />
+                        )}
+                        <span className={styles.wlmItemCustName} style={{ color: "dimgray" }}>
+                          {capitalizeFirstLetterOfString(workorder.customerFirst) + " " + capitalizeFirstLetterOfString(workorder.customerLast)}
+                        </span>
+                      </div>
 
-                        {/* Brand + description + line count */}
-                        <View style={{ flexDirection: "row", alignItems: "center" }}>
-                          {!!workorder.color1?.backgroundColor && (
-                            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: workorder.color1.backgroundColor, marginRight: 4 }} />
-                          )}
-                          {!!workorder.color2?.backgroundColor && (
-                            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: workorder.color2.backgroundColor, marginRight: 4 }} />
-                          )}
-                          <Text style={{ fontSize: 16, fontWeight: "500", color: C.text }}>
-                            {capitalizeFirstLetterOfString(workorder.brand) || ""}
-                          </Text>
-                          {!!workorder.description && (
-                            <View style={{ width: 7, height: 2, marginHorizontal: 5, backgroundColor: "lightgray" }} />
-                          )}
-                          <Text style={{ fontSize: 16, color: C.text }}>
-                            {capitalizeFirstLetterOfString(workorder.description)}
-                          </Text>
-                          {workorder.workorderLines?.length > 0 && (
-                            <View
-                              style={{
-                                backgroundColor: "gray",
-                                borderRadius: 10,
-                                paddingHorizontal: 6,
-                                paddingVertical: 1,
-                                marginLeft: 8,
-                              }}
-                            >
-                              <Text style={{ color: "white", fontSize: 15, fontWeight: "600" }}>
-                                {workorder.workorderLines.length}
-                              </Text>
-                            </View>
-                          )}
-                        </View>
-                      </View>
+                      {/* Brand + description + line count */}
+                      <div className={styles.wlmItemDescRow}>
+                        {!!workorder.color1?.backgroundColor && (
+                          <div className={styles.wlmItemColorDot} style={{ backgroundColor: workorder.color1.backgroundColor }} />
+                        )}
+                        {!!workorder.color2?.backgroundColor && (
+                          <div className={styles.wlmItemColorDot} style={{ backgroundColor: workorder.color2.backgroundColor }} />
+                        )}
+                        <span className={styles.wlmItemBrand} style={{ color: C.text }}>
+                          {capitalizeFirstLetterOfString(workorder.brand) || ""}
+                        </span>
+                        {!!workorder.description && (
+                          <div className={styles.wlmItemSep} />
+                        )}
+                        <span className={styles.wlmItemDesc} style={{ color: C.text }}>
+                          {capitalizeFirstLetterOfString(workorder.description)}
+                        </span>
+                        {workorder.workorderLines?.length > 0 && (
+                          <div className={styles.wlmItemLineCount}>
+                            <span className={styles.wlmItemLineCountText}>
+                              {workorder.workorderLines.length}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-                      {/* Right: date, status, wait time */}
-                      <View
-                        style={{
-                          width: "35%",
-                          justifyContent: "flex-end",
-                          alignItems: "center",
-                          flexDirection: "row",
-                          height: "100%",
-                        }}
-                      >
-                        <View
-                          style={{
-                            flexDirection: "column",
-                            alignItems: "flex-end",
-                            justifyContent: "space-between",
-                            height: "100%",
-                          }}
+                    {/* Right: date, status, wait time */}
+                    <div className={styles.wlmItemRight}>
+                      <div className={styles.wlmItemRightInner}>
+                        <span className={styles.wlmItemDate}>
+                          {(() => {
+                            let d = new Date(workorder.startedOnMillis);
+                            let h = d.getHours();
+                            let m = d.getMinutes();
+                            h = h % 12 || 12;
+                            return h + ":" + (m < 10 ? "0" : "") + m + "  ";
+                          })()}
+                          {formatMillisForDisplay(
+                            workorder.startedOnMillis,
+                            new Date(workorder.startedOnMillis).getFullYear() !== new Date().getFullYear()
+                          )}
+                        </span>
+                        <div className={styles.wlmItemDateSpacer} />
+                        <div
+                          className={styles.wlmItemStatus}
+                          style={{ backgroundColor: rs.backgroundColor, borderLeftColor: rs.textColor }}
                         >
-                          <Text style={{ color: "dimgray", fontSize: 15 }}>
-                            {(() => {
-                              let d = new Date(workorder.startedOnMillis);
-                              let h = d.getHours();
-                              let m = d.getMinutes();
-                              h = h % 12 || 12;
-                              return h + ":" + (m < 10 ? "0" : "") + m + "  ";
-                            })()}
-                            {formatMillisForDisplay(
-                              workorder.startedOnMillis,
-                              new Date(workorder.startedOnMillis).getFullYear() !== new Date().getFullYear()
-                            )}
-                          </Text>
-                          <View style={{ width: 8 }} />
-                          <View
-                            style={{
-                              backgroundColor: rs.backgroundColor,
-                              flexDirection: "row",
-                              paddingHorizontal: 11,
-                              paddingVertical: 2,
-                              alignItems: "center",
-                              borderRadius: 10,
-                              borderColor: "transparent",
-                              borderLeftColor: rs.textColor,
-                            }}
-                          >
-                            {!!wipUser && (
-                              <Text style={{ color: C.red, fontSize: 13, fontStyle: "italic", marginRight: 5 }}>{wipUser}</Text>
-                            )}
-                            <Text style={{ color: rs.textColor, fontSize: 15, fontWeight: "normal" }}>
-                              {rs.label}
-                            </Text>
-                          </View>
-                        </View>
-                        <StandWaitTimeIndicator workorder={workorder} />
-                      </View>
-                    </View>
+                          {!!wipUser && (
+                            <span className={styles.wlmItemWipUser} style={{ color: C.red }}>{wipUser}</span>
+                          )}
+                          <span className={styles.wlmItemStatusText} style={{ color: rs.textColor }}>
+                            {rs.label}
+                          </span>
+                        </div>
+                      </div>
+                      <StandWaitTimeIndicator workorder={workorder} />
+                    </div>
+                  </div>
 
-                    {/* Part ordered / source row */}
-                    {!!(workorder.partOrdered || workorder.partSource || workorder.trackingNumber) && (
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          paddingTop: 2,
-                          paddingBottom: 1,
-                          marginTop: 2,
-                        }}
-                      >
-                        {!!workorder.partOrdered && (
-                          <Text numberOfLines={1} style={{ fontSize: 16, color: C.blue, fontWeight: "500" }}>
-                            {capitalizeFirstLetterOfString(workorder.partOrdered)}
-                          </Text>
-                        )}
-                        {!!(workorder.partOrdered && workorder.partSource) && (
-                          <View style={{ width: 5, height: 2, marginHorizontal: 5, backgroundColor: "lightgray" }} />
-                        )}
-                        {!!workorder.partSource && (
-                          <Text numberOfLines={1} style={{ fontSize: 16, color: C.orange }}>
-                            {capitalizeFirstLetterOfString(workorder.partSource)}
-                          </Text>
-                        )}
-                        {!!(workorder.partOrderedMillis && workorder.partOrderEstimateMillis) && (
-                          <Text numberOfLines={1} style={{ fontSize: 14, color: "dimgray", marginLeft: 6 }}>
-                            {formatMillisForDisplay(workorder.partOrderedMillis)}
-                            {" \u2192 " + formatMillisForDisplay(workorder.partOrderEstimateMillis)}
-                          </Text>
-                        )}
-                        {!!workorder.trackingNumber && (
-                          <Text numberOfLines={1} style={{ fontSize: 14, color: C.blue, marginLeft: 6 }}>
-                            {workorder.trackingNumber}
-                          </Text>
-                        )}
-                      </View>
-                    )}
-                  </View>
-                </TouchableOpacity>
+                  {/* Part ordered / source row */}
+                  {!!(workorder.partOrdered || workorder.partSource || workorder.trackingNumber) && (
+                    <div className={styles.wlmItemPartRow}>
+                      {!!workorder.partOrdered && (
+                        <span className={styles.wlmItemPart} style={{ color: C.blue }}>
+                          {capitalizeFirstLetterOfString(workorder.partOrdered)}
+                        </span>
+                      )}
+                      {!!(workorder.partOrdered && workorder.partSource) && (
+                        <div className={styles.wlmItemPartSep} />
+                      )}
+                      {!!workorder.partSource && (
+                        <span className={styles.wlmItemPartSource} style={{ color: C.orange }}>
+                          {capitalizeFirstLetterOfString(workorder.partSource)}
+                        </span>
+                      )}
+                      {!!(workorder.partOrderedMillis && workorder.partOrderEstimateMillis) && (
+                        <span className={styles.wlmItemPartDate}>
+                          {formatMillisForDisplay(workorder.partOrderedMillis)}
+                          {" \u2192 " + formatMillisForDisplay(workorder.partOrderEstimateMillis)}
+                        </span>
+                      )}
+                      {!!workorder.trackingNumber && (
+                        <span className={styles.wlmItemPartTracking} style={{ color: C.blue }}>
+                          {workorder.trackingNumber}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </StandTouch>
               );
             })
           )}
-        </ScrollView>
+        </div>
       </div>
-    </div>
     </StandTouch>
   );
 };

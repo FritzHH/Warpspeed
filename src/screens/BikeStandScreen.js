@@ -2411,7 +2411,7 @@ export function BikeStandScreen() {
           )}
 
           {/* ── 20% sidebar + 80% canvas ── */}
-          <View style={{ flex: 1, flexDirection: "row", opacity: hasWorkorderReady ? 1 : 0.35 }} pointerEvents={hasWorkorderReady ? "auto" : "none"}>
+          <div className={styles.standMainRow} style={{ opacity: hasWorkorderReady ? 1 : 0.35, pointerEvents: hasWorkorderReady ? "auto" : "none" }}>
             {/* Left sidebar - root buttons */}
             <div className={styles.standSidebar} style={{ borderRightColor: gray(0.15) }}>
               {/* Breadcrumbs in sidebar */}
@@ -2580,14 +2580,14 @@ export function BikeStandScreen() {
             </div>
 
             {/* Right panel - canvas */}
-            <View style={{ width: "80%", position: "relative", zIndex: 1 }}>
+            <div className={styles.standCanvasPane}>
               {/* Breadcrumbs + child buttons above canvas */}
               {sCurrentParentID !== null && (
-                <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingBottom: 4, paddingTop: 4, flexWrap: "wrap" }}>
+                <div className={styles.standTopCrumbRow}>
                   {sMenuPath.map((crumb, i) => (
-                    <View key={crumb.id} style={{ flexDirection: "row", alignItems: "center" }}>
+                    <div key={crumb.id} className={styles.standTopCrumbSeg}>
                       {i > 0 && (
-                        <Text style={{ color: gray(0.3), marginHorizontal: 4, fontSize: 15 }}>{">"}</Text>
+                        <span className={styles.standTopCrumbSep} style={{ color: gray(0.3) }}>{">"}</span>
                       )}
                       <StandTouch onPress={() => {
                           let newPath = sMenuPath.slice(0, i + 1);
@@ -2600,35 +2600,20 @@ export function BikeStandScreen() {
                             _setSelectedButtonID(null);
                           }
                       }}>
-                      <TouchableOpacity
-                        onPress={() => {
-                          let newPath = sMenuPath.slice(0, i + 1);
-                          _setMenuPath(newPath);
-                          _setCurrentParentID(crumb.id);
-                          let crumbBtn = (zQuickItemButtons || []).find((b) => b.id === crumb.id);
-                          if (crumbBtn?.items?.length > 0) {
-                            _setSelectedButtonID(crumb.id);
-                          } else {
-                            _setSelectedButtonID(null);
-                          }
-                        }}
-                      >
-                        <Text style={{
+                        <span className={styles.standTopCrumbText} style={{
                           color: i === sMenuPath.length - 1 ? gray(0.4) : gray(0.55),
-                          fontSize: 15,
                           fontWeight: i === sMenuPath.length - 1 ? "bold" : "normal",
                         }}>
                           {(crumb.name || "(unnamed)").toUpperCase()}
-                        </Text>
-                      </TouchableOpacity>
+                        </span>
                       </StandTouch>
-                    </View>
+                    </div>
                   ))}
-                </View>
+                </div>
               )}
 
               {currentChildren.length > 0 && (
-                <View style={{ flexDirection: "row", flexWrap: "wrap", marginBottom: 0 }}>
+                <div className={styles.standChildBtnRow}>
                   {currentChildren.map((btn) => {
                     let isSelected = sSelectedButtonID === btn.id;
                     return (
@@ -2654,21 +2639,16 @@ export function BikeStandScreen() {
                       />
                     );
                   })}
-                </View>
+                </div>
               )}
 
               {/* Canvas */}
               {sSelectedButtonID ? (
-                <ScrollView style={{ flex: 1, backgroundColor: lightenRGBByPercent(C.backgroundWhite, 20) }}>
+                <div className={styles.standCanvasScroll} style={{ backgroundColor: lightenRGBByPercent(C.backgroundWhite, 20) }}>
                   <div
+                    className={styles.standCanvasInner}
                     style={{
-                      position: "relative",
-                      width: "100%",
                       minHeight: Math.max(500, canvasMaxBottom * 8) * (1 + sSubMenuHeightAdj * 0.03),
-                      overflow: "hidden",
-                      borderRadius: 6,
-                      padding: 5,
-                      boxSizing: "border-box",
                     }}
                   >
                     {canvasItems.map((itemObj) => {
@@ -2685,100 +2665,57 @@ export function BikeStandScreen() {
                       let hasDiscount = !!workorderLine?.discountObj?.value;
 
                       return (
-                        <StandTouch onPress={() => {
-                            if (sDiscountCardID) { _setDiscountCardID(null); return; }
-                            const now = Date.now();
-                            if (lastCanvasClickItemRef.current === itemObj.inventoryItemID && now - lastCanvasClickTimeRef.current < 700) {
-                              lastCanvasClickTimeRef.current = 0;
-                              lastCanvasClickItemRef.current = null;
-                              openNoteHelperForCanvasItem(invItem);
-                            } else {
-                              lastCanvasClickTimeRef.current = now;
-                              lastCanvasClickItemRef.current = itemObj.inventoryItemID;
-                              inventoryItemSelected(invItem);
-                              _setPulseID(itemObj.inventoryItemID);
-                              clearTimeout(pulseTimerRef.current);
-                              pulseTimerRef.current = setTimeout(() => _setPulseID(null), 160);
-                            }
-                        }} onLongPress={() => openNoteHelperForCanvasItem(invItem)} delayLongPress={150}>
-                        <TouchableOpacity
+                        <StandTouch
                           key={itemObj.inventoryItemID}
-                          activeOpacity={0.6}
-                          onPress={(e) => {
-                            if (sDiscountCardID) { _setDiscountCardID(null); return; }
-                            const now = Date.now();
-                            if (lastCanvasClickItemRef.current === itemObj.inventoryItemID && now - lastCanvasClickTimeRef.current < 700) {
-                              lastCanvasClickTimeRef.current = 0;
-                              lastCanvasClickItemRef.current = null;
-                              openNoteHelperForCanvasItem(invItem);
-                            } else {
-                              lastCanvasClickTimeRef.current = now;
-                              lastCanvasClickItemRef.current = itemObj.inventoryItemID;
-                              inventoryItemSelected(invItem);
-                              _setPulseID(itemObj.inventoryItemID);
-                              clearTimeout(pulseTimerRef.current);
-                              pulseTimerRef.current = setTimeout(() => _setPulseID(null), 160);
-                            }
-                          }}
-                          onLongPress={() => {
-                            openNoteHelperForCanvasItem(invItem);
-                          }}
-                          delayLongPress={150}
+                          className={styles.standCanvasItem}
                           style={{
-                            position: "absolute",
                             left: (itemObj.x || 0) + "%",
                             top: (itemObj.y || 0) + "%",
                             width: w + "%",
                             height: h + "%",
-                            flexDirection: "column",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            borderWidth: 1,
                             borderColor: C.buttonLightGreenOutline,
-                            borderRadius: 8,
                             backgroundColor: itemObj.backgroundColor || C.buttonLightGreenOutline,
-                            overflow: "visible",
-                            paddingHorizontal: 4,
-                            paddingVertical: 2,
-                            transform: [{ scale: sPulseID === itemObj.inventoryItemID ? 1.12 : 1 }],
-                            transitionProperty: "transform",
-                            transitionDuration: "150ms",
-                            transitionTimingFunction: "ease-out",
+                            transform: sPulseID === itemObj.inventoryItemID ? "scale(1.12)" : "scale(1)",
                           }}
+                          onPress={() => {
+                            if (sDiscountCardID) { _setDiscountCardID(null); return; }
+                            const now = Date.now();
+                            if (lastCanvasClickItemRef.current === itemObj.inventoryItemID && now - lastCanvasClickTimeRef.current < 700) {
+                              lastCanvasClickTimeRef.current = 0;
+                              lastCanvasClickItemRef.current = null;
+                              openNoteHelperForCanvasItem(invItem);
+                            } else {
+                              lastCanvasClickTimeRef.current = now;
+                              lastCanvasClickItemRef.current = itemObj.inventoryItemID;
+                              inventoryItemSelected(invItem);
+                              _setPulseID(itemObj.inventoryItemID);
+                              clearTimeout(pulseTimerRef.current);
+                              pulseTimerRef.current = setTimeout(() => _setPulseID(null), 160);
+                            }
+                          }}
+                          onLongPress={() => openNoteHelperForCanvasItem(invItem)}
+                          delayLongPress={150}
                         >
-                          <Text
+                          <span
+                            className={styles.standCanvasItemName}
                             style={{
                               fontSize: fontSize,
                               color: itemObj.textColor || (invItem ? C.text : gray(0.35)),
-                              textAlign: "center",
-                              fontWeight: "500",
                             }}
                           >
                             {name}
-                          </Text>
+                          </span>
                           {isOnWorkorder && (
-                            <View style={{
-                              position: "absolute",
-                              top: -8,
-                              left: -8,
-                              backgroundColor: gray(0.85),
-                              borderRadius: 18,
-                              minWidth: 36,
-                              height: 36,
-                              alignItems: "center",
-                              justifyContent: "center",
-                              paddingHorizontal: 6,
-                              zIndex: 10,
-                            }}>
-                              <Text style={{ fontSize: 28, fontWeight: "700", color: C.red }}>
+                            <div className={styles.standCanvasQtyBadge} style={{ backgroundColor: gray(0.85) }}>
+                              <span className={styles.standCanvasQtyText} style={{ color: C.red }}>
                                 {workorderLine?.qty || 1}
-                              </Text>
-                            </View>
+                              </span>
+                            </div>
                           )}
                           {hasDiscount && (
-                            <Text style={{ fontSize: 10, color: C.green, fontWeight: "600" }}>
+                            <span className={styles.standCanvasDiscountLabel} style={{ color: C.green }}>
                               {workorderLine.discountObj.name || "Discount"}
-                            </Text>
+                            </span>
                           )}
                           {/* Discount dropdown on long-press */}
                           {sDiscountCardID === itemObj.inventoryItemID && (
@@ -2820,47 +2757,26 @@ export function BikeStandScreen() {
                               ))}
                             </div>
                           )}
-                        </TouchableOpacity>
                         </StandTouch>
                       );
                     })}
                     {canvasItems.length === 0 && (
-                      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", paddingTop: 60 }}>
-                        <Text style={{ fontSize: 16, color: gray(0.5), marginTop: 12 }}>No items in this menu</Text>
-                      </View>
+                      <div className={styles.standCanvasEmpty}>
+                        <span className={styles.standCanvasEmptyText} style={{ color: gray(0.5) }}>No items in this menu</span>
+                      </div>
                     )}
                   </div>
-                </ScrollView>
+                </div>
               ) : (
-                <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-                  <Text style={{ fontSize: 16, color: gray(0.4) }}>Select a button to view items</Text>
-                </View>
+                <div className={styles.standCanvasNoSelect}>
+                  <span className={styles.standCanvasNoSelectText} style={{ color: gray(0.4) }}>Select a button to view items</span>
+                </div>
               )}
 
               {/* Workorder items overlay — grows upward from bottom, covers full screen */}
               {sShowItemOverlay && selectedWorkorder?.workorderLines?.length > 0 && (
-                <StandTouch touchStart={false} onPress={() => _setShowItemOverlay(false)}>
-                <TouchableOpacity
-                  activeOpacity={1}
-                  onPress={() => _setShowItemOverlay(false)}
-                  style={{
-                    position: "fixed",
-                    left: "5%",
-                    right: 0,
-                    top: 0,
-                    bottom: 0,
-                    justifyContent: "flex-end",
-                    paddingHorizontal: 8,
-                    paddingBottom: 100,
-                    zIndex: 50,
-                  }}
-                >
-                  <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()} style={{
-                    backgroundColor: "rgba(240,240,240,0.9)",
-                    borderRadius: 16,
-                    padding: 10,
-                    alignSelf: "flex-start",
-                  }}>
+                <StandTouch touchStart={false} className={styles.standItemsOverlay} onPress={() => _setShowItemOverlay(false)}>
+                  <div className={styles.standItemsOverlayInner} onClick={(e) => e.stopPropagation()}>
                   {selectedWorkorder.workorderLines.map((line) => {
                     let inv = line.inventoryItem || {};
                     let informal = inv.informalName || "";
@@ -2870,47 +2786,31 @@ export function BikeStandScreen() {
                     let isSwipedLeft = isSwiped && sSwipeDir === "left";
                     let isSwipedRight = isSwiped && sSwipeDir === "right";
                     return (
-                      <View
-                        key={line.id}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          alignSelf: "stretch",
-                          marginTop: 4,
-                        }}
-                      >
+                      <div key={line.id} className={styles.standItemRow}>
                         {/* Discount icon — revealed on swipe right */}
                         {isSwipedRight && (
-                          <StandTouch onPress={() => {
-                              _setSwipedCardID(null);
-                              _setSwipeDir(null);
-                              _setDiscountCardID(line.inventoryItem?.id === sDiscountCardID ? null : line.inventoryItem?.id);
-                          }}>
-                          <TouchableOpacity
+                          <StandTouch
+                            className={`${styles.standItemSideBtn} ${styles.standItemSideBtnRight}`}
+                            style={{ backgroundColor: lightenRGBByPercent(C.orange, 50) }}
                             onPress={() => {
                               _setSwipedCardID(null);
                               _setSwipeDir(null);
                               _setDiscountCardID(line.inventoryItem?.id === sDiscountCardID ? null : line.inventoryItem?.id);
                             }}
-                            style={{
-                              backgroundColor: lightenRGBByPercent(C.orange, 50),
-                              borderRadius: 6,
-                              paddingVertical: 5,
-                              paddingHorizontal: 8,
-                              marginRight: 4,
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
                           >
                             <Image_ icon={ICONS.dollarYellow} size={22} />
-                          </TouchableOpacity>
                           </StandTouch>
                         )}
 
                         {/* Card body — tap opens notes modal or custom item editor */}
-                        <TouchableOpacity
-                          activeOpacity={0.6}
-                          onPress={() => {
+                        <div
+                          className={styles.standItemCard}
+                          style={{
+                            backgroundColor: inv.customLabor ? lightenRGBByPercent(C.blue, 80) : inv.customPart ? lightenRGBByPercent(C.green, 80) : C.backgroundListWhite,
+                            borderColor: C.buttonLightGreenOutline,
+                            borderLeftColor: line.discountObj?.name ? C.lightred : lightenRGBByPercent(C.green, 60),
+                          }}
+                          onClick={() => {
                             if (inv.customPart || inv.customLabor) {
                               _setEditingLine(line);
                               _setCustomItemModal(inv.customLabor ? "labor" : "item");
@@ -2936,217 +2836,168 @@ export function BikeStandScreen() {
                           }}
                           onTouchStart={handleItemCardTouchStart}
                           onTouchEnd={(e) => handleItemCardTouchEnd(e, line.id)}
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            backgroundColor: inv.customLabor ? lightenRGBByPercent(C.blue, 80) : inv.customPart ? lightenRGBByPercent(C.green, 80) : C.backgroundListWhite,
-                            borderRadius: 12,
-                            borderWidth: 1,
-                            borderColor: C.buttonLightGreenOutline,
-                            borderLeftWidth: 6,
-                            borderLeftColor: line.discountObj?.name ? C.lightred : lightenRGBByPercent(C.green, 60),
-                            paddingVertical: 16,
-                            paddingHorizontal: 10,
-                          }}
                         >
                           {(inv.customPart || inv.customLabor) && (
-                            <View style={{ backgroundColor: inv.customLabor ? lightenRGBByPercent(C.blue, 55) : lightenRGBByPercent(C.green, 55), borderRadius: 15, paddingHorizontal: 10, paddingVertical: 4, marginRight: 8 }}>
-                              <Text style={{ fontSize: 18, fontWeight: "700", color: inv.customLabor ? lightenRGBByPercent(C.blue, 15) : lightenRGBByPercent(C.green, 15) }}>
+                            <span className={styles.standItemKindBadge} style={{ backgroundColor: inv.customLabor ? lightenRGBByPercent(C.blue, 55) : lightenRGBByPercent(C.green, 55) }}>
+                              <span className={styles.standItemKindBadgeText} style={{ color: inv.customLabor ? lightenRGBByPercent(C.blue, 15) : lightenRGBByPercent(C.green, 15) }}>
                                 {inv.customPart ? "ITEM" : inv.minutes ? inv.minutes + " MINS" : "LABOR"}
-                              </Text>
-                            </View>
+                              </span>
+                            </span>
                           )}
-                          <View style={{ flex: 1 }}>
-                          {line.discountObj?.name && (
-                            <Text style={{ fontSize: 22, fontWeight: "600", color: C.red, marginBottom: 2 }}>{line.discountObj.name}</Text>
-                          )}
-                          <View style={{ flexDirection: "row", alignItems: "center", flexWrap: "wrap" }}>
-                            <Text style={{ fontSize: 30, color: C.text, flexShrink: 1 }}>
-                              {formal}
-                            </Text>
-                            {(line.qty || 1) > 1 && (
-                              <View style={{
-                                backgroundColor: C.blue,
-                                borderRadius: 12,
-                                minWidth: 28,
-                                height: 28,
-                                alignItems: "center",
-                                justifyContent: "center",
-                                paddingHorizontal: 5,
-                                marginLeft: 12,
-                              }}>
-                                <Text style={{ fontSize: 21, fontWeight: "700", color: C.textWhite }}>{line.qty}</Text>
-                              </View>
+                          <div className={styles.standItemCardBody}>
+                            {line.discountObj?.name && (
+                              <span className={styles.standItemDiscountName} style={{ color: C.red }}>{line.discountObj.name}</span>
                             )}
-                            <View style={{
-                              backgroundColor: lightenRGBByPercent(C.green, 70),
-                              borderRadius: 10,
-                              paddingHorizontal: 7,
-                              paddingVertical: 2,
-                              marginLeft: 12,
-                            }}>
-                              <Text style={{ fontSize: 26, fontWeight: "600", color: C.text }}>
-                                {formatCurrencyDisp((inv.price || 0) * (line.qty || 1), true)}
-                              </Text>
-                            </View>
-                          </View>
-                          </View>
-                        </TouchableOpacity>
+                            <div className={styles.standItemNameRow}>
+                              <span className={styles.standItemFormalName} style={{ color: C.text }}>
+                                {formal}
+                              </span>
+                              {(line.qty || 1) > 1 && (
+                                <span className={styles.standItemQtyPill} style={{ backgroundColor: C.blue }}>
+                                  <span className={styles.standItemQtyPillText} style={{ color: C.textWhite }}>{line.qty}</span>
+                                </span>
+                              )}
+                              <span className={styles.standItemPricePill} style={{ backgroundColor: lightenRGBByPercent(C.green, 70) }}>
+                                <span className={styles.standItemPricePillText} style={{ color: C.text }}>
+                                  {formatCurrencyDisp((inv.price || 0) * (line.qty || 1), true)}
+                                </span>
+                              </span>
+                            </div>
+                          </div>
+                        </div>
 
                         {/* Delete icon — revealed on swipe left */}
                         {isSwipedLeft && (
-                          <StandTouch onPress={() => removeWorkorderLine(line.id)}>
-                          <TouchableOpacity
+                          <StandTouch
+                            className={`${styles.standItemSideBtn} ${styles.standItemSideBtnLeft}`}
+                            style={{ backgroundColor: lightenRGBByPercent("rgb(103, 124, 231)", 50) }}
                             onPress={() => removeWorkorderLine(line.id)}
-                            style={{
-                              backgroundColor: lightenRGBByPercent("rgb(103, 124, 231)", 50),
-                              borderRadius: 6,
-                              paddingVertical: 5,
-                              paddingHorizontal: 8,
-                              marginLeft: 4,
-                              alignItems: "center",
-                              justifyContent: "center",
-                            }}
                           >
                             <Image_ icon={ICONS.trash} size={44} />
-                          </TouchableOpacity>
                           </StandTouch>
                         )}
-                      </View>
+                      </div>
                     );
                   })}
-
-                  </TouchableOpacity>
-                </TouchableOpacity>
+                  </div>
                 </StandTouch>
               )}
 
               {/* Footer — totals or size editor */}
               {sSubMenuEditMode ? (
-                <View style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  paddingVertical: 14,
-                  paddingHorizontal: 16,
-                  borderTopWidth: 1,
-                  borderTopColor: gray(0.1),
-                  backgroundColor: "rgba(255,255,255,0.65)",
-                  gap: 24,
-                }}>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={{ fontSize: 18, fontWeight: "600", color: gray(0.5) }}>H</Text>
-                    <StandTouch onPress={() => { let v = sSubMenuHeightAdj - 1; _setSubMenuHeightAdj(v); localStorageWrapper.setItem("standSubMenuHeightAdj", String(v)); }}>
-                    <TouchableOpacity onPress={() => { let v = sSubMenuHeightAdj - 1; _setSubMenuHeightAdj(v); localStorageWrapper.setItem("standSubMenuHeightAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>-</Text>
-                    </TouchableOpacity>
+                <div className={styles.standCanvasFooterEdit} style={{ borderTopColor: gray(0.1) }}>
+                  <div className={styles.standCanvasFooterEditGroup}>
+                    <span className={styles.standCanvasFooterEditLabel} style={{ color: gray(0.5) }}>H</span>
+                    <StandTouch
+                      className={styles.standCanvasFooterEditStep}
+                      style={{ backgroundColor: gray(0.1) }}
+                      onPress={() => { let v = sSubMenuHeightAdj - 1; _setSubMenuHeightAdj(v); localStorageWrapper.setItem("standSubMenuHeightAdj", String(v)); }}
+                    >
+                      <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>-</span>
                     </StandTouch>
-                    <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, minWidth: 26, textAlign: "center" }}>{sSubMenuHeightAdj}</Text>
-                    <StandTouch onPress={() => { let v = sSubMenuHeightAdj + 1; _setSubMenuHeightAdj(v); localStorageWrapper.setItem("standSubMenuHeightAdj", String(v)); }}>
-                    <TouchableOpacity onPress={() => { let v = sSubMenuHeightAdj + 1; _setSubMenuHeightAdj(v); localStorageWrapper.setItem("standSubMenuHeightAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>+</Text>
-                    </TouchableOpacity>
+                    <span className={styles.standCanvasFooterEditValue} style={{ color: C.text }}>{sSubMenuHeightAdj}</span>
+                    <StandTouch
+                      className={styles.standCanvasFooterEditStep}
+                      style={{ backgroundColor: gray(0.1) }}
+                      onPress={() => { let v = sSubMenuHeightAdj + 1; _setSubMenuHeightAdj(v); localStorageWrapper.setItem("standSubMenuHeightAdj", String(v)); }}
+                    >
+                      <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>+</span>
                     </StandTouch>
-                  </View>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={{ fontSize: 18, fontWeight: "600", color: gray(0.5) }}>Font</Text>
-                    <StandTouch onPress={() => { let v = sSubMenuFontAdj - 1; _setSubMenuFontAdj(v); localStorageWrapper.setItem("standSubMenuFontAdj", String(v)); }}>
-                    <TouchableOpacity onPress={() => { let v = sSubMenuFontAdj - 1; _setSubMenuFontAdj(v); localStorageWrapper.setItem("standSubMenuFontAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>-</Text>
-                    </TouchableOpacity>
+                  </div>
+                  <div className={styles.standCanvasFooterEditGroup}>
+                    <span className={styles.standCanvasFooterEditLabel} style={{ color: gray(0.5) }}>Font</span>
+                    <StandTouch
+                      className={styles.standCanvasFooterEditStep}
+                      style={{ backgroundColor: gray(0.1) }}
+                      onPress={() => { let v = sSubMenuFontAdj - 1; _setSubMenuFontAdj(v); localStorageWrapper.setItem("standSubMenuFontAdj", String(v)); }}
+                    >
+                      <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>-</span>
                     </StandTouch>
-                    <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, minWidth: 26, textAlign: "center" }}>{sSubMenuFontAdj}</Text>
-                    <StandTouch onPress={() => { let v = sSubMenuFontAdj + 1; _setSubMenuFontAdj(v); localStorageWrapper.setItem("standSubMenuFontAdj", String(v)); }}>
-                    <TouchableOpacity onPress={() => { let v = sSubMenuFontAdj + 1; _setSubMenuFontAdj(v); localStorageWrapper.setItem("standSubMenuFontAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>+</Text>
-                    </TouchableOpacity>
+                    <span className={styles.standCanvasFooterEditValue} style={{ color: C.text }}>{sSubMenuFontAdj}</span>
+                    <StandTouch
+                      className={styles.standCanvasFooterEditStep}
+                      style={{ backgroundColor: gray(0.1) }}
+                      onPress={() => { let v = sSubMenuFontAdj + 1; _setSubMenuFontAdj(v); localStorageWrapper.setItem("standSubMenuFontAdj", String(v)); }}
+                    >
+                      <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>+</span>
                     </StandTouch>
-                  </View>
-                  <View style={{ width: 1, height: 28, backgroundColor: gray(0.2) }} />
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={{ fontSize: 18, fontWeight: "600", color: gray(0.5) }}>Nav</Text>
-                    <StandTouch onPress={() => { let v = sNavFontAdj - 1; _setNavFontAdj(v); localStorageWrapper.setItem("standNavFontAdj", String(v)); }}>
-                    <TouchableOpacity onPress={() => { let v = sNavFontAdj - 1; _setNavFontAdj(v); localStorageWrapper.setItem("standNavFontAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>-</Text>
-                    </TouchableOpacity>
+                  </div>
+                  <div className={styles.standCanvasFooterEditDivider} style={{ backgroundColor: gray(0.2) }} />
+                  <div className={styles.standCanvasFooterEditGroup}>
+                    <span className={styles.standCanvasFooterEditLabel} style={{ color: gray(0.5) }}>Nav</span>
+                    <StandTouch
+                      className={styles.standCanvasFooterEditStep}
+                      style={{ backgroundColor: gray(0.1) }}
+                      onPress={() => { let v = sNavFontAdj - 1; _setNavFontAdj(v); localStorageWrapper.setItem("standNavFontAdj", String(v)); }}
+                    >
+                      <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>-</span>
                     </StandTouch>
-                    <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, minWidth: 26, textAlign: "center" }}>{sNavFontAdj}</Text>
-                    <StandTouch onPress={() => { let v = sNavFontAdj + 1; _setNavFontAdj(v); localStorageWrapper.setItem("standNavFontAdj", String(v)); }}>
-                    <TouchableOpacity onPress={() => { let v = sNavFontAdj + 1; _setNavFontAdj(v); localStorageWrapper.setItem("standNavFontAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>+</Text>
-                    </TouchableOpacity>
+                    <span className={styles.standCanvasFooterEditValue} style={{ color: C.text }}>{sNavFontAdj}</span>
+                    <StandTouch
+                      className={styles.standCanvasFooterEditStep}
+                      style={{ backgroundColor: gray(0.1) }}
+                      onPress={() => { let v = sNavFontAdj + 1; _setNavFontAdj(v); localStorageWrapper.setItem("standNavFontAdj", String(v)); }}
+                    >
+                      <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>+</span>
                     </StandTouch>
-                  </View>
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                    <Text style={{ fontSize: 18, fontWeight: "600", color: gray(0.5) }}>Pad</Text>
-                    <StandTouch onPress={() => { let v = sNavPaddingAdj - 1; _setNavPaddingAdj(v); localStorageWrapper.setItem("standNavPaddingAdj", String(v)); }}>
-                    <TouchableOpacity onPress={() => { let v = sNavPaddingAdj - 1; _setNavPaddingAdj(v); localStorageWrapper.setItem("standNavPaddingAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>-</Text>
-                    </TouchableOpacity>
+                  </div>
+                  <div className={styles.standCanvasFooterEditGroup}>
+                    <span className={styles.standCanvasFooterEditLabel} style={{ color: gray(0.5) }}>Pad</span>
+                    <StandTouch
+                      className={styles.standCanvasFooterEditStep}
+                      style={{ backgroundColor: gray(0.1) }}
+                      onPress={() => { let v = sNavPaddingAdj - 1; _setNavPaddingAdj(v); localStorageWrapper.setItem("standNavPaddingAdj", String(v)); }}
+                    >
+                      <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>-</span>
                     </StandTouch>
-                    <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, minWidth: 26, textAlign: "center" }}>{sNavPaddingAdj}</Text>
-                    <StandTouch onPress={() => { let v = sNavPaddingAdj + 1; _setNavPaddingAdj(v); localStorageWrapper.setItem("standNavPaddingAdj", String(v)); }}>
-                    <TouchableOpacity onPress={() => { let v = sNavPaddingAdj + 1; _setNavPaddingAdj(v); localStorageWrapper.setItem("standNavPaddingAdj", String(v)); }} style={{ width: 40, height: 40, borderRadius: 8, backgroundColor: gray(0.1), alignItems: "center", justifyContent: "center" }}>
-                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.text }}>+</Text>
-                    </TouchableOpacity>
+                    <span className={styles.standCanvasFooterEditValue} style={{ color: C.text }}>{sNavPaddingAdj}</span>
+                    <StandTouch
+                      className={styles.standCanvasFooterEditStep}
+                      style={{ backgroundColor: gray(0.1) }}
+                      onPress={() => { let v = sNavPaddingAdj + 1; _setNavPaddingAdj(v); localStorageWrapper.setItem("standNavPaddingAdj", String(v)); }}
+                    >
+                      <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>+</span>
                     </StandTouch>
-                  </View>
-                </View>
+                  </div>
+                </div>
               ) : (
-              <View
+              <div
+                className={styles.standCanvasFooter}
+                style={{ borderTopColor: gray(0.1) }}
                 onClick={() => _setShowItemOverlay((p) => !p)}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  paddingVertical: 14,
-                  paddingHorizontal: 16,
-                  borderTopWidth: 1,
-                  borderTopColor: gray(0.1),
-                  backgroundColor: "rgba(255,255,255,0.65)",
-                  cursor: "pointer",
-                }}
               >
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 20 }}>
-                  <View style={{ alignItems: "center" }}>
-                    <Text style={{ fontSize: 15, color: gray(0.5) }}>Subtotal</Text>
-                    <Text style={{ fontSize: 22, fontWeight: "600", color: C.text }}>{formatCurrencyDisp(totals.runningSubtotal, true)}</Text>
-                  </View>
-                  <View style={{ alignItems: "center" }}>
-                    <Text style={{ fontSize: 15, color: gray(0.5) }}>Discount</Text>
-                    <Text style={{ fontSize: 22, fontWeight: "600", color: C.red }}>-{formatCurrencyDisp(totals.runningDiscount, true)}</Text>
-                  </View>
-                  <View style={{ alignItems: "center" }}>
-                    <Text style={{ fontSize: 15, color: gray(0.5) }}>Tax</Text>
-                    <Text style={{ fontSize: 22, fontWeight: "600", color: C.text }}>{formatCurrencyDisp(totals.runningTax, true)}</Text>
-                  </View>
-                  <View style={{ alignItems: "center" }}>
-                    <Text style={{ fontSize: 18, color: gray(0.5) }}>Total</Text>
-                    <Text style={{ fontSize: 28, fontWeight: "700", color: C.text }}>{formatCurrencyDisp(totals.finalTotal, true)}</Text>
-                  </View>
-                </View>
+                <div className={styles.standCanvasFooterLeft}>
+                  <div className={styles.standCanvasFooterStat}>
+                    <span className={styles.standCanvasFooterStatLabel} style={{ color: gray(0.5) }}>Subtotal</span>
+                    <span className={styles.standCanvasFooterStatVal} style={{ color: C.text }}>{formatCurrencyDisp(totals.runningSubtotal, true)}</span>
+                  </div>
+                  <div className={styles.standCanvasFooterStat}>
+                    <span className={styles.standCanvasFooterStatLabel} style={{ color: gray(0.5) }}>Discount</span>
+                    <span className={styles.standCanvasFooterStatVal} style={{ color: C.red }}>-{formatCurrencyDisp(totals.runningDiscount, true)}</span>
+                  </div>
+                  <div className={styles.standCanvasFooterStat}>
+                    <span className={styles.standCanvasFooterStatLabel} style={{ color: gray(0.5) }}>Tax</span>
+                    <span className={styles.standCanvasFooterStatVal} style={{ color: C.text }}>{formatCurrencyDisp(totals.runningTax, true)}</span>
+                  </div>
+                  <div className={styles.standCanvasFooterStat}>
+                    <span className={styles.standCanvasFooterStatLabelLg} style={{ color: gray(0.5) }}>Total</span>
+                    <span className={styles.standCanvasFooterStatValLg} style={{ color: C.text }}>{formatCurrencyDisp(totals.finalTotal, true)}</span>
+                  </div>
+                </div>
                 {selectedWorkorder?.workorderLines?.length > 0 && (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginRight: 10 }}>
-                    <Text style={{ fontSize: 26, fontStyle: "italic", color: sShowItemOverlay ? C.red : gray(0.35), fontWeight: sShowItemOverlay ? "600" : "normal" }}>{sShowItemOverlay ? "Tap to close" : "Tap for items"}</Text>
-                    <View style={{
-                      backgroundColor: C.blue,
-                      borderRadius: 10,
-                      minWidth: 32,
-                      height: 32,
-                      alignItems: "center",
-                      justifyContent: "center",
-                      paddingHorizontal: 6,
-                    }}>
-                      <Text style={{ fontSize: 22, fontWeight: "700", color: C.textWhite }}>
+                  <div className={styles.standCanvasFooterRight}>
+                    <span className={styles.standCanvasFooterHint} style={{ color: sShowItemOverlay ? C.red : gray(0.35), fontWeight: sShowItemOverlay ? "600" : "normal" }}>{sShowItemOverlay ? "Tap to close" : "Tap for items"}</span>
+                    <span className={styles.standCanvasFooterCountPill} style={{ backgroundColor: C.blue }}>
+                      <span className={styles.standCanvasFooterCountText} style={{ color: C.textWhite }}>
                         {selectedWorkorder.workorderLines.reduce((sum, ln) => sum + (ln.qty || 1), 0)}
-                      </Text>
-                    </View>
-                  </View>
+                      </span>
+                    </span>
+                  </div>
                 )}
-              </View>
+              </div>
               )}
-            </View>
-          </View>
+            </div>
+          </div>
 
           {/* Printer selection modal */}
           {sShowPrinterSelectModal && (

@@ -1664,3 +1664,383 @@
   font-size: 36px;
   font-weight: 700;
 }
+
+/* ── Phase 3f: Canvas + Items Overlay + Footer ── */
+
+.standMainRow {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+}
+
+.standCanvasPane {
+  width: 80%;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.standTopCrumbRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 4px 8px;
+  flex-wrap: wrap;
+}
+
+.standTopCrumbSeg {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.standTopCrumbSep {
+  margin: 0 4px;
+  font-size: 15px;
+}
+
+.standTopCrumbText {
+  font-size: 15px;
+}
+
+.standChildBtnRow {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  margin-bottom: 0;
+}
+
+.standCanvasScroll {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.standCanvasInner {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 6px;
+  padding: 5px;
+  box-sizing: border-box;
+}
+
+.standCanvasItem {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 8px;
+  overflow: visible;
+  padding: 2px 4px;
+  transition-property: transform;
+  transition-duration: 150ms;
+  transition-timing-function: ease-out;
+  cursor: pointer;
+  user-select: none;
+}
+
+.standCanvasItemName {
+  text-align: center;
+  font-weight: 500;
+}
+
+.standCanvasQtyBadge {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  border-radius: 18px;
+  min-width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  z-index: 10;
+}
+
+.standCanvasQtyText {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.standCanvasDiscountLabel {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.standCanvasEmpty {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding-top: 60px;
+}
+
+.standCanvasEmptyText {
+  font-size: 16px;
+  margin-top: 12px;
+}
+
+.standCanvasNoSelect {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.standCanvasNoSelectText {
+  font-size: 16px;
+}
+
+/* Items overlay */
+.standItemsOverlay {
+  position: fixed;
+  left: 5%;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0 8px 100px 8px;
+  z-index: 50;
+}
+
+.standItemsOverlayInner {
+  background-color: rgba(240, 240, 240, 0.9);
+  border-radius: 16px;
+  padding: 10px;
+  align-self: flex-start;
+}
+
+.standItemRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  align-self: stretch;
+  margin-top: 4px;
+}
+
+.standItemSideBtn {
+  border-radius: 6px;
+  padding: 5px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.standItemSideBtnRight {
+  margin-right: 4px;
+}
+
+.standItemSideBtnLeft {
+  margin-left: 4px;
+}
+
+.standItemCard {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-radius: 12px;
+  border-width: 1px;
+  border-style: solid;
+  border-left-width: 6px;
+  padding: 16px 10px;
+  cursor: pointer;
+}
+
+.standItemKindBadge {
+  border-radius: 15px;
+  padding: 4px 10px;
+  margin-right: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.standItemKindBadgeText {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.standItemCardBody {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.standItemDiscountName {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.standItemNameRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.standItemFormalName {
+  font-size: 30px;
+  flex-shrink: 1;
+}
+
+.standItemQtyPill {
+  border-radius: 12px;
+  min-width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+  margin-left: 12px;
+}
+
+.standItemQtyPillText {
+  font-size: 21px;
+  font-weight: 700;
+}
+
+.standItemPricePill {
+  border-radius: 10px;
+  padding: 2px 7px;
+  margin-left: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.standItemPricePillText {
+  font-size: 26px;
+  font-weight: 600;
+}
+
+/* Canvas footer */
+.standCanvasFooterEdit {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 16px;
+  border-top-width: 1px;
+  border-top-style: solid;
+  background-color: rgba(255, 255, 255, 0.65);
+  gap: 24px;
+}
+
+.standCanvasFooterEditGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.standCanvasFooterEditLabel {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.standCanvasFooterEditStep {
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.standCanvasFooterEditStepText {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.standCanvasFooterEditValue {
+  font-size: 18px;
+  font-weight: 600;
+  min-width: 26px;
+  text-align: center;
+}
+
+.standCanvasFooterEditDivider {
+  width: 1px;
+  height: 28px;
+}
+
+.standCanvasFooter {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-top-width: 1px;
+  border-top-style: solid;
+  background-color: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+}
+
+.standCanvasFooterLeft {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 20px;
+}
+
+.standCanvasFooterStat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.standCanvasFooterStatLabel {
+  font-size: 15px;
+}
+
+.standCanvasFooterStatLabelLg {
+  font-size: 18px;
+}
+
+.standCanvasFooterStatVal {
+  font-size: 22px;
+  font-weight: 600;
+}
+
+.standCanvasFooterStatValLg {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.standCanvasFooterRight {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-right: 10px;
+}
+
+.standCanvasFooterHint {
+  font-size: 26px;
+  font-style: italic;
+}
+
+.standCanvasFooterCountPill {
+  border-radius: 10px;
+  min-width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+}
+
+.standCanvasFooterCountText {
+  font-size: 22px;
+  font-weight: 700;
+}

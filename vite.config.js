@@ -112,6 +112,7 @@ export default defineConfig(async () => {
           if (id.includes('@stripe')) return 'stripe';
           if (id.includes('xlsx')) return 'xlsx';
           if (id.includes('react-quill') || id.includes(path.sep + 'quill')) return 'quill';
+          if (id.includes('react-day-picker') || id.includes('date-fns')) return 'day-picker';
           if (id.includes('@radix-ui')) return 'radix';
           if (id.includes('lodash')) return 'lodash';
           if (id.includes('dayjs')) return 'dayjs';

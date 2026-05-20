@@ -1,42 +1,6 @@
 /*eslint-disable*/
-import {
-  View,
-  Text,
-  TextInput,
-  FlatList,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  ScrollView,
-} from "react-native-web";
-import {
-  formatPhoneWithDashes,
-  bestForegroundHex,
-  checkInputForNumbersOnly,
-  clog,
-  formatCurrencyDisp,
-  formatMillisForDisplay,
-  // searchInventory moved to Web Worker
-  generateTimesForListDisplay,
-  generateEAN13Barcode,
-  normalizeBarcode,
-  getDayOfWeekFrom0To7Input,
-  log,
-  gray,
-  moveItemInArr,
-  NUMS,
-  removeDashesFromPhone,
-  dollarsToCents,
-  capitalizeFirstLetterOfString,
-  printBuilder,
-  calculateRunningTotals,
-  localStorageWrapper,
-  createNewWorkorder,
-  formatWorkorderNumber,
-  intakeButtonsToRows,
-  intakeRowsToFlat,
-  generate36CharUUID,
-  lightenRGBByPercent,
-} from "../../../../utils";
+import { formatPhoneWithDashes, bestForegroundHex, checkInputForNumbersOnly, clog, formatCurrencyDisp, formatMillisForDisplay, // searchInventory moved to Web Worker
+  generateTimesForListDisplay, generateEAN13Barcode, normalizeBarcode, getDayOfWeekFrom0To7Input, log, moveItemInArr, NUMS, removeDashesFromPhone, dollarsToCents, capitalizeFirstLetterOfString, printBuilder, calculateRunningTotals, localStorageWrapper, createNewWorkorder, formatWorkorderNumber, intakeButtonsToRows, intakeRowsToFlat, generate36CharUUID, lightenRGBByPercent } from "../../../../utils";
 import { workerSearchInventory } from "../../../../inventorySearchManager";
 import {
   // useDatabaseStore,
@@ -52,21 +16,6 @@ import {
   useEmailStore,
 } from "../../../../stores";
 import {
-  Button_,
-  DropdownMenu,
-  Image_,
-  NumberSpinner_,
-  ScreenModal,
-  TextInput_,
-  TimePicker_,
-  TimeSpinner,
-  Tooltip,
-  TouchableOpacity_,
-  Pressable_,
-  StatusPickerModal,
-  Dialog_,
-} from "../../../../components";
-import {
   CheckBox,
   Image,
   Tooltip as DomTooltip,
@@ -77,6 +26,7 @@ import {
   DropdownMenu as DomDropdownMenu,
   StatusPickerModal as DomStatusPickerModal,
 } from "../../../../dom_components";
+import { QuickItemButtonsComponent } from "./QuickItemButtons";
 import adminStyles from "./Dashboard_Admin.module.css";
 import cloneDeep from "lodash/cloneDeep";
 import React, { Children, useEffect, useRef, useState, Suspense, lazy } from "react";
@@ -86,9 +36,13 @@ import { C, COLOR_GRADIENTS, Fonts, ICONS, Z } from "../../../../styles";
 import defaultLogo from "../../../../resources/default_app_logo_large.png";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
 import { APP_USER, COLORS, INTAKE_QUICK_BUTTON_PROTO, NOTE_HELPER_PROTO, NOTE_HELPER_ITEM_PROTO, QUICK_CUSTOMER_NOTE_PROTO, QUICK_CUSTOMER_NOTE_ITEM_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../../data";
-import { UserClockHistoryModal } from "../../modal_screens/UserClockHistoryModalScreen";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
+const UserClockHistoryModal = lazy(() =>
+  import("../../modal_screens/UserClockHistoryModalScreen").then((m) => ({
+    default: m.UserClockHistoryModal,
+  }))
+);
 const SalesReportsModal = lazy(() =>
   import("../../modal_screens/SalesReports").then((m) => ({
     default: m.SalesReportsModal,
@@ -105,7 +59,6 @@ import { mapCustomers, mapWorkorders, mapSales, mapStatuses, mapEmployees, mapPu
 import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead, firestoreQuery, firestoreDelete, firestoreWrite, firestoreBatchWrite } from "../../../../db_calls";
 import { DB_NODES } from "../../../../constants";
 import { newCheckoutGetStripeReaders } from "../../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
-import { StandButtonsCanvasEditor } from "./StandButtonsCanvas";
 import { ListOptionsComponent } from "./ListsOptions";
 import { StoreInfoComponent } from "./StoreInfo/StoreInfo";
 import { LabelDesignerModalV2 as LabelDesignerModal } from "../../modal_screens/LabelDesignerModalV2";
@@ -154,7 +107,6 @@ export function Dashboard_Admin({}) {
   const sExpand = useTabNamesStore((state) => state.getDashboardExpand());
   const _setExpand = useTabNamesStore((state) => state.setDashboardExpand);
   const [sStandEditButtonObj, _setStandEditButtonObj] = useState(null);
-  const [sShowStandButtonsModal, _setShowStandButtonsModal] = useState(false);
   const [sShowLabelDesigner, _setShowLabelDesigner] = useState(false);
 
   //////////////////////////////////////////////////////////////////////////
@@ -200,12 +152,7 @@ export function Dashboard_Admin({}) {
   //////////////////////////////////////////////////////////////////////////
   // Main component /////////////////////////////////////////////////////////
   return (
-    <View
-      style={{
-        paddingTop: 20,
-        flex: 1,
-      }}
-    >
+    <div className={adminStyles.dashboardRoot}>
       {/**Modals that will appear when user takes an action */}
       {!!sFacialRecognitionModalUserObj && (
         <FaceEnrollModalScreen
@@ -215,10 +162,12 @@ export function Dashboard_Admin({}) {
         />
       )}
       {!!sPunchClockUserObj && (
-        <UserClockHistoryModal
-          handleExit={() => _setPunchClockUserObj()}
-          userObj={sPunchClockUserObj}
-        />
+        <Suspense fallback={null}>
+          <UserClockHistoryModal
+            handleExit={() => _setPunchClockUserObj()}
+            userObj={sPunchClockUserObj}
+          />
+        </Suspense>
       )}
       {!!sShowSalesReportModal && (
         <Suspense fallback={null}>
@@ -251,97 +200,14 @@ export function Dashboard_Admin({}) {
           }}
         />
       )}
-      {sShowStandButtonsModal &&
-        createPortal(
-          <div
-            onClick={() => _setShowStandButtonsModal(false)}
-            style={{
-              position: "fixed",
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundColor: "rgba(0,0,0,0.5)",
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              zIndex: Z.modal,
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                width: "85vw",
-                maxWidth: 1200,
-                height: "92vh",
-                backgroundColor: "white",
-                borderRadius: 12,
-                display: "flex",
-                flexDirection: "column",
-                overflow: "hidden",
-              }}
-            >
-              {/* Header */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: 16,
-                  borderBottomWidth: 1,
-                  borderBottomColor: gray(0.15),
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 16,
-                    fontWeight: Fonts.weight.textHeavy,
-                    color: C.text,
-                  }}
-                >
-                  Stand Buttons Editor
-                </Text>
-                <TouchableOpacity onPress={() => _setShowStandButtonsModal(false)}>
-                  <Image_ icon={ICONS.close1} size={18} />
-                </TouchableOpacity>
-              </View>
-              {/* Body: search panel + simulator side by side */}
-              <div style={{ flex: 1, display: "flex", flexDirection: "row", overflow: "hidden" }}>
-                {/* Left: Inventory Search Panel */}
-                <StandButtonsSearchPanel
-                  zSettingsObj={zSettingsObj}
-                  handleSettingsFieldChange={handleSettingsFieldChange}
-                />
-                {/* Right: Editor */}
-                <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column" }}>
-                  <StandButtonsCanvasEditor
-                    zSettingsObj={zSettingsObj}
-                    handleSettingsFieldChange={handleSettingsFieldChange}
-                    _setStandEditButtonObj={_setStandEditButtonObj}
-                    _setShowStandButtonsModal={_setShowStandButtonsModal}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>,
-          document.body
-        )}
-
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          paddingHorizontal: 5,
-          flex: 1,
-        }}
-      >
+      <div className={adminStyles.dashboardRow}>
         {/*********************left-side column container *****************/}
         <div
           className={adminStyles.tabBarScroll}
           style={{
             "--tab-bar-bg": C.backgroundListWhite,
             "--tab-bar-border": C.buttonLightGreenOutline,
-            "--tab-bar-spacer": gray(0.1),
+            "--tab-bar-spacer": C.borderSubtle,
             "--tab-bar-row-selected-bg": C.orange,
           }}
         >
@@ -353,7 +219,7 @@ export function Dashboard_Admin({}) {
               handleExpandPress={() => _setShowSalesReportModal(true)}
               style={{
                 fontWeight: sExpand === TAB_NAMES.sales ? 500 : null,
-                color: sExpand === TAB_NAMES.sales ? C.green : gray(0.6),
+                color: sExpand === TAB_NAMES.sales ? C.green : C.textSecondary,
               }}
               text={TAB_NAMES.sales}
               icon={ICONS.dollarYellow}
@@ -377,7 +243,7 @@ export function Dashboard_Admin({}) {
               style={{
                 fontWeight: sExpand === TAB_NAMES.payments ? 500 : null,
 
-                color: sExpand === TAB_NAMES.payments ? C.green : gray(0.6),
+                color: sExpand === TAB_NAMES.payments ? C.green : C.textSecondary,
               }}
             />
             <VerticalSpacer />
@@ -391,7 +257,7 @@ export function Dashboard_Admin({}) {
               }
               style={{
                 fontWeight: sExpand === TAB_NAMES.ordering ? 500 : null,
-                color: sExpand === TAB_NAMES.ordering ? C.green : gray(0.6),
+                color: sExpand === TAB_NAMES.ordering ? C.green : C.textSecondary,
               }}
               text={TAB_NAMES.ordering}
               icon={ICONS.ordering}
@@ -413,7 +279,7 @@ export function Dashboard_Admin({}) {
               icon={ICONS.userControl}
               style={{
                 fontWeight: sExpand === TAB_NAMES.users ? 500 : null,
-                color: sExpand === TAB_NAMES.users ? C.green : gray(0.6),
+                color: sExpand === TAB_NAMES.users ? C.green : C.textSecondary,
               }}
               disabled={sMenuLocked}
             />
@@ -424,7 +290,7 @@ export function Dashboard_Admin({}) {
               handleExpandPress={() => _setShowPayrollModal(true)}
               style={{
                 fontWeight: sExpand === TAB_NAMES.payroll ? 500 : null,
-                color: sExpand === TAB_NAMES.payroll ? C.green : gray(0.6),
+                color: sExpand === TAB_NAMES.payroll ? C.green : C.textSecondary,
               }}
               text={TAB_NAMES.payroll}
               icon={ICONS.greenDollar}
@@ -438,7 +304,7 @@ export function Dashboard_Admin({}) {
               handleExpandPress={() => _setShowScheduleModal(true)}
               style={{
                 fontWeight: sExpand === TAB_NAMES.schedule ? 500 : null,
-                color: sExpand === TAB_NAMES.schedule ? C.green : gray(0.6),
+                color: sExpand === TAB_NAMES.schedule ? C.green : C.textSecondary,
               }}
               text={TAB_NAMES.schedule}
               icon={ICONS.clock}
@@ -457,7 +323,7 @@ export function Dashboard_Admin({}) {
               icon={ICONS.quickItemButton}
               style={{
                 fontWeight: sExpand === TAB_NAMES.quickItems ? 500 : null,
-                color: sExpand === TAB_NAMES.quickItems ? C.green : gray(0.6),
+                color: sExpand === TAB_NAMES.quickItems ? C.green : C.textSecondary,
               }}
               disabled={sMenuLocked}
             />
@@ -474,7 +340,7 @@ export function Dashboard_Admin({}) {
               style={{
                 fontWeight: sExpand === TAB_NAMES.statuses ? 500 : null,
 
-                color: sExpand === TAB_NAMES.statuses ? C.green : gray(0.6),
+                color: sExpand === TAB_NAMES.statuses ? C.green : C.textSecondary,
               }}
               disabled={sMenuLocked}
             />
@@ -488,7 +354,7 @@ export function Dashboard_Admin({}) {
               style={{
                 fontWeight: sExpand === TAB_NAMES.lists ? 500 : null,
 
-                color: sExpand === TAB_NAMES.lists ? C.green : gray(0.6),
+                color: sExpand === TAB_NAMES.lists ? C.green : C.textSecondary,
               }}
               text={TAB_NAMES.lists}
               disabled={sMenuLocked}
@@ -504,7 +370,7 @@ export function Dashboard_Admin({}) {
               icon={ICONS.storeInfo}
               style={{
                 fontWeight: sExpand === TAB_NAMES.storeInfo ? 500 : null,
-                color: sExpand === TAB_NAMES.storeInfo ? C.green : gray(0.6),
+                color: sExpand === TAB_NAMES.storeInfo ? C.green : C.textSecondary,
               }}
               text={TAB_NAMES.storeInfo}
               disabled={sMenuLocked}
@@ -523,7 +389,7 @@ export function Dashboard_Admin({}) {
               style={{
                 fontWeight: sExpand === TAB_NAMES.textTemplates ? 500 : null,
                 color:
-                  sExpand === TAB_NAMES.textTemplates ? C.green : gray(0.6),
+                  sExpand === TAB_NAMES.textTemplates ? C.green : C.textSecondary,
               }}
               text={TAB_NAMES.textTemplates}
               icon={ICONS.notes}
@@ -543,7 +409,7 @@ export function Dashboard_Admin({}) {
               style={{
                 fontWeight: sExpand === TAB_NAMES.emailTemplates ? 500 : null,
                 color:
-                  sExpand === TAB_NAMES.emailTemplates ? C.green : gray(0.6),
+                  sExpand === TAB_NAMES.emailTemplates ? C.green : C.textSecondary,
               }}
               text={TAB_NAMES.emailTemplates}
               icon={ICONS.notes}
@@ -560,7 +426,7 @@ export function Dashboard_Admin({}) {
               }
               style={{
                 fontWeight: sExpand === TAB_NAMES.import ? 500 : null,
-                color: sExpand === TAB_NAMES.import ? C.green : gray(0.6),
+                color: sExpand === TAB_NAMES.import ? C.green : C.textSecondary,
               }}
               text={TAB_NAMES.import}
               icon={ICONS.importIcon}
@@ -577,7 +443,7 @@ export function Dashboard_Admin({}) {
               }
               style={{
                 fontWeight: sExpand === TAB_NAMES.backup ? 500 : null,
-                color: sExpand === TAB_NAMES.backup ? C.green : gray(0.6),
+                color: sExpand === TAB_NAMES.backup ? C.green : C.textSecondary,
               }}
               text={TAB_NAMES.backup}
               icon={ICONS.tools}
@@ -589,30 +455,22 @@ export function Dashboard_Admin({}) {
         {/*********************right-side column container****************** */}
 
         {!sExpand && (
-          <View style={{ width: "70%", height: "100%", justifyContent: "center", alignItems: "center" }}>
-            <Image_
+          <div className={adminStyles.dashboardEmpty}>
+            <Image
               icon={defaultLogo}
-              style={{ opacity: 0.08, width: "60%", height: "60%" }}
+              width="60%"
+              height="60%"
+              className={adminStyles.dashboardEmptyLogo}
             />
-          </View>
+          </div>
         )}
-        {!!sExpand && <ScrollView
-          style={{
-            width: "70%",
-          }}
-          contentContainerStyle={{ alignItems: "center" }}
+        {!!sExpand && <div
+          className={adminStyles.dashboardPane}
+          style={{ "--pane-title-color": C.textSecondary }}
         >
-          <Text
-              style={{
-                borderColor: C.buttonLightGreenOutline,
-                color: gray(0.6),
-                marginBottom: 10,
-                fontSize: 17,
-                fontWeight: 500,
-              }}
-            >
-              {sExpand === TAB_NAMES.payments ? "CARD READERS / RECEIPT PRINTERS" : sExpand?.toUpperCase()}
-            </Text>
+          <span className={adminStyles.dashboardPaneTitle}>
+            {sExpand === TAB_NAMES.payments ? "CARD READERS / RECEIPT PRINTERS" : sExpand?.toUpperCase()}
+          </span>
           {sExpand === TAB_NAMES.payments && (
             <>
               <PaymentProcessingComponent
@@ -677,9 +535,9 @@ export function Dashboard_Admin({}) {
           )}
           {sExpand === TAB_NAMES.import && <ImportComponent />}
           {sExpand === TAB_NAMES.backup && <BackupRecoveryComponent />}
-        </ScrollView>}
-      </View>
-    </View>
+        </div>}
+      </div>
+    </div>
   );
 }
 
@@ -755,25 +613,23 @@ function MenuListLabelComponent({
       {!dropdownDataArr && (
         <span
           className={adminStyles.tabBarRowText}
-          style={{ color: selected ? C.textWhite : gray(0.5) }}
+          style={{ color: selected ? C.textWhite : C.textMuted }}
         >
           {text.toUpperCase()}
         </span>
       )}
       {!!dropdownDataArr && (
-        <DropdownMenu
+        <DomDropdownMenu
           buttonStyle={{
             backgroundColor: "transparent",
-            paddingHorizontal: 0,
-            paddingVertical: 0,
+            padding: 0,
           }}
-          itemStyle={{ width: null }}
           buttonText={dropdownLabel}
           dataArr={dropdownDataArr}
           onSelect={onDropdownSelect}
           buttonTextStyle={{
             fontSize: 15,
-            color: gray(0.5),
+            color: C.textMuted,
             textAlign: "left",
             fontWeight: "500",
           }}
@@ -814,14 +670,14 @@ function BoxButton1({
       text={label}
       icon={icon || ICONS.add}
       iconSize={iconSize || 30}
-      textStyle={{ fontSize: 14, color: gray(0.6), ...textStyle }}
+      textStyle={{ fontSize: 14, color: C.textSecondary, ...textStyle }}
       buttonStyle={{
         paddingLeft: 0,
         paddingRight: 0,
         paddingTop: 0,
         paddingBottom: 0,
         borderRadius: 5,
-        backgroundColor: gray(0.2),
+        backgroundColor: C.surfaceAlt,
         marginBottom: 0,
         ...style,
       }}
@@ -831,23 +687,34 @@ function BoxButton1({
 }
 
 function MoveArrows({ index, listLength, onMove }) {
+  const atTop = index === 0;
+  const atBottom = index === listLength - 1;
+  const btnStyle = (dimmed) => ({
+    padding: 4,
+    opacity: dimmed ? 0.25 : 1,
+    background: "none",
+    border: "none",
+    cursor: dimmed ? "not-allowed" : "pointer",
+  });
   return (
-    <View style={{ flexDirection: "row", alignItems: "center", marginLeft: 5 }}>
-      <TouchableOpacity
-        disabled={index === 0}
-        onPress={() => onMove(index, "up")}
-        style={{ padding: 4, opacity: index === 0 ? 0.25 : 1 }}
+    <div style={{ display: "flex", flexDirection: "row", alignItems: "center", marginLeft: 5, flexShrink: 0 }}>
+      <button
+        type="button"
+        disabled={atTop}
+        onClick={() => onMove(index, "up")}
+        style={btnStyle(atTop)}
       >
-        <Image_ icon={ICONS.upChevron} size={13} />
-      </TouchableOpacity>
-      <TouchableOpacity
-        disabled={index === listLength - 1}
-        onPress={() => onMove(index, "down")}
-        style={{ padding: 4, opacity: index === listLength - 1 ? 0.25 : 1 }}
+        <Image icon={ICONS.upChevron} size={13} />
+      </button>
+      <button
+        type="button"
+        disabled={atBottom}
+        onClick={() => onMove(index, "down")}
+        style={btnStyle(atBottom)}
       >
-        <Image_ icon={ICONS.downChevron} size={13} />
-      </TouchableOpacity>
-    </View>
+        <Image icon={ICONS.downChevron} size={13} />
+      </button>
+    </div>
   );
 }
 
@@ -973,7 +840,7 @@ const AppUserListComponent = ({
               </span>
             </div>
             <div className={adminStyles.ucSensitivityRow}>
-              <span style={{ fontSize: 11, color: gray(0.5), marginRight: 8 }}>Strict</span>
+              <span style={{ fontSize: 11, color: C.textMuted, marginRight: 8 }}>Strict</span>
               <input
                 type="range"
                 min="0.35"
@@ -985,36 +852,11 @@ const AppUserListComponent = ({
                 }}
                 style={{ flex: 1, cursor: "pointer" }}
               />
-              <span style={{ fontSize: 11, color: gray(0.5), marginLeft: 8 }}>Loose</span>
+              <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 8 }}>Loose</span>
             </div>
           </div>
         )}
-        <div className={adminStyles.ucDivider} style={{ backgroundColor: gray(0.2) }} />
-        {/* <View
-            style={{
-              flexDirection: "row",
-              width: "100%",
-              justifyContent: "flex-end",
-              alignItems: "center",
-            }}
-          > */}
-        {/* <Button_
-            onPress={fillPunchHistory}
-            text={"Fill History"}
-            buttonStyle={{
-              borderRadius: 5,
-              padding: 0,
-              height: 20,
-              backgroundColor: C.buttonLightGreen,
-              borderColor: C.buttonLightGreenOutline,
-              borderWidth: 1,
-            }}
-            textStyle={{
-              fontSize: 14,
-              fontColor: C.textMain,
-            }}
-          /> */}
-
+        <div className={adminStyles.ucDivider} style={{ backgroundColor: C.surfaceAlt }} />
         <div className={adminStyles.ucAddUserWrap}>
           <BoxButton1
             iconSize={35}
@@ -1148,7 +990,7 @@ const AppUserListComponent = ({
                             paddingTop: 1,
                             paddingBottom: 1,
                             borderColor: borderColor,
-                            color: editable ? C.text : gray(0.5),
+                            color: editable ? C.text : C.textMuted,
                           }}
                           className={adminStyles.ucNameInput}
                           onChangeText={(value) => {
@@ -1170,7 +1012,7 @@ const AppUserListComponent = ({
                             paddingLeft: 5,
                             paddingRight: 5,
                             borderColor: borderColor,
-                            color: editable ? C.text : gray(0.5),
+                            color: editable ? C.text : C.textMuted,
                           }}
                           className={adminStyles.ucNameInput}
                         />
@@ -1193,7 +1035,7 @@ const AppUserListComponent = ({
                             paddingTop: 1,
                             paddingBottom: 1,
                             borderColor: borderColor,
-                            color: editable ? C.text : gray(0.5),
+                            color: editable ? C.text : C.textMuted,
                           }}
                           className={adminStyles.ucPhoneInput}
                         />
@@ -1213,7 +1055,7 @@ const AppUserListComponent = ({
                             paddingTop: 1,
                             paddingBottom: 1,
                             borderColor: borderColor,
-                            color: editable ? C.text : gray(0.5),
+                            color: editable ? C.text : C.textMuted,
                           }}
                           className={adminStyles.ucEmailInput}
                         />
@@ -1237,7 +1079,7 @@ const AppUserListComponent = ({
                             placeholderTextColor={"lightgray"}
                             editable={editable}
                             className={adminStyles.ucCredInput}
-                            style={{ color: editable ? C.text : gray(0.5) }}
+                            style={{ color: editable ? C.text : C.textMuted }}
                           />
                           {editable ? (
                             <DomTouchableOpacity
@@ -1264,7 +1106,7 @@ const AppUserListComponent = ({
                             placeholderTextColor={"lightgray"}
                             editable={editable}
                             className={adminStyles.ucCredInput}
-                            style={{ color: editable ? C.text : gray(0.5) }}
+                            style={{ color: editable ? C.text : C.textMuted }}
                           />
                           {editable ? (
                             <DomTouchableOpacity
@@ -1308,7 +1150,7 @@ const AppUserListComponent = ({
                             }}
                             buttonText={userObj.permissions.name}
                             buttonTextStyle={{
-                              color: editable ? C.text : gray(0.5),
+                              color: editable ? C.text : C.textMuted,
                               fontSize: 14,
                             }}
                           />
@@ -1375,11 +1217,11 @@ const AppUserListComponent = ({
                             <div
                               key={statusId}
                               className={adminStyles.ucChip}
-                              style={{ backgroundColor: editable ? status.backgroundColor : gray(0.85) }}
+                              style={{ backgroundColor: editable ? status.backgroundColor : C.surfaceAlt }}
                             >
                               <span
                                 className={adminStyles.ucChipLabel}
-                                style={{ color: editable ? status.textColor : gray(0.5) }}
+                                style={{ color: editable ? status.textColor : C.textMuted }}
                               >
                                 {status.label}
                               </span>
@@ -1442,11 +1284,11 @@ const AppUserListComponent = ({
                             <div
                               key={accountKey}
                               className={adminStyles.ucChip}
-                              style={{ backgroundColor: editable ? C.blue : gray(0.85) }}
+                              style={{ backgroundColor: editable ? C.blue : C.surfaceAlt }}
                             >
                               <span
                                 className={adminStyles.ucChipLabel}
-                                style={{ color: editable ? C.textWhite : gray(0.5) }}
+                                style={{ color: editable ? C.textWhite : C.textMuted }}
                               >
                                 {acct.displayName}
                               </span>
@@ -1552,43 +1394,58 @@ const WorkorderStatusesComponent = ({
           backgroundColor: "transparent",
           borderWidth: 0,
           alignItems: "center",
-          paddingHorizontal: 0,
-          paddingVertical: 0,
+          padding: 0,
           width: "100%",
         }}
       >
-        <View
+        <div
           style={{
+            display: "flex",
+            flexDirection: "column",
             width: "100%",
             alignItems: "center",
             borderWidth: 1,
+            borderStyle: "solid",
             paddingBottom: 30,
             paddingTop: 13,
-            paddingHorizontal: 10,
+            paddingLeft: 10,
+            paddingRight: 10,
             borderColor: C.buttonLightGreenOutline,
             backgroundColor: C.backgroundListWhite,
             borderRadius: 10,
+            boxSizing: "border-box",
           }}
         >
           {/* Status Auto-Text show/hide */}
-          <View style={{ width: "100%", marginBottom: 12 }}>
-            <TouchableOpacity
-              onPress={() => _setShowAutoText(!sShowAutoText)}
-              style={{ flexDirection: "row", alignItems: "center", marginBottom: sShowAutoText ? 8 : 0 }}
+          <div style={{ display: "flex", flexDirection: "column", width: "100%", marginBottom: 12 }}>
+            <button
+              type="button"
+              onClick={() => _setShowAutoText(!sShowAutoText)}
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                marginBottom: sShowAutoText ? 8 : 0,
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+                alignSelf: "flex-start",
+              }}
             >
-              <Text style={{ fontSize: 13, color: gray(0.5), fontWeight: "600" }}>
+              <span style={{ fontSize: 13, color: C.textMuted, fontWeight: "600" }}>
                 {sShowAutoText ? "Status Auto-Text  \u25B2" : "Status Auto-Text  \u25BC"}
-              </Text>
-            </TouchableOpacity>
+              </span>
+            </button>
             {sShowAutoText && (
               <StatusAutoTextSection
                 zSettingsObj={zSettingsObj}
                 handleSettingsFieldChange={handleSettingsFieldChange}
               />
             )}
-          </View>
+          </div>
 
-          <View style={{ width: "100%", alignItems: "flex-start" }}>
+          <div style={{ display: "flex", width: "100%", alignItems: "flex-start" }}>
             <BoxButton1
               style={{
                 marginBottom: 10,
@@ -1601,7 +1458,7 @@ const WorkorderStatusesComponent = ({
                 });
                 proto.label = "New Status";
                 proto.id = crypto.randomUUID();
-                proto.backgroundColor = gray(0.3);
+                proto.backgroundColor = C.borderStrong;
                 proto.textColor = C.text;
                 proto.removable = true;
                 proto.requireWaitTime = false;
@@ -1610,13 +1467,14 @@ const WorkorderStatusesComponent = ({
                 handleSettingsFieldChange("statuses", newStatuses);
               }}
             />
-          </View>
+          </div>
           {statuses.map((item, idx) => {
             let isEditing = sEditableInputIdx === idx;
             return (
               <div
                 key={item.id}
                 style={{
+                  display: "flex",
                   flexDirection: "column",
                   alignItems: "center",
                   width: "100%",
@@ -1659,8 +1517,9 @@ const WorkorderStatusesComponent = ({
                   }}
                 >
                   {/* Status color bar + label */}
-                  <View
+                  <div
                     style={{
+                      display: "flex",
                       backgroundColor: item.backgroundColor,
                       alignItems: "center",
                       flexDirection: "row",
@@ -1670,23 +1529,26 @@ const WorkorderStatusesComponent = ({
                     }}
                   >
                     {!item.removable && (
-                      <View style={{ width: "10%" }} />
+                      <div style={{ width: "10%", flexShrink: 0 }} />
                     )}
-                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                      <TextInput_
+                    <div style={{ display: "flex", flexDirection: "column", flex: 1, alignItems: "center", justifyContent: "center" }}>
+                      <DomTextInput
                         debounceMs={500}
                         style={{
                           width: "100%",
                           textAlign: "center",
                           color: item.textColor,
-                          outlineWidth: 0,
-                          paddingVertical: 4,
+                          outline: "none",
+                          paddingTop: 4,
+                          paddingBottom: 4,
                           fontSize: 13,
                           borderWidth: 1,
+                          borderStyle: "solid",
                           borderColor:
                             isEditing && item.removable
-                              ? gray(0.4)
+                              ? C.borderStrong
                               : "transparent",
+                          backgroundColor: "transparent",
                         }}
                         onChangeText={(val) => {
                           let newStatuses = zSettingsObj.statuses.map((o) => {
@@ -1700,37 +1562,40 @@ const WorkorderStatusesComponent = ({
                         value={item.label}
                       />
                       {!!zSettingsObj?.waitTimeLinkedStatus?.[item.id] && (
-                        <Text style={{ color: item.textColor, fontSize: 10, textAlign: "center", marginTop: -2 }}>
-                          <Text style={{ fontStyle: "italic" }}>{"Wait time: "}</Text>
+                        <span style={{ color: item.textColor, fontSize: 10, textAlign: "center", marginTop: -2 }}>
+                          <span style={{ fontStyle: "italic" }}>{"Wait time: "}</span>
                           {zSettingsObj.waitTimeLinkedStatus[item.id].label}
-                        </Text>
+                        </span>
                       )}
-                    </View>
+                    </div>
                     {!item.removable && (
-                      <View
+                      <div
                         style={{
+                          display: "flex",
                           width: "10%",
+                          flexShrink: 0,
                           height: "100%",
                           alignItems: "flex-end",
                           justifyContent: "flex-start",
                           padding: 3,
                         }}
                       >
-                        <Image_ icon={ICONS.blocked} size={15} />
-                      </View>
+                        <Image icon={ICONS.blocked} size={15} />
+                      </div>
                     )}
-                  </View>
+                  </div>
                   {/* Controls: edit, delete, color pickers */}
-                  <View
+                  <div
                     style={{
+                      display: "flex",
                       flexDirection: "row",
                       alignItems: "center",
                       marginLeft: 10,
                     }}
                   >
-                    <Tooltip text="Edit label" position="top">
+                    <DomTooltip text="Edit label" position="top">
                       <BoxButton1
-                        style={{ paddingHorizontal: 5 }}
+                        style={{ paddingLeft: 5, paddingRight: 5 }}
                         iconSize={17}
                         icon={isEditing ? ICONS.clickHere : ICONS.editPencil}
                         onPress={() =>
@@ -1739,11 +1604,11 @@ const WorkorderStatusesComponent = ({
                           )
                         }
                       />
-                    </Tooltip>
+                    </DomTooltip>
                     {item.removable ? (
-                      <Tooltip text="Delete status" position="top">
+                      <DomTooltip text="Delete status" position="top">
                         <BoxButton1
-                          style={{ paddingHorizontal: 5 }}
+                          style={{ paddingLeft: 5, paddingRight: 5 }}
                           iconSize={15}
                           icon={ICONS.trash}
                           onPress={() => {
@@ -1753,15 +1618,15 @@ const WorkorderStatusesComponent = ({
                             handleSettingsFieldChange("statuses", newStatuses);
                           }}
                         />
-                      </Tooltip>
+                      </DomTooltip>
                     ) : (
-                      <View style={{ paddingHorizontal: 5, opacity: 0.3, cursor: "not-allowed" }}>
-                        <Image_ icon={ICONS.trash} size={15} />
-                      </View>
+                      <div style={{ display: "flex", paddingLeft: 5, paddingRight: 5, opacity: 0.3, cursor: "not-allowed" }}>
+                        <Image icon={ICONS.trash} size={15} />
+                      </div>
                     )}
-                    <Tooltip text="Edit colors" position="top">
+                    <DomTooltip text="Edit colors" position="top">
                       <BoxButton1
-                        style={{ paddingHorizontal: 5 }}
+                        style={{ paddingLeft: 5, paddingRight: 5 }}
                         iconSize={23}
                         icon={ICONS.colorWheel}
                         onPress={() => {
@@ -1770,8 +1635,8 @@ const WorkorderStatusesComponent = ({
                           _setModalTextColor(item.textColor);
                         }}
                       />
-                    </Tooltip>
-                    <Tooltip text="Require wait time before status change" position="top">
+                    </DomTooltip>
+                    <DomTooltip text="Require wait time before status change" position="top">
                       <CheckBox
                         text=""
                         isChecked={!!item.requireWaitTime}
@@ -1784,9 +1649,9 @@ const WorkorderStatusesComponent = ({
                         }}
                         buttonStyle={{ marginLeft: 5 }}
                       />
-                    </Tooltip>
-                    <Tooltip text="Auto-add this wait time" position="top">
-                      <DropdownMenu
+                    </DomTooltip>
+                    <DomTooltip text="Auto-add this wait time" position="top">
+                      <DomDropdownMenu
                         dataArr={[
                           { id: "__none__", label: "No linked wait time" },
                           ...(zSettingsObj?.waitTimes || []),
@@ -1805,16 +1670,16 @@ const WorkorderStatusesComponent = ({
                         buttonStyle={{
                           backgroundColor: "transparent",
                           borderWidth: 0,
-                          paddingHorizontal: 5,
-                          paddingVertical: 0,
+                          paddingLeft: 5,
+                          paddingRight: 5,
+                          paddingTop: 0,
+                          paddingBottom: 0,
                         }}
                         buttonText={""}
-                        modalCoordX={-120}
-                        modalCoordY={30}
                         menuMaxHeight={300}
                       />
-                    </Tooltip>
-                    <Tooltip text="Hidden from status picker" position="top">
+                    </DomTooltip>
+                    <DomTooltip text="Hidden from status picker" position="top">
                       <CheckBox
                         text=""
                         isChecked={!!item.hidden}
@@ -1827,11 +1692,11 @@ const WorkorderStatusesComponent = ({
                         }}
                         buttonStyle={{ marginLeft: 5 }}
                       />
-                    </Tooltip>
-                  </View>
+                    </DomTooltip>
+                  </div>
                   {/* Drag direction indicators */}
                   {sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx > idx && (
-                    <Image_
+                    <Image
                       icon={ICONS.backRed}
                       size={14}
                       style={{
@@ -1842,7 +1707,7 @@ const WorkorderStatusesComponent = ({
                     />
                   )}
                   {sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx < idx && (
-                    <Image_
+                    <Image
                       icon={ICONS.rightArrowBlue}
                       size={14}
                       style={{
@@ -1856,12 +1721,12 @@ const WorkorderStatusesComponent = ({
               </div>
             );
           })}
-        </View>
+        </div>
       </BoxContainerInnerComponent>
 
       {/* Color picker modal */}
       {!!sColorModalItem && createPortal(
-        <View
+        <div
           style={{
             position: "fixed",
             top: 0,
@@ -1869,13 +1734,15 @@ const WorkorderStatusesComponent = ({
             right: 0,
             bottom: 0,
             backgroundColor: "rgba(0,0,0,0.5)",
+            display: "flex",
             justifyContent: "center",
             alignItems: "center",
             zIndex: Z.modal,
           }}
         >
-          <View
+          <div
             style={{
+              display: "flex",
               backgroundColor: C.backgroundListWhite,
               borderRadius: 10,
               padding: 30,
@@ -1883,73 +1750,86 @@ const WorkorderStatusesComponent = ({
               width: "90%",
               maxHeight: "85%",
               borderWidth: 2,
+              borderStyle: "solid",
               borderColor: C.buttonLightGreenOutline,
               flexDirection: "row",
               alignItems: "stretch",
+              boxSizing: "border-box",
             }}
           >
             {/* Status list sidebar */}
-            <View style={{ width: 180, marginRight: 0, paddingRight: 15 }}>
-              <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.45), marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
+            <div style={{ display: "flex", flexDirection: "column", width: 180, flexShrink: 0, paddingRight: 15 }}>
+              <span style={{ fontSize: 13, fontWeight: "600", color: C.textMuted, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
                 Copy From
-              </Text>
-              <ScrollView style={{ flex: 1 }}>
+              </span>
+              <div style={{ flex: 1, overflowY: "auto" }}>
                 {(zSettingsObj.statuses || []).filter((s) => !s.hidden && s.id !== sColorModalItem.id).map((status) => (
-                  <TouchableOpacity
+                  <button
                     key={status.id}
-                    onPress={() => {
+                    type="button"
+                    onClick={() => {
                       _setModalBgColor(status.backgroundColor);
                       _setModalTextColor(status.textColor);
                     }}
                     style={{
+                      display: "block",
+                      width: "100%",
+                      textAlign: "left",
                       backgroundColor: status.backgroundColor,
                       borderRadius: 6,
-                      paddingVertical: 8,
-                      paddingHorizontal: 10,
+                      paddingTop: 8,
+                      paddingBottom: 8,
+                      paddingLeft: 10,
+                      paddingRight: 10,
                       marginBottom: 6,
                       borderWidth: 1,
-                      borderColor: gray(0.15),
+                      borderStyle: "solid",
+                      borderColor: C.borderSubtle,
+                      cursor: "pointer",
                     }}
                   >
-                    <Text style={{ color: status.textColor, fontSize: 12, fontWeight: "500" }} numberOfLines={1}>
+                    <span style={{ color: status.textColor, fontSize: 12, fontWeight: "500", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", display: "block" }}>
                       {status.label}
-                    </Text>
-                  </TouchableOpacity>
+                    </span>
+                  </button>
                 ))}
-              </ScrollView>
-            </View>
-            <View style={{ width: 1, backgroundColor: gray(0.15), marginHorizontal: 15 }} />
+              </div>
+            </div>
+            <div style={{ width: 1, flexShrink: 0, backgroundColor: C.surfaceAlt, marginLeft: 15, marginRight: 15 }} />
 
             {/* Main color picker area */}
-            <View style={{ flex: 1, alignItems: "center" }}>
-              <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 20 }}>
+            <div style={{ display: "flex", flexDirection: "column", flex: 1, alignItems: "center" }}>
+              <span style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 20 }}>
                 Edit Status Colors
-              </Text>
+              </span>
 
               {/* Live preview */}
-              <View
+              <div
                 style={{
+                  display: "flex",
                   backgroundColor: sModalBgColor,
                   borderRadius: 5,
-                  paddingVertical: 10,
-                  paddingHorizontal: 30,
+                  paddingTop: 10,
+                  paddingBottom: 10,
+                  paddingLeft: 30,
+                  paddingRight: 30,
                   alignItems: "center",
                   justifyContent: "center",
                   minWidth: 200,
                   marginBottom: 25,
                 }}
               >
-                <Text style={{ color: sModalTextColor, fontSize: 14, fontWeight: "500" }}>
+                <span style={{ color: sModalTextColor, fontSize: 14, fontWeight: "500" }}>
                   {sColorModalItem.label}
-                </Text>
-              </View>
+                </span>
+              </div>
 
               {/* Two color wheels side by side */}
-              <View style={{ flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 30 }}>
-                <View style={{ alignItems: "center" }}>
-                  <Text style={{ fontSize: 13, color: C.text, marginBottom: 8, fontWeight: "500" }}>
+              <div style={{ display: "flex", flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 30 }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, color: C.text, marginBottom: 8, fontWeight: "500" }}>
                     Background Color
-                  </Text>
+                  </span>
                   <ColorWheel
                     key={"bg-" + sModalBgColor}
                     initialColor={sModalBgColor}
@@ -1957,11 +1837,11 @@ const WorkorderStatusesComponent = ({
                       _setModalBgColor(val.hex);
                     }}
                   />
-                </View>
-                <View style={{ alignItems: "center" }}>
-                  <Text style={{ fontSize: 13, color: C.text, marginBottom: 8, fontWeight: "500" }}>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+                  <span style={{ fontSize: 13, color: C.text, marginBottom: 8, fontWeight: "500" }}>
                     Text Color
-                  </Text>
+                  </span>
                   <ColorWheel
                     key={"text-" + sModalTextColor}
                     initialColor={sModalTextColor}
@@ -1969,12 +1849,12 @@ const WorkorderStatusesComponent = ({
                       _setModalTextColor(val.hex);
                     }}
                   />
-                </View>
-              </View>
+                </div>
+              </div>
 
               {/* Action buttons */}
-              <View style={{ flexDirection: "row", justifyContent: "center", marginTop: 25, gap: 15 }}>
-                <Button_
+              <div style={{ display: "flex", flexDirection: "row", justifyContent: "center", marginTop: 25, gap: 15 }}>
+                <DomButton
                   text="Save Changes"
                   colorGradientArr={COLOR_GRADIENTS.green}
                   onPress={() => {
@@ -1987,15 +1867,15 @@ const WorkorderStatusesComponent = ({
                     _setColorModalItem(null);
                   }}
                 />
-                <Button_
+                <DomButton
                   text="Exit (discard any changes)"
                   colorGradientArr={COLOR_GRADIENTS.grey}
                   onPress={() => _setColorModalItem(null)}
                 />
-              </View>
-            </View>
-          </View>
-        </View>,
+              </div>
+            </div>
+          </div>
+        </div>,
         document.body
       )}
     </BoxContainerOuterComponent>
@@ -2034,8 +1914,23 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
     return t ? t.label : "None";
   }
 
+  const numInputStyle = {
+    width: 50,
+    height: 30,
+    borderWidth: 1,
+    borderStyle: "solid",
+    borderColor: C.borderSubtle,
+    borderRadius: 6,
+    paddingLeft: 6,
+    paddingRight: 6,
+    textAlign: "center",
+    fontSize: 12,
+    outline: "none",
+    boxSizing: "border-box",
+  };
+
   return (
-    <View style={{ width: "100%", paddingHorizontal: 4 }}>
+    <div style={{ display: "flex", flexDirection: "column", width: "100%", paddingLeft: 4, paddingRight: 4 }}>
       <BoxButton1
         style={{ alignSelf: "flex-start", marginBottom: 8 }}
         onPress={addRule}
@@ -2046,29 +1941,34 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
         );
         let statusObj = statuses.find((s) => s.id === rule.statusID);
         return (
-          <View
+          <div
             key={rule.id}
             style={{
+              display: "flex",
+              flexDirection: "column",
               width: "100%",
               borderWidth: 1,
+              borderStyle: "solid",
               borderColor: C.buttonLightGreenOutline,
               borderRadius: 8,
               backgroundColor: C.listItemWhite,
               padding: 10,
               marginBottom: 8,
+              boxSizing: "border-box",
             }}
           >
             {/* Status selector */}
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-              <Text style={{ fontSize: 12, color: gray(0.5), width: 70 }}>Status</Text>
-              <DropdownMenu
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: C.textMuted, width: 70, flexShrink: 0 }}>Status</span>
+              <DomDropdownMenu
                 dataArr={availableStatuses.map((s) => ({ label: s.label, id: s.id }))}
                 onSelect={(val) => updateRule(rule.id, "statusID", val.id)}
                 buttonText={getStatusLabel(rule.statusID)}
                 buttonStyle={{
                   flex: 1,
-                  backgroundColor: statusObj?.backgroundColor || gray(0.1),
-                  paddingVertical: 6,
+                  backgroundColor: statusObj?.backgroundColor || C.surfaceAlt,
+                  paddingTop: 6,
+                  paddingBottom: 6,
                   borderRadius: 6,
                 }}
                 buttonTextStyle={{
@@ -2077,48 +1977,50 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   fontWeight: "500",
                 }}
               />
-            </View>
+            </div>
 
             {/* SMS template selector */}
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-              <Text style={{ fontSize: 12, color: gray(0.5), width: 70 }}>SMS</Text>
-              <DropdownMenu
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: C.textMuted, width: 70, flexShrink: 0 }}>SMS</span>
+              <DomDropdownMenu
                 dataArr={[{ label: "None", id: "" }, ...smsTemplates.map((t) => ({ label: t.label, id: t.id }))]}
                 onSelect={(val) => updateRule(rule.id, "smsTemplateID", val.id)}
                 buttonText={getTemplateLabel(rule.smsTemplateID, smsTemplates)}
                 buttonStyle={{
                   flex: 1,
-                  paddingVertical: 6,
+                  paddingTop: 6,
+                  paddingBottom: 6,
                   borderRadius: 6,
                   borderWidth: 1,
-                  borderColor: gray(0.15),
+                  borderColor: C.borderSubtle,
                 }}
                 buttonTextStyle={{ fontSize: 12, color: C.text }}
               />
-            </View>
+            </div>
 
             {/* Email template selector */}
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-              <Text style={{ fontSize: 12, color: gray(0.5), width: 70 }}>Email</Text>
-              <DropdownMenu
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: C.textMuted, width: 70, flexShrink: 0 }}>Email</span>
+              <DomDropdownMenu
                 dataArr={[{ label: "None", id: "" }, ...emailTemplates.map((t) => ({ label: t.label, id: t.id }))]}
                 onSelect={(val) => updateRule(rule.id, "emailTemplateID", val.id)}
                 buttonText={getTemplateLabel(rule.emailTemplateID, emailTemplates)}
                 buttonStyle={{
                   flex: 1,
-                  paddingVertical: 6,
+                  paddingTop: 6,
+                  paddingBottom: 6,
                   borderRadius: 6,
                   borderWidth: 1,
-                  borderColor: gray(0.15),
+                  borderColor: C.borderSubtle,
                 }}
                 buttonTextStyle={{ fontSize: 12, color: C.text }}
               />
-            </View>
+            </div>
 
             {/* Delay inputs */}
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-              <Text style={{ fontSize: 12, color: gray(0.5), width: 70 }}>Delay</Text>
-              <TextInput_
+            <div style={{ display: "flex", flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: C.textMuted, width: 70, flexShrink: 0 }}>Delay</span>
+              <DomTextInput
                 debounceMs={500}
                 value={String(rule.delayMinutes || 0)}
                 onChangeText={(val) => {
@@ -2126,20 +2028,10 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   if (isNaN(num) || num < 0) num = 0;
                   updateRule(rule.id, "delayMinutes", num);
                 }}
-                style={{
-                  width: 50,
-                  height: 30,
-                  borderWidth: 1,
-                  borderColor: gray(0.15),
-                  borderRadius: 6,
-                  paddingHorizontal: 6,
-                  textAlign: "center",
-                  fontSize: 12,
-                  outlineWidth: 0,
-                }}
+                style={numInputStyle}
               />
-              <Text style={{ fontSize: 11, color: gray(0.4), marginHorizontal: 4 }}>min</Text>
-              <TextInput_
+              <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 4, marginRight: 4 }}>min</span>
+              <DomTextInput
                 debounceMs={500}
                 value={String(rule.delaySeconds || 0)}
                 onChangeText={(val) => {
@@ -2148,1003 +2040,43 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   if (num > 59) num = 59;
                   updateRule(rule.id, "delaySeconds", num);
                 }}
-                style={{
-                  width: 50,
-                  height: 30,
-                  borderWidth: 1,
-                  borderColor: gray(0.15),
-                  borderRadius: 6,
-                  paddingHorizontal: 6,
-                  textAlign: "center",
-                  fontSize: 12,
-                  outlineWidth: 0,
-                }}
+                style={numInputStyle}
               />
-              <Text style={{ fontSize: 11, color: gray(0.4), marginHorizontal: 4 }}>sec</Text>
-            </View>
+              <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 4, marginRight: 4 }}>sec</span>
+            </div>
 
             {/* Delete button */}
-            <TouchableOpacity
-              onPress={() => deleteRule(rule.id)}
-              style={{ alignSelf: "flex-end" }}
+            <button
+              type="button"
+              onClick={() => deleteRule(rule.id)}
+              style={{
+                alignSelf: "flex-end",
+                background: "none",
+                border: "none",
+                padding: 0,
+                cursor: "pointer",
+              }}
             >
-              <Text style={{ fontSize: 11, color: C.lightred, fontWeight: "500" }}>Delete</Text>
-            </TouchableOpacity>
-          </View>
+              <span style={{ fontSize: 11, color: C.lightred, fontWeight: "500" }}>Delete</span>
+            </button>
+          </div>
         );
       })}
       {rules.length === 0 && (
-        <Text style={{ fontSize: 11, color: gray(0.4), fontStyle: "italic" }}>
+        <span style={{ fontSize: 11, color: C.textMuted, fontStyle: "italic" }}>
           No auto-text rules configured. Tap + to add one.
-        </Text>
+        </span>
       )}
-    </View>
+    </div>
   );
 };
 
-const QBInventorySearchModal = ({ parentName, onClose, onAddItems, existingItemIDs = [] }) => {
-  const [sInvSearch, _setInvSearch] = useState("");
-  const [sInvResults, _setInvResults] = useState([]);
-  const [sSelectedIDs, _setSelectedIDs] = useState(new Set());
-
-  function doSearch(val) {
-    _setInvSearch(val);
-    if (!val || val.length < 3) { _setInvResults([]); return; }
-    workerSearchInventory(val, (results) => _setInvResults(results));
-  }
-
-  function clearSearch() {
-    _setInvSearch("");
-    _setInvResults([]);
-  }
-
-  function toggleSelected(id) {
-    _setSelectedIDs((prev) => {
-      let next = new Set(prev);
-      if (next.has(id)) next.delete(id); else next.add(id);
-      return next;
-    });
-  }
-
-  function handleSingleSelect(id) {
-    onAddItems([id]);
-    onClose();
-  }
-
-  function handleMultiSelect() {
-    if (sSelectedIDs.size === 0) return;
-    onAddItems([...sSelectedIDs]);
-    onClose();
-  }
-
-  return createPortal(
-    <div
-      style={{
-        position: "fixed",
-        top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.45)",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: Z.modal,
-      }}
-      onClick={onClose}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: 550,
-          height: window.innerHeight - 100,
-          backgroundColor: C.backgroundWhite,
-          borderRadius: 12,
-          border: "1px solid " + C.buttonLightGreenOutline,
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-        {/* Header */}
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            paddingHorizontal: 16,
-            paddingVertical: 10,
-            borderBottomWidth: 1,
-            borderBottomColor: gray(0.1),
-          }}
-        >
-          <Text style={{ fontSize: 16, fontWeight: "bold", color: C.text }}>
-            {"Add items to "}
-            <Text style={{ color: C.green }}>{parentName}</Text>
-          </Text>
-          <Button_
-            icon={ICONS.close1}
-            iconSize={28}
-            onPress={onClose}
-            buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 0, paddingVertical: 0, marginBottom: 0 }}
-          />
-        </View>
-
-        {/* Search bar */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            paddingHorizontal: 16,
-            paddingVertical: 8,
-          }}
-        >
-          <Button_
-            icon={ICONS.reset1}
-            iconSize={20}
-            onPress={clearSearch}
-            useColorGradient={false}
-          />
-          <TextInput_
-            autoFocus={true}
-            style={{
-              flex: 1,
-              borderBottomWidth: 1,
-              borderBottomColor: gray(0.2),
-              fontSize: 18,
-              color: C.text,
-              outlineWidth: 0,
-              outlineStyle: "none",
-              paddingVertical: 4,
-              marginLeft: 8,
-            }}
-            placeholder="Search inventory"
-            placeholderTextColor={gray(0.2)}
-            value={sInvSearch}
-            onChangeText={doSearch}
-          />
-        </View>
-
-        {/* Select Items button */}
-        <View style={{ paddingHorizontal: 16, paddingVertical: 6 }}>
-          <Button_
-            text={sSelectedIDs.size > 0 ? "Select Items (" + sSelectedIDs.size + ")" : "Select Items"}
-            onPress={handleMultiSelect}
-            enabled={sSelectedIDs.size > 0}
-            colorGradientArr={COLOR_GRADIENTS.green}
-            buttonStyle={{ borderRadius: 5, paddingVertical: 8, opacity: sSelectedIDs.size > 0 ? 1 : 0.4 }}
-            textStyle={{ fontSize: 13, color: C.textWhite }}
-          />
-        </View>
-
-        {/* Results */}
-        <FlatList
-          data={sInvResults.slice(0, 50)}
-          keyExtractor={(item) => item.id}
-          style={{ flex: 1, paddingHorizontal: 8 }}
-          renderItem={({ item, index }) => {
-            let isChecked = sSelectedIDs.has(item.id);
-            let alreadyAdded = existingItemIDs.includes(item.id);
-            return (
-              <div
-                onMouseEnter={(e) => { if (!alreadyAdded) e.currentTarget.style.opacity = "0.7"; }}
-                onMouseLeave={(e) => { e.currentTarget.style.opacity = alreadyAdded ? "0.4" : "1"; }}
-                style={{
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  borderRadius: 6,
-                  border: "1px solid " + gray(0.12),
-                  backgroundColor: index % 2 === 0 ? C.backgroundListWhite : gray(0.04),
-                  marginBottom: 2,
-                  paddingTop: 6,
-                  paddingBottom: 6,
-                  paddingLeft: 6,
-                  paddingRight: 6,
-                  cursor: alreadyAdded ? "default" : "pointer",
-                  opacity: alreadyAdded ? 0.4 : 1,
-                }}
-              >
-                <CheckBox
-                  isChecked={isChecked}
-                  onCheck={alreadyAdded ? undefined : () => toggleSelected(item.id)}
-                  buttonStyle={{ marginRight: 4 }}
-                />
-                <TouchableOpacity
-                  onPress={alreadyAdded ? undefined : () => handleSingleSelect(item.id)}
-                  style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
-                  disabled={alreadyAdded}
-                >
-                  <View style={{ flex: 1, paddingLeft: 4 }}>
-                    <Text style={{ fontSize: 14, color: alreadyAdded ? gray(0.4) : C.text }} numberOfLines={1}>
-                      {item.informalName || item.formalName}
-                    </Text>
-                    {!!item.informalName && (
-                      <Text style={{ fontSize: 11, color: gray(0.4) }} numberOfLines={1}>
-                        {item.formalName}
-                      </Text>
-                    )}
-                  </View>
-                  <Text style={{ fontSize: 13, color: alreadyAdded ? gray(0.4) : C.text, marginLeft: 8 }}>
-                    {"$" + formatCurrencyDisp(item.price)}
-                  </Text>
-                </TouchableOpacity>
-              </div>
-            );
-          }}
-        />
-      </div>
-    </div>,
-    document.body
-  );
-};
-
-const QuickItemButtonsComponent = () => {
-  const zSettingsObj = useSettingsStore((state) => state.settings);
-  const sCurrentParentID = useTabNamesStore((state) => state.getDashboardQBParentID());
-  const _setCurrentParentID = useTabNamesStore((state) => state.setDashboardQBParentID);
-  const sMenuPath = useTabNamesStore((state) => state.getDashboardQBMenuPath());
-  const _setMenuPath = (valOrFn) => {
-    if (typeof valOrFn === "function") {
-      let current = useTabNamesStore.getState().getDashboardQBMenuPath();
-      useTabNamesStore.getState().setDashboardQBMenuPath(valOrFn(current));
-    } else {
-      useTabNamesStore.getState().setDashboardQBMenuPath(valOrFn);
-    }
-  };
-  const [sDragIdx, _setDragIdx] = useState(null);
-  const [sDragOverIdx, _setDragOverIdx] = useState(null);
-  const [sEditingID, _setEditingID] = useState(null);
-  const [sShowInvSearchModal, _setShowInvSearchModal] = useState(false);
-  const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
-
-  function getDescendantIDs(buttonID, allButtons) {
-    let descendants = [];
-    let children = allButtons.filter((b) => b.parentID === buttonID);
-    children.forEach((child) => {
-      descendants.push(child.id);
-      descendants.push(...getDescendantIDs(child.id, allButtons));
-    });
-    return descendants;
-  }
-
-  function getChildCount(buttonID) {
-    return (zSettingsObj?.quickItemButtons || []).filter(
-      (b) => b.parentID === buttonID
-    ).length;
-  }
-
-  function drillIn(btn) {
-    console.log("[Dashboard QB] drillIn button:", JSON.stringify(btn, null, 2));
-    console.log("[Dashboard QB] drillIn button.items count:", btn.items?.length, "items:", JSON.stringify(btn.items, null, 2));
-    _setMenuPath((prev) => [...prev, { id: btn.id, name: btn.name }]);
-    _setCurrentParentID(btn.id);
-  }
-
-  function handleBack() {
-    let path = [...sMenuPath];
-    path.pop();
-    _setMenuPath(path);
-    _setCurrentParentID(path.length > 0 ? path[path.length - 1].id : null);
-  }
-
-  function handleDelete(btn) {
-    if (btn.id === "labor" || btn.id === "item") return;
-    let deletedParentID = btn.parentID || null;
-    let updated = zSettingsObj.quickItemButtons
-      .filter((o) => o.id !== btn.id)
-      .map((o) =>
-        o.parentID === btn.id ? { ...o, parentID: deletedParentID } : o
-      );
-    useSettingsStore.getState().setField("quickItemButtons", updated);
-  }
-
-  function handleNameChange(btn, val) {
-    useSettingsStore.getState().setField(
-      "quickItemButtons",
-      zSettingsObj.quickItemButtons.map((o) =>
-        o.id === btn.id ? { ...o, name: val } : o
-      )
-    );
-  }
-
-  function handleAdd() {
-    let newID = crypto.randomUUID();
-    let quickButtonsArr = [...(zSettingsObj?.quickItemButtons || [])];
-    quickButtonsArr.push({
-      id: newID,
-      name: "",
-      parentID: sCurrentParentID,
-      items: [],
-    });
-    useSettingsStore.getState().setField("quickItemButtons", quickButtonsArr);
-    _setEditingID(newID);
-  }
-
-  function handleAddItemsToButton(itemIDs) {
-    // console.log("[Dashboard QB] handleAddItemsToButton itemIDs:", JSON.stringify(itemIDs));
-    if (!sCurrentParentID) return;
-    let updated = (zSettingsObj?.quickItemButtons || []).map((b) => {
-      if (b.id !== sCurrentParentID) return b;
-      let existing = b.items || [];
-      let existingIDs = existing.map((e) => typeof e === "string" ? e : e.inventoryItemID);
-      let newEntries = itemIDs
-        .filter((id) => !existingIDs.includes(id))
-        .map((id, i) => ({ inventoryItemID: id, x: ((existingIDs.length + i) % 6) * (QB_DEFAULT_W + QB_SNAP_PCT), y: Math.floor((existingIDs.length + i) / 6) * (QB_DEFAULT_H + QB_SNAP_PCT), w: QB_DEFAULT_W, h: QB_DEFAULT_H, fontSize: 10 }));
-      return { ...b, items: [...existing, ...newEntries] };
-    });
-    // console.log("[Dashboard QB] handleAddItemsToButton updated button:", JSON.stringify(updated.find(b => b.id === sCurrentParentID), null, 2));
-    useSettingsStore.getState().setField("quickItemButtons", updated);
-  }
-
-  // Render the extracted component, passing needed props
-  function renderInvSearchModal() {
-    if (!sShowInvSearchModal) return null;
-    const parentBtn = (zSettingsObj?.quickItemButtons || []).find((b) => b.id === sCurrentParentID);
-    const parentName = parentBtn?.name || "(unnamed)";
-    const existingItemIDs = (parentBtn?.items || []).map((e) => typeof e === "string" ? e : e.inventoryItemID);
-    return (
-      <QBInventorySearchModal
-        parentName={parentName}
-        onClose={() => _setShowInvSearchModal(false)}
-        onAddItems={handleAddItemsToButton}
-        existingItemIDs={existingItemIDs}
-      />
-    );
-  }
-
-  function reorderSubButtons(fromIdx, toIdx) {
-    if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
-    let allButtons = [...zSettingsObj.quickItemButtons];
-    let children = allButtons.filter(
-      (b) => sCurrentParentID === null ? !b.parentID : b.parentID === sCurrentParentID
-    );
-    let [dragged] = children.splice(fromIdx, 1);
-    children.splice(toIdx, 0, dragged);
-    let childIndex = 0;
-    let isMatch = sCurrentParentID === null ? (b) => !b.parentID : (b) => b.parentID === sCurrentParentID;
-    let result = allButtons.map((b) => {
-      if (isMatch(b)) return children[childIndex++];
-      return b;
-    });
-    useSettingsStore.getState().setField("quickItemButtons", result);
-  }
-
-  function handleToggleDivider(itemID) {
-    if (!sCurrentParentID) return;
-    let updated = allButtons.map((b) => {
-      if (b.id !== sCurrentParentID) return b;
-      let dividers = [...(b.dividers || [])];
-      let idx = dividers.findIndex((d) => d.itemID === itemID);
-      if (idx >= 0) dividers.splice(idx, 1);
-      else dividers.push({ itemID, label: "" });
-      return { ...b, dividers };
-    });
-    useSettingsStore.getState().setField("quickItemButtons", updated);
-  }
-
-  function handleDividerLabelChange(itemID, label) {
-    if (!sCurrentParentID) return;
-    let capitalized = label.replace(/(?:^|\s)\S/g, (ch) => ch.toUpperCase());
-    let updated = allButtons.map((b) => {
-      if (b.id !== sCurrentParentID) return b;
-      let dividers = (b.dividers || []).map((d) =>
-        d.itemID === itemID ? { ...d, label: capitalized } : d
-      );
-      return { ...b, dividers };
-    });
-    useSettingsStore.getState().setField("quickItemButtons", updated);
-  }
-
-  let allButtons = zSettingsObj?.quickItemButtons || [];
-  let topLevelButtons = allButtons.filter((b) => !b.parentID);
-  let currentChildren = allButtons.filter(
-    (b) => b.parentID === sCurrentParentID
-  );
-  let parentButton = sCurrentParentID ? allButtons.find((b) => b.id === sCurrentParentID) : null;
-  let parentItems = (parentButton?.items || []).map((entry) => {
-    let id = typeof entry === "string" ? entry : entry.inventoryItemID;
-    return zInventoryArr.find((o) => o.id === id);
-  }).filter(Boolean);
-
-  function renderButtonCard(btn, idx, isDraggable, isColumn) {
-    let isEditing = sEditingID === btn.id;
-    let childCount = getChildCount(btn.id);
-    let formalNames = "";
-    if (isEditing) {
-      formalNames = (btn.items || []).map((entry) => {
-        let id = typeof entry === "string" ? entry : entry.inventoryItemID;
-        return zInventoryArr.find((o) => o.id === id)?.formalName;
-      }).filter(Boolean).join(", ");
-    }
-    return (
-      <div
-        key={btn.id}
-        draggable={isDraggable}
-        onDragStart={isDraggable ? () => _setDragIdx(idx) : undefined}
-        onDragOver={
-          isDraggable
-            ? (e) => {
-                e.preventDefault();
-                _setDragOverIdx(idx);
-              }
-            : undefined
-        }
-        onDragEnd={
-          isDraggable
-            ? () => {
-                _setDragIdx(null);
-                _setDragOverIdx(null);
-              }
-            : undefined
-        }
-        onDrop={
-          isDraggable
-            ? (e) => {
-                e.preventDefault();
-                reorderSubButtons(sDragIdx, idx);
-                _setDragIdx(null);
-                _setDragOverIdx(null);
-              }
-            : undefined
-        }
-        onMouseEnter={(e) => {
-          if (!isEditing) e.currentTarget.style.opacity = "0.7";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.opacity = "1";
-        }}
-        style={{
-          width: isColumn ? "100%" : 170,
-          minHeight: isColumn ? 44 : 60,
-          marginRight: 4,
-          marginBottom: 4,
-          marginLeft: 4,
-          marginTop: isEditing && formalNames ? 22 : 4,
-          padding: 8,
-          display: "flex",
-          flexDirection: isColumn ? "row" : "column",
-          borderWidth: isDraggable && sDragOverIdx === idx ? 2 : 1,
-          borderStyle: "solid",
-          borderColor:
-            isDraggable && sDragOverIdx === idx
-              ? C.blue
-              : C.buttonLightGreenOutline,
-          borderRadius: 8,
-          backgroundColor: isEditing ? "rgb(245,166,35)" : isColumn ? C.listItemWhite : C.backgroundGreen,
-          alignItems: "center",
-          justifyContent: isColumn ? "flex-start" : "center",
-          position: "relative",
-          cursor: isDraggable ? "grab" : "pointer",
-          opacity: isDraggable && sDragIdx === idx ? 0.5 : 1,
-          boxSizing: "border-box",
-        }}
-      >
-        {/* Formal name helper above card when editing */}
-        {isEditing && formalNames ? (
-          <Text
-            style={{
-              position: "absolute",
-              top: -18,
-              left: 0,
-              right: 0,
-              fontSize: 10,
-              color: gray(0.5),
-              textAlign: isColumn ? "left" : "center",
-              paddingHorizontal: 4,
-              pointerEvents: "none",
-            }}
-            numberOfLines={1}
-          >
-            {formalNames}
-          </Text>
-        ) : null}
-        {/* Name area */}
-        {isEditing ? (
-          <TextInput_
-            autoFocus={true}
-            onChangeText={(val) => handleNameChange(btn, val)}
-            placeholder="Enter name..."
-            placeholderTextColor={gray(0.3)}
-            style={{
-              flex: isColumn ? 1 : undefined,
-              width: isColumn ? undefined : "100%",
-              paddingHorizontal: 5,
-              paddingVertical: 3,
-              fontSize: 13,
-              textAlign: isColumn ? "left" : "center",
-              color: C.text,
-              outlineWidth: 0,
-              outlineStyle: "none",
-            }}
-            value={btn.name}
-          />
-        ) : (
-          <TouchableOpacity
-            onPress={(btn.id === "labor" || btn.id === "item") ? undefined : () => drillIn(btn)}
-            style={{
-              flex: isColumn ? 1 : undefined,
-              width: isColumn ? undefined : "100%",
-              cursor: (btn.id === "labor" || btn.id === "item") ? "default" : "pointer",
-            }}
-          >
-            <Text
-              style={{
-                width: "100%",
-                fontSize: 13,
-                textAlign: isColumn ? "left" : "center",
-                color: C.text,
-                paddingHorizontal: 5,
-                paddingVertical: 3,
-              }}
-              numberOfLines={1}
-            >
-              {btn.name || "(unnamed)"}
-            </Text>
-          </TouchableOpacity>
-        )}
-        {/* Controls row: badge + edit + delete */}
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "center",
-            marginTop: isColumn ? 0 : 4,
-            marginLeft: isColumn ? 8 : 0,
-          }}
-        >
-          {childCount > 0 && (
-            <View
-              style={{
-                backgroundColor: C.blue,
-                borderRadius: 8,
-                minWidth: 16,
-                height: 16,
-                alignItems: "center",
-                justifyContent: "center",
-                marginRight: 6,
-              }}
-            >
-              <Text
-                style={{
-                  color: C.textWhite,
-                  fontSize: 10,
-                  fontWeight: "bold",
-                  paddingHorizontal: 4,
-                }}
-              >
-                {childCount}
-              </Text>
-            </View>
-          )}
-          <BoxButton1
-            onPress={() =>
-              _setEditingID(isEditing ? null : btn.id)
-            }
-            iconSize={isEditing ? 37 : 17}
-            icon={isEditing ? ICONS.clickHere : ICONS.editPencil}
-          />
-          {btn.removable !== false && (
-            <BoxButton1
-              onPress={() => handleDelete(btn)}
-              style={{ marginLeft: 6 }}
-              iconSize={17}
-              icon={ICONS.trash}
-            />
-          )}
-        </View>
-        {isDraggable && sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx > idx && (
-          <Image_
-            icon={ICONS.backRed}
-            size={14}
-            style={{
-              position: "absolute",
-              bottom: 4,
-              left: 4,
-            }}
-          />
-        )}
-        {isDraggable && sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx < idx && (
-          <Image_
-            icon={ICONS.rightArrowBlue}
-            size={14}
-            style={{
-              position: "absolute",
-              bottom: 4,
-              left: isColumn ? 4 : undefined,
-              right: isColumn ? undefined : 4,
-            }}
-          />
-        )}
-      </div>
-    );
-  }
-
-  // ── TOP-LEVEL VIEW ──
-  if (sCurrentParentID === null) {
-    return (
-      <BoxContainerOuterComponent style={{ flex: 1 }}>
-        <BoxContainerInnerComponent
-          style={{ width: "100%", alignItems: "center", borderWidth: 0, flex: 1 }}
-        >
-          <View style={{ width: "100%", alignItems: "center", flexDirection: "column", marginBottom: 10 }}>
-            <Tooltip text="Add quick-item button" position="right">
-              <BoxButton1 onPress={handleAdd} icon={ICONS.menu1} iconSize={40} />
-            </Tooltip>
-          </View>
-          <View
-            style={{
-              width: "100%",
-              flex: 1,
-              borderWidth: 1,
-              borderColor: C.buttonLightGreenOutline,
-              backgroundColor: C.backgroundListWhite,
-              borderRadius: 10,
-              paddingVertical: 10,
-              paddingHorizontal: 10,
-            }}
-          >
-            <ScrollView style={{ width: "100%", flex: 1 }}>
-              {topLevelButtons.map((btn, idx) =>
-                renderButtonCard(btn, idx, true, true)
-              )}
-            </ScrollView>
-          </View>
-        </BoxContainerInnerComponent>
-      </BoxContainerOuterComponent>
-    );
-  }
-
-  // ── SUB-LEVEL VIEW ──
-  return (
-    <BoxContainerOuterComponent>
-      <BoxContainerInnerComponent
-        style={{ width: "100%", alignItems: "center", borderWidth: 0 }}
-      >
-        <View style={{ width: "100%" }}>
-          {/* Navigation header */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginBottom: 10,
-              flexWrap: "wrap",
-            }}
-          >
-            <TouchableOpacity
-              onPress={() => {
-                _setCurrentParentID(null);
-                _setMenuPath([]);
-              }}
-              style={{
-                paddingVertical: 4,
-                paddingHorizontal: 8,
-                borderRadius: 5,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                marginRight: 8,
-              }}
-            >
-              <Text style={{ fontSize: 12, color: C.blue, fontWeight: "bold" }}>
-                {"Top Level"}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleBack}
-              style={{
-                paddingVertical: 4,
-                paddingHorizontal: 8,
-                borderRadius: 5,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                marginRight: 12,
-              }}
-            >
-              <Text style={{ fontSize: 12, color: C.text }}>
-                {"\u25C0 Back"}
-              </Text>
-            </TouchableOpacity>
-            {/* Breadcrumb trail */}
-            <View
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              {sMenuPath.map((crumb, i) => (
-                <View
-                  key={crumb.id}
-                  style={{ flexDirection: "row", alignItems: "center" }}
-                >
-                  {i > 0 && (
-                    <Text
-                      style={{
-                        color: gray(0.3),
-                        marginHorizontal: 4,
-                        fontSize: 13,
-                      }}
-                    >
-                      {">"}
-                    </Text>
-                  )}
-                  <TouchableOpacity
-                    onPress={() => {
-                      _setMenuPath((prev) => prev.slice(0, i + 1));
-                      _setCurrentParentID(crumb.id);
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color:
-                          i === sMenuPath.length - 1 ? C.text : C.blue,
-                        fontSize: 13,
-                        fontWeight:
-                          i === sMenuPath.length - 1 ? "bold" : "normal",
-                      }}
-                    >
-                      {crumb.name || "(unnamed)"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </View>
-          </View>
-
-          {/* Add buttons */}
-          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 4 }}>
-            <Tooltip text="Add item" position="right">
-              <BoxButton1 onPress={() => _setShowInvSearchModal(true)} iconSize={40} />
-            </Tooltip>
-            <View style={{ marginLeft: 8 }}>
-              <Tooltip text="Add sub-menu" position="right">
-                <BoxButton1 onPress={handleAdd} icon={ICONS.menu1} iconSize={40} />
-              </Tooltip>
-            </View>
-          </View>
-
-          {renderInvSearchModal()}
-
-          {/* Flex-wrap grid of sub-buttons */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              flexWrap: "wrap",
-              marginTop: 10,
-            }}
-          >
-            {currentChildren.map((btn, idx) =>
-              renderButtonCard(btn, idx, true)
-            )}
-          </div>
-
-          {/* Inventory items linked to this button */}
-          {sCurrentParentID && (
-            <ParentButtonItemsList
-              sCurrentParentID={sCurrentParentID}
-              handleDividerLabelChange={handleDividerLabelChange}
-              handleToggleDivider={handleToggleDivider}
-            />
-          )}
-        </View>
-      </BoxContainerInnerComponent>
-    </BoxContainerOuterComponent>
-  );
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// Parent Button Items List — own drag state, same pattern as WorkorderStatusesComponent
-////////////////////////////////////////////////////////////////////////////////
-
-const ParentButtonItemsList = ({
-  sCurrentParentID,
-  handleDividerLabelChange,
-  handleToggleDivider,
-}) => {
-  const zSettingsObj = useSettingsStore((state) => state.settings);
-  const [sDragIdx, _setDragIdx] = useState(null);
-  const [sDragOverIdx, _setDragOverIdx] = useState(null);
-  const zInventoryArr = useInventoryStore((state) => state.inventoryArr);
-
-  let quickItemButtons = zSettingsObj?.quickItemButtons || [];
-  let parentButton = quickItemButtons.find((b) => b.id === sCurrentParentID);
-  let parentItems = (parentButton?.items || []).map((entry) => {
-    let id = typeof entry === "string" ? entry : entry.inventoryItemID;
-    return zInventoryArr.find((o) => o.id === id);
-  }).filter(Boolean);
-
-  function handleItemLabelChange(inventoryItemID, val) {
-    let invItem = zInventoryArr.find((o) => o.id === inventoryItemID);
-    if (!invItem) return;
-    let updated = { ...invItem, informalName: val };
-    // Update local inventory store immediately for speed
-    let updatedArr = zInventoryArr.map((i) => i.id === inventoryItemID ? updated : i);
-    useInventoryStore.getState().setItems(updatedArr);
-    dbSaveInventoryItem(updated);
-  }
-
-  function reorderItems(fromIdx, toIdx) {
-    if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
-    let items = [...(parentButton?.items || [])];
-    let [dragged] = items.splice(fromIdx, 1);
-    items.splice(toIdx, 0, dragged);
-    let updated = quickItemButtons.map((b) =>
-      b.id === sCurrentParentID ? { ...b, items } : b
-    );
-    useSettingsStore.getState().setField("quickItemButtons", updated);
-  }
-
-  function handleDeleteItem(itemId) {
-    let items = (parentButton?.items || []).filter((entry) => {
-      let id = typeof entry === "string" ? entry : entry.inventoryItemID;
-      return id !== itemId;
-    });
-    let updated = quickItemButtons.map((b) =>
-      b.id === sCurrentParentID ? { ...b, items } : b
-    );
-    useSettingsStore.getState().setField("quickItemButtons", updated);
-  }
-
-  function handleAddToTargetQB(inventoryItemID, targetBtnID) {
-    let targetBtn = quickItemButtons.find((b) => b.id === targetBtnID);
-    if (!targetBtn) return;
-    let existingIDs = (targetBtn.items || []).map((e) => typeof e === "string" ? e : e.inventoryItemID);
-    if (existingIDs.includes(inventoryItemID)) return;
-    let sourceEntry = (parentButton?.items || []).find((e) => {
-      let id = typeof e === "string" ? e : e.inventoryItemID;
-      return id === inventoryItemID;
-    });
-    let w = (sourceEntry && typeof sourceEntry !== "string") ? sourceEntry.w || QB_DEFAULT_W : QB_DEFAULT_W;
-    let h = (sourceEntry && typeof sourceEntry !== "string") ? sourceEntry.h || QB_DEFAULT_H : QB_DEFAULT_H;
-    let fontSize = (sourceEntry && typeof sourceEntry !== "string") ? sourceEntry.fontSize || 10 : 10;
-    let newEntry = { inventoryItemID, x: (existingIDs.length % 6) * (QB_DEFAULT_W + QB_SNAP_PCT), y: Math.floor(existingIDs.length / 6) * (QB_DEFAULT_H + QB_SNAP_PCT), w, h, fontSize };
-    if (sourceEntry && typeof sourceEntry !== "string" && sourceEntry.color) newEntry.color = sourceEntry.color;
-    let updated = quickItemButtons.map((b) =>
-      b.id === targetBtnID ? { ...b, items: [...(b.items || []), newEntry] } : b
-    );
-    useSettingsStore.getState().setField("quickItemButtons", updated);
-  }
-
-  if (parentItems.length === 0) return null;
-
-  let dropdownTargets = quickItemButtons
-    .filter((b) => b.id !== "labor" && b.id !== "item" && b.id !== sCurrentParentID)
-    .map((b) => ({ id: b.id, label: b.name || "(unnamed)" }));
-
-  return (
-    <View style={{ marginTop: 10, width: "100%" }}>
-      <Text style={{ fontSize: 12, fontWeight: "bold", color: gray(0.5), marginBottom: 6 }}>
-        ITEMS ({parentItems.length})
-      </Text>
-      {parentItems.map((inv, idx) => {
-        let dividerObj = (parentButton?.dividers || []).find((d) => d.itemID === inv.id);
-        let hasDivider = !!dividerObj;
-        return (
-          <React.Fragment key={inv.id}>
-            {hasDivider && (
-              <View style={{ marginTop: 10, marginBottom: 4 }}>
-                <View style={{ height: 4, backgroundColor: C.buttonLightGreenOutline, borderRadius: 2 }} />
-                <TextInput_
-                  placeholder="Divider label (optional)"
-                  value={dividerObj?.label || ""}
-                  onChangeText={(val) => handleDividerLabelChange(inv.id, val)}
-                  debounceMs={500}
-                  style={{
-                    fontSize: 12,
-                    color: gray(0.5),
-                    paddingVertical: 3,
-                    paddingHorizontal: 6,
-                    outlineWidth: 0,
-                    backgroundColor: "transparent",
-                  }}
-                />
-              </View>
-            )}
-            <div
-              draggable
-              onDragStart={() => _setDragIdx(idx)}
-              onDragOver={(e) => {
-                e.preventDefault();
-                _setDragOverIdx(idx);
-              }}
-              onDragEnd={() => {
-                _setDragIdx(null);
-                _setDragOverIdx(null);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                reorderItems(sDragIdx, idx);
-                _setDragIdx(null);
-                _setDragOverIdx(null);
-              }}
-              onContextMenu={(e) => { e.preventDefault(); handleToggleDivider(inv.id); }}
-              title={hasDivider ? "Right click to remove divider" : "Right click to add divider above"}
-              style={{
-                display: "flex",
-                flexDirection: "row",
-                alignItems: "center",
-                paddingTop: 6,
-                paddingBottom: 6,
-                paddingLeft: 8,
-                paddingRight: 8,
-                borderRadius: 6,
-                borderWidth: sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx ? 2 : 1,
-                borderStyle: "solid",
-                borderColor: sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx ? C.blue : C.buttonLightGreenOutline,
-                backgroundColor: idx % 2 === 0 ? C.backgroundListWhite : C.listItemWhite,
-                marginBottom: 2,
-                cursor: "grab",
-                opacity: sDragIdx === idx ? 0.5 : 1,
-                position: "relative",
-              }}
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, color: C.text }} numberOfLines={1}>
-                  {inv.formalName}
-                </Text>
-                <TextInput_
-                  placeholder="Descriptive name"
-                  placeholderTextColor={gray(0.35)}
-                  value={inv.informalName || ""}
-                  onChangeText={(val) => handleItemLabelChange(inv.id, val)}
-                  debounceMs={400}
-                  style={{
-                    fontSize: 11,
-                    color: C.blue,
-                    paddingVertical: 2,
-                    paddingHorizontal: 0,
-                    marginTop: 2,
-                    outlineWidth: 0,
-                    backgroundColor: "transparent",
-                    borderBottomWidth: 1,
-                    borderBottomColor: gray(0.15),
-                  }}
-                />
-              </View>
-              <Text style={{ fontSize: 12, color: gray(0.5), marginRight: 10 }}>
-                {"$" + formatCurrencyDisp(inv.price)}
-              </Text>
-              {dropdownTargets.length > 0 && (
-                <View style={{ marginRight: 10 }}>
-                  <DropdownMenu
-                    dataArr={dropdownTargets}
-                    onSelect={(item) => handleAddToTargetQB(inv.id, item.id)}
-                    buttonIcon={ICONS.add}
-                    buttonIconSize={17}
-                    buttonStyle={{ backgroundColor: "transparent", borderWidth: 0, paddingVertical: 0, paddingHorizontal: 0 }}
-                    centerMenuVertically
-                    menuMaxHeight={window.innerHeight - 20}
-                  />
-                </View>
-              )}
-              <TouchableOpacity onPress={() => handleDeleteItem(inv.id)}>
-                <Image_ icon={ICONS.trash} size={14} />
-              </TouchableOpacity>
-              {sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx > idx && (
-                <Image_
-                  icon={ICONS.backRed}
-                  size={14}
-                  style={{ position: "absolute", bottom: 4, left: 4 }}
-                />
-              )}
-              {sDragOverIdx === idx && sDragIdx !== null && sDragIdx !== idx && sDragIdx < idx && (
-                <Image_
-                  icon={ICONS.rightArrowBlue}
-                  size={14}
-                  style={{ position: "absolute", bottom: 4, left: 4 }}
-                />
-              )}
-            </div>
-          </React.Fragment>
-        );
-      })}
-    </View>
-  );
-};
 
 const OrderingComponent = () => {
   return (
     <BoxContainerOuterComponent>
       <BoxContainerInnerComponent style={{ width: "100%", alignItems: "center", justifyContent: "center", minHeight: 200 }}>
-        <span style={{ color: gray(0.15), fontSize: 28, fontWeight: "600" }}>Ordering system not ready</span>
+        <span style={{ color: C.textDisabled, fontSize: 28, fontWeight: "600" }}>Ordering system not ready</span>
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );
@@ -3314,826 +2246,6 @@ const SPOOF_WORKORDER = {
   startedOnMillis: 1774312878862,
 };
 
-////////////////////////////////////////////////////////////////////////////////
-// Stand Buttons Search Panel (left side of modal)
-////////////////////////////////////////////////////////////////////////////////
-
-const StandButtonsSearchPanel = ({ zSettingsObj, handleSettingsFieldChange }) => {
-  const [sSearchString, _setSearchString] = useState("");
-  const [sSearchResults, _setSearchResults] = useState([]);
-  const [sSelectedItems, _setSelectedItems] = useState([]);
-
-  function handleSearch(val) {
-    _setSearchString(val);
-    if (!val || val.length < 2) {
-      _setSearchResults([]);
-      return;
-    }
-    workerSearchInventory(val, (results) => _setSearchResults(results));
-  }
-
-  function toggleItem(item) {
-    _setSelectedItems((prev) => {
-      let exists = prev.find((o) => o.id === item.id);
-      if (exists) return prev.filter((o) => o.id !== item.id);
-      return [...prev, item];
-    });
-  }
-
-  function handleAddSelected() {
-    if (sSelectedItems.length === 0) return;
-    let rows = intakeButtonsToRows(zSettingsObj?.intakeQuickButtons || []);
-
-    let lastRowIdx = rows.length > 0 ? rows.length - 1 : 0;
-    let newButtons = sSelectedItems.map((item) => ({
-      ...cloneDeep(INTAKE_QUICK_BUTTON_PROTO),
-      id: crypto.randomUUID(),
-      label: item.informalName || item.formalName || "",
-      inventoryItemID: item.id,
-      row: lastRowIdx,
-    }));
-
-    if (rows.length === 0) {
-      rows.push(newButtons);
-    } else {
-      rows[rows.length - 1] = [...rows[rows.length - 1], ...newButtons];
-    }
-    handleSettingsFieldChange("intakeQuickButtons", intakeRowsToFlat(rows));
-    _setSelectedItems([]);
-  }
-
-  return (
-    <div
-      style={{
-        width: "35%",
-        minWidth: 280,
-        maxWidth: 420,
-        borderRightWidth: 1,
-        borderRightStyle: "solid",
-        borderRightColor: gray(0.15),
-        display: "flex",
-        flexDirection: "column",
-        flexShrink: 0,
-      }}
-    >
-      {/* Search header */}
-      <View style={{ padding: 12, paddingBottom: 8 }}>
-        <Text
-          style={{
-            fontSize: 11,
-            fontWeight: Fonts.weight.textHeavy,
-            color: C.blue,
-            marginBottom: 4,
-          }}
-        >
-          SEARCH INVENTORY
-        </Text>
-        <TextInput_
-          style={{
-            borderColor: C.buttonLightGreenOutline,
-            borderWidth: 1,
-            borderRadius: 6,
-            width: "100%",
-            fontSize: 13,
-            color: C.text,
-            paddingVertical: 6,
-            paddingHorizontal: 8,
-            outlineWidth: 0,
-            outlineStyle: "none",
-          }}
-          value={sSearchString}
-          onChangeText={handleSearch}
-          placeholder="Search inventory..."
-          placeholderTextColor={gray(0.35)}
-        />
-      </View>
-
-      {/* Results list */}
-      <ScrollView style={{ flex: 1, paddingHorizontal: 12 }}>
-        {sSearchResults.slice(0, 50).map((item, idx) => {
-          let isSelected = !!sSelectedItems.find((o) => o.id === item.id);
-          return (
-            <TouchableOpacity
-              key={item.id || idx}
-              onPress={() => toggleItem(item)}
-              style={{
-                flexDirection: "row",
-                alignItems: "center",
-                paddingVertical: 6,
-                paddingHorizontal: 6,
-                borderBottomWidth: 1,
-                borderBottomColor: gray(0.08),
-                backgroundColor: isSelected ? "rgb(230, 245, 235)" : "transparent",
-                borderRadius: 4,
-              }}
-            >
-              <CheckBox
-                isChecked={isSelected}
-                onCheck={() => toggleItem(item)}
-                buttonStyle={{ marginRight: 8 }}
-              />
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 12, color: C.text }}>
-                  {item.informalName || item.formalName || "Unknown"}
-                </Text>
-                {!!item.brand && (
-                  <Text style={{ fontSize: 10, color: gray(0.5) }}>
-                    {item.brand}
-                  </Text>
-                )}
-              </View>
-              <Text style={{ fontSize: 12, color: C.text }}>
-                ${formatCurrencyDisp(item.price || 0)}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-        {sSearchString.length >= 2 && sSearchResults.length === 0 && (
-          <Text
-            style={{
-              fontSize: 12,
-              color: gray(0.4),
-              textAlign: "center",
-              paddingVertical: 20,
-            }}
-          >
-            No results found
-          </Text>
-        )}
-      </ScrollView>
-
-      {/* Add Selected button */}
-      {sSelectedItems.length > 0 && (
-        <View
-          style={{
-            padding: 12,
-            borderTopWidth: 1,
-            borderTopColor: gray(0.15),
-            alignItems: "center",
-          }}
-        >
-          <Button_
-            text={`Add ${sSelectedItems.length} Item${sSelectedItems.length > 1 ? "s" : ""}`}
-            colorGradientArr={COLOR_GRADIENTS.green}
-            onPress={handleAddSelected}
-            style={{ paddingHorizontal: 20, paddingVertical: 8, width: "100%" }}
-          />
-        </View>
-      )}
-    </div>
-  );
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// Stand Buttons Editor Component
-////////////////////////////////////////////////////////////////////////////////
-
-const StandButtonsEditorComponent = ({
-  zSettingsObj,
-  handleSettingsFieldChange,
-  _setStandEditButtonObj,
-  _setShowStandButtonsModal,
-}) => {
-  const [sEditMode, _setEditMode] = useState(false);
-  const [sDragSource, _setDragSource] = useState(null);
-  const [sDragTarget, _setDragTarget] = useState(null);
-  const [sNewRowDropTarget, _setNewRowDropTarget] = useState(null);
-  const [sSelectedWorkorderID, _setSelectedWorkorderID] = useState(null);
-  const [sShowWODropdown, _setShowWODropdown] = useState(false);
-  const [sButtonHeight, _setButtonHeight] = useState(40);
-  const [sContainerSize, _setContainerSize] = useState({ w: 0, h: 0 });
-  const resizeObsRef = useRef(null);
-  const containerRefCb = useCallback((node) => {
-    if (resizeObsRef.current) resizeObsRef.current.disconnect();
-    if (!node) return;
-    let obs = new ResizeObserver((entries) => {
-      let { width, height } = entries[0].contentRect;
-      _setContainerSize({ w: Math.floor(width), h: Math.floor(height) });
-    });
-    obs.observe(node);
-    resizeObsRef.current = obs;
-  }, []);
-
-  const zWorkorders = useOpenWorkordersStore((state) => state.workorders);
-  const zInventory = useInventoryStore((state) => state.inventoryArr);
-
-  let selectedWorkorder = sSelectedWorkorderID
-    ? zWorkorders.find((o) => o.id === sSelectedWorkorderID) || null
-    : null;
-
-  let salesTaxPercent = zSettingsObj?.salesTaxPercent || 0;
-  let totals = selectedWorkorder?.workorderLines?.length > 0
-    ? calculateRunningTotals(selectedWorkorder, salesTaxPercent, [], false, !!selectedWorkorder.taxFree)
-    : { finalTotal: 0, runningSubtotal: 0, runningTax: 0, runningQty: 0 };
-
-  let rows = intakeButtonsToRows(zSettingsObj?.intakeQuickButtons || []);
-  let allButtons = rows.flat();
-  let ROW_HEIGHT = sButtonHeight + 10; // button + 5px padding top + 5px padding bottom
-  let btnMargin = 6; // 3px margin on each side of button
-  let buttonsPerRow = sContainerSize.w > 0 ? Math.floor(sContainerSize.w / (100 + btnMargin)) : 1;
-  let buttonVisualRows = allButtons.length > 0 ? Math.ceil(allButtons.length / buttonsPerRow) : 0;
-  let totalRows = sContainerSize.h > 0 ? Math.floor(sContainerSize.h / ROW_HEIGHT) : 0;
-  let emptyRowCount = Math.max(0, totalRows - buttonVisualRows);
-
-  function saveRows(updatedRows) {
-    let cleaned = updatedRows.filter((row) => row.length > 0);
-    handleSettingsFieldChange("intakeQuickButtons", intakeRowsToFlat(cleaned));
-  }
-
-  function handleDeleteButton(btnId) {
-    saveFlatButtons(allButtons.filter((b) => b.id !== btnId));
-  }
-
-  function handleLabelChange(btnId, val) {
-    saveFlatButtons(allButtons.map((b) => b.id === btnId ? { ...b, label: val } : b));
-  }
-
-  function saveFlatButtons(flat) {
-    handleSettingsFieldChange("intakeQuickButtons", flat.map((b) => ({ ...b, row: 0 })));
-  }
-
-  function handleReorder(fromRow, fromIdx, toRow, toIdx) {
-    if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
-    let flat = [...allButtons];
-    let [dragged] = flat.splice(fromIdx, 1);
-    flat.splice(toIdx, 0, dragged);
-    saveFlatButtons(flat);
-  }
-
-  function handleDropToNewRow(slotIdx) {
-    if (!sDragSource) return;
-    let flat = [...allButtons];
-    let [dragged] = flat.splice(sDragSource.btnIdx, 1);
-    let insertAt = slotIdx * buttonsPerRow;
-    if (insertAt > flat.length) insertAt = flat.length;
-    flat.splice(insertAt, 0, dragged);
-    saveFlatButtons(flat);
-  }
-
-  function handleNewWorkorder() {
-    useLoginStore.getState().requireLogin(() => {
-      useCurrentCustomerStore.getState().setCustomer(null, false);
-      let store = useOpenWorkordersStore.getState();
-      store.setWorkorderPreviewID(null);
-      let wo = createNewWorkorder({
-        startedByFirst: useLoginStore.getState().currentUser?.first,
-        startedByLast: useLoginStore.getState().currentUser?.last,
-      });
-      store.setWorkorder(wo, false);
-      _setSelectedWorkorderID(wo.id);
-    });
-  }
-
-  async function handleQuickButtonPress(btn) {
-    if (!selectedWorkorder || !btn.inventoryItemID) return;
-    let invItem = (zInventory || []).find((o) => o.id === btn.inventoryItemID);
-    if (!invItem) return;
-    await dbSaveOpenWorkorder(selectedWorkorder);
-    let lines = [...(selectedWorkorder.workorderLines || [])];
-    let line = cloneDeep(WORKORDER_ITEM_PROTO);
-    line.inventoryItem = invItem;
-    line.id = crypto.randomUUID();
-    lines.push(line);
-    useOpenWorkordersStore.getState().setField("workorderLines", lines, selectedWorkorder.id, true);
-  }
-
-  function handleModQty(lineId, direction) {
-    if (!selectedWorkorder) return;
-    let lines = selectedWorkorder.workorderLines.map((line) => {
-      if (line.id !== lineId) return line;
-      let newQty = direction === "up" ? line.qty + 1 : Math.max(1, line.qty - 1);
-      return { ...line, qty: newQty };
-    });
-    useOpenWorkordersStore.getState().setField("workorderLines", lines, selectedWorkorder.id, true);
-  }
-
-  function handleDropOnRow(targetRowIdx) {
-    if (!sDragSource) return;
-    if (sDragSource.rowIdx === targetRowIdx) return;
-    let updated = rows.map((row) => [...row]);
-    let [dragged] = updated[sDragSource.rowIdx].splice(sDragSource.btnIdx, 1);
-    // Adjust target index if source row will be removed (empty after splice)
-    let adjIdx = targetRowIdx;
-    if (updated[sDragSource.rowIdx].length === 0 && targetRowIdx > sDragSource.rowIdx) {
-      adjIdx = targetRowIdx - 1;
-    }
-    updated = updated.filter((row) => row.length > 0);
-    updated[adjIdx] = [...updated[adjIdx], dragged];
-    saveRows(updated);
-  }
-
-  let woLabel = selectedWorkorder
-    ? `#${formatWorkorderNumber(selectedWorkorder.workorderNumber)} - ${selectedWorkorder.customerFirst || selectedWorkorder.brand || "(no name)"} ${selectedWorkorder.customerLast || ""}`.trim()
-    : "Select Workorder...";
-
-  return (
-    <View style={{ flex: 1, width: "100%", padding: 10, alignItems: "center" }}>
-      <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8, width: "70%" }}>
-        <Text style={{ flex: 1, fontSize: 12, color: gray(0.45) }}>
-          {sEditMode ? "Drag buttons to reorder. Drop onto a row or the bottom slot." : "Tap a button to add items to the workorder."}
-        </Text>
-        <TouchableOpacity
-          onPress={() => { _setEditMode(!sEditMode); _setDragSource(null); _setDragTarget(null); _setNewRowDropTarget(null); }}
-          style={{
-            paddingHorizontal: 12,
-            paddingVertical: 6,
-            borderRadius: 6,
-            backgroundColor: sEditMode ? C.green : gray(0.12),
-            marginLeft: 8,
-          }}
-        >
-          <Text style={{ fontSize: 11, fontWeight: "600", color: sEditMode ? "white" : C.text }}>
-            {sEditMode ? "Done" : "Edit Layout"}
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {sEditMode && (
-        <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8, width: "70%" }}>
-          <Text style={{ fontSize: 11, color: gray(0.45), marginRight: 8 }}>Button Height: {sButtonHeight}px</Text>
-          <input
-            type="range"
-            min={30}
-            max={80}
-            value={sButtonHeight}
-            onChange={(e) => _setButtonHeight(Number(e.target.value))}
-            style={{ flex: 1 }}
-          />
-        </View>
-      )}
-
-      {/* Tablet mock frame */}
-      <div
-        style={{
-          width: "70%",
-          flex: 1,
-          borderWidth: 3,
-          borderStyle: "solid",
-          borderColor: gray(0.3),
-          borderRadius: 20,
-          backgroundColor: C.backgroundWhite,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-          padding: 12,
-          boxSizing: "border-box",
-        }}
-      >
-        {/* Header row: workorder selector + new button + total */}
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 8,
-            gap: 6,
-            position: "relative",
-          }}
-        >
-          {/* Workorder selector */}
-          <TouchableOpacity
-            onPress={() => _setShowWODropdown(!sShowWODropdown)}
-            style={{
-              flex: 1,
-              height: 36,
-              borderWidth: 1,
-              borderColor: gray(0.15),
-              borderRadius: 6,
-              flexDirection: "row",
-              alignItems: "center",
-              paddingHorizontal: 10,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 12,
-                color: selectedWorkorder ? C.text : gray(0.35),
-                flex: 1,
-              }}
-              numberOfLines={1}
-            >
-              {woLabel}
-            </Text>
-            <Image_ icon={ICONS.downChevron} size={10} />
-          </TouchableOpacity>
-
-          {/* New workorder button (icon only) */}
-          <TouchableOpacity
-            onPress={handleNewWorkorder}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: 6,
-              backgroundColor: C.blue,
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
-          >
-            <Image_ icon={ICONS.add} size={16} />
-          </TouchableOpacity>
-
-          {/* Total price */}
-          {selectedWorkorder && (
-            <View
-              style={{
-                height: 36,
-                borderRadius: 6,
-                backgroundColor: C.green,
-                paddingHorizontal: 10,
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}
-            >
-              <Text style={{ fontSize: 13, color: "white", fontWeight: Fonts.weight.textHeavy }}>
-                ${formatCurrencyDisp(totals.finalTotal)}
-              </Text>
-            </View>
-          )}
-
-          {/* Workorder dropdown */}
-          {sShowWODropdown && (
-            <div
-              style={{
-                position: "absolute",
-                top: 40,
-                left: 0,
-                right: 70,
-                maxHeight: 200,
-                backgroundColor: "white",
-                borderWidth: 1,
-                borderStyle: "solid",
-                borderColor: gray(0.15),
-                borderRadius: 6,
-                zIndex: 100,
-                overflowY: "auto",
-                boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
-              }}
-            >
-              {zWorkorders.map((wo) => (
-                <TouchableOpacity
-                  key={wo.id}
-                  onPress={() => {
-                    _setSelectedWorkorderID(wo.id);
-                    _setShowWODropdown(false);
-                  }}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    padding: 8,
-                    borderBottomWidth: 1,
-                    borderBottomColor: gray(0.06),
-                    backgroundColor: wo.id === sSelectedWorkorderID ? "rgb(230,240,252)" : "white",
-                  }}
-                >
-                  <Text style={{ fontSize: 12, color: C.text }} numberOfLines={1}>
-                    #{formatWorkorderNumber(wo.workorderNumber)} - {wo.customerFirst || wo.brand || "(no name)"} {wo.customerLast || ""}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              {zWorkorders.length === 0 && (
-                <Text style={{ fontSize: 12, color: gray(0.4), textAlign: "center", padding: 12 }}>
-                  No open workorders
-                </Text>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Scrollable body: line items + quick buttons */}
-        <div style={{ flex: 1, overflowY: sEditMode ? "hidden" : "auto", display: "flex", flexDirection: "column" }}>
-          {/* Line items list */}
-          {selectedWorkorder && selectedWorkorder.workorderLines?.length > 0 && (
-            <div style={{ marginBottom: 8 }}>
-              {selectedWorkorder.workorderLines.map((line) => {
-                let inv = line.inventoryItem || {};
-                let name = inv.informalName || inv.formalName || "Unknown";
-                let lineTotal = (inv.price || 0) * (line.qty || 1);
-                return (
-                  <div
-                    key={line.id}
-                    style={{
-                      display: "flex",
-                      flexDirection: "row",
-                      alignItems: "center",
-                      paddingVertical: 6,
-                      paddingHorizontal: 8,
-                      marginBottom: 3,
-                      borderWidth: 1,
-                      borderStyle: "solid",
-                      borderColor: gray(0.1),
-                      borderRadius: 6,
-                      backgroundColor: "white",
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontSize: 12, color: C.text }} numberOfLines={1}>
-                        {name}
-                      </Text>
-                      <Text style={{ fontSize: 10, color: gray(0.5) }}>
-                        ${formatCurrencyDisp(lineTotal)}
-                      </Text>
-                    </View>
-                    <View style={{ flexDirection: "row", alignItems: "center" }}>
-                      <TouchableOpacity
-                        onPress={() => handleModQty(line.id, "down")}
-                        style={{
-                          width: 24,
-                          height: 24,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Image_ icon={ICONS.downArrowOrange} size={12} />
-                      </TouchableOpacity>
-                      <View
-                        style={{
-                          minWidth: 28,
-                          height: 24,
-                          borderRadius: 4,
-                          backgroundColor: gray(0.08),
-                          alignItems: "center",
-                          justifyContent: "center",
-                          marginHorizontal: 2,
-                        }}
-                      >
-                        <Text style={{ fontSize: 12, color: C.text, fontWeight: "600" }}>
-                          {line.qty || 1}
-                        </Text>
-                      </View>
-                      <TouchableOpacity
-                        onPress={() => handleModQty(line.id, "up")}
-                        style={{
-                          width: 24,
-                          height: 24,
-                          alignItems: "center",
-                          justifyContent: "center",
-                        }}
-                      >
-                        <Image_ icon={ICONS.upArrowOrange} size={12} />
-                      </TouchableOpacity>
-                    </View>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-
-          {/* Line items empty state */}
-          {selectedWorkorder && (!selectedWorkorder.workorderLines || selectedWorkorder.workorderLines.length === 0) && (
-            <div
-              style={{
-                borderWidth: 1,
-                borderStyle: "dashed",
-                borderColor: gray(0.15),
-                borderRadius: 6,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                marginBottom: 8,
-                paddingVertical: 20,
-              }}
-            >
-              <Text style={{ fontSize: 11, color: gray(0.3) }}>
-                Press a button below to add items
-              </Text>
-            </div>
-          )}
-
-          {/* Quick Buttons area */}
-          <div
-            ref={containerRefCb}
-            style={{
-              flex: 1,
-              display: "flex",
-              flexDirection: "column",
-              borderTopWidth: 1,
-              borderTopStyle: "solid",
-              borderTopColor: gray(0.15),
-              overflowY: (buttonVisualRows * ROW_HEIGHT) > sContainerSize.h ? "auto" : "hidden",
-            }}
-          >
-            {/* All buttons in a single flex-wrap container */}
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "row",
-                flexWrap: "wrap",
-                alignItems: "flex-start",
-              }}
-            >
-              {rows.flat().map((btn, flatIdx) => (
-                <StandButtonCard
-                  key={btn.id}
-                  btn={btn}
-                  rowIdx={0}
-                  btnIdx={flatIdx}
-                  sEditMode={sEditMode}
-                  sDragSource={sDragSource}
-                  sDragTarget={sDragTarget}
-                  _setDragSource={_setDragSource}
-                  _setDragTarget={_setDragTarget}
-                  handleReorder={handleReorder}
-                  handleLabelChange={handleLabelChange}
-                  handleDeleteButton={handleDeleteButton}
-                  onQuickButtonPress={() => handleQuickButtonPress(btn)}
-                  buttonHeight={sButtonHeight}
-                />
-              ))}
-            </div>
-
-            {/* Empty row drop targets - edit mode only */}
-            {sEditMode && emptyRowCount > 0 && Array.from({ length: emptyRowCount }).map((_, i) => {
-              let slotIdx = buttonVisualRows + i;
-              let isSlotOver = sNewRowDropTarget === slotIdx && !!sDragSource;
-              return (
-                <div
-                  key={"empty-" + slotIdx}
-                  onDragOver={(e) => {
-                    e.preventDefault();
-                    _setNewRowDropTarget(slotIdx);
-                  }}
-                  onDragLeave={() => _setNewRowDropTarget(null)}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    handleDropToNewRow(slotIdx);
-                    _setDragSource(null);
-                    _setNewRowDropTarget(null);
-                  }}
-                  style={{
-                    height: ROW_HEIGHT,
-                    borderWidth: 2,
-                    borderStyle: "dashed",
-                    borderColor: isSlotOver ? C.green : gray(0.15),
-                    borderRadius: 8,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    backgroundColor: isSlotOver ? "rgba(76, 175, 80, 0.1)" : "transparent",
-                  }}
-                >
-                  <Text style={{ fontSize: 11, color: isSlotOver ? C.green : gray(0.25) }}>
-                    {isSlotOver ? "Drop to create new row" : ""}
-                  </Text>
-                </div>
-              );
-            })}
-
-            {rows.flat().length === 0 && !sEditMode && (
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: gray(0.35),
-                  textAlign: "center",
-                  paddingVertical: 16,
-                }}
-              >
-                Search and add items from the panel on the left.
-              </Text>
-            )}
-          </div>
-        </div>
-      </div>
-    </View>
-  );
-};
-
-////////////////////////////////////////////////////////////////////////////////
-// Stand Button Card (draggable)
-////////////////////////////////////////////////////////////////////////////////
-
-const StandButtonCard = ({
-  btn,
-  rowIdx,
-  btnIdx,
-  sEditMode,
-  sDragSource,
-  sDragTarget,
-  _setDragSource,
-  _setDragTarget,
-  handleReorder,
-  handleLabelChange,
-  handleDeleteButton,
-  onQuickButtonPress,
-  buttonHeight,
-}) => {
-  const [sIsEditingLabel, _setIsEditingLabel] = useState(false);
-
-  let isOver =
-    sEditMode && sDragTarget &&
-    sDragTarget.btnIdx === btnIdx;
-  let isDragging =
-    sEditMode && sDragSource &&
-    sDragSource.btnIdx === btnIdx;
-
-  return (
-    <div
-      draggable={sEditMode && !sIsEditingLabel}
-      onClick={() => {
-        if (sEditMode) { _setIsEditingLabel(true); }
-        else if (onQuickButtonPress) { onQuickButtonPress(); }
-      }}
-      onDragStart={sEditMode ? () => _setDragSource({ rowIdx, btnIdx }) : undefined}
-      onDragOver={sEditMode ? (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        _setDragTarget({ rowIdx, btnIdx });
-      } : undefined}
-      onDrop={sEditMode ? (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (sDragSource) {
-          handleReorder(sDragSource.rowIdx, sDragSource.btnIdx, rowIdx, btnIdx);
-        }
-        _setDragSource(null);
-        _setDragTarget(null);
-      } : undefined}
-      onDragEnd={sEditMode ? () => {
-        _setDragSource(null);
-        _setDragTarget(null);
-      } : undefined}
-      style={{
-        minWidth: 50,
-        maxWidth: 100,
-        height: buttonHeight || 40,
-        margin: 3,
-        paddingVertical: 5,
-        paddingHorizontal: 6,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: isOver ? 2 : 1,
-        borderStyle: "solid",
-        borderColor: isOver ? C.blue : C.buttonLightGreenOutline,
-        borderRadius: 8,
-        backgroundColor: C.listItemWhite,
-        position: "relative",
-        cursor: sEditMode ? (sIsEditingLabel ? "text" : "grab") : "pointer",
-        opacity: isDragging ? 0.5 : 1,
-        boxSizing: "border-box",
-      }}
-    >
-      {/* Delete button (top-right) - edit mode only */}
-      {sEditMode && (
-        <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top: 2, right: 2, zIndex: 2 }}>
-          <TouchableOpacity
-            onPress={() => handleDeleteButton(btn.id)}
-            style={{
-              width: 16,
-              height: 16,
-              borderRadius: 8,
-              backgroundColor: gray(0.12),
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Image_ icon={ICONS.trash} size={10} />
-          </TouchableOpacity>
-        </div>
-      )}
-
-      {/* Label - inline editable in edit mode */}
-      {sEditMode && sIsEditingLabel ? (
-        <div onClick={(e) => e.stopPropagation()}>
-          <TextInput_
-            debounceMs={500}
-            style={{
-              fontSize: 11,
-              color: C.text,
-              textAlign: "center",
-              borderBottomWidth: 1,
-              borderBottomColor: gray(0.3),
-              paddingVertical: 2,
-              width: "100%",
-              outlineWidth: 0,
-              outlineStyle: "none",
-            }}
-            value={btn.label || ""}
-            onChangeText={(val) => handleLabelChange(btn.id, val)}
-            onBlur={() => _setIsEditingLabel(false)}
-            autoFocus
-            placeholder="Label..."
-            placeholderTextColor={gray(0.3)}
-          />
-        </div>
-      ) : (
-        <Text
-          style={{
-            fontSize: 11,
-            color: btn.label ? C.text : (sEditMode ? gray(0.35) : gray(0.35)),
-            textAlign: "center",
-            fontWeight: "500",
-          }}
-          numberOfLines={2}
-        >
-          {btn.label || (sEditMode ? "(tap to name)" : "")}
-        </Text>
-      )}
-    </div>
-  );
-};
 
 ////////////////////////////////////////////////////////////////////////////////
 // Stand Button Inventory Modal
@@ -4199,17 +2311,18 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
         }}
       >
         {/* Header */}
-        <View
+        <div
           style={{
+            display: "flex",
             flexDirection: "row",
             justifyContent: "space-between",
             alignItems: "center",
             padding: 16,
-            borderBottomWidth: 1,
-            borderBottomColor: gray(0.15),
+            borderBottom: "1px solid " + C.borderSubtle,
+            flexShrink: 0,
           }}
         >
-          <Text
+          <span
             style={{
               fontSize: 16,
               fontWeight: Fonts.weight.textHeavy,
@@ -4217,15 +2330,25 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
             }}
           >
             Stand Button — Select Item
-          </Text>
-          <TouchableOpacity onPress={onClose}>
-            <Image_ icon={ICONS.close1} size={18} />
-          </TouchableOpacity>
-        </View>
+          </span>
+          <DomTouchableOpacity onPress={onClose}>
+            <Image icon={ICONS.close1} size={18} />
+          </DomTouchableOpacity>
+        </div>
 
         {/* Label input */}
-        <View style={{ padding: 16, paddingBottom: 8 }}>
-          <Text
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            paddingTop: 16,
+            paddingBottom: 8,
+            paddingLeft: 16,
+            paddingRight: 16,
+            flexShrink: 0,
+          }}
+        >
+          <span
             style={{
               fontSize: 11,
               fontWeight: Fonts.weight.textHeavy,
@@ -4234,71 +2357,88 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
             }}
           >
             BUTTON LABEL
-          </Text>
-          <TextInput_
+          </span>
+          <DomTextInput
             style={{
-              borderBottomColor: gray(0.3),
-              borderBottomWidth: 1,
+              borderBottom: "1px solid " + C.borderStrong,
               width: "100%",
               fontSize: 14,
               color: C.text,
-              paddingVertical: 6,
-              outlineWidth: 0,
-              outlineStyle: "none",
+              paddingTop: 6,
+              paddingBottom: 6,
+              outline: "none",
+              boxSizing: "border-box",
             }}
             value={sLabel}
             onChangeText={_setLabel}
             placeholder="Button label..."
-            placeholderTextColor={gray(0.3)}
+            placeholderTextColor={C.textDisabled}
           />
-        </View>
+        </div>
 
         {/* Currently selected item */}
         {resolvedItem && (
-          <View
+          <div
             style={{
-              marginHorizontal: 16,
-              marginBottom: 8,
+              display: "flex",
               flexDirection: "row",
               alignItems: "center",
-              paddingVertical: 8,
-              paddingHorizontal: 10,
+              marginLeft: 16,
+              marginRight: 16,
+              marginBottom: 8,
+              paddingTop: 8,
+              paddingBottom: 8,
+              paddingLeft: 10,
+              paddingRight: 10,
               backgroundColor: "rgb(230, 240, 252)",
               borderRadius: 4,
-              borderLeftWidth: 3,
-              borderLeftColor: C.blue,
+              borderLeft: "3px solid " + C.blue,
+              boxSizing: "border-box",
+              flexShrink: 0,
             }}
           >
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, color: C.text }}>
+            <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+              <span style={{ fontSize: 13, color: C.text }}>
                 {resolvedItem.informalName ||
                   resolvedItem.formalName ||
                   "Unknown"}
-              </Text>
-              <Text style={{ fontSize: 11, color: C.lightText }}>
+              </span>
+              <span style={{ fontSize: 11, color: C.lightText }}>
                 ${formatCurrencyDisp(resolvedItem.price || 0)}
-              </Text>
-            </View>
-            <TouchableOpacity
+              </span>
+            </div>
+            <DomTouchableOpacity
               onPress={() => {
                 _setSelectedItemID("");
                 _setLabel("");
               }}
               style={{
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-                backgroundColor: gray(0.08),
+                paddingLeft: 8,
+                paddingRight: 8,
+                paddingTop: 4,
+                paddingBottom: 4,
+                backgroundColor: C.surfaceAlt,
                 borderRadius: 4,
               }}
             >
-              <Text style={{ fontSize: 10, color: C.lightred }}>Remove</Text>
-            </TouchableOpacity>
-          </View>
+              <span style={{ fontSize: 10, color: C.lightred }}>Remove</span>
+            </DomTouchableOpacity>
+          </div>
         )}
 
         {/* Search input */}
-        <View style={{ padding: 16, paddingTop: 8, paddingBottom: 8 }}>
-          <Text
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            paddingTop: 8,
+            paddingBottom: 8,
+            paddingLeft: 16,
+            paddingRight: 16,
+            flexShrink: 0,
+          }}
+        >
+          <span
             style={{
               fontSize: 11,
               fontWeight: Fonts.weight.textHeavy,
@@ -4307,90 +2447,97 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
             }}
           >
             SEARCH INVENTORY
-          </Text>
-          <TextInput_
+          </span>
+          <DomTextInput
             style={{
-              borderBottomColor: gray(0.3),
-              borderBottomWidth: 1,
+              borderBottom: "1px solid " + C.borderStrong,
               width: "100%",
               fontSize: 14,
               color: C.text,
-              paddingVertical: 6,
-              outlineWidth: 0,
-              outlineStyle: "none",
+              paddingTop: 6,
+              paddingBottom: 6,
+              outline: "none",
+              boxSizing: "border-box",
             }}
             value={sSearchString}
             onChangeText={handleSearch}
             placeholder="Search inventory (min 3 chars)..."
-            placeholderTextColor={gray(0.3)}
+            placeholderTextColor={C.textDisabled}
             autoFocus
           />
-        </View>
+        </div>
 
         {/* Search results */}
-        <ScrollView
+        <div
           style={{
             flex: 1,
-            marginHorizontal: 16,
+            overflowY: "auto",
+            marginLeft: 16,
+            marginRight: 16,
             marginBottom: 8,
-            borderWidth: sSearchResults.length > 0 ? 1 : 0,
-            borderColor: gray(0.1),
+            border: sSearchResults.length > 0 ? "1px solid " + C.borderSubtle : "none",
             borderRadius: 4,
             backgroundColor: "white",
+            boxSizing: "border-box",
           }}
         >
           {sSearchResults.map((item, idx) => (
-            <TouchableOpacity
+            <DomTouchableOpacity
               key={item.id || idx}
               onPress={() => handleSelectItem(item)}
               style={{
+                display: "flex",
                 flexDirection: "row",
                 justifyContent: "space-between",
                 alignItems: "center",
                 padding: 8,
-                borderBottomWidth: 1,
-                borderBottomColor: gray(0.08),
+                borderBottom: "1px solid " + C.borderSubtle,
+                boxSizing: "border-box",
               }}
             >
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 13, color: C.text }}>
+              <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+                <span style={{ fontSize: 13, color: C.text }}>
                   {item.informalName || item.formalName || "Unknown"}
-                </Text>
+                </span>
                 {!!item.brand && (
-                  <Text style={{ fontSize: 11, color: gray(0.5) }}>
+                  <span style={{ fontSize: 11, color: C.textMuted }}>
                     {item.brand}
-                  </Text>
+                  </span>
                 )}
-              </View>
-              <Text style={{ fontSize: 13, color: C.text }}>
+              </div>
+              <span style={{ fontSize: 13, color: C.text }}>
                 ${formatCurrencyDisp(item.price || 0)}
-              </Text>
-            </TouchableOpacity>
+              </span>
+            </DomTouchableOpacity>
           ))}
-        </ScrollView>
+        </div>
 
         {/* Footer with Save/Cancel */}
-        <View
+        <div
           style={{
+            display: "flex",
             flexDirection: "row",
             justifyContent: "flex-end",
             padding: 16,
-            borderTopWidth: 1,
-            borderTopColor: gray(0.15),
+            borderTop: "1px solid " + C.borderSubtle,
+            flexShrink: 0,
+            boxSizing: "border-box",
           }}
         >
-          <Button_
+          <DomButton
             text="Cancel"
             onPress={onClose}
             buttonStyle={{
-              paddingHorizontal: 16,
-              paddingVertical: 8,
+              paddingLeft: 16,
+              paddingRight: 16,
+              paddingTop: 8,
+              paddingBottom: 8,
               marginRight: 10,
-              backgroundColor: gray(0.15),
+              backgroundColor: C.surfaceAlt,
             }}
             textStyle={{ color: C.text }}
           />
-          <Button_
+          <DomButton
             text="Save"
             colorGradientArr={COLOR_GRADIENTS.green}
             onPress={() =>
@@ -4400,9 +2547,14 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
                 inventoryItemID: sSelectedItemID,
               })
             }
-            buttonStyle={{ paddingHorizontal: 16, paddingVertical: 8 }}
+            buttonStyle={{
+              paddingLeft: 16,
+              paddingRight: 16,
+              paddingTop: 8,
+              paddingBottom: 8,
+            }}
           />
-        </View>
+        </div>
       </div>
     </div>,
     document.body

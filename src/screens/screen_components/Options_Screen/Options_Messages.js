@@ -1,18 +1,7 @@
 /* eslint-disable */
 
 import { createPortal } from "react-dom";
-import {
-  capitalizeFirstLetterOfString,
-  calculateRunningTotals,
-  dim,
-  findTemplateByType,
-  formatDateTimeForReceipt,
-  formatPhoneWithDashes,
-  formatStoreHours,
-  gray,
-  log,
-  printBuilder,
-} from "../../../utils";
+import { capitalizeFirstLetterOfString, calculateRunningTotals, dim, findTemplateByType, formatDateTimeForReceipt, formatPhoneWithDashes, formatStoreHours, log, printBuilder } from "../../../utils";
 import {
   DropdownMenu as DropdownMenuDom,
   Image as ImageDom,
@@ -55,7 +44,6 @@ import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
 import { dbSendReceipt, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond, dbToggleSMSForwarding, dbGetCustomer, dbSaveMessageTranslation } from "../../../db_calls_wrapper";
 import { translateText } from "../../../db_calls";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
-import { TransformWrapper, TransformComponent, useTransformEffect } from "react-zoom-pan-pinch";
 import { scheduleAutoSend, clearAutoSend, buildForwardToPayload } from "./ReplyOptionsBar";
 import { ComposeArea } from "./ComposeArea";
 import { IncomingMessageComponent, OutgoingMessageComponent, MediaThumbnail } from "./MessageBubble";
@@ -1119,7 +1107,7 @@ export function MessagesComponent({}) {
             {/* Thread list */}
             {zSmsThreads.length < 1 ? (
               <div className={hubStyles.hubEmpty}>
-                <span className={hubStyles.hubEmptyText} style={{ color: gray(0.3) }}>No conversations yet</span>
+                <span className={hubStyles.hubEmptyText} style={{ color: C.textDisabled }}>No conversations yet</span>
               </div>
             ) : (
               <div className={hubStyles.threadList}>
@@ -1170,7 +1158,7 @@ export function MessagesComponent({}) {
             ) : (
               <div className={hubStyles.hubPlaceholderCol}>
                 <div className={hubStyles.hubPlaceholderCenter}>
-                  <span className={hubStyles.hubPlaceholderText} style={{ color: gray(0.25) }}>Select a conversation</span>
+                  <span className={hubStyles.hubPlaceholderText} style={{ color: C.textDisabled }}>Select a conversation</span>
                 </div>
                 <div className={hubStyles.hubPlaceholderEntryRow}>
                   <PhoneNumberInput
@@ -1213,10 +1201,10 @@ export function MessagesComponent({}) {
     <div className={hubStyles.customerRoot}>
       {zCustomer?.customerCell && !sCustomPhoneMode && (
         <div className={hubStyles.customerBanner}>
-          <span className={hubStyles.customerBannerName} style={{ color: gray(0.4) }}>
+          <span className={hubStyles.customerBannerName} style={{ color: C.textMuted }}>
             {((zCustomer.first || "") + " " + (zCustomer.last || "")).trim()}
           </span>
-          <span className={hubStyles.customerBannerPhone} style={{ color: gray(0.4) }}>
+          <span className={hubStyles.customerBannerPhone} style={{ color: C.textMuted }}>
             {`(${zCustomer.customerCell.slice(0, 3)}) ${zCustomer.customerCell.slice(3, 6)}-${zCustomer.customerCell.slice(6)}`}
           </span>
         </div>
@@ -1229,7 +1217,7 @@ export function MessagesComponent({}) {
         )}
         {(!zMessagesLoading || sCustomPhoneMode) && messagesArr.length < 1 && (
           <div className={hubStyles.messagesCenter}>
-            <span className={hubStyles.messagesEmptyText} style={{ color: gray(0.25) }}>
+            <span className={hubStyles.messagesEmptyText} style={{ color: C.textDisabled }}>
               {sCustomPhoneMode
                 ? (sCustomPhone.length < 10
                   ? "Enter a phone number to message"
@@ -1443,7 +1431,7 @@ export function MessagesComponent({}) {
               ) : null}
               {sCustomPhoneMode ? (
                 <div className={hubStyles.customPhoneInfo}>
-                  <span className={hubStyles.customPhoneText} style={{ color: gray(0.45) }}>{formatPhoneWithDashes(sCustomPhone)}</span>
+                  <span className={hubStyles.customPhoneText} style={{ color: C.textMuted }}>{formatPhoneWithDashes(sCustomPhone)}</span>
                   {hasCustomer && (
                     <TouchableOpacityDom
                       onPress={handleExitCustomPhoneMode}
@@ -1475,10 +1463,10 @@ export function MessagesComponent({}) {
 
 function ThreadCard({ thread, isSelected, isHovered, isUnread, activeWO, onPress, onHoverIn, onHoverOut }) {
   let bgColor = isUnread ? "rgb(0,122,255)" : "transparent";
-  if (isSelected) bgColor = isUnread ? "rgb(0,100,220)" : gray(0.05);
-  else if (isHovered) bgColor = isUnread ? "rgb(0,110,235)" : gray(0.03);
+  if (isSelected) bgColor = isUnread ? "rgb(0,100,220)" : C.surfaceAlt;
+  else if (isHovered) bgColor = isUnread ? "rgb(0,110,235)" : C.surfaceAlt;
   let textColor = isUnread ? "white" : C.text;
-  let subtextColor = isUnread ? "rgba(255,255,255,0.7)" : gray(0.35);
+  let subtextColor = isUnread ? "rgba(255,255,255,0.7)" : C.textDisabled;
   let formattedPhone = formatPhoneWithDashes(thread.phone);
   let customerName = activeWO
     ? (activeWO.customerFirst + " " + activeWO.customerLast).trim()
@@ -1515,7 +1503,7 @@ function ThreadCard({ thread, isSelected, isHovered, isUnread, activeWO, onPress
     cardStyle.borderBottomColor = C.orange;
   }
   let nameColor = isUnread ? "rgba(255,255,255,0.85)" : C.blue;
-  let previewColor = isUnread ? "rgba(255,255,255,0.85)" : gray(0.5);
+  let previewColor = isUnread ? "rgba(255,255,255,0.85)" : C.borderStrong;
 
   return (
     <div
@@ -2108,7 +2096,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
           onPress={handleLoadMore}
           disabled={sLoadingMore || sNoMoreHistory}
           className={hubStyles.hubPanelHeaderBtn}
-          style={{ backgroundColor: (sLoadingMore || sNoMoreHistory) ? gray(0.15) : C.blue, opacity: sNoMoreHistory ? 0.4 : 1 }}
+          style={{ backgroundColor: (sLoadingMore || sNoMoreHistory) ? C.surfaceAlt : C.blue, opacity: sNoMoreHistory ? 0.4 : 1 }}
         >
           {sLoadingMore ? <SmallLoadingIndicatorDom /> : <span className={hubStyles.hubPanelHeaderBtnText}>Load more</span>}
         </TouchableOpacityDom>
@@ -2142,7 +2130,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
       <div className={hubStyles.hubMessagesArea}>
         {sMessages.length < 1 && !sListenerConnecting ? (
           <div className={hubStyles.messagesCenter}>
-            <span className={hubStyles.hubMessagesEmptyText} style={{ color: gray(0.25) }}>No messages yet</span>
+            <span className={hubStyles.hubMessagesEmptyText} style={{ color: C.textDisabled }}>No messages yet</span>
           </div>
         ) : sMessages.length < 1 ? null : (
           <div

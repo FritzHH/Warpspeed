@@ -3,7 +3,7 @@ import styles from "./SettingsCSVComponent.module.css";
 import { Button } from "../../../../dom_components";
 import { useSettingsStore } from "../../../../stores";
 import { C, COLOR_GRADIENTS } from "../../../../styles";
-import { gray } from "../../../../utils";
+
 
 export function SettingsCSVComponent() {
   const zSettingsObj = useSettingsStore((state) => state.settings);
@@ -73,7 +73,7 @@ export function SettingsCSVComponent() {
       </span>
       <span
         className={styles.sectionDescription}
-        style={{ color: gray(0.5) }}
+        style={{ color: C.textMuted }}
       >
         Download the current settings as a CSV file, or restore settings from a
         previously downloaded CSV.

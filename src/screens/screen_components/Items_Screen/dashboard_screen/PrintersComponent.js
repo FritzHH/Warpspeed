@@ -3,7 +3,7 @@ import styles from "./PrintersComponent.module.css";
 import { Button, CheckBox, Image } from "../../../../dom_components";
 import { useAlertScreenStore } from "../../../../stores";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
-import { gray, localStorageWrapper, printBuilder } from "../../../../utils";
+import { localStorageWrapper, printBuilder } from "../../../../utils";
 import { dbSavePrintObj } from "../../../../db_calls_wrapper";
 import { labelPrintBuilder } from "../../../../shared/labelPrintBuilder";
 
@@ -45,7 +45,7 @@ function PrinterCard({
           <span className={styles.printerLabel} style={{ color: C.text }}>
             {printer.label || "Unlabeled"}
           </span>
-          <span className={styles.printerName} style={{ color: gray(0.5) }}>
+          <span className={styles.printerName} style={{ color: C.textMuted }}>
             {printer.printerName || "—"}
           </span>
         </div>
@@ -146,12 +146,12 @@ export function PrintersComponent({ zSettingsObj, handleSettingsFieldChange }) {
       <div className={`${styles.outerBox} ${styles.outerBoxSpaced}`}>
         <div className={styles.innerBox}>
           <div className={styles.sectionHeaderRow}>
-            <span className={styles.sectionHeaderLabel} style={{ color: gray(0.6) }}>
+            <span className={styles.sectionHeaderLabel} style={{ color: C.textSecondary }}>
               RECEIPT PRINTER
             </span>
           </div>
           {receiptPrinters.length === 0 && (
-            <span className={styles.emptyText} style={{ color: gray(0.5) }}>
+            <span className={styles.emptyText} style={{ color: C.textMuted }}>
               No receipt printers configured
             </span>
           )}
@@ -172,12 +172,12 @@ export function PrintersComponent({ zSettingsObj, handleSettingsFieldChange }) {
       <div className={`${styles.outerBox} ${styles.outerBoxSpaced}`}>
         <div className={styles.innerBox}>
           <div className={styles.sectionHeaderRow}>
-            <span className={styles.sectionHeaderLabel} style={{ color: gray(0.6) }}>
+            <span className={styles.sectionHeaderLabel} style={{ color: C.textSecondary }}>
               LABEL PRINTER
             </span>
           </div>
           {labelPrinters.length === 0 && (
-            <span className={styles.emptyText} style={{ color: gray(0.5) }}>
+            <span className={styles.emptyText} style={{ color: C.textMuted }}>
               No label printers configured
             </span>
           )}
@@ -198,7 +198,7 @@ export function PrintersComponent({ zSettingsObj, handleSettingsFieldChange }) {
       <div className={`${styles.outerBox} ${styles.outerBoxSpaced}`}>
         <div className={styles.innerBox}>
           <div className={styles.sectionHeaderRow}>
-            <span className={styles.sectionHeaderLabel} style={{ color: gray(0.6) }}>
+            <span className={styles.sectionHeaderLabel} style={{ color: C.textSecondary }}>
               INTAKE RECEIPTS
             </span>
           </div>
@@ -244,7 +244,7 @@ export function PrintersComponent({ zSettingsObj, handleSettingsFieldChange }) {
       <div className={`${styles.outerBox} ${styles.outerBoxSpaced}`}>
         <div className={styles.innerBox}>
           <div className={styles.sectionHeaderRow}>
-            <span className={styles.sectionHeaderLabel} style={{ color: gray(0.6) }}>
+            <span className={styles.sectionHeaderLabel} style={{ color: C.textSecondary }}>
               SALES RECEIPTS
             </span>
           </div>

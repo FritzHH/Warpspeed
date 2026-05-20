@@ -35,8 +35,8 @@
   bottom: 10px;
   border-radius: 5px;
   overflow: hidden;
-  background-color: #ffffff;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  background-color: var(--surface-base);
+  box-shadow: 0 4px 20px var(--shadow-color-default);
 }
 
 .scrollArea {
@@ -49,16 +49,16 @@
 }
 
 .scrollArea::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.05);
+  background: var(--surface-alt);
 }
 
 .scrollArea::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--border-strong);
   border-radius: 6px;
 }
 
 .scrollArea::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--text-muted);
 }
 
 .row {

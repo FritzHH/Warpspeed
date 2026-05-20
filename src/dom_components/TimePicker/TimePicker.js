@@ -1,6 +1,6 @@
 import React, { forwardRef, useState, useRef, useEffect, useCallback } from "react";
-import { ICONS } from "../../styles";
-import { gray } from "../../utils";
+import { C, ICONS } from "../../styles";
+
 import styles from "./TimePicker.module.css";
 
 const ITEM_H = 36;
@@ -64,7 +64,7 @@ function ScrollColumn({ items, selected, setter, formatFn, initialValue }) {
               <span style={{
                 fontSize: i === selIdx ? 19 : 17,
                 fontWeight: i === selIdx ? "600" : "400",
-                color: i === selIdx ? "#fff" : gray(0.55),
+                color: i === selIdx ? C.textOnAccent : C.textMuted,
               }}>
                 {formatFn(item)}
               </span>
@@ -135,7 +135,7 @@ export const TimePicker = forwardRef(function TimePicker(
                   <span style={{
                     fontSize: period === "AM" ? 19 : 17,
                     fontWeight: period === "AM" ? "600" : "400",
-                    color: period === "AM" ? "#fff" : gray(0.55),
+                    color: period === "AM" ? C.textOnAccent : C.textMuted,
                   }}>AM</span>
                 </div>
                 <div
@@ -146,7 +146,7 @@ export const TimePicker = forwardRef(function TimePicker(
                   <span style={{
                     fontSize: period === "PM" ? 19 : 17,
                     fontWeight: period === "PM" ? "600" : "400",
-                    color: period === "PM" ? "#fff" : gray(0.55),
+                    color: period === "PM" ? C.textOnAccent : C.textMuted,
                   }}>PM</span>
                 </div>
               </div>

@@ -1,12 +1,11 @@
 /* eslint-disable */
 
-import { View, Text, FlatList } from "react-native-web";
 import { useState } from "react";
-import { formatCurrencyDisp, formatMillisForDisplay, gray, log, formatWorkorderNumber, lightenRGBByPercent } from "../../../utils";
+import { formatCurrencyDisp, formatMillisForDisplay, formatWorkorderNumber, lightenRGBByPercent } from "../../../utils";
 import {
   SmallLoadingIndicator,
-  TouchableOpacity_,
-} from "../../../components";
+  TouchableOpacity,
+} from "../../../dom_components";
 import {
   useTicketSearchStore,
   useOpenWorkordersStore,
@@ -18,9 +17,13 @@ import { TAB_NAMES } from "../../../data";
 import { C } from "../../../styles";
 import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
 import { TransactionModal } from "../modal_screens/TransactionModal";
-import { FullSaleModal } from "../modal_screens/FullSaleModal";
+import { FullSaleModal } from "../../../dom_components";
 import { NewRefundModalScreen } from "../modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
-import { readTransactions, findSaleByTransactionID } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import {
+  readTransactions,
+  findSaleByTransactionID,
+} from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import styles from "./Items_TicketSearchResults.module.css";
 
 export function Items_TicketSearchResults({}) {
   const zResults = useTicketSearchStore((state) => state.getResults());
@@ -38,27 +41,22 @@ export function Items_TicketSearchResults({}) {
       return;
     }
 
-    // add to open workorders store if not already there
     let existing = useOpenWorkordersStore.getState().getWorkorders() || [];
     let found = existing.find((w) => w.id === wo.id);
     if (!found) {
       useOpenWorkordersStore.getState().setWorkorder(wo);
     }
 
-    // select this workorder
     useOpenWorkordersStore.getState().setOpenWorkorder(wo);
 
-    // lock if payment is complete
     if (wo.paymentComplete) {
       useOpenWorkordersStore.getState().setLockedWorkorderID(wo.id);
     }
 
-    // switch to workorder items tab
     useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.workorderItems);
   }
 
   async function handleSalePress(sale) {
-    // Hydrate _transactions then open SaleModal
     let txns = [];
     if (sale.transactionIDs?.length > 0) {
       txns = await readTransactions(sale.transactionIDs);
@@ -71,7 +69,6 @@ export function Items_TicketSearchResults({}) {
   }
 
   async function handleTransactionRefund(txn) {
-    // Find the sale that contains this transaction, then open refund modal
     let sale = await findSaleByTransactionID(txn.id);
     if (!sale) {
       useAlertScreenStore.getState().setAlert({
@@ -98,89 +95,80 @@ export function Items_TicketSearchResults({}) {
   function renderWorkorderCard(item) {
     let wo = item.data;
     let isPaid = wo.paymentComplete || !!wo.saleID;
+    let sale = wo.activeSaleID
+      ? zActiveSales.find((s) => s.id === wo.activeSaleID)
+      : null;
+    let paid = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
     return (
-      <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 15, fontWeight: "600", color: C.text }}>
+      <div className={styles.cardBody}>
+        <div className={styles.cardLeft}>
+          <span className={styles.titleText} style={{ color: C.text }}>
             WO #{formatWorkorderNumber(wo.workorderNumber) || wo.id}
-          </Text>
-          <Text style={{ fontSize: 13, color: gray(0.45), marginTop: 2 }}>
-            {[wo.brand, wo.description].filter(Boolean).join(" / ") || "No vehicle info"}
-          </Text>
+          </span>
+          <span className={styles.subText} style={{ color: C.textMuted }}>
+            {[wo.brand, wo.description].filter(Boolean).join(" / ") ||
+              "No vehicle info"}
+          </span>
           {wo.customerFirst ? (
-            <Text style={{ fontSize: 12, color: gray(0.55), marginTop: 2 }}>
+            <span className={styles.metaText} style={{ color: C.textMuted }}>
               {wo.customerFirst} {wo.customerLast || ""}
-            </Text>
+            </span>
           ) : null}
-        </View>
-        <View style={{ alignItems: "flex-end" }}>
-          <Text
+        </div>
+        <div className={styles.cardRight}>
+          <span
+            className={isPaid ? styles.badgePill : styles.badgePlain}
             style={{
-              fontSize: 12,
-              fontWeight: "600",
-              color: isPaid ? "#fff" : item.isCompleted ? C.blue : C.green,
+              color: isPaid ? C.textOnAccent : item.isCompleted ? C.blue : C.green,
               backgroundColor: isPaid ? C.red : "transparent",
-              paddingHorizontal: isPaid ? 6 : 0,
-              paddingVertical: isPaid ? 2 : 0,
-              borderRadius: 4,
-              overflow: "hidden",
             }}
           >
             {isPaid ? "PAID" : item.isCompleted ? "COMPLETED" : "OPEN"}
-          </Text>
-          {(() => {
-            let sale = wo.activeSaleID ? zActiveSales.find((s) => s.id === wo.activeSaleID) : null;
-            let paid = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
-            return paid > 0 && !wo.paymentComplete ? (
-              <Text style={{ fontSize: 11, color: C.orange, marginTop: 2 }}>
-                Partial: {formatCurrencyDisp(paid, true)}
-              </Text>
-            ) : null;
-          })()}
-        </View>
-      </View>
+          </span>
+          {paid > 0 && !wo.paymentComplete ? (
+            <span className={styles.partialText} style={{ color: C.orange }}>
+              Partial: {formatCurrencyDisp(paid, true)}
+            </span>
+          ) : null}
+        </div>
+      </div>
     );
   }
 
   function renderSaleCard(item) {
     let sale = item.data;
     return (
-      <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 15, fontWeight: "600", color: C.text }}>
+      <div className={styles.cardBody}>
+        <div className={styles.cardLeft}>
+          <span className={styles.titleText} style={{ color: C.text }}>
             Sale {"#" + sale.id.slice(-4)}
-          </Text>
-          <Text style={{ fontSize: 13, color: gray(0.45), marginTop: 2 }}>
+          </span>
+          <span className={styles.subText} style={{ color: C.textMuted }}>
             Total: {formatCurrencyDisp(sale.total, true)}
-          </Text>
+          </span>
           {sale.millis ? (
-            <Text style={{ fontSize: 12, color: gray(0.55), marginTop: 2 }}>
+            <span className={styles.metaText} style={{ color: C.textMuted }}>
               {formatMillisForDisplay(sale.millis)}
-            </Text>
+            </span>
           ) : null}
-        </View>
-        <View style={{ alignItems: "flex-end" }}>
-          <Text
+        </div>
+        <div className={styles.cardRight}>
+          <span
+            className={item.isCompleted ? styles.badgePill : styles.badgePlain}
             style={{
-              fontSize: 12,
-              fontWeight: "600",
-              color: item.isCompleted ? "#fff" : C.orange,
+              color: item.isCompleted ? C.textOnAccent : C.orange,
               backgroundColor: item.isCompleted ? C.green : "transparent",
-              paddingHorizontal: item.isCompleted ? 6 : 0,
-              paddingVertical: item.isCompleted ? 2 : 0,
-              borderRadius: 4,
-              overflow: "hidden",
             }}
           >
             {item.isCompleted ? "COMPLETED" : "PARTIAL"}
-          </Text>
+          </span>
           {sale.amountCaptured > 0 && !sale.paymentComplete ? (
-            <Text style={{ fontSize: 11, color: C.orange, marginTop: 2 }}>
+            <span className={styles.partialText} style={{ color: C.orange }}>
               Captured: {formatCurrencyDisp(sale.amountCaptured, true)}
-            </Text>
+            </span>
           ) : null}
-        </View>
-      </View>
+        </div>
+      </div>
     );
   }
 
@@ -188,63 +176,64 @@ export function Items_TicketSearchResults({}) {
     let txn = item.data;
     let isCard = txn.method === "card";
     return (
-      <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 15, fontWeight: "600", color: C.text }}>
+      <div className={styles.cardBody}>
+        <div className={styles.cardLeft}>
+          <span className={styles.titleText} style={{ color: C.text }}>
             Txn {"#" + txn.id.slice(-4)}
-          </Text>
-          <Text style={{ fontSize: 13, color: gray(0.45), marginTop: 2 }}>
+          </span>
+          <span className={styles.subText} style={{ color: C.textMuted }}>
             {(txn.method || "unknown").toUpperCase()}
             {isCard && txn.last4 ? " ..." + txn.last4 : ""}
             {" - " + formatCurrencyDisp(txn.amountCaptured || 0, true)}
-          </Text>
+          </span>
           {txn.millis ? (
-            <Text style={{ fontSize: 12, color: gray(0.55), marginTop: 2 }}>
+            <span className={styles.metaText} style={{ color: C.textMuted }}>
               {formatMillisForDisplay(txn.millis)}
-            </Text>
+            </span>
           ) : null}
-        </View>
-        <View style={{ alignItems: "flex-end" }}>
-          <View
+        </div>
+        <div className={styles.cardRight}>
+          <div
+            className={styles.methodBadge}
             style={{
               backgroundColor: isCard
                 ? lightenRGBByPercent(C.blue, 60)
                 : lightenRGBByPercent(C.green, 60),
-              paddingHorizontal: 8,
-              paddingVertical: 2,
-              borderRadius: 4,
             }}
           >
-            <Text
-              style={{
-                fontSize: 12,
-                fontWeight: "600",
-                color: isCard ? C.blue : C.green,
-              }}
+            <span
+              className={styles.methodBadgeText}
+              style={{ color: isCard ? C.blue : C.green }}
             >
               {isCard ? "CARD" : "CASH"}
-            </Text>
-          </View>
-        </View>
-      </View>
+            </span>
+          </div>
+        </div>
+      </div>
     );
   }
 
-  function renderItem({ item }) {
+  function renderItem(item, index) {
+    const borderColor =
+      item.type === "sale"
+        ? C.blue
+        : item.type === "transaction"
+          ? C.purple
+          : C.buttonLightGreenOutline;
+    const keyPrefix =
+      item.type === "workorder"
+        ? "wo-"
+        : item.type === "transaction"
+          ? "txn-"
+          : "sale-";
     return (
-      <TouchableOpacity_
+      <TouchableOpacity
+        key={keyPrefix + (item.data?.id || index)}
         onPress={() => handlePress(item)}
+        className={styles.card}
         style={{
-          flexDirection: "row",
-          alignItems: "center",
-          paddingVertical: 12,
-          paddingHorizontal: 15,
-          marginHorizontal: 10,
-          marginTop: 8,
           backgroundColor: C.listItemWhite,
-          borderRadius: 8,
-          borderWidth: 1,
-          borderColor: item.type === "sale" ? C.blue : item.type === "transaction" ? C.purple : C.buttonLightGreenOutline,
+          borderColor,
         }}
       >
         {item.type === "workorder"
@@ -252,37 +241,32 @@ export function Items_TicketSearchResults({}) {
           : item.type === "transaction"
             ? renderTransactionCard(item)
             : renderSaleCard(item)}
-      </TouchableOpacity_>
+      </TouchableOpacity>
     );
   }
 
   return (
-    <View style={{ flex: 1, width: "100%" }}>
-      <View style={{ paddingHorizontal: 15, paddingTop: 12, paddingBottom: 6 }}>
-        <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>
+    <div className={styles.root}>
+      <div className={styles.header}>
+        <span className={styles.headerText} style={{ color: C.text }}>
           Ticket Search Results ({zResults.length})
-        </Text>
-      </View>
-      <FlatList
-        data={zResults}
-        renderItem={renderItem}
-        keyExtractor={(item, index) => {
-          let pre = item.type === "workorder" ? "wo-" : item.type === "transaction" ? "txn-" : "sale-";
-          return pre + (item.data?.id || index);
-        }}
-        ListEmptyComponent={
+        </span>
+      </div>
+      <div className={styles.list}>
+        {zResults.length === 0 ? (
           zIsSearching ? (
             <SmallLoadingIndicator />
           ) : (
-            <View style={{ alignItems: "center", marginTop: 40 }}>
-              <Text style={{ fontSize: 14, color: gray(0.5) }}>
+            <div className={styles.emptyState}>
+              <span className={styles.emptyText} style={{ color: C.textMuted }}>
                 No results found
-              </Text>
-            </View>
+              </span>
+            </div>
           )
-        }
-        contentContainerStyle={{ paddingBottom: 20 }}
-      />
+        ) : (
+          zResults.map((item, index) => renderItem(item, index))
+        )}
+      </div>
       <ClosedWorkorderModal
         workorder={sClosedWorkorder}
         onClose={() => _sSetClosedWorkorder(null)}
@@ -303,9 +287,12 @@ export function Items_TicketSearchResults({}) {
           visible={true}
           saleID={sRefundSaleID}
           initialPayment={sRefundInitialPayment}
-          onClose={() => { _sSetRefundSaleID(null); _sSetRefundInitialPayment(null); }}
+          onClose={() => {
+            _sSetRefundSaleID(null);
+            _sSetRefundInitialPayment(null);
+          }}
         />
       )}
-    </View>
+    </div>
   );
 }

@@ -15,7 +15,7 @@ import {
   useInventoryStore,
 } from "../../../../stores";
 import { C, COLOR_GRADIENTS, ICONS, Z } from "../../../../styles";
-import { gray, formatCurrencyDisp } from "../../../../utils";
+import { formatCurrencyDisp } from "../../../../utils";
 import {
   QB_DEFAULT_W,
   QB_DEFAULT_H,
@@ -125,7 +125,7 @@ const QBInventorySearchModal = ({
         {/* Header */}
         <div
           className={styles.modalHeader}
-          style={{ borderBottomColor: gray(0.1) }}
+          style={{ borderBottomColor: C.borderSubtle }}
         >
           <span className={styles.modalHeaderTitle} style={{ color: C.text }}>
             {"Add items to "}
@@ -145,7 +145,7 @@ const QBInventorySearchModal = ({
           <input
             autoFocus
             className={styles.modalSearchInput}
-            style={{ borderBottomColor: gray(0.2), color: C.text }}
+            style={{ borderBottomColor: C.borderSubtle, color: C.text }}
             placeholder="Search inventory"
             value={sInvSearch}
             onChange={(e) => doSearch(e.target.value)}
@@ -183,9 +183,9 @@ const QBInventorySearchModal = ({
                 key={item.id}
                 className={`${styles.modalResultRow} ${alreadyAdded ? "" : styles.modalResultRowHover}`}
                 style={{
-                  borderColor: gray(0.12),
+                  borderColor: C.borderSubtle,
                   backgroundColor:
-                    index % 2 === 0 ? C.backgroundListWhite : gray(0.04),
+                    index % 2 === 0 ? C.backgroundListWhite : C.surfaceAlt,
                   cursor: alreadyAdded ? "default" : "pointer",
                   opacity: alreadyAdded ? 0.4 : 1,
                 }}
@@ -208,14 +208,14 @@ const QBInventorySearchModal = ({
                   <div className={styles.modalResultLabels}>
                     <span
                       className={styles.modalResultName}
-                      style={{ color: alreadyAdded ? gray(0.4) : C.text }}
+                      style={{ color: alreadyAdded ? C.textMuted : C.text }}
                     >
                       {item.informalName || item.formalName}
                     </span>
                     {!!item.informalName && (
                       <span
                         className={styles.modalResultFormal}
-                        style={{ color: gray(0.4) }}
+                        style={{ color: C.textMuted }}
                       >
                         {item.formalName}
                       </span>
@@ -223,7 +223,7 @@ const QBInventorySearchModal = ({
                   </div>
                   <span
                     className={styles.modalResultPrice}
-                    style={{ color: alreadyAdded ? gray(0.4) : C.text }}
+                    style={{ color: alreadyAdded ? C.textMuted : C.text }}
                   >
                     {"$" + formatCurrencyDisp(item.price)}
                   </span>
@@ -346,7 +346,7 @@ const ParentButtonItemsList = ({
 
   return (
     <div className={styles.itemsRoot}>
-      <span className={styles.itemsHeader} style={{ color: gray(0.5) }}>
+      <span className={styles.itemsHeader} style={{ color: C.textMuted }}>
         ITEMS ({parentItems.length})
       </span>
       {parentItems.map((inv, idx) => {
@@ -373,7 +373,7 @@ const ParentButtonItemsList = ({
                   debounceMs={500}
                   style={{
                     fontSize: 12,
-                    color: gray(0.5),
+                    color: C.textMuted,
                     paddingTop: 3,
                     paddingBottom: 3,
                     paddingLeft: 6,
@@ -429,7 +429,7 @@ const ParentButtonItemsList = ({
                 </span>
                 <TextInput
                   placeholder="Descriptive name"
-                  placeholderTextColor={gray(0.35)}
+                  placeholderTextColor={C.textDisabled}
                   value={inv.informalName || ""}
                   onChangeText={(val) =>
                     handleItemLabelChange(inv.id, val)
@@ -445,13 +445,13 @@ const ParentButtonItemsList = ({
                     marginTop: 2,
                     backgroundColor: "transparent",
                     borderBottomWidth: 1,
-                    borderBottomColor: gray(0.15),
+                    borderBottomColor: C.borderSubtle,
                   }}
                 />
               </div>
               <span
                 className={styles.itemRowPrice}
-                style={{ color: gray(0.5) }}
+                style={{ color: C.textMuted }}
               >
                 {"$" + formatCurrencyDisp(inv.price)}
               </span>
@@ -763,7 +763,7 @@ export const QuickItemButtonsComponent = () => {
         {isEditing && formalNames ? (
           <span
             className={`${styles.cardFormalNamesLabel} ${isColumn ? styles.cardFormalNamesLabelLeft : styles.cardFormalNamesLabelCenter}`}
-            style={{ color: gray(0.5) }}
+            style={{ color: C.textMuted }}
           >
             {formalNames}
           </span>
@@ -922,7 +922,7 @@ export const QuickItemButtonsComponent = () => {
                     {i > 0 && (
                       <span
                         className={styles.crumbSeparator}
-                        style={{ color: gray(0.3) }}
+                        style={{ color: C.textDisabled }}
                       >
                         {">"}
                       </span>

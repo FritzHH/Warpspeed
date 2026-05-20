@@ -1,0 +1,341 @@
+.root {
+  display: flex;
+  flex-direction: column;
+}
+
+.uncombineWarn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  background-color: rgb(255, 245, 157);
+  border-radius: 6px;
+  border: 1px solid rgb(255, 224, 50);
+  padding: 6px 10px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.uncombineWarnText {
+  font-size: 13px;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.woCard {
+  border: 1px solid;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 7px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.woHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 0;
+  flex-shrink: 0;
+}
+
+.woNumber {
+  font-size: 14px;
+  font-weight: 500;
+  margin-right: 8px;
+}
+
+.woBody {
+  display: flex;
+  flex-direction: column;
+}
+
+.woMeta {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1px 10px 10px 10px;
+  border-bottom: 1px solid;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.woMetaLeft {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 1;
+  min-width: 0;
+}
+
+.brand {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.description {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.colorPills {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.colorPillLeft {
+  padding: 5px 10px;
+  border-top-left-radius: 100px;
+  border-bottom-left-radius: 100px;
+}
+
+.colorPillRight {
+  padding: 5px 10px;
+  border-top-right-radius: 100px;
+  border-bottom-right-radius: 100px;
+}
+
+.line {
+  width: 100%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.lineRow {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  padding: 3px 5px 3px 4px;
+  margin: 3px 0;
+  border: 1px solid;
+  border-left-width: 3px;
+  border-radius: 7px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.lineLeft {
+  width: 60%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.lineLeftInner {
+  width: 100%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.discountRow {
+  align-self: flex-end;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.discountName {
+  font-size: 12px;
+  margin-right: 5px;
+}
+
+.discountSavings {
+  font-size: 12px;
+}
+
+.nameRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.typeTag {
+  border-radius: 15px;
+  padding: 3px 7px;
+  margin-right: 5px;
+  flex-shrink: 0;
+}
+
+.typeTagText {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.itemName {
+  font-size: 15px;
+  font-weight: 400;
+  flex: 1 1 0;
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.intakeNotes {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.lineRight {
+  width: 40%;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  height: 100%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.qtyControls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.qtyPill {
+  margin-left: 2px;
+  border-radius: 10px;
+  width: 30px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.qtyPillLarge {
+  border-radius: 15px;
+  width: 31px;
+  height: 23px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.qtyPillText {
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+  width: 100%;
+}
+
+.qtyPillTextLarge {
+  font-size: 16px;
+  font-weight: 500;
+  text-align: center;
+  width: 100%;
+}
+
+.priceBox {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 65px;
+  margin: 0 3px;
+  border: 1px solid;
+  border-radius: 7px;
+  height: 100%;
+  padding-right: 2px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.priceBoxRO {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
+  min-width: 85px;
+  margin: 0 5px;
+  border: 1px solid;
+  border-radius: 7px;
+  height: 100%;
+  padding-right: 2px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.priceCrossed {
+  font-size: 13px;
+}
+
+.priceFinal {
+  font-weight: 500;
+  min-width: 30px;
+  font-size: 13px;
+}
+
+.priceFinalRO {
+  font-weight: 500;
+  min-width: 30px;
+}
+
+.priceCrossedRO {
+}
+
+.actionsArea {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  margin-left: 4px;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.totalsRow {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
+  border-top: 1px solid;
+  margin-top: 5px;
+  padding-top: 5px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.totalsLabel {
+  font-size: 13px;
+}
+
+.totalsValue {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.totalsDivider {
+  width: 1px;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.totalsTotalWrap {
+  font-size: 13px;
+  border: 1px solid;
+  border-radius: 15px;
+  padding: 3px 14px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.totalsTotalValue {
+  font-weight: 700;
+  font-size: 15px;
+}

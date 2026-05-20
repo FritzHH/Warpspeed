@@ -1,4 +1,4 @@
-import { dim, getRgbFromNamedColor, lightenRGBByPercent, gray } from "./utils";
+import { dim, getRgbFromNamedColor, lightenRGBByPercent } from "./utils";
 // const { getDefaultConfig } = require("metro"); // Or require('metro-config') for bare React Native
 
 export const Z = {
@@ -40,7 +40,7 @@ export const Colors = {
 
 export const C = {
   green: "rgb(33, 148, 86)",
-  purple: "",
+  purple: "rgb(115, 83, 173)",
   orange: "rgb(230, 126, 34)",
   blue: "rgb(53, 135, 210)",
   lightred: "rgb(227, 116, 112)",
@@ -52,16 +52,87 @@ export const C = {
   backgroundListWhite: "rgb(251, 251, 254)",
 
   listItemWhite: "rgb(254, 254, 255)",
-  listItemBorder: gray(0.05),
+  listItemBorder: "rgb(242,242,242)",
 
   buttonLightGreen: "rgb(232, 239, 245)",
   buttonLightGreenOutline: "rgb(200, 228, 220)",
 
   darkBlue: "rgb(30, 80, 140)",
   text: lightenRGBByPercent("rgb(0,0,0)", 28),
-  lightText: gray(0.42),
+  lightText: "rgb(148,148,148)",
   textWhite: "rgb(255, 255, 255)",
+
+  // ============================================================
+  // SEMANTIC TOKEN ALIASES (Phase 4 bridge)
+  // ------------------------------------------------------------
+  // These resolve to CSS custom properties defined in
+  // src/styles/tokens.css. Source of truth: docs/design-tokens.md
+  //
+  // PREFER THESE NAMES IN NEW CODE.
+  // The non-aliased properties above are kept for backward
+  // compatibility and will be retired in Phase 9.
+  // ============================================================
+
+  // Surfaces
+  surfaceBase:           "var(--surface-base)",
+  surfaceAlt:            "var(--surface-alt)",
+  surfaceRaised:         "var(--surface-raised)",
+  surfaceAccentMuted:    "var(--surface-accent-muted)",
+  surfaceSuccessMuted:   "var(--surface-success-muted)",
+  surfaceWarningMuted:   "var(--surface-warning-muted)",
+  surfaceOverlay:        "var(--surface-overlay)",
+  surfaceOverlayLight:   "var(--surface-overlay-light)",
+  surfaceOverlayHeavy:   "var(--surface-overlay-heavy)",
+
+  // Borders
+  borderSubtle:          "var(--border-subtle)",
+  borderDefault:         "var(--border-default)",
+  borderStrong:          "var(--border-strong)",
+  borderFocus:           "var(--border-focus)",
+  borderWarning:         "var(--border-warning)",
+
+  // Text
+  textStrong:            "var(--text-strong)",
+  textDefault:           "var(--text-default)",
+  textSecondary:         "var(--text-secondary)",
+  textMuted:             "var(--text-muted)",
+  textDisabled:          "var(--text-disabled)",
+  textInverse:           "var(--text-inverse)",
+  textOnAccent:          "var(--text-on-accent)",
+  textWarning:           "var(--text-warning)",
+
+  // Accent and status
+  accent:                "var(--accent)",
+  accentHover:           "var(--accent-hover)",
+  success:               "var(--success)",
+  info:                  "var(--info)",
+  infoStrong:            "var(--info-strong)",
+  warning:               "var(--warning)",
+  danger:                "var(--danger)",
+  dangerMuted:           "var(--danger-muted)",
+  dangerStrong:          "var(--danger-strong)",
+
+  // Shadows (color only)
+  shadowColorSubtle:     "var(--shadow-color-subtle)",
+  shadowColorDefault:    "var(--shadow-color-default)",
+  shadowColorAccent:     "var(--shadow-color-accent)",
 };
+
+/**
+ * Resolve a CSS custom property to its computed RGB value.
+ * Use ONLY for non-CSS contexts: canvas drawing, jsPDF, chart libs,
+ * programmatic color math. In CSS / inline-style contexts use the
+ * C.* aliases directly - they're var(--...) and themable.
+ *
+ * @param {string} tokenName - token name WITHOUT leading "--"
+ *                             e.g. "text-muted" not "--text-muted"
+ * @returns {string} computed rgb()/rgba() string
+ */
+export function resolveToken(tokenName) {
+  return getComputedStyle(document.documentElement)
+    .getPropertyValue(`--${tokenName}`)
+    .trim();
+}
 
 export const COLOR_GRADIENTS = {
   red: [lightenRGBByPercent(C.red, 41), lightenRGBByPercent(C.red, 20)],
@@ -77,7 +148,7 @@ export const COLOR_GRADIENTS = {
   purple: ["rgb(103, 124, 231)", "rgb(115, 83, 173)"],
   blue: [lightenRGBByPercent(C.blue, 15), lightenRGBByPercent(C.blue, 0)],
   lightBlue: [lightenRGBByPercent(C.blue, 60), lightenRGBByPercent(C.blue, 45)],
-  grey: [gray(0.35), gray(0.45)],
+  grey: ["rgb(166,166,166)", "rgb(140,140,140)"],
   yellow: [lightenRGBByPercent(C.orange, 35), lightenRGBByPercent(C.orange, 15)],
 };
 
@@ -199,4 +270,11 @@ export const ButtonStyles = {
     backgroundColor: Colors.buttonDarkBackground,
     fontColor: Colors.buttonDarkFont,
   },
+};
+
+export const SHADOW_RADIUS_PROTO = {
+  shadowColor: C.green,
+  shadowOffset: { width: 2, height: 2 },
+  shadowOpacity: 0.25,
+  shadowRadius: 15,
 };

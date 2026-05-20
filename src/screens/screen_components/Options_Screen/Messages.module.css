@@ -5,7 +5,7 @@
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+  scrollbar-color: var(--border-subtle) transparent;
 }
 
 .threadList::-webkit-scrollbar {
@@ -13,7 +13,7 @@
 }
 
 .threadList::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--border-subtle);
   border-radius: 4px;
 }
 
@@ -30,14 +30,14 @@
   align-items: center;
   justify-content: center;
   font-size: 11px;
-  color: rgb(140, 140, 140);
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
 .threadCard {
   width: 100%;
   padding: 10px 2px;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid var(--border-subtle);
   cursor: pointer;
   user-select: none;
   box-sizing: border-box;
@@ -174,7 +174,7 @@
   border-width: 2px;
   border-style: solid;
   border-radius: 5px;
-  background-color: white;
+  background-color: var(--surface-base);
   flex-shrink: 0;
 }
 
@@ -238,7 +238,7 @@
 
 .customPhoneBackText {
   font-size: 13px;
-  color: white;
+  color: var(--text-on-accent);
 }
 
 /* ============================================================
@@ -261,28 +261,28 @@
 .translationBanner {
   padding: 6px;
   margin-bottom: 4px;
-  background-color: rgb(245, 245, 220);
+  background-color: var(--surface-warning-muted);
   border-radius: 5px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-subtle);
 }
 
 .translationText {
   font-size: 14px;
-  color: rgb(50, 50, 50);
+  color: var(--text-strong);
 }
 
 .translationLoading {
   font-size: 13px;
-  color: rgba(0, 0, 0, 0.5);
+  color: var(--text-muted);
   font-style: italic;
 }
 
 .audioBanner {
   padding: 8px;
   margin-bottom: 4px;
-  background-color: rgb(245, 245, 220);
+  background-color: var(--surface-warning-muted);
   border-radius: 5px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: 1px solid var(--border-subtle);
 }
 
 .audioBanner audio {
@@ -297,7 +297,7 @@
 .replyOptionsBar {
   width: 100%;
   margin-bottom: 4px;
-  background-color: orange;
+  background-color: var(--warning);
   padding: 10px;
   border-radius: 6px;
   box-sizing: border-box;
@@ -330,12 +330,12 @@
 }
 
 .replyOptionsLabel {
-  color: dimgray;
+  color: var(--text-secondary);
   font-weight: 500;
 }
 
 .replyOptionsCountdown {
-  color: dimgray;
+  color: var(--text-secondary);
 }
 
 .replyOptionsCanReplyRow {
@@ -349,7 +349,7 @@
 
 .replyOptionsCanReplyLabel {
   font-size: 15px;
-  color: dimgray;
+  color: var(--text-secondary);
   font-weight: 500;
   margin-right: 10px;
 }
@@ -365,9 +365,9 @@
 .replyOptionsAudioSendBtn {
   padding: 8px 16px;
   margin-right: 8px;
-  background-color: rgb(40, 167, 69);
+  background-color: var(--accent);
   border-radius: 5px;
-  color: white;
+  color: var(--text-on-accent);
   font-weight: 600;
   font-size: 15px;
   border: none;
@@ -375,15 +375,15 @@
 }
 
 .replyOptionsAudioSendBtn--uploading {
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: var(--surface-overlay-light);
   cursor: default;
 }
 
 .replyOptionsAudioDeleteBtn {
   padding: 8px 16px;
-  background-color: rgb(220, 53, 69);
+  background-color: var(--danger);
   border-radius: 5px;
-  color: white;
+  color: var(--text-on-accent);
   font-weight: 600;
   font-size: 15px;
   display: flex;
@@ -417,7 +417,7 @@
   width: 22px;
   height: 22px;
   border-radius: 4px;
-  border: 2px solid rgba(0, 0, 0, 0.15);
+  border: 2px solid var(--border-subtle);
   background-color: transparent;
   display: flex;
   align-items: center;
@@ -427,19 +427,19 @@
 }
 
 .replyOptionsForwardCheckbox--checked {
-  background-color: rgb(220, 53, 69);
-  border-color: rgb(220, 53, 69);
+  background-color: var(--danger);
+  border-color: var(--danger);
 }
 
 .replyOptionsForwardCheckmark {
-  color: white;
+  color: var(--text-on-accent);
   font-size: 14px;
   font-weight: bold;
 }
 
 .replyOptionsForwardLabel {
   font-size: 17px;
-  color: rgb(50, 50, 50);
+  color: var(--text-strong);
   margin-left: 8px;
 }
 
@@ -480,12 +480,12 @@
 }
 
 .bubbleInner--incoming {
-  background-color: rgb(230, 230, 230);
+  background-color: var(--surface-alt);
   border-bottom-left-radius: 2px;
 }
 
 .bubbleInner--outgoing {
-  background-color: rgb(0, 122, 255);
+  background-color: var(--info);
   border-bottom-right-radius: 2px;
   display: flex;
   flex-direction: row;
@@ -493,7 +493,7 @@
 }
 
 .bubbleInner--outgoingFailed {
-  background-color: rgb(200, 80, 80);
+  background-color: var(--danger-muted);
 }
 
 .bubbleInner--media {
@@ -513,18 +513,18 @@
 
 .bubbleTail--incoming {
   left: -8px;
-  border-top: 8px solid rgb(230, 230, 230);
+  border-top: 8px solid var(--surface-alt);
   border-left: 8px solid transparent;
 }
 
 .bubbleTail--outgoing {
   right: -8px;
-  border-top: 8px solid rgb(0, 122, 255);
+  border-top: 8px solid var(--info);
   border-right: 8px solid transparent;
 }
 
 .bubbleTail--outgoingFailed {
-  border-top-color: rgb(200, 80, 80);
+  border-top-color: var(--danger-muted);
 }
 
 .bubbleContent {
@@ -539,7 +539,7 @@
 }
 
 .bubbleTextOutgoing {
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .bubbleText a {
@@ -551,7 +551,7 @@
   font-size: 12px;
   font-style: italic;
   margin-top: 3px;
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--text-muted);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -563,7 +563,7 @@
 .bubbleTranslatingText {
   font-size: 14px;
   font-style: italic;
-  color: rgba(0, 0, 0, 0.5);
+  color: var(--text-muted);
 }
 
 .bubbleInfoRow {
@@ -577,13 +577,13 @@
 .bubbleInfoText {
   font-size: 11px;
   margin-top: 2px;
-  color: rgba(0, 0, 0, 0.6);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
 .bubbleAutoResponseText {
   font-size: 10px;
-  color: rgba(0, 0, 0, 0.5);
+  color: var(--text-muted);
   font-style: italic;
 }
 
@@ -592,7 +592,7 @@
 }
 
 .bubbleStatusText--sending {
-  color: rgba(0, 0, 0, 0.5);
+  color: var(--text-muted);
   font-style: italic;
 }
 
@@ -621,9 +621,9 @@
 
 .translateContextMenu {
   position: fixed;
-  background-color: white;
+  background-color: var(--surface-base);
   border-radius: 8px;
-  box-shadow: 0 3px 16px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 3px 16px var(--shadow-color-default);
   padding: 6px;
   min-width: 160px;
 }
@@ -632,7 +632,7 @@
   padding: 5px 12px;
   font-size: 11px;
   font-weight: 600;
-  color: rgba(0, 0, 0, 0.45);
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.5px;
 }
@@ -646,8 +646,8 @@
 }
 
 .translateContextItem:hover {
-  background-color: rgb(0, 122, 255);
-  color: white;
+  background-color: var(--info);
+  color: var(--text-on-accent);
 }
 
 /* ============================================================
@@ -661,7 +661,7 @@
   overflow: hidden;
   margin-bottom: 4px;
   margin-right: 4px;
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: var(--surface-alt);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -681,13 +681,13 @@
 
 .mediaThumbVideoLabel {
   font-size: 11px;
-  color: rgba(0, 0, 0, 0.4);
+  color: var(--text-disabled);
   margin-top: 4px;
 }
 
 .mediaThumbError {
   font-size: 11px;
-  color: rgba(0, 0, 0, 0.5);
+  color: var(--text-muted);
 }
 
 .mediaThumbLoadingOverlay {
@@ -707,7 +707,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.85);
+  background-color: var(--surface-overlay-heavy);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -725,13 +725,13 @@
   width: 36px;
   height: 36px;
   border-radius: 18px;
-  background-color: rgb(40, 167, 69);
+  background-color: var(--accent);
   display: flex;
   justify-content: center;
   align-items: center;
   cursor: pointer;
   z-index: 2;
-  color: white;
+  color: var(--text-on-accent);
   font-size: 16px;
   font-weight: bold;
   line-height: 1;
@@ -883,7 +883,7 @@
 
 .phoneEntryBackText {
   font-size: 13px;
-  color: white;
+  color: var(--text-on-accent);
 }
 
 /* ----- HubConversationPanel (Region C) ----- */
@@ -900,7 +900,7 @@
   flex-direction: row;
   align-items: center;
   padding: 8px 12px;
-  border-bottom: 1px solid rgb(230, 230, 230);
+  border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 
@@ -931,7 +931,7 @@
 
 .hubPanelNewThreadText {
   font-size: 12px;
-  color: white;
+  color: var(--text-on-accent);
   font-weight: 700;
 }
 
@@ -951,7 +951,7 @@
 
 .hubPanelHeaderBtnText {
   font-size: 12px;
-  color: white;
+  color: var(--text-on-accent);
   font-weight: 700;
 }
 
@@ -969,13 +969,13 @@
   border-width: 2px;
   border-style: solid;
   min-width: 240px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 4px 8px var(--shadow-color-default);
   overflow: hidden;
 }
 
 .woDropdownItem {
   padding: 10px 14px;
-  border-bottom: 1px solid rgb(230, 230, 230);
+  border-bottom: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -1005,7 +1005,7 @@
 
 .woDropdownStatusText {
   font-size: 11px;
-  color: white;
+  color: var(--text-on-accent);
   font-weight: 700;
 }
 
@@ -1036,7 +1036,7 @@
   flex-direction: column;
   align-items: center;
   padding-top: 10px;
-  border-right: 2px solid rgb(217, 217, 217);
+  border-right: 2px solid var(--border-subtle);
   flex-shrink: 0;
 }
 
@@ -1051,7 +1051,7 @@
 .hubSidebarExpanded {
   display: flex;
   flex-direction: column;
-  border-right-color: rgb(217, 217, 217);
+  border-right-color: var(--border-subtle);
   border-right-style: solid;
   flex-shrink: 0;
   min-height: 0;
@@ -1059,7 +1059,7 @@
 
 .hubSidebarHeader {
   padding: 10px;
-  border-bottom: 1px solid rgb(230, 230, 230);
+  border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
 }
 

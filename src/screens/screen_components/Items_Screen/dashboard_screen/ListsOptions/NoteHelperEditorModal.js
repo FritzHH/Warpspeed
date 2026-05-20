@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import { Dialog, TextInput, TouchableOpacity, Image, Button, Tooltip } from "../../../../../dom_components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../../styles";
-import { gray } from "../../../../../utils";
+
 import { NOTE_HELPER_ITEM_PROTO } from "../../../../../data";
 import styles from "./ListOptions.module.css";
 
@@ -56,7 +56,7 @@ export const NoteHelperEditorModal = ({
   }
 
   return (
-    <Dialog visible={visible} onClose={onClose} overlayColor="rgba(0,0,0,0.5)">
+    <Dialog visible={visible} onClose={onClose} overlayColor={C.surfaceOverlay}>
       <div
         className={styles.modalShell}
         style={{ borderColor: C.buttonLightGreenOutline }}
@@ -75,7 +75,7 @@ export const NoteHelperEditorModal = ({
               autoFocus
               capitalize
               placeholder="Category name"
-              placeholderTextColor={gray(0.4)}
+              placeholderTextColor={C.textMuted}
               onChangeText={(val) =>
                 _setCategory({ ...sCategory, label: val })
               }
@@ -122,7 +122,7 @@ export const NoteHelperEditorModal = ({
           className={styles.modalTargetRow}
           style={{ borderBottomColor: C.buttonLightGreenOutline }}
         >
-          <span className={styles.modalTargetRowLabel} style={{ color: gray(0.5) }}>
+          <span className={styles.modalTargetRowLabel} style={{ color: C.textMuted }}>
             Appears in:
           </span>
           <button
@@ -135,7 +135,7 @@ export const NoteHelperEditorModal = ({
             <div
               className={styles.modalTargetCheckboxBox}
               style={{
-                borderColor: sCategory.intakeNotes ? C.blue : gray(0.3),
+                borderColor: sCategory.intakeNotes ? C.blue : C.borderStrong,
                 backgroundColor: sCategory.intakeNotes ? C.blue : "transparent",
               }}
             />
@@ -156,7 +156,7 @@ export const NoteHelperEditorModal = ({
             <div
               className={styles.modalTargetCheckboxBox}
               style={{
-                borderColor: sCategory.receiptNotes ? C.blue : gray(0.3),
+                borderColor: sCategory.receiptNotes ? C.blue : C.borderStrong,
                 backgroundColor: sCategory.receiptNotes ? C.blue : "transparent",
               }}
             />
@@ -178,14 +178,14 @@ export const NoteHelperEditorModal = ({
               }}
             >
               <div className={styles.modalItemFieldRow}>
-                <span className={styles.modalItemFieldLabel} style={{ color: gray(0.4) }}>
+                <span className={styles.modalItemFieldLabel} style={{ color: C.textMuted }}>
                   Label
                 </span>
                 <TextInput
                   value={item.buttonLabel}
                   capitalize
                   placeholder="Button label"
-                  placeholderTextColor={gray(0.35)}
+                  placeholderTextColor={C.textDisabled}
                   onChangeText={(val) =>
                     updateItem(itemIdx, "buttonLabel", val)
                   }
@@ -203,7 +203,7 @@ export const NoteHelperEditorModal = ({
                 </TouchableOpacity>
               </div>
               <div className={styles.modalItemFieldRowMulti}>
-                <span className={styles.modalItemFieldLabelMulti} style={{ color: gray(0.4) }}>
+                <span className={styles.modalItemFieldLabelMulti} style={{ color: C.textMuted }}>
                   Text
                 </span>
                 <TextInput
@@ -211,7 +211,7 @@ export const NoteHelperEditorModal = ({
                   multiline
                   capitalize
                   placeholder="Text inserted into notes (optional - uses label if empty)"
-                  placeholderTextColor={gray(0.35)}
+                  placeholderTextColor={C.textDisabled}
                   onChangeText={(val) => updateItem(itemIdx, "text", val)}
                   className={styles.modalItemFieldInput}
                   style={{
@@ -232,7 +232,7 @@ export const NoteHelperEditorModal = ({
             className={styles.modalAddItemBtn}
             style={{ borderColor: C.buttonLightGreenOutline }}
           >
-            <span className={styles.modalAddItemBtnText} style={{ color: gray(0.4) }}>
+            <span className={styles.modalAddItemBtnText} style={{ color: C.textMuted }}>
               + Add Item
             </span>
           </button>

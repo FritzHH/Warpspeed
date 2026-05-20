@@ -1,0 +1,49 @@
+.screenRoot {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background-color: var(--surface-base);
+  justify-content: center;
+  align-items: center;
+}
+
+.screenRootActive {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background-color: var(--surface-base);
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+  box-sizing: border-box;
+}
+
+.idleWrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  justify-content: center;
+  align-items: center;
+}
+
+.idleLogo {
+  width: 120px;
+  height: 120px;
+  opacity: 0.3;
+  margin-bottom: 20px;
+  display: block;
+  object-fit: contain;
+}
+
+.idleText {
+  font-size: 22px;
+  margin: 0;
+}
+
+.translatedText {
+  font-size: 48px;
+  color: var(--text-default);
+  text-align: center;
+  line-height: 64px;
+  margin: 0;
+}

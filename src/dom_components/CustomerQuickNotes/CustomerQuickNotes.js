@@ -1,7 +1,7 @@
 import React, { forwardRef } from "react";
 import ReactDOM from "react-dom";
 import { C, Fonts } from "../../styles";
-import { gray, lightenRGBByPercent } from "../../utils";
+import { lightenRGBByPercent } from "../../utils";
 import styles from "./CustomerQuickNotes.module.css";
 
 export const CustomerQuickNotes = forwardRef(function CustomerQuickNotes(
@@ -64,7 +64,7 @@ export const CustomerQuickNotes = forwardRef(function CustomerQuickNotes(
         {/* Categories */}
         {quickNotes.map((category) => (
           <div key={category.id} className={styles.category}>
-            <span className={styles.categoryLabel} style={{ color: gray(0.4) }}>
+            <span className={styles.categoryLabel} style={{ color: C.textMuted }}>
               {category.label}
             </span>
             <div className={styles.chipGrid}>
@@ -79,7 +79,7 @@ export const CustomerQuickNotes = forwardRef(function CustomerQuickNotes(
                       backgroundColor: active ? lightenRGBByPercent(C.red, 70) : C.buttonLightGreenOutline,
                     }}
                   >
-                    <span style={{ fontSize: 15, color: active ? C.red : gray(0.5) }}>
+                    <span style={{ fontSize: 15, color: active ? C.danger : C.textMuted }}>
                       {item.buttonLabel}
                     </span>
                   </button>

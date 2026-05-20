@@ -1,0 +1,230 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px;
+  width: 100%;
+  height: 48%;
+  border-radius: 6px;
+  box-shadow: 2px 2px 15px rgba(60, 179, 113, 0.25);
+  flex-shrink: 0;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.containerDone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 15px;
+  width: 100%;
+  height: 48%;
+  border-radius: 6px;
+  box-shadow: 2px 2px 15px rgba(60, 179, 113, 0.25);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.celebrationInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.celebrationText {
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.88);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 6px;
+  z-index: 10;
+}
+
+.overlayText {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.overlayError {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  margin-top: 8px;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.amountBox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  border: 2px solid;
+  border-radius: 10px;
+  padding: 6px 10px;
+  width: 60%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.amountDollar {
+  font-size: 15px;
+}
+
+.amountInputWrap {
+  width: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-right: 5px;
+  flex-shrink: 0;
+}
+
+.amountInput {
+  font-size: 18px;
+  outline: none;
+  padding-right: 2px;
+  text-align: right;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.rowSplit {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.cardCol {
+  flex: 3 1 0;
+  margin-right: 6px;
+  min-width: 0;
+}
+
+.zipCol {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.halfCol {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.halfColLeft {
+  flex: 1 1 0;
+  margin-right: 6px;
+  min-width: 0;
+}
+
+.label {
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+
+.elementContainer {
+  border: 2px solid;
+  border-radius: 8px;
+  padding: 8px;
+  box-sizing: border-box;
+}
+
+.zipInput {
+  font-size: 14px;
+  outline: none;
+  border: 2px solid;
+  border-radius: 8px;
+  padding: 6px 8px;
+  width: 100%;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.statusRow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 30px;
+  flex-shrink: 0;
+}
+
+.statusInline {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.statusText {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.statusError {
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.actionRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.actionLeft {
+  width: 33%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 7px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.actionCenter {
+  width: 33%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  outline: none;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.actionRight {
+  width: 33%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-right: 7px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}

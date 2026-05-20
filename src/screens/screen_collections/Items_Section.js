@@ -1,6 +1,5 @@
 /* eslint-disable */
 
-import { View } from "react-native-web";
 import React, { useState, useCallback, useEffect, useRef } from "react";
 
 import { TAB_NAMES } from "../../data";
@@ -16,7 +15,6 @@ import {
 import sectionStyles from "./Items_Section.module.css";
 import { Items_Dashboard } from "../screen_components/Items_Screen/Items_Dashboard";
 import { CustomerSearchListComponent } from "../screen_components/Items_Screen/Items_CustomerSearchList";
-import { WorkorderPreview } from "../screen_components/Items_Screen/Items_WorkorderPreview";
 import { Items_WorkorderItemsTab } from "../screen_components/Items_Screen/Items_WorkorderItems";
 
 import {
@@ -34,7 +32,7 @@ import { Items_TicketSearchResults } from "../screen_components/Items_Screen/Ite
 import { Items_WorkorderSearchList } from "../screen_components/Items_Screen/Items_WorkorderSearchList";
 import { Items_EmailView } from "../screen_components/Items_Screen/Items_EmailView";
 import { RecentCustomersComponent } from "../screen_components/Items_Screen/Items_RecentCustomers";
-import { log, gray, lightenRGBByPercent } from "../../utils";
+import { log, lightenRGBByPercent } from "../../utils";
 import { useTranslation } from "../../useTranslation";
 import {
   broadcastToTranslateDisplay,
@@ -65,8 +63,6 @@ export const Items_Section = React.memo(({}) => {
         return <CustomerSearchListComponent />;
       case TAB_NAMES.itemsTab.dashboard:
         return <Items_Dashboard />;
-      case TAB_NAMES.itemsTab.preview:
-        return <WorkorderPreview />;
       case TAB_NAMES.itemsTab.workorderItems:
         return <Items_WorkorderItemsTab />;
       case TAB_NAMES.itemsTab.ticketSearchResults:
@@ -88,7 +84,7 @@ export const Items_Section = React.memo(({}) => {
 
   // log("----------------------Items section render");
   return (
-    <View style={{ flex: 1, width: "100%", height: "100%" }}>
+    <div className={sectionStyles.container}>
       <TabBar
         onTranslatePress={() => _sSetShowTranslateModal(true)}
         onDevNotesPress={() => _sSetShowDevNotes(true)}
@@ -102,7 +98,7 @@ export const Items_Section = React.memo(({}) => {
         visible={sShowDevNotes}
         onClose={() => _sSetShowDevNotes(false)}
       />
-    </View>
+    </div>
   );
 });
 
@@ -293,7 +289,7 @@ const TranslateModal = ({ visible, onClose }) => {
           }}
         >
           {isLoading ? (
-            <span className={sectionStyles.outputLoading} style={{ color: gray(0.5) }}>
+            <span className={sectionStyles.outputLoading} style={{ color: C.textMuted }}>
               Translating...
             </span>
           ) : (

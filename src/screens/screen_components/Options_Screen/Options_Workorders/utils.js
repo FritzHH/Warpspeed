@@ -1,10 +1,5 @@
 /* eslint-disable */
-import {
-  calculateWaitEstimateLabel,
-  capitalizeFirstLetterOfString,
-  gray,
-  resolveStatus,
-} from "../../../../utils";
+import { calculateWaitEstimateLabel, capitalizeFirstLetterOfString, resolveStatus } from "../../../../utils";
 import { C } from "../../../../styles";
 import { useSettingsStore } from "../../../../stores";
 
@@ -32,7 +27,7 @@ export function computeWaitInfo(workorder) {
 
   if (label === "No estimate") {
     result.waitEndDay = label;
-    result.textColor = gray(0.4);
+    result.textColor = C.textMuted;
     return result;
   }
 
@@ -40,7 +35,7 @@ export function computeWaitInfo(workorder) {
   const finished = isFinishedStatus(workorder);
 
   if (finished) {
-    result.textColor = gray(0.4);
+    result.textColor = C.textMuted;
   } else if (lowerLabel === "waiting" || lowerLabel === "today") {
     result.waitEndDay = label;
     result.textColor = "red";

@@ -1,9 +1,9 @@
 .card {
-  background-color: rgb(254, 254, 255);
+  background-color: var(--surface-raised);
   border-radius: 10px;
   border-width: 1px;
   border-style: solid;
-  border-color: rgb(200, 228, 220);
+  border-color: var(--border-default);
   padding: 12px;
   margin-bottom: 12px;
   box-sizing: border-box;
@@ -22,14 +22,14 @@
 
 .fieldLabel {
   font-size: 11px;
-  color: rgb(140, 140, 140);
+  color: var(--text-muted);
   margin-bottom: 2px;
   display: block;
 }
 
 .fieldLabelSmall {
   font-size: 11px;
-  color: rgb(140, 140, 140);
+  color: var(--text-muted);
   margin-bottom: 4px;
   display: block;
 }
@@ -44,7 +44,7 @@
 .input {
   flex: 1;
   height: 38px;
-  border-color: rgb(235, 235, 235);
+  border-color: var(--border-subtle);
   border-width: 1px;
   border-style: solid;
   padding-left: 8px;
@@ -59,7 +59,7 @@
 .inputSmall {
   width: 60px;
   height: 38px;
-  border-color: rgb(235, 235, 235);
+  border-color: var(--border-subtle);
   border-width: 1px;
   border-style: solid;
   padding-left: 8px;
@@ -92,11 +92,11 @@
 }
 
 .estimateMissing {
-  color: rgb(255, 26, 26);
+  color: var(--danger);
 }
 
 .estimateNormal {
-  color: rgb(128, 128, 128);
+  color: var(--text-muted);
 }
 
 .inputNoTopMargin8 {
@@ -139,7 +139,7 @@
 .orderingTitle {
   font-size: 13px;
   font-weight: 600;
-  color: rgb(140, 140, 140);
+  color: var(--text-muted);
 }
 
 .deliveryRow {
@@ -159,26 +159,26 @@
   border: none;
   cursor: pointer;
   flex-shrink: 0;
-  background-color: rgb(232, 239, 245);
+  background-color: var(--surface-accent-muted);
 }
 
 .waitBtnText {
   font-size: 16px;
   font-weight: 700;
   margin-top: -1px;
-  color: rgb(115, 115, 115);
+  color: var(--text-muted);
 }
 
 .waitDaysText {
   font-size: 14px;
   min-width: 60px;
   text-align: center;
-  color: rgb(71, 71, 71);
+  color: var(--text-default);
 }
 
 .deliveryDate {
   font-size: 13px;
-  color: rgb(140, 140, 140);
+  color: var(--text-muted);
   margin-left: 8px;
 }
 
@@ -216,27 +216,27 @@
 }
 
 .orderedRedBorder {
-  border-color: rgb(255, 26, 26);
+  border-color: var(--danger);
 }
 
 .orderedGreenBorder {
-  border-color: rgb(33, 148, 86);
+  border-color: var(--accent);
 }
 
 .orderedRedBg {
-  background-color: rgb(255, 26, 26);
+  background-color: var(--danger);
 }
 
 .orderedGreenBg {
-  background-color: rgb(33, 148, 86);
+  background-color: var(--accent);
 }
 
 .orderedRedText {
-  color: rgb(255, 26, 26);
+  color: var(--danger);
 }
 
 .orderedGreenText {
-  color: rgb(33, 148, 86);
+  color: var(--accent);
 }
 
 .trackingLink {
@@ -245,13 +245,13 @@
 
 .linkText {
   font-size: 13px;
-  color: rgb(53, 135, 210);
+  color: var(--info);
   text-decoration: underline;
 }
 
 .linkTextLarge {
   font-size: 14px;
-  color: rgb(53, 135, 210);
+  color: var(--info);
   text-decoration: underline;
   display: -webkit-box;
   -webkit-line-clamp: 2;
@@ -268,12 +268,12 @@
 .readBrand {
   font-size: 16px;
   font-weight: 600;
-  color: rgb(71, 71, 71);
+  color: var(--text-default);
 }
 
 .readDescription {
   font-size: 14px;
-  color: rgb(153, 153, 153);
+  color: var(--text-disabled);
   margin-top: 1px;
 }
 
@@ -297,7 +297,7 @@
   border-radius: 7px;
   border-width: 1px;
   border-style: solid;
-  border-color: rgb(51, 51, 51);
+  border-color: var(--text-strong);
   margin-right: 5px;
   flex-shrink: 0;
   box-sizing: border-box;
@@ -305,7 +305,7 @@
 
 .readColorLabel {
   font-size: 13px;
-  color: rgb(71, 71, 71);
+  color: var(--text-default);
 }
 
 .readEstimateRow {
@@ -317,7 +317,7 @@
 }
 
 .itemNotHereBadge {
-  background-color: rgb(255, 243, 176);
+  background-color: var(--surface-warning-muted);
   border-radius: 10px;
   padding-left: 8px;
   padding-right: 8px;
@@ -327,14 +327,14 @@
 }
 
 .itemNotHereText {
-  color: rgb(90, 75, 0);
+  color: var(--text-warning);
   font-size: 11px;
   font-weight: 600;
 }
 
 .readMaxWait {
   font-size: 13px;
-  color: rgb(140, 140, 140);
+  color: var(--text-muted);
   margin-bottom: 4px;
   display: block;
 }
@@ -351,7 +351,7 @@
 
 .readValue {
   font-size: 14px;
-  color: rgb(71, 71, 71);
+  color: var(--text-default);
 }
 
 .readDeliveryRow {
@@ -364,7 +364,7 @@
 
 .readDeliveryLabel {
   font-size: 13px;
-  color: rgb(140, 140, 140);
+  color: var(--text-muted);
 }
 
 .readOrderedStatus {

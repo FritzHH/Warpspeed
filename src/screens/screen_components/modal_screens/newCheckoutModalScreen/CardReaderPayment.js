@@ -11,13 +11,7 @@ import {
   Tooltip,
 } from "../../../../dom_components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
-import {
-  usdTypeMask,
-  formatCurrencyDisp,
-  log,
-  gray,
-  localStorageWrapper,
-} from "../../../../utils";
+import { usdTypeMask, formatCurrencyDisp, log, localStorageWrapper } from "../../../../utils";
 import { takeId, getId } from "../../../../idPool";
 import { useStripePaymentStore } from "../../../../stores";
 import { buildCardTransaction } from "./newCheckoutUtils";
@@ -489,7 +483,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   if (!hasOnlineReaders) {
     return (
       <div className={styles.containerNoReaders} style={SHADOW_PROTO}>
-        <span className={styles.scanningLabel} style={{ color: gray(0.55) }}>
+        <span className={styles.scanningLabel} style={{ color: C.textMuted }}>
           Scanning for readers
         </span>
         <span className={styles.titleText} style={{ color: C.blue }}>
@@ -585,12 +579,12 @@ export const CardReaderPayment = memo(function CardReaderPayment({
                 fontSize: 20,
                 outlineWidth: 0,
                 outlineStyle: "none",
-                color: lockAmount ? gray(0.5) : C.text,
+                color: lockAmount ? C.textMuted : C.text,
                 paddingRight: 2,
                 textAlign: "right",
               }}
               placeholder="0.00"
-              placeholderTextColor={gray(0.3)}
+              placeholderTextColor={C.textDisabled}
               value={sRequestedAmountDisp}
               onChangeText={handleAmountChange}
               editable={isEnabled && !lockAmount}
@@ -619,7 +613,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
           <div className={styles.processingRow}>
             <SmallLoadingIndicator color={C.green} text="" message="" containerStyle={{ padding: 2 }} />
             {!!zCardMessage && (
-              <span className={styles.processingMessage} style={{ color: gray(0.5) }}>{zCardMessage}</span>
+              <span className={styles.processingMessage} style={{ color: C.textMuted }}>{zCardMessage}</span>
             )}
           </div>
         )}

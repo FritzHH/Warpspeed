@@ -1,34 +1,7 @@
 /*eslint-disable*/
-import {
-  View,
-  Text,
-  FlatList,
-  ScrollView,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  Image,
-} from "react-native-web";
-import {
-  calculateRunningTotals,
-  capitalizeFirstLetterOfString,
-  checkInputForNumbersOnly,
-  formatCurrencyDisp,
-  formatMillisForDisplay,
-  formatPhoneForDisplay,
-  formatPhoneWithDashes,
-  generateEAN13Barcode,
-  gray,
-  lightenRGBByPercent,
-  formatWorkorderNumber,
-  localStorageWrapper,
-  log,
-  printBuilder,
-  removeDashesFromPhone,
-  resolveStatus,
-  usdTypeMask,
-} from "../../../utils";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useState, useEffect, useRef } from "react";
+import { calculateRunningTotals, capitalizeFirstLetterOfString, checkInputForNumbersOnly, formatCurrencyDisp, formatMillisForDisplay, formatPhoneForDisplay, formatPhoneWithDashes, generateEAN13Barcode, lightenRGBByPercent, formatWorkorderNumber, localStorageWrapper, printBuilder, removeDashesFromPhone, resolveStatus, usdTypeMask } from "../../../utils";
+import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import {
   useCheckoutStore,
   useCurrentCustomerStore,
@@ -41,9 +14,25 @@ import {
   useAlertScreenStore,
   useCustMessagesStore,
 } from "../../../stores";
-import { CONTACT_RESTRICTIONS, CUSTOMER_CREDIT_PROTO, CUSTOMER_LANGUAGES, CUSTOMER_PROTO, SMS_PROTO, TAB_NAMES } from "../../../data";
-import { Button_, DepositModal, DepositsList, DropdownMenu, Image_, SmallLoadingIndicator, TextInput_, Tooltip, TouchableOpacity_ } from "../../../components";
-import { CheckBox } from "../../../dom_components";
+import {
+  CONTACT_RESTRICTIONS,
+  CUSTOMER_CREDIT_PROTO,
+  CUSTOMER_LANGUAGES,
+  CUSTOMER_PROTO,
+  SMS_PROTO,
+  TAB_NAMES,
+} from "../../../data";
+import {
+  Button,
+  CheckBox,
+  DepositModal,
+  DepositsList,
+  DropdownMenu,
+  Image,
+  SmallLoadingIndicator,
+  TextInput,
+  Tooltip,
+} from "../../../dom_components";
 import {
   dbSaveCustomer,
   dbGetCustomer,
@@ -58,13 +47,32 @@ import {
   dbToggleSMSForwarding,
 } from "../../../db_calls_wrapper";
 import { smsService } from "../../../data_service_modules";
-import { ReplyOptionsBar, scheduleAutoSend, clearAutoSend, buildForwardToPayload } from "../Options_Screen/ReplyOptionsBar";
-import { readActiveSale, readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import {
+  scheduleAutoSend,
+  clearAutoSend,
+  buildForwardToPayload,
+} from "../Options_Screen/ReplyOptionsBar";
+import {
+  IncomingMessageComponent,
+  OutgoingMessageComponent,
+} from "../Options_Screen/MessageBubble";
+import { ComposeArea } from "../Options_Screen/ComposeArea";
+import {
+  readActiveSale,
+  readTransactions,
+} from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { sendCreditReceipt } from "./newCheckoutModalScreen/newCheckoutUtils";
 import { ClosedWorkorderModal } from "./ClosedWorkorderModal";
 import { DepositRefundModal } from "./newCheckoutModalScreen/DepositRefundModal";
-import { FullSaleModal } from "./FullSaleModal";
+import { FullSaleModal } from "../../../dom_components";
 import { GoogleMapsModal } from "./GoogleMapsModal";
+import styles from "./CustomerInfoModalScreen.module.css";
+
+const INPUT_BASE_STYLE = {
+  borderColor: C.borderSubtle,
+  color: C.text,
+  backgroundColor: C.listItemWhite,
+};
 
 export const CustomerInfoScreenModalComponent = ({
   incomingCustomer = null,
@@ -76,7 +84,6 @@ export const CustomerInfoScreenModalComponent = ({
   handleButton1Press,
   handleButton2Press,
 }) => {
-  // Use cached customer from store if available and matching, otherwise fall back to proto
   const getInitialCustomer = () => {
     if (incomingCustomer) return incomingCustomer;
     if (customerID) {
@@ -101,7 +108,7 @@ export const CustomerInfoScreenModalComponent = ({
   const [sEditingCredit, _sSetEditingCredit] = useState(null);
   const [sRefundDeposit, _sSetRefundDeposit] = useState(null);
   const [sSaleModalItem, _sSetSaleModalItem] = useState(null);
-  const [sCellDuplicateStatus, _sCellDuplicateStatus] = useState(null); // null | "checking" | "duplicate" | "unique" | "error"
+  const [sCellDuplicateStatus, _sCellDuplicateStatus] = useState(null);
   const [sShowMapsModal, _sSetShowMapsModal] = useState(false);
   const [sCellEditing, _sCellEditing] = useState(false);
   const [sCellEditValue, _sCellEditValue] = useState("");
@@ -109,16 +116,13 @@ export const CustomerInfoScreenModalComponent = ({
   const mountedRef = useRef(true);
   const initialCellRef = useRef(initialCustomer?.customerCell || "");
 
-  // Fetch fresh customer on mount (background refresh even if we have cached data)
   useEffect(() => {
     mountedRef.current = true;
 
-    // Load workorders/sales immediately from whatever customer data we have
     if (hasCachedCustomer) autoLoadWorkordersAndSales(initialCustomer);
 
     if (incomingCustomer || !customerID || isNewCustomer) return;
 
-    // Only show loading if we don't have cached data
     if (!hasCachedCustomer) _setCustomerLoading(true);
 
     dbGetCustomer(customerID).then((customer) => {
@@ -127,7 +131,6 @@ export const CustomerInfoScreenModalComponent = ({
         _setCustomerInfo(customer);
         useCurrentCustomerStore.getState().setCustomer(customer, false);
         _setCustomerLoading(false);
-        // Refresh workorders/sales with fresh customer data if IDs changed
         if (!hasCachedCustomer) autoLoadWorkordersAndSales(customer);
       } else {
         _setCustomerLoadError(true);
@@ -149,7 +152,6 @@ export const CustomerInfoScreenModalComponent = ({
       return [];
     }
     const openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
-    // Show local workorders immediately
     const localWOs = [];
     const dbIDs = [];
     woIDs.forEach((id) => {
@@ -158,7 +160,6 @@ export const CustomerInfoScreenModalComponent = ({
       else dbIDs.push(id);
     });
     if (localWOs.length > 0 && mountedRef.current) _sSetWorkorders(localWOs);
-    // Fetch completed workorders from DB in background
     if (dbIDs.length > 0) {
       _sSetWoLoading(true);
       try {
@@ -187,7 +188,6 @@ export const CustomerInfoScreenModalComponent = ({
       _sSetSales([]);
       return;
     }
-    // Show active sales from store immediately
     const activeSales = useActiveSalesStore.getState().getActiveSales() || [];
     const localSales = [];
     const dbIDs = [];
@@ -197,7 +197,6 @@ export const CustomerInfoScreenModalComponent = ({
       else dbIDs.push(id);
     });
     if (localSales.length > 0 && mountedRef.current) _sSetSales(localSales);
-    // Fetch completed sales from DB in background
     if (dbIDs.length > 0) {
       _sSetSalesLoading(true);
       try {
@@ -214,17 +213,14 @@ export const CustomerInfoScreenModalComponent = ({
         );
         const fetchedSales = results.filter(Boolean);
 
-        // Collect all unique workorder IDs referenced by fetched sales
         const allWoIDs = new Set();
         fetchedSales.forEach((sale) => {
           (sale.workorderIDs || []).forEach((id) => allWoIDs.add(id));
         });
 
-        // Build a map from already-loaded workorders
         const woMap = {};
         (loadedWorkorders || sWorkorders).forEach((wo) => { woMap[wo.id] = wo; });
 
-        // Fetch any workorder IDs not already loaded
         const missingIDs = [...allWoIDs].filter((id) => !woMap[id]);
         if (missingIDs.length > 0) {
           const openWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
@@ -242,7 +238,6 @@ export const CustomerInfoScreenModalComponent = ({
           fetched.filter(Boolean).forEach((wo) => { woMap[wo.id] = wo; });
         }
 
-        // Attach resolved workorder objects to each sale as _workorders
         const dbSalesWithWOs = fetchedSales.map((sale) => ({
           ...sale,
           _workorders: (sale.workorderIDs || [])
@@ -250,7 +245,6 @@ export const CustomerInfoScreenModalComponent = ({
             .filter(Boolean),
         }));
 
-        // Load transactions for each sale and attach as _transactions
         let txnMap = {};
         await Promise.all(dbSalesWithWOs.map(async (sale) => {
           if (sale.transactionIDs?.length > 0) {
@@ -280,41 +274,6 @@ export const CustomerInfoScreenModalComponent = ({
     await loadSales(customer, loadedWOs);
   }
 
-  function navigateToWorkorder(wo) {
-    const store = useOpenWorkordersStore.getState();
-    const openWOs = store.getWorkorders() || [];
-    const isOpen = openWOs.some((o) => o.id === wo.id);
-
-    if (isOpen) {
-      // Open workorder — navigate to it
-      store.setOpenWorkorderID(wo.id);
-      useTabNamesStore.getState().setItems({
-        infoTabName: TAB_NAMES.infoTab.workorder,
-        itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-        optionsTabName: TAB_NAMES.optionsTab.inventory,
-      });
-      useWorkorderPreviewStore.getState().setPreviewObj(null);
-      if (handleButton2Press) handleButton2Press();
-    } else {
-      // Completed workorder — open in closed workorder modal
-      _sSetClosedWorkorder(wo);
-    }
-  }
-
-  function setCustomerInfo(customerInfo) {
-    if (isNewCustomer) {
-      // this is a new customer, it is only held locally until the create customer button is pressed
-      _setCustomerInfo(customerInfo);
-    } else {
-      // old customer, saving updates as we go
-      useCurrentCustomerStore.getState().setCustomer(customerInfo);
-    }
-  }
-
-  function setCustomerField(fieldName, fieldVal) {
-    _setCustomerInfo({ ...sCustomerInfo, [fieldName]: fieldVal });
-  }
-
   const CUSTOMER_TO_WORKORDER_FIELDS = {
     first: "customerFirst",
     last: "customerLast",
@@ -335,7 +294,6 @@ export const CustomerInfoScreenModalComponent = ({
           }
           dbSaveCustomer(updated);
 
-          // Sync duplicated fields to open workorders
           const woField = CUSTOMER_TO_WORKORDER_FIELDS[fieldName];
           if (woField) {
             const allWOs = useOpenWorkordersStore.getState().getWorkorders() || [];
@@ -438,585 +396,552 @@ export const CustomerInfoScreenModalComponent = ({
     }
   }
 
-  const TEXT_INPUT_STYLE = {
-    width: "100%",
-    height: 40,
-    borderColor: gray(0.08),
-    borderWidth: 1,
-    marginTop: 15,
-    paddingHorizontal: 8,
-    outlineWidth: 0,
-    borderRadius: 7,
-    color: C.text,
-    backgroundColor: C.listItemWhite,
-  };
+  const cellHasError = sCellDuplicateStatus === "duplicate" || sCellDuplicateStatus === "error";
 
   return (
-    <TouchableWithoutFeedback>
-      <View
-        style={{
-          padding: 20,
-          backgroundColor: C.backgroundWhite,
-          width: "95%",
-          height: "90%",
-          flexDirection: "row",
-          borderRadius: 15,
-          shadowProps: {
-            shadowColor: "black",
-            shadowOffset: { width: 2, height: 2 },
-            shadowOpacity: 0.3,
-            shadowRadius: 5,
-          },
-        }}
-      >
-        <View style={{ width: "15%", padding: 10 }}>
-          <View
-            style={{
-              width: "100%",
-              flexDirection: "row",
-              justifyContent: "space-between",
-              marginBottom: 10,
+    <div className={styles.shell} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.formCol}>
+        <div className={styles.contactRow}>
+          <CheckBox
+            text={"Call Only"}
+            isChecked={sCustomerInfo?.contactRestriction === CONTACT_RESTRICTIONS.call}
+            onCheck={() => {
+              let val = sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.call ? "" : CONTACT_RESTRICTIONS.call;
+              saveField("contactRestriction", val);
             }}
-          >
-            <CheckBox
-              text={"Call Only"}
-              isChecked={
-                sCustomerInfo?.contactRestriction === CONTACT_RESTRICTIONS.call
-              }
-              onCheck={() => {
-                let val = sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.call ? "" : CONTACT_RESTRICTIONS.call;
-                saveField("contactRestriction", val);
-              }}
-            />
-            <CheckBox
-              text={"Email Only"}
-              isChecked={
-                sCustomerInfo?.contactRestriction === CONTACT_RESTRICTIONS.email
-              }
-              onCheck={() => {
-                let val = sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.email ? "" : CONTACT_RESTRICTIONS.email;
-                saveField("contactRestriction", val);
-              }}
-            />
-          </View>
-          <View>
-            {(!!sCustomerInfo?.customerCell || sCellEditing) && (
-              <View style={{ flexDirection: "row", alignItems: "center", marginLeft: 2 }}>
-                {sCellDuplicateStatus === "duplicate" ? (
-                  <Text style={{ color: C.red, fontSize: 11, fontWeight: "600" }}>Phone number duplicate</Text>
-                ) : sCellDuplicateStatus === "error" ? (
-                  <Text style={{ color: C.red, fontSize: 11, fontWeight: "600" }}>Network error - cannot verify</Text>
-                ) : sCellDuplicateStatus === "checking" ? (
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Text style={{ color: gray(0.3), fontSize: 11 }}>Cell</Text>
-                    <SmallLoadingIndicator style={{ marginLeft: 5 }} />
-                  </View>
-                ) : (
-                  <Text style={{ color: gray(0.3), fontSize: 11 }}>Cell</Text>
-                )}
-              </View>
-            )}
-            {(!isNewCustomer && !sCellEditing) ? (
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <TextInput_
-                  editable={false}
-                  placeholder="Cell phone"
-                  style={{
-                    ...TEXT_INPUT_STYLE,
-                    flex: 1,
-                    marginTop: sCustomerInfo.customerCell ? 1 : TEXT_INPUT_STYLE.marginTop,
-                    backgroundColor: gray(0.04),
-                  }}
-                  value={formatPhoneWithDashes(sCustomerInfo.customerCell)}
-                />
-                {sCellMigrating ? (
-                  <SmallLoadingIndicator style={{ marginLeft: 8 }} />
-                ) : (
-                  <TouchableOpacity
-                    disabled={(sCustomerInfo.customerCell || "").replace(/\D/g, "").length !== 10}
-                    onPress={handleCellEditStart}
-                    style={{ marginLeft: 8, opacity: (sCustomerInfo.customerCell || "").replace(/\D/g, "").length === 10 ? 1 : 0.3 }}
-                    title="Edit customer cell phone number"
-                  >
-                    <Image_ icon={ICONS.editPencil} style={{ width: 18, height: 18 }} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            ) : sCellEditing ? (
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
-                <TextInput_
-                  onChangeText={(val) => {
-                    val = removeDashesFromPhone(val);
-                    if (val.length > 10) return;
-                    _sCellEditValue(val);
-                    checkCellPhoneUnique(val);
-                  }}
-                  placeholder="Cell phone"
-                  style={{
-                    ...TEXT_INPUT_STYLE,
-                    flex: 1,
-                    marginTop: 1,
-                    ...(sCellDuplicateStatus === "duplicate" || sCellDuplicateStatus === "error"
-                      ? { borderColor: C.red, borderWidth: 2 }
-                      : {}),
-                  }}
-                  value={formatPhoneWithDashes(sCellEditValue)}
-                />
-                {sCellEditValue.replace(/\D/g, "").length === 10 && sCellDuplicateStatus !== "duplicate" ? (
-                  <TouchableOpacity
-                    onPress={handleCellSavePress}
-                    style={{ marginLeft: 8 }}
-                    title="Save new phone number"
-                  >
-                    <Image_ icon={ICONS.check1} style={{ width: 18, height: 18 }} />
-                  </TouchableOpacity>
-                ) : null}
-                <TouchableOpacity
-                  onPress={handleCellEditCancel}
-                  style={{ marginLeft: 6 }}
-                  title="Cancel"
-                >
-                  <Image_ icon={ICONS.close1} style={{ width: 16, height: 16 }} />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TextInput_
-                onChangeText={(val) => {
-                  val = removeDashesFromPhone(val);
-                  if (val.length > 10) return;
-                  saveField("customerCell", val);
-                  checkCellPhoneUnique(val);
-                }}
+          />
+          <CheckBox
+            text={"Email Only"}
+            isChecked={sCustomerInfo?.contactRestriction === CONTACT_RESTRICTIONS.email}
+            onCheck={() => {
+              let val = sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.email ? "" : CONTACT_RESTRICTIONS.email;
+              saveField("contactRestriction", val);
+            }}
+          />
+        </div>
+
+        <div>
+          {(!!sCustomerInfo?.customerCell || sCellEditing) && (
+            <div className={styles.cellHeader}>
+              {sCellDuplicateStatus === "duplicate" ? (
+                <span className={styles.cellLabelError} style={{ color: C.red }}>Phone number duplicate</span>
+              ) : sCellDuplicateStatus === "error" ? (
+                <span className={styles.cellLabelError} style={{ color: C.red }}>Network error - cannot verify</span>
+              ) : sCellDuplicateStatus === "checking" ? (
+                <>
+                  <span className={styles.cellLabel} style={{ color: C.textDisabled }}>Cell</span>
+                  <span style={{ marginLeft: 5, display: "flex", alignItems: "center" }}>
+                    <SmallLoadingIndicator />
+                  </span>
+                </>
+              ) : (
+                <span className={styles.cellLabel} style={{ color: C.textDisabled }}>Cell</span>
+              )}
+            </div>
+          )}
+
+          {(!isNewCustomer && !sCellEditing) ? (
+            <div className={styles.cellInlineRow}>
+              <TextInput
+                editable={false}
                 placeholder="Cell phone"
+                className={styles.input}
                 style={{
-                  ...TEXT_INPUT_STYLE,
-                  marginTop: sCustomerInfo.customerCell ? 1 : TEXT_INPUT_STYLE.marginTop,
-                  ...(sCellDuplicateStatus === "duplicate" || sCellDuplicateStatus === "error"
-                    ? { borderColor: C.red, borderWidth: 2 }
-                    : {}),
+                  ...INPUT_BASE_STYLE,
+                  flex: 1,
+                  marginTop: sCustomerInfo.customerCell ? 1 : 15,
+                  backgroundColor: C.surfaceAlt,
                 }}
                 value={formatPhoneWithDashes(sCustomerInfo.customerCell)}
               />
-            )}
-          </View>
-
-          <TextInput_
-            onChangeText={(val) => {
-              val = removeDashesFromPhone(val);
-              if (val.length > 10) return;
-              saveField("customerLandline", val);
-            }}
-            placeholder="Landline"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={formatPhoneWithDashes(sCustomerInfo.customerLandline)}
-          />
-          <TextInput_
-            onChangeText={(val) => saveField("first", capitalizeFirstLetterOfString(val))}
-            placeholder="First name"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={capitalizeFirstLetterOfString(sCustomerInfo.first)}
-            capitalize={true}
-          />
-          <TextInput_
-            onChangeText={(val) => saveField("last", capitalizeFirstLetterOfString(val))}
-            placeholder="Last name"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={capitalizeFirstLetterOfString(sCustomerInfo.last)}
-            capitalize={true}
-          />
-          <TextInput_
-            onChangeText={(val) => saveField("email", val)}
-            placeholder="Email address"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.email}
-          />
-          <TextInput_
-            onChangeText={(val) => saveField("streetAddress", capitalizeFirstLetterOfString(val))}
-            placeholder="Street address"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={capitalizeFirstLetterOfString(sCustomerInfo.streetAddress)}
-            capitalize={true}
-          />
-          <TextInput_
-            onChangeText={(val) => saveField("unit", val)}
-            placeholder="Unit"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={sCustomerInfo.unit}
-          />
-          <TextInput_
-            onChangeText={(val) => saveField("city", capitalizeFirstLetterOfString(val))}
-            placeholder="City"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={capitalizeFirstLetterOfString(sCustomerInfo.city)}
-            capitalize={true}
-          />
-          <TextInput_
-            onChangeText={(val) => saveField("state", val.toUpperCase())}
-            placeholder="State"
-            style={{ ...TEXT_INPUT_STYLE }}
-            value={(sCustomerInfo.state || "").toUpperCase()}
-          />
-          <View style={{ flexDirection: "row", alignItems: "center", justifiyContent: 'center', marginTop: TEXT_INPUT_STYLE.marginTop }}>
-            <TextInput_
+              {sCellMigrating ? (
+                <span style={{ marginLeft: 8, display: "flex", alignItems: "center" }}>
+                  <SmallLoadingIndicator />
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  disabled={(sCustomerInfo.customerCell || "").replace(/\D/g, "").length !== 10}
+                  onClick={handleCellEditStart}
+                  className={
+                    styles.cellIconBtn +
+                    ((sCustomerInfo.customerCell || "").replace(/\D/g, "").length !== 10
+                      ? " " + styles.cellIconBtnDisabled
+                      : "")
+                  }
+                  title="Edit customer cell phone number"
+                >
+                  <Image icon={ICONS.editPencil} style={{ width: 18, height: 18 }} />
+                </button>
+              )}
+            </div>
+          ) : sCellEditing ? (
+            <div className={styles.cellInlineRow}>
+              <TextInput
+                onChangeText={(val) => {
+                  val = removeDashesFromPhone(val);
+                  if (val.length > 10) return;
+                  _sCellEditValue(val);
+                  checkCellPhoneUnique(val);
+                }}
+                placeholder="Cell phone"
+                className={styles.input}
+                style={{
+                  ...INPUT_BASE_STYLE,
+                  flex: 1,
+                  marginTop: 1,
+                  ...(cellHasError ? { borderColor: C.red, borderWidth: 2 } : {}),
+                }}
+                value={formatPhoneWithDashes(sCellEditValue)}
+              />
+              {sCellEditValue.replace(/\D/g, "").length === 10 && sCellDuplicateStatus !== "duplicate" ? (
+                <button
+                  type="button"
+                  onClick={handleCellSavePress}
+                  className={styles.cellIconBtn}
+                  title="Save new phone number"
+                >
+                  <Image icon={ICONS.check1} style={{ width: 18, height: 18 }} />
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={handleCellEditCancel}
+                className={styles.cellIconBtn}
+                style={{ marginLeft: 6 }}
+                title="Cancel"
+              >
+                <Image icon={ICONS.close1} style={{ width: 16, height: 16 }} />
+              </button>
+            </div>
+          ) : (
+            <TextInput
               onChangeText={(val) => {
-                if (!checkInputForNumbersOnly(val)) return;
-                saveField("zip", val);
+                val = removeDashesFromPhone(val);
+                if (val.length > 10) return;
+                saveField("customerCell", val);
+                checkCellPhoneUnique(val);
               }}
-              placeholder="Zip code"
-              style={{ ...TEXT_INPUT_STYLE, marginTop: 0 }}
-              value={sCustomerInfo.zip}
+              placeholder="Cell phone"
+              className={styles.input}
+              style={{
+                ...INPUT_BASE_STYLE,
+                marginTop: sCustomerInfo.customerCell ? 1 : 15,
+                ...(cellHasError ? { borderColor: C.red, borderWidth: 2 } : {}),
+              }}
+              value={formatPhoneWithDashes(sCustomerInfo.customerCell)}
             />
-            {!!sCustomerInfo.streetAddress && !!sCustomerInfo.city && !!sCustomerInfo.state && (
-              <Button_
-                text="Maps"
-                icon={ICONS.map}
-                iconSize={30}
-                onPress={() => _sSetShowMapsModal(true)}
-                colorGradientArr={COLOR_GRADIENTS.blue}
-                buttonStyle={{
-                  // flex: 1,
-                  paddingVertical: 3,
-                  height: '100%',
-                  borderRadius: 7,
-                  marginLeft: 10,
-                  justifyContent: "center",
-                }}
-                textStyle={{ color: C.textWhite, fontSize: 15, fontWeight: "600" }}
-              />
-            )}
-          </View>
-          <TextInput_
-            onChangeText={(val) => saveField("notes", capitalizeFirstLetterOfString(val))}
-            placeholder="Address notes"
-            multiline={true}
-            numberOfLines={6}
-            style={{ ...TEXT_INPUT_STYLE, height: undefined, minHeight: 40, paddingVertical: 8 }}
-            value={capitalizeFirstLetterOfString(sCustomerInfo.notes)}
-            capitalize={true}
-          />
-          <CheckBox
-            isChecked={!!sCustomerInfo.gatedCommunity}
-            text="Gated community"
-            textStyle={{ fontSize: 13 }}
-            buttonStyle={{ backgroundColor: "transparent", marginTop: TEXT_INPUT_STYLE.marginTop }}
-            onCheck={() => saveField("gatedCommunity", !sCustomerInfo.gatedCommunity)}
-          />
-          <View style={{ flexDirection: "row", alignItems: "center", marginTop: TEXT_INPUT_STYLE.marginTop }}>
-            <Text style={{ fontSize: 13, color: gray(0.5), marginRight: 8 }}>Language</Text>
-            <DropdownMenu
-              dataArr={Object.values(CUSTOMER_LANGUAGES).map((lang) => ({ label: lang, value: lang }))}
-              buttonText={sCustomerInfo.language || CUSTOMER_LANGUAGES.english}
-              buttonStyle={{ ...TEXT_INPUT_STYLE, marginTop: 0, flex: 1 }}
-              buttonTextStyle={{ fontSize: 14, color: C.text }}
-              onSelect={(item) => saveField("language", item.value)}
-              useSelectedAsButtonTitle={false}
-            />
-          </View>
+          )}
+        </div>
 
-          <View style={{ flexDirection: "column" }}>
-            {!!button1Text && (
-              <Button_
-                onPress={() => handleButton1Press(sCustomerInfo)}
-                enabled={sCellDuplicateStatus !== "duplicate" && sCellDuplicateStatus !== "error" && sCellDuplicateStatus !== "checking"}
-                colorGradientArr={COLOR_GRADIENTS.yellow}
-                buttonStyle={{
-                  marginTop: 20,
-                  height: 40,
-                  width: "90%",
-                  borderWidth: 1,
-                  borderColor: gray(0.1),
-                }}
-                icon={ICONS.gears1}
-                iconSize={19}
-                textStyle={{ color: C.textWhite }}
-                text={button1Text}
-              />
-            )}
-            {!isNewCustomer && (
-              <Tooltip text="Deposits, gift cards and credits" position="top" style={{ marginTop: 20 }}>
-                <Button_
+        <TextInput
+          onChangeText={(val) => {
+            val = removeDashesFromPhone(val);
+            if (val.length > 10) return;
+            saveField("customerLandline", val);
+          }}
+          placeholder="Landline"
+          className={styles.input}
+          style={INPUT_BASE_STYLE}
+          value={formatPhoneWithDashes(sCustomerInfo.customerLandline)}
+        />
+        <TextInput
+          onChangeText={(val) => saveField("first", capitalizeFirstLetterOfString(val))}
+          placeholder="First name"
+          className={styles.input}
+          style={INPUT_BASE_STYLE}
+          value={capitalizeFirstLetterOfString(sCustomerInfo.first)}
+          capitalize={true}
+        />
+        <TextInput
+          onChangeText={(val) => saveField("last", capitalizeFirstLetterOfString(val))}
+          placeholder="Last name"
+          className={styles.input}
+          style={INPUT_BASE_STYLE}
+          value={capitalizeFirstLetterOfString(sCustomerInfo.last)}
+          capitalize={true}
+        />
+        <TextInput
+          onChangeText={(val) => saveField("email", val)}
+          placeholder="Email address"
+          className={styles.input}
+          style={INPUT_BASE_STYLE}
+          value={sCustomerInfo.email}
+        />
+        <TextInput
+          onChangeText={(val) => saveField("streetAddress", capitalizeFirstLetterOfString(val))}
+          placeholder="Street address"
+          className={styles.input}
+          style={INPUT_BASE_STYLE}
+          value={capitalizeFirstLetterOfString(sCustomerInfo.streetAddress)}
+          capitalize={true}
+        />
+        <TextInput
+          onChangeText={(val) => saveField("unit", val)}
+          placeholder="Unit"
+          className={styles.input}
+          style={INPUT_BASE_STYLE}
+          value={sCustomerInfo.unit}
+        />
+        <TextInput
+          onChangeText={(val) => saveField("city", capitalizeFirstLetterOfString(val))}
+          placeholder="City"
+          className={styles.input}
+          style={INPUT_BASE_STYLE}
+          value={capitalizeFirstLetterOfString(sCustomerInfo.city)}
+          capitalize={true}
+        />
+        <TextInput
+          onChangeText={(val) => saveField("state", val.toUpperCase())}
+          placeholder="State"
+          className={styles.input}
+          style={INPUT_BASE_STYLE}
+          value={(sCustomerInfo.state || "").toUpperCase()}
+        />
+
+        <div className={styles.zipMapsRow}>
+          <TextInput
+            onChangeText={(val) => {
+              if (!checkInputForNumbersOnly(val)) return;
+              saveField("zip", val);
+            }}
+            placeholder="Zip code"
+            className={styles.input}
+            style={{ ...INPUT_BASE_STYLE, marginTop: 0, flex: 1 }}
+            value={sCustomerInfo.zip}
+          />
+          {!!sCustomerInfo.streetAddress && !!sCustomerInfo.city && !!sCustomerInfo.state && (
+            <Button
+              text="Maps"
+              icon={ICONS.map}
+              iconSize={30}
+              onPress={() => _sSetShowMapsModal(true)}
+              colorGradientArr={COLOR_GRADIENTS.blue}
+              buttonStyle={{
+                paddingTop: 3,
+                paddingBottom: 3,
+                height: "100%",
+                borderRadius: 7,
+                marginLeft: 10,
+                justifyContent: "center",
+              }}
+              textStyle={{ color: C.textWhite, fontSize: 15, fontWeight: "600" }}
+            />
+          )}
+        </div>
+
+        <TextInput
+          onChangeText={(val) => saveField("notes", capitalizeFirstLetterOfString(val))}
+          placeholder="Address notes"
+          multiline={true}
+          numberOfLines={6}
+          className={styles.notes}
+          style={INPUT_BASE_STYLE}
+          value={capitalizeFirstLetterOfString(sCustomerInfo.notes)}
+          capitalize={true}
+        />
+
+        <CheckBox
+          isChecked={!!sCustomerInfo.gatedCommunity}
+          text="Gated community"
+          textStyle={{ fontSize: 13 }}
+          buttonStyle={{ backgroundColor: "transparent", marginTop: 15 }}
+          onCheck={() => saveField("gatedCommunity", !sCustomerInfo.gatedCommunity)}
+        />
+
+        <div className={styles.langRow}>
+          <span className={styles.langLabel} style={{ color: C.textMuted }}>Language</span>
+          <DropdownMenu
+            dataArr={Object.values(CUSTOMER_LANGUAGES).map((lang) => ({ label: lang, value: lang }))}
+            buttonText={sCustomerInfo.language || CUSTOMER_LANGUAGES.english}
+            buttonStyle={{ ...INPUT_BASE_STYLE, marginTop: 0, flex: 1, height: 40, borderWidth: 1, borderRadius: 7 }}
+            buttonTextStyle={{ fontSize: 14, color: C.text }}
+            onSelect={(item) => saveField("language", item.value)}
+            useSelectedAsButtonTitle={false}
+          />
+        </div>
+
+        <div className={styles.actionStack}>
+          {!!button1Text && (
+            <Button
+              onPress={() => handleButton1Press(sCustomerInfo)}
+              enabled={
+                sCellDuplicateStatus !== "duplicate" &&
+                sCellDuplicateStatus !== "error" &&
+                sCellDuplicateStatus !== "checking"
+              }
+              colorGradientArr={COLOR_GRADIENTS.yellow}
+              buttonStyle={{
+                marginTop: 20,
+                height: 40,
+                width: "90%",
+                borderWidth: 1,
+                borderColor: C.borderSubtle,
+              }}
+              icon={ICONS.gears1}
+              iconSize={19}
+              textStyle={{ color: C.textWhite }}
+              text={button1Text}
+            />
+          )}
+          {!isNewCustomer && (
+            <Tooltip text="Deposits, gift cards and credits" position="top">
+              <div style={{ marginTop: 20 }}>
+                <Button
                   onPress={() => _sSetShowDepositModal(true)}
                   colorGradientArr={COLOR_GRADIENTS.green}
                   icon={ICONS.greenDollar}
-                  buttonStyle={{
-                    height: 36,
-                    width: "90%",
-                  }}
+                  buttonStyle={{ height: 36, width: "90%" }}
                   iconSize={16}
                   textStyle={{ color: C.textWhite, fontSize: 13 }}
                   text={"Add Money"}
                 />
-              </Tooltip>
-            )}
-          </View>
-          <View style={{}} />
-          {!!button2Text && (
-            <Tooltip text="All edits auto-saved" position="top" style={{ marginTop: 20, marginBottom: 10 }}>
-              <Button_
+              </div>
+            </Tooltip>
+          )}
+        </div>
+
+        {!!button2Text && (
+          <Tooltip text="All edits auto-saved" position="top">
+            <div style={{ marginTop: 20, marginBottom: 10 }}>
+              <Button
                 icon={ICONS.close1}
                 colorGradientArr={COLOR_GRADIENTS.blue}
                 onPress={handleButton2Press}
-                buttonStyle={{
-                  height: 40,
-                  width: "90%",
-                }}
+                buttonStyle={{ height: 40, width: "90%" }}
                 iconSize={17}
                 textStyle={{ marginLeft: 15, color: C.textWhite }}
                 text={button2Text}
               />
-            </Tooltip>
+            </div>
+          </Tooltip>
+        )}
+      </div>
+
+      {!isNewCustomer && (
+        <div className={styles.workordersCol}>
+          <div className={styles.colHeader}>
+            <Button
+              icon={ICONS.workorder}
+              iconSize={18}
+              textStyle={{ color: C.textMuted, fontSize: 13 }}
+              text={"REFRESH WORKORDERS"}
+              buttonStyle={{ paddingLeft: 20, paddingRight: 20 }}
+              onPress={() => loadWorkorders()}
+              enabled={!sWoLoading}
+            />
+            {sWoLoading && (
+              <span style={{ marginLeft: 8, display: "flex", alignItems: "center" }}>
+                <SmallLoadingIndicator />
+              </span>
+            )}
+          </div>
+          {sWorkorders.length > 0 && (
+            <WorkordersList
+              workorders={sWorkorders}
+              onSelect={(wo) => { _sSetClosedWorkorder(wo); }}
+            />
           )}
-        </View>
-        {!isNewCustomer && (
-          <View
-            style={{
-              width: "30%",
-              height: "100%",
-              paddingHorizontal: 15,
-              paddingVertical: 5,
+          {sWorkorders.length === 0 &&
+            !sWoLoading &&
+            (sCustomerInfo.workorders || []).length === 0 && (
+              <span className={styles.emptyText} style={{ color: C.textMuted }}>
+                No workorders on file
+              </span>
+            )}
+        </div>
+      )}
+
+      {!isNewCustomer && (
+        <div className={styles.salesCol}>
+          <DepositsList
+            deposits={sCustomerInfo.deposits || []}
+            credits={sCustomerInfo.credits || []}
+            onDepositPress={(deposit) => {
+              if (!deposit.id) return;
+              _sSetRefundDeposit(deposit);
             }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
-              <Button_
-                icon={ICONS.workorder}
-                iconSize={18}
-                textStyle={{ color: gray(0.45), fontSize: 13 }}
-                text={"REFRESH WORKORDERS"}
-                buttonStyle={{ paddingHorizontal: 20 }}
-                onPress={() => loadWorkorders()}
-                enabled={!sWoLoading}
-              />
-              {sWoLoading && <View style={{ marginLeft: 8 }}><SmallLoadingIndicator /></View>}
-            </View>
-            {sWorkorders.length > 0 && (
-              <WorkordersList
-                workorders={sWorkorders}
-                onSelect={(wo) => {
-                  _sSetClosedWorkorder(wo);
+            onCreditPress={(credit) => _sSetEditingCredit(credit)}
+          />
+          <div className={styles.salesHeader}>
+            <Button
+              icon={ICONS.dollarYellow}
+              iconSize={20}
+              text={"REFRESH SALES"}
+              textStyle={{ color: C.textMuted, fontSize: 13 }}
+              buttonStyle={{ paddingLeft: 20, paddingRight: 20 }}
+              onPress={() => loadSales()}
+              enabled={!sSalesLoading}
+            />
+            {sSalesLoading && (
+              <span style={{ marginLeft: 8, display: "flex", alignItems: "center" }}>
+                <SmallLoadingIndicator />
+              </span>
+            )}
+          </div>
+          {sSales.length > 0 ? (
+            <div className={styles.scrollArea}>
+              <SalesList
+                sales={sSales}
+                transactionsMap={sSaleTransactionsMap}
+                onSelect={(sale) => {
+                  if (sale._isActiveSale) {
+                    if (handleButton2Press) handleButton2Press();
+                    useCheckoutStore.getState().setViewOnlySale(sale);
+                    useCheckoutStore.getState().setIsCheckingOut(true);
+                  } else {
+                    _sSetSaleModalItem({ saleID: sale.id });
+                  }
                 }}
               />
-            )}
-            {sWorkorders.length === 0 &&
-              !sWoLoading &&
-              (sCustomerInfo.workorders || []).length === 0 && (
-                <Text style={{ color: gray(0.4), fontSize: 12, marginTop: 10, textAlign: "center" }}>
-                  No workorders on file
-                </Text>
-              )}
-          </View>
-        )}
-        {!isNewCustomer && (
-          <View
-            style={{
-              width: "30%",
-              height: "100%",
-              paddingHorizontal: 15,
-              paddingVertical: 5,
-            }}
-          >
-            {/* Deposits / Credits / Gift Cards — natural height */}
-            <DepositsList
-              deposits={sCustomerInfo.deposits || []}
-              credits={sCustomerInfo.credits || []}
-              onDepositPress={(deposit) => {
-                if (!deposit.id) return;
-                _sSetRefundDeposit(deposit);
-              }}
-              onCreditPress={(credit) => _sSetEditingCredit(credit)}
-            />
-            {/* Sales — fills remaining space below deposits */}
-            <View style={{ flexDirection: "row", alignItems: "center", marginTop: 12, marginBottom: 8 }}>
-              <Button_
-                icon={ICONS.dollarYellow}
-                iconSize={20}
-                text={"REFRESH SALES"}
-                textStyle={{ color: gray(0.45), fontSize: 13 }}
-                buttonStyle={{ paddingHorizontal: 20 }}
-                onPress={() => loadSales()}
-                enabled={!sSalesLoading}
-              />
-              {sSalesLoading && <View style={{ marginLeft: 8 }}><SmallLoadingIndicator /></View>}
-            </View>
-            {sSales.length > 0 ? (
-              <ScrollView style={{ flex: 1 }}>
-                <SalesList
-                  sales={sSales}
-                  transactionsMap={sSaleTransactionsMap}
-                  onSelect={(sale) => {
-                    if (sale._isActiveSale) {
-                      if (handleButton2Press) handleButton2Press();
-                      useCheckoutStore.getState().setViewOnlySale(sale);
-                      useCheckoutStore.getState().setIsCheckingOut(true);
-                    } else {
-                      _sSetSaleModalItem({ saleID: sale.id });
-                    }
-                  }}
-                />
-              </ScrollView>
-            ) : !sSalesLoading && (sCustomerInfo.sales || []).length === 0 ? (
-              <Text style={{ color: gray(0.4), fontSize: 12, marginTop: 10, textAlign: "center" }}>
-                No sales on file
-              </Text>
-            ) : null}
-          </View>
-        )}
-        {!isNewCustomer && !!sCustomerInfo?.customerCell && (
-          <View style={{ width: "25%", height: "100%" }}>
-            <CustomerMessagesPanel
-              customerPhone={sCustomerInfo.customerCell}
-              customerID={sCustomerInfo.id}
-              customerFirst={sCustomerInfo.first}
-              customerLast={sCustomerInfo.last}
-            />
-          </View>
-        )}
-        <DepositModal
-          visible={sShowDepositModal}
-          onClose={() => _sSetShowDepositModal(false)}
-          customer={sCustomerInfo}
-          onPay={(depositInfo) => {
-            _sSetShowDepositModal(false);
-            if (handleButton2Press) handleButton2Press();
-            useCheckoutStore.getState().setDepositInfo(depositInfo);
-            useCheckoutStore.getState().setIsCheckingOut(true);
-          }}
-          onCredit={({ amountCents, text, sendSMS, sendEmail }) => {
-            let credit = { ...CUSTOMER_CREDIT_PROTO };
-            credit.id = generateEAN13Barcode();
-            credit.text = text;
-            credit.amountCents = amountCents;
-            credit.millis = Date.now();
-            let updated = { ...sCustomerInfo, credits: [...(sCustomerInfo.credits || []), credit] };
-            _setCustomerInfo(updated);
-            useCurrentCustomerStore.getState().setCustomer(updated);
-            dbSaveCustomer(updated);
-            if (sendSMS || sendEmail) {
-              let settings = useSettingsStore.getState().getSettings();
-              let customerForReceipt = {
-                first: sCustomerInfo.first || "",
-                last: sCustomerInfo.last || "",
-                customerCell: sCustomerInfo.customerCell || "",
-                email: sCustomerInfo.email || "",
-                id: sCustomerInfo.id || "",
-              };
-              sendCreditReceipt(credit, customerForReceipt, settings, sendSMS, sendEmail);
-            }
-          }}
-        />
-        <DepositRefundModal
-          visible={!!sRefundDeposit}
-          deposit={sRefundDeposit}
-          customer={sCustomerInfo}
-          onClose={() => _sSetRefundDeposit(null)}
-          onCustomerUpdated={(updatedCustomer) => {
-            _setCustomerInfo(updatedCustomer);
-          }}
-        />
-        <ClosedWorkorderModal
-          workorder={sClosedWorkorder}
-          onClose={() => _sSetClosedWorkorder(null)}
-          onGoToWorkorder={(wo) => {
-            const store = useOpenWorkordersStore.getState();
-            const lockedID = store.lockedWorkorderID;
-            if (lockedID && lockedID !== wo.id) {
-              store.setLockedWorkorderID(null);
-              store.removeWorkorder(lockedID, false);
-            }
-            store.setOpenWorkorderID(wo.id);
-            useTabNamesStore.getState().setItems({
-              infoTabName: TAB_NAMES.infoTab.workorder,
-              itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-              optionsTabName: TAB_NAMES.optionsTab.inventory,
+            </div>
+          ) : !sSalesLoading && (sCustomerInfo.sales || []).length === 0 ? (
+            <span className={styles.emptyText} style={{ color: C.textMuted }}>
+              No sales on file
+            </span>
+          ) : null}
+        </div>
+      )}
+
+      {!isNewCustomer && !!sCustomerInfo?.customerCell && (
+        <div className={styles.messagesCol}>
+          <CustomerMessagesPanel
+            customerPhone={sCustomerInfo.customerCell}
+            customerID={sCustomerInfo.id}
+            customerFirst={sCustomerInfo.first}
+            customerLast={sCustomerInfo.last}
+          />
+        </div>
+      )}
+
+      <DepositModal
+        visible={sShowDepositModal}
+        onClose={() => _sSetShowDepositModal(false)}
+        customer={sCustomerInfo}
+        onPay={(depositInfo) => {
+          _sSetShowDepositModal(false);
+          if (handleButton2Press) handleButton2Press();
+          useCheckoutStore.getState().setDepositInfo(depositInfo);
+          useCheckoutStore.getState().setIsCheckingOut(true);
+        }}
+        onCredit={({ amountCents, text, sendSMS, sendEmail }) => {
+          let credit = { ...CUSTOMER_CREDIT_PROTO };
+          credit.id = generateEAN13Barcode();
+          credit.text = text;
+          credit.amountCents = amountCents;
+          credit.millis = Date.now();
+          let updated = { ...sCustomerInfo, credits: [...(sCustomerInfo.credits || []), credit] };
+          _setCustomerInfo(updated);
+          useCurrentCustomerStore.getState().setCustomer(updated);
+          dbSaveCustomer(updated);
+          if (sendSMS || sendEmail) {
+            let settings = useSettingsStore.getState().getSettings();
+            let customerForReceipt = {
+              first: sCustomerInfo.first || "",
+              last: sCustomerInfo.last || "",
+              customerCell: sCustomerInfo.customerCell || "",
+              email: sCustomerInfo.email || "",
+              id: sCustomerInfo.id || "",
+            };
+            sendCreditReceipt(credit, customerForReceipt, settings, sendSMS, sendEmail);
+          }
+        }}
+      />
+      <DepositRefundModal
+        visible={!!sRefundDeposit}
+        deposit={sRefundDeposit}
+        customer={sCustomerInfo}
+        onClose={() => _sSetRefundDeposit(null)}
+        onCustomerUpdated={(updatedCustomer) => { _setCustomerInfo(updatedCustomer); }}
+      />
+      <ClosedWorkorderModal
+        workorder={sClosedWorkorder}
+        onClose={() => _sSetClosedWorkorder(null)}
+        onGoToWorkorder={(wo) => {
+          const store = useOpenWorkordersStore.getState();
+          const lockedID = store.lockedWorkorderID;
+          if (lockedID && lockedID !== wo.id) {
+            store.setLockedWorkorderID(null);
+            store.removeWorkorder(lockedID, false);
+          }
+          store.setOpenWorkorderID(wo.id);
+          useTabNamesStore.getState().setItems({
+            infoTabName: TAB_NAMES.infoTab.workorder,
+            itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+            optionsTabName: TAB_NAMES.optionsTab.inventory,
+          });
+          useWorkorderPreviewStore.getState().setPreviewObj(null);
+          if (wo.customerID) {
+            dbGetCustomer(wo.customerID).then((customer) => {
+              if (customer) useCurrentCustomerStore.getState().setCustomer(customer, false);
             });
-            useWorkorderPreviewStore.getState().setPreviewObj(null);
-            if (wo.customerID) {
-              dbGetCustomer(wo.customerID).then((customer) => {
-                if (customer) useCurrentCustomerStore.getState().setCustomer(customer, false);
-              });
-            }
-            _sSetClosedWorkorder(null);
-            if (handleButton2Press) handleButton2Press();
-          }}
-        />
-        <CreditEditModal
-          credit={sEditingCredit}
-          customer={sCustomerInfo}
-          onClose={() => _sSetEditingCredit(null)}
-          onSave={(credit, newAmountCents) => {
-            if (newAmountCents <= 0) {
-              // 0 or negative = delete
-              let updatedCredits = (sCustomerInfo.credits || []).filter((c) => c.id !== credit.id);
-              let updated = { ...sCustomerInfo, credits: updatedCredits };
-              _setCustomerInfo(updated);
-              useCurrentCustomerStore.getState().setCustomer(updated);
-              dbSaveCustomer(updated);
-              _sSetEditingCredit(null);
-            } else {
-              let updatedCredits = (sCustomerInfo.credits || []).map((c) =>
-                c.id === credit.id ? { ...c, amountCents: newAmountCents } : c
-              );
-              let updated = { ...sCustomerInfo, credits: updatedCredits };
-              _setCustomerInfo(updated);
-              useCurrentCustomerStore.getState().setCustomer(updated);
-              dbSaveCustomer(updated);
-              _sSetEditingCredit(null);
-            }
-          }}
-          onDelete={(credit) => {
+          }
+          _sSetClosedWorkorder(null);
+          if (handleButton2Press) handleButton2Press();
+        }}
+      />
+      <CreditEditModal
+        credit={sEditingCredit}
+        customer={sCustomerInfo}
+        onClose={() => _sSetEditingCredit(null)}
+        onSave={(credit, newAmountCents) => {
+          if (newAmountCents <= 0) {
             let updatedCredits = (sCustomerInfo.credits || []).filter((c) => c.id !== credit.id);
             let updated = { ...sCustomerInfo, credits: updatedCredits };
             _setCustomerInfo(updated);
             useCurrentCustomerStore.getState().setCustomer(updated);
             dbSaveCustomer(updated);
             _sSetEditingCredit(null);
+          } else {
+            let updatedCredits = (sCustomerInfo.credits || []).map((c) =>
+              c.id === credit.id ? { ...c, amountCents: newAmountCents } : c
+            );
+            let updated = { ...sCustomerInfo, credits: updatedCredits };
+            _setCustomerInfo(updated);
+            useCurrentCustomerStore.getState().setCustomer(updated);
+            dbSaveCustomer(updated);
+            _sSetEditingCredit(null);
+          }
+        }}
+        onDelete={(credit) => {
+          let updatedCredits = (sCustomerInfo.credits || []).filter((c) => c.id !== credit.id);
+          let updated = { ...sCustomerInfo, credits: updatedCredits };
+          _setCustomerInfo(updated);
+          useCurrentCustomerStore.getState().setCustomer(updated);
+          dbSaveCustomer(updated);
+          _sSetEditingCredit(null);
+        }}
+      />
+      {!!sSaleModalItem && (
+        <FullSaleModal
+          item={sSaleModalItem}
+          onClose={() => _sSetSaleModalItem(null)}
+          onRefund={(saleID) => {
+            _sSetSaleModalItem(null);
+            if (handleButton2Press) handleButton2Press();
+            useCheckoutStore.getState().setPendingRefundSaleID(saleID);
           }}
         />
-        {!!sSaleModalItem && (
-          <FullSaleModal
-            item={sSaleModalItem}
-            onClose={() => _sSetSaleModalItem(null)}
-            onRefund={(saleID) => {
-              _sSetSaleModalItem(null);
-              if (handleButton2Press) handleButton2Press();
-              useCheckoutStore.getState().setPendingRefundSaleID(saleID);
-            }}
-          />
-        )}
-        <GoogleMapsModal
-          visible={sShowMapsModal}
-          onClose={() => _sSetShowMapsModal(false)}
-          startAddress={(() => {
-            const si = useSettingsStore.getState().getSettings()?.storeInfo;
-            if (!si) return "";
-            return [si.street, si.unit, si.city, si.state, si.zip].filter(Boolean).join(", ");
-          })()}
-          endAddress={[sCustomerInfo.streetAddress, sCustomerInfo.unit, sCustomerInfo.city, sCustomerInfo.state, sCustomerInfo.zip].filter(Boolean).join(", ")}
-        />
-      </View>
-    </TouchableWithoutFeedback>
+      )}
+      <GoogleMapsModal
+        visible={sShowMapsModal}
+        onClose={() => _sSetShowMapsModal(false)}
+        startAddress={(() => {
+          const si = useSettingsStore.getState().getSettings()?.storeInfo;
+          if (!si) return "";
+          return [si.street, si.unit, si.city, si.state, si.zip].filter(Boolean).join(", ");
+        })()}
+        endAddress={[sCustomerInfo.streetAddress, sCustomerInfo.unit, sCustomerInfo.city, sCustomerInfo.state, sCustomerInfo.zip].filter(Boolean).join(", ")}
+      />
+    </div>
   );
 };
 
 const LoadingOverlay = ({ text }) => (
-  <View
-    style={{
-      position: "absolute",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: "rgba(255,255,255,0.85)",
-      justifyContent: "center",
-      alignItems: "center",
-      zIndex: 10,
-      borderRadius: 10,
-    }}
-  >
+  <div className={styles.loadingOverlay}>
     <SmallLoadingIndicator />
-    <Text style={{ color: gray(0.4), fontSize: 13, marginTop: 10 }}>
-      {text}
-    </Text>
-  </View>
+    <span className={styles.loadingText} style={{ color: C.textMuted }}>{text}</span>
+  </div>
 );
 
 const WorkorderCard = ({ workorder, statuses, taxPercent, zActiveSales, onSelect }) => {
@@ -1025,206 +950,143 @@ const WorkorderCard = ({ workorder, statuses, taxPercent, zActiveSales, onSelect
   const totals = calculateRunningTotals(workorder, taxPercent, [], false, !!workorder.taxFree);
   const itemCount = workorder.workorderLines?.length || 0;
 
+  let totalNode;
+  let sale = workorder.activeSaleID ? zActiveSales.find((s) => s.id === workorder.activeSaleID) : null;
+  let paid = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
+  if (workorder.paymentComplete) {
+    totalNode = (
+      <span className={styles.woFooterTotal} style={{ color: C.green }}>
+        {"$" + formatCurrencyDisp(totals.finalTotal)}
+      </span>
+    );
+  } else if (paid > 0) {
+    totalNode = (
+      <span className={styles.woFooterTotal} style={{ color: C.orange }}>
+        {"$" + formatCurrencyDisp(paid) + " paid"}
+      </span>
+    );
+  } else {
+    totalNode = (
+      <span className={styles.woFooterTotal} style={{ color: C.text }}>
+        {"$" + formatCurrencyDisp(totals.finalTotal)}
+      </span>
+    );
+  }
+
   return (
-    <View
+    <div
+      className={styles.woCard}
       style={{
-        marginBottom: 6,
-        borderRadius: 7,
-        borderLeftWidth: 4,
         borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
         borderColor: C.buttonLightGreenOutline,
-        borderWidth: 1,
         backgroundColor: C.listItemWhite,
       }}
     >
-    <TouchableOpacity_
-      onPress={() => onSelect(workorder)}
-      style={{
-        paddingVertical: 6,
-        paddingHorizontal: 10,
-      }}
-    >
-      {/* Row 1: Customer name + item count + workorder number + status badge */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 3,
-        }}
+      <button
+        type="button"
+        className={styles.woClickable}
+        onClick={() => onSelect(workorder)}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-          <Text numberOfLines={1} style={{ fontSize: 13, color: "dimgray" }}>
-            {capitalizeFirstLetterOfString(workorder.customerFirst) +
-              " " +
-              capitalizeFirstLetterOfString(workorder.customerLast)}
-          </Text>
-          {itemCount > 0 && (
-            <View
-              style={{
-                backgroundColor: "gray",
-                borderRadius: 10,
-                paddingHorizontal: 6,
-                paddingVertical: 1,
-                marginLeft: 6,
-              }}
-            >
-              <Text style={{ color: "white", fontSize: 10, fontWeight: "600" }}>
-                {itemCount}
-              </Text>
-            </View>
-          )}
-          {!!workorder.workorderNumber && (
-            <Text style={{ fontSize: 12, color: C.blue, marginLeft: 6, fontWeight: "500" }}>
-              {"#" + formatWorkorderNumber(workorder.workorderNumber)}
-            </Text>
-          )}
-        </View>
-        <View
-          style={{
-            backgroundColor: rs.backgroundColor,
-            paddingHorizontal: 10,
-            paddingVertical: 2,
-            borderRadius: 10,
-          }}
-        >
-          <Text style={{ color: rs.textColor, fontSize: 11, fontWeight: "600" }}>
-            {rs.label}
-          </Text>
-        </View>
-      </View>
-
-      {/* Row 2: Brand / description + color badges */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          marginBottom: 4,
-        }}
-      >
-        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-          <Text style={{ fontWeight: "500", color: C.text, fontSize: 14 }}>
-            {workorder.brand || ""}
-          </Text>
-          {!!workorder.description && (
-            <View
-              style={{
-                width: 7,
-                height: 2,
-                marginHorizontal: 5,
-                backgroundColor: "lightgray",
-              }}
-            />
-          )}
-          <Text numberOfLines={1} style={{ color: C.text, fontSize: 14 }}>
-            {workorder.description || ""}
-          </Text>
-        </View>
-        <View style={{ flexDirection: "row", marginLeft: 8 }}>
-          {!!workorder.color1?.label && (
-            <Text
-              style={{
-                fontSize: 10,
-                paddingHorizontal: 8,
-                paddingVertical: 2,
-                borderRadius: 100,
-                backgroundColor: workorder.color1.backgroundColor,
-                color: workorder.color1.textColor,
-              }}
-            >
-              {workorder.color1.label}
-            </Text>
-          )}
-          {!!workorder.color2?.label && (
-            <Text
-              style={{
-                fontSize: 10,
-                paddingHorizontal: 8,
-                paddingVertical: 2,
-                borderRadius: 100,
-                backgroundColor: workorder.color2.backgroundColor,
-                color: workorder.color2.textColor,
-                marginLeft: 4,
-              }}
-            >
-              {workorder.color2.label}
-            </Text>
-          )}
-        </View>
-      </View>
-
-      {/* Row 3: Date + wait time + total */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Text style={{ color: "dimgray", fontSize: 12 }}>
-          {formatMillisForDisplay(workorder.startedOnMillis, true)}
-        </Text>
-        {!!workorder.waitTime?.label && (
-          <Text style={{ color: gray(0.4), fontSize: 11, fontStyle: "italic" }}>
-            {"est: " + workorder.waitTime.label}
-          </Text>
-        )}
-        {(() => {
-          let sale = workorder.activeSaleID ? zActiveSales.find((s) => s.id === workorder.activeSaleID) : null;
-          let paid = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
-          if (workorder.paymentComplete) {
-            return (
-              <Text style={{ fontSize: 13, fontWeight: "600", color: C.green }}>
-                {"$" + formatCurrencyDisp(totals.finalTotal)}
-              </Text>
-            );
-          }
-          if (paid > 0) {
-            return (
-              <Text style={{ fontSize: 13, fontWeight: "600", color: C.orange }}>
-                {"$" + formatCurrencyDisp(paid) + " paid"}
-              </Text>
-            );
-          }
-          return (
-            <Text style={{ fontSize: 13, fontWeight: "600", color: C.text }}>
-              {"$" + formatCurrencyDisp(totals.finalTotal)}
-            </Text>
-          );
-        })()}
-      </View>
-
-    </TouchableOpacity_>
-
-      {/* Show/hide items toggle */}
-      {itemCount > 0 && (
-        <View style={{ paddingHorizontal: 10, paddingBottom: 6 }}>
-          <TouchableOpacity_
-            onPress={() => _sSetShowItems(!sShowItems)}
-            style={{ alignSelf: "flex-start" }}
+        <div className={styles.woRow}>
+          <div className={styles.woNameWrap}>
+            <span className={styles.woName}>
+              {capitalizeFirstLetterOfString(workorder.customerFirst) +
+                " " +
+                capitalizeFirstLetterOfString(workorder.customerLast)}
+            </span>
+            {itemCount > 0 && (
+              <span className={styles.woItemBadge}>{itemCount}</span>
+            )}
+            {!!workorder.workorderNumber && (
+              <span className={styles.woNumber} style={{ color: C.blue }}>
+                {"#" + formatWorkorderNumber(workorder.workorderNumber)}
+              </span>
+            )}
+          </div>
+          <span
+            className={styles.woStatusBadge}
+            style={{ backgroundColor: rs.backgroundColor, color: rs.textColor }}
           >
-            <Text style={{ fontSize: 11, color: C.blue }}>
-              {sShowItems ? "Hide items" : "Show items"}
-            </Text>
-          </TouchableOpacity_>
-          {sShowItems && (
-            <View style={{ marginTop: 4, paddingLeft: 4 }}>
-              {workorder.workorderLines.map((line) => (
-                <View key={line.id} style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
-                  <Text numberOfLines={1} style={{ fontSize: 12, color: C.text, flex: 1 }}>
-                    {line.inventoryItem?.formalName || "Unnamed item"}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: C.blue, fontWeight: "500", width: 36, textAlign: "right" }}>
-                    {line.qty}
-                  </Text>
-                </View>
-              ))}
-            </View>
+            {rs.label}
+          </span>
+        </div>
+
+        <div className={styles.woDescRow}>
+          <div className={styles.woNameWrap}>
+            <span className={styles.woBrand} style={{ color: C.text }}>
+              {workorder.brand || ""}
+            </span>
+            {!!workorder.description && <span className={styles.woDescDot} />}
+            <span className={styles.woDesc} style={{ color: C.text }}>
+              {workorder.description || ""}
+            </span>
+          </div>
+          <div className={styles.woColorRow}>
+            {!!workorder.color1?.label && (
+              <span
+                className={styles.woColorBadge}
+                style={{
+                  backgroundColor: workorder.color1.backgroundColor,
+                  color: workorder.color1.textColor,
+                }}
+              >
+                {workorder.color1.label}
+              </span>
+            )}
+            {!!workorder.color2?.label && (
+              <span
+                className={styles.woColorBadge + " " + styles.woColorBadgeSecond}
+                style={{
+                  backgroundColor: workorder.color2.backgroundColor,
+                  color: workorder.color2.textColor,
+                }}
+              >
+                {workorder.color2.label}
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className={styles.woFooter}>
+          <span className={styles.woFooterDate}>
+            {formatMillisForDisplay(workorder.startedOnMillis, true)}
+          </span>
+          {!!workorder.waitTime?.label && (
+            <span className={styles.woFooterWait} style={{ color: C.textMuted }}>
+              {"est: " + workorder.waitTime.label}
+            </span>
           )}
-        </View>
+          {totalNode}
+        </div>
+      </button>
+
+      {itemCount > 0 && (
+        <div className={styles.woItemsToggleWrap}>
+          <button
+            type="button"
+            onClick={() => _sSetShowItems(!sShowItems)}
+            className={styles.woItemsToggleBtn}
+            style={{ color: C.blue }}
+          >
+            {sShowItems ? "Hide items" : "Show items"}
+          </button>
+          {sShowItems && (
+            <div className={styles.woItemsList}>
+              {workorder.workorderLines.map((line) => (
+                <div key={line.id} className={styles.woItemRow}>
+                  <span className={styles.woItemName} style={{ color: C.text }}>
+                    {line.inventoryItem?.formalName || "Unnamed item"}
+                  </span>
+                  <span className={styles.woItemQty} style={{ color: C.blue }}>
+                    {line.qty}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
-    </View>
+    </div>
   );
 };
 
@@ -1233,22 +1095,21 @@ const WorkordersList = ({ workorders, onSelect }) => {
   const taxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
   const zActiveSales = useActiveSalesStore((state) => state.activeSales);
 
+  const sorted = [...workorders].sort((a, b) => (b.startedOnMillis || 0) - (a.startedOnMillis || 0));
+
   return (
-    <View style={{ flex: 1, width: "100%" }}>
-      <FlatList
-        data={[...workorders].sort((a, b) => (b.startedOnMillis || 0) - (a.startedOnMillis || 0))}
-        keyExtractor={(item) => item.id}
-        renderItem={(obj) => (
-          <WorkorderCard
-            workorder={obj.item}
-            statuses={statuses}
-            taxPercent={taxPercent}
-            zActiveSales={zActiveSales}
-            onSelect={onSelect}
-          />
-        )}
-      />
-    </View>
+    <div className={styles.scrollArea}>
+      {sorted.map((wo) => (
+        <WorkorderCard
+          key={wo.id}
+          workorder={wo}
+          statuses={statuses}
+          taxPercent={taxPercent}
+          zActiveSales={zActiveSales}
+          onSelect={onSelect}
+        />
+      ))}
+    </div>
   );
 };
 
@@ -1310,86 +1171,53 @@ const CreditEditModal = ({ credit, customer, onClose, onSave, onDelete }) => {
   }
 
   return (
-    <View
-      style={{
-        position: "absolute",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.4)",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: 100,
-        borderRadius: 15,
-      }}
-    >
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={onClose}
-        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-      />
-      <View
+    <div className={styles.creditBackdrop}>
+      <button type="button" className={styles.creditBackdropBtn} onClick={onClose} />
+      <div
+        className={styles.creditCard}
         style={{
-          width: 320,
           backgroundColor: C.backgroundWhite,
-          borderRadius: 12,
-          borderWidth: 2,
           borderColor: C.buttonLightGreenOutline,
-          padding: 20,
         }}
       >
-        <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 6 }}>
+        <div className={styles.creditTitle} style={{ color: C.text }}>
           Edit Credit
-        </Text>
+        </div>
         {!!(credit.text || credit.note) && (
-          <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 12 }}>
+          <div className={styles.creditNote} style={{ color: C.textMuted }}>
             {credit.text || credit.note}
-          </Text>
+          </div>
         )}
-        <View
+        <div
+          className={styles.creditAmountRow}
           style={{
-            flexDirection: "row",
-            alignItems: "center",
             borderColor: C.buttonLightGreenOutline,
-            borderWidth: 1,
-            borderRadius: 7,
             backgroundColor: C.listItemWhite,
-            marginBottom: 16,
-            paddingHorizontal: 10,
-            height: 40,
           }}
         >
-          <Text style={{ fontSize: 16, color: gray(0.4), marginRight: 4 }}>$</Text>
-          <TextInput_
+          <span className={styles.creditDollarSign} style={{ color: C.textMuted }}>$</span>
+          <TextInput
             placeholder={formatCurrencyDisp(credit.amountCents)}
-            placeholderTextColor={gray(0.35)}
+            placeholderTextColor={C.textDisabled}
             value={sDisplay}
             onChangeText={handleChange}
             debounceMs={0}
             onFocus={() => { _sSetDisplay(""); _sSetCents(0); }}
-            style={{
-              flex: 1,
-              fontSize: 16,
-              outlineWidth: 0,
-              outlineStyle: "none",
-              borderWidth: 0,
-              height: 38,
-              color: C.text,
-            }}
+            className={styles.creditAmountInput}
+            style={{ color: C.text }}
           />
-        </View>
-        <View style={{ marginBottom: 14 }}>
-          <Text style={{ fontSize: 12, color: gray(0.45), fontWeight: "600", marginBottom: 6 }}>
+        </div>
+        <div className={styles.creditReceiptWrap}>
+          <div className={styles.creditReceiptLabel} style={{ color: C.textMuted }}>
             Send Receipt
-          </Text>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
+          </div>
+          <div className={styles.creditCheckRow}>
             <CheckBox
               text="SMS"
               isChecked={sSendSMS}
               onCheck={() => _sSetSendSMS(!sSendSMS)}
               enabled={hasPhone}
-              textStyle={{ fontSize: 13, color: hasPhone ? C.text : gray(0.3) }}
+              textStyle={{ fontSize: 13, color: hasPhone ? C.text : C.textDisabled }}
               buttonStyle={{ marginRight: 18 }}
             />
             <CheckBox
@@ -1397,7 +1225,7 @@ const CreditEditModal = ({ credit, customer, onClose, onSave, onDelete }) => {
               isChecked={sSendEmail}
               onCheck={() => _sSetSendEmail(!sSendEmail)}
               enabled={hasEmail}
-              textStyle={{ fontSize: 13, color: hasEmail ? C.text : gray(0.3) }}
+              textStyle={{ fontSize: 13, color: hasEmail ? C.text : C.textDisabled }}
               buttonStyle={{ marginRight: 18 }}
             />
             <CheckBox
@@ -1406,36 +1234,36 @@ const CreditEditModal = ({ credit, customer, onClose, onSave, onDelete }) => {
               onCheck={() => _sSetPrint(!sPrint)}
               textStyle={{ fontSize: 13 }}
             />
-          </View>
-        </View>
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Button_
+          </div>
+        </div>
+        <div className={styles.creditActions}>
+          <Button
             text="Delete"
             icon={ICONS.trash}
             iconSize={14}
             colorGradientArr={COLOR_GRADIENTS.red}
             textStyle={{ color: C.textWhite, fontSize: 13 }}
-            buttonStyle={{ height: 34, borderRadius: 5, paddingHorizontal: 14 }}
+            buttonStyle={{ height: 34, borderRadius: 5, paddingLeft: 14, paddingRight: 14 }}
             onPress={() => onDelete(credit)}
           />
-          <View style={{ flexDirection: "row" }}>
-            <Button_
+          <div className={styles.creditActionGroup}>
+            <Button
               text="Cancel"
-              buttonStyle={{ height: 34, borderRadius: 5, paddingHorizontal: 14, marginRight: 8 }}
-              textStyle={{ color: gray(0.5), fontSize: 13 }}
+              buttonStyle={{ height: 34, borderRadius: 5, paddingLeft: 14, paddingRight: 14, marginRight: 8 }}
+              textStyle={{ color: C.textMuted, fontSize: 13 }}
               onPress={onClose}
             />
-            <Button_
+            <Button
               text="Save & Print"
               colorGradientArr={COLOR_GRADIENTS.green}
               textStyle={{ color: C.textWhite, fontSize: 13 }}
-              buttonStyle={{ height: 34, borderRadius: 5, paddingHorizontal: 20 }}
+              buttonStyle={{ height: 34, borderRadius: 5, paddingLeft: 20, paddingRight: 20 }}
               onPress={handleConfirm}
             />
-          </View>
-        </View>
-      </View>
-    </View>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -1459,23 +1287,28 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
   const [sShowReplyModal, _sSetShowReplyModal] = useState(false);
   const [sForwardReplies, _sSetForwardReplies] = useState(false);
   const zSmsThreads = useCustMessagesStore((state) => state.getSmsThreads());
-  let thread = zSmsThreads.find(t => t.phone === customerPhone);
-  const [sCanRespond, _sSetCanRespond] = useState(thread?.canRespond !== undefined ? !!thread.canRespond : true);
+  let thread = zSmsThreads.find((t) => t.phone === customerPhone);
+  const [sCanRespond, _sSetCanRespond] = useState(
+    thread?.canRespond !== undefined ? !!thread.canRespond : true
+  );
   const lastThreadCanRespondRef = useRef(thread?.canRespond);
   if (thread?.canRespond !== lastThreadCanRespondRef.current) {
     lastThreadCanRespondRef.current = thread?.canRespond;
     _sSetCanRespond(thread?.canRespond !== undefined ? !!thread.canRespond : true);
   }
-  const flatListRef = useRef(null);
+  const scrollRef = useRef(null);
   const unsubRef = useRef(null);
 
-  let outgoing = sMessages.filter(m => m.type === "outgoing");
-  let lastOutgoingID = outgoing.length > 0 ? [...outgoing].sort((a, b) => (b.millis || 0) - (a.millis || 0))[0]?.id : null;
+  let outgoing = sMessages.filter((m) => m.type === "outgoing");
+  let lastOutgoingID =
+    outgoing.length > 0
+      ? [...outgoing].sort((a, b) => (b.millis || 0) - (a.millis || 0))[0]?.id
+      : null;
 
   let currentUser = useLoginStore.getState().getCurrentUser();
   let hasActivePhone = !!currentUser?.phone;
 
-  // (useEffect required: this is a new self-contained component that needs to fetch/subscribe on mount)
+  // (useEffect required: this self-contained component fetches/subscribes on mount)
   useEffect(() => {
     if (!customerPhone || customerPhone.length !== 10) {
       _sSetMessages([]);
@@ -1484,25 +1317,27 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     }
     let cancelled = false;
     _sSetLoading(true);
-    dbGetCustomerMessages(customerPhone, null, 20).then((result) => {
-      if (cancelled) return;
-      _sSetLoading(false);
-      if (!result.success) return;
-      let sorted = result.messages.sort((a, b) => (a.millis || 0) - (b.millis || 0));
-      _sSetMessages(sorted);
-      let lastMillis = 0;
-      sorted.forEach((m) => { if (m.millis > lastMillis) lastMillis = m.millis; });
-      if (!lastMillis) lastMillis = Date.now();
-      unsubRef.current = dbListenToNewMessages(customerPhone, lastMillis, (newMessages) => {
+    dbGetCustomerMessages(customerPhone, null, 20)
+      .then((result) => {
         if (cancelled) return;
-        _sSetMessages((prev) => {
-          let existingIDs = new Set(prev.map((m) => m.id));
-          let fresh = newMessages.filter((m) => !existingIDs.has(m.id));
-          if (!fresh.length) return prev;
-          return [...prev, ...fresh].sort((a, b) => (a.millis || 0) - (b.millis || 0));
+        _sSetLoading(false);
+        if (!result.success) return;
+        let sorted = result.messages.sort((a, b) => (a.millis || 0) - (b.millis || 0));
+        _sSetMessages(sorted);
+        let lastMillis = 0;
+        sorted.forEach((m) => { if (m.millis > lastMillis) lastMillis = m.millis; });
+        if (!lastMillis) lastMillis = Date.now();
+        unsubRef.current = dbListenToNewMessages(customerPhone, lastMillis, (newMessages) => {
+          if (cancelled) return;
+          _sSetMessages((prev) => {
+            let existingIDs = new Set(prev.map((m) => m.id));
+            let fresh = newMessages.filter((m) => !existingIDs.has(m.id));
+            if (!fresh.length) return prev;
+            return [...prev, ...fresh].sort((a, b) => (a.millis || 0) - (b.millis || 0));
+          });
         });
-      });
-    }).catch(() => { _sSetLoading(false); });
+      })
+      .catch(() => { _sSetLoading(false); });
     return () => {
       cancelled = true;
       if (unsubRef.current) unsubRef.current();
@@ -1511,9 +1346,11 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
 
   // (useEffect required: auto-scroll on messages change)
   useEffect(() => {
-    if (sMessages.length > 0 && flatListRef.current) {
+    if (sMessages.length > 0 && scrollRef.current) {
       setTimeout(() => {
-        try { flatListRef.current.scrollToEnd({ animated: true }); } catch (e) { }
+        try {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        } catch (e) {}
       }, 100);
     }
   }, [sMessages.length]);
@@ -1554,7 +1391,7 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     _sSending(false);
     if (!result.success) {
       _sSetMessages((prev) =>
-        prev.map((m) => m.id === msg.id ? { ...m, status: "failed" } : m)
+        prev.map((m) => (m.id === msg.id ? { ...m, status: "failed" } : m))
       );
       useAlertScreenStore.getState().setValues({
         title: "Message Failed",
@@ -1566,7 +1403,7 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
       });
     } else {
       _sSetMessages((prev) =>
-        prev.map((m) => m.id === msg.id ? { ...m, status: "sent" } : m)
+        prev.map((m) => (m.id === msg.id ? { ...m, status: "sent" } : m))
       );
     }
   }
@@ -1593,7 +1430,13 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
       _sSetCanRespond(true);
       await dbUpdateMessageCanRespond(customerPhone, null, true);
     }
-    await dbToggleSMSForwarding(customerPhone, user.id, !isCurrentlyForwarding, user.phone, user.first);
+    await dbToggleSMSForwarding(
+      customerPhone,
+      user.id,
+      !isCurrentlyForwarding,
+      user.phone,
+      user.first
+    );
   }
 
   function handleToggleForwardReplies() {
@@ -1620,367 +1463,217 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     }
   }
 
-  const renderMessage = ({ item }) => {
-    let isOutgoing = item.type === "outgoing";
-    let isLastOutgoing = isOutgoing && item.id === lastOutgoingID;
-    let currentUserID = useLoginStore.getState().getCurrentUser()?.id;
-    let isForwarding = !!(currentUserID && thread?.forwardTo?.[currentUserID]);
-    let isResponding = (thread?.canRespond !== undefined ? thread.canRespond : item.canRespond);
-    return (
-      <View style={{ alignSelf: isOutgoing ? "flex-end" : "flex-start", maxWidth: "80%", marginBottom: 8 }}>
-        <View
-          style={{
-            backgroundColor: isOutgoing ? C.blue : C.backgroundWhite,
-            borderRadius: 14,
-            borderBottomRightRadius: isOutgoing ? 4 : 14,
-            borderBottomLeftRadius: isOutgoing ? 14 : 4,
-            paddingVertical: 8,
-            paddingHorizontal: 12,
-            borderWidth: isOutgoing ? 0 : 1,
-            borderColor: isOutgoing ? "transparent" : lightenRGBByPercent(C.buttonLightGreenOutline, 30),
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: 1 },
-            shadowOpacity: 0.06,
-            shadowRadius: 3,
-            flexDirection: "row",
-            alignItems: "flex-start",
-          }}
-        >
-          {isOutgoing && isLastOutgoing && (
-            <View style={{ flexDirection: "column", alignItems: "center", marginRight: 5, marginTop: 2 }}>
-              <Tooltip text={isResponding ? "Block responses from user" : "Allow responses"} position="top">
-                <TouchableOpacity onPress={handleToggleBlock} style={{ alignItems: "center", justifyContent: "center" }}>
-                  <Image source={isResponding ? ICONS.unblock : ICONS.blocked} style={{ width: 28, height: 28 }} />
-                </TouchableOpacity>
-              </Tooltip>
-              <Tooltip text={isForwarding ? "Stop forwarding replies to me" : "Forward replies to me"} position="top">
-                <TouchableOpacity onPress={handleToggleForward} style={{ alignItems: "center", justifyContent: "center", marginTop: 4 }}>
-                  <Image source={isForwarding ? ICONS.allowNotif : ICONS.blockNotif} style={{ width: 22, height: 22 }} />
-                </TouchableOpacity>
-              </Tooltip>
-            </View>
-          )}
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: isOutgoing ? C.textWhite : C.text, fontSize: 13, lineHeight: 18 }}>
-              {item.message}
-            </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: isOutgoing ? "flex-end" : "flex-start", marginTop: 4 }}>
-              <Text style={{ color: isOutgoing ? "rgba(255,255,255,0.55)" : gray(0.55), fontSize: 10 }}>
-                {formatMillisForDisplay(item.millis)}
-              </Text>
-              {item.status === "sending" && (
-                <Text style={{ color: isOutgoing ? "rgba(255,255,255,0.55)" : gray(0.55), fontSize: 10, marginLeft: 6, fontStyle: "italic" }}>
-                  Sending...
-                </Text>
-              )}
-              {item.status === "failed" && (
-                <Text style={{ color: C.lightred, fontSize: 10, marginLeft: 6, fontWeight: "600" }}>
-                  Failed
-                </Text>
-              )}
-            </View>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
   return (
-    <View
+    <div
+      className={styles.msgPanel}
       style={{
-        width: "100%",
-        height: "100%",
-        borderLeftWidth: 1,
         borderLeftColor: C.buttonLightGreenOutline,
         backgroundColor: C.backgroundWhite,
       }}
     >
-      {/* Header */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          paddingHorizontal: 14,
-          paddingVertical: 10,
-          borderBottomWidth: 1,
-          borderBottomColor: lightenRGBByPercent(C.buttonLightGreenOutline, 30),
-        }}
+      <div
+        className={styles.msgHeader}
+        style={{ borderBottomColor: lightenRGBByPercent(C.buttonLightGreenOutline, 30) }}
       >
-        <Image_ icon={ICONS.paperPlane} style={{ width: 18, height: 18, marginRight: 8, opacity: 0.7 }} />
-        <Text style={{ fontSize: 14, fontWeight: "700", color: C.text, marginRight: 8 }}>
-          Messages
-        </Text>
-        <Text style={{ fontSize: 12, color: gray(0.45) }}>
+        <Image icon={ICONS.paperPlane} className={styles.msgHeaderIcon} />
+        <span className={styles.msgHeaderTitle} style={{ color: C.text }}>Messages</span>
+        <span className={styles.msgHeaderPhone} style={{ color: C.textMuted }}>
           {formatPhoneForDisplay(customerPhone)}
-        </Text>
-      </View>
+        </span>
+      </div>
 
-      {/* Messages list */}
       {sLoading ? (
-        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+        <div className={styles.msgLoadingWrap}>
           <SmallLoadingIndicator />
-        </View>
+        </div>
+      ) : sMessages.length === 0 ? (
+        <div className={styles.msgListEmpty}>
+          <Image icon={ICONS.paperPlane} className={styles.msgEmptyIcon} />
+          <span className={styles.msgEmptyText} style={{ color: C.textMuted }}>
+            No messages yet
+          </span>
+        </div>
       ) : (
-        <FlatList
-          ref={flatListRef}
-          data={sMessages}
-          keyExtractor={(item) => item.id}
-          renderItem={renderMessage}
-          style={{ flex: 1 }}
-          onContentSizeChange={() => {
-            if (sMessages.length > 0 && flatListRef.current) {
-              try { flatListRef.current.scrollToEnd({ animated: false }); } catch (e) {}
-            }
-          }}
-          contentContainerStyle={sMessages.length === 0 ? { flex: 1, justifyContent: "center", alignItems: "center" } : { paddingVertical: 10, paddingHorizontal: 12 }}
-          ListEmptyComponent={
-            <View style={{ alignItems: "center" }}>
-              <Image_ icon={ICONS.paperPlane} style={{ width: 40, height: 40, opacity: 0.12, marginBottom: 10 }} />
-              <Text style={{ color: gray(0.5), fontSize: 13 }}>
-                No messages yet
-              </Text>
-            </View>
-          }
-        />
+        <div ref={scrollRef} className={styles.msgListWrap}>
+          {sMessages.map((msg) =>
+            msg.type === "outgoing" ? (
+              <OutgoingMessageComponent
+                key={msg.id}
+                msgObj={msg}
+                isLastOutgoing={msg.id === lastOutgoingID}
+                thread={thread}
+                onToggleBlock={handleToggleBlock}
+                onToggleForward={handleToggleForward}
+              />
+            ) : (
+              <IncomingMessageComponent
+                key={msg.id}
+                msgObj={msg}
+                onScrollToBottom={() => {
+                  if (scrollRef.current) {
+                    scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+                  }
+                }}
+              />
+            )
+          )}
+        </div>
       )}
 
-      {/* Reply options bar */}
-      <View style={{ paddingHorizontal: 10 }}>
-        <ReplyOptionsBar
-          visible={sShowReplyModal}
-          forwardReplies={sForwardReplies}
-          hasActivePhone={hasActivePhone}
-          onSelectCanRespond={(canRespond) => {
-            clearAutoSend();
-            _sSetCanRespond(canRespond);
-            _sSetShowReplyModal(false);
-            sendMessage(canRespond);
-          }}
-          onToggleForward={handleToggleForwardReplies}
-        />
-      </View>
-
-      {/* Input area */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "flex-end",
-          paddingHorizontal: 10,
-          paddingVertical: 8,
-          borderTopWidth: 1,
-          borderTopColor: lightenRGBByPercent(C.buttonLightGreenOutline, 30),
+      <ComposeArea
+        mode="customer"
+        value={sNewMessage}
+        onChange={(val) => _sSetNewMessage(autoCapitalize(val))}
+        onSend={handlePressSend}
+        sendDisabled={sSending || !sNewMessage.trim()}
+        placeholder="Type a message..."
+        showReplyOptions={sShowReplyModal}
+        forwardReplies={sForwardReplies}
+        hasActivePhone={hasActivePhone}
+        onSelectCanRespond={(canRespond) => {
+          clearAutoSend();
+          _sSetCanRespond(canRespond);
+          _sSetShowReplyModal(false);
+          sendMessage(canRespond);
         }}
-      >
-        <TextInput_
-          value={sNewMessage}
-          onChangeText={(val) => _sSetNewMessage(autoCapitalize(val))}
-          debounceMs={0}
-          placeholder="Type a message..."
-          placeholderTextColor={gray(0.5)}
-          multiline={true}
-          numberOfLines={4}
-          onSubmitEditing={handlePressSend}
-          style={{
-            flex: 1,
-            minHeight: 34,
-            fontSize: 13,
-            color: C.text,
-            lineHeight: 18,
-            borderWidth: 1.5,
-            borderColor: C.buttonLightGreenOutline,
-            borderRadius: 10,
-            backgroundColor: C.listItemWhite,
-            paddingHorizontal: 10,
-            paddingVertical: 7,
-            marginRight: 8,
-          }}
-        />
-        <Button_
-          text="Send"
-          colorGradientArr={COLOR_GRADIENTS.blue}
-          textStyle={{ color: C.textWhite, fontSize: 12, fontWeight: "600" }}
-          buttonStyle={{ height: 34, paddingHorizontal: 14, borderRadius: 8, marginBottom: 1 }}
-          onPress={handlePressSend}
-          enabled={!sSending && !!sNewMessage.trim()}
-        />
-      </View>
-    </View>
+        onToggleForward={handleToggleForwardReplies}
+      />
+    </div>
   );
 };
 
 const SalesList = ({ sales, transactionsMap = {}, onSelect }) => {
+  const sorted = [...sales].sort((a, b) => (b.millis || 0) - (a.millis || 0));
   return (
-    <View style={{ width: "100%" }}>
-      {[...sales].sort((a, b) => (b.millis || 0) - (a.millis || 0)).map((sale) => {
+    <div style={{ width: "100%" }}>
+      {sorted.map((sale) => {
         const txns = transactionsMap[sale.id] || [];
-        const totalRefunded = txns.reduce((s, t) => s + (t.refunds || []).reduce((rs, r) => rs + (r.amount || 0), 0), 0);
+        const totalRefunded = txns.reduce(
+          (s, t) => s + (t.refunds || []).reduce((rs, r) => rs + (r.amount || 0), 0),
+          0
+        );
         const hasRefunds = totalRefunded > 0;
 
         return (
-          <TouchableOpacity_
+          <button
+            type="button"
             key={sale.id}
-            onPress={() => onSelect(sale)}
+            onClick={() => onSelect(sale)}
+            className={styles.saleCard}
             style={{
-              marginBottom: 6,
-              borderRadius: 7,
-              borderLeftWidth: 4,
               borderLeftColor: sale._isActiveSale
                 ? C.orange
                 : sale.paymentComplete
                   ? C.green
                   : C.lightred,
               borderColor: C.buttonLightGreenOutline,
-              borderWidth: 1,
               backgroundColor: C.listItemWhite,
-              paddingVertical: 8,
-              paddingHorizontal: 10,
             }}
           >
-            {/* Row 1: Date + badges */}
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 4,
-              }}
-            >
-              <Text style={{ color: "dimgray", fontSize: 12 }}>
+            <div className={styles.saleRow1}>
+              <span className={styles.saleDate} style={{ color: "dimgray" }}>
                 {formatMillisForDisplay(sale.millis, true)}
-              </Text>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
+              </span>
+              <div className={styles.saleBadgesWrap}>
                 {sale._isActiveSale && (
-                  <View
+                  <span
+                    className={styles.saleBadge}
                     style={{
                       backgroundColor: lightenRGBByPercent(C.orange, 65),
-                      paddingHorizontal: 8,
-                      paddingVertical: 2,
-                      borderRadius: 10,
-                      marginRight: 6,
+                      color: C.orange,
                     }}
                   >
-                    <Text style={{ fontSize: 10, fontWeight: "600", color: C.orange }}>
-                      Active
-                    </Text>
-                  </View>
+                    Active
+                  </span>
                 )}
                 {sale.isDepositSale && (
-                  <View
+                  <span
+                    className={styles.saleBadgeSmall}
                     style={{
                       backgroundColor: sale.depositType === "credit"
                         ? lightenRGBByPercent(C.blue, 70)
                         : lightenRGBByPercent(C.orange, 70),
-                      paddingHorizontal: 6,
-                      paddingVertical: 1,
-                      borderRadius: 8,
-                      marginRight: 6,
+                      color: sale.depositType === "credit" ? C.blue : C.orange,
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: 10,
-                        fontWeight: "600",
-                        color: sale.depositType === "credit" ? C.blue : C.orange,
-                      }}
-                    >
-                      {sale.depositType === "credit" ? "Credit" : "Deposit"}
-                    </Text>
-                  </View>
+                    {sale.depositType === "credit" ? "Credit" : "Deposit"}
+                  </span>
                 )}
                 {sale._isActiveSale && (
-                  <View
+                  <span
+                    className={styles.saleBadge}
                     style={{
                       backgroundColor: lightenRGBByPercent(C.orange, 65),
-                      paddingHorizontal: 8,
-                      paddingVertical: 2,
-                      borderRadius: 10,
+                      color: C.orange,
+                      marginRight: 0,
                     }}
                   >
-                    <Text style={{ fontSize: 10, fontWeight: "600", color: C.orange }}>
-                      In Progress
-                    </Text>
-                  </View>
+                    In Progress
+                  </span>
                 )}
-              </View>
-            </View>
+              </div>
+            </div>
 
-            {/* Row 2: Totals */}
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: 4,
-              }}
-            >
+            <div className={styles.saleTotalsRow}>
               {!sale.isDepositSale && (
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
-                  <Text style={{ fontSize: 11, color: gray(0.5) }}>{"Sub: "}</Text>
-                  <Text style={{ fontSize: 12, color: C.text }}>
+                <div className={styles.saleTotalsLeft}>
+                  <span className={styles.saleLabel} style={{ color: C.textMuted }}>Sub: </span>
+                  <span className={styles.saleValue} style={{ color: C.text }}>
                     {"$" + formatCurrencyDisp(sale.subtotal)}
-                  </Text>
+                  </span>
                   {sale.discount > 0 && (
-                    <Text style={{ fontSize: 11, color: C.lightred, marginLeft: 8 }}>
+                    <span className={styles.saleDiscount} style={{ color: C.lightred }}>
                       {"-$" + formatCurrencyDisp(sale.discount)}
-                    </Text>
+                    </span>
                   )}
-                  <Text style={{ fontSize: 11, color: gray(0.5), marginLeft: 8 }}>{"Tax: "}</Text>
-                  <Text style={{ fontSize: 12, color: C.text }}>
+                  <span className={styles.saleLabelInline} style={{ color: C.textMuted }}>Tax: </span>
+                  <span className={styles.saleValue} style={{ color: C.text }}>
                     {"$" + formatCurrencyDisp(sale.salesTax || sale.tax || 0)}
-                  </Text>
-                </View>
+                  </span>
+                </div>
               )}
-              <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
+              <span className={styles.saleGrandTotal} style={{ color: C.text }}>
                 {"$" + formatCurrencyDisp(sale.total)}
-              </Text>
-            </View>
+              </span>
+            </div>
 
-            {/* Row 3: Payment method(s) */}
-            <View style={{ flexDirection: "row", flexWrap: "wrap", alignItems: "center" }}>
+            <div className={styles.salePaymentRow}>
               {txns.map((p, idx) => (
-                <View
+                <div
                   key={p.id || idx}
+                  className={styles.salePaymentChip}
                   style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    backgroundColor: gray(0.04),
-                    borderRadius: 5,
-                    paddingHorizontal: 6,
-                    paddingVertical: 2,
-                    marginRight: 6,
-                    marginBottom: 2,
-                    borderWidth: 1,
-                    borderColor: gray(0.1),
+                    backgroundColor: C.surfaceAlt,
+                    borderColor: C.borderSubtle,
                   }}
                 >
-                  <Text style={{ fontSize: 11, color: C.text }}>
+                  <span className={styles.salePaymentText} style={{ color: C.text }}>
                     {p.method === "cash"
                       ? "Cash"
                       : p.method === "check"
                         ? "Check"
                         : (p.cardType || "Card") + (p.last4 ? " ..." + p.last4 : "")}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: gray(0.4), marginLeft: 4 }}>
+                  </span>
+                  <span className={styles.salePaymentAmount} style={{ color: C.textMuted }}>
                     {"$" + formatCurrencyDisp(p.amountCaptured)}
-                  </Text>
-                </View>
+                  </span>
+                </div>
               ))}
               {hasRefunds && (
-                <Text style={{ fontSize: 11, color: C.lightred, marginLeft: 4 }}>
+                <span className={styles.saleRefunded} style={{ color: C.lightred }}>
                   {"Refunded: $" + formatCurrencyDisp(totalRefunded)}
-                </Text>
+                </span>
               )}
-            </View>
+            </div>
 
-            {/* Row 4: Linked workorders */}
             {sale.workorderIDs?.length > 0 && (
-              <Text style={{ fontSize: 10, color: gray(0.4), marginTop: 4 }}>
+              <span className={styles.saleLinkedWO} style={{ color: C.textMuted }}>
                 {"WO: " + sale.workorderIDs.join(", ")}
-              </Text>
+              </span>
             )}
-          </TouchableOpacity_>
+          </button>
         );
       })}
-    </View>
+    </div>
   );
 };

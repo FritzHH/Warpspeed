@@ -1,0 +1,63 @@
+/* Shared layout primitives for the checkout modal family.
+   Dynamic colors stay inline (C.*, gray()) — these are structure only. */
+
+.row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.rowBetween {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* Horizontal rule used between sections inside totals/cards. */
+.divider {
+  width: 100%;
+  height: 1px;
+  margin: 10px 0;
+  flex-shrink: 0;
+}
+
+/* White card surface used by payment rows, totals boxes, etc. */
+.card {
+  width: 100%;
+  border-radius: 8px;
+  margin-bottom: 5px;
+  padding: 5px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* Label + value row used inside totals blocks. */
+.totalRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+/* Small pill badge (e.g. "Fully Refunded", "REFUND" tag). */
+.pill {
+  border-radius: 5px;
+  padding: 2px 8px;
+  flex-shrink: 0;
+}
+
+.pillText {
+  font-size: 10px;
+  font-weight: 600;
+}

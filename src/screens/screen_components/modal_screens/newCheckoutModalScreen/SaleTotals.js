@@ -1,206 +1,95 @@
 /* eslint-disable */
-import { View, Text, Animated } from "react-native-web";
-import { useRef, memo } from "react";
-import { C, Fonts } from "../../../../styles";
-import { formatCurrencyDisp, gray } from "../../../../utils";
+import { memo } from "react";
+import styles from "./SaleTotals.module.css";
+import { C } from "../../../../styles";
+import { formatCurrencyDisp } from "../../../../utils";
 
 function TotalRow({ label, value, labelStyle, valueStyle }) {
   let displayValue =
     typeof value === "number" ? formatCurrencyDisp(value) : value;
 
   return (
-    <View
-      style={{
-        alignItems: "center",
-        flexDirection: "row",
-        justifyContent: "space-between",
-        width: "100%",
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 13,
-          color: gray(0.5),
-          ...labelStyle,
-        }}
+    <div className={styles.totalRow}>
+      <span
+        className={styles.totalRowLabel}
+        style={{ color: C.textMuted, ...labelStyle }}
       >
         {label}
-      </Text>
-      <View style={{ flexDirection: "row" }}>
-        <Text
-          style={{
-            fontSize: 13,
-            color: C.green,
-            marginRight: 10,
-          }}
-        >
+      </span>
+      <div className={styles.totalRowValueWrap}>
+        <span className={styles.dollarSign} style={{ color: C.green }}>
           $
-        </Text>
-        <Text
-          style={{
-            fontSize: 17,
-            color: gray(0.5),
-            ...valueStyle,
-          }}
+        </span>
+        <span
+          className={styles.totalRowValue}
+          style={{ color: C.textMuted, ...valueStyle }}
         >
           {displayValue}
-        </Text>
-      </View>
-    </View>
+        </span>
+      </div>
+    </div>
   );
 }
 
 function Divider() {
   return (
-    <View
-      style={{
-        width: "100%",
-        height: 1,
-        marginVertical: 10,
-        backgroundColor: C.buttonLightGreenOutline,
-      }}
+    <div
+      className={styles.divider}
+      style={{ backgroundColor: C.buttonLightGreenOutline }}
     />
   );
 }
 
 export const PaymentStatus = memo(function PaymentStatus({ sale, amountRemaining }) {
-  const successScale = useRef(new Animated.Value(0)).current;
-  const successOpacity = useRef(new Animated.Value(0)).current;
-  const successPulse = useRef(new Animated.Value(1)).current;
-  const successAnimStarted = useRef(false);
-
   if (!sale) return null;
 
-  if (sale.paymentComplete && !successAnimStarted.current) {
-    successAnimStarted.current = true;
-    Animated.parallel([
-      Animated.spring(successScale, { toValue: 1, friction: 4, tension: 80, useNativeDriver: false }),
-      Animated.timing(successOpacity, { toValue: 1, duration: 300, useNativeDriver: false }),
-    ]).start(() => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(successPulse, { toValue: 1.06, duration: 800, useNativeDriver: false }),
-          Animated.timing(successPulse, { toValue: 1, duration: 800, useNativeDriver: false }),
-        ])
-      ).start();
-    });
-  }
-
   return (
-    <View
-      style={{
-        width: "100%",
-        alignItems: "flex-end",
-        marginTop: 15,
-      }}
-    >
-      {/* Amount Paid */}
+    <div className={styles.statusContainer}>
       {(sale.amountCaptured || 0) > 0 && !sale.paymentComplete && (
-        <Text
-          style={{
-            fontSize: 18,
-            fontWeight: 500,
-            color: gray(0.6),
-          }}
-        >
+        <span className={styles.amountText} style={{ color: C.textSecondary }}>
           {"AMOUNT PAID:   $" + formatCurrencyDisp(sale.amountCaptured || 0)}
-        </Text>
+        </span>
       )}
 
-      {/* Amount Remaining */}
       {amountRemaining > 0 && (
-        <Text
-          style={{
-            fontSize: 18,
-            fontWeight: 500,
-            color: C.green,
-          }}
-        >
+        <span className={styles.amountText} style={{ color: C.green }}>
           {"AMOUNT LEFT TO PAY:   $" + formatCurrencyDisp(amountRemaining)}
-        </Text>
+        </span>
       )}
 
-      {/* Sale Complete */}
       {sale.paymentComplete && (
-        <Animated.View
-          style={{
-            backgroundColor: C.green,
-            borderRadius: 10,
-            paddingVertical: 8,
-            paddingHorizontal: 20,
-            opacity: successOpacity,
-            transform: [{ scale: Animated.multiply(successScale, successPulse) }],
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "700",
-              color: C.textWhite,
-              textAlign: "center",
-            }}
-          >
+        <div className={styles.successPill} style={{ backgroundColor: C.green }}>
+          <span className={styles.successText} style={{ color: C.textWhite }}>
             PAYMENT COMPLETE
-          </Text>
-        </Animated.View>
+          </span>
+        </div>
       )}
-    </View>
+    </div>
   );
 });
 
 export const CashChangeNeeded = memo(function CashChangeNeeded({ cashChangeNeeded }) {
   if (!cashChangeNeeded || cashChangeNeeded <= 0) return null;
   return (
-    <View
+    <div
+      className={styles.changeBox}
       style={{
         borderColor: C.buttonLightGreenOutline,
-        borderRadius: 10,
-        borderWidth: 2,
         backgroundColor: C.green,
-        paddingVertical: 10,
-        paddingHorizontal: 10,
-        flexDirection: "column",
-        marginTop: 5,
-        width: "60%",
-        alignSelf: "center",
       }}
     >
-      <Text
-        style={{
-          fontSize: 11,
-          color: gray(0.75),
-          width: "100%",
-          textAlign: "left",
-          paddingBottom: 3,
-        }}
-      >
+      <span className={styles.changeLabel} style={{ color: C.textSecondary }}>
         CHANGE NEEDED
-      </Text>
-      <Text
-        style={{
-          textAlign: "right",
-          fontSize: 25,
-          color: C.textWhite,
-        }}
-      >
-        <Text
-          style={{
-            fontSize: 15,
-            paddingRight: 7,
-          }}
-        >
-          $
-        </Text>
+      </span>
+      <span className={styles.changeAmount} style={{ color: C.textWhite }}>
+        <span className={styles.changeAmountDollar}>$</span>
         {formatCurrencyDisp(cashChangeNeeded)}
-      </Text>
-    </View>
+      </span>
+    </div>
   );
 });
 
-export const SaleTotals = memo(function SaleTotals({
-  sale,
-  settings,
-}) {
+export const SaleTotals = memo(function SaleTotals({ sale, settings }) {
   if (!sale) return null;
 
   let hasDiscount = (sale.discount || 0) > 0;
@@ -209,22 +98,13 @@ export const SaleTotals = memo(function SaleTotals({
   if (amountRemaining < 0) amountRemaining = 0;
 
   return (
-    <View style={{ marginTop: 5 }}>
-      {/* Totals Box */}
-      <View
-        style={{
-          backgroundColor: "#FFFCF2",
-          borderRadius: 10,
-          borderWidth: 1,
-          borderColor: C.buttonLightGreenOutline,
-          paddingHorizontal: 10,
-          paddingVertical: 7,
-        }}
+    <div className={styles.totalsWrap}>
+      <div
+        className={styles.totalsBox}
+        style={{ borderColor: C.buttonLightGreenOutline }}
       >
-        {/* Subtotal */}
         <TotalRow label="SUBTOTAL" value={sale.subtotal || 0} />
 
-        {/* Discount */}
         {hasDiscount && <Divider />}
         {hasDiscount && (
           <TotalRow
@@ -234,7 +114,6 @@ export const SaleTotals = memo(function SaleTotals({
           />
         )}
 
-        {/* Discounted Total */}
         {hasDiscount && (
           <TotalRow
             label="DISCOUNTED TOTAL"
@@ -244,13 +123,8 @@ export const SaleTotals = memo(function SaleTotals({
         )}
         {hasDiscount && <Divider />}
 
-        {/* Sales Tax */}
-        <TotalRow
-          label="SALES TAX"
-          value={sale.salesTax || 0}
-        />
+        <TotalRow label="SALES TAX" value={sale.salesTax || 0} />
 
-        {/* Card Fee */}
         {hasCardFee && (
           <TotalRow
             label={`CARD FEE (${sale.cardFeePercent || 0}%)`}
@@ -260,14 +134,13 @@ export const SaleTotals = memo(function SaleTotals({
 
         <Divider />
 
-        {/* Total Sale */}
         <TotalRow
           label="TOTAL SALE"
           value={sale.total || 0}
           labelStyle={{ fontSize: 16 }}
-          valueStyle={{ fontWeight: 500, fontSize: 18, color: gray(0.6) }}
+          valueStyle={{ fontWeight: 500, fontSize: 18, color: C.textSecondary }}
         />
-      </View>
-    </View>
+      </div>
+    </div>
   );
 });

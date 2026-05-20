@@ -1,11 +1,12 @@
 /* eslint-disable */
 import React, { useState } from "react";
-import { View, Text, TouchableOpacity, Image, Alert } from "react-native-web";
-import { C, Colors, Fonts } from "../styles";
 import { sendPasswordReset, dbLoginUser, dbLogout, loadTenantAndSettings } from "../db_calls_wrapper";
-import { gray } from "../utils";
+
 import { topUpPool } from "../idPool";
+import { useAlertScreenStore } from "../stores";
+import { C, Fonts } from "../styles";
 import logo from "../resources/default_app_logo_large.png";
+import styles from "./LoginScreen.module.css";
 
 // ── Brand colors pulled from the logo ──
 const BRAND_BLUE = "#2B7CB5";
@@ -60,11 +61,13 @@ export function LoginScreen({ setUser }) {
 
     try {
       await sendPasswordReset(email);
-      Alert.alert(
-        "Password Reset",
-        "A password reset email has been sent to your email address.",
-        [{ text: "OK" }]
-      );
+      useAlertScreenStore.getState().setValues({
+        title: "Password Reset",
+        message: "A password reset email has been sent to your email address.",
+        btn1Text: "OK",
+        handleBtn1Press: () => {},
+        showAlert: true,
+      });
     } catch (error) {
       setError(getErrorMessage(error.code));
     }
@@ -92,198 +95,117 @@ export function LoginScreen({ setUser }) {
     }
   };
 
-  let emailBorder = emailFocused ? BRAND_BLUE : gray(0.78);
-  let passwordBorder = passwordFocused ? BRAND_BLUE : gray(0.78);
+  const emailBorder = emailFocused ? BRAND_BLUE : C.borderStrong;
+  const passwordBorder = passwordFocused ? BRAND_BLUE : C.borderStrong;
 
   return (
-    <View style={{
-      width: "100%",
-      height: "100vh",
-      backgroundColor: BRAND_BLUE,
-      justifyContent: "center",
-      alignItems: "center",
-    }}>
+    <div className={styles.screen} style={{ backgroundColor: BRAND_BLUE }}>
       {/* Card */}
-      <View style={{
-        width: "90%",
-        maxWidth: 380,
-        backgroundColor: "#fff",
-        borderRadius: 16,
-        alignItems: "center",
-        paddingTop: 40,
-        paddingBottom: 30,
-        paddingHorizontal: 30,
-        shadowColor: "#000",
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.2,
-        shadowRadius: 24,
-        elevation: 12,
-      }}>
-
+      <div className={styles.card}>
         {/* Logo */}
-        <Image
-          source={logo}
-          style={{ width: 160, height: 160, marginBottom: 10 }}
-          resizeMode="contain"
-        />
+        <img src={logo} alt="" className={styles.logo} />
 
         {/* Yellow accent divider */}
-        <View style={{
-          width: "60%",
-          height: 3,
-          backgroundColor: BRAND_YELLOW,
-          borderRadius: 2,
-          marginBottom: 28,
-        }} />
+        <div className={styles.divider} style={{ backgroundColor: BRAND_YELLOW }} />
 
         <form
           onSubmit={(e) => { e.preventDefault(); handleSignIn(); }}
-          style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}
+          className={styles.form}
         >
-        {/* Email */}
-        <View style={{ width: "100%", marginBottom: 14 }}>
-          <Text style={{
-            fontSize: 12,
-            color: BRAND_DARK_BLUE,
-            fontWeight: Fonts.weight.textHeavy,
-            marginBottom: 4,
-            marginLeft: 2,
-          }}>EMAIL</Text>
-          <input
-            type="email"
-            name="email"
-            id="email"
-            autoComplete="email"
-            placeholder="you@example.com"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            onFocus={() => setEmailFocused(true)}
-            onBlur={() => setEmailFocused(false)}
-            style={{
-              width: "100%",
-              border: `2px solid ${emailBorder}`,
-              borderRadius: 10,
-              padding: "11px 14px",
-              fontSize: 15,
-              backgroundColor: "#FAFBFC",
-              outline: "none",
-              color: "#333",
-              boxSizing: "border-box",
-              fontFamily: "inherit",
-            }}
-          />
-        </View>
-
-        {/* Password */}
-        <View style={{ width: "100%", marginBottom: 6 }}>
-          <Text style={{
-            fontSize: 12,
-            color: BRAND_DARK_BLUE,
-            fontWeight: Fonts.weight.textHeavy,
-            marginBottom: 4,
-            marginLeft: 2,
-          }}>PASSWORD</Text>
-          <View style={{ width: "100%", flexDirection: "row", alignItems: "center", borderWidth: 2, borderColor: passwordBorder, borderRadius: 10, backgroundColor: "#FAFBFC" }}>
+          {/* Email */}
+          <div className={styles.fieldGroup}>
+            <span
+              className={styles.fieldLabel}
+              style={{ color: BRAND_DARK_BLUE, fontWeight: Fonts.weight.textHeavy }}
+            >
+              EMAIL
+            </span>
             <input
-              type={showPassword ? "text" : "password"}
-              name="password"
-              id="password"
-              autoComplete="current-password"
-              placeholder="Enter password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              onFocus={() => setPasswordFocused(true)}
-              onBlur={() => setPasswordFocused(false)}
-              style={{
-                flex: 1,
-                padding: "11px 14px",
-                fontSize: 15,
-                outline: "none",
-                color: "#333",
-                backgroundColor: "transparent",
-                border: "none",
-                fontFamily: "inherit",
-              }}
+              type="email"
+              name="email"
+              id="email"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              onFocus={() => setEmailFocused(true)}
+              onBlur={() => setEmailFocused(false)}
+              className={styles.textInput}
+              style={{ border: `2px solid ${emailBorder}` }}
             />
-            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ paddingHorizontal: 12, paddingVertical: 8 }}>
-              <Text style={{ fontSize: 16, color: gray(0.45), userSelect: "none" }}>{showPassword ? "\u{1F441}" : "\u{1F441}\u{200D}\u{1F5E8}"}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+          </div>
 
-        {/* Error message */}
-        {error ? (
-          <View style={{
-            width: "100%",
-            backgroundColor: "#FEF2F2",
-            borderWidth: 1,
-            borderColor: "#FECACA",
-            borderRadius: 8,
-            paddingVertical: 10,
-            paddingHorizontal: 12,
-            marginTop: 10,
-            marginBottom: 4,
-          }}>
-            <Text style={{
-              color: "#B91C1C",
-              fontSize: 13,
-              fontWeight: "500",
-            }}>{error}</Text>
-          </View>
-        ) : (
-          <View style={{ height: 16 }} />
-        )}
+          {/* Password */}
+          <div className={styles.fieldGroupTight}>
+            <span
+              className={styles.fieldLabel}
+              style={{ color: BRAND_DARK_BLUE, fontWeight: Fonts.weight.textHeavy }}
+            >
+              PASSWORD
+            </span>
+            <div className={styles.passwordRow} style={{ borderColor: passwordBorder }}>
+              <input
+                type={showPassword ? "text" : "password"}
+                name="password"
+                id="password"
+                autoComplete="current-password"
+                placeholder="Enter password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                onFocus={() => setPasswordFocused(true)}
+                onBlur={() => setPasswordFocused(false)}
+                className={styles.passwordInput}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className={styles.eyeButton}
+              >
+                <span className={styles.eyeIcon} style={{ color: C.textMuted }}>
+                  {showPassword ? "\u{1F441}" : "\u{1F441}\u{200D}\u{1F5E8}"}
+                </span>
+              </button>
+            </div>
+          </div>
 
-        {/* Sign In button */}
-        <button
-          type="submit"
-          disabled={isLoading}
-          style={{
-            width: "100%",
-            backgroundColor: isLoading ? gray(0.6) : BRAND_BLUE,
-            borderRadius: 10,
-            paddingTop: 13,
-            paddingBottom: 13,
-            border: "none",
-            cursor: isLoading ? "default" : "pointer",
-            marginTop: 6,
-            boxShadow: `0px 3px 6px rgba(43, 124, 181, 0.3)`,
-          }}
-        >
-          <Text style={{
-            color: "#fff",
-            fontSize: 16,
-            fontWeight: "700",
-            letterSpacing: 0.5,
-            textAlign: "center",
-          }}>
-            {isLoading ? "Signing In..." : "Sign In"}
-          </Text>
-        </button>
+          {/* Error message */}
+          {error ? (
+            <div className={styles.errorBox}>
+              <span className={styles.errorText}>{error}</span>
+            </div>
+          ) : (
+            <div className={styles.errorSpacer} />
+          )}
+
+          {/* Sign In button */}
+          <button
+            type="submit"
+            disabled={isLoading}
+            className={styles.signInButton}
+            style={{ backgroundColor: isLoading ? C.borderStrong : BRAND_BLUE, cursor: isLoading ? "default" : "pointer" }}
+          >
+            <span className={styles.signInLabel}>
+              {isLoading ? "Signing In..." : "Sign In"}
+            </span>
+          </button>
         </form>
 
         {/* Forgot password */}
-        <TouchableOpacity
-          style={{ marginTop: 16, paddingVertical: 4 }}
-          onPress={handleForgotPassword}
+        <button
+          type="button"
+          className={styles.forgotButton}
+          onClick={handleForgotPassword}
         >
-          <Text style={{
-            color: BRAND_DARK_BLUE,
-            fontSize: 13,
-            fontWeight: "500",
-          }}>Forgot Password?</Text>
-        </TouchableOpacity>
-      </View>
+          <span className={styles.forgotLabel} style={{ color: BRAND_DARK_BLUE }}>
+            Forgot Password?
+          </span>
+        </button>
+      </div>
 
       {/* Bottom branding */}
-      <Text style={{
-        color: "rgba(255,255,255,0.5)",
-        fontSize: 11,
-        marginTop: 24,
-        fontWeight: "500",
-      }}>
+      <span className={styles.brandingText}>
         Warpspeed POS
-      </Text>
-    </View>
+      </span>
+    </div>
   );
 }

@@ -4,27 +4,18 @@ import {
   Button,
   Dialog,
   LoadingIndicator,
+  DateTimePicker,
 } from "../../../dom_components";
 import { C, COLOR_GRADIENTS } from "../../../styles";
-import {
-  getPreviousMondayDayJS,
-  capitalizeFirstLetterOfString,
-  formatCurrencyDisp,
-  formatMillisForDisplay,
-  gray,
-  lightenRGBByPercent,
-} from "../../../utils";
+import { getPreviousMondayDayJS, capitalizeFirstLetterOfString, formatCurrencyDisp, formatMillisForDisplay, lightenRGBByPercent } from "../../../utils";
 import dayjs from "dayjs";
-import CalendarPicker, {
-  useDefaultStyles,
-} from "react-native-ui-datepicker";
 import {
   queryCompletedSalesReport,
   queryActiveSalesForReport,
   queryTransactionsByDateRange,
 } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { useActiveSalesStore, useCheckoutStore } from "../../../stores";
-import { FullSaleModal } from "./FullSaleModal";
+import { FullSaleModal } from "../../../dom_components";
 import styles from "./SalesReports.module.css";
 
 const PAGE_SIZE = 50;
@@ -57,8 +48,6 @@ function generateDateChips(startDate, endDate) {
 }
 
 export const SalesReportsModal = ({ handleExit }) => {
-  const defaultStyles = useDefaultStyles();
-
   const [sStartDate, _setStartDate] = useState(dayjs().startOf("day"));
   const [sEndDate, _setEndDate] = useState(dayjs().endOf("day"));
   const [sResults, _setResults] = useState([]);
@@ -360,23 +349,12 @@ export const SalesReportsModal = ({ handleExit }) => {
 
   let dateChips = generateDateChips(displayStart, displayEnd);
 
-  let calendarStyles = {
-    ...defaultStyles,
-    today: {
-      borderColor: C.lightred,
-      borderWidth: 2,
-      borderRadius: 100,
-    },
-    selected: {
-      borderRadius: 100,
-      backgroundColor: C.blue,
-    },
-    selected_label: { color: "white" },
-    range: {
+  let calendarModifiersStyles = {
+    range_middle: {
       backgroundColor: lightenRGBByPercent(C.blue, 70),
+      color: C.text,
       borderRadius: 0,
     },
-    range_label: { color: C.text },
   };
 
   function renderGroupHeader(group) {
@@ -392,7 +370,7 @@ export const SalesReportsModal = ({ handleExit }) => {
       <div
         key={"gh-" + group.saleID}
         className={styles.groupHeader}
-        style={{ backgroundColor: gray(0.06) }}
+        style={{ backgroundColor: C.surfaceAlt }}
       >
         <span className={styles.groupHeaderText} style={{ color: C.darkBlue }}>
           {!hasCustomer && <span style={{ color: labelColor }}>{label}</span>}
@@ -429,10 +407,10 @@ export const SalesReportsModal = ({ handleExit }) => {
         className={styles.row}
         style={{
           backgroundColor: bgColor,
-          borderBottomColor: gray(0.05),
+          borderBottomColor: C.borderSubtle,
           background: bgColor,
           border: "none",
-          borderBottom: "1px solid " + gray(0.05),
+          borderBottom: "1px solid " + C.borderSubtle,
           font: "inherit",
           cursor: "pointer",
           textAlign: "left",
@@ -454,7 +432,7 @@ export const SalesReportsModal = ({ handleExit }) => {
           </span>
         </div>
         <div className={`${styles.cell} ${styles.cellMethod}`}>
-          <span className={styles.cellMethodText} style={{ color: gray(0.5), width: "100%" }}>
+          <span className={styles.cellMethodText} style={{ color: C.textMuted, width: "100%" }}>
             {capitalizeFirstLetterOfString(tx.method || "")}
           </span>
         </div>
@@ -468,7 +446,7 @@ export const SalesReportsModal = ({ handleExit }) => {
           </span>
         </div>
         <div className={`${styles.cell} ${styles.cellDate}`}>
-          <span className={styles.cellDateText} style={{ color: gray(0.45), width: "100%" }}>
+          <span className={styles.cellDateText} style={{ color: C.textMuted, width: "100%" }}>
             {dateStr}
           </span>
         </div>
@@ -530,7 +508,7 @@ export const SalesReportsModal = ({ handleExit }) => {
       <Dialog
         visible={true}
         onClose={handleExit}
-        overlayColor="rgba(0,0,0,0.5)"
+        overlayColor={C.surfaceOverlay}
         title="Sales History"
       >
         <div className={styles.card}>
@@ -578,15 +556,13 @@ export const SalesReportsModal = ({ handleExit }) => {
               <span className={styles.calendarHeader} style={{ color: C.orange }}>
                 Begin Date
               </span>
-              <CalendarPicker
+              <DateTimePicker
                 key={"begin-" + sCalKey}
-                styles={calendarStyles}
-                mode="range"
-                startDate={displayStart}
-                endDate={displayEnd}
-                onChange={({ startDate, endDate }) => {
+                modifiersStyles={calendarModifiersStyles}
+                range={{ startDate: displayStart, endDate: displayEnd }}
+                handleDateRangeChange={({ startDate, endDate }) => {
                   _setActiveShortcut(null);
-                  _setPendingStart(dayjs(startDate));
+                  if (startDate) _setPendingStart(dayjs(startDate));
                   if (endDate) _setPendingEnd(dayjs(endDate));
                 }}
               />
@@ -658,17 +634,19 @@ export const SalesReportsModal = ({ handleExit }) => {
                       </button>
                     </div>
                   ) : (
-                    <CalendarPicker
+                    <DateTimePicker
                       key={"end-" + sCalKey + "-" + sEndCalMonth + "-" + sEndCalYear}
-                      styles={calendarStyles}
-                      mode="range"
-                      startDate={displayStart}
-                      endDate={displayEnd}
-                      month={sEndCalMonth}
-                      year={sEndCalYear}
-                      onChange={({ endDate }) => {
+                      modifiersStyles={calendarModifiersStyles}
+                      range={{ startDate: displayStart, endDate: displayEnd }}
+                      month={new Date(sEndCalYear, sEndCalMonth, 1)}
+                      onMonthChange={(d) => {
+                        _setEndCalMonth(d.getMonth());
+                        _setEndCalYear(d.getFullYear());
+                      }}
+                      handleDateRangeChange={({ startDate, endDate }) => {
                         _setActiveShortcut(null);
-                        _setPendingEnd(dayjs(endDate));
+                        if (startDate) _setPendingStart(dayjs(startDate));
+                        if (endDate) _setPendingEnd(dayjs(endDate));
                       }}
                     />
                   )}
@@ -700,7 +678,7 @@ export const SalesReportsModal = ({ handleExit }) => {
 
             {/* Results Count + Page Info */}
             <div className={styles.resultsHeader}>
-              <span className={styles.resultsCount} style={{ color: gray(0.4) }}>
+              <span className={styles.resultsCount} style={{ color: C.textMuted }}>
                 {sLoading
                   ? "Loading..."
                   : sViewMode === "sale"
@@ -713,7 +691,7 @@ export const SalesReportsModal = ({ handleExit }) => {
                       ? flatSorted.length + " transactions of " + sTransactionResults.length
                       : flatSorted.length + " transactions")}
               </span>
-              <span className={styles.pageOf} style={{ color: gray(0.4) }}>
+              <span className={styles.pageOf} style={{ color: C.textMuted }}>
                 Page {sPage + 1} of {totalPages}
               </span>
             </div>
@@ -726,7 +704,7 @@ export const SalesReportsModal = ({ handleExit }) => {
                   onClick={() => { _setViewMode("sale"); _setPage(0); }}
                   className={`${styles.viewModeBtn} ${styles.viewModeBtnLeft}`}
                   style={{
-                    backgroundColor: sViewMode === "sale" ? C.blue : gray(0.85),
+                    backgroundColor: sViewMode === "sale" ? C.blue : C.surfaceAlt,
                     border: "none",
                     cursor: "pointer",
                     font: "inherit",
@@ -734,7 +712,7 @@ export const SalesReportsModal = ({ handleExit }) => {
                 >
                   <span
                     className={styles.viewModeText}
-                    style={{ color: sViewMode === "sale" ? "white" : gray(0.4) }}
+                    style={{ color: sViewMode === "sale" ? "white" : C.textMuted }}
                   >
                     By Sale
                   </span>
@@ -744,7 +722,7 @@ export const SalesReportsModal = ({ handleExit }) => {
                   onClick={handleViewModeTransaction}
                   className={`${styles.viewModeBtn} ${styles.viewModeBtnRight}`}
                   style={{
-                    backgroundColor: sViewMode === "transaction" ? C.blue : gray(0.85),
+                    backgroundColor: sViewMode === "transaction" ? C.blue : C.surfaceAlt,
                     border: "none",
                     cursor: "pointer",
                     font: "inherit",
@@ -752,7 +730,7 @@ export const SalesReportsModal = ({ handleExit }) => {
                 >
                   <span
                     className={styles.viewModeText}
-                    style={{ color: sViewMode === "transaction" ? "white" : gray(0.4) }}
+                    style={{ color: sViewMode === "transaction" ? "white" : C.textMuted }}
                   >
                     By Transaction
                   </span>
@@ -786,7 +764,7 @@ export const SalesReportsModal = ({ handleExit }) => {
                 disabled={!searchQuery}
                 className={styles.clearBtn}
                 style={{
-                  backgroundColor: searchQuery ? C.orange : gray(0.8),
+                  backgroundColor: searchQuery ? C.orange : C.surfaceAlt,
                   border: "none",
                   cursor: searchQuery ? "pointer" : "default",
                   font: "inherit",
@@ -794,7 +772,7 @@ export const SalesReportsModal = ({ handleExit }) => {
               >
                 <span
                   className={styles.clearBtnText}
-                  style={{ color: searchQuery ? "white" : gray(0.5) }}
+                  style={{ color: searchQuery ? "white" : C.textMuted }}
                 >
                   Clear Search
                 </span>
@@ -818,7 +796,7 @@ export const SalesReportsModal = ({ handleExit }) => {
                 (sViewMode === "transaction" && pageTransactions.length === 0)) &&
                 !sLoading && (
                   <div className={styles.emptyState}>
-                    <span className={styles.emptyStateText} style={{ color: gray(0.5) }}>
+                    <span className={styles.emptyStateText} style={{ color: C.textMuted }}>
                       {sResults.length === 0
                         ? "Select a date range to view transactions"
                         : "No matching transactions"}
@@ -828,14 +806,14 @@ export const SalesReportsModal = ({ handleExit }) => {
             </div>
 
             {/* Pagination Controls */}
-            <div className={styles.pagination} style={{ borderTopColor: gray(0.85) }}>
+            <div className={styles.pagination} style={{ borderTopColor: C.borderStrong }}>
               <button
                 type="button"
                 onClick={() => _setPage(Math.max(0, sPage - 1))}
                 disabled={sPage === 0}
                 className={styles.pagBtn}
                 style={{
-                  backgroundColor: sPage === 0 ? gray(0.85) : C.blue,
+                  backgroundColor: sPage === 0 ? C.surfaceAlt : C.blue,
                   border: "none",
                   cursor: sPage === 0 ? "default" : "pointer",
                   font: "inherit",
@@ -844,7 +822,7 @@ export const SalesReportsModal = ({ handleExit }) => {
               >
                 <span
                   className={styles.pagBtnText}
-                  style={{ color: sPage === 0 ? gray(0.5) : "white" }}
+                  style={{ color: sPage === 0 ? C.textMuted : "white" }}
                 >
                   Prev
                 </span>
@@ -858,7 +836,7 @@ export const SalesReportsModal = ({ handleExit }) => {
                 disabled={sPage >= totalPages - 1}
                 className={styles.pagBtn}
                 style={{
-                  backgroundColor: sPage >= totalPages - 1 ? gray(0.85) : C.blue,
+                  backgroundColor: sPage >= totalPages - 1 ? C.surfaceAlt : C.blue,
                   border: "none",
                   cursor: sPage >= totalPages - 1 ? "default" : "pointer",
                   font: "inherit",
@@ -866,7 +844,7 @@ export const SalesReportsModal = ({ handleExit }) => {
               >
                 <span
                   className={styles.pagBtnText}
-                  style={{ color: sPage >= totalPages - 1 ? gray(0.5) : "white" }}
+                  style={{ color: sPage >= totalPages - 1 ? C.textMuted : "white" }}
                 >
                   Next
                 </span>
@@ -973,7 +951,7 @@ const TransactionViewerModal = ({ tx, onClose }) => {
     <Dialog
       visible={true}
       onClose={onClose}
-      overlayColor="rgba(0,0,0,0.5)"
+      overlayColor={C.surfaceOverlay}
       title="Transaction Details"
     >
       <div className={styles.txModalCard}>
@@ -987,9 +965,9 @@ const TransactionViewerModal = ({ tx, onClose }) => {
               <div
                 key={idx}
                 className={`${styles.txModalRow} ${isLast ? styles.txModalRowLast : ""}`}
-                style={{ borderBottomColor: gray(0.08) }}
+                style={{ borderBottomColor: C.borderSubtle }}
               >
-                <span className={styles.txModalLabel} style={{ color: gray(0.45) }}>
+                <span className={styles.txModalLabel} style={{ color: C.textMuted }}>
                   {row.label}
                 </span>
                 <span

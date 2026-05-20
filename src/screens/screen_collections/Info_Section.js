@@ -1,7 +1,6 @@
 /* eslint-disable */
 
-import {} from "../../components";
-import { AnimatedComponentSwitch } from "../../components/AnimatedComponentSwitch";
+import { AnimatedSwitch } from "../../dom_components";
 import { Colors } from "../../styles";
 import { TAB_NAMES, WORKORDER_PROTO } from "../../data";
 import { ActiveWorkorderComponent } from "../screen_components/Info_Screen/Info_ActiveWorkorder";
@@ -29,8 +28,8 @@ export const Info_Section = React.memo(({}) => {
   }
 
   return (
-    <AnimatedComponentSwitch animationType="fade" duration={200}>
+    <AnimatedSwitch animationType="fade" duration={200}>
       {ScreenComponent(zInfoTabName)}
-    </AnimatedComponentSwitch>
+    </AnimatedSwitch>
   );
 });

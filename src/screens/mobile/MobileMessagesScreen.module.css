@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: rgb(254, 254, 254);
+  background-color: var(--surface-base);
   box-sizing: border-box;
 }
 
@@ -10,10 +10,10 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  background-color: rgb(225, 244, 235);
+  background-color: var(--surface-success-muted);
   border-bottom-width: 1px;
   border-bottom-style: solid;
-  border-bottom-color: rgb(200, 228, 220);
+  border-bottom-color: var(--border-default);
   padding-left: 16px;
   padding-right: 16px;
   padding-top: 10px;
@@ -50,7 +50,7 @@
 
 .headerPhone {
   font-size: 13px;
-  color: rgb(153, 153, 153);
+  color: var(--text-secondary);
   margin-top: 2px;
 }
 
@@ -82,7 +82,7 @@
 
 .emptyText {
   font-size: 15px;
-  color: rgb(153, 153, 153);
+  color: var(--text-secondary);
 }
 
 .bottomSpacer {
@@ -92,8 +92,8 @@
 .inputArea {
   border-top-width: 1px;
   border-top-style: solid;
-  border-top-color: lightgray;
-  background-color: rgb(254, 254, 255);
+  border-top-color: var(--border-strong);
+  background-color: var(--surface-raised);
   padding-left: 12px;
   padding-right: 12px;
   padding-bottom: 10px;
@@ -121,12 +121,12 @@
   position: absolute;
   bottom: 100%;
   left: 0;
-  background-color: rgb(254, 254, 255);
+  background-color: var(--surface-raised);
   border-radius: 8px;
   border-width: 1px;
   border-style: solid;
-  border-color: lightgray;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+  border-color: var(--border-strong);
+  box-shadow: 0 2px 6px var(--shadow-color-default);
   min-width: 160px;
   z-index: 5;
 }
@@ -145,7 +145,7 @@
 
 .menuDivider {
   height: 1px;
-  background-color: rgb(217, 217, 217);
+  background-color: var(--border-subtle);
 }
 
 .inputRow {
@@ -158,7 +158,7 @@
   flex: 1;
   border-width: 1px;
   border-style: solid;
-  border-color: rgb(209, 209, 209);
+  border-color: var(--border-strong);
   border-radius: 20px;
   padding-left: 14px;
   padding-right: 14px;
@@ -167,7 +167,7 @@
   font-size: 16px;
   line-height: 20px;
   outline: none;
-  background-color: rgb(254, 254, 254);
+  background-color: var(--surface-base);
   resize: none;
   font-family: inherit;
   min-height: 36px;
@@ -190,16 +190,16 @@
 }
 
 .sendBtnEnabled {
-  background-color: rgb(53, 135, 210);
+  background-color: var(--info);
 }
 
 .sendBtnDisabled {
-  background-color: rgb(204, 204, 204);
+  background-color: var(--border-subtle);
   cursor: default;
 }
 
 .sendBtnIcon {
-  color: white;
+  color: var(--text-on-accent);
   font-size: 18px;
   font-weight: 700;
   margin-left: 2px;
@@ -213,7 +213,7 @@
 }
 
 .notFoundText {
-  color: rgb(153, 153, 153);
+  color: var(--text-secondary);
   font-size: 16px;
 }
 
@@ -237,7 +237,7 @@
 }
 
 .bubbleIncoming {
-  background-color: lightgray;
+  background-color: var(--surface-alt);
   border-radius: 16px;
   border-bottom-left-radius: 4px;
   padding-left: 12px;
@@ -274,28 +274,28 @@
 
 .bubbleTextOutgoing {
   font-size: 15px;
-  color: white;
+  color: var(--text-on-accent);
   white-space: pre-wrap;
   word-break: break-word;
 }
 
 .timestampIncoming {
   font-size: 11px;
-  color: rgb(128, 128, 128);
+  color: var(--text-muted);
   margin-top: 2px;
   margin-left: 4px;
 }
 
 .timestampOutgoing {
   font-size: 11px;
-  color: rgb(128, 128, 128);
+  color: var(--text-muted);
   margin-top: 2px;
   margin-right: 4px;
 }
 
 .statusSending {
   font-size: 10px;
-  color: rgb(128, 128, 128);
+  color: var(--text-muted);
   font-style: italic;
 }
 

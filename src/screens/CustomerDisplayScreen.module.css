@@ -1,0 +1,630 @@
+/* ============================================================
+ * CustomerDisplayScreen.module.css
+ * DOM/CSS Module port of the customer-facing display screen.
+ * ============================================================ */
+
+/* Root container - fills the popup window */
+.root {
+  display: flex;
+  flex-direction: column;
+  width: 100vw;
+  height: 100vh;
+  background-color: black;
+  overflow: hidden;
+}
+
+/* ---- Background logo ---- */
+.bgLogo {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+/* ---- Welcome header ---- */
+.welcomeHeader {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  align-items: center;
+  padding-top: 40px;
+}
+
+.welcomeText {
+  font-size: 48px;
+  font-weight: 800; /* Fonts.weight.textHeavy */
+  text-align: center;
+  margin: 0;
+}
+
+/* ---- Translate overlay ---- */
+.translateOverlay {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgb(30, 30, 30);
+  justify-content: center;
+  align-items: center;
+  padding: 40px;
+}
+
+.translateText {
+  font-size: 48px;
+  font-weight: 800;
+  text-align: center;
+  line-height: 64px;
+  width: 80%;
+  text-transform: capitalize;
+  margin: 0;
+}
+
+/* ---- Animated overlay container (slide in/out) ---- */
+.overlayWrap {
+  position: absolute;
+  top: 50px;
+  right: 15px;
+  bottom: 50px;
+  display: flex;
+  flex-direction: column;
+}
+
+.overlayWrapWide {
+  width: 40%;
+  min-width: 380px;
+}
+
+.overlayWrapTall {
+  left: 10%;
+}
+
+@keyframes displaySlideIn {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+@keyframes displaySlideOut {
+  from { transform: translateX(0); }
+  to   { transform: translateX(100%); }
+}
+
+.slideIn  { animation: displaySlideIn  0.4s ease forwards; }
+.slideOut { animation: displaySlideOut 0.4s ease forwards; }
+
+/* ---- Workorder overlay layout ---- */
+.workorderRoot {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+}
+
+.leftPanel {
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(240, 248, 255, 0.95);
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.leftPanelOpen {
+  width: 38%;
+  border-right: 1px solid var(--surface-overlay-light);
+}
+
+.leftPanelClosed {
+  width: 0%;
+}
+
+.rightPanel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background-color: rgba(255, 255, 255, 0.95);
+  justify-content: space-between;
+}
+
+/* greeting */
+.greetingBox {
+  display: flex;
+  flex-direction: column;
+  padding: 18px 16px 10px 16px;
+  background-color: rgba(64, 174, 113, 0.12);
+}
+
+.greetingText {
+  font-weight: 700;
+  margin: 0;
+}
+
+.greetingShort { font-size: 22px; }
+.greetingTall  { font-size: 26px; }
+
+/* customer contact box */
+.contactBox {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 16px;
+}
+
+.contactRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.contactRowLast {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.contactIcon {
+  width: 14px;
+  height: 14px;
+  margin-right: 8px;
+  opacity: 0.5;
+}
+
+.contactText {
+  font-size: 15px;
+  margin: 0;
+}
+
+.contactTextSm {
+  font-size: 14px;
+  margin: 0;
+}
+
+/* divider */
+.sectionDivider {
+  height: 1px;
+  background-color: var(--border-default);
+  margin: 8px 16px;
+  flex-shrink: 0;
+}
+
+/* icon row */
+.iconRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 5px 20px;
+}
+
+.iconRowImg {
+  margin-right: 10px;
+  opacity: 0.8;
+}
+
+.iconRowBody {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.bikeDesc {
+  font-size: 17px;
+  font-weight: 500;
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* color row */
+.colorRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.colorPill {
+  display: flex;
+  flex-direction: column;
+  border-radius: 14px;
+  padding: 4px 14px;
+  margin-right: 8px;
+}
+
+.colorPillText {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+
+/* notes */
+.notesBlock {
+  display: flex;
+  flex-direction: column;
+}
+
+.notesBody {
+  display: flex;
+  flex-direction: column;
+  padding: 6px 16px;
+}
+
+.notesHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.notesHeaderIcon {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  opacity: 0.6;
+}
+
+.notesHeaderText {
+  font-size: 14px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.notesScroll {
+  display: flex;
+  flex-direction: column;
+  max-height: 140px;
+  overflow-y: auto;
+}
+
+.noteCard {
+  display: flex;
+  flex-direction: column;
+  background-color: rgba(255, 243, 176, 0.5);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 4px;
+}
+
+.noteText {
+  font-size: 13px;
+  margin: 0;
+}
+
+/* footer of left panel (wait time/date) */
+.leftFooter {
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 12px;
+}
+
+.waitTimeText {
+  font-size: 15px;
+  margin: 0;
+}
+
+.checkedInText {
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ---- Right panel - items list ---- */
+.itemsHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 10px 20px;
+  background-color: rgba(64, 174, 113, 0.08);
+}
+
+.itemsHeaderIcon {
+  width: 22px;
+  height: 22px;
+  margin-right: 10px;
+  opacity: 0.8;
+}
+
+.itemsHeaderText {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.itemsCount {
+  font-size: 15px;
+  margin: 0 0 0 8px;
+}
+
+.itemsScroll {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.lineItemWrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.lineItemStripeEven {
+  background-color: transparent;
+}
+.lineItemStripeOdd {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+.receiptNotesBox {
+  display: flex;
+  flex-direction: column;
+  padding: 0 50px 8px 50px;
+}
+
+.receiptNotesText {
+  font-size: 13px;
+  font-style: italic;
+  margin: 0;
+}
+
+/* ---- Line item row ---- */
+.lineRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 12px 20px;
+}
+
+.lineQty {
+  font-size: 18px;
+  width: 30px;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.lineMain {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.lineName {
+  font-size: 18px;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lineDiscountName {
+  font-size: 13px;
+  margin: 0;
+}
+
+.linePriceCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-left: 12px;
+}
+
+.priceStrike {
+  font-size: 14px;
+  text-decoration: line-through;
+  margin: 0;
+}
+
+.priceSavings {
+  font-size: 13px;
+  margin: 0;
+}
+
+.priceFinal {
+  font-size: 18px;
+  margin: 0;
+}
+
+.priceRegular {
+  font-size: 18px;
+  margin: 0;
+}
+
+.itemRowDivider {
+  height: 1px;
+  background-color: var(--surface-overlay-light);
+  margin: 0 20px;
+  flex-shrink: 0;
+}
+
+/* ---- Totals ---- */
+.totalsSection {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 0;
+  border-top: 2px solid var(--border-default);
+}
+
+.totalRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 4px 20px;
+}
+
+.totalLabel {
+  margin: 0;
+}
+
+.totalValue {
+  margin: 0;
+}
+
+.totalNormal {
+  font-size: 18px;
+  font-weight: 400;
+}
+
+.totalBold {
+  font-size: 28px;
+  font-weight: 700;
+}
+
+.totalsThickDivider {
+  height: 2px;
+  background-color: var(--surface-overlay-light);
+  margin: 6px 20px;
+  flex-shrink: 0;
+}
+
+.paidBadgeBox {
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  padding: 10px 0;
+  margin: 8px 20px 0 20px;
+  align-items: center;
+}
+
+.paidBadgeText {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  margin: 0;
+  color: var(--text-on-accent);
+}
+
+/* ---- Sale overlay ---- */
+.overlayPanel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  background-color: rgba(255, 255, 255, 0.88);
+  justify-content: space-between;
+}
+
+.overlayPanelHeader {
+  display: flex;
+  flex-direction: column;
+}
+
+.overlayPanelHeaderInner {
+  display: flex;
+  flex-direction: column;
+  padding: 14px 0;
+  align-items: center;
+}
+
+.overlayPanelHeaderText {
+  font-size: 20px;
+  font-weight: 400;
+  margin: 0;
+}
+
+.overlayPanelHeaderDivider {
+  height: 1px;
+  background-color: var(--surface-overlay-light);
+  margin: 0 20px;
+  flex-shrink: 0;
+}
+
+.saleTotalsBox {
+  display: flex;
+  flex-direction: column;
+  padding: 12px 0;
+}
+
+.saleTotalsDivider {
+  height: 1px;
+  background-color: var(--surface-overlay-light);
+  margin: 0 20px 12px 20px;
+  flex-shrink: 0;
+}
+
+.saleInnerDivider {
+  height: 8px;
+  border-bottom: 1px solid var(--surface-overlay-light);
+  margin: 0 20px;
+  flex-shrink: 0;
+}
+
+.saleDividerSpacer {
+  height: 8px;
+  flex-shrink: 0;
+}
+
+.salePaymentBlock {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+  padding: 0 20px;
+}
+
+.salePaidBadge {
+  display: flex;
+  flex-direction: column;
+  margin: 12px 20px 0 20px;
+  align-items: center;
+  border-radius: 8px;
+  padding: 12px 0;
+}
+
+.salePaidBadgeText {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-on-accent);
+  margin: 0;
+}
+
+/* ---- Customer info section (legacy/unused) ---- */
+.customerInfoBox {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 20px;
+}
+
+.customerNameText {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.customerLineText {
+  font-size: 14px;
+  margin: 0;
+}
+
+.customerAddressText {
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+/* ---- Media overlay ---- */
+.mediaOverlay {
+  display: flex;
+  flex-direction: column;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--surface-overlay-heavy);
+  justify-content: center;
+  align-items: center;
+}
+
+.mediaVideo {
+  max-width: 90%;
+  max-height: 90%;
+  border-radius: 8px;
+}
+
+.mediaImage {
+  width: 90%;
+  height: 90%;
+  border-radius: 8px;
+  object-fit: contain;
+}

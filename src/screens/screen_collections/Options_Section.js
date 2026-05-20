@@ -1,18 +1,12 @@
 /* eslint-disable */
 
-import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native-web";
-import {
-  checkInternetConnection,
-  convertMillisToHoursMins,
-  dim,
-  localStorageWrapper,
-  log,
-} from "../../utils";
-import { Image_, Button_, Tooltip } from "../../components";
+import { checkInternetConnection, convertMillisToHoursMins, dim, localStorageWrapper, log } from "../../utils";
+import { Button, Tooltip } from "../../dom_components";
 import { TabMenuButton } from "../../dom_components/TabMenuButton/TabMenuButton";
 import { C, COLOR_GRADIENTS, Fonts, ICONS, Z } from "../../styles";
 import { TAB_NAMES } from "../../data";
 import tabBarStyles from "./OptionsTabBar.module.css";
+import styles from "./Options_Section.module.css";
 // import { QuickItemsTab } from "./Options_QuickItemsTab";
 import ReactDOM from "react-dom";
 import React, { useEffect, useRef, useState, useCallback, Suspense, lazy } from "react";
@@ -35,7 +29,7 @@ const PayrollModal = lazy(() =>
 );
 import { getWeekStart, formatTimeShort, getStoreHoursForDayIndex } from "../screen_components/modal_screens/ScheduleModal";
 import dayjs from "dayjs";
-import { gray } from "../../utils";
+
 
 export const Options_Section = React.memo(({}) => {
   // store getters ///////////////////////////////////////////////////////////////
@@ -70,7 +64,7 @@ export const Options_Section = React.memo(({}) => {
   }
 
   return (
-    <View style={{ height: "100%", width: "100%", backgroundColor: null }}>
+    <div className={styles.sectionRoot}>
       <TabBar
         zOptionsTabName={zOptionsTabName}
         handleUserPress={handleUserClockPress}
@@ -94,7 +88,7 @@ export const Options_Section = React.memo(({}) => {
           }}
         />
       )}
-    </View>
+    </div>
   );
 });
 
@@ -141,7 +135,7 @@ export const TabBar = ({
 
   function UserButton() {
     return (
-      <Tooltip text="Press for user, right-click to log out" position="bottom" hideOnPress>
+      <Tooltip text="Press for user, right-click to log out" position="bottom">
         <div
           className={tabBarStyles.userBtnWrap}
           onContextMenu={(e) => {
@@ -349,9 +343,9 @@ const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 function ScheduleWeekRow({ label, user, weekStart, schedules, storeHours, todayStr }) {
   let weekShifts = schedules?.[weekStart]?.shifts || {};
   return (
-    <View style={{ width: "100%", marginBottom: 10 }}>
-      <Text style={{ fontSize: 13, fontWeight: "700", color: "rgb(130,130,130)", marginBottom: 6 }}>{label}</Text>
-      <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+    <div className={styles.weekRow}>
+      <p className={styles.weekLabel}>{label}</p>
+      <div className={styles.weekDaysRow}>
         {DAY_LABELS.map((dayName, i) => {
           let dayIndex = i + 1;
           let shiftKey = `${user?.id}_${dayIndex}`;
@@ -362,49 +356,44 @@ function ScheduleWeekRow({ label, user, weekStart, schedules, storeHours, todayS
           let isToday = dateStr === todayStr;
 
           return (
-            <View
+            <div
               key={dayIndex}
+              className={styles.dayCell}
               style={{
-                flex: 1,
-                alignItems: "center",
-                marginHorizontal: 3,
-                backgroundColor: shift ? "#e8f5e9" : "rgb(235,235,235)",
-                borderRadius: 10,
-                paddingVertical: 10,
-                borderWidth: isToday ? 2 : 1,
-                borderColor: isToday ? C.blue : shift ? C.green : "rgb(210,210,210)",
-                minHeight: 70,
-                justifyContent: "center",
+                backgroundColor: shift ? C.surfaceSuccessMuted : C.borderSubtle,
+                border: `${isToday ? 2 : 1}px solid ${
+                  isToday ? C.blue : shift ? C.green : C.borderStrong
+                }`,
               }}
             >
-              <Text
+              <span
+                className={styles.dayName}
                 style={{
-                  fontSize: 14,
-                  fontWeight: isToday ? "800" : "700",
+                  fontWeight: isToday ? 800 : 700,
                   color: isToday ? C.blue : C.text,
                 }}
               >
                 {dayName}
-              </Text>
+              </span>
               {isClosed ? (
-                <Text style={{ fontSize: 11, color: "rgb(140,140,140)", marginTop: 3, fontWeight: "600" }}>OFF</Text>
+                <span className={styles.dayOff}>OFF</span>
               ) : shift ? (
-                <View style={{ alignItems: "center", marginTop: 3 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: C.text }}>
+                <div className={styles.dayShift}>
+                  <span className={styles.dayShiftTime}>
                     {formatTimeShort(shift.startTime)}
-                  </Text>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: C.text }}>
+                  </span>
+                  <span className={styles.dayShiftTime}>
                     {formatTimeShort(shift.endTime)}
-                  </Text>
-                </View>
+                  </span>
+                </div>
               ) : (
-                <Text style={{ fontSize: 12, color: "rgb(160,160,160)", marginTop: 3 }}>-</Text>
+                <span className={styles.dayEmpty}>-</span>
               )}
-            </View>
+            </div>
           );
         })}
-      </View>
-    </View>
+      </div>
+    </div>
   );
 }
 
@@ -473,72 +462,23 @@ const UserClockModal = ({ user, handleExit, handleViewHistory }) => {
   let todayStr = dayjs().format("YYYY-MM-DD");
 
   return ReactDOM.createPortal(
-    <View
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.4)",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: Z.modal,
-      }}
-    >
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={handleExit}
-        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, cursor: "default" }}
+    <div className={styles.modalOverlay} style={{ zIndex: Z.modal }}>
+      <button
+        type="button"
+        aria-label="Close"
+        className={styles.modalBackdropBtn}
+        onClick={handleExit}
       />
-      <View
-        style={{
-          backgroundColor: C.backgroundWhite,
-          borderRadius: 15,
-          alignItems: "center",
-          minWidth: 700,
-          maxWidth: 800,
-          width: "50%",
-          overflow: "hidden",
-        }}
-      >
+      <div className={styles.modalCard}>
         {/* ─── title + clock status ───────────────────────────── */}
-        <Text
-          style={{
-            fontWeight: "500",
-            marginTop: 25,
-            fontSize: 25,
-            color: "red",
-            textAlign: "center",
-          }}
-        >
-          PUNCH CLOCK
-        </Text>
-        <Text
-          style={{
-            textAlign: "center",
-            width: "90%",
-            marginTop: 10,
-            fontSize: 18,
-            color: gray(0.25),
-          }}
-        >
+        <p className={styles.modalTitle}>PUNCH CLOCK</p>
+        <p className={styles.modalClockMessage} style={{ color: C.textDisabled }}>
           {clockMessage}
-        </Text>
+        </p>
 
         {/* ─── 3 buttons in a row ─────────────────────────────── */}
-        <View
-          style={{
-            marginTop: 25,
-            marginBottom: 25,
-            flexDirection: "row",
-            justifyContent: "center",
-            alignItems: "center",
-            width: "100%",
-            paddingHorizontal: 20,
-          }}
-        >
-          <Button_
+        <div className={styles.modalButtonsRow}>
+          <Button
             colorGradientArr={COLOR_GRADIENTS.green}
             text={option === "in" ? "CLOCK IN" : "CLOCK OUT"}
             buttonStyle={{ paddingVertical: 4, marginHorizontal: 6, flex: 1 }}
@@ -547,7 +487,7 @@ const UserClockModal = ({ user, handleExit, handleViewHistory }) => {
             iconSize={60}
             icon={ICONS.clockGif}
           />
-          <Button_
+          <Button
             colorGradientArr={COLOR_GRADIENTS.blue}
             text="VIEW HISTORY"
             buttonStyle={{ paddingVertical: 4, marginHorizontal: 6, flex: 1 }}
@@ -556,7 +496,7 @@ const UserClockModal = ({ user, handleExit, handleViewHistory }) => {
             iconSize={60}
             icon={ICONS.listGif}
           />
-          <Button_
+          <Button
             colorGradientArr={COLOR_GRADIENTS.purple}
             text="CANCEL"
             buttonStyle={{ paddingVertical: 4, marginHorizontal: 6, flex: 1 }}
@@ -565,17 +505,12 @@ const UserClockModal = ({ user, handleExit, handleViewHistory }) => {
             iconSize={60}
             icon={ICONS.cancelGif}
           />
-        </View>
+        </div>
 
         {/* ─── schedule: this week + next week ────────────────── */}
-        <View
-          style={{
-            width: "100%",
-            borderTopWidth: 1,
-            borderTopColor: gray(0.12),
-            paddingVertical: 16,
-            paddingHorizontal: 20,
-          }}
+        <div
+          className={styles.scheduleWrap}
+          style={{ borderTopColor: C.borderSubtle }}
         >
           <ScheduleWeekRow
             label="This Week"
@@ -593,9 +528,9 @@ const UserClockModal = ({ user, handleExit, handleViewHistory }) => {
             storeHours={storeHours}
             todayStr={todayStr}
           />
-        </View>
-      </View>
-    </View>,
+        </div>
+      </div>
+    </div>,
     document.body
   );
 };
@@ -613,96 +548,42 @@ const CameraPreviewModal = ({ visible, onClose }) => {
   if (!visible) return null;
 
   return ReactDOM.createPortal(
-    <View
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0, 0, 0, 0.5)",
-        justifyContent: "center",
-        alignItems: "center",
-        zIndex: Z.modal,
-      }}
-    >
-      <TouchableOpacity
-        activeOpacity={1}
-        onPress={onClose}
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          cursor: "default",
-        }}
+    <div className={styles.camOverlay} style={{ zIndex: Z.modal }}>
+      <button
+        type="button"
+        aria-label="Close"
+        className={styles.modalBackdropBtn}
+        onClick={onClose}
       />
-      <View
-        style={{
-          width: 520,
-          backgroundColor: C.backgroundWhite,
-          borderRadius: 12,
-          borderWidth: 2,
-          borderColor: C.buttonLightGreenOutline,
-          padding: 20,
-        }}
-      >
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: 16,
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: Fonts.weight.textHeavy,
-              color: C.text,
-            }}
+      <div className={styles.camCard}>
+        <div className={styles.camHeader}>
+          <span
+            className={styles.camTitle}
+            style={{ fontWeight: Fonts.weight.textHeavy }}
           >
             Camera Preview
-          </Text>
-          <TouchableOpacity onPress={onClose}>
-            <Image_ source={ICONS.close1} width={18} height={18} />
-          </TouchableOpacity>
-        </View>
-        <View
-          style={{
-            borderRadius: 10,
-            overflow: "hidden",
-            borderWidth: 2,
-            borderColor: C.buttonLightGreenOutline,
-            backgroundColor: "black",
-          }}
-        >
-          <video
-            ref={videoRef}
-            autoPlay
-            muted
-            style={{
-              width: "100%",
-              display: "block",
-              borderRadius: 8,
-            }}
-          />
-        </View>
-        {!zCameraStream && (
-          <Text
-            style={{
-              fontSize: 14,
-              color: C.red,
-              textAlign: "center",
-              marginTop: 12,
-            }}
+          </span>
+          <button
+            type="button"
+            className={styles.camCloseBtn}
+            onClick={onClose}
+            aria-label="Close camera preview"
           >
-            No camera stream available
-          </Text>
+            <img
+              src={typeof ICONS.close1 === "object" ? ICONS.close1.default || ICONS.close1 : ICONS.close1}
+              alt=""
+              className={styles.camCloseIcon}
+            />
+          </button>
+        </div>
+        <div className={styles.camVideoWrap}>
+          <video ref={videoRef} autoPlay muted className={styles.camVideo} />
+        </div>
+        {!zCameraStream && (
+          <p className={styles.camNoStream}>No camera stream available</p>
         )}
-      </View>
-    </View>,
+      </div>
+    </div>,
     document.body
   );
 };

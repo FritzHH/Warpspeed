@@ -1,30 +1,21 @@
 /* eslint-disable */
 import React, { useEffect, useState, useRef } from "react";
-import { View, Text, ScrollView, Image, TouchableOpacity } from "react-native-web";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   useOpenWorkordersStore,
   useSettingsStore,
 } from "../../stores";
-import { TextInput_, DropdownMenu, Image_, Button_ } from "../../components";
+import { TextInput, DropdownMenu, Image, Button } from "../../dom_components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
 import { COLORS } from "../../data";
-import {
-  capitalizeFirstLetterOfString,
-  formatPhoneWithDashes,
-  formatMillisForDisplay,
-  resolveStatus,
-  formatCurrencyDisp,
-  gray,
-  log,
-  scheduleAutoText,
-} from "../../utils";
+import { capitalizeFirstLetterOfString, formatPhoneWithDashes, formatMillisForDisplay, resolveStatus, formatCurrencyDisp, log, scheduleAutoText } from "../../utils";
 import {
   dbUploadWorkorderMedia,
   dbListenToSingleWorkorder,
 } from "../../db_calls_wrapper";
 import { WorkorderMediaModal } from "../screen_components/modal_screens/WorkorderMediaModal";
 import cloneDeep from "lodash/cloneDeep";
+import styles from "./MobileWorkorderDetailScreen.module.css";
 
 export function MobileWorkorderDetailScreen() {
   const { id } = useParams();
@@ -38,7 +29,6 @@ export function MobileWorkorderDetailScreen() {
   const [sUploading, _setUploading] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Listen to this specific workorder for real-time updates
   useEffect(() => {
     if (!id) return;
     const unsubscribe = dbListenToSingleWorkorder(id, (data) => {
@@ -51,17 +41,11 @@ export function MobileWorkorderDetailScreen() {
 
   if (!zWorkorder) {
     return (
-      <View
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
-        <Text style={{ color: C.lightText, fontSize: 16 }}>
+      <div className={styles.notFound}>
+        <span className={styles.notFoundText} style={{ color: C.lightText }}>
           Workorder not found
-        </Text>
-      </View>
+        </span>
+      </div>
     );
   }
 
@@ -102,142 +86,70 @@ export function MobileWorkorderDetailScreen() {
     outlineWidth: 0,
   };
 
-  const LABEL_STYLE = {
-    fontSize: 13,
-    color: C.lightText,
-    marginBottom: 4,
-    marginLeft: 2,
-  };
-
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: C.backgroundWhite }}
-      contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
-    >
+    <div className={styles.scroll} style={{ backgroundColor: C.backgroundWhite }}>
       {/* Customer Info Header */}
-      <View
+      <div
+        className={styles.customerCard}
         style={{
           backgroundColor: C.buttonLightGreen,
           borderColor: C.buttonLightGreenOutline,
-          borderWidth: 1,
-          borderRadius: 10,
-          padding: 16,
-          marginBottom: 16,
         }}
       >
-        <Text
-          style={{
-            fontSize: 20,
-            fontWeight: "600",
-            color: C.text,
-          }}
-        >
+        <span className={styles.customerName} style={{ color: C.text }}>
           {capitalizeFirstLetterOfString(zWorkorder.customerFirst) +
             " " +
             capitalizeFirstLetterOfString(zWorkorder.customerLast)}
-        </Text>
+        </span>
         {!!zWorkorder.customerCell && (
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginTop: 8,
-            }}
-          >
-            <Image_
-              icon={ICONS.cellPhone}
-              size={18}
-              style={{ marginRight: 6 }}
-            />
-            <Text style={{ color: C.text, fontSize: 14 }}>
+          <div className={styles.customerCellRow}>
+            <Image icon={ICONS.cellPhone} size={18} style={{ marginRight: 6 }} />
+            <span className={styles.customerCellText} style={{ color: C.text }}>
               {formatPhoneWithDashes(zWorkorder.customerCell)}
-            </Text>
-          </View>
+            </span>
+          </div>
         )}
-        <Text
-          style={{
-            color: C.lightText,
-            fontSize: 13,
-            marginTop: 4,
-          }}
-        >
+        <span className={styles.customerOpened} style={{ color: C.lightText }}>
           Opened: {formatMillisForDisplay(zWorkorder.startedOnMillis)}
-        </Text>
-      </View>
+        </span>
+      </div>
 
-      {/* Photos & Videos Section — PRIORITY: at top */}
-      <View
-        style={{
-          backgroundColor: C.backgroundListWhite,
-          borderWidth: 1,
-          borderColor: gray(0.9),
-          borderRadius: 10,
-          padding: 14,
-          marginBottom: 16,
-        }}
+      {/* Photos & Videos Section */}
+      <div
+        className={styles.section}
+        style={{ backgroundColor: C.backgroundListWhite, borderColor: C.borderStrong }}
       >
-        <Text
-          style={{
-            fontSize: 14,
-            fontWeight: "600",
-            color: C.text,
-            marginBottom: 10,
-          }}
-        >
+        <span className={styles.sectionTitle} style={{ color: C.text }}>
           Photos & Videos
-          {zWorkorder.media?.length > 0
-            ? ` (${zWorkorder.media.length})`
-            : ""}
-        </Text>
+          {zWorkorder.media?.length > 0 ? ` (${zWorkorder.media.length})` : ""}
+        </span>
 
-        {/* Thumbnail preview grid */}
         {zWorkorder.media?.length > 0 && (
-          <View
-            style={{
-              flexDirection: "row",
-              flexWrap: "wrap",
-              gap: 6,
-              marginBottom: 12,
-            }}
-          >
+          <div className={styles.thumbGrid}>
             {zWorkorder.media.slice(0, 6).map((item) => (
-              <TouchableOpacity
+              <button
+                type="button"
                 key={item.id}
-                onPress={() => _setShowMediaModal("view")}
-                style={{
-                  width: "31%",
-                  aspectRatio: 1,
-                  borderRadius: 6,
-                  borderWidth: 1,
-                  borderColor: gray(0.85),
-                  overflow: "hidden",
-                  backgroundColor: gray(0.95),
-                }}
+                onClick={() => _setShowMediaModal("view")}
+                className={styles.thumb}
+                style={{ borderColor: C.borderStrong, backgroundColor: C.surfaceAlt }}
               >
                 {item.type === "video" ? (
-                  <View
-                    style={{
-                      flex: 1,
-                      justifyContent: "center",
-                      alignItems: "center",
-                      backgroundColor: gray(0.2),
-                    }}
-                  >
-                    <Text style={{ color: "white", fontSize: 24 }}>▶</Text>
-                  </View>
+                  <div className={styles.thumbVideo} style={{ backgroundColor: C.surfaceAlt }}>
+                    <span className={styles.thumbVideoPlay}>▶</span>
+                  </div>
                 ) : (
-                  <Image
-                    source={{ uri: item.url }}
-                    style={{ width: "100%", height: "100%" }}
-                    resizeMode="cover"
+                  <img
+                    src={item.url}
+                    alt=""
+                    className={styles.thumbImg}
                   />
                 )}
-              </TouchableOpacity>
+              </button>
             ))}
-          </View>
+          </div>
         )}
 
-        {/* Hidden file input for camera capture */}
         <input
           ref={fileInputRef}
           type="file"
@@ -263,10 +175,10 @@ export function MobileWorkorderDetailScreen() {
             _setUploading(false);
             if (fileInputRef.current) fileInputRef.current.value = "";
           }}
-          style={{ display: "none" }}
+          className={styles.hiddenFileInput}
         />
 
-        <Button_
+        <Button
           text={sUploading ? "Uploading..." : "Take Photo / Video"}
           icon={ICONS.camera}
           iconSize={20}
@@ -281,86 +193,61 @@ export function MobileWorkorderDetailScreen() {
           textStyle={{ fontSize: 16, fontWeight: "500" }}
         />
         {zWorkorder.media?.length > 0 && (
-          <Button_
+          <Button
             text={`View All Media (${zWorkorder.media.length})`}
             icon={ICONS.eyeballs}
             iconSize={18}
             colorGradientArr={COLOR_GRADIENTS.blue}
             onPress={() => _setShowMediaModal("view")}
-            buttonStyle={{
-              paddingVertical: 12,
-              borderRadius: 5,
-            }}
+            buttonStyle={{ paddingVertical: 12, borderRadius: 5 }}
             textStyle={{ fontSize: 15, fontWeight: "500" }}
           />
         )}
-      </View>
+      </div>
 
       {/* Navigation Buttons — Items + Messages */}
-      <View style={{ flexDirection: "row", marginBottom: 16 }}>
-        <TouchableOpacity
-          onPress={() => navigate(`/workorder/${id}/items`)}
+      <div className={styles.navRow}>
+        <button
+          type="button"
+          onClick={() => navigate(`/workorder/${id}/items`)}
+          className={`${styles.navBtn} ${styles.navBtnFirst}`}
           style={{
-            flex: 1,
             backgroundColor: C.buttonLightGreen,
             borderColor: C.buttonLightGreenOutline,
-            borderWidth: 1,
-            borderRadius: 5,
-            paddingVertical: 14,
-            alignItems: "center",
-            marginRight: 8,
           }}
         >
-          <Image_ icon={ICONS.shoppingCart} size={22} />
-          <Text
-            style={{
-              color: C.text,
-              fontSize: 14,
-              fontWeight: "500",
-              marginTop: 4,
-            }}
-          >
+          <Image icon={ICONS.shoppingCart} size={22} />
+          <span className={styles.navBtnLabel} style={{ color: C.text }}>
             Items ({zWorkorder.workorderLines?.length || 0})
-          </Text>
-        </TouchableOpacity>
+          </span>
+        </button>
 
-        <TouchableOpacity
-          onPress={() => navigate(`/workorder/${id}/messages`)}
+        <button
+          type="button"
+          onClick={() => navigate(`/workorder/${id}/messages`)}
+          className={styles.navBtn}
           style={{
-            flex: 1,
             backgroundColor: C.buttonLightGreen,
             borderColor: C.buttonLightGreenOutline,
-            borderWidth: 1,
-            borderRadius: 5,
-            paddingVertical: 14,
-            alignItems: "center",
           }}
         >
-          <Image_ icon={ICONS.cellPhone} size={22} />
-          <Text
-            style={{
-              color: C.text,
-              fontSize: 14,
-              fontWeight: "500",
-              marginTop: 4,
-            }}
-          >
+          <Image icon={ICONS.cellPhone} size={22} />
+          <span className={styles.navBtnLabel} style={{ color: C.text }}>
             Messages
-          </Text>
-        </TouchableOpacity>
-      </View>
+          </span>
+        </button>
+      </div>
 
       {/* Status */}
       {(() => {
         const rs = resolveStatus(zWorkorder?.status, zSettings?.statuses);
         return (
-          <View style={{ marginBottom: 16 }}>
-            <Text style={LABEL_STYLE}>Status</Text>
+          <div className={styles.statusBlock}>
+            <span className={styles.label} style={{ color: C.lightText }}>Status</span>
             <DropdownMenu
               dataArr={zSettings?.statuses || []}
               onSelect={(val) => {
                 setField("status", val.id);
-                // Auto-text: check if this status has an auto-text rule
                 const autoTextRules = zSettings?.statusAutoText || [];
                 const rule = autoTextRules.find((r) => r.statusID === val.id);
                 if (rule) {
@@ -381,24 +268,17 @@ export function MobileWorkorderDetailScreen() {
               }}
               buttonText={rs.label || "Select Status"}
             />
-          </View>
+          </div>
         );
       })()}
 
       {/* Bike Info Section */}
-      <View
-        style={{
-          backgroundColor: C.backgroundListWhite,
-          borderWidth: 1,
-          borderColor: gray(0.9),
-          borderRadius: 10,
-          padding: 14,
-          marginBottom: 16,
-        }}
+      <div
+        className={styles.section}
+        style={{ backgroundColor: C.backgroundListWhite, borderColor: C.borderStrong }}
       >
-        {/* Brand */}
-        <Text style={LABEL_STYLE}>Brand</Text>
-        <TextInput_
+        <span className={styles.label} style={{ color: C.lightText }}>Brand</span>
+        <TextInput
           placeholder="Brand"
           style={{
             ...FIELD_STYLE,
@@ -408,31 +288,25 @@ export function MobileWorkorderDetailScreen() {
           value={zWorkorder.brand || ""}
           onChangeText={(val) => setField("brand", val)}
         />
-        <View
-          style={{
-            flexDirection: "row",
-            marginBottom: 12,
-          }}
-        >
-          <View style={{ flex: 1, marginRight: 4 }}>
+        <div className={styles.row}>
+          <div className={styles.colLeft}>
             <DropdownMenu
               dataArr={zSettings?.bikeBrands || []}
               onSelect={(item) => setField("brand", item)}
               buttonText={zSettings?.bikeBrandsName || "Bikes"}
             />
-          </View>
-          <View style={{ flex: 1, marginLeft: 4 }}>
+          </div>
+          <div className={styles.colRight}>
             <DropdownMenu
               dataArr={zSettings?.bikeOptionalBrands || []}
               onSelect={(item) => setField("brand", item)}
               buttonText={zSettings?.bikeOptionalBrandsName || "E-bikes"}
             />
-          </View>
-        </View>
+          </div>
+        </div>
 
-        {/* Model/Description */}
-        <Text style={LABEL_STYLE}>Model / Description</Text>
-        <TextInput_
+        <span className={styles.label} style={{ color: C.lightText }}>Model / Description</span>
+        <TextInput
           placeholder="Model/Description"
           style={{
             ...FIELD_STYLE,
@@ -442,98 +316,80 @@ export function MobileWorkorderDetailScreen() {
           value={zWorkorder.description || ""}
           onChangeText={(val) => setField("description", val)}
         />
-        <View style={{ marginBottom: 12 }}>
+        <div className={styles.singleDropdownWrap}>
           <DropdownMenu
             dataArr={zSettings?.bikeDescriptions || []}
             onSelect={(item) => setField("description", item)}
             buttonText="Descriptions"
           />
-        </View>
+        </div>
 
-        {/* Colors */}
-        <View style={{ flexDirection: "row", marginBottom: 12 }}>
-          <View style={{ flex: 1, marginRight: 4 }}>
-            <Text style={LABEL_STYLE}>Color 1</Text>
-            <TextInput_
+        <div className={styles.row}>
+          <div className={styles.colLeft}>
+            <span className={styles.label} style={{ color: C.lightText }}>Color 1</span>
+            <TextInput
               placeholder="Color 1"
               value={zWorkorder.color1?.label || ""}
               style={{
                 ...FIELD_STYLE,
-                backgroundColor:
-                  zWorkorder.color1?.backgroundColor || C.listItemWhite,
+                backgroundColor: zWorkorder.color1?.backgroundColor || C.listItemWhite,
                 color: zWorkorder.color1?.textColor || C.text,
                 fontWeight: zWorkorder.color1?.label ? "500" : "400",
               }}
               onChangeText={(val) => setBikeColor(val, "color1")}
             />
-          </View>
-          <View style={{ flex: 1, marginLeft: 4 }}>
-            <Text style={LABEL_STYLE}>Color 2</Text>
-            <TextInput_
+          </div>
+          <div className={styles.colRight}>
+            <span className={styles.label} style={{ color: C.lightText }}>Color 2</span>
+            <TextInput
               placeholder="Color 2"
               value={zWorkorder.color2?.label || ""}
               style={{
                 ...FIELD_STYLE,
-                backgroundColor:
-                  zWorkorder.color2?.backgroundColor || C.listItemWhite,
+                backgroundColor: zWorkorder.color2?.backgroundColor || C.listItemWhite,
                 color: zWorkorder.color2?.textColor || C.text,
                 fontWeight: zWorkorder.color2?.label ? "500" : "400",
               }}
               onChangeText={(val) => setBikeColor(val, "color2")}
             />
-          </View>
-        </View>
+          </div>
+        </div>
 
-        {/* Wait Time */}
-        <Text style={LABEL_STYLE}>Estimated Wait</Text>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            marginBottom: 8,
-          }}
-        >
-          <View style={{ flex: 1, marginRight: 4 }}>
-            <View
+        <span className={styles.label} style={{ color: C.lightText }}>Estimated Wait</span>
+        <div className={styles.waitRow}>
+          <div className={styles.colLeft}>
+            <div
+              className={styles.waitDisplay}
               style={{
-                ...FIELD_STYLE,
-                paddingVertical: 14,
-                justifyContent: "center",
+                borderColor: C.buttonLightGreenOutline,
+                backgroundColor: C.listItemWhite,
               }}
             >
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: zWorkorder.waitTime?.label ? C.text : C.lightText,
-                }}
+              <span
+                className={styles.waitDisplayText}
+                style={{ color: zWorkorder.waitTime?.label ? C.text : C.lightText }}
               >
                 {zWorkorder.waitTime?.label || "Not set"}
-              </Text>
-            </View>
-          </View>
-          <View style={{ flex: 1, marginLeft: 4 }}>
+              </span>
+            </div>
+          </div>
+          <div className={styles.colRight}>
             <DropdownMenu
               dataArr={zSettings?.waitTimes || []}
               onSelect={(item) => setField("waitTime", item)}
               buttonText="Wait Times"
             />
-          </View>
-        </View>
-      </View>
+          </div>
+        </div>
+      </div>
 
       {/* Part Info Section */}
-      <View
-        style={{
-          backgroundColor: C.backgroundListWhite,
-          borderWidth: 1,
-          borderColor: gray(0.9),
-          borderRadius: 10,
-          padding: 14,
-          marginBottom: 16,
-        }}
+      <div
+        className={styles.section}
+        style={{ backgroundColor: C.backgroundListWhite, borderColor: C.borderStrong }}
       >
-        <Text style={LABEL_STYLE}>Part Ordered</Text>
-        <TextInput_
+        <span className={styles.label} style={{ color: C.lightText }}>Part Ordered</span>
+        <TextInput
           placeholder="Part Ordered"
           style={{
             ...FIELD_STYLE,
@@ -544,8 +400,8 @@ export function MobileWorkorderDetailScreen() {
           onChangeText={(val) => setField("partOrdered", val)}
         />
 
-        <Text style={LABEL_STYLE}>Part Source</Text>
-        <TextInput_
+        <span className={styles.label} style={{ color: C.lightText }}>Part Source</span>
+        <TextInput
           placeholder="Part Source"
           style={{
             ...FIELD_STYLE,
@@ -560,147 +416,78 @@ export function MobileWorkorderDetailScreen() {
           onSelect={(item) => setField("partSource", item)}
           buttonText="Part Sources"
         />
-      </View>
+      </div>
 
       {/* Workorder Items Section — tap to edit */}
-      <TouchableOpacity
-        activeOpacity={0.7}
-        onPress={() => navigate(`/workorder/${id}/items`)}
-        style={{
-          backgroundColor: C.backgroundListWhite,
-          borderWidth: 1,
-          borderColor: gray(0.9),
-          borderRadius: 10,
-          padding: 14,
-          marginBottom: 16,
-        }}
+      <button
+        type="button"
+        onClick={() => navigate(`/workorder/${id}/items`)}
+        className={styles.itemsCard}
+        style={{ backgroundColor: C.backgroundListWhite, borderColor: C.borderStrong }}
       >
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            marginBottom: zWorkorder.workorderLines?.length > 0 ? 10 : 0,
-          }}
+        <div
+          className={styles.itemsHeader}
+          style={{ marginBottom: zWorkorder.workorderLines?.length > 0 ? 10 : 0 }}
         >
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: "600",
-              color: C.text,
-            }}
-          >
+          <span className={styles.itemsHeaderTitle} style={{ color: C.text }}>
             Items ({zWorkorder.workorderLines?.length || 0})
-          </Text>
-          <Text
-            style={{
-              fontSize: 13,
-              color: C.blue,
-              fontWeight: "500",
-            }}
-          >
+          </span>
+          <span className={styles.itemsTapToEdit} style={{ color: C.blue }}>
             Tap to edit
-          </Text>
-        </View>
+          </span>
+        </div>
         {zWorkorder.workorderLines?.map((line, idx) => {
           const item = line.inventoryItem;
-          const unitPrice = line.useSalePrice
-            ? item?.salePrice
-            : item?.price;
+          const unitPrice = line.useSalePrice ? item?.salePrice : item?.price;
           const lineTotal = line.discountObj?.newPrice
             ? line.discountObj.newPrice
             : (unitPrice || 0) * (line.qty || 1);
           return (
-            <View
+            <div
               key={line.id || idx}
+              className={styles.lineRow}
               style={{
-                paddingVertical: 10,
-                borderTopWidth: idx > 0 ? 1 : 0,
-                borderTopColor: gray(0.9),
+                borderTop: idx > 0 ? `1px solid ${C.borderStrong}` : "none",
               }}
             >
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                }}
-              >
-                <View style={{ flex: 1, marginRight: 8 }}>
-                  <Text
-                    style={{
-                      fontSize: 15,
-                      fontWeight: "500",
-                      color: C.text,
-                    }}
-                    numberOfLines={2}
-                  >
+              <div className={styles.lineMain}>
+                <div className={styles.lineNameCol}>
+                  <span className={styles.lineName} style={{ color: C.text }}>
                     {item?.formalName || "Unknown Item"}
-                  </Text>
+                  </span>
                   {line.qty > 1 && (
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        color: C.lightText,
-                        marginTop: 2,
-                      }}
-                    >
+                    <span className={styles.lineQty} style={{ color: C.lightText }}>
                       Qty: {line.qty} x ${formatCurrencyDisp(unitPrice)}
-                    </Text>
+                    </span>
                   )}
                   {!!line.discountObj?.name && (
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        color: C.lightred,
-                        marginTop: 2,
-                      }}
-                    >
+                    <span className={styles.lineDiscount} style={{ color: C.lightred }}>
                       {line.discountObj.name}
                       {line.discountObj.savings
                         ? " (-$" + formatCurrencyDisp(line.discountObj.savings) + ")"
                         : ""}
-                    </Text>
+                    </span>
                   )}
-                </View>
-                <Text
-                  style={{
-                    fontSize: 15,
-                    fontWeight: "500",
-                    color: C.text,
-                  }}
-                >
+                </div>
+                <span className={styles.linePrice} style={{ color: C.text }}>
                   ${formatCurrencyDisp(lineTotal)}
-                </Text>
-              </View>
+                </span>
+              </div>
               {!!line.intakeNotes && (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: "orange",
-                    marginTop: 4,
-                  }}
-                >
+                <span className={styles.lineIntake} style={{ color: "orange" }}>
                   {line.intakeNotes}
-                </Text>
+                </span>
               )}
               {!!line.receiptNotes && (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: C.green,
-                    marginTop: 2,
-                  }}
-                >
+                <span className={styles.lineReceipt} style={{ color: C.green }}>
                   {line.receiptNotes}
-                </Text>
+                </span>
               )}
-            </View>
+            </div>
           );
         })}
-      </TouchableOpacity>
+      </button>
 
-      {/* Media Modal */}
       {sShowMediaModal && (
         <WorkorderMediaModal
           visible={!!sShowMediaModal}
@@ -710,8 +497,7 @@ export function MobileWorkorderDetailScreen() {
         />
       )}
 
-      {/* Bottom spacer */}
-      <View style={{ height: 40 }} />
-    </ScrollView>
+      <div className={styles.bottomSpacer} />
+    </div>
   );
 }

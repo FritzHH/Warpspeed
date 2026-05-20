@@ -1,7 +1,7 @@
 import React, { useRef, useState } from "react";
 import { Button } from "../../../../../dom_components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../../styles";
-import { gray } from "../../../../../utils";
+
 import { SETTINGS_OBJ } from "../../../../../data";
 import { TemplateRow } from "./TemplateRow";
 import { EmojiPickerModal } from "./EmojiPickerModal";
@@ -188,7 +188,7 @@ export const TextTemplatesComponent = ({
               paddingHorizontal: 12,
               paddingVertical: 6,
               borderRadius: 5,
-              backgroundColor: gray(0.2),
+              backgroundColor: C.surfaceAlt,
             }}
           />
         </div>

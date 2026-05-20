@@ -14,31 +14,7 @@ import {
   useLoginStore,
   useAlertScreenStore,
 } from "../stores";
-import {
-  resolveStatus,
-  formatCurrencyDisp,
-  gray,
-  lightenRGBByPercent,
-  capitalizeFirstLetterOfString,
-  applyDiscountToWorkorderItem,
-  calculateRunningTotals,
-  deepEqual,
-  removeDashesFromPhone,
-  formatPhoneWithDashes,
-  checkInputForNumbersOnly,
-  calculateWaitEstimateLabel,
-  formatMillisForDisplay,
-  compressImage,
-  createNewWorkorder,
-  scheduleAutoText,
-  usdTypeMask,
-  generateEAN13Barcode,
-  log,
-  printBuilder,
-  localStorageWrapper,
-  replaceOrAddToArr,
-  findTemplateByType,
-} from "../utils";
+import { resolveStatus, formatCurrencyDisp, lightenRGBByPercent, capitalizeFirstLetterOfString, applyDiscountToWorkorderItem, calculateRunningTotals, deepEqual, removeDashesFromPhone, formatPhoneWithDashes, checkInputForNumbersOnly, calculateWaitEstimateLabel, formatMillisForDisplay, compressImage, createNewWorkorder, scheduleAutoText, usdTypeMask, generateEAN13Barcode, log, printBuilder, localStorageWrapper, replaceOrAddToArr, findTemplateByType } from "../utils";
 import {
   WORKORDER_ITEM_PROTO,
   COLORS,
@@ -53,15 +29,16 @@ import {
   INVENTORY_ITEM_PROTO,
 } from "../data";
 import {
-  Button_,
-  Image_,
-  TextInput_,
+  Button,
+  Image,
+  TextInput,
   PhoneNumberInput,
-  Tooltip,
   SmallLoadingIndicator,
   NoteHelper,
-} from "../components";
-import { CheckBox, StatusPickerModal, DropdownMenu } from "../dom_components";
+  CheckBox,
+  StatusPickerModal,
+  DropdownMenu,
+} from "../dom_components";
 import {
   dbListenToSettings,
   dbListenToInventory,
@@ -1269,13 +1246,13 @@ export function BikeStandScreen() {
           <div className={styles.bmBackdrop}>
             <div className={styles.bmDialog} onClick={(e) => e.stopPropagation()}>
               {/* Header */}
-              <div className={styles.bmHeader} style={{ borderBottomColor: gray(0.15) }}>
+              <div className={styles.bmHeader} style={{ borderBottomColor: C.borderSubtle }}>
                 <div className={styles.bmHeaderInfo}>
                   <span className={styles.bmHeaderName} style={{ color: C.text }}>
                     {customerName || "Standalone Sale"}
                   </span>
                   {customerCell ? (
-                    <span className={styles.bmHeaderPhone} style={{ color: gray(0.5) }}>{formatPhoneWithDashes(customerCell)}</span>
+                    <span className={styles.bmHeaderPhone} style={{ color: C.textMuted }}>{formatPhoneWithDashes(customerCell)}</span>
                   ) : null}
                 </div>
                 <StatusPickerModal
@@ -1313,7 +1290,7 @@ export function BikeStandScreen() {
                     if (woID) useOpenWorkordersStore.getState().removeWorkorder(woID, true);
                   }}
                 >
-                  <Image_ icon={ICONS.close1} size={24} />
+                  <Image icon={ICONS.close1} size={24} />
                   <span className={styles.bmCancelText} style={{ color: C.textWhite }}>Cancel</span>
                 </StandTouch>
               </div>
@@ -1321,12 +1298,12 @@ export function BikeStandScreen() {
               {/* Fields */}
               <div className={styles.bmScroll}>
                 {/* Brand row */}
-                <div className={styles.bmFieldLabel} style={{ color: gray(0.4) }}>Brand</div>
+                <div className={styles.bmFieldLabel} style={{ color: C.textMuted }}>Brand</div>
                 <div className={styles.bmFieldRow} style={{ zIndex: 12 }}>
                   <div className={styles.bmFieldHalf} style={{ zIndex: 10 }}>
                     <StandTouch onPress={() => activateDetailField("brand")}>
                       <div style={{ pointerEvents: "none" }}>
-                        <TextInput_
+                        <TextInput
                           placeholder="Brand"
                           editable={false}
                           style={{
@@ -1351,7 +1328,7 @@ export function BikeStandScreen() {
                         {brandSuggestions.map((item) => (
                           <div
                             key={item}
-                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = C.surfaceAlt; }}
                             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                             className={styles.bmSuggestionRow}
                           >
@@ -1375,7 +1352,7 @@ export function BikeStandScreen() {
                                 useSettingsStore.getState().setField("allBrands", updated);
                               }}
                             >
-                              <span className={styles.bmSuggestionRemoveText} style={{ color: gray(0.55) }}>{"\u2715"}</span>
+                              <span className={styles.bmSuggestionRemoveText} style={{ color: C.textMuted }}>{"\u2715"}</span>
                             </StandTouch>
                           </div>
                         ))}
@@ -1419,12 +1396,12 @@ export function BikeStandScreen() {
                 </div>
 
                 {/* Description row */}
-                <div className={styles.bmFieldLabel} style={{ color: gray(0.4) }}>Model / Description</div>
+                <div className={styles.bmFieldLabel} style={{ color: C.textMuted }}>Model / Description</div>
                 <div className={styles.bmFieldRow} style={{ zIndex: 11 }}>
                   <div className={styles.bmFieldHalf} style={{ zIndex: 9 }}>
                     <StandTouch onPress={() => activateDetailField("description")}>
                       <div style={{ pointerEvents: "none" }}>
-                        <TextInput_
+                        <TextInput
                           placeholder="Model/Description"
                           editable={false}
                           style={{
@@ -1449,7 +1426,7 @@ export function BikeStandScreen() {
                         {descSuggestions.map((item) => (
                           <div
                             key={item}
-                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                            onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = C.surfaceAlt; }}
                             onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                             className={styles.bmSuggestionRow}
                           >
@@ -1473,7 +1450,7 @@ export function BikeStandScreen() {
                                 useSettingsStore.getState().setField("allDescriptions", updated);
                               }}
                             >
-                              <span className={styles.bmSuggestionRemoveText} style={{ color: gray(0.55) }}>{"\u2715"}</span>
+                              <span className={styles.bmSuggestionRemoveText} style={{ color: C.textMuted }}>{"\u2715"}</span>
                             </StandTouch>
                           </div>
                         ))}
@@ -1499,13 +1476,13 @@ export function BikeStandScreen() {
                 </div>
 
                 {/* Color row */}
-                <div className={styles.bmFieldLabel} style={{ color: gray(0.4) }}>Colors</div>
+                <div className={styles.bmFieldLabel} style={{ color: C.textMuted }}>Colors</div>
                 <div className={styles.bmFieldRow} style={{ zIndex: 10 }}>
                   <div style={{ width: "50%", display: "flex", flexDirection: "row", alignItems: "center", overflow: "visible", flexShrink: 0 }}>
                     <div style={{ width: "48%", position: "relative", zIndex: 8, overflow: "visible", flexShrink: 0 }}>
                       <StandTouch onPress={() => activateDetailField("color1")}>
                         <div style={{ pointerEvents: "none" }}>
-                          <TextInput_
+                          <TextInput
                             placeholder="Color 1"
                             editable={false}
                             style={{
@@ -1530,7 +1507,7 @@ export function BikeStandScreen() {
                           {color1Suggestions.map((item) => (
                             <div
                               key={item}
-                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = C.surfaceAlt; }}
                               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                               className={styles.bmSuggestionRow}
                             >
@@ -1555,7 +1532,7 @@ export function BikeStandScreen() {
                     <div style={{ width: "48%", position: "relative", zIndex: 7, overflow: "visible", flexShrink: 0 }}>
                       <StandTouch onPress={() => activateDetailField("color2")}>
                         <div style={{ pointerEvents: "none" }}>
-                          <TextInput_
+                          <TextInput
                             placeholder="Color 2"
                             editable={false}
                             style={{
@@ -1580,7 +1557,7 @@ export function BikeStandScreen() {
                           {color2Suggestions.map((item) => (
                             <div
                               key={item}
-                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = C.surfaceAlt; }}
                               onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                               className={styles.bmSuggestionRow}
                             >
@@ -1640,13 +1617,13 @@ export function BikeStandScreen() {
                 </div>
 
                 {/* Wait time row */}
-                <div className={styles.bmFieldLabel} style={{ color: gray(0.4) }}>Wait Time</div>
+                <div className={styles.bmFieldLabel} style={{ color: C.textMuted }}>Wait Time</div>
                 <div className={styles.bmWaitRow}>
                   <div className={styles.bmWaitLeft}>
-                    <span className={styles.bmWaitDaysLabel} style={{ color: gray(0.5) }}>Max wait days:</span>
+                    <span className={styles.bmWaitDaysLabel} style={{ color: C.textMuted }}>Max wait days:</span>
                     <StandTouch onPress={() => activateDetailField("waitDays")}>
                       <div style={{ pointerEvents: "none" }}>
-                        <TextInput_
+                        <TextInput
                           placeholder="0"
                           editable={false}
                           style={{
@@ -1685,7 +1662,7 @@ export function BikeStandScreen() {
                         }, 500);
                       }}
                     >
-                      <Image_ icon={ICONS.minus} size={36} />
+                      <Image icon={ICONS.minus} size={36} />
                     </StandTouch>
                     <StandTouch
                       style={{ marginLeft: 6 }}
@@ -1704,7 +1681,7 @@ export function BikeStandScreen() {
                         }, 500);
                       }}
                     >
-                      <Image_ icon={ICONS.add} size={36} />
+                      <Image icon={ICONS.add} size={36} />
                     </StandTouch>
                   </div>
                   <div className={styles.bmWaitDropdownSlot}>
@@ -1734,7 +1711,7 @@ export function BikeStandScreen() {
                   let estimateLabel = calculateWaitEstimateLabel(selectedWorkorder, zSettings);
                   let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
                   return estimateLabel ? (
-                    <span className={styles.bmWaitEstimate} style={{ color: isMissing ? C.red : gray(0.5), display: "block" }}>
+                    <span className={styles.bmWaitEstimate} style={{ color: isMissing ? C.red : C.textMuted, display: "block" }}>
                       {estimateLabel}
                     </span>
                   ) : null;
@@ -1751,7 +1728,7 @@ export function BikeStandScreen() {
                     />
                     <div className={styles.bmKeypadCloseRow}>
                       <StandTouch className={styles.bmKeypadCloseBtn} onPress={() => { saveDetailOnLeave(sDetailField); _setDetailField(null); }}>
-                        <Image_ icon={ICONS.close1} size={36} />
+                        <Image icon={ICONS.close1} size={36} />
                       </StandTouch>
                     </div>
                   </div>
@@ -1762,14 +1739,14 @@ export function BikeStandScreen() {
               {(() => {
                 let hasBrand = !!(selectedWorkorder?.brand);
                 return (
-                  <div className={styles.bmFooter} style={{ borderTopColor: gray(0.15) }}>
+                  <div className={styles.bmFooter} style={{ borderTopColor: C.borderSubtle }}>
                     <StandTouch
                       className={styles.bmAddItemsBtn}
-                      style={{ backgroundColor: hasBrand ? C.green : gray(0.15) }}
+                      style={{ backgroundColor: hasBrand ? C.green : C.surfaceAlt }}
                       onPress={() => { if (!hasBrand) return; saveDetailOnLeave(sDetailField); _setShowBikeInfoModal(false); _setDetailField(null); }}
                     >
-                      <Image_ icon={ICONS.add} size={36} />
-                      <span className={styles.bmAddItemsText} style={{ color: hasBrand ? C.textWhite : gray(0.4) }}>Add Items</span>
+                      <Image icon={ICONS.add} size={36} />
+                      <span className={styles.bmAddItemsText} style={{ color: hasBrand ? C.textWhite : C.textMuted }}>Add Items</span>
                     </StandTouch>
                   </div>
                 );
@@ -1836,13 +1813,13 @@ export function BikeStandScreen() {
         <div className={styles.standModalBackdrop} style={{ zIndex: Z.modal }}>
           <div className={styles.standSettingsDialog}>
             <StandTouch touchStart={false} onPress={() => _setShowStandSettings(false)}>
-              <div className={styles.standSettingsHeader} style={{ borderBottomColor: gray(0.1) }}>
+              <div className={styles.standSettingsHeader} style={{ borderBottomColor: C.borderSubtle }}>
                 <span className={styles.standSettingsHeaderTitle} style={{ color: C.text }}>Stand Settings</span>
-                <span className={styles.standSettingsHeaderHint} style={{ color: gray(0.35) }}>Tap to close</span>
+                <span className={styles.standSettingsHeaderHint} style={{ color: C.textDisabled }}>Tap to close</span>
               </div>
             </StandTouch>
             <div className={styles.standSettingsBody}>
-              <div className={styles.standSettingsSectionLabel} style={{ color: gray(0.4) }}>LOGIN</div>
+              <div className={styles.standSettingsSectionLabel} style={{ color: C.textMuted }}>LOGIN</div>
               <StandTouch onPress={() => {
                   let next = !sBypassFaceRecognition;
                   _setBypassFaceRecognition(next);
@@ -1861,7 +1838,7 @@ export function BikeStandScreen() {
                 />
                 <div className={styles.standSettingsToggleTextCol}>
                   <span className={styles.standSettingsToggleTitle} style={{ color: C.text }}>Bypass facial recognition</span>
-                  <span className={styles.standSettingsToggleSubtitle} style={{ color: gray(0.45) }}>Skip face scan and go straight to PIN entry on this device</span>
+                  <span className={styles.standSettingsToggleSubtitle} style={{ color: C.textMuted }}>Skip face scan and go straight to PIN entry on this device</span>
                 </div>
               </StandTouch>
             </div>
@@ -1887,7 +1864,7 @@ export function BikeStandScreen() {
                 _setShowPinModal(true);
               }}
               className={styles.standFacePinBtn}
-              style={{ backgroundColor: gray(0.15) }}
+              style={{ backgroundColor: C.surfaceAlt }}
             >
               <span className={styles.standFacePinBtnText} style={{ color: C.text }}>Use PIN</span>
             </StandTouch>
@@ -1937,7 +1914,7 @@ export function BikeStandScreen() {
               onPress={() => { _setShowPinModal(false); _setPin(""); pendingActionRef.current = null; }}
               className={styles.standPinCancel}
             >
-              <span className={styles.standPinCancelText} style={{ color: gray(0.5) }}>Cancel</span>
+              <span className={styles.standPinCancelText} style={{ color: C.textMuted }}>Cancel</span>
             </StandTouch>
           </div>
         </div>
@@ -1957,7 +1934,7 @@ export function BikeStandScreen() {
                     {customerName || "Standalone Sale"}
                   </span>
                   {customerCell ? (
-                    <span className={styles.bvHeaderPhone} style={{ color: gray(0.5) }}>
+                    <span className={styles.bvHeaderPhone} style={{ color: C.textMuted }}>
                       {formatPhoneWithDashes(customerCell)}
                     </span>
                   ) : null}
@@ -1990,29 +1967,29 @@ export function BikeStandScreen() {
                 )}
                 <div className={styles.bvHeaderRight}>
                   {selectedWorkorder?.brand ? (
-                    <span className={styles.bvHeaderBrand} style={{ color: gray(0.5) }}>
+                    <span className={styles.bvHeaderBrand} style={{ color: C.textMuted }}>
                       {capitalizeFirstLetterOfString(selectedWorkorder.brand)}
                     </span>
                   ) : null}
                   {selectedWorkorder?.description ? (
-                    <span className={styles.bvHeaderDescription} style={{ color: gray(0.5) }}>
+                    <span className={styles.bvHeaderDescription} style={{ color: C.textMuted }}>
                       {capitalizeFirstLetterOfString(selectedWorkorder.description)}
                     </span>
                   ) : null}
-                  <Image_ icon={ICONS.info} size={39} />
-                  <span className={styles.bvHeaderHint} style={{ color: gray(0.35) }}>Tap for workorder info</span>
+                  <Image icon={ICONS.info} size={39} />
+                  <span className={styles.bvHeaderHint} style={{ color: C.textDisabled }}>Tap for workorder info</span>
                 </div>
               </StandTouch>
 
               {/* Collapsible bike details panel */}
               {sShowBikeDetails && selectedWorkorder && (
-                <div className={styles.bvDetailsPanel} style={{ borderBottomColor: gray(0.15) }}>
+                <div className={styles.bvDetailsPanel} style={{ borderBottomColor: C.borderSubtle }}>
 
                   {/* Brand row */}
                   <div className={styles.bvFieldRow}>
                     <StandTouch onPress={() => activateDetailField("brand")} className={styles.bvFieldHalf}>
                       <div style={{ pointerEvents: "none" }}>
-                        <TextInput_
+                        <TextInput
                           placeholder={"Brand"}
                           editable={false}
                           style={{
@@ -2073,7 +2050,7 @@ export function BikeStandScreen() {
                   <div className={styles.bvFieldRow}>
                     <StandTouch onPress={() => activateDetailField("description")} className={styles.bvFieldHalf}>
                       <div style={{ pointerEvents: "none" }}>
-                        <TextInput_
+                        <TextInput
                           placeholder={"Model/Description"}
                           editable={false}
                           style={{
@@ -2118,7 +2095,7 @@ export function BikeStandScreen() {
                     <div className={styles.bvColorHalf}>
                       <StandTouch onPress={() => activateDetailField("color1")} className={styles.bvColorInput48}>
                         <div style={{ pointerEvents: "none" }}>
-                          <TextInput_
+                          <TextInput
                             placeholder={"Color 1"}
                             editable={false}
                             style={{
@@ -2141,7 +2118,7 @@ export function BikeStandScreen() {
                       <div className={styles.bvFieldGap4pct} />
                       <StandTouch onPress={() => activateDetailField("color2")} className={styles.bvColorInput48}>
                         <div style={{ pointerEvents: "none" }}>
-                          <TextInput_
+                          <TextInput
                             placeholder={"Color 2"}
                             editable={false}
                             style={{
@@ -2209,12 +2186,12 @@ export function BikeStandScreen() {
                   {/* Wait time row */}
                   <div className={styles.bvFieldRowTight}>
                     <div className={styles.bvWaitHalf}>
-                      <span className={styles.bvWaitLabel} style={{ color: gray(0.5) }}>
+                      <span className={styles.bvWaitLabel} style={{ color: C.textMuted }}>
                         Max wait days:
                       </span>
                       <StandTouch onPress={() => activateDetailField("waitDays")}>
                         <div style={{ pointerEvents: "none" }}>
-                          <TextInput_
+                          <TextInput
                             placeholder={"0"}
                             editable={false}
                             style={{
@@ -2254,7 +2231,7 @@ export function BikeStandScreen() {
                         className={styles.bvWaitStep}
                         style={{ opacity: (!selectedWorkorder?.waitTime?.maxWaitTimeDays || Number(selectedWorkorder?.waitTime?.maxWaitTimeDays) <= 1) ? 0.3 : 1 }}
                       >
-                        <Image_ icon={ICONS.minus} size={29} />
+                        <Image icon={ICONS.minus} size={29} />
                       </StandTouch>
                       <StandTouch
                         onPress={() => {
@@ -2273,7 +2250,7 @@ export function BikeStandScreen() {
                         }}
                         className={styles.bvWaitStepPlus}
                       >
-                        <Image_ icon={ICONS.add} size={29} />
+                        <Image icon={ICONS.add} size={29} />
                       </StandTouch>
                     </div>
                     <div className={styles.bvFieldHalfRowAlign}>
@@ -2303,7 +2280,7 @@ export function BikeStandScreen() {
                     let estimateLabel = calculateWaitEstimateLabel(selectedWorkorder, zSettings);
                     let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
                     return estimateLabel ? (
-                      <span className={styles.bvWaitEstimate} style={{ color: isMissing ? C.red : gray(0.5) }}>
+                      <span className={styles.bvWaitEstimate} style={{ color: isMissing ? C.red : C.textMuted }}>
                         {estimateLabel}
                       </span>
                     ) : null;
@@ -2320,7 +2297,7 @@ export function BikeStandScreen() {
                       />
                       <div className={styles.bvKeypadCloseRow}>
                         <StandTouch onPress={() => _setDetailField(null)} className={styles.bvKeypadClose}>
-                          <Image_ icon={ICONS.close1} size={32} />
+                          <Image icon={ICONS.close1} size={32} />
                         </StandTouch>
                       </div>
                     </div>
@@ -2372,7 +2349,7 @@ export function BikeStandScreen() {
                     }}
                     className={styles.bvHideDivider}
                   >
-                    <span className={styles.bvHideDividerText} style={{ color: gray(0.35) }}>Tap to hide</span>
+                    <span className={styles.bvHideDividerText} style={{ color: C.textDisabled }}>Tap to hide</span>
                   </div>
 
                 </div>
@@ -2394,7 +2371,7 @@ export function BikeStandScreen() {
                     startFaceLogin();
                   }}
                 >
-                  <Image_ icon={ICONS.search} size={69} />
+                  <Image icon={ICONS.search} size={69} />
                   <span className={styles.shoFindText} style={{ color: C.textWhite }}>Find Workorder</span>
                 </StandTouch>
                 <StandTouch
@@ -2402,7 +2379,7 @@ export function BikeStandScreen() {
                   style={{ backgroundColor: C.green }}
                   onPress={handleNewWorkorderPress}
                 >
-                  <Image_ icon={ICONS.gears1} size={138} />
+                  <Image icon={ICONS.gears1} size={138} />
                   <span className={styles.shoNewText} style={{ color: C.textWhite }}>New Workorder</span>
                 </StandTouch>
               </div>
@@ -2412,7 +2389,7 @@ export function BikeStandScreen() {
           {/* ── 20% sidebar + 80% canvas ── */}
           <div className={styles.standMainRow} style={{ opacity: hasWorkorderReady ? 1 : 0.35, pointerEvents: hasWorkorderReady ? "auto" : "none" }}>
             {/* Left sidebar - root buttons */}
-            <div className={styles.standSidebar} style={{ borderRightColor: gray(0.15) }}>
+            <div className={styles.standSidebar} style={{ borderRightColor: C.borderSubtle }}>
               {/* Breadcrumbs in sidebar */}
               {sCurrentParentID !== null && sMenuPath.length > 0 && (
                 <div className={styles.standBreadcrumbRow}>
@@ -2425,7 +2402,7 @@ export function BikeStandScreen() {
                   </StandTouch>
                   {sMenuPath.map((crumb, i) => (
                     <div key={crumb.id} className={styles.standBreadcrumbSeg}>
-                      <span className={styles.standBreadcrumbSep} style={{ color: gray(0.3) }}>{">"}</span>
+                      <span className={styles.standBreadcrumbSep} style={{ color: C.textDisabled }}>{">"}</span>
                       <StandTouch onPress={() => {
                           let newPath = sMenuPath.slice(0, i + 1);
                           _setMenuPath(newPath);
@@ -2438,7 +2415,7 @@ export function BikeStandScreen() {
                           }
                       }}>
                         <span className={styles.standBreadcrumbText} style={{
-                          color: i === sMenuPath.length - 1 ? gray(0.4) : gray(0.55),
+                          color: i === sMenuPath.length - 1 ? C.textMuted : C.textMuted,
                           fontWeight: i === sMenuPath.length - 1 ? "bold" : "normal",
                         }}>
                           {(crumb.name || "").toUpperCase()}
@@ -2453,7 +2430,7 @@ export function BikeStandScreen() {
               <div className={styles.standNavScroll}>
                 {/* Inventory search button — always top */}
                 <div className={styles.standNavItem}>
-                  <Button_
+                  <Button
                     onPress={() => _setShowInventoryModal(true)}
                     colorGradientArr={COLOR_GRADIENTS.purple}
                     buttonStyle={{
@@ -2482,7 +2459,7 @@ export function BikeStandScreen() {
                     (sMenuPath.length > 0 && sMenuPath[0].id === item.id);
                   return (
                     <div key={item.id} className={styles.standNavItem}>
-                      <Button_
+                      <Button
                         onPress={() => handleNavButtonPress(item)}
                         colorGradientArr={isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "item" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
                         buttonStyle={{
@@ -2509,12 +2486,12 @@ export function BikeStandScreen() {
 
               {/* Static bottom container: Print + Menu */}
               {hasWorkorderReady && (
-                <div className={styles.standSidebarFooter} style={{ borderTopColor: gray(0.15) }}>
+                <div className={styles.standSidebarFooter} style={{ borderTopColor: C.borderSubtle }}>
                   <div className={styles.standSidebarFooterRow}>
                     {/* Print button — opens unified print modal */}
                     {selectedWorkorder && (
                       <StandTouch onPress={() => _setShowPrinterSelectModal(true)} className={styles.standFooterIconBtn}>
-                        <Image_ icon={selectedPrinterOffline ? warningIcon : ICONS.print} size={48} />
+                        <Image icon={selectedPrinterOffline ? warningIcon : ICONS.print} size={48} />
                       </StandTouch>
                     )}
 
@@ -2522,7 +2499,7 @@ export function BikeStandScreen() {
                     <PopoverPrimitive.Root open={sShowFooterMenu} onOpenChange={_setShowFooterMenu}>
                     <PopoverPrimitive.Anchor asChild>
                       <StandTouch onPress={() => _setShowFooterMenu(v => !v)} className={styles.standFooterIconBtn}>
-                        <Image_ icon={ICONS.listsAndOptions} size={48} />
+                        <Image icon={ICONS.listsAndOptions} size={48} />
                       </StandTouch>
                     </PopoverPrimitive.Anchor>
 
@@ -2533,40 +2510,40 @@ export function BikeStandScreen() {
                         <StandTouch
                           onPress={() => { _setShowFooterMenu(false); _setSelectedWorkorderID(null); _setPendingCustomer(null); _setShowWorkorderList(true); }}
                           className={styles.standFooterMenuItem}
-                          style={{ borderBottomColor: gray(0.1) }}
+                          style={{ borderBottomColor: C.borderSubtle }}
                         >
-                          <Image_ icon={ICONS.search} size={36} />
+                          <Image icon={ICONS.search} size={36} />
                           <span className={styles.standFooterMenuItemText} style={{ color: C.text }}>Find Workorder</span>
                         </StandTouch>
                         <StandTouch
                           onPress={() => { _setShowFooterMenu(false); handleNewWorkorderPress(); }}
                           className={styles.standFooterMenuItem}
-                          style={{ borderBottomColor: gray(0.1) }}
+                          style={{ borderBottomColor: C.borderSubtle }}
                         >
-                          <Image_ icon={plusIcon} size={36} />
+                          <Image icon={plusIcon} size={36} />
                           <span className={styles.standFooterMenuItemText} style={{ color: C.text }}>New Workorder</span>
                         </StandTouch>
                         <StandTouch
                           onPress={() => { _setShowFooterMenu(false); _setSubMenuEditMode(!sSubMenuEditMode); }}
                           className={styles.standFooterMenuItem}
-                          style={{ borderBottomColor: gray(0.1) }}
+                          style={{ borderBottomColor: C.borderSubtle }}
                         >
-                          <Image_ icon={ICONS.editPencil} size={36} />
+                          <Image icon={ICONS.editPencil} size={36} />
                           <span className={styles.standFooterMenuItemText} style={{ color: C.text }}>Edit Sizing</span>
                         </StandTouch>
                         <StandTouch
                           onPress={() => { _setShowFooterMenu(false); _setShowStandSettings(true); }}
                           className={styles.standFooterMenuItem}
-                          style={{ borderBottomColor: gray(0.1) }}
+                          style={{ borderBottomColor: C.borderSubtle }}
                         >
-                          <Image_ icon={ICONS.settings} size={36} />
+                          <Image icon={ICONS.settings} size={36} />
                           <span className={styles.standFooterMenuItemText} style={{ color: C.text }}>Settings</span>
                         </StandTouch>
                         <StandTouch
                           onPress={() => { _setShowFooterMenu(false); window.location.href = window.location.pathname + "?v=" + Date.now(); }}
                           className={styles.standFooterMenuItem}
                         >
-                          <Image_ icon={ICONS.gears1} size={36} />
+                          <Image icon={ICONS.gears1} size={36} />
                           <span className={styles.standFooterMenuItemText} style={{ color: C.text }}>Reload Page</span>
                         </StandTouch>
                       </div>
@@ -2586,7 +2563,7 @@ export function BikeStandScreen() {
                   {sMenuPath.map((crumb, i) => (
                     <div key={crumb.id} className={styles.standTopCrumbSeg}>
                       {i > 0 && (
-                        <span className={styles.standTopCrumbSep} style={{ color: gray(0.3) }}>{">"}</span>
+                        <span className={styles.standTopCrumbSep} style={{ color: C.textDisabled }}>{">"}</span>
                       )}
                       <StandTouch onPress={() => {
                           let newPath = sMenuPath.slice(0, i + 1);
@@ -2600,7 +2577,7 @@ export function BikeStandScreen() {
                           }
                       }}>
                         <span className={styles.standTopCrumbText} style={{
-                          color: i === sMenuPath.length - 1 ? gray(0.4) : gray(0.55),
+                          color: i === sMenuPath.length - 1 ? C.textMuted : C.textMuted,
                           fontWeight: i === sMenuPath.length - 1 ? "bold" : "normal",
                         }}>
                           {(crumb.name || "(unnamed)").toUpperCase()}
@@ -2616,7 +2593,7 @@ export function BikeStandScreen() {
                   {currentChildren.map((btn) => {
                     let isSelected = sSelectedButtonID === btn.id;
                     return (
-                      <Button_
+                      <Button
                         key={btn.id}
                         onPress={() => handleNavButtonPress(btn)}
                         colorGradientArr={isSelected ? ["rgb(240,200,40)", "rgb(240,200,40)"] : [C.green, C.green]}
@@ -2699,13 +2676,13 @@ export function BikeStandScreen() {
                             className={styles.standCanvasItemName}
                             style={{
                               fontSize: fontSize,
-                              color: itemObj.textColor || (invItem ? C.text : gray(0.35)),
+                              color: itemObj.textColor || (invItem ? C.text : C.textDisabled),
                             }}
                           >
                             {name}
                           </span>
                           {isOnWorkorder && (
-                            <div className={styles.standCanvasQtyBadge} style={{ backgroundColor: gray(0.85) }}>
+                            <div className={styles.standCanvasQtyBadge} style={{ backgroundColor: C.surfaceAlt }}>
                               <span className={styles.standCanvasQtyText} style={{ color: C.red }}>
                                 {workorderLine?.qty || 1}
                               </span>
@@ -2727,7 +2704,7 @@ export function BikeStandScreen() {
                                 zIndex: 100,
                                 backgroundColor: "white",
                                 borderRadius: 6,
-                                border: "1px solid " + gray(0.2),
+                                border: "1px solid " + C.borderSubtle,
                                 boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                 minWidth: 140,
                                 overflow: "hidden",
@@ -2735,8 +2712,8 @@ export function BikeStandScreen() {
                             >
                               <div
                                 onClick={() => handleDiscountSelect(itemObj.inventoryItemID, null)}
-                                style={{ padding: "9px 10px", cursor: "pointer", fontSize: 24, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
-                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
+                                style={{ padding: "9px 10px", cursor: "pointer", fontSize: 24, color: C.text, borderBottom: "1px solid " + C.borderSubtle }}
+                                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = C.surfaceAlt; }}
                                 onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
                               >
                                 No Discount
@@ -2747,8 +2724,8 @@ export function BikeStandScreen() {
                                 <div
                                   key={d.name + "-" + dIdx}
                                   onClick={() => handleDiscountSelect(itemObj.inventoryItemID, d)}
-                                  style={{ padding: "9px 10px", cursor: "pointer", fontSize: 24, color: C.text, borderBottom: "1px solid " + gray(0.1) }}
-                                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
+                                  style={{ padding: "9px 10px", cursor: "pointer", fontSize: 24, color: C.text, borderBottom: "1px solid " + C.borderSubtle }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = C.surfaceAlt; }}
                                   onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
                                 >
                                   {d.name}
@@ -2761,14 +2738,14 @@ export function BikeStandScreen() {
                     })}
                     {canvasItems.length === 0 && (
                       <div className={styles.standCanvasEmpty}>
-                        <span className={styles.standCanvasEmptyText} style={{ color: gray(0.5) }}>No items in this menu</span>
+                        <span className={styles.standCanvasEmptyText} style={{ color: C.textMuted }}>No items in this menu</span>
                       </div>
                     )}
                   </div>
                 </div>
               ) : (
                 <div className={styles.standCanvasNoSelect}>
-                  <span className={styles.standCanvasNoSelectText} style={{ color: gray(0.4) }}>Select a button to view items</span>
+                  <span className={styles.standCanvasNoSelectText} style={{ color: C.textMuted }}>Select a button to view items</span>
                 </div>
               )}
 
@@ -2797,7 +2774,7 @@ export function BikeStandScreen() {
                               _setDiscountCardID(line.inventoryItem?.id === sDiscountCardID ? null : line.inventoryItem?.id);
                             }}
                           >
-                            <Image_ icon={ICONS.dollarYellow} size={22} />
+                            <Image icon={ICONS.dollarYellow} size={22} />
                           </StandTouch>
                         )}
 
@@ -2872,7 +2849,7 @@ export function BikeStandScreen() {
                             style={{ backgroundColor: lightenRGBByPercent("rgb(103, 124, 231)", 50) }}
                             onPress={() => removeWorkorderLine(line.id)}
                           >
-                            <Image_ icon={ICONS.trash} size={44} />
+                            <Image icon={ICONS.trash} size={44} />
                           </StandTouch>
                         )}
                       </div>
@@ -2884,12 +2861,12 @@ export function BikeStandScreen() {
 
               {/* Footer — totals or size editor */}
               {sSubMenuEditMode ? (
-                <div className={styles.standCanvasFooterEdit} style={{ borderTopColor: gray(0.1) }}>
+                <div className={styles.standCanvasFooterEdit} style={{ borderTopColor: C.borderSubtle }}>
                   <div className={styles.standCanvasFooterEditGroup}>
-                    <span className={styles.standCanvasFooterEditLabel} style={{ color: gray(0.5) }}>H</span>
+                    <span className={styles.standCanvasFooterEditLabel} style={{ color: C.textMuted }}>H</span>
                     <StandTouch
                       className={styles.standCanvasFooterEditStep}
-                      style={{ backgroundColor: gray(0.1) }}
+                      style={{ backgroundColor: C.surfaceAlt }}
                       onPress={() => { let v = sSubMenuHeightAdj - 1; _setSubMenuHeightAdj(v); localStorageWrapper.setItem("standSubMenuHeightAdj", String(v)); }}
                     >
                       <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>-</span>
@@ -2897,17 +2874,17 @@ export function BikeStandScreen() {
                     <span className={styles.standCanvasFooterEditValue} style={{ color: C.text }}>{sSubMenuHeightAdj}</span>
                     <StandTouch
                       className={styles.standCanvasFooterEditStep}
-                      style={{ backgroundColor: gray(0.1) }}
+                      style={{ backgroundColor: C.surfaceAlt }}
                       onPress={() => { let v = sSubMenuHeightAdj + 1; _setSubMenuHeightAdj(v); localStorageWrapper.setItem("standSubMenuHeightAdj", String(v)); }}
                     >
                       <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>+</span>
                     </StandTouch>
                   </div>
                   <div className={styles.standCanvasFooterEditGroup}>
-                    <span className={styles.standCanvasFooterEditLabel} style={{ color: gray(0.5) }}>Font</span>
+                    <span className={styles.standCanvasFooterEditLabel} style={{ color: C.textMuted }}>Font</span>
                     <StandTouch
                       className={styles.standCanvasFooterEditStep}
-                      style={{ backgroundColor: gray(0.1) }}
+                      style={{ backgroundColor: C.surfaceAlt }}
                       onPress={() => { let v = sSubMenuFontAdj - 1; _setSubMenuFontAdj(v); localStorageWrapper.setItem("standSubMenuFontAdj", String(v)); }}
                     >
                       <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>-</span>
@@ -2915,18 +2892,18 @@ export function BikeStandScreen() {
                     <span className={styles.standCanvasFooterEditValue} style={{ color: C.text }}>{sSubMenuFontAdj}</span>
                     <StandTouch
                       className={styles.standCanvasFooterEditStep}
-                      style={{ backgroundColor: gray(0.1) }}
+                      style={{ backgroundColor: C.surfaceAlt }}
                       onPress={() => { let v = sSubMenuFontAdj + 1; _setSubMenuFontAdj(v); localStorageWrapper.setItem("standSubMenuFontAdj", String(v)); }}
                     >
                       <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>+</span>
                     </StandTouch>
                   </div>
-                  <div className={styles.standCanvasFooterEditDivider} style={{ backgroundColor: gray(0.2) }} />
+                  <div className={styles.standCanvasFooterEditDivider} style={{ backgroundColor: C.surfaceAlt }} />
                   <div className={styles.standCanvasFooterEditGroup}>
-                    <span className={styles.standCanvasFooterEditLabel} style={{ color: gray(0.5) }}>Nav</span>
+                    <span className={styles.standCanvasFooterEditLabel} style={{ color: C.textMuted }}>Nav</span>
                     <StandTouch
                       className={styles.standCanvasFooterEditStep}
-                      style={{ backgroundColor: gray(0.1) }}
+                      style={{ backgroundColor: C.surfaceAlt }}
                       onPress={() => { let v = sNavFontAdj - 1; _setNavFontAdj(v); localStorageWrapper.setItem("standNavFontAdj", String(v)); }}
                     >
                       <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>-</span>
@@ -2934,17 +2911,17 @@ export function BikeStandScreen() {
                     <span className={styles.standCanvasFooterEditValue} style={{ color: C.text }}>{sNavFontAdj}</span>
                     <StandTouch
                       className={styles.standCanvasFooterEditStep}
-                      style={{ backgroundColor: gray(0.1) }}
+                      style={{ backgroundColor: C.surfaceAlt }}
                       onPress={() => { let v = sNavFontAdj + 1; _setNavFontAdj(v); localStorageWrapper.setItem("standNavFontAdj", String(v)); }}
                     >
                       <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>+</span>
                     </StandTouch>
                   </div>
                   <div className={styles.standCanvasFooterEditGroup}>
-                    <span className={styles.standCanvasFooterEditLabel} style={{ color: gray(0.5) }}>Pad</span>
+                    <span className={styles.standCanvasFooterEditLabel} style={{ color: C.textMuted }}>Pad</span>
                     <StandTouch
                       className={styles.standCanvasFooterEditStep}
-                      style={{ backgroundColor: gray(0.1) }}
+                      style={{ backgroundColor: C.surfaceAlt }}
                       onPress={() => { let v = sNavPaddingAdj - 1; _setNavPaddingAdj(v); localStorageWrapper.setItem("standNavPaddingAdj", String(v)); }}
                     >
                       <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>-</span>
@@ -2952,7 +2929,7 @@ export function BikeStandScreen() {
                     <span className={styles.standCanvasFooterEditValue} style={{ color: C.text }}>{sNavPaddingAdj}</span>
                     <StandTouch
                       className={styles.standCanvasFooterEditStep}
-                      style={{ backgroundColor: gray(0.1) }}
+                      style={{ backgroundColor: C.surfaceAlt }}
                       onPress={() => { let v = sNavPaddingAdj + 1; _setNavPaddingAdj(v); localStorageWrapper.setItem("standNavPaddingAdj", String(v)); }}
                     >
                       <span className={styles.standCanvasFooterEditStepText} style={{ color: C.text }}>+</span>
@@ -2962,30 +2939,30 @@ export function BikeStandScreen() {
               ) : (
               <div
                 className={styles.standCanvasFooter}
-                style={{ borderTopColor: gray(0.1) }}
+                style={{ borderTopColor: C.borderSubtle }}
                 onClick={() => _setShowItemOverlay((p) => !p)}
               >
                 <div className={styles.standCanvasFooterLeft}>
                   <div className={styles.standCanvasFooterStat}>
-                    <span className={styles.standCanvasFooterStatLabel} style={{ color: gray(0.5) }}>Subtotal</span>
+                    <span className={styles.standCanvasFooterStatLabel} style={{ color: C.textMuted }}>Subtotal</span>
                     <span className={styles.standCanvasFooterStatVal} style={{ color: C.text }}>{formatCurrencyDisp(totals.runningSubtotal, true)}</span>
                   </div>
                   <div className={styles.standCanvasFooterStat}>
-                    <span className={styles.standCanvasFooterStatLabel} style={{ color: gray(0.5) }}>Discount</span>
+                    <span className={styles.standCanvasFooterStatLabel} style={{ color: C.textMuted }}>Discount</span>
                     <span className={styles.standCanvasFooterStatVal} style={{ color: C.red }}>-{formatCurrencyDisp(totals.runningDiscount, true)}</span>
                   </div>
                   <div className={styles.standCanvasFooterStat}>
-                    <span className={styles.standCanvasFooterStatLabel} style={{ color: gray(0.5) }}>Tax</span>
+                    <span className={styles.standCanvasFooterStatLabel} style={{ color: C.textMuted }}>Tax</span>
                     <span className={styles.standCanvasFooterStatVal} style={{ color: C.text }}>{formatCurrencyDisp(totals.runningTax, true)}</span>
                   </div>
                   <div className={styles.standCanvasFooterStat}>
-                    <span className={styles.standCanvasFooterStatLabelLg} style={{ color: gray(0.5) }}>Total</span>
+                    <span className={styles.standCanvasFooterStatLabelLg} style={{ color: C.textMuted }}>Total</span>
                     <span className={styles.standCanvasFooterStatValLg} style={{ color: C.text }}>{formatCurrencyDisp(totals.finalTotal, true)}</span>
                   </div>
                 </div>
                 {selectedWorkorder?.workorderLines?.length > 0 && (
                   <div className={styles.standCanvasFooterRight}>
-                    <span className={styles.standCanvasFooterHint} style={{ color: sShowItemOverlay ? C.red : gray(0.35), fontWeight: sShowItemOverlay ? "600" : "normal" }}>{sShowItemOverlay ? "Tap to close" : "Tap for items"}</span>
+                    <span className={styles.standCanvasFooterHint} style={{ color: sShowItemOverlay ? C.red : C.textDisabled, fontWeight: sShowItemOverlay ? "600" : "normal" }}>{sShowItemOverlay ? "Tap to close" : "Tap for items"}</span>
                     <span className={styles.standCanvasFooterCountPill} style={{ backgroundColor: C.blue }}>
                       <span className={styles.standCanvasFooterCountText} style={{ color: C.textWhite }}>
                         {selectedWorkorder.workorderLines.reduce((sum, ln) => sum + (ln.qty || 1), 0)}
@@ -3005,11 +2982,11 @@ export function BikeStandScreen() {
                 <div className={styles.printerScroll}>
 
                   {/* Intake section */}
-                  <span className={styles.printerSectionLabel} style={{ color: gray(0.5), display: "block" }}>INTAKE</span>
+                  <span className={styles.printerSectionLabel} style={{ color: C.textMuted, display: "block" }}>INTAKE</span>
                   <div className={styles.printerIntakeCard} style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.backgroundListWhite }}>
                     <div className={styles.printerIntakeRow}>
                       <div className={styles.printerIntakeLeft}>
-                        <Button_
+                        <Button
                           text="Print"
                           onPress={() => { handleIntakePrint(); }}
                           colorGradientArr={COLOR_GRADIENTS.green}
@@ -3019,7 +2996,7 @@ export function BikeStandScreen() {
                         />
                         {(customerCell || customerEmail) ? (
                           <div className={styles.printerIntakeSent}>
-                            <Button_
+                            <Button
                               text="Text/Email"
                               onPress={() => { handleIntakeElectronic(); }}
                               colorGradientArr={COLOR_GRADIENTS.blue}
@@ -3027,16 +3004,16 @@ export function BikeStandScreen() {
                               textStyle={{ fontSize: 23, fontWeight: "700" }}
                             />
                             {zSendStatuses[sSelectedWorkorderID] === "sent" && (
-                              <Image_ icon={ICONS.check1} size={28} />
+                              <Image icon={ICONS.check1} size={28} />
                             )}
                             {zSendStatuses[sSelectedWorkorderID] === "failed" && (
-                              <Image_ icon={ICONS.redx} size={28} />
+                              <Image icon={ICONS.redx} size={28} />
                             )}
                           </div>
                         ) : null}
                       </div>
                       {(customerCell || customerEmail) ? (
-                        <Button_
+                        <Button
                           text="Both"
                           onPress={() => { handleIntakePrint(); handleIntakeElectronic(); }}
                           colorGradientArr={COLOR_GRADIENTS.purple}
@@ -3050,7 +3027,7 @@ export function BikeStandScreen() {
 
                   {/* Print workorder button */}
                   <div className={styles.printerWorkorderBlock}>
-                    <Button_
+                    <Button
                       text="PRINT WORKORDER"
                       onPress={() => { handleWorkorderPrint(); }}
                       colorGradientArr={COLOR_GRADIENTS.yellow}
@@ -3061,9 +3038,9 @@ export function BikeStandScreen() {
                   </div>
 
                   {/* Printer selection section */}
-                  <span className={`${styles.printerSectionLabel} ${styles.printerSectionLabelTop}`} style={{ color: gray(0.5), display: "block" }}>AVAILABLE PRINTERS</span>
+                  <span className={`${styles.printerSectionLabel} ${styles.printerSectionLabelTop}`} style={{ color: C.textMuted, display: "block" }}>AVAILABLE PRINTERS</span>
                   {receiptPrinters.length === 0 ? (
-                    <span className={styles.printerEmpty} style={{ color: gray(0.5), display: "block" }}>No receipt printers configured</span>
+                    <span className={styles.printerEmpty} style={{ color: C.textMuted, display: "block" }}>No receipt printers configured</span>
                   ) : (
                     receiptPrinters.map((printer, idx) => {
                       let isSelected = printer.id === sSelectedPrinterID;
@@ -3073,7 +3050,7 @@ export function BikeStandScreen() {
                           key={printer.id}
                           className={styles.printerCard}
                           style={{
-                            borderColor: isSelected ? C.green : gray(0.15),
+                            borderColor: isSelected ? C.green : C.borderSubtle,
                             backgroundColor: isSelected ? lightenRGBByPercent(C.green, 70) : C.backgroundListWhite,
                             marginBottom: idx < receiptPrinters.length - 1 ? 8 : 0,
                           }}
@@ -3089,7 +3066,7 @@ export function BikeStandScreen() {
                                 {printer.label || printer.printerName || printer.id}
                               </span>
                               {printer.printerName && printer.label ? (
-                                <span className={styles.printerSubname} style={{ color: gray(0.5) }}>{printer.printerName}</span>
+                                <span className={styles.printerSubname} style={{ color: C.textMuted }}>{printer.printerName}</span>
                               ) : null}
                             </div>
                           </div>
@@ -3101,7 +3078,7 @@ export function BikeStandScreen() {
                               buttonStyle={{ backgroundColor: "transparent" }}
                               onCheck={() => handleSelectPrinter(printer.id)}
                             />
-                            <Button_
+                            <Button
                               text="Test Print"
                               onPress={() => {
                                 let testObj = printBuilder.test();
@@ -3189,7 +3166,7 @@ export function BikeStandScreen() {
                 {/* Header: item name + target toggle + tap/swipe to close */}
                 <div
                   className={styles.notesHeader}
-                  style={{ borderBottom: "1px solid " + gray(0.1) }}
+                  style={{ borderBottom: "1px solid " + C.borderSubtle }}
                   onClick={() => _setIntakeNotesLineID(null)}
                   onTouchStart={(e) => { notesSwipeRef.current = e.touches[0].clientY; }}
                   onTouchEnd={(e) => {
@@ -3202,7 +3179,7 @@ export function BikeStandScreen() {
                 >
                   <span className={styles.notesHeaderTitle} style={{ color: C.text }}>{itemLabel}</span>
                   <div className={styles.notesFontGroup} onClick={(e) => e.stopPropagation()}>
-                    <span className={styles.notesFontLabel} style={{ color: gray(0.4) }}>Font size</span>
+                    <span className={styles.notesFontLabel} style={{ color: C.textMuted }}>Font size</span>
                     <StandTouch
                       className={styles.notesFontBtn}
                       onPress={() => {
@@ -3211,7 +3188,7 @@ export function BikeStandScreen() {
                         localStorageWrapper.setItem("standNoteHelperFontAdj", String(next));
                       }}
                     >
-                      <Image_ source={ICONS.minus} style={{ width: 22, height: 22 }} />
+                      <Image icon={ICONS.minus} style={{ width: 22, height: 22 }} />
                     </StandTouch>
                     <StandTouch
                       className={styles.notesFontBtn}
@@ -3221,10 +3198,10 @@ export function BikeStandScreen() {
                         localStorageWrapper.setItem("standNoteHelperFontAdj", String(next));
                       }}
                     >
-                      <Image_ source={ICONS.add} style={{ width: 22, height: 22 }} />
+                      <Image icon={ICONS.add} style={{ width: 22, height: 22 }} />
                     </StandTouch>
                   </div>
-                  <span className={styles.notesHeaderHint} style={{ color: gray(0.35) }}>Tap to close</span>
+                  <span className={styles.notesHeaderHint} style={{ color: C.textDisabled }}>Tap to close</span>
                 </div>
 
                 {/* Tap-off overlay to dismiss keyboard */}
@@ -3241,8 +3218,8 @@ export function BikeStandScreen() {
                   <div className={styles.notesCategoryRow}>
                     <div className={`${styles.notesCategoryCol} ${styles.notesCategoryColLeft}`}>
                       {noteHelpers.filter((_, i) => i % 2 === 0).map((category) => (
-                        <div key={category.id} className={styles.notesCategoryCard} style={{ borderColor: gray(0.15) }}>
-                          <span className={styles.notesCategoryLabel} style={{ fontSize: 19 + sNoteHelperFontAdj, color: gray(0.4), display: "block" }}>
+                        <div key={category.id} className={styles.notesCategoryCard} style={{ borderColor: C.borderSubtle }}>
+                          <span className={styles.notesCategoryLabel} style={{ fontSize: 19 + sNoteHelperFontAdj, color: C.textMuted, display: "block" }}>
                             {category.label}
                           </span>
                           <div className={styles.notesChipRow}>
@@ -3260,7 +3237,7 @@ export function BikeStandScreen() {
                                   }}
                                   onPress={() => toggleNoteChip(category.id, item)}
                                 >
-                                  <span style={{ fontSize: 25 + sNoteHelperFontAdj, color: active ? C.blue : gray(0.5), fontWeight: active ? "600" : "400" }}>
+                                  <span style={{ fontSize: 25 + sNoteHelperFontAdj, color: active ? C.blue : C.textMuted, fontWeight: active ? "600" : "400" }}>
                                     {displayLabel}
                                   </span>
                                 </StandTouch>
@@ -3273,8 +3250,8 @@ export function BikeStandScreen() {
                     <div className={styles.notesCategoryDivider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
                     <div className={`${styles.notesCategoryCol} ${styles.notesCategoryColRight}`}>
                       {noteHelpers.filter((_, i) => i % 2 === 1).map((category) => (
-                        <div key={category.id} className={styles.notesCategoryCard} style={{ borderColor: gray(0.15) }}>
-                          <span className={styles.notesCategoryLabel} style={{ fontSize: 19 + sNoteHelperFontAdj, color: gray(0.4), display: "block" }}>
+                        <div key={category.id} className={styles.notesCategoryCard} style={{ borderColor: C.borderSubtle }}>
+                          <span className={styles.notesCategoryLabel} style={{ fontSize: 19 + sNoteHelperFontAdj, color: C.textMuted, display: "block" }}>
                             {category.label}
                           </span>
                           <div className={styles.notesChipRow}>
@@ -3292,7 +3269,7 @@ export function BikeStandScreen() {
                                   }}
                                   onPress={() => toggleNoteChip(category.id, item)}
                                 >
-                                  <span style={{ fontSize: 25 + sNoteHelperFontAdj, color: active ? C.blue : gray(0.5), fontWeight: active ? "600" : "400" }}>
+                                  <span style={{ fontSize: 25 + sNoteHelperFontAdj, color: active ? C.blue : C.textMuted, fontWeight: active ? "600" : "400" }}>
                                     {displayLabel}
                                   </span>
                                 </StandTouch>
@@ -3309,21 +3286,21 @@ export function BikeStandScreen() {
                 <div className={styles.notesActionRow}>
                   <StandTouch
                     className={styles.notesTargetBtn}
-                    style={{ backgroundColor: sNotesTarget === "intakeNotes" ? C.orange : gray(0.08) }}
+                    style={{ backgroundColor: sNotesTarget === "intakeNotes" ? C.orange : C.surfaceAlt }}
                     onPress={() => switchNotesTarget("intakeNotes")}
                   >
-                    <Image_ icon={ICONS.editPencil} size={24} />
-                    <span className={styles.notesTargetText} style={{ color: sNotesTarget === "intakeNotes" ? C.textWhite : gray(0.5) }}>Intake</span>
+                    <Image icon={ICONS.editPencil} size={24} />
+                    <span className={styles.notesTargetText} style={{ color: sNotesTarget === "intakeNotes" ? C.textWhite : C.textMuted }}>Intake</span>
                   </StandTouch>
                   <StandTouch
                     className={styles.notesTargetBtn}
-                    style={{ backgroundColor: sNotesTarget === "receiptNotes" ? C.green : gray(0.08) }}
+                    style={{ backgroundColor: sNotesTarget === "receiptNotes" ? C.green : C.surfaceAlt }}
                     onPress={() => switchNotesTarget("receiptNotes")}
                   >
-                    <Image_ icon={ICONS.receipt} size={24} />
-                    <span className={styles.notesTargetText} style={{ color: sNotesTarget === "receiptNotes" ? C.textWhite : gray(0.5) }}>Receipt</span>
+                    <Image icon={ICONS.receipt} size={24} />
+                    <span className={styles.notesTargetText} style={{ color: sNotesTarget === "receiptNotes" ? C.textWhite : C.textMuted }}>Receipt</span>
                   </StandTouch>
-                  <span className={styles.notesAddingLabel} style={{ color: gray(0.4) }}>
+                  <span className={styles.notesAddingLabel} style={{ color: C.textMuted }}>
                     Adding to <span style={{ color: sNotesTarget === "intakeNotes" ? C.orange : C.green }}>{sNotesTarget === "intakeNotes" ? "Intake" : "Receipt"}</span> notes
                   </span>
 
@@ -3336,7 +3313,7 @@ export function BikeStandScreen() {
                       style={{ backgroundColor: "rgb(103, 124, 231)" }}
                       onPress={() => _setNotesDiscountOpen((p) => !p)}
                     >
-                      <Image_ icon={ICONS.dollarYellow} size={32} />
+                      <Image icon={ICONS.dollarYellow} size={32} />
                       <span className={styles.notesActionBtnText} style={{ color: C.textWhite }}>Discount</span>
                     </StandTouch>
                     {sNotesDiscountOpen && (() => {
@@ -3346,11 +3323,11 @@ export function BikeStandScreen() {
                         <div
                           className={styles.notesDiscountMenu}
                           onClick={(e) => e.stopPropagation()}
-                          style={{ border: "1px solid " + gray(0.2) }}
+                          style={{ border: "1px solid " + C.borderSubtle }}
                         >
                           <StandTouch
                             className={styles.notesDiscountItem}
-                            style={{ borderBottom: "1px solid " + gray(0.1), color: C.text }}
+                            style={{ borderBottom: "1px solid " + C.borderSubtle, color: C.text }}
                             onPress={() => { handleDiscountSelect(invItemID, null); _setNotesDiscountOpen(false); }}
                           >
                             No Discount
@@ -3361,7 +3338,7 @@ export function BikeStandScreen() {
                             <StandTouch
                               key={d.name + "-" + dIdx}
                               className={styles.notesDiscountItem}
-                              style={{ borderBottom: "1px solid " + gray(0.1), color: C.text }}
+                              style={{ borderBottom: "1px solid " + C.borderSubtle, color: C.text }}
                               onPress={() => { handleDiscountSelect(invItemID, d); _setNotesDiscountOpen(false); }}
                             >
                               {d.name}
@@ -3398,7 +3375,7 @@ export function BikeStandScreen() {
                           useOpenWorkordersStore.getState().setField("workorderLines", lines, sSelectedWorkorderID, true);
                         }}
                       >
-                        <Image_ icon={ICONS.axe} size={32} />
+                        <Image icon={ICONS.axe} size={32} />
                         <span className={styles.notesActionBtnText} style={{ color: C.textWhite }}>Split</span>
                       </StandTouch>
                     );
@@ -3449,7 +3426,7 @@ export function BikeStandScreen() {
                           {activeText.length === 0 && cursorPos === 0 ? (
                             <span data-notes-text="true" className={styles.notesEditorText} style={{ color: C.text }}>
                               <span className={styles.notesEditorCaret} style={{ color: C.blue }}>|</span>
-                              <span className={styles.notesEditorPlaceholder} style={{ color: gray(0.35) }}>Tap here to type</span>
+                              <span className={styles.notesEditorPlaceholder} style={{ color: C.textDisabled }}>Tap here to type</span>
                             </span>
                           ) : (
                             <span data-notes-text="true" className={styles.notesEditorText} style={{ color: C.text }}>
@@ -3488,7 +3465,7 @@ export function BikeStandScreen() {
                 {/* Qty arrows + Close button */}
                 <div className={styles.notesFooterRow}>
                   <div className={styles.notesQtyGroup}>
-                    <Button_
+                    <Button
                       enabled={sNotesQty > 0}
                       onPress={() => _setNotesQty((q) => Math.max(0, q - 1))}
                       buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 3 }}
@@ -3496,7 +3473,7 @@ export function BikeStandScreen() {
                       iconSize={96}
                     />
                     <span className={styles.notesQtyValue} style={{ color: sNotesQty === 0 ? C.red : C.text }}>{sNotesQty}</span>
-                    <Button_
+                    <Button
                       onPress={() => _setNotesQty((q) => q + 1)}
                       buttonStyle={{ backgroundColor: "transparent", paddingHorizontal: 3 }}
                       icon={ICONS.upArrowOrange}
@@ -3766,13 +3743,13 @@ const WorkorderListModal = ({ onSelect, onClose, onNewWorkorder, activeWorkorder
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header — title, search, new workorder */}
-        <div className={styles.wlmHeader} style={{ borderBottomColor: gray(0.1) }}>
+        <div className={styles.wlmHeader} style={{ borderBottomColor: C.borderSubtle }}>
           <span className={styles.wlmTitle} style={{ color: C.text }}>Open Workorders</span>
           <div
             className={styles.wlmSearchBox}
             style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
           >
-            <Image_ icon={ICONS.search} size={16} style={{ marginRight: 6, opacity: 0.4 }} />
+            <Image icon={ICONS.search} size={16} style={{ marginRight: 6, opacity: 0.4 }} />
             <input
               type="text"
               value={sSearch}
@@ -3783,7 +3760,7 @@ const WorkorderListModal = ({ onSelect, onClose, onNewWorkorder, activeWorkorder
             />
             {!!sSearch && (
               <StandTouch className={styles.wlmSearchClearBtn} onPress={() => _setSearch("")}>
-                <Image_ icon={ICONS.close1} size={18} />
+                <Image icon={ICONS.close1} size={18} />
               </StandTouch>
             )}
           </div>
@@ -3796,13 +3773,13 @@ const WorkorderListModal = ({ onSelect, onClose, onNewWorkorder, activeWorkorder
           </StandTouch>
           <StandTouch
             className={styles.wlmCloseBtn}
-            style={{ backgroundColor: gray(0.08) }}
+            style={{ backgroundColor: C.surfaceAlt }}
             onPress={onClose}
             touchStart={false}
           >
             <span
               className={styles.wlmCloseBtnText}
-              style={{ color: gray(0.5) }}
+              style={{ color: C.textMuted }}
               onTouchStart={(e) => { _swipeRef.current = e.touches[0].clientY; }}
               onTouchEnd={(e) => {
                 if (_swipeRef.current !== null) {
@@ -3818,7 +3795,7 @@ const WorkorderListModal = ({ onSelect, onClose, onNewWorkorder, activeWorkorder
         {/* Workorder list */}
         <div className={styles.wlmScroll}>
           {sortedWorkorders.length === 0 ? (
-            <span className={styles.wlmEmpty} style={{ color: gray(0.4) }}>No open workorders.</span>
+            <span className={styles.wlmEmpty} style={{ color: C.textMuted }}>No open workorders.</span>
           ) : (
             sortedWorkorders.map((workorder) => {
               const rs = resolveStatus(workorder.status, zStatuses);
@@ -4101,7 +4078,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
         <div onClick={(e) => e.stopPropagation()} className={styles.nwmDialog}>
           {/* Header */}
           {sMode === "create" ? (
-            <div className={styles.nwmCreateHeader} style={{ borderBottomColor: gray(0.1) }}>
+            <div className={styles.nwmCreateHeader} style={{ borderBottomColor: C.borderSubtle }}>
               <StandTouch onPress={() => _setMode("search")}>
                 <span className={styles.nwmBackBtn} style={{ color: C.blue }}>
                   {"\u2190"} Back to Search
@@ -4121,7 +4098,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
               }}
               className={styles.nwmTapToClose}
             >
-              <span className={styles.nwmTapToCloseText} style={{ color: gray(0.35) }}>Tap to close</span>
+              <span className={styles.nwmTapToCloseText} style={{ color: C.textDisabled }}>Tap to close</span>
             </div>
           )}
 
@@ -4135,7 +4112,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                 >
                   <div className={styles.nwmSearchText}>
                     {displayText || (
-                      <span style={{ color: gray(0.3) }}>
+                      <span style={{ color: C.textDisabled }}>
                         {sKeypadMode === "phone" ? "Phone number..." : "Name..."}
                       </span>
                     )}
@@ -4174,9 +4151,9 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                       </span>
                       <div className={styles.nwmResultMeta}>
                         {!(cust.customerCell || cust.cell) && cust.landline && (
-                          <span className={styles.nwmResultMetaLandline} style={{ color: gray(0.35) }}>landline</span>
+                          <span className={styles.nwmResultMetaLandline} style={{ color: C.textDisabled }}>landline</span>
                         )}
-                        <span className={styles.nwmResultPhone} style={{ color: gray(0.5) }}>
+                        <span className={styles.nwmResultPhone} style={{ color: C.textMuted }}>
                           {(cust.customerCell || cust.cell)
                             ? formatPhoneWithDashes(cust.customerCell || cust.cell)
                             : cust.landline ? formatPhoneWithDashes(cust.landline) : cust.email || ""}
@@ -4186,14 +4163,14 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                   </StandTouch>
                 ))}
                 {!sSearching && sSearchResults.length === 0 && ((sKeypadMode === "phone" && sSearchText.replace(/\D/g, "").length >= 4) || (sKeypadMode === "alpha" && sSearchText.length >= 3)) && (
-                  <div className={styles.nwmNoResults} style={{ color: gray(0.4) }}>No results found.</div>
+                  <div className={styles.nwmNoResults} style={{ color: C.textMuted }}>No results found.</div>
                 )}
               </div>
 
               {/* Create new customer button - phone: 10 digits + no results; name: 3+ chars */}
               {((sKeypadMode === "phone" && sSearchText.replace(/\D/g, "").length === 10 && sSearchResults.length === 0 && !sSearching) ||
                 (sKeypadMode === "alpha" && sSearchText.length >= 3 && !sSearching)) && (
-                <div className={styles.nwmCreateBtnWrap} style={{ borderTopColor: gray(0.1) }}>
+                <div className={styles.nwmCreateBtnWrap} style={{ borderTopColor: C.borderSubtle }}>
                   <StandTouch onPress={handleSwitchToCreate}>
                     <div className={styles.nwmCreateBtn} style={{ backgroundColor: C.green, textAlign: "center" }}>
                       + Create New Customer
@@ -4221,7 +4198,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                         backgroundColor: sActiveField === field.key ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
                       }}
                     >
-                      <span className={styles.nwmFormLabel} style={{ color: gray(0.5) }}>{field.label}</span>
+                      <span className={styles.nwmFormLabel} style={{ color: C.textMuted }}>{field.label}</span>
                       <span className={styles.nwmFormValue} style={{ color: C.text }}>
                         {field.key === "phone"
                           ? formatPhoneWithDashes((sCreateForm[field.key] || "").replace(/\D/g, ""))
@@ -4240,7 +4217,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
 
               {/* Spacer + Create button */}
               <div className={styles.nwmSpacer} />
-              <div className={styles.nwmCreateBtnWrap} style={{ borderTopColor: gray(0.1) }}>
+              <div className={styles.nwmCreateBtnWrap} style={{ borderTopColor: C.borderSubtle }}>
                 <StandTouch
                   onPress={() => { if (sCreateForm.first || sCreateForm.phone) handleCreateAndStart(); }}
                 >
@@ -4438,11 +4415,11 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
       <div onClick={(e) => e.stopPropagation()} className={styles.scimDialog}>
         {/* Header — tap to close */}
         <StandTouch onPress={onClose}>
-          <div className={styles.scimHeader} style={{ borderBottomColor: gray(0.1) }}>
+          <div className={styles.scimHeader} style={{ borderBottomColor: C.borderSubtle }}>
             <span className={styles.scimTitle} style={{ color: C.text }}>
               Add Custom {isLabor ? "Labor" : "Item"}
             </span>
-            <span className={styles.scimTapToClose} style={{ color: gray(0.35) }}>Tap to close</span>
+            <span className={styles.scimTapToClose} style={{ color: C.textDisabled }}>Tap to close</span>
           </div>
         </StandTouch>
 
@@ -4465,14 +4442,14 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
                       }}
                     >
                       <div className={styles.scimPairedLabelCol}>
-                        <span className={styles.scimPairedLabel} style={{ color: gray(0.5) }}>Minutes</span>
+                        <span className={styles.scimPairedLabel} style={{ color: C.textMuted }}>Minutes</span>
                         {zLaborRate ? (
-                          <span className={styles.scimPairedSublabel} style={{ color: gray(0.4) }}>
+                          <span className={styles.scimPairedSublabel} style={{ color: C.textMuted }}>
                             {"@ $" + usdTypeMask(zLaborRate, { withDollar: false }).display + "/hr"}
                           </span>
                         ) : null}
                       </div>
-                      <span className={styles.scimPairedValue} style={{ color: minVal ? C.text : gray(0.3) }}>
+                      <span className={styles.scimPairedValue} style={{ color: minVal ? C.text : C.textDisabled }}>
                         {minVal || ""}
                         {isMinActive && <span style={{ color: C.blue }}>|</span>}
                       </span>
@@ -4486,8 +4463,8 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
                         backgroundColor: isPriceActive ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
                       }}
                     >
-                      <span className={styles.scimPairedLabel} style={{ color: gray(0.5) }}>Price *</span>
-                      <span className={styles.scimPairedValue} style={{ color: priceVal ? C.text : gray(0.3) }}>
+                      <span className={styles.scimPairedLabel} style={{ color: C.textMuted }}>Price *</span>
+                      <span className={styles.scimPairedValue} style={{ color: priceVal ? C.text : C.textDisabled }}>
                         {priceVal || "$0.00"}
                         {isPriceActive && <span style={{ color: C.blue }}>|</span>}
                       </span>
@@ -4510,14 +4487,14 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
                   }}
                 >
                   <div className={styles.scimFieldLabelCol}>
-                    <span className={styles.scimFieldLabel} style={{ color: gray(0.5) }}>
+                    <span className={styles.scimFieldLabel} style={{ color: C.textMuted }}>
                       {field.label}{field.required ? " *" : ""}
                     </span>
                     {field.sublabel ? (
-                      <span className={styles.scimFieldSublabel} style={{ color: gray(0.4) }}>{field.sublabel}</span>
+                      <span className={styles.scimFieldSublabel} style={{ color: C.textMuted }}>{field.sublabel}</span>
                     ) : null}
                   </div>
-                  <span className={styles.scimFieldValue} style={{ color: val ? getFieldColor(field.key) : gray(0.3) }}>
+                  <span className={styles.scimFieldValue} style={{ color: val ? getFieldColor(field.key) : C.textDisabled }}>
                     {val || (field.key === "price" ? "$0.00" : "")}
                     {isActive && <span style={{ color: C.blue }}>|</span>}
                   </span>
@@ -4535,15 +4512,15 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
 
           {/* Discount selector */}
           <div className={styles.scimDiscountSection}>
-            <div className={styles.scimDiscountLabel} style={{ color: gray(0.5) }}>Discount</div>
+            <div className={styles.scimDiscountLabel} style={{ color: C.textMuted }}>Discount</div>
             <div className={styles.scimDiscountChips}>
               <StandTouch onPress={() => _setDiscountObj(null)}>
                 <div
                   className={styles.scimDiscountChip}
                   style={{
-                    borderColor: !sDiscountObj ? C.blue : gray(0.15),
+                    borderColor: !sDiscountObj ? C.blue : C.borderSubtle,
                     backgroundColor: !sDiscountObj ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
-                    color: !sDiscountObj ? C.blue : gray(0.5),
+                    color: !sDiscountObj ? C.blue : C.textMuted,
                   }}
                 >
                   None
@@ -4558,7 +4535,7 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
                       <div
                         className={styles.scimDiscountChip}
                         style={{
-                          borderColor: isSelected ? C.blue : gray(0.15),
+                          borderColor: isSelected ? C.blue : C.borderSubtle,
                           backgroundColor: isSelected ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
                           color: isSelected ? C.blue : C.text,
                         }}
@@ -4571,7 +4548,7 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
             </div>
             {discountedCents !== null && (
               <div className={styles.scimDiscountPreview}>
-                <span className={styles.scimDiscountOriginal} style={{ color: gray(0.5) }}>
+                <span className={styles.scimDiscountOriginal} style={{ color: C.textMuted }}>
                   {"$" + usdTypeMask(sPriceCents, { withDollar: false }).display}
                 </span>
                 <span className={styles.scimDiscountFinal} style={{ color: C.green }}>
@@ -4593,7 +4570,7 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
         </div>
 
         {/* Save button */}
-        <div className={styles.scimSaveWrap} style={{ borderTopColor: gray(0.1) }}>
+        <div className={styles.scimSaveWrap} style={{ borderTopColor: C.borderSubtle }}>
           <StandTouch onPress={() => { if (canSave) handleSave(); }}>
             <div
               className={styles.scimSaveBtn}
@@ -4666,10 +4643,10 @@ const PhoneSearchModal = ({ onSelect, onClose }) => {
     <div onClick={onClose} className={styles.psmBackdrop} style={{ zIndex: Z.modal }}>
       <div onClick={(e) => e.stopPropagation()} className={styles.psmDialog}>
         {/* Header */}
-        <div className={styles.psmHeader} style={{ borderBottomColor: gray(0.1) }}>
+        <div className={styles.psmHeader} style={{ borderBottomColor: C.borderSubtle }}>
           <span className={styles.psmTitle} style={{ color: C.text }}>Search Customer</span>
           <StandTouch onPress={onClose}>
-            <span className={styles.psmClose} style={{ color: gray(0.5) }}>Close</span>
+            <span className={styles.psmClose} style={{ color: C.textMuted }}>Close</span>
           </StandTouch>
         </div>
 
@@ -4680,7 +4657,7 @@ const PhoneSearchModal = ({ onSelect, onClose }) => {
               width: "8%",
               height: 40,
               outlineStyle: "none",
-              borderColor: gray(0.08),
+              borderColor: C.borderSubtle,
               fontSize: 22,
               color: C.text,
             }}
@@ -4688,7 +4665,7 @@ const PhoneSearchModal = ({ onSelect, onClose }) => {
             value={sPhoneInput}
             onChangeText={handlePhoneChange}
             dashStyle={{ width: 10, marginHorizontal: 4 }}
-            dashColor={gray(0.2)}
+            dashColor={C.borderSubtle}
             textColor={C.text}
           />
         </div>
@@ -4696,27 +4673,27 @@ const PhoneSearchModal = ({ onSelect, onClose }) => {
         {/* Results */}
         <div className={styles.psmResults}>
           {sIsSearching && (
-            <div className={styles.psmStatusText} style={{ color: gray(0.4) }}>Searching...</div>
+            <div className={styles.psmStatusText} style={{ color: C.textMuted }}>Searching...</div>
           )}
           {!sIsSearching && sSearchResults.length === 0 && sPhoneInput.length > 0 && removeDashesFromPhone(sPhoneInput).length >= 5 && (
-            <div className={styles.psmStatusText} style={{ color: gray(0.4) }}>No customers found.</div>
+            <div className={styles.psmStatusText} style={{ color: C.textMuted }}>No customers found.</div>
           )}
           {sSearchResults.map((customer) => (
             <StandTouch key={customer.id} onPress={() => onSelect(customer)}>
               <div
                 className={styles.psmResultRow}
-                style={{ borderColor: gray(0.08), backgroundColor: C.listItemWhite }}
+                style={{ borderColor: C.borderSubtle, backgroundColor: C.listItemWhite }}
               >
                 <div className={styles.psmResultMain}>
                   <span className={styles.psmResultName} style={{ color: C.text }}>
                     {capitalizeFirstLetterOfString(customer.first || "")} {capitalizeFirstLetterOfString(customer.last || "")}
                   </span>
-                  <span className={styles.psmResultPhone} style={{ color: gray(0.5) }}>
+                  <span className={styles.psmResultPhone} style={{ color: C.textMuted }}>
                     {formatPhoneWithDashes(customer.customerCell || "")}
                   </span>
                 </div>
                 {customer.email && (
-                  <span className={styles.psmResultEmail} style={{ color: gray(0.4) }}>
+                  <span className={styles.psmResultEmail} style={{ color: C.textMuted }}>
                     {customer.email}
                   </span>
                 )}
@@ -4854,16 +4831,16 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
   return (
     <div className={styles.swdContainer}>
       {/* Top bar: customer info + back button */}
-      <div className={styles.swdTopBar} style={{ borderBottomColor: gray(0.1) }}>
+      <div className={styles.swdTopBar} style={{ borderBottomColor: C.borderSubtle }}>
         <StandTouch onPress={onShowCustomerModal} style={{ flex: 1, display: "flex", minWidth: 0 }}>
           <div className={styles.swdCustomerInner}>
-            <Image_ icon={ICONS.ridingBike} size={28} style={{ marginRight: 8 }} />
+            <Image icon={ICONS.ridingBike} size={28} style={{ marginRight: 8 }} />
             <div className={styles.swdCustomerTextCol}>
               <span className={styles.swdCustomerName} style={{ color: C.text }}>
                 {custName || "Customer"}
               </span>
               {custPhone ? (
-                <span className={styles.swdCustomerPhone} style={{ color: gray(0.5) }}>
+                <span className={styles.swdCustomerPhone} style={{ color: C.textMuted }}>
                   {formatPhoneWithDashes(custPhone)}
                 </span>
               ) : null}
@@ -4871,7 +4848,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
           </div>
         </StandTouch>
         <StandTouch onPress={onBack}>
-          <div className={styles.swdBackButton} style={{ backgroundColor: gray(0.12), color: C.text }}>
+          <div className={styles.swdBackButton} style={{ backgroundColor: C.surfaceAlt, color: C.text }}>
             Back to Buttons
           </div>
         </StandTouch>
@@ -4880,10 +4857,10 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
       {/* Scrollable form */}
       <div className={styles.swdScroll}>
         {/* Bike details section */}
-        <div className={styles.swdSectionBike} style={{ backgroundColor: C.backgroundListWhite, borderColor: gray(0.05) }}>
+        <div className={styles.swdSectionBike} style={{ backgroundColor: C.backgroundListWhite, borderColor: C.borderSubtle }}>
           {/* Brand row */}
           <div className={styles.swdRow}>
-            <TextInput_
+            <TextInput
               placeholder="Brand"
               capitalize={true}
               style={{ ...inputStyle, width: "45%", fontWeight: zWorkorder?.brand ? "500" : null }}
@@ -4912,7 +4889,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
 
           {/* Model/Description row */}
           <div className={`${styles.swdRow} ${styles.swdRowMT}`}>
-            <TextInput_
+            <TextInput
               placeholder="Model/Description"
               capitalize={true}
               style={{ ...inputStyle, width: "45%", fontWeight: zWorkorder?.description ? "500" : null }}
@@ -4931,7 +4908,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
 
           {/* Colors row */}
           <div className={`${styles.swdRow} ${styles.swdRowMT}`}>
-            <TextInput_
+            <TextInput
               placeholder="Color 1"
               capitalize={true}
               value={zWorkorder?.color1?.label}
@@ -4945,7 +4922,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
               onChangeText={(val) => setBikeColor(val, "color1")}
             />
             <div className={styles.swdColorGap} />
-            <TextInput_
+            <TextInput
               placeholder="Color 2"
               capitalize={true}
               value={zWorkorder?.color2?.label}
@@ -5013,8 +4990,8 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
 
           {/* Wait time row */}
           <div className={`${styles.swdRow} ${styles.swdRowMT}`}>
-            <span className={styles.swdGrayLabel} style={{ color: gray(0.5) }}>Max wait days:</span>
-            <TextInput_
+            <span className={styles.swdGrayLabel} style={{ color: C.textMuted }}>Max wait days:</span>
+            <TextInput
               placeholder="0"
               inputMode="numeric"
               style={{
@@ -5049,15 +5026,15 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
             </div>
           </div>
           {estimateLabel && (
-            <div className={styles.swdEstimateLine} style={{ color: gray(0.5) }}>
+            <div className={styles.swdEstimateLine} style={{ color: C.textMuted }}>
               {estimateLabel}
             </div>
           )}
         </div>
 
         {/* Parts section */}
-        <div className={styles.swdSectionParts} style={{ backgroundColor: gray(0.05) }}>
-          <TextInput_
+        <div className={styles.swdSectionParts} style={{ backgroundColor: C.surfaceAlt }}>
+          <TextInput
             placeholder="Part name/description"
             capitalize={true}
             style={{ ...inputStyle, width: "100%", fontWeight: zWorkorder?.partOrdered ? "500" : null, backgroundColor: C.backgroundWhite }}
@@ -5069,7 +5046,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
           />
 
           <div className={`${styles.swdRow} ${styles.swdRowMT}`}>
-            <TextInput_
+            <TextInput
               placeholder="Part Source"
               capitalize={true}
               value={zWorkorder?.partSource}
@@ -5095,22 +5072,22 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
           {/* Est delivery + to be ordered */}
           <div className={`${styles.swdRowSpaced} ${styles.swdRowMT}`}>
             <div className={styles.swdEstDeliveryGroup} style={{ opacity: zWorkorder?.partToBeOrdered ? 0.35 : 1 }}>
-              <span className={styles.swdEstLabel} style={{ color: gray(0.45) }}>Est. delivery</span>
+              <span className={styles.swdEstLabel} style={{ color: C.textMuted }}>Est. delivery</span>
               <StandTouch onPress={() => { if (!zWorkorder?.partToBeOrdered) updateWaitDays(Math.max(0, sWaitDays - 1)); }}>
-                <div className={styles.swdAdjustBtn} style={{ backgroundColor: zWorkorder?.partToBeOrdered ? gray(0.85) : C.buttonLightGreen }}>
-                  <span className={styles.swdAdjustBtnText} style={{ color: gray(0.55) }}>-</span>
+                <div className={styles.swdAdjustBtn} style={{ backgroundColor: zWorkorder?.partToBeOrdered ? C.surfaceAlt : C.buttonLightGreen }}>
+                  <span className={styles.swdAdjustBtnText} style={{ color: C.textMuted }}>-</span>
                 </div>
               </StandTouch>
               <span className={styles.swdDaysDisplay} style={{ color: C.text }}>
                 {sWaitDays + " days"}
               </span>
               <StandTouch onPress={() => { if (!zWorkorder?.partToBeOrdered) updateWaitDays(sWaitDays + 1); }}>
-                <div className={styles.swdAdjustBtn} style={{ backgroundColor: zWorkorder?.partToBeOrdered ? gray(0.85) : C.buttonLightGreen }}>
-                  <span className={styles.swdAdjustBtnText} style={{ color: gray(0.55) }}>+</span>
+                <div className={styles.swdAdjustBtn} style={{ backgroundColor: zWorkorder?.partToBeOrdered ? C.surfaceAlt : C.buttonLightGreen }}>
+                  <span className={styles.swdAdjustBtnText} style={{ color: C.textMuted }}>+</span>
                 </div>
               </StandTouch>
               {!!zWorkorder?.partOrderEstimateMillis && !zWorkorder?.partToBeOrdered && (
-                <span className={styles.swdEstDate} style={{ color: gray(0.45) }}>
+                <span className={styles.swdEstDate} style={{ color: C.textMuted }}>
                   {formatMillisForDisplay(zWorkorder.partOrderEstimateMillis)}
                 </span>
               )}
@@ -5119,7 +5096,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
               text="To be ordered"
               isChecked={!!zWorkorder?.partToBeOrdered}
               onCheck={() => setField("partToBeOrdered", !zWorkorder?.partToBeOrdered)}
-              textStyle={{ fontSize: 14, color: gray(0.55) }}
+              textStyle={{ fontSize: 14, color: C.textMuted }}
             />
           </div>
         </div>
@@ -5136,7 +5113,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
         <div className={styles.swdMediaCol}>
           <div className={styles.swdMediaBtnRow}>
             <StandTouch onPress={() => uploadInputRef.current?.click()}>
-              <Button_
+              <Button
                 icon={ICONS.uploadCamera}
                 iconSize={40}
                 onPress={() => uploadInputRef.current?.click()}
@@ -5145,7 +5122,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
             </StandTouch>
             <div className={styles.swdViewMediaWrap}>
               <StandTouch onPress={() => _setShowMediaModal("view")}>
-                <Button_
+                <Button
                   icon={ICONS.viewPhoto}
                   iconSize={50}
                   onPress={() => _setShowMediaModal("view")}
@@ -5167,11 +5144,11 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
             <div className={styles.swdProgressRow}>
               <span
                 className={styles.swdProgressText}
-                style={{ color: sUploadProgress.done ? (sUploadProgress.failed > 0 ? C.red : C.green) : gray(0.45) }}
+                style={{ color: sUploadProgress.done ? (sUploadProgress.failed > 0 ? C.red : C.green) : C.textMuted }}
               >
                 {sUploadProgress.completed}/{sUploadProgress.total}
               </span>
-              <div className={styles.swdProgressTrack} style={{ backgroundColor: gray(0.88) }}>
+              <div className={styles.swdProgressTrack} style={{ backgroundColor: C.surfaceAlt }}>
                 {!sUploadProgress.done ? (
                   <div className={styles.swdProgressFill} style={{ width: "40%", backgroundColor: C.blue }} />
                 ) : (
@@ -5225,10 +5202,10 @@ const CustomerInfoViewModal = ({ customer, onClose }) => {
   return createPortal(
     <div onClick={onClose} className={styles.cimBackdrop} style={{ zIndex: Z.modal }}>
       <div onClick={(e) => e.stopPropagation()} className={styles.cimDialog}>
-        <div className={styles.cimHeader} style={{ borderBottomColor: gray(0.1) }}>
+        <div className={styles.cimHeader} style={{ borderBottomColor: C.borderSubtle }}>
           <span className={styles.cimTitle} style={{ color: C.text }}>Customer Info</span>
           <StandTouch onPress={onClose}>
-            <span className={styles.cimClose} style={{ color: gray(0.5) }}>Close</span>
+            <span className={styles.cimClose} style={{ color: C.textMuted }}>Close</span>
           </StandTouch>
         </div>
         <div className={styles.cimBody}>
@@ -5236,9 +5213,9 @@ const CustomerInfoViewModal = ({ customer, onClose }) => {
             <div
               key={idx}
               className={`${styles.cimField}${idx < fields.length - 1 ? " " + styles.cimFieldBordered : ""}`}
-              style={idx < fields.length - 1 ? { borderBottomColor: gray(0.06) } : undefined}
+              style={idx < fields.length - 1 ? { borderBottomColor: C.borderSubtle } : undefined}
             >
-              <span className={styles.cimFieldLabel} style={{ color: gray(0.5) }}>{f.label}</span>
+              <span className={styles.cimFieldLabel} style={{ color: C.textMuted }}>{f.label}</span>
               <span className={styles.cimFieldValue} style={{ color: C.text }}>
                 {capitalizeFirstLetterOfString(String(f.value))}
               </span>

@@ -1,7 +1,7 @@
 import React from "react";
 import { TextInput } from "../../../../../dom_components";
 import { C, ICONS } from "../../../../../styles";
-import { gray, moveItemInArr } from "../../../../../utils";
+import { moveItemInArr } from "../../../../../utils";
 import { DISCOUNT_TYPES } from "../../../../../constants";
 import { BoxButton1, MoveArrows, BoxContainerInner } from "./_helpers";
 import styles from "./ListOptions.module.css";
@@ -46,7 +46,7 @@ export const Discounts = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   handleSettingsFieldChange("discounts", discountsArr);
                 }}
                 placeholder="Discount Name"
-                placeholderTextColor={gray(0.15)}
+                placeholderTextColor={C.textDisabled}
                 className={styles.discountInput}
                 style={{
                   width: "50%",
@@ -78,7 +78,7 @@ export const Discounts = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   handleSettingsFieldChange("discounts", discountsArr);
                 }}
                 placeholder="Value"
-                placeholderTextColor={gray(0.15)}
+                placeholderTextColor={C.textDisabled}
                 className={styles.discountInput}
                 style={{
                   width: "10%",

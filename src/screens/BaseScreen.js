@@ -1,14 +1,9 @@
 /* eslint-disable */
 
 import React, { useEffect, useRef, useState, Suspense, lazy } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator } from "react-native-web";
 import { C, Colors, ICONS, ViewStyles } from "../styles";
 
-import {
-  AlertBox_,
-  LoginModalScreen,
-  SHADOW_RADIUS_PROTO,
-} from "../components";
+import { AlertBox, LoginModal, SmallLoadingIndicator } from "../dom_components";
 import { Info_Section } from "./screen_collections/Info_Section";
 import styles from "./BaseScreen.module.css";
 import { Items_Section } from "./screen_collections/Items_Section";
@@ -42,7 +37,7 @@ const FaceDetectionClientComponent = lazy(() =>
 );
 import { NewCheckoutModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewCheckoutModalScreen";
 import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
-import { FullSaleModal } from "./screen_components/modal_screens/FullSaleModal";
+import { FullSaleModal } from "../dom_components";
 import { isSaleID, isLightspeedID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { decodeLightspeedBarcode, lightenRGBByPercent } from "../utils";
 import { newCheckoutGetStripeReaders, readActiveSale, recoverPendingActiveSales } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
@@ -505,18 +500,14 @@ export function BaseScreen() {
   }, []);
 
 
+  const greenShadow = `1px 1px 10px ${C.green.replace("rgb", "rgba").replace(")", ", 0.5)")}`;
+
   return (
-    <View
+    <div
       onMouseMove={() => throttledSetLastAction()}
       onKeyUp={() => throttledSetLastAction()}
-      style={{
-        width: screenWidth,
-        height: screenHeight,
-        flexDirection: "row",
-        justifyContent: "space-around",
-        alignItems: "center",
-        position: "relative",
-      }}
+      className={styles.root}
+      style={{ width: screenWidth, height: screenHeight }}
     >
 
       <style>{`
@@ -541,146 +532,66 @@ export function BaseScreen() {
         }}
       />
       {zShowLoginScreen && !zLoginModalVisible && (
-        <LoginModalScreen modalVisible={true} />
+        <LoginModal modalVisible={true} />
       )}
       {!!zRunBackgroundRecognition && zUseFacialRecognition && (
         <Suspense fallback={null}>
           <FaceDetectionClientComponent />
         </Suspense>
       )}
-      {/* {!!(!zPauseAlertOnBaseComponent && zShowAlert) && <AlertBox_ />} */}
-      <AlertBox_ showAlert={zShowAlert} />
-      <View
-        style={{
-          width: "65%",
-          backgroundColor: C.backgroundWhite,
-          height: "100%",
-          paddingRight: 8,
-          justifyContent: "space-around",
-        }}
+      <AlertBox showAlert={zShowAlert} />
+      <div
+        className={styles.leftCol}
+        style={{ backgroundColor: C.backgroundWhite }}
       >
         {localStorage.getItem("warpspeed_has_secondary_display") === "true" &&
           (sDisplayStatus === DISPLAY_STATUS.CLOSED ||
           sDisplayStatus === DISPLAY_STATUS.HIDDEN) && (
-            <View
-              style={{
-                height: 25,
-                width: "95%",
-                alignSelf: 'center',
-                flexDirection: "row",
-                alignItems: "center",
-                justifyContent: 'center',
-                paddingHorizontal: 10,
-                paddingVertical: 4,
-                backgroundColor: C.red,
-              borderRadius: 5,
-              }}
+            <div
+              className={styles.banner}
+              style={{ backgroundColor: C.red }}
             >
-              <Text
-                style={{
-                  fontSize: 17,
-                  color: C.textWhite,
-                  fontWeight: "600",
-                }}
-              >
+              <span className={styles.bannerTextLg} style={{ color: C.textWhite }}>
                 Customer screen is closed
-              </Text>
-              <TouchableOpacity
+              </span>
+              <button
+                type="button"
                 disabled={sDisplayLoading}
-              onPress={() => openDisplayWindow()}
-                style={{ marginLeft: 10, paddingHorizontal: 12, paddingVertical: 2, backgroundColor: C.green, borderRadius: 5, opacity: sDisplayLoading ? 0.5 : 1 }}
+                onClick={() => openDisplayWindow()}
+                className={styles.bannerOpenBtn}
+                style={{ backgroundColor: C.green, opacity: sDisplayLoading ? 0.5 : 1 }}
               >
                 {sDisplayLoading ? (
-                  <ActivityIndicator size="small" color={C.textWhite} />
+                  <SmallLoadingIndicator color={C.textWhite} />
                 ) : (
-                  <Text
-                    style={{
-                      fontSize: 15,
-                      color: C.textWhite,
-                      fontWeight: "600",
-                    }}
-                  >
+                  <span className={styles.bannerBtnText} style={{ color: C.textWhite }}>
                     Open
-                  </Text>
+                  </span>
                 )}
-              </TouchableOpacity>
-            </View>
+              </button>
+            </div>
           )}
         {!sDisplayFullscreen && sDisplayStatus !== DISPLAY_STATUS.CLOSED && sDisplayStatus !== DISPLAY_STATUS.HIDDEN && (
-          <div
-            style={{
-              height: 25,
-              width: "95%",
-              alignSelf: 'center',
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: 'center',
-              paddingLeft: 10,
-              paddingRight: 10,
-              paddingTop: 4,
-              paddingBottom: 4,
-              backgroundColor: 'yellow',
-              borderRadius: 5,
-              animation: "bannerPulse 1.5s ease-in-out infinite",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 15,
-                color: 'red',
-                fontWeight: "600",
-              }}
-            >
+          <div className={`${styles.banner} ${styles.bannerPulse}`} style={{ backgroundColor: "yellow" }}>
+            <span className={styles.bannerBtnText} style={{ color: "red" }}>
               Double-click anywhere in the secondary display to go Full Screen!
-            </Text>
+            </span>
           </div>
         )}
         {zIsReconnecting && (
-          <div
-            style={{
-              height: 25,
-              width: "95%",
-              alignSelf: "center",
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "center",
-              paddingLeft: 10,
-              paddingRight: 10,
-              paddingTop: 4,
-              paddingBottom: 4,
-              backgroundColor: C.orange,
-              borderRadius: 5,
-              animation: "bannerPulse 1.5s ease-in-out infinite",
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 15,
-                color: C.textWhite,
-                fontWeight: "600",
-              }}
-            >
+          <div className={`${styles.banner} ${styles.bannerPulse}`} style={{ backgroundColor: C.orange }}>
+            <span className={styles.bannerBtnText} style={{ color: C.textWhite }}>
               Reconnecting: {zReconnectingNames.join(", ")}...
-            </Text>
+            </span>
           </div>
         )}
-        <View
-          style={{
-            width: "100%",
-            height: "64%",
-            flexDirection: "row",
-            justifyContent: "space-around",
-          }}
-        >
-          {/*Info Section */}
+        <div className={styles.row}>
           <div
             className={styles.infoShell}
             style={{
               backgroundColor: C.backgroundWhite,
               borderColor: C.buttonLightGreen,
-              boxShadow: `1px 1px 10px ${C.green.replace("rgb", "rgba").replace(")", ", 0.5)")}`,
+              boxShadow: greenShadow,
             }}
           >
             <Info_Section />
@@ -690,44 +601,33 @@ export function BaseScreen() {
             style={{
               backgroundColor: C.backgroundWhite,
               borderColor: C.buttonLightGreen,
-              boxShadow: `1px 1px 10px ${C.green.replace("rgb", "rgba").replace(")", ", 0.5)")}`,
+              boxShadow: greenShadow,
             }}
           >
             <Items_Section />
           </div>
-        </View>
+        </div>
         <div
           className={styles.notesShell}
           style={{
             backgroundColor: C.backgroundWhite,
             borderColor: C.buttonLightGreen,
-            boxShadow: `1px 1px 10px ${C.green.replace("rgb", "rgba").replace(")", ", 0.5)")}`,
+            boxShadow: greenShadow,
           }}
         >
           <Notes_Section />
         </div>
-      </View>
-      <View
+      </div>
+      <div
+        className={styles.rightCol}
         style={{
-          marginRight: 13,
-          // width: "100%",
-          width: "34%",
-          height: "99%",
           backgroundColor: C.backgroundWhite,
           borderColor: C.buttonLightGreen,
-          borderWidth: 1,
-          borderRadius: 15,
-          shadowColor: C.green,
-          shadowOffset: {
-            width: 0,
-            height: 1,
-          },
-          shadowOpacity: 0.5,
-          shadowRadius: 10,
+          boxShadow: greenShadow,
         }}
       >
         <Options_Section />
-      </View>
-    </View>
+      </div>
+    </div>
   );
 }

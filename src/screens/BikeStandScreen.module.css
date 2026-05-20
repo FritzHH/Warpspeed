@@ -276,7 +276,7 @@
 .cimBackdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--surface-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -285,7 +285,7 @@
 .cimDialog {
   width: 70%;
   max-width: 420px;
-  background-color: white;
+  background-color: var(--surface-base);
   border-radius: 12px;
   overflow: hidden;
 }
@@ -349,7 +349,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--surface-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -358,7 +358,7 @@
 .nwmDialog {
   width: 95%;
   height: 95%;
-  background-color: white;
+  background-color: var(--surface-base);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -438,7 +438,7 @@
   cursor: pointer;
   font-size: 23px;
   font-weight: 600;
-  color: white;
+  color: var(--text-on-accent);
   flex-shrink: 0;
 }
 
@@ -512,7 +512,7 @@
   cursor: pointer;
   font-size: 21px;
   font-weight: 600;
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .nwmFormCol {
@@ -562,7 +562,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: var(--surface-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -697,7 +697,7 @@
   cursor: pointer;
   font-size: 16px;
   font-weight: 600;
-  color: white;
+  color: var(--text-on-accent);
   flex-shrink: 0;
 }
 
@@ -769,7 +769,7 @@
   cursor: pointer;
   font-size: 28px;
   font-weight: 600;
-  color: white;
+  color: var(--text-on-accent);
 }
 
 /* =================================================================
@@ -779,7 +779,7 @@
 .psmBackdrop {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--surface-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -789,7 +789,7 @@
   width: 80%;
   max-width: 500px;
   max-height: 80%;
-  background-color: white;
+  background-color: var(--surface-base);
   border-radius: 12px;
   overflow: hidden;
   display: flex;
@@ -966,11 +966,11 @@
 }
 
 .standFooterMenuContent {
-  background-color: white;
+  background-color: var(--surface-base);
   border-radius: 10px;
   border-width: 2px;
   border-style: solid;
-  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 -2px 8px var(--shadow-color-default);
   overflow: hidden;
   min-width: 320px;
 }
@@ -1004,7 +1004,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--surface-overlay);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1016,7 +1016,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: var(--surface-overlay-heavy);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -1025,7 +1025,7 @@
 .standSettingsDialog {
   width: 70%;
   max-width: 500px;
-  background-color: white;
+  background-color: var(--surface-base);
   border-radius: 14px;
   overflow: hidden;
 }
@@ -1096,7 +1096,7 @@
   flex-direction: column;
   align-items: center;
   padding: 30px 40px;
-  background-color: white;
+  background-color: var(--surface-base);
   border-radius: 16px;
 }
 
@@ -1128,7 +1128,7 @@
   flex-direction: column;
   align-items: center;
   padding: 30px 40px;
-  background-color: white;
+  background-color: var(--surface-base);
   border-radius: 16px;
   min-width: 280px;
 }
@@ -1453,7 +1453,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: var(--surface-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2050,7 +2050,7 @@
 .printerBackdrop {
   position: absolute;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--surface-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2178,7 +2178,7 @@
 .notesBackdrop {
   position: absolute;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: var(--surface-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2362,10 +2362,10 @@
   bottom: 100%;
   right: 0;
   z-index: 100;
-  background-color: white;
+  background-color: var(--surface-base);
   border-radius: 6px;
   border: 1px solid;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 8px var(--shadow-color-default);
   min-width: 160px;
   overflow: hidden;
   margin-bottom: 4px;
@@ -2521,7 +2521,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--surface-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2530,7 +2530,7 @@
 .wlmDialog {
   width: 95%;
   height: 90%;
-  background-color: white;
+  background-color: var(--surface-base);
   border-radius: 12px;
   display: flex;
   flex-direction: column;
@@ -2695,7 +2695,7 @@
   width: 7px;
   height: 2px;
   margin: 0 5px;
-  background-color: lightgray;
+  background-color: var(--border-strong);
   flex-shrink: 0;
 }
 
@@ -2704,7 +2704,7 @@
 }
 
 .wlmItemLineCount {
-  background-color: gray;
+  background-color: var(--text-muted);
   border-radius: 10px;
   padding: 1px 6px;
   margin-left: 8px;
@@ -2712,7 +2712,7 @@
 }
 
 .wlmItemLineCountText {
-  color: white;
+  color: var(--text-on-accent);
   font-size: 15px;
   font-weight: 600;
 }
@@ -2736,7 +2736,7 @@
 }
 
 .wlmItemDate {
-  color: dimgray;
+  color: var(--text-secondary);
   font-size: 15px;
 }
 
@@ -2755,7 +2755,7 @@
 }
 
 .wlmItemWipUser {
-  color: rgb(204, 0, 0);
+  color: var(--danger);
   font-size: 13px;
   font-style: italic;
   margin-right: 5px;
@@ -2786,7 +2786,7 @@
   width: 5px;
   height: 2px;
   margin: 0 5px;
-  background-color: lightgray;
+  background-color: var(--border-strong);
   flex-shrink: 0;
 }
 
@@ -2799,7 +2799,7 @@
 
 .wlmItemPartDate {
   font-size: 14px;
-  color: dimgray;
+  color: var(--text-secondary);
   margin-left: 6px;
   white-space: nowrap;
   overflow: hidden;

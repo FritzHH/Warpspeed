@@ -1,11 +1,9 @@
 /* eslint-disable */
 import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { View, Text, Image, TouchableOpacity, ScrollView } from "react-native-web";
 import { C, COLOR_GRADIENTS, ICONS, Z } from "../../../styles";
-import { Button_, Image_, Tooltip } from "../../../components";
-import { CheckBox } from "../../../dom_components";
-import { gray, log, compressImage } from "../../../utils";
+import { Button, Image, Tooltip, CheckBox } from "../../../dom_components";
+import { log, compressImage } from "../../../utils";
 import {
   useOpenWorkordersStore,
   useAlertScreenStore,
@@ -19,6 +17,7 @@ import {
   dbSendEmail,
 } from "../../../db_calls_wrapper";
 import { broadcastToDisplay, DISPLAY_MSG_TYPES } from "../../../broadcastChannel";
+import styles from "./WorkorderMediaModal.module.css";
 
 export const WorkorderMediaModal = ({
   visible,
@@ -46,6 +45,7 @@ export const WorkorderMediaModal = ({
   const [sCompressConfirm, _setCompressConfirm] = useState(true);
   const [sCastToDisplay, _setCastToDisplay] = useState(false);
   const fileInputRef = useRef(null);
+  const [sDeleting, _setDeleting] = useState(false);
 
   if (!visible) return null;
 
@@ -64,7 +64,6 @@ export const WorkorderMediaModal = ({
     });
   }
 
-  // Upload handlers
   function handleDirectUpload(e) {
     const files = Array.from(e.target.files);
     if (!files.length) return;
@@ -127,7 +126,6 @@ export const WorkorderMediaModal = ({
     let sendEmail = sSendEmail && hasEmail;
     if (!sendEmail) return;
 
-    // Update local store immediately — mark as sent
     const updatedMedia = zMedia.map((m) => {
       if (!sSelectedIds.has(m.id)) return m;
       return {
@@ -142,7 +140,6 @@ export const WorkorderMediaModal = ({
     useOpenWorkordersStore.getState().setField("media", updatedMedia, workorderID);
     onClose();
 
-    // Fire off sends in background
     const hasImages = selectedItems.some((m) => m.type === "image");
     const hasVideos = selectedItems.some((m) => m.type === "video");
     let noun = hasImages && hasVideos
@@ -169,7 +166,6 @@ export const WorkorderMediaModal = ({
     let willSendText = sSendText && !!onSendMedia;
     if (!willSendEmail && !willSendText) return;
 
-    // Optimistic update: mark media as sent
     const updatedMedia = zMedia.map((m) => {
       if (!sSelectedIds.has(m.id)) return m;
       return {
@@ -183,7 +179,6 @@ export const WorkorderMediaModal = ({
     });
     useOpenWorkordersStore.getState().setField("media", updatedMedia, workorderID);
 
-    // Send email if checked
     if (willSendEmail) {
       const hasImages = selectedItems.some((m) => m.type === "image");
       const hasVideos = selectedItems.some((m) => m.type === "video");
@@ -203,28 +198,22 @@ export const WorkorderMediaModal = ({
       dbSendEmail(zWorkorder.customerEmail, subject, htmlBody);
     }
 
-    // Send text if checked - pass to parent for can respond flow
     if (willSendText) {
       onSendMedia(selectedItems);
       return;
     }
 
-    // Only email - close modal
     onClose();
   }
-
-  const [sDeleting, _setDeleting] = useState(false);
 
   function handleDeleteSelected() {
     const selectedItems = zMedia.filter((m) => sSelectedIds.has(m.id));
     if (!selectedItems.length) return;
 
-    // Update local store immediately and close
     const remaining = zMedia.filter((m) => !sSelectedIds.has(m.id));
     useOpenWorkordersStore.getState().setField("media", remaining, workorderID);
     _setSelectedIds(new Set());
 
-    // Fire off storage deletes in background
     for (let i = 0; i < selectedItems.length; i++) {
       dbDeleteWorkorderMedia(selectedItems[i]);
     }
@@ -277,97 +266,38 @@ export const WorkorderMediaModal = ({
 
     return createPortal(
       <div
+        className={styles.fullOverlay}
         onClick={handleCloseFullView}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.85)",
-          zIndex: Z.modal + 100,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
+        style={{ zIndex: Z.modal + 100 }}
       >
-        <div
-          onClick={(e) => e.stopPropagation()}
-          style={{
-            position: "relative",
-            width: "90%",
-            maxWidth: 800,
-            maxHeight: "90%",
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-          }}
-        >
+        <div className={styles.fullContent} onClick={(e) => e.stopPropagation()}>
           {hasPrev && (
-            <div
+            <button
+              type="button"
+              className={`${styles.navButton} ${styles.navPrev}`}
               onClick={() => handleFullViewNav(-1)}
-              style={{
-                position: "absolute",
-                left: 8,
-                top: "50%",
-                transform: "translateY(-50%)",
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: "rgba(255,255,255,0.15)",
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                cursor: "pointer",
-                zIndex: 1,
-              }}
             >
-              <Image source={ICONS.caretLeft} style={{ width: 44, height: 44 }} />
-            </div>
+              <Image src={ICONS.caretLeft} size={44} resizeMode="contain" />
+            </button>
           )}
           {sFullView.type === "video" ? (
             <video
               src={sFullView.url}
               controls
               autoPlay
-              style={{
-                maxWidth: "100%",
-                maxHeight: "70vh",
-                borderRadius: 8,
-              }}
+              className={styles.fullVideo}
             />
           ) : (
-            <Image
-              source={{ uri: sFullView.url }}
-              style={{
-                width: "100%",
-                height: 500,
-                borderRadius: 8,
-              }}
-              resizeMode="contain"
-            />
+            <img src={sFullView.url} alt="" className={styles.fullImage} draggable={false} />
           )}
           {hasNext && (
-            <div
+            <button
+              type="button"
+              className={`${styles.navButton} ${styles.navNext}`}
               onClick={() => handleFullViewNav(1)}
-              style={{
-                position: "absolute",
-                right: 8,
-                top: "50%",
-                transform: "translateY(-50%)",
-                width: 44,
-                height: 44,
-                borderRadius: 22,
-                backgroundColor: "rgba(255,255,255,0.15)",
-                display: "flex",
-                justifyContent: "center",
-                alignItems: "center",
-                cursor: "pointer",
-                zIndex: 1,
-              }}
             >
-              <Image source={ICONS.caretRight} style={{ width: 44, height: 44 }} />
-            </div>
+              <Image src={ICONS.caretRight} size={44} resizeMode="contain" />
+            </button>
           )}
         </div>
       </div>,
@@ -375,90 +305,56 @@ export const WorkorderMediaModal = ({
     );
   }
 
+  const tileWidth = isMobile ? "31%" : 120;
+  const tileHeight = isMobile ? 100 : 120;
+
   return createPortal(
     <div
+      className={styles.overlay}
       onClick={onClose}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        zIndex: Z.modal,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
+      style={{ zIndex: Z.modal }}
     >
       <div
+        className={styles.modal}
         onClick={(e) => e.stopPropagation()}
         style={{
           width: MODAL_WIDTH,
-          maxHeight: "80%",
           backgroundColor: C.backgroundWhite,
-          borderRadius: 12,
-          borderWidth: 1,
           borderColor: C.buttonLightGreenOutline,
-          overflow: "hidden",
-          display: "flex",
-          flexDirection: "column",
         }}
       >
         {/* Header */}
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: 16,
-            borderBottomWidth: 1,
-            borderBottomColor: gray(0.25),
-          }}
-        >
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "600",
-              color: C.text,
-            }}
-          >
+        <div className={styles.header} style={{ borderBottomColor: C.borderSubtle }}>
+          <span className={styles.headerTitle} style={{ color: C.text }}>
             Workorder Media
-          </Text>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          </span>
+          <div className={styles.headerRight}>
             <CheckBox
               text="Cast images to customer screen"
               isChecked={sCastToDisplay}
               onCheck={() => _setCastToDisplay(!sCastToDisplay)}
             />
-            {/* Upload button in header */}
             {!isDonePaid && (
-              <Button_
-                text="UPLOAD"
-                icon={ICONS.uploadCamera}
-                iconSize={18}
-                onPress={() => fileInputRef.current?.click()}
-                buttonStyle={{
-                  backgroundColor: C.orange,
-                  paddingHorizontal: 10,
-                  paddingVertical: 4,
-                  borderRadius: 5,
-                }}
-                textStyle={{ color: "white", fontSize: 14, fontWeight: "700" }}
-              />
+              <button
+                type="button"
+                className={styles.uploadBtn}
+                style={{ backgroundColor: C.orange }}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <Image src={ICONS.uploadCamera} size={18} resizeMode="contain" />
+                UPLOAD
+              </button>
             )}
-            <Button_
-              text="X"
-              onPress={onClose}
-              buttonStyle={{
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 6,
-              }}
-              textStyle={{ fontSize: 16, fontWeight: "600", color: C.lightText }}
-            />
-          </View>
-        </View>
+            <button
+              type="button"
+              className={styles.closeBtn}
+              style={{ color: C.lightText }}
+              onClick={onClose}
+            >
+              X
+            </button>
+          </div>
+        </div>
 
         {/* Hidden file input */}
         <input
@@ -468,22 +364,12 @@ export const WorkorderMediaModal = ({
           multiple
           {...(isMobile ? { capture: "environment" } : {})}
           onChange={handleDirectUpload}
-          style={{ display: "none" }}
+          className={styles.hiddenFileInput}
         />
 
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={{ padding: 16 }}
-        >
-          {/* Media grid */}
+        <div className={styles.scrollArea}>
           {zMedia.length > 0 ? (
-            <View
-              style={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-                gap: 8,
-              }}
-            >
+            <div className={styles.grid}>
               {zMedia.map((item) => {
                 const isSelected = sSelectedIds.has(item.id);
                 const wasSent = !!(item.sentToCustomer?.sms || item.sentToCustomer?.email);
@@ -493,162 +379,108 @@ export const WorkorderMediaModal = ({
                   ? (displaySize < 1048576 ? (displaySize / 1024).toFixed(0) + " KB" : (displaySize / 1048576).toFixed(1) + " MB")
                   : "";
                 return (
-                  <View key={item.id} style={{ width: isMobile ? "31%" : 120, alignItems: "center" }}>
-                  <View
-                    style={{
-                      width: "100%",
-                      height: isMobile ? 100 : 120,
-                      borderRadius: 8,
-                      borderWidth: isSelected ? 2 : 1,
-                      borderColor: isSelected ? C.green : gray(0.85),
-                      overflow: "hidden",
-                      backgroundColor: gray(0.95),
-                    }}
-                  >
-                    <TouchableOpacity
-                      onPress={() => onSelect ? onSelect(item) : handleOpenFullView(item)}
-                      style={{ flex: 1 }}
-                    >
-                      {item.type === "video" ? (
-                        <View
-                          style={{
-                            flex: 1,
-                            justifyContent: "center",
-                            alignItems: "center",
-                            backgroundColor: gray(0.2),
-                          }}
-                        >
-                          <Text style={{ color: "white", fontSize: 28 }}>
-                            ▶
-                          </Text>
-                          <Text
-                            style={{ color: "white", fontSize: 10, marginTop: 2 }}
-                            numberOfLines={1}
-                          >
-                            {item.filename}
-                          </Text>
-                        </View>
-                      ) : (
-                        <Image
-                          source={{ uri: item.thumbnailUrl || item.url }}
-                          style={{ width: "100%", height: "100%" }}
-                          resizeMode="cover"
-                        />
-                      )}
-                    </TouchableOpacity>
-
-                    {/* Selection checkbox — top-left */}
-                    <TouchableOpacity
-                      onPress={() => toggleSelection(item.id)}
+                  <div key={item.id} className={styles.tile} style={{ width: tileWidth }}>
+                    <div
+                      className={styles.tileThumb}
                       style={{
-                        position: "absolute",
-                        top: 4,
-                        left: 4,
-                        width: 24,
-                        height: 24,
-                        borderRadius: 4,
-                        backgroundColor: "rgba(255,255,255,0.85)",
-                        justifyContent: "center",
-                        alignItems: "center",
+                        height: tileHeight,
+                        borderWidth: isSelected ? 2 : 1,
+                        borderColor: isSelected ? C.green : C.borderStrong,
+                        backgroundColor: C.surfaceAlt,
                       }}
                     >
-                      <Image_
-                        icon={isSelected ? ICONS.checkbox : ICONS.checkoxEmpty}
-                        size={16}
-                      />
-                    </TouchableOpacity>
-
-                    {/* Delete — top-right */}
-                    <TouchableOpacity
-                      onPress={() => handleDeleteSingle(item)}
-                      style={{
-                        position: "absolute",
-                        top: 4,
-                        right: 4,
-                        width: 22,
-                        height: 22,
-                        borderRadius: 11,
-                        backgroundColor: C.purple,
-                        justifyContent: "center",
-                        alignItems: "center",
-                      }}
-                    >
-                      <Image_ icon={ICONS.trash} size={13} />
-                    </TouchableOpacity>
-
-                    {/* Sent badge — bottom-right */}
-                    {wasSent && (
-                      <View
-                        style={{
-                          position: "absolute",
-                          bottom: 4,
-                          right: 4,
-                          backgroundColor: C.green,
-                          borderRadius: 4,
-                          paddingHorizontal: 5,
-                          paddingVertical: 2,
-                        }}
+                      <button
+                        type="button"
+                        className={styles.tileSurface}
+                        onClick={() => onSelect ? onSelect(item) : handleOpenFullView(item)}
                       >
-                        <Text style={{ color: "white", fontSize: 9, fontWeight: "600" }}>
-                          {item.sentToCustomer?.sms && item.sentToCustomer?.email
-                            ? "Texted + Emailed"
-                            : item.sentToCustomer?.sms
-                              ? "Texted"
-                              : "Emailed"}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
-                  <Tooltip text={`${displayName}${sizeStr ? ` — ${sizeStr}` : ""}`} position="bottom">
-                    <Text style={{ fontSize: 9, color: gray(0.5), marginTop: 2, width: isMobile ? undefined : 120 }}>
-                      {displayName}{sizeStr ? ` — ${sizeStr}` : ""}
-                    </Text>
-                  </Tooltip>
-                  </View>
+                        {item.type === "video" ? (
+                          <div className={styles.videoTile} style={{ backgroundColor: C.surfaceAlt }}>
+                            <span className={styles.videoIcon}>▶</span>
+                            <span className={styles.videoLabel}>{item.filename}</span>
+                          </div>
+                        ) : (
+                          <img
+                            src={item.thumbnailUrl || item.url}
+                            alt=""
+                            className={styles.thumbImg}
+                            draggable={false}
+                          />
+                        )}
+                      </button>
+
+                      {/* Selection checkbox */}
+                      <button
+                        type="button"
+                        className={`${styles.iconBtn} ${styles.selectBox}`}
+                        onClick={(e) => { e.stopPropagation(); toggleSelection(item.id); }}
+                      >
+                        <Image
+                          icon={isSelected ? ICONS.checkbox : ICONS.checkoxEmpty}
+                          size={16}
+                          resizeMode="contain"
+                        />
+                      </button>
+
+                      {/* Delete */}
+                      <button
+                        type="button"
+                        className={`${styles.iconBtn} ${styles.deleteBtn}`}
+                        style={{ backgroundColor: C.purple }}
+                        onClick={(e) => { e.stopPropagation(); handleDeleteSingle(item); }}
+                      >
+                        <Image icon={ICONS.trash} size={13} resizeMode="contain" />
+                      </button>
+
+                      {/* Sent badge */}
+                      {wasSent && (
+                        <div className={styles.sentBadge} style={{ backgroundColor: C.green }}>
+                          <span className={styles.sentBadgeText}>
+                            {item.sentToCustomer?.sms && item.sentToCustomer?.email
+                              ? "Texted + Emailed"
+                              : item.sentToCustomer?.sms
+                                ? "Texted"
+                                : "Emailed"}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                    <Tooltip text={`${displayName}${sizeStr ? ` — ${sizeStr}` : ""}`} position="bottom">
+                      <span
+                        className={styles.tileLabel}
+                        style={{ color: C.textMuted, width: isMobile ? undefined : 120 }}
+                      >
+                        {displayName}{sizeStr ? ` — ${sizeStr}` : ""}
+                      </span>
+                    </Tooltip>
+                  </div>
                 );
               })}
-            </View>
+            </div>
           ) : (
-            <Text
-              style={{
-                color: C.lightText,
-                fontSize: 14,
-                textAlign: "center",
-                paddingVertical: 20,
-              }}
-            >
+            <div className={styles.emptyText} style={{ color: C.lightText }}>
               No media on this workorder
-            </Text>
+            </div>
           )}
-        </ScrollView>
+        </div>
 
-        {/* Info — send media via text through Messages (only when NOT opened from Messages) */}
+        {/* Info banner */}
         {zMedia.length > 0 && hasCell && !onSendMedia && !onSelect && (
-          <View style={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: 2 }}>
-            <Text style={{ fontSize: 13, color: gray(0.5), fontStyle: "italic", textAlign: "center" }}>
+          <div className={styles.infoBanner}>
+            <div className={styles.infoBannerText} style={{ color: C.textMuted }}>
               To send media via text, use the Messages tab
-            </Text>
-          </View>
+            </div>
+          </div>
         )}
-        {/* Footer — Send / Delete Media buttons */}
+
+        {/* Footer */}
         {zMedia.length > 0 && (selectedCount > 0 || hasEmail || onSendMedia) && (
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              paddingHorizontal: 12,
-              paddingBottom: 12,
-              paddingTop: 4,
-              borderTopWidth: 1,
-              borderTopColor: gray(0.25),
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <div className={styles.footer} style={{ borderTopColor: C.borderSubtle }}>
+            <div className={styles.footerLeft}>
               {selectedCount > 0 && (
-                <Text style={{ color: C.lightText, fontSize: 13 }}>
+                <span className={styles.selectedCount} style={{ color: C.lightText }}>
                   {selectedCount} selected
-                </Text>
+                </span>
               )}
               {onSendMedia && hasCell && (
                 <CheckBox
@@ -664,124 +496,117 @@ export const WorkorderMediaModal = ({
                   onCheck={() => _setSendEmail(!sSendEmail)}
                 />
               )}
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-            {selectedCount > 0 && (
-              <Button_
-                text={sDeleting ? "Deleting..." : "Delete Media"}
-                colorGradientArr={COLOR_GRADIENTS.red}
-                icon={ICONS.trash}
-                iconSize={14}
-                onPress={handleDeleteSelected}
-                enabled={!sDeleting && !sSending}
-                buttonStyle={{
-                  paddingHorizontal: 20,
-                  paddingVertical: 10,
-                  borderRadius: 5,
-                  opacity: !sDeleting && !sSending ? 1 : 0.4,
-                }}
-                textStyle={{ fontSize: 14, fontWeight: "500" }}
-              />
-            )}
-            {onSendMedia ? (
-              <Button_
-                text="Send Media"
-                colorGradientArr={COLOR_GRADIENTS.green}
-                icon={ICONS.paperPlane}
-                iconSize={16}
-                onPress={handleSendAll}
-                enabled={selectedCount > 0 && (sSendText || sSendEmail)}
-                buttonStyle={{
-                  paddingHorizontal: 20,
-                  paddingVertical: 10,
-                  borderRadius: 5,
-                  opacity: selectedCount > 0 && (sSendText || sSendEmail) ? 1 : 0.4,
-                }}
-                textStyle={{ fontSize: 14, fontWeight: "500" }}
-              />
-            ) : hasEmail ? (
-              <Button_
-                text={sSending ? "Sending..." : "Email Media"}
-                colorGradientArr={COLOR_GRADIENTS.green}
-                icon={ICONS.paperPlane}
-                iconSize={16}
-                onPress={handleSendMedia}
-                enabled={selectedCount > 0 && !sSending}
-                buttonStyle={{
-                  paddingHorizontal: 20,
-                  paddingVertical: 10,
-                  borderRadius: 5,
-                  opacity: selectedCount > 0 && !sSending ? 1 : 0.4,
-                }}
-                textStyle={{ fontSize: 14, fontWeight: "500" }}
-              />
-            ) : null}
-            </View>
-          </View>
+            </div>
+            <div className={styles.footerRight}>
+              {selectedCount > 0 && (
+                <Button
+                  text={sDeleting ? "Deleting..." : "Delete Media"}
+                  colorGradientArr={COLOR_GRADIENTS.red}
+                  icon={ICONS.trash}
+                  iconSize={14}
+                  onPress={handleDeleteSelected}
+                  enabled={!sDeleting && !sSending}
+                  buttonStyle={{
+                    paddingLeft: 20,
+                    paddingRight: 20,
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    borderRadius: 5,
+                    opacity: !sDeleting && !sSending ? 1 : 0.4,
+                  }}
+                  textStyle={{ fontSize: 14, fontWeight: "500" }}
+                />
+              )}
+              {onSendMedia ? (
+                <Button
+                  text="Send Media"
+                  colorGradientArr={COLOR_GRADIENTS.green}
+                  icon={ICONS.paperPlane}
+                  iconSize={16}
+                  onPress={handleSendAll}
+                  enabled={selectedCount > 0 && (sSendText || sSendEmail)}
+                  buttonStyle={{
+                    paddingLeft: 20,
+                    paddingRight: 20,
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    borderRadius: 5,
+                    opacity: selectedCount > 0 && (sSendText || sSendEmail) ? 1 : 0.4,
+                  }}
+                  textStyle={{ fontSize: 14, fontWeight: "500" }}
+                />
+              ) : hasEmail ? (
+                <Button
+                  text={sSending ? "Sending..." : "Email Media"}
+                  colorGradientArr={COLOR_GRADIENTS.green}
+                  icon={ICONS.paperPlane}
+                  iconSize={16}
+                  onPress={handleSendMedia}
+                  enabled={selectedCount > 0 && !sSending}
+                  buttonStyle={{
+                    paddingLeft: 20,
+                    paddingRight: 20,
+                    paddingTop: 10,
+                    paddingBottom: 10,
+                    borderRadius: 5,
+                    opacity: selectedCount > 0 && !sSending ? 1 : 0.4,
+                  }}
+                  textStyle={{ fontSize: 14, fontWeight: "500" }}
+                />
+              ) : null}
+            </div>
+          </div>
         )}
       </div>
 
       {/* Upload compression confirmation overlay */}
       {sPendingFiles && (
         <div
+          className={styles.confirmOverlay}
           onClick={(e) => e.stopPropagation()}
-          style={{
-            position: "fixed",
-            top: 0, left: 0, right: 0, bottom: 0,
-            backgroundColor: "rgba(0, 0, 0, 0.5)",
-            zIndex: 10000,
-            display: "flex",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
+          style={{ zIndex: 10000 }}
         >
+          <div className={styles.confirmBackdrop} onClick={handleCancelUpload} />
           <div
-            onClick={handleCancelUpload}
-            style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, cursor: "default" }}
-          />
-          <View
+            className={styles.confirmCard}
             style={{
-              width: 624,
               backgroundColor: C.backgroundWhite,
-              borderRadius: 12,
-              borderWidth: 2,
               borderColor: C.buttonLightGreenOutline,
-              padding: 20,
             }}
           >
-            <Text style={{ fontSize: 14, color: C.text, marginBottom: 10, lineHeight: 20, textAlign: "center" }}>
+            <div className={styles.confirmMessage} style={{ color: C.text }}>
               Compression is set to medium. Only uncheck the box if you need high zoom capability, as the process takes drastically longer. Recommendation: first try the compressed image to see if it's good enough before using the uncompressed option.
-            </Text>
+            </div>
             {sPendingFiles.map((f, idx) => (
-              <Text key={idx} style={{ fontSize: 12, color: gray(0.45), textAlign: "center" }}>
+              <div key={idx} className={styles.confirmFileRow} style={{ color: C.textMuted }}>
                 {f.name} - {f.size < 1048576 ? (f.size / 1024).toFixed(0) + " KB" : (f.size / 1048576).toFixed(1) + " MB"}
-              </Text>
+              </div>
             ))}
-            <View style={{ height: 14 }} />
-            <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+            <div className={styles.confirmSpacer} />
+            <div className={styles.confirmActions}>
               <CheckBox
                 text="Medium compression"
                 isChecked={sCompressConfirm}
                 onCheck={() => _setCompressConfirm(!sCompressConfirm)}
               />
-              <View style={{ flexDirection: "row", gap: 10 }}>
-                <Button_
+              <div className={styles.confirmActionGroup}>
+                <Button
                   text="Upload"
                   colorGradientArr={COLOR_GRADIENTS.green}
                   onPress={handleConfirmUpload}
-                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 5 }}
+                  buttonStyle={{ paddingLeft: 20, paddingRight: 20, paddingTop: 10, paddingBottom: 10, borderRadius: 5 }}
                   textStyle={{ fontSize: 14 }}
                 />
-                <Button_
+                <Button
                   text="Cancel"
                   colorGradientArr={COLOR_GRADIENTS.grey}
                   onPress={handleCancelUpload}
-                  buttonStyle={{ paddingHorizontal: 20, paddingVertical: 10, borderRadius: 5 }}
+                  buttonStyle={{ paddingLeft: 20, paddingRight: 20, paddingTop: 10, paddingBottom: 10, borderRadius: 5 }}
                   textStyle={{ fontSize: 14 }}
                 />
-              </View>
-            </View>
-          </View>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>,

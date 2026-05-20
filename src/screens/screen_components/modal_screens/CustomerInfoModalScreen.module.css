@@ -1,0 +1,711 @@
+/* Outer shell — sized by parent modal overlay */
+.shell {
+  width: 95%;
+  height: 90%;
+  padding: 20px;
+  background-color: var(--bg-white, var(--surface-base));
+  border-radius: 15px;
+  display: flex;
+  flex-direction: row;
+  box-shadow: 2px 2px 5px var(--shadow-color-default);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+/* Form column (15%) */
+.formCol {
+  width: 15%;
+  padding: 10px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.contactRow {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.cellHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+
+.cellLabel {
+  font-size: 11px;
+}
+
+.cellLabelError {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.cellInlineRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.cellIconBtn {
+  margin-left: 8px;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cellIconBtnDisabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* Standard form input */
+.input {
+  width: 100%;
+  height: 40px;
+  border-width: 1px;
+  border-style: solid;
+  margin-top: 15px;
+  padding-left: 8px;
+  padding-right: 8px;
+  outline: none;
+  border-radius: 7px;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 14px;
+}
+
+.input::placeholder {
+  opacity: 1;
+}
+
+.inputTight {
+  margin-top: 1px;
+}
+
+.inputReadonly {
+  flex: 1;
+}
+
+.inputError {
+  border-width: 2px;
+}
+
+.notes {
+  width: 100%;
+  border-width: 1px;
+  border-style: solid;
+  margin-top: 15px;
+  padding: 8px;
+  outline: none;
+  border-radius: 7px;
+  min-height: 40px;
+  box-sizing: border-box;
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.zipMapsRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 15px;
+  flex-shrink: 0;
+}
+
+.langRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 15px;
+  flex-shrink: 0;
+}
+
+.langLabel {
+  font-size: 13px;
+  margin-right: 8px;
+}
+
+.actionStack {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* Workorders column (30%) */
+.workordersCol {
+  width: 30%;
+  height: 100%;
+  padding: 5px 15px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Sales column (30%) */
+.salesCol {
+  width: 30%;
+  height: 100%;
+  padding: 5px 15px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Messages column (25%) */
+.messagesCol {
+  width: 25%;
+  height: 100%;
+  flex-shrink: 0;
+}
+
+.colHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.salesHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 12px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.emptyText {
+  font-size: 12px;
+  margin-top: 10px;
+  text-align: center;
+}
+
+.scrollArea {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Loading overlay */
+.loadingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(255, 255, 255, 0.85);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 10;
+  border-radius: 10px;
+  flex-direction: column;
+}
+
+.loadingText {
+  font-size: 13px;
+  margin-top: 10px;
+}
+
+/* Workorder card */
+.woCard {
+  margin-bottom: 6px;
+  border-radius: 7px;
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-width: 1px;
+  border-style: solid;
+  box-sizing: border-box;
+}
+
+.woClickable {
+  padding: 6px 10px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  width: 100%;
+  text-align: left;
+  display: block;
+  font: inherit;
+  color: inherit;
+}
+
+.woRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+}
+
+.woNameWrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.woName {
+  font-size: 13px;
+  color: dimgray;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.woItemBadge {
+  background-color: gray;
+  border-radius: 10px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  color: white;
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.woNumber {
+  font-size: 12px;
+  margin-left: 6px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.woStatusBadge {
+  padding: 2px 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.woDescRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.woBrand {
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.woDescDot {
+  width: 7px;
+  height: 2px;
+  margin: 0 5px;
+  background-color: lightgray;
+  flex-shrink: 0;
+}
+
+.woDesc {
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.woColorRow {
+  display: flex;
+  flex-direction: row;
+  margin-left: 8px;
+  flex-shrink: 0;
+}
+
+.woColorBadge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 100px;
+}
+
+.woColorBadgeSecond {
+  margin-left: 4px;
+}
+
+.woFooter {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.woFooterDate {
+  color: dimgray;
+  font-size: 12px;
+}
+
+.woFooterWait {
+  font-size: 11px;
+  font-style: italic;
+}
+
+.woFooterTotal {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.woItemsToggleWrap {
+  padding: 0 10px 6px 10px;
+}
+
+.woItemsToggleBtn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+}
+
+.woItemsList {
+  margin-top: 4px;
+  padding-left: 4px;
+}
+
+.woItemRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 2px;
+}
+
+.woItemName {
+  font-size: 12px;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.woItemQty {
+  font-size: 12px;
+  font-weight: 500;
+  width: 36px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Sales card */
+.saleCard {
+  margin-bottom: 6px;
+  border-radius: 7px;
+  border-left-width: 4px;
+  border-left-style: solid;
+  border-width: 1px;
+  border-style: solid;
+  padding: 8px 10px;
+  cursor: pointer;
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+  display: block;
+  box-sizing: border-box;
+  color: inherit;
+}
+
+.saleRow1 {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.saleDate {
+  font-size: 12px;
+}
+
+.saleBadgesWrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.saleBadge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.saleBadgeSmall {
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-size: 10px;
+  font-weight: 600;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.saleTotalsRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.saleTotalsLeft {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.saleLabel {
+  font-size: 11px;
+}
+
+.saleValue {
+  font-size: 12px;
+}
+
+.saleDiscount {
+  font-size: 11px;
+  margin-left: 8px;
+}
+
+.saleLabelInline {
+  font-size: 11px;
+  margin-left: 8px;
+}
+
+.saleGrandTotal {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.salePaymentRow {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.salePaymentChip {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-radius: 5px;
+  padding: 2px 6px;
+  margin-right: 6px;
+  margin-bottom: 2px;
+  border-width: 1px;
+  border-style: solid;
+}
+
+.salePaymentText {
+  font-size: 11px;
+}
+
+.salePaymentAmount {
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.saleRefunded {
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+.saleLinkedWO {
+  font-size: 10px;
+  margin-top: 4px;
+}
+
+/* Credit edit modal */
+.creditBackdrop {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--surface-overlay);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 100;
+  border-radius: 15px;
+}
+
+.creditBackdropBtn {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: default;
+}
+
+.creditCard {
+  width: 320px;
+  border-radius: 12px;
+  border-width: 2px;
+  border-style: solid;
+  padding: 20px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.creditTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.creditNote {
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.creditAmountRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 7px;
+  margin-bottom: 16px;
+  padding: 0 10px;
+  height: 40px;
+}
+
+.creditDollarSign {
+  font-size: 16px;
+  margin-right: 4px;
+}
+
+.creditAmountInput {
+  flex: 1;
+  font-size: 16px;
+  border: none;
+  outline: none;
+  height: 38px;
+  background: transparent;
+  font-family: inherit;
+}
+
+.creditReceiptWrap {
+  margin-bottom: 14px;
+}
+
+.creditReceiptLabel {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.creditCheckRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.creditActions {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.creditActionGroup {
+  display: flex;
+  flex-direction: row;
+}
+
+/* Messages panel */
+.msgPanel {
+  width: 100%;
+  height: 100%;
+  border-left-width: 1px;
+  border-left-style: solid;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.msgHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  flex-shrink: 0;
+}
+
+.msgHeaderIcon {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+  opacity: 0.7;
+}
+
+.msgHeaderTitle {
+  font-size: 14px;
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+.msgHeaderPhone {
+  font-size: 12px;
+}
+
+.msgListWrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 12px;
+}
+
+.msgListEmpty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+.msgEmptyIcon {
+  width: 40px;
+  height: 40px;
+  opacity: 0.12;
+  margin-bottom: 10px;
+}
+
+.msgEmptyText {
+  font-size: 13px;
+}
+
+.msgLoadingWrap {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}

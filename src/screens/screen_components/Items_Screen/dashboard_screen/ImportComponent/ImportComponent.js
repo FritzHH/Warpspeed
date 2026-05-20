@@ -2,21 +2,14 @@
 import React, { useState, useRef } from "react";
 import styles from "./ImportComponent.module.css";
 import cloneDeep from "lodash/cloneDeep";
-import {
-  gray,
-  log,
-  localStorageWrapper,
-  capitalizeFirstLetterOfString,
-  generateEAN13Barcode,
-  normalizeBarcode,
-} from "../../../../../utils";
+import { log, localStorageWrapper, capitalizeFirstLetterOfString, generateEAN13Barcode, normalizeBarcode } from "../../../../../utils";
 import {
   useSettingsStore,
   useMigrationStore,
   useAlertScreenStore,
   useOpenWorkordersStore,
 } from "../../../../../stores";
-import { Image_ } from "../../../../../components";
+import { Image } from "../../../../../dom_components";
 import { C, ICONS } from "../../../../../styles";
 import { SETTINGS_OBJ, TIME_PUNCH_PROTO } from "../../../../../data";
 import {
@@ -1747,12 +1740,12 @@ const ImportComponent = () => {
           {sMigrationStep}
         </span>
         {sMigrationProgress.total > 0 ? (
-          <div className={styles.progressTrack} style={{ backgroundColor: gray(0.85) }}>
+          <div className={styles.progressTrack} style={{ backgroundColor: C.surfaceAlt }}>
             <div className={styles.progressFill} style={{ width: pct + "%", backgroundColor: C.green }} />
           </div>
         ) : null}
         {sMigrationProgress.total > 0 ? (
-          <span className={styles.progressCount} style={{ color: gray(0.5) }}>
+          <span className={styles.progressCount} style={{ color: C.textMuted }}>
             {sMigrationProgress.done} / {sMigrationProgress.total}
           </span>
         ) : null}
@@ -1771,14 +1764,14 @@ const ImportComponent = () => {
           className={styles.cardButton}
           style={{
             borderColor: C.red,
-            backgroundColor: sMigrating ? gray(0.85) : C.listItemWhite,
+            backgroundColor: sMigrating ? C.surfaceAlt : C.listItemWhite,
             opacity: migrationDisabled ? 0.5 : 1,
           }}
         >
           <span className={styles.cardButtonTitle} style={{ color: C.red }}>
             {sMigrating ? "Migrating..." : "Full Migration"}
           </span>
-          <span className={styles.cardButtonSubtitle} style={{ color: gray(0.5) }}>
+          <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
             All customers, inventory, workorders, sales
           </span>
         </button>
@@ -1791,14 +1784,14 @@ const ImportComponent = () => {
           className={styles.cardButton}
           style={{
             borderColor: C.orange,
-            backgroundColor: sDevMigrating ? gray(0.85) : C.listItemWhite,
+            backgroundColor: sDevMigrating ? C.surfaceAlt : C.listItemWhite,
             opacity: migrationDisabled ? 0.5 : 1,
           }}
         >
           <span className={styles.cardButtonTitle} style={{ color: C.orange }}>
             {sDevMigrating ? "Migrating..." : "Dev Migration (20 WOs)"}
           </span>
-          <span className={styles.cardButtonSubtitle} style={{ color: gray(0.5) }}>
+          <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
             Full mapping, 50 most recent WOs + dependencies, 7 CSVs
           </span>
         </button>
@@ -1818,7 +1811,7 @@ const ImportComponent = () => {
           <span className={styles.cardButtonTitle} style={{ color: C.blue }}>
             Validate Export CSVs
           </span>
-          <span className={styles.cardButtonSubtitle} style={{ color: gray(0.5) }}>
+          <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
             Cross-check all 7 _import_ files
           </span>
         </button>
@@ -1830,14 +1823,14 @@ const ImportComponent = () => {
           className={styles.cardButton}
           style={{
             borderColor: "rgb(115, 83, 173)",
-            backgroundColor: sDevMigrating ? gray(0.85) : C.listItemWhite,
+            backgroundColor: sDevMigrating ? C.surfaceAlt : C.listItemWhite,
             opacity: migrationDisabled ? 0.5 : 1,
           }}
         >
           <span className={styles.cardButtonTitle} style={{ color: "rgb(115, 83, 173)" }}>
             {sDevMigrating ? "Uploading..." : "Dev Upload Migration"}
           </span>
-          <span className={styles.cardButtonSubtitle} style={{ color: gray(0.5) }}>
+          <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
             Clear DB + upload 20 most recent WOs + all dependencies
           </span>
         </button>
@@ -1850,14 +1843,14 @@ const ImportComponent = () => {
           className={styles.cardButton}
           style={{
             borderColor: C.buttonLightGreenOutline,
-            backgroundColor: sLookupLoading ? gray(0.85) : C.listItemWhite,
+            backgroundColor: sLookupLoading ? C.surfaceAlt : C.listItemWhite,
             opacity: sLookupLoading ? 0.5 : 1,
           }}
         >
           <span className={styles.cardButtonTitle} style={{ color: C.text }}>
             {sLookupLoading ? "Importing..." : "Dev Import"}
           </span>
-          <span className={styles.cardButtonSubtitle} style={{ color: gray(0.5) }}>
+          <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
             Up to 40 workorders (matching statuses)
           </span>
         </button>
@@ -1869,7 +1862,7 @@ const ImportComponent = () => {
           className={styles.cardButton}
           style={{
             borderColor: C.buttonLightGreenOutline,
-            backgroundColor: sLookupLoading ? gray(0.85) : C.listItemWhite,
+            backgroundColor: sLookupLoading ? C.surfaceAlt : C.listItemWhite,
             opacity: sLookupLoading ? 0.5 : 1,
             marginBottom: 20,
           }}
@@ -1877,7 +1870,7 @@ const ImportComponent = () => {
           <span className={styles.cardButtonTitle} style={{ color: C.text }}>
             {sLookupLoading ? "Importing..." : "Inventory Import"}
           </span>
-          <span className={styles.cardButtonSubtitle} style={{ color: gray(0.5) }}>
+          <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
             All items from Lightspeed CSV
           </span>
         </button>
@@ -1912,14 +1905,14 @@ const ImportComponent = () => {
           className={styles.cardButton}
           style={{
             borderColor: C.lightred,
-            backgroundColor: sLookupLoading ? gray(0.85) : C.listItemWhite,
+            backgroundColor: sLookupLoading ? C.surfaceAlt : C.listItemWhite,
             opacity: sLookupLoading ? 0.5 : 1,
           }}
         >
           <span className={styles.cardButtonTitle} style={{ color: C.lightred }}>
             {sLookupLoading ? "Clearing..." : "Clear DB"}
           </span>
-          <span className={styles.cardButtonSubtitle} style={{ color: gray(0.5) }}>
+          <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
             Customers, workorders, sales
           </span>
         </button>
@@ -1946,7 +1939,7 @@ const ImportComponent = () => {
           className={styles.cardButton}
           style={{
             borderColor: C.lightred,
-            backgroundColor: sLookupLoading ? gray(0.85) : C.listItemWhite,
+            backgroundColor: sLookupLoading ? C.surfaceAlt : C.listItemWhite,
             opacity: sLookupLoading ? 0.5 : 1,
             marginBottom: 20,
           }}
@@ -1954,7 +1947,7 @@ const ImportComponent = () => {
           <span className={styles.cardButtonTitle} style={{ color: C.lightred }}>
             {sLookupLoading ? "Clearing..." : "Clear Inventory"}
           </span>
-          <span className={styles.cardButtonSubtitle} style={{ color: gray(0.5) }}>
+          <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
             All inventory items
           </span>
         </button>
@@ -1976,7 +1969,7 @@ const ImportComponent = () => {
                 opacity: sLsImporting || sLsConnected ? 0.5 : 1,
               }}
             >
-              <Image_ icon={ICONS.importIcon} size={30} />
+              <Image icon={ICONS.importIcon} size={30} />
               <span
                 className={styles.gridButtonLabel}
                 style={{ color: sLsConnected ? "white" : C.text }}
@@ -2004,7 +1997,7 @@ const ImportComponent = () => {
           className={styles.cardButton}
           style={{
             borderColor: C.buttonLightGreenOutline,
-            backgroundColor: sLsImporting === "all-csvs" ? gray(0.85) : C.listItemWhite,
+            backgroundColor: sLsImporting === "all-csvs" ? C.surfaceAlt : C.listItemWhite,
             opacity: !sLsConnected ? 0.5 : sLsImporting === "all-csvs" ? 0.5 : 1,
             marginBottom: 15,
           }}
@@ -2012,7 +2005,7 @@ const ImportComponent = () => {
           <span className={styles.cardButtonTitle} style={{ color: C.text }}>
             {sLsImporting === "all-csvs" ? "Exporting..." : "Export All CSVs"}
           </span>
-          <span className={styles.cardButtonSubtitle} style={{ color: gray(0.5) }}>
+          <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
             All {CSV_EXPORT_TYPES.length} exports, sequentially
           </span>
         </button>
@@ -2030,7 +2023,7 @@ const ImportComponent = () => {
                   opacity: !sLsConnected ? 0.5 : sLsImporting === btn.type ? 0.5 : 1,
                 }}
               >
-                <Image_ icon={ICONS.importIcon} size={30} />
+                <Image icon={ICONS.importIcon} size={30} />
                 <span className={styles.gridButtonLabel} style={{ color: C.text }}>
                   {sLsImporting === btn.type ? "Exporting..." : "Export " + btn.label}
                 </span>
@@ -2067,7 +2060,7 @@ const ImportComponent = () => {
               disabled={sLookupLoading || !sWoLookup.trim()}
               className={styles.goButton}
               style={{
-                backgroundColor: sLookupLoading || !sWoLookup.trim() ? gray(0.7) : C.green,
+                backgroundColor: sLookupLoading || !sWoLookup.trim() ? C.borderStrong : C.green,
                 opacity: sLookupLoading || !sWoLookup.trim() ? 0.5 : 1,
               }}
             >
@@ -2098,7 +2091,7 @@ const ImportComponent = () => {
               disabled={sLookupLoading || !sCustLookup.trim()}
               className={styles.goButton}
               style={{
-                backgroundColor: sLookupLoading || !sCustLookup.trim() ? gray(0.7) : C.green,
+                backgroundColor: sLookupLoading || !sCustLookup.trim() ? C.borderStrong : C.green,
                 opacity: sLookupLoading || !sCustLookup.trim() ? 0.5 : 1,
               }}
             >
@@ -2120,7 +2113,7 @@ const ImportComponent = () => {
 
         {/***************** dev tools **************************/}
         <div className={styles.devToolsBlock} style={{ borderTopColor: C.buttonLightGreenOutline }}>
-          <span className={styles.devToolsHeader} style={{ color: gray(0.5) }}>
+          <span className={styles.devToolsHeader} style={{ color: C.textMuted }}>
             Dev Tools
           </span>
           <button

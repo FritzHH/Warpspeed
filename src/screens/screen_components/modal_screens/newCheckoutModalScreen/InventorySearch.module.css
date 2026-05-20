@@ -1,0 +1,100 @@
+.container {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.searchRow {
+  display: flex;
+  flex-direction: row;
+  padding: 0 10px;
+  flex-shrink: 0;
+}
+
+.searchInput {
+  width: 100%;
+  margin-bottom: 10px;
+  font-size: 16px;
+  border: 0;
+  border-bottom: 1px solid;
+  outline: none;
+  background: transparent;
+  padding: 4px 0;
+  box-sizing: border-box;
+}
+
+.notFoundBox {
+  margin: 0 6px 8px 6px;
+  padding: 10px;
+  border-radius: 6px;
+  background-color: var(--surface-warning-muted);
+  border: 1px solid;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.notFoundText {
+  font-size: 12px;
+  margin-bottom: 6px;
+}
+
+.notFoundBarcode {
+  font-weight: 600;
+}
+
+.notFoundActions {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.resultsScroll {
+  max-height: 140px;
+  margin: 0 6px;
+  border: 1px solid;
+  border-radius: 4px;
+  background-color: var(--surface-base);
+  overflow-y: auto;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.resultRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-bottom: 3px;
+  border: 1px solid;
+  border-left-width: 3px;
+  border-radius: 5px;
+  padding: 5px;
+  cursor: pointer;
+  background: transparent;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.resultRow:hover {
+  background-color: var(--surface-overlay-light);
+}
+
+.resultNameCol {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.resultPriceCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.resultDollar {
+  font-size: 13px;
+}

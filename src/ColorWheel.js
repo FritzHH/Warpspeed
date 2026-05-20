@@ -1,20 +1,26 @@
 /* eslint-disable */
 // ColorWheel.js
 import React, { useMemo, useRef, useState, useCallback } from "react";
-import { View, PanResponder } from "react-native";
-import Svg, {
-  Circle,
-  Defs,
-  G,
-  LinearGradient,
-  Path,
-  Rect,
-  Stop,
-  ClipPath,
-} from "react-native-svg";
-import { processColor } from "react-native";
 
 // ---------- Color utils ----------
+
+function resolveToHex(input) {
+  if (!input) return "#FF4D4D";
+  if (typeof input === "string" && input.charAt(0) === "#") return input;
+  // Browser-friendly named-color resolution via canvas
+  if (typeof document !== "undefined") {
+    try {
+      const c = document.createElement("canvas");
+      c.width = c.height = 1;
+      const ctx = c.getContext("2d");
+      ctx.fillStyle = "#000";
+      ctx.fillStyle = input;
+      const resolved = ctx.fillStyle; // canvas normalizes to #rrggbb or rgba(...)
+      if (typeof resolved === "string" && resolved.charAt(0) === "#") return resolved.toUpperCase();
+    } catch (e) {}
+  }
+  return "#FF4D4D";
+}
 
 // ---------- Component ----------
 /**
@@ -32,24 +38,19 @@ export function ColorWheel({
   style,
   thing,
 }) {
-  // log("iniital", initialColor);
-  if (!initialColor.includes("#")) {
-    let intColor = processColor(initialColor);
-    initialColor = (intColor >>> 0).toString(16).padStart(8, "0").toUpperCase();
-  }
-  // if (!initialColor.includes("#")) initialColor = rgbToHex(initialRGB);
-  // log("thin", thing);
+  initialColor = resolveToHex(initialColor);
+
   // geometry
   const radius = size / 2;
   const ringOuter = radius;
   const ringInner = radius - strokeWidth;
   const svRadius = ringInner - 8; // small gap inside ring
+
   function clamp(v, min = 0, max = 1) {
     return Math.min(max, Math.max(min, v));
   }
 
   function hsvToRgb(h, s, v) {
-    // h in [0, 360), s,v in [0,1]
     const c = v * s;
     const hp = (h % 360) / 60;
     const x = c * (1 - Math.abs((hp % 2) - 1));
@@ -118,6 +119,7 @@ export function ColorWheel({
       b: int & 255,
     };
   }
+
   // state
   const initialHsv = useMemo(() => {
     const { r, g, b } = hexToRgb(initialColor);
@@ -129,6 +131,7 @@ export function ColorWheel({
   const uidRef = useRef("cw-" + Math.random().toString(36).slice(2, 8));
   const uid = uidRef.current;
 
+  const svgRef = useRef(null);
   const center = { x: radius, y: radius };
 
   // derived current color
@@ -153,8 +156,7 @@ export function ColorWheel({
     const dx = x - center.x;
     const dy = y - center.y;
     const r = Math.sqrt(dx * dx + dy * dy);
-    // atan2(y, x) but SVG y+ is down, so invert dy for angle
-    let theta = Math.atan2(-dy, dx); // in radians
+    let theta = Math.atan2(-dy, dx);
     let deg = (theta * 180) / Math.PI;
     if (deg < 0) deg += 360;
     return { r, deg, dx, dy };
@@ -164,16 +166,15 @@ export function ColorWheel({
   const isInSV = (r) => r <= svRadius;
 
   // SV math (we use a square clipped to a circle)
-  const svSquareSize = svRadius * Math.SQRT1_2 * 2; // square inside circle (max inscribed square)
+  const svSquareSize = svRadius * Math.SQRT1_2 * 2; // max inscribed square
   const svSquareTopLeft = {
     x: center.x - svSquareSize / 2,
     y: center.y - svSquareSize / 2,
   };
 
   const pointToSV = (x, y) => {
-    // normalize to square
-    let sx = (x - svSquareTopLeft.x) / svSquareSize; // 0..1
-    let sy = (y - svSquareTopLeft.y) / svSquareSize; // 0..1
+    let sx = (x - svSquareTopLeft.x) / svSquareSize;
+    let sy = (y - svSquareTopLeft.y) / svSquareSize;
     sx = clamp(sx);
     sy = clamp(sy);
     const s = sx;
@@ -187,8 +188,15 @@ export function ColorWheel({
     return { x, y };
   };
 
-  // Pan handling
+  // Pointer handling
   const activeZoneRef = useRef(""); // 'hue' | 'sv' | ''
+
+  const getLocalCoords = (e) => {
+    const node = svgRef.current;
+    if (!node) return { x: 0, y: 0 };
+    const rect = node.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  };
 
   const updateFromPoint = (evtX, evtY, forceZone) => {
     const { r, deg } = polarFromPoint(evtX, evtY);
@@ -212,32 +220,27 @@ export function ColorWheel({
     }
   };
 
-  const panResponder = useMemo(
-    () =>
-      PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: () => true,
-        onPanResponderGrant: (e) => {
-          const { locationX, locationY } = e.nativeEvent;
-          updateFromPoint(locationX, locationY);
-        },
-        onPanResponderMove: (e) => {
-          const { locationX, locationY } = e.nativeEvent;
-          updateFromPoint(locationX, locationY, activeZoneRef.current);
-        },
-        onPanResponderRelease: () => {
-          activeZoneRef.current = "";
-        },
-        onPanResponderTerminate: () => {
-          activeZoneRef.current = "";
-        },
-      }),
-    [hsv]
-  );
+  const handlePointerDown = (e) => {
+    e.preventDefault();
+    const { x, y } = getLocalCoords(e);
+    try { e.currentTarget.setPointerCapture(e.pointerId); } catch (err) {}
+    updateFromPoint(x, y);
+  };
+
+  const handlePointerMove = (e) => {
+    if (!activeZoneRef.current) return;
+    const { x, y } = getLocalCoords(e);
+    updateFromPoint(x, y, activeZoneRef.current);
+  };
+
+  const handlePointerUp = (e) => {
+    activeZoneRef.current = "";
+    try { e.currentTarget.releasePointerCapture(e.pointerId); } catch (err) {}
+  };
 
   // Build hue ring segments (sweep)
   const segments = useMemo(() => {
-    const n = 180; // segments (higher = smoother)
+    const n = 180;
     const anglePer = 360 / n;
     const paths = [];
     for (let i = 0; i < n; i++) {
@@ -288,54 +291,61 @@ export function ColorWheel({
   const hueHex = useMemo(() => rgbToHex(hueRgb), [hueRgb]);
 
   return (
-    <View style={style} {...panResponder.panHandlers}>
-      <Svg width={size} height={size}>
-        <Defs>
+    <div style={style}>
+      <svg
+        ref={svgRef}
+        width={size}
+        height={size}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        style={{ touchAction: "none", userSelect: "none", display: "block" }}
+      >
+        <defs>
           {/* Clip inner SV square to a circle */}
-          <ClipPath id={"svClip-" + uid}>
-            <Circle cx={center.x} cy={center.y} r={svRadius} />
-          </ClipPath>
+          <clipPath id={"svClip-" + uid}>
+            <circle cx={center.x} cy={center.y} r={svRadius} />
+          </clipPath>
 
-          {/* SV gradients (horizontal: white -> hue), (vertical overlay: transparent -> black) */}
-          <LinearGradient id={"svSaturation-" + uid} x1="0" y1="0" x2="1" y2="0">
-            <Stop offset="0" stopColor="#FFFFFF" />
-            <Stop offset="1" stopColor={hueHex} />
-          </LinearGradient>
-          <LinearGradient id={"svValue-" + uid} x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="rgba(0,0,0,0)" />
-            <Stop offset="1" stopColor="rgba(0,0,0,1)" />
-          </LinearGradient>
-        </Defs>
+          {/* SV gradients */}
+          <linearGradient id={"svSaturation-" + uid} x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stopColor="#FFFFFF" />
+            <stop offset="1" stopColor={hueHex} />
+          </linearGradient>
+          <linearGradient id={"svValue-" + uid} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor="rgba(0,0,0,0)" />
+            <stop offset="1" stopColor="rgba(0,0,0,1)" />
+          </linearGradient>
+        </defs>
 
         {/* Hue ring (sweep) */}
-        <G>
+        <g>
           {segments.map((seg, idx) => (
-            <Path key={idx} d={seg.d} fill={seg.fill} />
+            <path key={idx} d={seg.d} fill={seg.fill} />
           ))}
-        </G>
+        </g>
 
         {/* Inner SV area */}
-        <G clipPath={"url(#svClip-" + uid + ")"}>
-          {/* Base white->hue gradient */}
-          <Rect
+        <g clipPath={"url(#svClip-" + uid + ")"}>
+          <rect
             x={svSquareTopLeft.x}
             y={svSquareTopLeft.y}
             width={svSquareSize}
             height={svSquareSize}
             fill={"url(#svSaturation-" + uid + ")"}
           />
-          {/* Overlay top->bottom to darken (value) */}
-          <Rect
+          <rect
             x={svSquareTopLeft.x}
             y={svSquareTopLeft.y}
             width={svSquareSize}
             height={svSquareSize}
             fill={"url(#svValue-" + uid + ")"}
           />
-        </G>
+        </g>
 
         {/* Hue marker */}
-        <Circle
+        <circle
           cx={hueMarker.x}
           cy={hueMarker.y}
           r={strokeWidth / 2.6}
@@ -343,7 +353,7 @@ export function ColorWheel({
           strokeWidth={2}
           fill="none"
         />
-        <Circle
+        <circle
           cx={hueMarker.x}
           cy={hueMarker.y}
           r={strokeWidth / 2.6 - 4}
@@ -353,8 +363,8 @@ export function ColorWheel({
         />
 
         {/* SV marker (crosshair) */}
-        <G>
-          <Circle
+        <g>
+          <circle
             cx={svMarker.x}
             cy={svMarker.y}
             r={8}
@@ -362,7 +372,7 @@ export function ColorWheel({
             strokeWidth={2}
             fill="none"
           />
-          <Circle
+          <circle
             cx={svMarker.x}
             cy={svMarker.y}
             r={6}
@@ -370,10 +380,10 @@ export function ColorWheel({
             strokeWidth={2}
             fill="none"
           />
-        </G>
+        </g>
 
         {/* Current color preview (small dot at center) */}
-        <Circle
+        <circle
           cx={center.x}
           cy={center.y}
           r={6}
@@ -381,7 +391,7 @@ export function ColorWheel({
           stroke="#fff"
           strokeWidth={1.5}
         />
-      </Svg>
-    </View>
+      </svg>
+    </div>
   );
 }

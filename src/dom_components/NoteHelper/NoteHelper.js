@@ -1,7 +1,7 @@
 import React, { forwardRef, useState, useEffect, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { C, Fonts } from "../../styles";
-import { gray, lightenRGBByPercent } from "../../utils";
+import { lightenRGBByPercent } from "../../utils";
 import styles from "./NoteHelper.module.css";
 
 export const NoteHelper = forwardRef(function NoteHelper(
@@ -98,7 +98,7 @@ export const NoteHelper = forwardRef(function NoteHelper(
       <div key={category.id} className={styles.category}>
         <span
           className={styles.categoryLabel}
-          style={{ fontSize: 14 + fontSizeAdj, color: gray(0.4) }}
+          style={{ fontSize: 14 + fontSizeAdj, color: C.textMuted }}
         >
           {category.label}
         </span>
@@ -117,7 +117,7 @@ export const NoteHelper = forwardRef(function NoteHelper(
                   paddingBottom: 5 + chipPaddingVertAdj,
                 }}
               >
-                <span style={{ fontSize: 15 + fontSizeAdj, color: active ? C.red : gray(0.5) }}>
+                <span style={{ fontSize: 15 + fontSizeAdj, color: active ? C.red : C.textMuted }}>
                   {label}
                 </span>
               </button>
@@ -146,22 +146,22 @@ export const NoteHelper = forwardRef(function NoteHelper(
             {workorderLine.inventoryItem?.informalName || workorderLine.inventoryItem?.formalName || "Item"}
           </span>
           <div className={styles.targetRow}>
-            <span className={styles.addingTo} style={{ color: gray(0.5) }}>Adding to:</span>
+            <span className={styles.addingTo} style={{ color: C.textMuted }}>Adding to:</span>
             <button
               className={styles.targetBtn}
               onClick={() => _sSetTarget("intakeNotes")}
-              style={{ backgroundColor: sTarget === "intakeNotes" ? "orange" : gray(0.08) }}
+              style={{ backgroundColor: sTarget === "intakeNotes" ? "orange" : C.surfaceAlt }}
             >
-              <span style={{ fontSize: 12 + fontSizeAdj, color: sTarget === "intakeNotes" ? "white" : gray(0.5) }}>
+              <span style={{ fontSize: 12 + fontSizeAdj, color: sTarget === "intakeNotes" ? "white" : C.textMuted }}>
                 Intake
               </span>
             </button>
             <button
               className={styles.targetBtn}
               onClick={() => _sSetTarget("receiptNotes")}
-              style={{ backgroundColor: sTarget === "receiptNotes" ? "green" : gray(0.08) }}
+              style={{ backgroundColor: sTarget === "receiptNotes" ? "green" : C.surfaceAlt }}
             >
-              <span style={{ fontSize: 12 + fontSizeAdj, color: sTarget === "receiptNotes" ? "white" : gray(0.5) }}>
+              <span style={{ fontSize: 12 + fontSizeAdj, color: sTarget === "receiptNotes" ? "white" : C.textMuted }}>
                 Receipt
               </span>
             </button>
@@ -182,23 +182,23 @@ export const NoteHelper = forwardRef(function NoteHelper(
         {/* Notes inputs at bottom */}
         <div className={styles.notesSection} style={{ borderTopColor: C.buttonLightGreenOutline }}>
           <div className={styles.noteBlock}>
-            <span className={styles.noteLabel} style={{ fontSize: 11 + fontSizeAdj, color: gray(0.4) }}>Intake notes</span>
+            <span className={styles.noteLabel} style={{ fontSize: 11 + fontSizeAdj, color: C.textMuted }}>Intake notes</span>
             <textarea
               className={styles.noteTextarea}
               value={workorderLine.intakeNotes || ""}
               onChange={(e) => onUpdateLine({ ...workorderLine, intakeNotes: e.target.value })}
               placeholder="Intake notes"
-              style={{ fontSize: 15 + fontSizeAdj, color: "orange", borderColor: gray(0.25), minHeight: 32 + fontSizeAdj }}
+              style={{ fontSize: 15 + fontSizeAdj, color: "orange", borderColor: C.borderStrong, minHeight: 32 + fontSizeAdj }}
             />
           </div>
           <div className={styles.noteBlock}>
-            <span className={styles.noteLabel} style={{ fontSize: 11 + fontSizeAdj, color: gray(0.4) }}>Receipt notes</span>
+            <span className={styles.noteLabel} style={{ fontSize: 11 + fontSizeAdj, color: C.textMuted }}>Receipt notes</span>
             <textarea
               className={styles.noteTextarea}
               value={workorderLine.receiptNotes || ""}
               onChange={(e) => onUpdateLine({ ...workorderLine, receiptNotes: e.target.value })}
               placeholder="Receipt notes"
-              style={{ fontSize: 15 + fontSizeAdj, color: "green", borderColor: gray(0.25), minHeight: 32 + fontSizeAdj }}
+              style={{ fontSize: 15 + fontSizeAdj, color: "green", borderColor: C.borderStrong, minHeight: 32 + fontSizeAdj }}
             />
           </div>
         </div>

@@ -2,13 +2,7 @@
 
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import cloneDeep from "lodash/cloneDeep";
-import {
-  formatPhoneWithDashes,
-  removeDashesFromPhone,
-  stringIsNumeric,
-  gray,
-  capitalizeAllWordsInSentence,
-} from "../../../utils";
+import { formatPhoneWithDashes, removeDashesFromPhone, stringIsNumeric, capitalizeAllWordsInSentence } from "../../../utils";
 import { Button, ScreenModal, PhoneNumberInput, Tooltip } from "../../../dom_components";
 import { CUSTOMER_PROTO, TAB_NAMES } from "../../../data";
 import {
@@ -391,7 +385,7 @@ export function NewWorkorderComponent({}) {
               width: "8%",
               height: 37,
               outlineStyle: "none",
-              borderColor: gray(0.08),
+              borderColor: C.borderSubtle,
               fontSize: 25,
               color: C.text,
             }}
@@ -400,7 +394,7 @@ export function NewWorkorderComponent({}) {
             value={sTextInput}
             onChangeText={(val) => handleTextChange(val)}
             dashStyle={{ width: 10, marginHorizontal: 4 }}
-            dashColor={gray(0.2)}
+            dashColor={C.borderSubtle}
             textColor={C.text}
           />
         ) : (
@@ -414,7 +408,7 @@ export function NewWorkorderComponent({}) {
             style={{
               caretColor: C.cursorRed,
               color: C.text,
-              borderBottomColor: gray(0.2),
+              borderBottomColor: C.borderSubtle,
             }}
           />
         )}

@@ -1,0 +1,237 @@
+/* ============================================================
+ * TOKENS SWATCH PAGE — admin-only design-token visualizer
+ * Renders every semantic token from src/styles/tokens.css with
+ * live computed values so dark mode + tenant overrides reflect.
+ * ============================================================ */
+
+.root {
+  width: 100%;
+  min-height: 100vh;
+  background-color: var(--surface-base);
+  color: var(--text-default);
+  padding: 2% 3%;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2%;
+  padding-bottom: 1.5%;
+  border-bottom: 2px solid var(--border-subtle);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.titleBlock {
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-strong);
+  margin: 0;
+}
+
+.subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.controlBtn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background-color: var(--surface-alt);
+  color: var(--text-default);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.controlBtn:hover {
+  background-color: var(--surface-accent-muted);
+  border-color: var(--border-focus);
+}
+
+.controlBtnActive {
+  background-color: var(--accent);
+  color: var(--text-on-accent);
+  border-color: var(--accent);
+}
+
+.controlBtnActive:hover {
+  background-color: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.tenantSelect {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-default);
+  background-color: var(--surface-alt);
+  color: var(--text-default);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.section {
+  margin-bottom: 3%;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 1%;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sectionTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-strong);
+  margin: 0;
+}
+
+.sectionCount {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-raised);
+  box-shadow: 0 1px 3px var(--shadow-color-subtle);
+}
+
+.swatch {
+  width: 100%;
+  height: 96px;
+  position: relative;
+  background-image:
+    linear-gradient(45deg, rgba(0,0,0,0.06) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(0,0,0,0.06) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(0,0,0,0.06) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(0,0,0,0.06) 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.swatchFill {
+  position: absolute;
+  inset: 0;
+}
+
+.swatchBorder {
+  position: absolute;
+  inset: 12px;
+  border-width: 4px;
+  border-style: solid;
+  border-radius: 6px;
+  background-color: var(--surface-base);
+}
+
+.swatchText {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  font-weight: 700;
+  background-color: var(--surface-base);
+}
+
+.swatchShadow {
+  position: absolute;
+  inset: 16px;
+  background-color: var(--surface-raised);
+  border-radius: 6px;
+}
+
+.meta {
+  padding: 10px 12px;
+  border-top: 1px solid var(--border-subtle);
+  background-color: var(--surface-base);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.metaName {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-strong);
+}
+
+.metaValue {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.metaCss {
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.deniedRoot {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--surface-base);
+  color: var(--text-default);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.deniedBox {
+  text-align: center;
+  padding: 32px 40px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background-color: var(--surface-raised);
+  box-shadow: 0 4px 12px var(--shadow-color-default);
+}
+
+.deniedTitle {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--danger);
+  margin: 0 0 8px;
+}
+
+.deniedMsg {
+  font-size: 14px;
+  color: var(--text-secondary);
+  margin: 0;
+}

@@ -1,7 +1,7 @@
 import React, { forwardRef, useState, useRef, useImperativeHandle, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { C, ICONS } from "../../styles";
-import { gray, lightenRGBByPercent, usdTypeMask } from "../../utils";
+import { lightenRGBByPercent, usdTypeMask } from "../../utils";
 import { DISCOUNT_TYPES } from "../../constants";
 import styles from "./LineActionsDropdown.module.css";
 
@@ -54,7 +54,7 @@ const CustomInputRow = ({
     onClick={(e) => e.stopPropagation()}
     onMouseDown={(e) => e.stopPropagation()}
   >
-    <span className={styles.customLabel} style={{ color: gray(0.5) }}>
+    <span className={styles.customLabel} style={{ color: C.textMuted }}>
       {label}
     </span>
     <input
@@ -142,7 +142,7 @@ const MenuContent = ({
 
   return (
     <>
-      <div className={styles.iconRow} style={{ borderBottomColor: gray(0.1) }}>
+      <div className={styles.iconRow} style={{ borderBottomColor: C.borderSubtle }}>
         {showSplit && (
           <button
             className={styles.iconBtn}
@@ -170,7 +170,7 @@ const MenuContent = ({
           style={{
             width: showSplit ? "50%" : "100%",
             backgroundColor: lightenRGBByPercent(C.lightred, 85),
-            borderLeft: showSplit ? `1px solid ${gray(0.1)}` : "none",
+            borderLeft: showSplit ? `1px solid ${C.borderSubtle}` : "none",
           }}
           onClick={(e) => {
             e.stopPropagation();
@@ -190,7 +190,7 @@ const MenuContent = ({
 
       <DiscountRow
         label="No Discount"
-        bg={gray(0.036)}
+        bg={C.surfaceAlt}
         selected={noDiscountSelected}
         onClick={() => {
           close();
@@ -202,7 +202,7 @@ const MenuContent = ({
         <DiscountRow
           key={discount.id ?? `${discount.name}_${dIdx}`}
           label={discount.name}
-          bg={dIdx % 2 === 0 ? "white" : gray(0.036)}
+          bg={dIdx % 2 === 0 ? C.surfaceBase : C.surfaceAlt}
           selected={matchedPresetId === discount.id}
           onClick={() => {
             close();
@@ -211,7 +211,7 @@ const MenuContent = ({
         />
       ))}
 
-      <div className={styles.divider} style={{ backgroundColor: gray(0.15) }} />
+      <div className={styles.divider} style={{ backgroundColor: C.borderSubtle }} />
 
       <CustomInputRow
         label="Custom %"
@@ -401,7 +401,7 @@ export const LineActionsDropdown = forwardRef(function LineActionsDropdown(
               el.style.left = left + "px";
             }}
             className={styles.menu}
-            style={{ borderColor: gray(0.08) }}
+            style={{ borderColor: C.borderSubtle }}
             role="menu"
           >
             <MenuContent

@@ -8,7 +8,7 @@ import {
   lightenRGBByPercent,
   resolveStatus,
 } from "../../../../utils";
-import { Tooltip, WebPageModal, DropdownMenu } from "../../../../components";
+import { Tooltip, WebPageModal, DropdownMenu } from "../../../../dom_components";
 import { C, ICONS } from "../../../../styles";
 import {
   useOpenWorkordersStore,

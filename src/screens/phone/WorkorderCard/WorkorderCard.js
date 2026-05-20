@@ -1,4 +1,4 @@
-import { ICONS } from "../../../styles";
+import { ICONS, C } from "../../../styles";
 import {
   resolveStatus,
   capitalizeFirstLetterOfString,
@@ -13,10 +13,10 @@ import {
 } from "../helpers";
 import styles from "./WorkorderCard.module.css";
 
-const TEXT_COLOR = "rgb(71, 71, 71)";
-const RED_COLOR = "rgb(255, 26, 26)";
-const GREEN_COLOR = "rgb(33, 148, 86)";
-const DEFAULT_BORDER_COLOR = "rgb(200, 228, 220)";
+const TEXT_COLOR = C.textDefault;
+const RED_COLOR = C.danger;
+const GREEN_COLOR = C.accent;
+const DEFAULT_BORDER_COLOR = C.borderDefault;
 
 export function WorkorderCard({ workorder, zStatuses, onPress }) {
   const rs = resolveStatus(workorder.status, zStatuses);

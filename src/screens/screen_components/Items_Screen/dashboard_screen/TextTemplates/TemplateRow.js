@@ -7,7 +7,7 @@ import {
   Tooltip,
 } from "../../../../../dom_components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../../styles";
-import { gray } from "../../../../../utils";
+
 import {
   TEXT_TEMPLATE_VARIABLES,
   TEXT_TEMPLATE_TYPE_VARIABLES,
@@ -58,13 +58,13 @@ export function TemplateRow({
           onChangeText={(val) => onFieldChange(templateObj, "label", val)}
           onFocus={() => onSelectTemplate(templateObj.id)}
           placeholder="Template name..."
-          placeholderTextColor={gray(0.3)}
+          placeholderTextColor={C.textDisabled}
           className={styles.labelInput}
           style={{ borderColor: C.buttonLightGreenOutline, color: C.text }}
           value={labelValue}
         />
         <div className={styles.orderGroup}>
-          <span className={styles.orderLabel} style={{ color: gray(0.5) }}>
+          <span className={styles.orderLabel} style={{ color: C.textMuted }}>
             Order
           </span>
           <DropdownMenu
@@ -114,7 +114,7 @@ export function TemplateRow({
           onCursorChange(templateObj.id, start);
         }}
         placeholder="Message body..."
-        placeholderTextColor={gray(0.3)}
+        placeholderTextColor={C.textDisabled}
         className={styles.bodyInput}
         style={{ borderColor: C.buttonLightGreenOutline, color: C.text }}
         value={contentValue}

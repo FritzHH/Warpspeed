@@ -1,9 +1,8 @@
 /* eslint-disable */
 import { memo } from "react";
-import { View, Text } from "react-native-web";
-import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
-import { Button_ } from "../../../../components";
-import { gray } from "../../../../utils";
+import styles from "./SaleHeader.module.css";
+import { C, COLOR_GRADIENTS } from "../../../../styles";
+import { Button } from "../../../../dom_components";
 import { dlog, DCAT } from "./checkoutDebugLog";
 
 export const SaleHeader = memo(function SaleHeader({
@@ -16,29 +15,19 @@ export const SaleHeader = memo(function SaleHeader({
   let saleComplete = sale?.paymentComplete;
 
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "flex-end",
-        alignItems: "center",
-        paddingHorizontal: 20,
-        paddingTop: 10,
-        paddingBottom: 5,
-      }}
-    >
-      {/* Reprint */}
+    <div className={styles.header}>
       {saleComplete && onReprint && (
-        <Button_
-          text="REPRINT"
-          onPress={() => { dlog(DCAT.BUTTON, "reprint", "SaleHeader", {}); onReprint(); }}
-          colorGradientArr={COLOR_GRADIENTS.greenblue}
-          textStyle={{ color: C.textWhite }}
-          buttonStyle={{ width: 150, marginRight: 10 }}
-        />
+        <div className={styles.reprintWrap}>
+          <Button
+            text="REPRINT"
+            onPress={() => { dlog(DCAT.BUTTON, "reprint", "SaleHeader", {}); onReprint(); }}
+            colorGradientArr={COLOR_GRADIENTS.greenblue}
+            textStyle={{ color: C.textWhite }}
+            buttonStyle={{ width: 150 }}
+          />
+        </div>
       )}
-
-      {/* Close / Cancel */}
-      <Button_
+      <Button
         text={saleComplete ? "CLOSE" : "CANCEL"}
         onPress={() => { dlog(DCAT.BUTTON, saleComplete ? "close" : "cancel", "SaleHeader", {}); onClose(); }}
         enabled={
@@ -49,6 +38,6 @@ export const SaleHeader = memo(function SaleHeader({
         textStyle={{ color: C.textWhite }}
         buttonStyle={{ width: 150 }}
       />
-    </View>
+    </div>
   );
 });

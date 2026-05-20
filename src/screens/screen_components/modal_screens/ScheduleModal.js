@@ -1,20 +1,19 @@
 /*eslint-disable*/
 import React, { useState, useRef, useCallback } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ScrollView,
-  TouchableWithoutFeedback,
-} from "react-native-web";
-import ReactDOM from "react-dom";
 import cloneDeep from "lodash/cloneDeep";
 import debounce from "lodash/debounce";
 import dayjs from "dayjs";
-import { C, ICONS, Z } from "../../../styles";
-import { gray, trimToTwoDecimals } from "../../../utils";
-import { Image_, TimePicker_ } from "../../../components";
+import { C, ICONS } from "../../../styles";
+import { trimToTwoDecimals } from "../../../utils";
+import {
+  Image,
+  TouchableOpacity,
+  Button,
+  Dialog,
+  TimePicker,
+} from "../../../dom_components";
 import { useSettingsStore, useAlertScreenStore } from "../../../stores";
+import styles from "./ScheduleModal.module.css";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -30,7 +29,6 @@ export function getWeekStart(date) {
 
 export function getStoreHoursForDayIndex(storeHours, dayIndex) {
   if (!storeHours?.standard) return null;
-  // dayIndex 1=Mon..7=Sun maps to storeHours.standard[0]=Mon..[6]=Sun
   return storeHours.standard[dayIndex - 1] || null;
 }
 
@@ -88,9 +86,9 @@ function getUserWeekHours(userId, shifts) {
 const PICKER_W = 208;
 const PICKER_H = 360;
 
-function openPickerAt(e, setter) {
-  let x = e.nativeEvent?.pageX ?? e.pageX ?? 0;
-  let y = e.nativeEvent?.pageY ?? e.pageY ?? 0;
+function pickerCoords(e) {
+  let x = e.pageX ?? 0;
+  let y = e.pageY ?? 0;
   let left = x - PICKER_W / 2;
   let top = y - PICKER_H + 40;
   let vw = window.innerWidth;
@@ -99,7 +97,7 @@ function openPickerAt(e, setter) {
   if (left + PICKER_W > vw - 8) left = vw - PICKER_W - 8;
   if (top < 8) top = 8;
   if (top + PICKER_H > vh - 8) top = vh - PICKER_H - 8;
-  setter({ left, top });
+  return { left, top };
 }
 
 function ShiftCell({ shift, isClosed, storeHoursDay, onAddWithTimes, onUpdate, onRemove, isPastWeek }) {
@@ -108,19 +106,9 @@ function ShiftCell({ shift, isClosed, storeHoursDay, onAddWithTimes, onUpdate, o
 
   if (isClosed) {
     return (
-      <View
-        style={{
-          flex: 1,
-          minHeight: 60,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: "rgb(235,235,235)",
-          borderRadius: 6,
-          margin: 2,
-        }}
-      >
-        <Text style={{ fontSize: 11, color: "rgb(140,140,140)", fontWeight: "500" }}>CLOSED</Text>
-      </View>
+      <div className={`${styles.shiftCell} ${styles.shiftCellClosed}`}>
+        <span className={styles.shiftCellClosedText}>CLOSED</span>
+      </div>
     );
   }
 
@@ -131,8 +119,7 @@ function ShiftCell({ shift, isClosed, storeHoursDay, onAddWithTimes, onUpdate, o
   let inInitial = hasShift ? parseTime(shift.startTime) : defaultStart;
   let outInitial = hasShift ? parseTime(shift.endTime) : defaultEnd;
 
-  // past week: light gray; current/future: dark gray
-  let filledBg = isPastWeek ? "rgb(190,190,190)" : "rgb(120,120,120)";
+  let filledBg = isPastWeek ? C.textMuted : C.textSecondary;
 
   function handlePickerConfirm({ hour, minute, period }) {
     let newTime = formatTime(hour, minute, period);
@@ -152,156 +139,95 @@ function ShiftCell({ shift, isClosed, storeHoursDay, onAddWithTimes, onUpdate, o
       }
     }
     _setPickerFor(null);
+    _setPickerPos(null);
   }
 
-  // past week with no shift: just an empty gray cell
   if (isPastWeek && !hasShift) {
     return (
-      <View
-        style={{
-          flex: 1,
-          minHeight: 60,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: "rgb(240,240,240)",
-          borderRadius: 6,
-          margin: 2,
-        }}
-      >
-        <Text style={{ fontSize: 12, color: "rgb(190,190,190)" }}>-</Text>
-      </View>
+      <div className={`${styles.shiftCell} ${styles.shiftCellEmpty}`}>
+        <span className={styles.pastEmptyText}>-</span>
+      </div>
     );
   }
 
-  // past week with shift: read-only display
   if (isPastWeek && hasShift) {
     return (
-      <View
-        style={{
-          flex: 1,
-          minHeight: 60,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: "rgb(240,240,240)",
-          borderRadius: 6,
-          margin: 2,
-        }}
-      >
-        <View style={{ backgroundColor: filledBg, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 4, marginBottom: 3, width: "90%", alignItems: "center" }}>
-          <Text style={{ fontSize: 12, color: "white", fontWeight: "700" }}>{formatTimeShort(shift.startTime)}</Text>
-        </View>
-        <View style={{ backgroundColor: filledBg, borderRadius: 5, paddingHorizontal: 6, paddingVertical: 4, width: "90%", alignItems: "center" }}>
-          <Text style={{ fontSize: 12, color: "white", fontWeight: "700" }}>{formatTimeShort(shift.endTime)}</Text>
-        </View>
-      </View>
+      <div className={`${styles.shiftCell} ${styles.shiftCellPastFilled}`}>
+        <div className={styles.timeBox} style={{ backgroundColor: filledBg }}>
+          <span className={styles.timeBtnText}>{formatTimeShort(shift.startTime)}</span>
+        </div>
+        <div className={`${styles.timeBox} ${styles.timeBoxLast}`} style={{ backgroundColor: filledBg }}>
+          <span className={styles.timeBtnText}>{formatTimeShort(shift.endTime)}</span>
+        </div>
+      </div>
     );
   }
 
+  let cellClass = hasShift
+    ? `${styles.shiftCell} ${styles.shiftCellHasShift}`
+    : `${styles.shiftCell} ${styles.shiftCellEditable}`;
+
   return (
-    <View
-      style={{
-        flex: 1,
-        minHeight: 60,
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: hasShift ? "#e8f5e9" : "rgb(240,240,240)",
-        borderRadius: 6,
-        margin: 2,
-        borderWidth: hasShift ? 1 : 0,
-        borderColor: hasShift ? C.green : "transparent",
-        position: "relative",
-      }}
-    >
+    <div className={cellClass} style={hasShift ? { borderColor: C.green } : undefined}>
       {hasShift && (
-        <TouchableOpacity
-          onPress={onRemove}
-          style={{
-            position: "absolute",
-            top: 2,
-            right: 2,
-            width: 18,
-            height: 18,
-            borderRadius: 9,
-            backgroundColor: "rgb(210,210,210)",
-            justifyContent: "center",
-            alignItems: "center",
-            zIndex: 1,
-          }}
-        >
-          <Text style={{ fontSize: 11, fontWeight: "700", color: "rgb(100,100,100)", marginTop: -1 }}>x</Text>
-        </TouchableOpacity>
+        <button className={styles.removeBtn} onClick={onRemove}>
+          <span className={styles.removeBtnText}>x</span>
+        </button>
       )}
-      <TouchableOpacity
-        onPress={(e) => { openPickerAt(e, _setPickerPos); _setPickerFor("in"); }}
-        style={{
-          backgroundColor: hasShift ? filledBg : C.green,
-          borderRadius: 5,
-          paddingHorizontal: 6,
-          paddingVertical: 4,
-          marginBottom: 3,
-          width: "90%",
-          alignItems: "center",
+      <button
+        className={`${styles.timeBox} ${styles.timeBtn}`}
+        style={{ backgroundColor: hasShift ? filledBg : C.green }}
+        onClick={(e) => {
+          _setPickerPos(pickerCoords(e));
+          _setPickerFor("in");
         }}
       >
-        <Text style={{ fontSize: 12, color: "white", fontWeight: "700" }}>
+        <span className={styles.timeBtnText}>
           {hasShift ? formatTimeShort(shift.startTime) : "In"}
-        </Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={(e) => { openPickerAt(e, _setPickerPos); _setPickerFor("out"); }}
-        style={{
-          backgroundColor: hasShift ? filledBg : C.blue,
-          borderRadius: 5,
-          paddingHorizontal: 6,
-          paddingVertical: 4,
-          width: "90%",
-          alignItems: "center",
+        </span>
+      </button>
+      <button
+        className={`${styles.timeBox} ${styles.timeBoxLast} ${styles.timeBtn}`}
+        style={{ backgroundColor: hasShift ? filledBg : C.blue }}
+        onClick={(e) => {
+          _setPickerPos(pickerCoords(e));
+          _setPickerFor("out");
         }}
       >
-        <Text style={{ fontSize: 12, color: "white", fontWeight: "700" }}>
+        <span className={styles.timeBtnText}>
           {hasShift ? formatTimeShort(shift.endTime) : "Out"}
-        </Text>
-      </TouchableOpacity>
-      {!!sPickerFor && sPickerPos && ReactDOM.createPortal(
-        <View
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 10000,
+        </span>
+      </button>
+      {!!sPickerFor && sPickerPos && (
+        <div
+          className={styles.pickerBackdrop}
+          onClick={() => {
+            _setPickerFor(null);
+            _setPickerPos(null);
           }}
         >
-          <TouchableWithoutFeedback onPress={() => { _setPickerFor(null); _setPickerPos(null); }}>
-            <View style={{ width: "100%", height: "100%", backgroundColor: "rgba(0,0,0,0.25)" }}>
-              <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-                <View
-                  style={{
-                    position: "absolute",
-                    left: sPickerPos.left,
-                    top: sPickerPos.top,
-                    alignItems: "center",
-                  }}
-                >
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: "white", marginBottom: 6 }}>
-                    {sPickerFor === "in" ? "Clock In Time" : "Clock Out Time"}
-                  </Text>
-                  <TimePicker_
-                    initialHour={sPickerFor === "in" ? inInitial.hour : outInitial.hour}
-                    initialMinute={sPickerFor === "in" ? inInitial.minute : outInitial.minute}
-                    initialPeriod={sPickerFor === "in" ? inInitial.period : outInitial.period}
-                    onConfirm={(val) => { handlePickerConfirm(val); _setPickerPos(null); }}
-                    onCancel={() => { _setPickerFor(null); _setPickerPos(null); }}
-                  />
-                </View>
-              </TouchableWithoutFeedback>
-            </View>
-          </TouchableWithoutFeedback>
-        </View>,
-        document.body
+          <div
+            className={styles.pickerWrap}
+            style={{ left: sPickerPos.left, top: sPickerPos.top }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className={styles.pickerTitle}>
+              {sPickerFor === "in" ? "Clock In Time" : "Clock Out Time"}
+            </span>
+            <TimePicker
+              initialHour={sPickerFor === "in" ? inInitial.hour : outInitial.hour}
+              initialMinute={sPickerFor === "in" ? inInitial.minute : outInitial.minute}
+              initialPeriod={sPickerFor === "in" ? inInitial.period : outInitial.period}
+              onConfirm={handlePickerConfirm}
+              onCancel={() => {
+                _setPickerFor(null);
+                _setPickerPos(null);
+              }}
+            />
+          </div>
+        </div>
       )}
-    </View>
+    </div>
   );
 }
 
@@ -446,7 +372,6 @@ export function ScheduleModal({ handleExit }) {
     }
   }
 
-  // week date range label
   let weekStartDay = dayjs(sWeekStart);
   let weekEndDay = weekStartDay.add(6, "day");
   let weekLabel =
@@ -455,10 +380,9 @@ export function ScheduleModal({ handleExit }) {
   let isCurrentWeek = sWeekStart === currentWeekStart;
   let isPastWeek = sWeekStart < currentWeekStart;
 
-  // build day columns
   let dayColumns = [];
   for (let i = 0; i < 7; i++) {
-    let dayIndex = i + 1; // 1=Mon..7=Sun
+    let dayIndex = i + 1;
     let date = weekStartDay.add(i, "day");
     let storeDay = getStoreHoursForDayIndex(storeHours, dayIndex);
     dayColumns.push({
@@ -473,345 +397,215 @@ export function ScheduleModal({ handleExit }) {
     });
   }
 
-  let Component = useCallback(() => {
-    return (
-      <TouchableWithoutFeedback>
-        <View
-          style={{
-            width: "92%",
-            height: "94%",
-            backgroundColor: C.backgroundWhite,
-            borderRadius: 15,
-            overflow: "hidden",
-            flexDirection: "column",
-          }}
-        >
-          {/* ─── header ──────────────────────────────────────────────── */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingHorizontal: 20,
-              paddingVertical: 14,
-              borderBottomWidth: 1,
-              borderBottomColor: "rgb(220,220,220)",
-              backgroundColor: "white",
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <TouchableOpacity
-                onPress={() => navigateWeek(-1)}
-                style={{
-                  width: 44,
-                  height: 44,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  backgroundColor: "rgb(230,230,230)",
-                  borderRadius: 10,
-                }}
-              >
-                <Text style={{ fontSize: 20, color: C.text, fontWeight: "700" }}>{"<"}</Text>
-              </TouchableOpacity>
-
-              <Text
-                style={{
-                  fontSize: 20,
-                  fontWeight: "700",
-                  color: C.text,
-                  marginHorizontal: 16,
-                  minWidth: 220,
-                  textAlign: "center",
-                }}
-              >
-                {weekLabel}
-              </Text>
-
-              <TouchableOpacity
-                onPress={() => navigateWeek(1)}
-                style={{
-                  width: 44,
-                  height: 44,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  backgroundColor: "rgb(230,230,230)",
-                  borderRadius: 10,
-                }}
-              >
-                <Text style={{ fontSize: 20, color: C.text, fontWeight: "700" }}>{">"}</Text>
-              </TouchableOpacity>
-
-              {!isCurrentWeek && (
-                <TouchableOpacity
-                  onPress={goToToday}
-                  style={{
-                    marginLeft: 16,
-                    backgroundColor: C.blue,
-                    borderRadius: 8,
-                    paddingVertical: 8,
-                    paddingHorizontal: 16,
-                  }}
-                >
-                  <Text style={{ color: "white", fontSize: 14, fontWeight: "700" }}>Today</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <TouchableOpacity
-                onPress={isPastWeek ? undefined : handleCopyLastWeek}
-                style={{
-                  backgroundColor: C.green,
-                  borderRadius: 8,
-                  paddingVertical: 10,
-                  paddingHorizontal: 18,
-                  marginRight: 16,
-                  opacity: isPastWeek ? 0.4 : 1,
-                }}
-                disabled={isPastWeek}
-              >
-                <Text style={{ color: "white", fontSize: 14, fontWeight: "700" }}>
-                  Copy Last Week
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={isPastWeek ? undefined : handleCopyForward}
-                style={{
-                  backgroundColor: C.orange,
-                  borderRadius: 8,
-                  paddingVertical: 10,
-                  paddingHorizontal: 18,
-                  marginRight: 16,
-                  opacity: isPastWeek ? 0.4 : 1,
-                }}
-                disabled={isPastWeek}
-              >
-                <Text style={{ color: "white", fontSize: 14, fontWeight: "700" }}>
-                  Copy Forward
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleExit}
-                style={{
-                  width: 40,
-                  height: 40,
-                  justifyContent: "center",
-                  alignItems: "center",
-                }}
-              >
-                <Image_ icon={ICONS.close1} size={31} />
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* ─── grid ────────────────────────────────────────────────── */}
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 12 }}>
-            {/* day header row */}
-            <View style={{ flexDirection: "row", marginBottom: 6 }}>
-              <View style={{ width: 100, paddingRight: 8 }} />
-              {dayColumns.map((col) => (
-                <View
-                  key={col.dayIndex}
-                  style={{
-                    flex: 1,
-                    alignItems: "center",
-                    paddingVertical: 8,
-                    margin: 2,
-                    backgroundColor: col.isClosed ? "rgb(235,235,235)" : C.blue,
-                    borderRadius: 8,
-                    opacity: col.isClosed ? 0.6 : 1,
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      fontWeight: "600",
-                      color: col.isClosed ? "rgb(140,140,140)" : "white",
-                    }}
-                  >
-                    {col.name} {col.date}
-                  </Text>
-                  {col.isClosed ? (
-                    <Text style={{ fontSize: 11, color: "rgb(140,140,140)", marginTop: 2 }}>Closed</Text>
-                  ) : (
-                    <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.75)", marginTop: 2 }}>
-                      {formatTimeShort(col.openTime)} - {formatTimeShort(col.closeTime)}
-                    </Text>
-                  )}
-                </View>
-              ))}
-              {sShowPay && (
-                <View style={{ width: 80, justifyContent: "center", alignItems: "center", margin: 2 }}>
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: C.text }}>Pay</Text>
-                </View>
-              )}
-            </View>
-
-            {/* employee rows */}
-            {users.map((user) => {
-              let weekHours = getUserWeekHours(user.id, sShifts);
-              let wage = Number(user.hourlyWage) || 0;
-              let weekPay = trimToTwoDecimals(weekHours * wage);
-              return (
-                <View
-                  key={user.id}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "stretch",
-                    marginBottom: 4,
-                    minHeight: 64,
-                  }}
-                >
-                  <View
-                    style={{
-                      width: 100,
-                      justifyContent: "center",
-                      paddingRight: 6,
-                      paddingLeft: 4,
-                    }}
-                  >
-                    <Text
-                      style={{
-                        fontSize: 14,
-                        fontWeight: "700",
-                        color: C.text,
-                      }}
-                      numberOfLines={1}
-                    >
-                      {user.first}
-                    </Text>
-                    {!!user.last && (
-                      <Text
-                        style={{
-                          fontSize: 11,
-                          color: "rgb(140,140,140)",
-                          fontWeight: "500",
-                        }}
-                        numberOfLines={1}
-                      >
-                        {user.last}
-                      </Text>
-                    )}
-                    <Text style={{ fontSize: 10, color: "rgb(160,160,160)", fontWeight: "500", marginTop: 1 }}>
-                      {trimToTwoDecimals(weekHours)}
-                    </Text>
-                  </View>
-
-                  {dayColumns.map((col) => {
-                    let shiftKey = `${user.id}_${col.dayIndex}`;
-                    let shift = sShifts[shiftKey] || null;
-                    return (
-                      <ShiftCell
-                        key={shiftKey}
-                        shift={shift}
-                        isClosed={col.isClosed}
-                        storeHoursDay={col}
-                        isPastWeek={isPastWeek}
-                        onAddWithTimes={(startTime, endTime) => handleAddShift(user.id, col.dayIndex, startTime, endTime)}
-                        onUpdate={(updated) => handleUpdateShift(shiftKey, updated)}
-                        onRemove={() => handleRemoveShift(shiftKey)}
-                      />
-                    );
-                  })}
-
-                  {sShowPay && (
-                    <View style={{ width: 80, justifyContent: "center", alignItems: "center", margin: 2 }}>
-                      <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>
-                        ${weekPay.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              );
-            })}
-
-            {/* ─── summary row ──────────────────────────────────────── */}
-            {(() => {
-              let totalHours = 0;
-              let totalPay = 0;
-              users.forEach((user) => {
-                let h = getUserWeekHours(user.id, sShifts);
-                totalHours += h;
-                totalPay += h * (Number(user.hourlyWage) || 0);
-              });
-              totalHours = trimToTwoDecimals(totalHours);
-              totalPay = trimToTwoDecimals(totalPay);
-              return (
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginTop: 8,
-                    paddingTop: 10,
-                    borderTopWidth: 1,
-                    borderTopColor: "rgb(220,220,220)",
-                  }}
-                >
-                  <View style={{ width: 100, paddingLeft: 4 }}>
-                    <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>Total</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: "rgb(100,100,100)" }}>
-                      {totalHours} scheduled
-                    </Text>
-                  </View>
-                  {sShowPay && (
-                    <View style={{ width: 80, alignItems: "center" }}>
-                      <Text style={{ fontSize: 14, fontWeight: "700", color: C.text }}>
-                        ${totalPay.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </Text>
-                    </View>
-                  )}
-                  <TouchableOpacity
-                    onPress={() => _setShowPay(!sShowPay)}
-                    style={{
-                      backgroundColor: sShowPay ? "rgb(180,180,180)" : "rgb(103,124,231)",
-                      borderRadius: 8,
-                      paddingVertical: 8,
-                      paddingHorizontal: 14,
-                      marginLeft: 12,
-                    }}
-                  >
-                    <Text style={{ color: "white", fontSize: 13, fontWeight: "700" }}>
-                      {sShowPay ? "Hide Pay" : "Show Pay"}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              );
-            })()}
-          </ScrollView>
-        </View>
-      </TouchableWithoutFeedback>
-    );
+  let totalHours = 0;
+  let totalPay = 0;
+  users.forEach((user) => {
+    let h = getUserWeekHours(user.id, sShifts);
+    totalHours += h;
+    totalPay += h * (Number(user.hourlyWage) || 0);
   });
+  totalHours = trimToTwoDecimals(totalHours);
+  totalPay = trimToTwoDecimals(totalPay);
 
-  return ReactDOM.createPortal(
-    <View
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        zIndex: Z.modal,
-      }}
-    >
-      <TouchableWithoutFeedback onPress={handleExit}>
-        <View
-          style={{
-            width: "100%",
-            height: "100%",
-            backgroundColor: "rgba(0,0,0,0.5)",
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Component />
-        </View>
-      </TouchableWithoutFeedback>
-    </View>,
-    document.body
+  return (
+    <Dialog visible={true} onClose={handleExit} title="Schedule">
+      <div
+        style={{
+          width: "92%",
+          height: "94%",
+          backgroundColor: C.backgroundWhite,
+          borderRadius: 15,
+          overflow: "hidden",
+          display: "flex",
+          flexDirection: "column",
+          boxSizing: "border-box",
+        }}
+      >
+        {/* ─── header ──────────────────────────────────────────────── */}
+        <div className={styles.header}>
+          <div className={styles.headerLeft}>
+            <button className={styles.navBtn} onClick={() => navigateWeek(-1)} style={{ color: C.text }}>
+              {"<"}
+            </button>
+            <span className={styles.weekLabel} style={{ color: C.text }}>
+              {weekLabel}
+            </span>
+            <button className={styles.navBtn} onClick={() => navigateWeek(1)} style={{ color: C.text }}>
+              {">"}
+            </button>
+            {!isCurrentWeek && (
+              <Button
+                text="Today"
+                onPress={goToToday}
+                buttonStyle={{
+                  marginLeft: 16,
+                  backgroundColor: C.blue,
+                  borderRadius: 8,
+                  paddingTop: 8,
+                  paddingBottom: 8,
+                  paddingLeft: 16,
+                  paddingRight: 16,
+                }}
+                textStyle={{ color: "white", fontSize: 14, fontWeight: "700" }}
+              />
+            )}
+          </div>
+
+          <div className={styles.headerRight}>
+            <Button
+              text="Copy Last Week"
+              onPress={handleCopyLastWeek}
+              enabled={!isPastWeek}
+              buttonStyle={{
+                backgroundColor: C.green,
+                borderRadius: 8,
+                paddingTop: 10,
+                paddingBottom: 10,
+                paddingLeft: 18,
+                paddingRight: 18,
+                marginRight: 16,
+                opacity: isPastWeek ? 0.4 : 1,
+              }}
+              textStyle={{ color: "white", fontSize: 14, fontWeight: "700" }}
+            />
+            <Button
+              text="Copy Forward"
+              onPress={handleCopyForward}
+              enabled={!isPastWeek}
+              buttonStyle={{
+                backgroundColor: C.orange,
+                borderRadius: 8,
+                paddingTop: 10,
+                paddingBottom: 10,
+                paddingLeft: 18,
+                paddingRight: 18,
+                marginRight: 16,
+                opacity: isPastWeek ? 0.4 : 1,
+              }}
+              textStyle={{ color: "white", fontSize: 14, fontWeight: "700" }}
+            />
+            <TouchableOpacity onPress={handleExit} style={{ width: 40, height: 40, justifyContent: "center", alignItems: "center", display: "flex" }}>
+              <Image icon={ICONS.close1} size={31} />
+            </TouchableOpacity>
+          </div>
+        </div>
+
+        {/* ─── grid ────────────────────────────────────────────────── */}
+        <div className={styles.gridScroll}>
+          {/* day header row */}
+          <div className={styles.dayHeaderRow}>
+            <div className={styles.dayHeaderSpacer} />
+            {dayColumns.map((col) => (
+              <div
+                key={col.dayIndex}
+                className={`${styles.dayHeaderCell} ${col.isClosed ? styles.dayHeaderCellClosed : ""}`}
+                style={{ backgroundColor: col.isClosed ? C.borderSubtle : C.blue }}
+              >
+                <span
+                  className={styles.dayHeaderName}
+                  style={{ color: col.isClosed ? C.textMuted : C.textOnAccent }}
+                >
+                  {col.name} {col.date}
+                </span>
+                {col.isClosed ? (
+                  <span className={styles.dayHeaderHours} style={{ color: C.textMuted }}>
+                    Closed
+                  </span>
+                ) : (
+                  <span className={styles.dayHeaderHours} style={{ color: "rgba(255,255,255,0.75)" }}>
+                    {formatTimeShort(col.openTime)} - {formatTimeShort(col.closeTime)}
+                  </span>
+                )}
+              </div>
+            ))}
+            {sShowPay && (
+              <div className={styles.payCol}>
+                <span className={styles.payColHeaderText} style={{ color: C.text }}>Pay</span>
+              </div>
+            )}
+          </div>
+
+          {/* employee rows */}
+          {users.map((user) => {
+            let weekHours = getUserWeekHours(user.id, sShifts);
+            let wage = Number(user.hourlyWage) || 0;
+            let weekPay = trimToTwoDecimals(weekHours * wage);
+            return (
+              <div key={user.id} className={styles.employeeRow}>
+                <div className={styles.employeeNameCol}>
+                  <span className={styles.employeeFirst} style={{ color: C.text }}>
+                    {user.first}
+                  </span>
+                  {!!user.last && (
+                    <span className={styles.employeeLast}>{user.last}</span>
+                  )}
+                  <span className={styles.employeeHours}>
+                    {trimToTwoDecimals(weekHours)}
+                  </span>
+                </div>
+
+                {dayColumns.map((col) => {
+                  let shiftKey = `${user.id}_${col.dayIndex}`;
+                  let shift = sShifts[shiftKey] || null;
+                  return (
+                    <ShiftCell
+                      key={shiftKey}
+                      shift={shift}
+                      isClosed={col.isClosed}
+                      storeHoursDay={col}
+                      isPastWeek={isPastWeek}
+                      onAddWithTimes={(startTime, endTime) => handleAddShift(user.id, col.dayIndex, startTime, endTime)}
+                      onUpdate={(updated) => handleUpdateShift(shiftKey, updated)}
+                      onRemove={() => handleRemoveShift(shiftKey)}
+                    />
+                  );
+                })}
+
+                {sShowPay && (
+                  <div className={styles.payCol}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
+                      ${weekPay.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+
+          {/* ─── summary row ──────────────────────────────────────── */}
+          <div className={styles.summaryRow}>
+            <div className={styles.summaryLabelCol}>
+              <span className={styles.summaryLabel} style={{ color: C.text }}>Total</span>
+            </div>
+            <div className={styles.summaryHoursCol}>
+              <span className={styles.summaryHoursText}>
+                {totalHours} scheduled
+              </span>
+            </div>
+            {sShowPay && (
+              <div className={styles.payCol}>
+                <span className={styles.summaryPay} style={{ color: C.text }}>
+                  ${totalPay.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
+            <Button
+              text={sShowPay ? "Hide Pay" : "Show Pay"}
+              onPress={() => _setShowPay(!sShowPay)}
+              buttonStyle={{
+                backgroundColor: sShowPay ? "rgb(180,180,180)" : "rgb(103,124,231)",
+                borderRadius: 8,
+                paddingTop: 8,
+                paddingBottom: 8,
+                paddingLeft: 14,
+                paddingRight: 14,
+                marginLeft: 12,
+              }}
+              textStyle={{ color: "white", fontSize: 13, fontWeight: "700" }}
+            />
+          </div>
+        </div>
+      </div>
+    </Dialog>
   );
 }

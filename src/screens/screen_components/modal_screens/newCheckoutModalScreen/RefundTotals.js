@@ -1,42 +1,28 @@
 /* eslint-disable */
-import { View, Text, Image } from "react-native-web";
 import { memo } from "react";
+import styles from "./RefundTotals.module.css";
 import { C, Fonts, ICONS } from "../../../../styles";
-import {
-  formatCurrencyDisp,
-  gray,
-} from "../../../../utils";
+import { formatCurrencyDisp } from "../../../../utils";
 
 function TotalRow({ label, value, color, bold, fontSize = 13 }) {
+  let textStyle = {
+    fontSize,
+    color: color || C.text,
+    fontWeight: bold ? Fonts.weight.textHeavy : Fonts.weight.textRegular,
+  };
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        paddingVertical: 3,
-      }}
-    >
-      <Text
-        style={{
-          fontSize,
-          color: color || C.text,
-          fontWeight: bold ? Fonts.weight.textHeavy : Fonts.weight.textRegular,
-        }}
-      >
-        {label}
-      </Text>
-      <Text
-        style={{
-          fontSize,
-          color: color || C.text,
-          fontWeight: bold ? Fonts.weight.textHeavy : Fonts.weight.textRegular,
-        }}
-      >
+    <div className={styles.totalRow}>
+      <span style={textStyle}>{label}</span>
+      <span style={textStyle}>
         {typeof value === "number" ? formatCurrencyDisp(value) : value}
-      </Text>
-    </View>
+      </span>
+    </div>
   );
+}
+
+function resolveIcon(src) {
+  if (!src) return null;
+  return typeof src === "object" ? src.default || src : src;
 }
 
 export const RefundTotals = memo(function RefundTotals({
@@ -54,31 +40,22 @@ export const RefundTotals = memo(function RefundTotals({
   customerFirst = "",
 }) {
   let grandTotalRefund = hasItemSelection ? itemRefundTotal : selectedPaymentsTotal;
-
-  // Exceeds limit check
   let exceedsLimit = grandTotalRefund > maxRefundAllowed;
 
   return (
-    <View style={{ padding: 10 }}>
-      <Text
+    <div className={styles.container}>
+      <div
+        className={styles.title}
         style={{
-          fontSize: 14,
-          fontWeight: Fonts.weight.textHeavy,
           color: C.text,
-          marginBottom: 8,
-          borderBottomWidth: 1,
-          borderBottomColor: gray(0.1),
-          paddingBottom: 6,
+          fontWeight: Fonts.weight.textHeavy,
+          borderBottomColor: C.borderSubtle,
         }}
       >
         REFUND TOTALS
-      </Text>
+      </div>
 
-      {/* Original Sale Info */}
-      <TotalRow
-        label="ORIGINAL SALE TOTAL"
-        value={originalSale?.total || 0}
-      />
+      <TotalRow label="ORIGINAL SALE TOTAL" value={originalSale?.total || 0} />
 
       {previouslyRefunded > 0 && (
         <TotalRow
@@ -97,11 +74,7 @@ export const RefundTotals = memo(function RefundTotals({
         />
       )}
 
-      <TotalRow
-        label="MAX REFUND REMAINING"
-        value={maxRefundAllowed}
-        bold
-      />
+      <TotalRow label="MAX REFUND REMAINING" value={maxRefundAllowed} bold />
 
       {cardFeeDeduction > 0 && (
         <TotalRow
@@ -112,22 +85,11 @@ export const RefundTotals = memo(function RefundTotals({
         />
       )}
 
-      {/* Divider */}
-      <View
-        style={{
-          borderTopWidth: 1,
-          borderTopColor: gray(0.15),
-          marginVertical: 8,
-        }}
-      />
+      <div className={styles.divider} style={{ borderTopColor: C.borderSubtle }} />
 
-      {/* Selected Items Total */}
       {hasItemSelection && (
         <>
-          <TotalRow
-            label="SELECTED ITEMS"
-            value={selectedItemsTotal}
-          />
+          <TotalRow label="SELECTED ITEMS" value={selectedItemsTotal} />
           {salesTaxPercent > 0 && (
             <TotalRow
               label={`TAX (${salesTaxPercent}%)`}
@@ -139,24 +101,12 @@ export const RefundTotals = memo(function RefundTotals({
         </>
       )}
 
-      {/* Selected Payments Total */}
       {!hasItemSelection && selectedPaymentsTotal > 0 && (
-        <TotalRow
-          label="SELECTED PAYMENTS"
-          value={selectedPaymentsTotal}
-        />
+        <TotalRow label="SELECTED PAYMENTS" value={selectedPaymentsTotal} />
       )}
 
-      {/* Divider */}
-      <View
-        style={{
-          borderTopWidth: 1,
-          borderTopColor: gray(0.15),
-          marginVertical: 6,
-        }}
-      />
+      <div className={styles.dividerTight} style={{ borderTopColor: C.borderSubtle }} />
 
-      {/* Total Refund */}
       <TotalRow
         label="TOTAL REFUND"
         value={grandTotalRefund}
@@ -165,71 +115,46 @@ export const RefundTotals = memo(function RefundTotals({
         fontSize={16}
       />
 
-      {/* Error: Exceeds limit */}
       {exceedsLimit && (
-        <View
-          style={{
-            backgroundColor: "rgb(252, 235, 235)",
-            borderRadius: 6,
-            padding: 8,
-            marginTop: 6,
-          }}
+        <div
+          className={styles.exceedsBox}
+          style={{ backgroundColor: "rgb(252, 235, 235)" }}
         >
-          <Text
+          <div
+            className={styles.exceedsText}
             style={{
-              fontSize: 11,
               color: C.lightred,
               fontWeight: Fonts.weight.textHeavy,
-              textAlign: "center",
             }}
           >
             Refund exceeds maximum allowed ({formatCurrencyDisp(maxRefundAllowed)})
-          </Text>
-        </View>
+          </div>
+        </div>
       )}
 
-      {/* Refund Complete */}
       {refundComplete && (
-        <View
-          style={{
-            backgroundColor: C.green,
-            borderRadius: 10,
-            paddingBottom: 10,
-            paddingHorizontal: 14,
-            marginTop: 4,
-            alignItems: "center",
-            justifyContent: "center",
-          }}
-        >
-          <Image
-            source={ICONS.popperCelebration}
-            style={{ width: 130, height: 130, marginTop: -5 }}
-            resizeMode="contain"
+        <div className={styles.completeBox} style={{ backgroundColor: C.green }}>
+          <img
+            src={resolveIcon(ICONS.popperCelebration)}
+            alt=""
+            className={styles.completeImage}
           />
-          <Text
-            style={{
-              fontSize: 17,
-              fontWeight: Fonts.weight.textSuperheavy,
-              color: "white",
-              letterSpacing: 1.5,
-            }}
+          <div
+            className={styles.completeHeading}
+            style={{ fontWeight: Fonts.weight.textSuperheavy }}
           >
             REFUND COMPLETE
-          </Text>
+          </div>
           {lastRefundAmount > 0 && (
-            <Text
-              style={{
-                fontSize: 15,
-                fontWeight: Fonts.weight.textHeavy,
-                color: C.text,
-                marginTop: 6,
-              }}
+            <div
+              className={styles.completeReturn}
+              style={{ color: C.text, fontWeight: Fonts.weight.textHeavy }}
             >
               {"Return " + formatCurrencyDisp(lastRefundAmount, true) + " to " + (customerFirst ? customerFirst.charAt(0).toUpperCase() + customerFirst.slice(1).toLowerCase() : "customer")}
-            </Text>
+            </div>
           )}
-        </View>
+        </div>
       )}
-    </View>
+    </div>
   );
 });

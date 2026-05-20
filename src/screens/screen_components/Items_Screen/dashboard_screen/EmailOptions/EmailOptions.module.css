@@ -105,7 +105,7 @@
 }
 
 .emojiCell:hover {
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: var(--surface-overlay-light);
 }
 
 .templateCard {
@@ -140,7 +140,7 @@
 }
 
 .actionSection {
-  background-color: #E8F5E9;
+  background-color: var(--surface-success-muted);
   padding: 16px;
   margin-top: 8px;
   display: flex;
@@ -285,7 +285,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: var(--surface-overlay);
 }
 
 .emojiModalCloseLayer {

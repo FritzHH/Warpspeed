@@ -3,7 +3,7 @@ import styles from "./BackupRecoveryComponent.module.css";
 import { Button } from "../../../../dom_components";
 import { useSettingsStore } from "../../../../stores";
 import { C, COLOR_GRADIENTS } from "../../../../styles";
-import { gray, formatMillisForDisplay, log } from "../../../../utils";
+import { formatMillisForDisplay, log } from "../../../../utils";
 import { firestoreQuery } from "../../../../db_calls";
 import {
   dbRehydrateFromArchive,
@@ -106,7 +106,7 @@ export function BackupRecoveryComponent() {
         </span>
         <span
           className={styles.sectionDescription}
-          style={{ color: gray(0.5) }}
+          style={{ color: C.textMuted }}
         >
           Manually runs the full nightly archive process: backs up all collections
           to Cloud Storage, cleans up old media, and cleans up standalone active sales.
@@ -175,7 +175,7 @@ export function BackupRecoveryComponent() {
         </span>
         <span
           className={styles.sectionDescription}
-          style={{ color: gray(0.5) }}
+          style={{ color: C.textMuted }}
         >
           Restores all archived data from Cloud Storage back to Firestore. Only
           use this if the database has been corrupted or data is missing.
@@ -295,7 +295,7 @@ export function BackupRecoveryComponent() {
         )}
 
         {sLoading && (
-          <span className={styles.loadingText} style={{ color: gray(0.5) }}>
+          <span className={styles.loadingText} style={{ color: C.textMuted }}>
             Loading...
           </span>
         )}
@@ -312,7 +312,7 @@ export function BackupRecoveryComponent() {
                 </span>
                 <span
                   className={styles.logCardMillis}
-                  style={{ color: gray(0.5) }}
+                  style={{ color: C.textMuted }}
                 >
                   {logEntry.millis
                     ? formatMillisForDisplay(logEntry.millis)

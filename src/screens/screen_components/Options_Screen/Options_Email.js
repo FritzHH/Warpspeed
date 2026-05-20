@@ -2,13 +2,13 @@
 
 import React, { useState, useCallback, useMemo } from "react";
 import { C, Fonts, ICONS } from "../../../styles";
-import { Tooltip } from "../../../components";
+import { Tooltip } from "../../../dom_components";
 import { TabMenuButton } from "../../../dom_components/TabMenuButton/TabMenuButton";
 import { useEmailStore, useLoginStore, useSettingsStore, useTabNamesStore } from "../../../stores";
 import { TAB_NAMES } from "../../../data";
 import { dbGmailDisconnect, dbGmailModifyLabels } from "../../../db_calls_wrapper";
 import { buildSignOffHtml } from "../Items_Screen/Items_EmailView";
-import { log, gray, lightenRGBByPercent } from "../../../utils";
+import { log, lightenRGBByPercent } from "../../../utils";
 import dayjs from "dayjs";
 import styles from "./OptionsEmail.module.css";
 

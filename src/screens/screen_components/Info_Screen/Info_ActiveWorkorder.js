@@ -1,27 +1,6 @@
 /* eslint-disable */
 
-import {
-  capitalizeFirstLetterOfString,
-  checkInputForNumbersOnly,
-  formatCurrencyDisp,
-  formatMillisForDisplay,
-  formatPhoneWithDashes,
-  formatPhoneWithParens,
-  createNewWorkorder,
-  generateEAN13Barcode,
-  generate36CharUUID,
-  gray,
-  lightenRGBByPercent,
-  log,
-  deepEqual,
-  printBuilder,
-  removeUnusedFields,
-  resolveStatus,
-  calculateWaitEstimateLabel,
-  findTemplateByType,
-  scheduleAutoText,
-  localStorageWrapper,
-} from "../../../utils";
+import { capitalizeFirstLetterOfString, checkInputForNumbersOnly, formatCurrencyDisp, formatMillisForDisplay, formatPhoneWithDashes, formatPhoneWithParens, createNewWorkorder, generateEAN13Barcode, generate36CharUUID, lightenRGBByPercent, log, deepEqual, printBuilder, removeUnusedFields, resolveStatus, calculateWaitEstimateLabel, findTemplateByType, scheduleAutoText, localStorageWrapper } from "../../../utils";
 import {
   Button as Button_,
   CheckBox,
@@ -90,7 +69,7 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
     cursor: "pointer",
   };
   const pillText = { fontSize: 12, color: "white", fontWeight: "600" };
-  const labelText = { fontSize: 11, color: gray(0.5), fontStyle: "italic", marginRight: 4 };
+  const labelText = { fontSize: 11, color: C.textMuted, fontStyle: "italic", marginRight: 4 };
 
   const startParts = parse12To24Parts(pd.startTime);
   const endParts = parse12To24Parts(pd.endTime);
@@ -687,7 +666,7 @@ export const ActiveWorkorderComponent = ({}) => {
             />
           </Tooltip>
           {!!zCustomerLanguage && zCustomerLanguage !== CUSTOMER_LANGUAGES.english && (
-            <span className={styles.langText} style={{ color: gray(0.5) }}>
+            <span className={styles.langText} style={{ color: C.textMuted }}>
               {zCustomerLanguage}
             </span>
           )}
@@ -739,9 +718,9 @@ export const ActiveWorkorderComponent = ({}) => {
           <div
             style={{
               marginTop: 10,
-              borderColor: gray(0.05),
+              borderColor: C.borderSubtle,
               padding: "8px 8px",
-              backgroundColor: gray(0.05),
+              backgroundColor: C.surfaceAlt,
               borderWidth: 1,
               borderStyle: "solid",
               borderRadius: 5,
@@ -824,7 +803,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     {brandSuggestions.map((item) => (
                       <div
                         key={item}
-                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = C.surfaceAlt; }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                         style={{ display: "flex", flexDirection: "row", alignItems: "center", padding: "6px 8px" }}
                       >
@@ -846,7 +825,7 @@ export const ActiveWorkorderComponent = ({}) => {
                           }}
                           style={{ paddingLeft: 8, cursor: "pointer", background: "none", border: "none", font: "inherit" }}
                         >
-                          <span style={{ fontSize: 12, color: gray(0.55) }}>✕</span>
+                          <span style={{ fontSize: 12, color: C.textMuted }}>✕</span>
                         </button>
                       </div>
                     ))}
@@ -990,7 +969,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     {descSuggestions.map((item) => (
                       <div
                         key={item}
-                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                        onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = C.surfaceAlt; }}
                         onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                         style={{ display: "flex", flexDirection: "row", alignItems: "center", padding: "6px 8px" }}
                       >
@@ -1012,7 +991,7 @@ export const ActiveWorkorderComponent = ({}) => {
                           }}
                           style={{ paddingLeft: 8, cursor: "pointer", background: "none", border: "none", font: "inherit" }}
                         >
-                          <span style={{ fontSize: 12, color: gray(0.55) }}>✕</span>
+                          <span style={{ fontSize: 12, color: C.textMuted }}>✕</span>
                         </button>
                       </div>
                     ))}
@@ -1134,7 +1113,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       {color1Suggestions.map((item) => (
                         <div
                           key={item}
-                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = C.surfaceAlt; }}
                           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                           style={{ display: "flex", flexDirection: "row", alignItems: "center", padding: "6px 8px" }}
                         >
@@ -1216,7 +1195,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       {color2Suggestions.map((item) => (
                         <div
                           key={item}
-                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.06); }}
+                          onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = C.surfaceAlt; }}
                           onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
                           style={{ display: "flex", flexDirection: "row", alignItems: "center", padding: "6px 8px" }}
                         >
@@ -1502,7 +1481,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 boxSizing: "border-box",
               }}
             >
-              <span style={{ color: gray(0.5), fontSize: 13, marginRight: 4 }}>
+              <span style={{ color: C.textMuted, fontSize: 13, marginRight: 4 }}>
                 Max wait days:
               </span>
               <TextInput_
@@ -1572,7 +1551,7 @@ export const ActiveWorkorderComponent = ({}) => {
               {(() => {
                 let estimateLabel = calculateWaitEstimateLabel(zOpenWorkorder, useSettingsStore.getState().getSettings());
                 let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
-                let estimateColor = gray(0.5);
+                let estimateColor = C.textMuted;
                 if (isMissing) estimateColor = C.red;
                 else if (/overdue/i.test(estimateLabel) || /today/i.test(estimateLabel)) estimateColor = C.red;
                 else if (/tomorrow/i.test(estimateLabel)) estimateColor = C.green;
@@ -1612,13 +1591,13 @@ export const ActiveWorkorderComponent = ({}) => {
               marginTop: 0,
               width: "100%",
               padding: "8px 8px",
-              backgroundColor: gray(0.05),
+              backgroundColor: C.surfaceAlt,
               borderRadius: 5,
               boxSizing: "border-box",
             }}
           >
             <div style={{ width: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', marginBottom: (sShowItemOrdering || hasItemOrderingData) ? 7 : 0, opacity: .5 }}>
-              <div style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: gray(0.25) }} />
+              <div style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: C.surfaceAlt }} />
               <button
                 type="button"
                 disabled={hasItemOrderingData}
@@ -1627,10 +1606,10 @@ export const ActiveWorkorderComponent = ({}) => {
                 }}
                 style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', margin: '0 8px', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: hasItemOrderingData ? 'default' : 'pointer' }}
               >
-                <span style={{ fontSize: 12, fontWeight: '600', fontStyle: 'italic', color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : gray(0.5), marginRight: 5 }}>Ordering Info</span>
-                <span style={{ fontSize: 10, color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : gray(0.5), display: 'inline-block', transform: (sShowItemOrdering || hasItemOrderingData) ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
+                <span style={{ fontSize: 12, fontWeight: '600', fontStyle: 'italic', color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : C.textMuted, marginRight: 5 }}>Ordering Info</span>
+                <span style={{ fontSize: 10, color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : C.textMuted, display: 'inline-block', transform: (sShowItemOrdering || hasItemOrderingData) ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
               </button>
-              <div style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: gray(0.25) }} />
+              <div style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: C.surfaceAlt }} />
             </div>
             {(sShowItemOrdering || hasItemOrderingData) && (
               <div style={{ display: "flex", flexDirection: "row", width: "100%", marginTop: 5, boxSizing: "border-box" }}>
@@ -1650,7 +1629,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     <TextInput_
                       inputRef={partOrderedInputRef}
                       placeholder={"Item names/descriptions"}
-                      placeholderTextColor={gray(0.2)}
+                      placeholderTextColor={C.textDisabled}
                       editable={!isDonePaid && hasActiveItem}
                       capitalize={true}
                       style={{
@@ -1688,7 +1667,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     <TextInput_
                       value={capitalizeFirstLetterOfString(sActiveOrderedItem?.partSource || "")}
                       placeholder={"Item sources"}
-                      placeholderTextColor={gray(0.2)}
+                      placeholderTextColor={C.textDisabled}
                       editable={!isDonePaid && hasActiveItem}
                       capitalize={true}
                       style={{
@@ -1755,7 +1734,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                   >
                     <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
-                      <span style={{ fontSize: 11, color: gray(0.45), marginRight: 8, fontStyle: "italic" }}>
+                      <span style={{ fontSize: 11, color: C.textMuted, marginRight: 8, fontStyle: "italic" }}>
                         Est. delivery
                       </span>
                       <button
@@ -1766,7 +1745,7 @@ export const ActiveWorkorderComponent = ({}) => {
                           width: 20,
                           height: 20,
                           borderRadius: 4,
-                          backgroundColor: (isDonePaid || !hasActiveItem) ? gray(0.85) : C.buttonLightGreen,
+                          backgroundColor: (isDonePaid || !hasActiveItem) ? C.surfaceAlt : C.buttonLightGreen,
                           display: "flex",
                           justifyContent: "center",
                           alignItems: "center",
@@ -1775,7 +1754,7 @@ export const ActiveWorkorderComponent = ({}) => {
                           cursor: (isDonePaid || !hasActiveItem) ? "default" : "pointer",
                         }}
                       >
-                        <span style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>−</span>
+                        <span style={{ color: C.textMuted, fontSize: 14, fontWeight: "700", marginTop: -1 }}>−</span>
                       </button>
                       <span
                         style={{
@@ -1796,7 +1775,7 @@ export const ActiveWorkorderComponent = ({}) => {
                           width: 20,
                           height: 20,
                           borderRadius: 4,
-                          backgroundColor: (isDonePaid || !hasActiveItem) ? gray(0.85) : C.buttonLightGreen,
+                          backgroundColor: (isDonePaid || !hasActiveItem) ? C.surfaceAlt : C.buttonLightGreen,
                           display: "flex",
                           justifyContent: "center",
                           alignItems: "center",
@@ -1805,11 +1784,11 @@ export const ActiveWorkorderComponent = ({}) => {
                           cursor: (isDonePaid || !hasActiveItem) ? "default" : "pointer",
                         }}
                       >
-                        <span style={{ color: gray(0.55), fontSize: 14, fontWeight: "700", marginTop: -1 }}>+</span>
+                        <span style={{ color: C.textMuted, fontSize: 14, fontWeight: "700", marginTop: -1 }}>+</span>
                       </button>
                     </div>
                     {!!sActiveOrderedItem?.partOrderEstimateMillis && (
-                      <span style={{ fontSize: 12, color: sWaitDays > 0 ? gray(0.45) : "transparent" }}>
+                      <span style={{ fontSize: 12, color: sWaitDays > 0 ? C.textMuted : "transparent" }}>
                         {formatMillisForDisplay(sActiveOrderedItem.partOrderEstimateMillis)}
                       </span>
                     )}
@@ -1833,7 +1812,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   <div style={{ width: '100%', display: 'flex', flexDirection: 'row', alignItems: 'stretch', marginTop: 8, height: 22 }}>
                     <TextInput_
                       placeholder="Tracking num or website here..."
-                      placeholderTextColor={gray(.3)}
+                      placeholderTextColor={C.textDisabled}
                       editable={hasActiveItem}
                       value={sActiveOrderedItem?.trackingNumber || ""}
                       onChangeText={(val) => {
@@ -1841,7 +1820,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       }}
                       multiline={false}
                       numberOfLines={1}
-                      style={{ height: '100%', boxSizing: 'border-box', fontSize: 11, flex: 1, padding: "0 5px", border: `1px solid ${gray(.15)}`, borderRadius: 6, resize: "none", overflow: "hidden", color: C.text, outline: "none" }}
+                      style={{ height: '100%', boxSizing: 'border-box', fontSize: 11, flex: 1, padding: "0 5px", border: `1px solid ${C.borderSubtle}`, borderRadius: 6, resize: "none", overflow: "hidden", color: C.text, outline: "none" }}
                     />
                     {sActiveOrderedItem?.trackingNumber ? (() => {
                       const inputVal = sActiveOrderedItem.trackingNumber.trim();
@@ -1855,7 +1834,7 @@ export const ActiveWorkorderComponent = ({}) => {
                             title="Press to open, right-click to copy"
                             onClick={() => window.open(openUrl, "_blank")}
                             onContextMenu={copyOnRightClick}
-                            style={{ height: '100%', boxSizing: 'border-box', marginLeft: 5, backgroundColor: C.buttonLightGreen, borderColor: C.buttonLightGreenOutline, borderWidth: 1, borderStyle: 'solid', borderRadius: 5, paddingTop: 0, paddingBottom: 0, paddingLeft: 8, paddingRight: 8, fontSize: 12, color: gray(0.55), fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                            style={{ height: '100%', boxSizing: 'border-box', marginLeft: 5, backgroundColor: C.buttonLightGreen, borderColor: C.buttonLightGreenOutline, borderWidth: 1, borderStyle: 'solid', borderRadius: 5, paddingTop: 0, paddingBottom: 0, paddingLeft: 8, paddingRight: 8, fontSize: 12, color: C.textMuted, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
                           >
                             Open
                           </button>
@@ -1915,7 +1894,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     ? `Previous item (${sActiveOrderedIndex} of ${items.length})`
                     : "Already at first item";
                   return (
-                    <div style={{ width: "13%", flexShrink: 0, display: "flex", flexDirection: "column", paddingLeft: 5, borderLeftWidth: 1, borderLeftStyle: "solid", borderLeftColor: gray(0.12), boxSizing: "border-box" }}>
+                    <div style={{ width: "13%", flexShrink: 0, display: "flex", flexDirection: "column", paddingLeft: 5, borderLeftWidth: 1, borderLeftStyle: "solid", borderLeftColor: C.borderSubtle, boxSizing: "border-box" }}>
                       {/* Plus button */}
                       <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
                         <Tooltip text={addTooltip} position="left">
@@ -2028,7 +2007,7 @@ export const ActiveWorkorderComponent = ({}) => {
               </span>
             </div>
             {sUploadProgress && (
-              <div style={{ position: "absolute", bottom: -2, left: 0, right: 0, height: 4, backgroundColor: gray(0.88), borderRadius: 2, overflow: "hidden" }}>
+              <div style={{ position: "absolute", bottom: -2, left: 0, right: 0, height: 4, backgroundColor: C.surfaceAlt, borderRadius: 2, overflow: "hidden" }}>
                 {!sUploadProgress.done ? (
                   <div
                     style={{

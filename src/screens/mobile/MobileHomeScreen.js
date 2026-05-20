@@ -1,11 +1,11 @@
 /* eslint-disable */
 import React from "react";
-import { View } from "react-native-web";
 import { useNavigate } from "react-router-dom";
-import { Button_ } from "../../components";
+import { Button } from "../../dom_components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
 import { useOpenWorkordersStore } from "../../stores";
 import { ROUTES } from "../../routes";
+import styles from "./MobileHomeScreen.module.css";
 
 export function MobileHomeScreen() {
   const navigate = useNavigate();
@@ -14,17 +14,8 @@ export function MobileHomeScreen() {
   );
 
   return (
-    <View
-      style={{
-        width: "100%",
-        height: "100%",
-        justifyContent: "center",
-        alignItems: "center",
-        paddingHorizontal: 24,
-        backgroundColor: C.backgroundWhite,
-      }}
-    >
-      <Button_
+    <div className={styles.root}>
+      <Button
         text={`Workorders (${zWorkorderCount})`}
         icon={ICONS.workorder}
         iconSize={40}
@@ -42,7 +33,7 @@ export function MobileHomeScreen() {
           color: C.textWhite,
         }}
       />
-      <Button_
+      <Button
         text="Bike Stand"
         icon={ICONS.tools1}
         iconSize={30}
@@ -60,6 +51,6 @@ export function MobileHomeScreen() {
           color: C.textWhite,
         }}
       />
-    </View>
+    </div>
   );
 }

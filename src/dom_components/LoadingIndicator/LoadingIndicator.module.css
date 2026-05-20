@@ -24,7 +24,7 @@
 .spinner {
   border-radius: 50%;
   border-style: solid;
-  border-color: rgba(0, 0, 0, 0.1);
+  border-color: var(--border-subtle);
   border-top-color: currentColor;
   animation: spin 0.75s linear infinite;
 }
@@ -32,6 +32,6 @@
 .message {
   margin-top: 10px;
   font-size: 14px;
-  color: #666;
+  color: var(--text-muted);
   text-align: center;
 }

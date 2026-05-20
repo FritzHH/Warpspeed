@@ -1,4 +1,4 @@
-.scrollContainer {
+.scrollRoot {
   width: 100%;
   height: 100%;
   overflow-y: auto;
@@ -7,7 +7,7 @@
   flex-shrink: 0;
 }
 
-.header {
+.headerSection {
   margin-bottom: 30px;
   flex-shrink: 0;
 }
@@ -31,15 +31,18 @@
 }
 
 .messageBannerSuccess {
-  background-color: #d4edda;
-  border-left: 4px solid #28a745;
-  color: #155724;
+  background-color: var(--surface-success-muted);
+  border-left: 4px solid var(--accent);
 }
 
 .messageBannerError {
-  background-color: #f8d7da;
-  border-left: 4px solid #dc3545;
-  color: #721c24;
+  background-color: var(--danger-muted);
+  border-left: 4px solid var(--danger);
+}
+
+.messageText {
+  font-size: 14px;
+  margin: 0;
 }
 
 .section {
@@ -51,12 +54,14 @@
   font-size: 16px;
   font-weight: 600;
   margin: 0 0 10px 0;
+  display: block;
 }
 
 .sectionTitle {
   font-size: 18px;
   font-weight: 600;
   margin: 0 0 15px 0;
+  display: block;
 }
 
 .storeIdRow {
@@ -83,107 +88,56 @@
   padding: 12px 18px;
   border-radius: 5px;
   flex-shrink: 0;
+  border: none;
+  cursor: pointer;
 }
 
 .copyButtonText {
-  color: white;
+  color: var(--text-on-accent);
   font-weight: 600;
 }
 
-.storeIdHint {
+.helperText {
   font-size: 12px;
   margin: 5px 0 0 0;
+  display: block;
 }
 
-.gridRow {
-  display: flex;
-  flex-direction: row;
-  gap: 15px;
-}
-
-.gridCellFlex1 {
-  flex: 1;
-  min-width: 0;
-}
-
-.gridCellFlex2 {
-  flex: 2;
-  min-width: 0;
-}
-
-.actionRow {
-  display: flex;
-  flex-direction: row;
-  gap: 15px;
-  margin-top: 30px;
-  flex-shrink: 0;
-}
-
-.actionButton {
-  flex: 1;
-}
-
-.instructions {
-  margin-top: 30px;
-  padding: 20px;
-  background-color: #fffbea;
-  border-radius: 8px;
-  border: 1px solid #ffd700;
-  flex-shrink: 0;
-}
-
-.instructionsTitle {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 10px 0;
-}
-
-.instructionsBody {
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-.instructionsLine {
-  margin: 0 0 5px 0;
-}
-
-.instructionsLineLast {
-  margin: 0;
-}
-
-.statusInfo {
-  margin-top: 20px;
-  padding: 15px;
-  background-color: #e7f3ff;
-  border-radius: 8px;
-  border: 1px solid #2196f3;
-  flex-shrink: 0;
-}
-
-.statusInfoText {
-  font-size: 14px;
-  margin: 0;
-}
-
-.inputField {
+.fieldWrapper {
   margin-bottom: 15px;
 }
 
-.inputLabel {
+.fieldLabel {
   display: block;
   font-size: 14px;
   font-weight: 500;
   margin-bottom: 5px;
 }
 
-.inputControl {
+.fieldInput {
   padding: 10px;
   border-radius: 5px;
   font-size: 14px;
   width: 100%;
-  background-color: white;
+  background-color: var(--surface-base);
   box-sizing: border-box;
   flex-shrink: 0;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  gap: 15px;
+}
+
+.col1 {
+  flex: 1;
+  min-width: 0;
+}
+
+.col2 {
+  flex: 2;
+  min-width: 0;
 }
 
 .featureRow {
@@ -192,7 +146,7 @@
   align-items: center;
   padding: 15px;
   margin-bottom: 10px;
-  background-color: white;
+  background-color: var(--surface-base);
   border-radius: 8px;
   cursor: pointer;
 }
@@ -202,7 +156,7 @@
   flex-shrink: 0;
 }
 
-.featureTextCol {
+.featureContent {
   flex: 1;
   min-width: 0;
 }
@@ -219,7 +173,59 @@
   font-size: 13px;
 }
 
-.monoBold {
-  font-weight: bold;
-  font-family: monospace;
+.actionRow {
+  display: flex;
+  flex-direction: row;
+  gap: 15px;
+  margin-top: 30px;
+  flex-shrink: 0;
+}
+
+.actionButton {
+  flex: 1;
+}
+
+.instructionsBox {
+  margin-top: 30px;
+  padding: 20px;
+  background-color: var(--surface-warning-muted);
+  border-radius: 8px;
+  border: 1px solid var(--border-warning);
+  flex-shrink: 0;
+}
+
+.instructionsTitle {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 10px 0;
+  display: block;
+}
+
+.instructionsList {
+  font-size: 14px;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+}
+
+.instructionsItem {
+  margin: 0 0 5px 0;
+}
+
+.instructionsItemLast {
+  margin: 0;
+}
+
+.statusBox {
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #e7f3ff;
+  border-radius: 8px;
+  border: 1px solid #2196f3;
+  flex-shrink: 0;
+}
+
+.statusText {
+  font-size: 14px;
+  margin: 0;
 }

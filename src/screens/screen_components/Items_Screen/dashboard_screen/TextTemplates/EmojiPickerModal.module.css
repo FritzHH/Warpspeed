@@ -7,7 +7,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: var(--surface-overlay);
 }
 
 .backdropClickCatcher {
@@ -58,7 +58,7 @@
 }
 
 .emojiCell:hover {
-  background-color: rgba(0, 0, 0, 0.05);
+  background-color: var(--surface-overlay-light);
 }
 
 .emoji {

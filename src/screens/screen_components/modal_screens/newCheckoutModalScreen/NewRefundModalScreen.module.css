@@ -1,0 +1,316 @@
+.modalBox {
+  display: flex;
+  flex-direction: column;
+  width: 85%;
+  height: 95%;
+  flex-shrink: 0;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 2px 2px 15px rgba(220, 80, 80, 0.25);
+  position: relative;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+.headerSaleID {
+  font-size: 14px;
+}
+
+.headerSubInfo {
+  font-size: 12px;
+}
+
+.headerCustomerInfo {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-left: 4px;
+}
+
+.headerCenter {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.headerCenterPill {
+  border-radius: 6px;
+  padding: 4px 14px;
+  display: inline-block;
+}
+
+.headerCenterText {
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: white;
+}
+
+.headerRight {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 1px;
+}
+
+.loadingWrap {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.loadingText {
+  font-size: 16px;
+  font-style: italic;
+}
+
+.body {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: row;
+  padding: 10px;
+  min-height: 0;
+}
+
+.leftCol {
+  width: 29%;
+  flex-shrink: 0;
+  border-right-width: 1px;
+  border-right-style: solid;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.refundPane {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.midCol {
+  width: 29%;
+  flex-shrink: 0;
+  border-right-width: 1px;
+  border-right-style: solid;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.midScroll {
+  flex: 1 1 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.rightCol {
+  width: 42%;
+  flex-shrink: 0;
+  padding-left: 10px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.rightEmpty {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.rightEmptyText {
+  font-size: 14px;
+  text-align: center;
+}
+
+.notesSection {
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.notesTitle {
+  font-size: 13px;
+  margin-bottom: 6px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  padding-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.prevNoteBox {
+  border-radius: 4px;
+  padding: 6px;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.prevNoteHeader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.prevNoteMeta {
+  font-size: 10px;
+  font-style: italic;
+}
+
+.prevNoteInitials {
+  font-size: 10px;
+}
+
+.prevNoteReason {
+  font-size: 11px;
+  margin-top: 2px;
+  display: block;
+}
+
+.newNoteWrap {
+  border-style: solid;
+  border-radius: 6px;
+  padding: 6px 8px;
+  margin-top: 4px;
+  background-color: white;
+  flex-shrink: 0;
+}
+
+.creditRefundBtn {
+  border-radius: 8px;
+  padding: 12px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-top: 8px;
+  border: none;
+  cursor: pointer;
+  width: 100%;
+}
+
+.creditRefundBtn:disabled {
+  cursor: default;
+}
+
+.creditRefundTitle {
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  color: white;
+}
+
+.creditRefundSub {
+  font-size: 11px;
+  margin-top: 3px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.footerRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-evenly;
+  align-items: center;
+  padding: 8px 0;
+  border-top-width: 1px;
+  border-top-style: solid;
+  flex-shrink: 0;
+}
+
+.footerCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.footerLabel {
+  font-size: 12px;
+}
+
+.footerIconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.footerIconBtn:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
+.footerIconDisabled {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  opacity: 0.3;
+}
+
+.popOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--surface-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  z-index: 100;
+}
+
+.popBox {
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 40px;
+}
+
+.popText {
+  font-size: 18px;
+  font-weight: 600;
+  margin-top: 12px;
+}
+
+.noSaleWrap {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+}
+
+.noSaleText {
+  font-size: 16px;
+}

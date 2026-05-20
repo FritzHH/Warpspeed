@@ -1,7 +1,7 @@
 .innerBox {
   width: 100%;
-  border: 1px solid var(--settings-csv-border, #b6dab6);
-  background-color: var(--settings-csv-bg, #f7fbf7);
+  border: 1px solid var(--settings-csv-border, var(--border-default));
+  background-color: var(--settings-csv-bg, var(--surface-success-muted));
   border-radius: 10px;
   padding: 15px;
   box-sizing: border-box;

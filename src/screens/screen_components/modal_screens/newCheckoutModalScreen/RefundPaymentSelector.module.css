@@ -1,0 +1,248 @@
+.container {
+  padding: 10px;
+}
+
+.title {
+  font-size: 13px;
+  margin-bottom: 6px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  padding-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.subtitle {
+  font-size: 10px;
+  font-style: italic;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.row {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  width: 100%;
+  text-align: left;
+  flex-shrink: 0;
+}
+
+.row:disabled {
+  cursor: default;
+}
+
+.creditRow {
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-radius: 4px;
+  cursor: pointer;
+  user-select: none;
+  background: none;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  width: 100%;
+  text-align: left;
+  flex-shrink: 0;
+}
+
+.creditRow:disabled {
+  cursor: default;
+}
+
+.checkbox {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border-width: 2px;
+  border-style: solid;
+  margin-right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.checkboxTick {
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  margin-top: -1px;
+  line-height: 1;
+}
+
+.rowMiddle {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.rowMain {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.badgeRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.badge {
+  border-radius: 3px;
+  padding: 1px 5px;
+  flex-shrink: 0;
+}
+
+.badgeText {
+  font-size: 9px;
+  color: white;
+}
+
+.amountText {
+  font-size: 13px;
+}
+
+.cardLine {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.lsIndicator {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 3px;
+  border-radius: 3px;
+  padding: 2px 5px;
+  align-self: flex-start;
+}
+
+.lsIndicatorText {
+  font-size: 9px;
+}
+
+.refundedText {
+  font-size: 10px;
+  margin-top: 2px;
+}
+
+.availableText {
+  font-size: 10px;
+  margin-top: 1px;
+}
+
+.fullyRefundedText {
+  font-size: 10px;
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.dateText {
+  font-size: 10px;
+  font-style: italic;
+  margin-top: 2px;
+}
+
+.returnModeRow {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 6px;
+  gap: 4px;
+}
+
+.returnModeBtn {
+  flex: 1 1 0;
+  padding: 4px 0;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+}
+
+.returnModeText {
+  font-size: 9px;
+}
+
+.section {
+  margin-top: 8px;
+  border-top-width: 1px;
+  border-top-style: solid;
+  padding-top: 6px;
+}
+
+.sectionTitle {
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.customAmountRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 6px;
+  gap: 6px;
+}
+
+.customAmountBtn {
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+}
+
+.customAmountInputWrap {
+  flex: 1 1 0;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 4px;
+  padding: 3px 6px;
+  background-color: white;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.customAmountInput {
+  width: 100%;
+  font-size: 13px;
+  text-align: right;
+  outline: none;
+  border: none;
+  background: transparent;
+  min-width: 0;
+}
+
+.customAmountInput::placeholder {
+  color: var(--text-muted);
+}
+
+.refundRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6px 8px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  border-radius: 4px;
+  flex-shrink: 0;
+}

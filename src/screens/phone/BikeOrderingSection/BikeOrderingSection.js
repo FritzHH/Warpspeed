@@ -1,5 +1,5 @@
 import { useState, useRef } from "react";
-import { ICONS } from "../../../styles";
+import { ICONS, C } from "../../../styles";
 import { useOpenWorkordersStore } from "../../../stores";
 import {
   capitalizeFirstLetterOfString,
@@ -25,7 +25,7 @@ const COLOR_DROPDOWN_ITEM_TEXT_STYLE = { fontSize: 17 };
 const COLOR_DROPDOWN_ITEM_STYLE = { paddingTop: 2, paddingBottom: 2 };
 const CHECKBOX_TEXT_STYLE = { fontSize: 13 };
 const CHECKBOX_BUTTON_STYLE = { backgroundColor: "transparent", marginBottom: 8 };
-const GRAY_FALLBACK = "rgb(128, 128, 128)";
+const GRAY_FALLBACK = C.textMuted;
 
 export function BikeOrderingSection({ workorder, zSettings, setField }) {
   const [sBikeEditing, _setBikeEditing] = useState(false);

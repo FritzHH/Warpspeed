@@ -14,6 +14,7 @@ export const ROUTES = {
   stand: "/stand",
   phone: "/phone",
   dbViewer: "/db-viewer",
+  tokens: "/tokens",
   mobile: {
     home: "/",
     workorders: "/workorders",

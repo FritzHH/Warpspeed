@@ -9,11 +9,7 @@ import {
   Dialog,
 } from "../../../dom_components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../styles";
-import {
-  gray,
-  lightenRGBByPercent,
-  localStorageWrapper,
-} from "../../../utils";
+import { lightenRGBByPercent, localStorageWrapper } from "../../../utils";
 import { useSettingsStore, useAlertScreenStore } from "../../../stores";
 import { dbSavePrintObj } from "../../../db_calls_wrapper";
 import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
@@ -244,15 +240,15 @@ function FieldPalette({ fields, onAddField, onRemoveField }) {
             }}
             className={styles.fieldPaletteItem}
             style={{
-              backgroundColor: isOnCanvas ? gray(0.92) : C.buttonLightGreen,
-              borderColor: isOnCanvas ? gray(0.8) : C.buttonLightGreenOutline,
+              backgroundColor: isOnCanvas ? C.surfaceAlt : C.buttonLightGreen,
+              borderColor: isOnCanvas ? C.borderStrong : C.buttonLightGreenOutline,
               opacity: isOnCanvas ? 0.5 : 1,
               cursor: isOnCanvas ? "default" : "pointer",
             }}
           >
             <span
               className={styles.fieldPaletteItemLabel}
-              style={{ color: isOnCanvas ? gray(0.5) : C.text }}
+              style={{ color: isOnCanvas ? C.textMuted : C.text }}
             >
               {af.label}
             </span>
@@ -280,7 +276,7 @@ function PropertiesPanel({ field, onUpdate, onRemove, labelWidth }) {
       <div className={styles.propertiesEmpty}>
         <span
           className={styles.propertiesEmptyText}
-          style={{ color: gray(0.5) }}
+          style={{ color: C.textMuted }}
         >
           Select a field on the canvas to edit its properties
         </span>
@@ -305,11 +301,11 @@ function PropertiesPanel({ field, onUpdate, onRemove, labelWidth }) {
 
       {/* Position display */}
       <div className={styles.propertiesSection}>
-        <span className={styles.propertiesPositionLabel} style={{ color: gray(0.5) }}>Position</span>
+        <span className={styles.propertiesPositionLabel} style={{ color: C.textMuted }}>Position</span>
         <div className={styles.propertiesPositionRow}>
           <span className={styles.propertiesPositionValue} style={{ color: C.text }}>X: {field.x}  Y: {field.y}</span>
         </div>
-        <span className={styles.propertiesHint} style={{ color: gray(0.6) }}>Arrow keys to move (Shift = fine)</span>
+        <span className={styles.propertiesHint} style={{ color: C.textSecondary }}>Arrow keys to move (Shift = fine)</span>
       </div>
 
       {isBarcode ? (
@@ -372,7 +368,7 @@ function PropertiesPanel({ field, onUpdate, onRemove, labelWidth }) {
           </div>
 
           <div className={styles.alignSection}>
-            <span className={styles.alignLabel} style={{ color: gray(0.5) }}>Align</span>
+            <span className={styles.alignLabel} style={{ color: C.textMuted }}>Align</span>
             <div className={styles.alignRow}>
               {["left", "center", "right"].map((a) => {
                 let selected = (field.align || "center") === a;
@@ -382,7 +378,7 @@ function PropertiesPanel({ field, onUpdate, onRemove, labelWidth }) {
                     onClick={() => handleChange("align", a)}
                     className={styles.alignBtn}
                     style={{
-                      borderColor: selected ? C.blue : gray(0.8),
+                      borderColor: selected ? C.blue : C.borderStrong,
                       backgroundColor: selected ? lightenRGBByPercent(C.blue, 85) : "transparent",
                       marginRight: a !== "right" ? 4 : 0,
                     }}
@@ -420,7 +416,7 @@ function PropertiesPanel({ field, onUpdate, onRemove, labelWidth }) {
 function PropRow({ label, value, children }) {
   return (
     <div className={styles.propRow}>
-      <span className={styles.propRowLabel} style={{ color: gray(0.5) }}>{label}</span>
+      <span className={styles.propRowLabel} style={{ color: C.textMuted }}>{label}</span>
       <div className={styles.propRowValueRow}>
         {children}
         <span className={styles.propRowValue} style={{ color: C.text }}>{value}</span>
@@ -908,7 +904,7 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
               />
               <span
                 className={styles.quickPrintLabel}
-                style={{ color: isQuickPrint ? C.green : gray(0.5) }}
+                style={{ color: isQuickPrint ? C.green : C.textMuted }}
               >
                 Quick Print
               </span>
@@ -933,7 +929,7 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
               textStyle={{ fontSize: 18 }}
               enabled={sIsDirty && sFields.length > 0}
             />
-            <span className={styles.canvasInfoText} style={{ color: gray(0.5) }}>
+            <span className={styles.canvasInfoText} style={{ color: C.textMuted }}>
               {sLabelSize.name} - {sLabelSize.width} x {sLabelSize.height} dots
             </span>
             <div
@@ -945,14 +941,14 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
               style={{
                 width: canvasW,
                 height: canvasH,
-                borderColor: gray(0.3),
+                borderColor: C.borderStrong,
               }}
             >
               {/* Printer margin guides */}
-              <div className={styles.marginGuideV} style={{ left: 30 * scale, borderLeftColor: gray(0.7) }} />
-              <div className={styles.marginGuideV} style={{ right: 30 * scale, left: "auto", borderLeftColor: gray(0.7) }} />
-              <div className={styles.marginGuideH} style={{ top: 20 * scale, borderTopColor: gray(0.7) }} />
-              <div className={styles.marginGuideH} style={{ bottom: 20 * scale, top: "auto", borderTopColor: gray(0.7) }} />
+              <div className={styles.marginGuideV} style={{ left: 30 * scale, borderLeftColor: C.borderStrong }} />
+              <div className={styles.marginGuideV} style={{ right: 30 * scale, left: "auto", borderLeftColor: C.borderStrong }} />
+              <div className={styles.marginGuideH} style={{ top: 20 * scale, borderTopColor: C.borderStrong }} />
+              <div className={styles.marginGuideH} style={{ bottom: 20 * scale, top: "auto", borderTopColor: C.borderStrong }} />
               {/* Vertical center line */}
               <div className={styles.centerLine} />
 
@@ -982,7 +978,7 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
         </div>
 
         {/* ─── Bottom Bar ─── */}
-        <div className={styles.bottomBar} style={{ borderTopColor: gray(0.85) }}>
+        <div className={styles.bottomBar} style={{ borderTopColor: C.borderStrong }}>
           <div className={styles.bottomBarInner}>
             <div className={styles.bottomBarLeft}>
               <Button

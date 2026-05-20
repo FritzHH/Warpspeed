@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: column;
   height: 100%;
-  background-color: rgb(254, 254, 254);
+  background-color: var(--surface-base);
   position: relative;
   box-sizing: border-box;
 }
@@ -15,10 +15,10 @@
   padding-right: 16px;
   padding-top: 12px;
   padding-bottom: 12px;
-  background-color: rgb(225, 244, 235);
+  background-color: var(--surface-success-muted);
   border-bottom-width: 1px;
   border-bottom-style: solid;
-  border-bottom-color: rgb(200, 228, 220);
+  border-bottom-color: var(--border-default);
   flex-shrink: 0;
 }
 
@@ -35,7 +35,7 @@
   font-size: 17px;
   margin-left: 8px;
   font-weight: 500;
-  color: rgb(71, 71, 71);
+  color: var(--text-default);
 }
 
 .scroll {
@@ -65,11 +65,11 @@
 .totalLabel {
   font-size: 17px;
   font-weight: 600;
-  color: rgb(71, 71, 71);
+  color: var(--text-default);
 }
 
 .totalValue {
   font-size: 17px;
   font-weight: 700;
-  color: rgb(71, 71, 71);
+  color: var(--text-default);
 }

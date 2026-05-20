@@ -1,6 +1,6 @@
 import React, { forwardRef } from "react";
 import { C } from "../../styles";
-import { gray, lightenRGBByPercent, formatCurrencyDisp, formatMillisForDisplay } from "../../utils";
+import { lightenRGBByPercent, formatCurrencyDisp, formatMillisForDisplay } from "../../utils";
 import { useAlertScreenStore } from "../../stores";
 import styles from "./DepositsList.module.css";
 
@@ -34,7 +34,7 @@ export const DepositsList = forwardRef(function DepositsList(
         Deposits / Credits / Gift Cards
       </span>
       {allItems.length === 0 && (
-        <span className={styles.empty} style={{ color: gray(0.4) }}>
+        <span className={styles.empty} style={{ color: C.textMuted }}>
           No deposits, credits, or gift cards on file
         </span>
       )}
@@ -74,12 +74,12 @@ export const DepositsList = forwardRef(function DepositsList(
                   {isGiftCard ? "Gift Card" : isCredit ? "Credit" : "Deposit"}
                 </span>
                 {!!noteText && (
-                  <span className={styles.noteText} style={{ color: gray(0.5) }}>
+                  <span className={styles.noteText} style={{ color: C.textMuted }}>
                     {noteText}
                   </span>
                 )}
               </div>
-              <span className={styles.dateText} style={{ color: gray(0.4) }}>
+              <span className={styles.dateText} style={{ color: C.textMuted }}>
                 {formatMillisForDisplay(item.millis)}
               </span>
             </div>

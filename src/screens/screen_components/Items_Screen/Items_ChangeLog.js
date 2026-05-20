@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { gray, deepEqual } from "../../../utils";
+import { deepEqual } from "../../../utils";
 import { C, Fonts } from "../../../styles";
 import { useOpenWorkordersStore } from "../../../stores";
 import styles from "./Items_ChangeLog.module.css";
@@ -63,10 +63,10 @@ function ChangeLogRow({ entry, index }) {
     <div
       className={styles.row}
       style={{
-        backgroundColor: index % 2 === 0 ? C.listItemWhite : gray(0.06),
+        backgroundColor: index % 2 === 0 ? C.listItemWhite : C.surfaceAlt,
       }}
     >
-      <div className={styles.timeCell} style={{ color: gray(0.45) }}>
+      <div className={styles.timeCell} style={{ color: C.textMuted }}>
         {formatTimestamp(entry.timestamp)}
       </div>
       <div className={styles.changeCell} style={{ color: C.text }}>
@@ -93,7 +93,7 @@ export function Items_ChangeLog() {
   if (sorted.length === 0) {
     return (
       <div className={styles.emptyWrap}>
-        <div className={styles.emptyText} style={{ color: gray(0.5) }}>
+        <div className={styles.emptyText} style={{ color: C.textMuted }}>
           No changes recorded
         </div>
       </div>
@@ -110,7 +110,7 @@ export function Items_ChangeLog() {
           borderBottomColor: C.buttonLightGreenOutline,
         }}
       >
-        <div className={styles.headerLabel} style={{ color: gray(0.5) }}>
+        <div className={styles.headerLabel} style={{ color: C.textMuted }}>
           {"Started: "}
           <span
             className={styles.headerValue}
@@ -137,13 +137,13 @@ export function Items_ChangeLog() {
       >
         <div
           className={styles.colTime}
-          style={{ color: gray(0.45), fontWeight: Fonts.weight.textHeavy }}
+          style={{ color: C.textMuted, fontWeight: Fonts.weight.textHeavy }}
         >
           Time
         </div>
         <div
           className={styles.colChange}
-          style={{ color: gray(0.45), fontWeight: Fonts.weight.textHeavy }}
+          style={{ color: C.textMuted, fontWeight: Fonts.weight.textHeavy }}
         >
           Change
         </div>

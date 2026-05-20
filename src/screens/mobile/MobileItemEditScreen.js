@@ -1,24 +1,10 @@
 /* eslint-disable */
-import React, { useState, useEffect, useRef } from "react";
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  FlatList,
-} from "react-native-web";
+import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import cloneDeep from "lodash/cloneDeep";
-import { TextInput_, Button_, DropdownMenu, Image_ } from "../../components";
+import { TextInput, Button, DropdownMenu, Image } from "../../dom_components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
-import {
-  formatCurrencyDisp,
-  calculateRunningTotals,
-  applyDiscountToWorkorderItem,
-  replaceOrAddToArr,
-  gray,
-  log,
-} from "../../utils";
+import { formatCurrencyDisp, calculateRunningTotals, applyDiscountToWorkorderItem, replaceOrAddToArr } from "../../utils";
 import { workerSearchInventory } from "../../inventorySearchManager";
 import {
   useOpenWorkordersStore,
@@ -26,6 +12,7 @@ import {
   useSettingsStore,
 } from "../../stores";
 import { WORKORDER_ITEM_PROTO } from "../../data";
+import styles from "./MobileItemEditScreen.module.css";
 
 export function MobileItemEditScreen() {
   const { id } = useParams();
@@ -50,7 +37,6 @@ export function MobileItemEditScreen() {
     finalTotal: 0,
   });
 
-  // Recalculate running totals when workorder lines change
   useEffect(() => {
     if (!zWorkorder) return;
     const totals = calculateRunningTotals(
@@ -65,13 +51,11 @@ export function MobileItemEditScreen() {
 
   if (!zWorkorder) {
     return (
-      <View
-        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
-      >
-        <Text style={{ color: C.lightText, fontSize: 16 }}>
+      <div className={styles.notFound}>
+        <span className={styles.notFoundText} style={{ color: C.lightText }}>
           Workorder not found
-        </Text>
-      </View>
+        </span>
+      </div>
     );
   }
 
@@ -197,22 +181,20 @@ export function MobileItemEditScreen() {
   // Render
   //////////////////////////////////////////////////////////////
   return (
-    <View style={{ flex: 1, backgroundColor: C.backgroundWhite }}>
+    <div className={styles.root} style={{ backgroundColor: C.backgroundWhite }}>
       {/* Search bar */}
-      <View
+      <div
+        className={styles.searchBar}
         style={{
-          paddingHorizontal: 16,
-          paddingVertical: 10,
           backgroundColor: C.buttonLightGreen,
-          borderBottomWidth: 1,
           borderBottomColor: C.buttonLightGreenOutline,
         }}
       >
         {sShowSearch ? (
-          <View>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <View style={{ flex: 1 }}>
-                <TextInput_
+          <div>
+            <div className={styles.searchRow}>
+              <div className={styles.searchInputWrap}>
+                <TextInput
                   placeholder="Search inventory..."
                   value={sSearchText}
                   onChangeText={handleSearch}
@@ -228,80 +210,65 @@ export function MobileItemEditScreen() {
                     backgroundColor: C.listItemWhite,
                     outlineWidth: 0,
                   }}
-                  debounceMS={200}
+                  debounceMs={200}
                 />
-              </View>
-              <TouchableOpacity
-                onPress={() => {
+              </div>
+              <button
+                type="button"
+                className={styles.cancelBtn}
+                onClick={() => {
                   _setShowSearch(false);
                   _setSearchText("");
                   _setSearchResults([]);
                 }}
-                style={{ marginLeft: 10, paddingVertical: 8 }}
               >
-                <Text
-                  style={{ color: C.red, fontSize: 15, fontWeight: "500" }}
-                >
+                <span className={styles.cancelText} style={{ color: C.red }}>
                   Cancel
-                </Text>
-              </TouchableOpacity>
-            </View>
+                </span>
+              </button>
+            </div>
 
             {/* Search results */}
             {sSearchResults.length > 0 && (
-              <View
+              <div
+                className={styles.resultsBox}
                 style={{
-                  marginTop: 8,
-                  maxHeight: 250,
                   backgroundColor: C.listItemWhite,
-                  borderRadius: 8,
-                  borderWidth: 1,
-                  borderColor: gray(0.85),
+                  borderColor: C.borderStrong,
                 }}
               >
-                <ScrollView>
+                <div className={styles.resultsScroll}>
                   {sSearchResults.map((item, idx) => (
-                    <TouchableOpacity
+                    <button
+                      type="button"
                       key={item.id || idx}
-                      onPress={() => addItem(item)}
+                      onClick={() => addItem(item)}
+                      className={styles.resultRow}
                       style={{
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        paddingVertical: 12,
-                        paddingHorizontal: 14,
-                        borderTopWidth: idx > 0 ? 1 : 0,
-                        borderTopColor: gray(0.92),
+                        borderTop:
+                          idx > 0 ? `1px solid ${C.borderStrong}` : "none",
                       }}
                     >
-                      <Text
-                        numberOfLines={1}
-                        style={{
-                          fontSize: 15,
-                          color: C.text,
-                          flex: 1,
-                          marginRight: 10,
-                        }}
+                      <span
+                        className={styles.resultName}
+                        style={{ color: C.text }}
                       >
                         {item.formalName || item.informalName || "Unknown"}
-                      </Text>
-                      <Text
-                        style={{
-                          fontSize: 14,
-                          color: C.green,
-                          fontWeight: "500",
-                        }}
+                      </span>
+                      <span
+                        className={styles.resultPrice}
+                        style={{ color: C.green }}
                       >
                         ${formatCurrencyDisp(item.price)}
-                      </Text>
-                    </TouchableOpacity>
+                      </span>
+                    </button>
                   ))}
-                </ScrollView>
-              </View>
+                </div>
+              </div>
             )}
-          </View>
+          </div>
         ) : (
-          <Button_
+          <Button
             text="Add Item"
             icon={ICONS.new}
             iconSize={20}
@@ -314,26 +281,17 @@ export function MobileItemEditScreen() {
             textStyle={{ fontSize: 16, fontWeight: "500" }}
           />
         )}
-      </View>
+      </div>
 
       {/* Current items list */}
-      <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 12 }}
-      >
+      <div className={styles.itemsScroll}>
         {(!zWorkorder.workorderLines ||
           zWorkorder.workorderLines.length === 0) && (
-          <View
-            style={{
-              justifyContent: "center",
-              alignItems: "center",
-              paddingVertical: 40,
-            }}
-          >
-            <Text style={{ fontSize: 15, color: C.lightText }}>
+          <div className={styles.empty}>
+            <span className={styles.emptyText} style={{ color: C.lightText }}>
               No items added yet
-            </Text>
-          </View>
+            </span>
+          </div>
         )}
 
         {zWorkorder.workorderLines?.map((line, idx) => {
@@ -344,70 +302,39 @@ export function MobileItemEditScreen() {
             : (unitPrice || 0) * (line.qty || 1);
 
           return (
-            <View
+            <div
               key={line.id || idx}
+              className={styles.lineCard}
               style={{
-                backgroundColor: idx % 2 === 0 ? C.listItemWhite : gray(0.97),
-                borderRadius: 10,
-                padding: 14,
-                marginBottom: 8,
-                borderWidth: 1,
-                borderColor: gray(0.9),
+                backgroundColor: idx % 2 === 0 ? C.listItemWhite : C.surfaceAlt,
+                borderColor: C.borderStrong,
               }}
             >
               {/* Item name + price */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  marginBottom: 8,
-                }}
-              >
-                <Text
-                  numberOfLines={2}
-                  style={{
-                    fontSize: 15,
-                    fontWeight: "500",
-                    color: C.text,
-                    flex: 1,
-                    marginRight: 8,
-                  }}
-                >
+              <div className={styles.nameRow}>
+                <span className={styles.itemName} style={{ color: C.text }}>
                   {item?.formalName || "Unknown Item"}
-                </Text>
-                <Text
-                  style={{
-                    fontSize: 15,
-                    fontWeight: "600",
-                    color: C.text,
-                  }}
-                >
+                </span>
+                <span className={styles.itemTotal} style={{ color: C.text }}>
                   ${formatCurrencyDisp(lineTotal)}
-                </Text>
-              </View>
+                </span>
+              </div>
 
               {/* Unit price if qty > 1 */}
               {line.qty > 1 && (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: C.lightText,
-                    marginBottom: 6,
-                  }}
+                <span
+                  className={styles.unitPrice}
+                  style={{ color: C.lightText }}
                 >
                   ${formatCurrencyDisp(unitPrice)} each
-                </Text>
+                </span>
               )}
 
               {/* Discount display */}
               {!!line.discountObj?.name && (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: C.lightred,
-                    marginBottom: 6,
-                  }}
+                <span
+                  className={styles.discountText}
+                  style={{ color: C.lightred }}
                 >
                   {line.discountObj.name}
                   {line.discountObj.savings
@@ -415,144 +342,78 @@ export function MobileItemEditScreen() {
                       formatCurrencyDisp(line.discountObj.savings) +
                       ")"
                     : ""}
-                </Text>
+                </span>
               )}
 
               {/* Intake notes */}
               {!!line.intakeNotes && (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: "orange",
-                    marginBottom: 6,
-                  }}
+                <span
+                  className={styles.intakeText}
+                  style={{ color: "orange" }}
                 >
                   {line.intakeNotes}
-                </Text>
+                </span>
               )}
 
               {/* Receipt notes */}
               {!!line.receiptNotes && (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: C.green,
-                    marginBottom: 6,
-                  }}
+                <span
+                  className={styles.receiptText}
+                  style={{ color: C.green }}
                 >
                   {line.receiptNotes}
-                </Text>
+                </span>
               )}
 
               {/* Qty row */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  marginBottom: 8,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: C.lightText,
-                    marginRight: 10,
-                  }}
-                >
+              <div className={styles.qtyRow}>
+                <span className={styles.qtyLabel} style={{ color: C.lightText }}>
                   Qty
-                </Text>
-                <TouchableOpacity
-                  onPress={() => modifyQty(line, "down")}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => modifyQty(line, "down")}
+                  className={styles.qtyBtn}
                   style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 6,
-                    backgroundColor: line.qty <= 1 ? gray(0.85) : C.blue,
-                    justifyContent: "center",
-                    alignItems: "center",
+                    backgroundColor: line.qty <= 1 ? C.surfaceAlt : C.blue,
                   }}
                 >
-                  <Text
-                    style={{
-                      color: "white",
-                      fontSize: 18,
-                      fontWeight: "700",
-                    }}
-                  >
-                    −
-                  </Text>
-                </TouchableOpacity>
-                <Text
-                  style={{
-                    fontSize: 17,
-                    fontWeight: "600",
-                    color: C.text,
-                    minWidth: 40,
-                    textAlign: "center",
-                  }}
-                >
+                  <span className={styles.qtyBtnText}>−</span>
+                </button>
+                <span className={styles.qtyValue} style={{ color: C.text }}>
                   {line.qty}
-                </Text>
-                <TouchableOpacity
-                  onPress={() => modifyQty(line, "up")}
-                  style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: 6,
-                    backgroundColor: C.blue,
-                    justifyContent: "center",
-                    alignItems: "center",
-                  }}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => modifyQty(line, "up")}
+                  className={styles.qtyBtn}
+                  style={{ backgroundColor: C.blue }}
                 >
-                  <Text
-                    style={{
-                      color: "white",
-                      fontSize: 18,
-                      fontWeight: "700",
-                    }}
-                  >
-                    +
-                  </Text>
-                </TouchableOpacity>
-              </View>
+                  <span className={styles.qtyBtnText}>+</span>
+                </button>
+              </div>
 
               {/* Actions row: Split + Discount + Remove */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                }}
-              >
+              <div className={styles.actionsRow}>
                 {/* Split button — only if qty > 1 */}
                 {line.qty > 1 && (
-                  <TouchableOpacity
-                    onPress={() => splitItem(line, idx)}
+                  <button
+                    type="button"
+                    onClick={() => splitItem(line, idx)}
+                    className={styles.splitBtn}
                     style={{
-                      flexDirection: "row",
-                      alignItems: "center",
                       backgroundColor: C.buttonLightGreen,
                       borderColor: C.buttonLightGreenOutline,
-                      borderWidth: 1,
-                      borderRadius: 6,
-                      paddingVertical: 6,
-                      paddingHorizontal: 10,
-                      marginRight: 8,
                     }}
                   >
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        color: C.text,
-                        fontWeight: "500",
-                      }}
-                    >
+                    <span className={styles.splitText} style={{ color: C.text }}>
                       Split
-                    </Text>
-                  </TouchableOpacity>
+                    </span>
+                  </button>
                 )}
 
                 {/* Discount dropdown */}
-                <View style={{ marginRight: 8 }}>
+                <div className={styles.discountWrap}>
                   <DropdownMenu
                     buttonText="Discount"
                     buttonStyle={{
@@ -585,81 +446,58 @@ export function MobileItemEditScreen() {
                       }
                     }}
                   />
-                </View>
+                </div>
 
                 {/* Remove button */}
-                <TouchableOpacity
-                  onPress={() => deleteItem(idx)}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    backgroundColor: C.lightred,
-                    borderRadius: 6,
-                    paddingVertical: 6,
-                    paddingHorizontal: 10,
-                    marginLeft: "auto",
-                  }}
+                <button
+                  type="button"
+                  onClick={() => deleteItem(idx)}
+                  className={styles.removeBtn}
+                  style={{ backgroundColor: C.lightred }}
                 >
-                  <Image_ icon={ICONS.trash} size={16} />
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      color: "white",
-                      fontWeight: "500",
-                      marginLeft: 4,
-                    }}
-                  >
-                    Remove
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
+                  <Image icon={ICONS.trash} size={16} />
+                  <span className={styles.removeText}>Remove</span>
+                </button>
+              </div>
+            </div>
           );
         })}
 
         {/* Bottom spacer for totals bar */}
-        <View style={{ height: 80 }} />
-      </ScrollView>
+        <div className={styles.bottomSpacer} />
+      </div>
 
       {/* Bottom totals bar */}
-      <View
+      <div
+        className={styles.totalsBar}
         style={{
           backgroundColor: C.buttonLightGreen,
-          borderTopWidth: 1,
           borderTopColor: C.buttonLightGreenOutline,
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
         }}
       >
-        <View>
-          <Text style={{ fontSize: 12, color: C.lightText }}>
+        <div className={styles.totalsLeft}>
+          <span className={styles.totalsSmall} style={{ color: C.lightText }}>
             {sTotals.runningQty} item{sTotals.runningQty !== 1 ? "s" : ""}
-          </Text>
+          </span>
           {sTotals.runningDiscount > 0 && (
-            <Text style={{ fontSize: 12, color: C.lightred }}>
+            <span
+              className={styles.totalsDiscount}
+              style={{ color: C.lightred }}
+            >
               Disc: -${formatCurrencyDisp(sTotals.runningDiscount)}
-            </Text>
+            </span>
           )}
-        </View>
-        <View style={{ alignItems: "flex-end" }}>
-          <Text style={{ fontSize: 12, color: C.lightText }}>
+        </div>
+        <div className={styles.totalsRight}>
+          <span className={styles.totalsSmall} style={{ color: C.lightText }}>
             Sub: ${formatCurrencyDisp(sTotals.runningTotal)} + Tax: $
             {formatCurrencyDisp(sTotals.runningTax)}
-          </Text>
-          <Text
-            style={{
-              fontSize: 18,
-              fontWeight: "700",
-              color: C.text,
-            }}
-          >
+          </span>
+          <span className={styles.totalsFinal} style={{ color: C.text }}>
             ${formatCurrencyDisp(sTotals.finalTotal)}
-          </Text>
-        </View>
-      </View>
-    </View>
+          </span>
+        </div>
+      </div>
+    </div>
   );
 }

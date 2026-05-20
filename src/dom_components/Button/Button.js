@@ -31,6 +31,8 @@ export const Button = forwardRef(function Button(
     enabled = true,
     // Additive props
     className = "",
+    innerClassName = "",
+    textClassName = "",
     "aria-label": ariaLabel,
     "data-testid": testId,
   },
@@ -87,15 +89,20 @@ export const Button = forwardRef(function Button(
   const paddingH = buttonStyle.paddingHorizontal;
   const paddingV = buttonStyle.paddingVertical;
 
+  // When innerClassName is supplied, defer all padding to that CSS class so it
+  // isn't overridden by inline style defaults.
+  const hasInnerClass = !!innerClassName;
   const innerStyle = {
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
     borderRadius: 5,
-    paddingLeft: icon ? 10 : (paddingH != null ? paddingH : 15),
-    paddingRight: paddingH != null ? paddingH : 15,
-    paddingTop: paddingV != null ? paddingV : 5,
-    paddingBottom: paddingV != null ? paddingV : 5,
+    ...(hasInnerClass ? {} : {
+      paddingLeft: icon ? 10 : (paddingH != null ? paddingH : 15),
+      paddingRight: paddingH != null ? paddingH : 15,
+      paddingTop: paddingV != null ? paddingV : 5,
+      paddingBottom: paddingV != null ? paddingV : 5,
+    }),
     ...shadowStyle,
     ...buttonStyle,
     background: gradient || undefined,
@@ -183,7 +190,7 @@ export const Button = forwardRef(function Button(
           }
         }}
       >
-        <div className={styles.inner} style={innerStyle}>
+        <div className={`${styles.inner} ${innerClassName}`} style={innerStyle}>
           {!!icon && (
             <img
               src={resolveIcon(icon)}
@@ -203,7 +210,7 @@ export const Button = forwardRef(function Button(
             <TextComponent />
           ) : (
             <span
-              className={styles.text}
+              className={`${styles.text} ${textClassName}`}
               style={{
                 textAlign: "center",
                 fontSize: 15,

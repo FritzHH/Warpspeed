@@ -7,7 +7,7 @@
 }
 
 .touchable:focus-visible {
-  outline: 2px solid #007bff;
+  outline: 2px solid var(--border-focus);
   outline-offset: 2px;
 }
 
@@ -25,7 +25,7 @@
 .text {
   text-align: center;
   font-size: 15px;
-  color: white;
+  color: var(--text-on-accent);
 }
 
 .icon {

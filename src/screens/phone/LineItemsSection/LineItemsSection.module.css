@@ -1,9 +1,9 @@
 .card {
-  background-color: rgb(254, 254, 255);
+  background-color: var(--surface-raised);
   border-radius: 10px;
   border-width: 1px;
   border-style: solid;
-  border-color: rgb(200, 228, 220);
+  border-color: var(--border-default);
   padding: 12px;
   margin-bottom: 12px;
   box-sizing: border-box;
@@ -20,7 +20,7 @@
 .headerLabel {
   font-size: 14px;
   font-weight: 600;
-  color: rgb(140, 140, 140);
+  color: var(--text-muted);
 }
 
 .addBtn {
@@ -35,7 +35,7 @@
 .lineRowDivider {
   border-bottom-width: 1px;
   border-bottom-style: solid;
-  border-bottom-color: rgb(230, 230, 230);
+  border-bottom-color: var(--border-subtle);
 }
 
 .lineTop {
@@ -62,12 +62,12 @@
 
 .lineQty {
   font-size: 13px;
-  color: rgb(128, 128, 128);
+  color: var(--text-muted);
 }
 
 .lineDiscount {
   font-size: 12px;
-  color: rgb(232, 95, 95);
+  color: var(--danger);
 }
 
 .linePriceCol {
@@ -79,12 +79,12 @@
 
 .unitPrice {
   font-size: 12px;
-  color: rgb(128, 128, 128);
+  color: var(--text-muted);
 }
 
 .unitPriceStrike {
   font-size: 12px;
-  color: rgb(128, 128, 128);
+  color: var(--text-muted);
   text-decoration: line-through;
 }
 
@@ -143,5 +143,5 @@
 
 .emptyText {
   font-size: 15px;
-  color: rgb(128, 128, 128);
+  color: var(--text-muted);
 }

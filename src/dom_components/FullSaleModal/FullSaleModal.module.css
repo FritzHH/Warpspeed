@@ -1,0 +1,629 @@
+/* ── Main modal shell ── */
+.card {
+  width: 60%;
+  max-width: 800px;
+  height: 85%;
+  background-color: var(--card-bg);
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* ── Header ── */
+.header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--header-bg);
+  flex-shrink: 0;
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.headerRight {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.saleIdText {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.importBadge {
+  background-color: var(--import-bg);
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: 8px;
+}
+
+.importBadgeText {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--import-color);
+}
+
+/* ── Sale View Banner ── */
+.banner {
+  background-color: var(--banner-bg);
+  padding: 8px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bannerTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--banner-color);
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+.bannerSubtitle {
+  font-size: 11px;
+  color: var(--banner-color);
+  margin-top: 2px;
+  text-align: center;
+  opacity: 0.7;
+}
+
+/* ── Date Banner ── */
+.dateBanner {
+  padding: 8px 20px;
+  background-color: var(--surface-alt);
+  flex-shrink: 0;
+}
+
+.dateText {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* ── Body (two columns) ── */
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  padding: 20px;
+  min-height: 0;
+}
+
+.colLeft {
+  flex: 1;
+  padding-right: 20px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.colRight {
+  flex: 1;
+  padding-left: 15px;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.divider {
+  width: 1px;
+  background-color: var(--border-subtle);
+  margin: 0 5px;
+  flex-shrink: 0;
+}
+
+/* ── Totals box ── */
+.totalsBox {
+  border-radius: 7px;
+  border: 1px solid var(--totals-border);
+  background-color: var(--list-item-bg);
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.totalsDivider {
+  height: 1px;
+  background-color: var(--border-default);
+  margin: 6px 0;
+}
+
+/* ── TotalRow ── */
+.totalRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.totalRowLabel {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.totalRowLabelBold {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.totalRowValue {
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.totalRowValueBold {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+/* ── Amount info rows ── */
+.amountInfo {
+  margin-bottom: 8px;
+}
+
+.amountRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.amountLabel {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.amountValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--amount-color);
+}
+
+/* ── SectionHeader ── */
+.sectionHeader {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin: 14px 0 6px 0;
+  letter-spacing: 0.5px;
+  display: block;
+}
+
+/* ── DetailRow ── */
+.detailRow {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 5px;
+}
+
+.detailLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  width: 70px;
+  flex-shrink: 0;
+}
+
+.detailValue {
+  font-size: 12px;
+  flex: 1;
+}
+
+/* ── Payments ── */
+.paymentCard {
+  margin-bottom: 8px;
+  border-radius: 7px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--list-item-bg);
+  padding: 10px 12px;
+}
+
+.paymentTopRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.paymentMethod {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.paymentAmount {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.paymentTimestamp {
+  font-size: 10px;
+  color: var(--text-disabled);
+  margin-top: 2px;
+}
+
+.paymentDetailLine {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.paymentAuthLine {
+  font-size: 10px;
+  color: var(--text-disabled);
+}
+
+.paymentCashTendered {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.paymentRefundedLine {
+  font-size: 11px;
+  margin-top: 2px;
+  color: var(--refund-color);
+}
+
+.emptyHint {
+  font-size: 12px;
+  color: var(--text-disabled);
+  font-style: italic;
+  margin-top: 8px;
+  display: block;
+}
+
+/* ── Credits ── */
+.creditCard {
+  margin-bottom: 4px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--list-item-bg);
+  padding: 8px;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  display: block;
+}
+
+.creditTopRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.creditType {
+  font-size: 12px;
+  color: var(--credit-color);
+}
+
+.creditAmount {
+  font-size: 12px;
+}
+
+.creditId {
+  font-size: 10px;
+  color: var(--text-disabled);
+  margin-top: 2px;
+}
+
+/* ── Refunds ── */
+.refundTotalsRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.refundTotalsLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--refund-color);
+}
+
+.refundTotalsValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--refund-color);
+}
+
+.refundCard {
+  margin-bottom: 4px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--list-item-bg);
+  padding: 8px;
+}
+
+.refundTopRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.refundMethod {
+  font-size: 12px;
+  color: var(--refund-color);
+}
+
+.refundAmount {
+  font-size: 12px;
+  color: var(--refund-color);
+}
+
+.refundNotes {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ── Footer ── */
+.footer {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 10px 20px;
+  border-top: 1px solid var(--border-subtle);
+  background-color: var(--header-bg);
+  flex-shrink: 0;
+}
+
+/* ── Workorder card ── */
+.workorderBtn {
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: block;
+}
+
+.workorderCard {
+  margin-bottom: 10px;
+  border-radius: 7px;
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--wo-status-color);
+  background-color: var(--list-item-bg);
+  padding: 10px;
+}
+
+.workorderHeader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.workorderTitle {
+  font-size: 13px;
+  font-weight: 600;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.statusBadge {
+  background-color: var(--badge-bg);
+  padding: 2px 8px;
+  border-radius: 8px;
+  margin-left: 6px;
+  flex-shrink: 0;
+}
+
+.statusBadgeText {
+  color: var(--badge-color);
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.colorRow {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 6px;
+}
+
+.colorBadge {
+  background-color: var(--badge-bg);
+  padding: 2px 8px;
+  border-radius: 8px;
+  margin-right: 4px;
+}
+
+.colorBadgeText {
+  font-size: 9px;
+  color: var(--badge-color);
+}
+
+.workorderDate {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+  display: block;
+}
+
+.taxFreeBadge {
+  background-color: var(--badge-bg);
+  padding: 2px 8px;
+  border-radius: 6px;
+  align-self: flex-start;
+  margin-bottom: 4px;
+  display: inline-block;
+}
+
+.taxFreeBadgeText {
+  font-size: 9px;
+  font-weight: 600;
+  color: var(--badge-color);
+}
+
+.lineItemsBlock {
+  margin-top: 6px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 6px;
+}
+
+.lineItemSubtotalRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.lineItemSubtotalLabel {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.lineItemSubtotalValue {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* ── Line item row ── */
+.lineItemRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 3px;
+}
+
+.lineItemName {
+  font-size: 11px;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lineItemRight {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.lineItemDiscount {
+  font-size: 10px;
+  color: var(--discount-color);
+  margin-right: 6px;
+}
+
+.lineItemPrice {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* ── Loading / error inner ── */
+.loadingCard {
+  width: 300px;
+  background-color: var(--card-bg);
+  border-radius: 15px;
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.loadingText {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin-top: 12px;
+}
+
+.errorText {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--error-color);
+  margin-bottom: 15px;
+}
+
+.workordersLoadingBlock {
+  padding: 15px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.workordersLoadingText {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+/* ── Credit detail modal ── */
+.creditDetailCard {
+  width: 35%;
+  max-width: 420px;
+  background-color: var(--card-bg);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.creditDetailHeader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--header-bg);
+}
+
+.creditDetailBadge {
+  background-color: var(--badge-bg);
+  padding: 4px 14px;
+  border-radius: 10px;
+}
+
+.creditDetailBadgeText {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--badge-color);
+}
+
+.creditDetailBody {
+  padding: 20px;
+}
+
+.creditDetailAmountBox {
+  border-radius: 7px;
+  border: 1px solid var(--totals-border);
+  background-color: var(--list-item-bg);
+  padding: 12px;
+}
+
+.creditDetailAmountRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.creditDetailAmountLabel {
+  font-size: 15px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.creditDetailAmountValue {
+  font-size: 17px;
+  font-weight: 700;
+}

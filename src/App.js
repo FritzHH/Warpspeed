@@ -3,7 +3,7 @@ import React, { useState, useEffect, Suspense, lazy } from "react";
 import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { BaseScreen } from "./screens/BaseScreen";
 import { LoginScreen } from "./screens/LoginScreen";
-import { ProtectedRoute } from "./components";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import { CustomerDisplayScreen } from "./screens/CustomerDisplayScreen";
 import { TranslateScreen } from "./screens/TranslateScreen";
@@ -16,13 +16,14 @@ const BikeStandScreen = lazy(() =>
 import { PhoneScreen } from "./screens/phone/PhoneScreen";
 import { HomeScreen } from "./screens/HomeScreen";
 import { DatabaseViewerScreen } from "./screens/DatabaseViewerScreen";
+import { TokensScreen } from "./screens/TokensScreen";
 import {
   onAuthStateChange,
   loadTenantAndSettings,
   dbLogout,
 } from "./db_calls_wrapper";
-import { log, gray } from "./utils";
-import { View } from "react-native-web";
+import { log } from "./utils";
+import { C } from "./styles";
 import { useLayoutStore, useSettingsStore, useLoginStore } from "./stores";
 import { ROUTES } from "./routes";
 import { topUpPool } from "./idPool";
@@ -100,14 +101,14 @@ function PhoneScreenWrapper() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: gray(0.12),
+        backgroundColor: C.surfaceAlt,
       }}>
         <div style={{
           height: "90vh",
           aspectRatio: "9 / 19.5",
           borderRadius: 40,
           overflow: "hidden",
-          border: "6px solid " + gray(0.2),
+          border: "6px solid " + C.borderSubtle,
           backgroundColor: "white",
           display: "flex",
           boxShadow: "0 8px 30px rgba(0,0,0,0.2)",
@@ -137,14 +138,14 @@ function BikeStandScreenWrapper() {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: gray(0.12),
+        backgroundColor: C.surfaceAlt,
       }}>
         <div style={{
           height: "90vh",
           aspectRatio: "3 / 4",
           borderRadius: 16,
           overflow: "hidden",
-          border: "2px solid " + gray(0.25),
+          border: "2px solid " + C.borderSubtle,
           backgroundColor: "white",
           display: "flex",
         }}>
@@ -297,6 +298,16 @@ function App() {
 
         {/* Database Viewer */}
         <Route path={ROUTES.dbViewer} element={<DatabaseViewerScreen />} />
+
+        {/* Protected route - Design Tokens (admin-gated inside the screen) */}
+        <Route
+          path={ROUTES.tokens}
+          element={
+            <ProtectedRoute user={user}>
+              <TokensScreen />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Public route - Customer Display */}
         <Route path={ROUTES.display} element={<CustomerDisplayScreen />} />

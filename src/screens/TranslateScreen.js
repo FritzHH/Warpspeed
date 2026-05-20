@@ -1,35 +1,24 @@
 /* eslint-disable */
-import { View, Text } from "react-native-web";
 import { useState, useEffect } from "react";
 import { onTranslateMessage, TRANSLATE_MSG_TYPES } from "../broadcastChannel";
 import { C, Fonts } from "../styles";
-import { gray } from "../utils";
 import logo from "../resources/default_app_logo_large.png";
+import styles from "./TranslateScreen.module.css";
 
 function IdleScreen() {
   return (
-    <View
-      style={{
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <img
-        src={logo}
-        alt="logo"
-        style={{ width: 120, height: 120, opacity: 0.3, marginBottom: 20 }}
-      />
-      <Text
+    <div className={styles.idleWrap}>
+      <img src={logo} alt="logo" className={styles.idleLogo} />
+      <p
+        className={styles.idleText}
         style={{
-          fontSize: 22,
-          color: gray(0.55),
+          color: C.textMuted,
           fontWeight: Fonts.weight.textRegular,
         }}
       >
         Translation Display
-      </Text>
-    </View>
+      </p>
+    </div>
   );
 }
 
@@ -55,40 +44,20 @@ export function TranslateScreen() {
 
   if (!sTranslatedText) {
     return (
-      <View
-        style={{
-          flex: 1,
-          backgroundColor: C.backgroundWhite,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
-      >
+      <div className={styles.screenRoot}>
         <IdleScreen />
-      </View>
+      </div>
     );
   }
 
   return (
-    <View
-      style={{
-        flex: 1,
-        backgroundColor: C.backgroundWhite,
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 40,
-      }}
-    >
-      <Text
-        style={{
-          fontSize: 48,
-          color: C.text,
-          fontWeight: Fonts.weight.textHeavy,
-          textAlign: "center",
-          lineHeight: 64,
-        }}
+    <div className={styles.screenRootActive}>
+      <p
+        className={styles.translatedText}
+        style={{ fontWeight: Fonts.weight.textHeavy }}
       >
         {sTranslatedText}
-      </Text>
-    </View>
+      </p>
+    </div>
   );
 }

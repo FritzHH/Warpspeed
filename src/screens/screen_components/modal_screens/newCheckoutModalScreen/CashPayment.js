@@ -1,17 +1,12 @@
 /* eslint-disable */
-import { View, Text, TextInput, Image } from "react-native-web";
 import { useState, useRef, memo } from "react";
-import { Button_, SHADOW_RADIUS_PROTO } from "../../../../components";
-import { CheckBox } from "../../../../dom_components";
-import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
-import {
-  usdTypeMask,
-  formatCurrencyDisp,
-  gray,
-} from "../../../../utils";
+import { Button, CheckBox, TextInput, Image } from "../../../../dom_components";
+import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
+import { usdTypeMask, formatCurrencyDisp } from "../../../../utils";
 import { buildCashTransaction } from "./newCheckoutUtils";
 import { takeId, getId } from "../../../../idPool";
 import { dlog, DCAT } from "./checkoutDebugLog";
+import styles from "./CashPayment.module.css";
 
 export const CashPayment = memo(function CashPayment({
   amountLeftToPay = 0,
@@ -38,7 +33,6 @@ export const CashPayment = memo(function CashPayment({
   const autoLoadedRef = useRef(false);
   const prevAmountRef = useRef(amountLeftToPay);
 
-  // Auto-load amountLeftToPay into pay amount on first availability
   if (amountLeftToPay > 0 && !autoLoadedRef.current && isVisible) {
     autoLoadedRef.current = true;
     prevAmountRef.current = amountLeftToPay;
@@ -49,7 +43,6 @@ export const CashPayment = memo(function CashPayment({
     }
   }
 
-  // Sync display when balance changes externally (other payment captured, card processing)
   if (autoLoadedRef.current && amountLeftToPay !== prevAmountRef.current) {
     prevAmountRef.current = amountLeftToPay;
     if (amountLeftToPay > 0) {
@@ -69,12 +62,10 @@ export const CashPayment = memo(function CashPayment({
     if (result.cents > amountLeftToPay) {
       _setPayAmountDisp(formatCurrencyDisp(amountLeftToPay));
       _setPayAmount(amountLeftToPay);
-
       return;
     }
     _setPayAmountDisp(result.display);
     _setPayAmount(result.cents);
-
   }
 
   function handleTenderAmountChange(val) {
@@ -104,7 +95,6 @@ export const CashPayment = memo(function CashPayment({
     let txnId = takeId("transactions") || await getId("transactions");
     let payment = buildCashTransaction(sPayAmount, tenderCents, sIsCheck, txnId);
 
-    // Calculate change
     let change = tenderCents - sPayAmount;
     if (change > 0 && onCashChange) {
       onCashChange(change);
@@ -112,11 +102,9 @@ export const CashPayment = memo(function CashPayment({
 
     if (onPaymentCapture) onPaymentCapture(payment);
 
-    // Show celebration
     _setSuccessMsg(`Payment of $${formatCurrencyDisp(payment.amountCaptured)} approved`);
     _setDone(true);
 
-    // Reset inputs
     _setPayAmount("");
     _setPayAmountDisp("");
     _setTenderAmount("");
@@ -124,7 +112,6 @@ export const CashPayment = memo(function CashPayment({
     _setStatusMessage("");
     _setIsCheck(false);
 
-    // If partial payment, reset back to form after brief celebration
     let newRemaining = amountLeftToPay - payment.amountCaptured;
     if (newRemaining > 0) {
       setTimeout(() => {
@@ -135,140 +122,84 @@ export const CashPayment = memo(function CashPayment({
   }
 
   let isEnabled = !saleComplete && amountLeftToPay > 0;
-
-  // ── Success celebration ──
   let celebrationGif = saleComplete ? ICONS.guyCelebrating : ICONS.popperCelebration;
 
   if (sDone) {
     return (
-      <View
-        style={{
-          alignItems: "center",
-          width: "100%",
-          height: "48%",
-          borderRadius: 15,
-          ...SHADOW_RADIUS_PROTO,
-          justifyContent: "center",
-          paddingHorizontal: 15,
-        }}
-      >
-        <View style={{ alignItems: "center" }}>
+      <div className={styles.containerDone}>
+        <div className={styles.celebrationInner}>
           <Image
-            source={celebrationGif}
-            style={{ width: 100, height: 100, marginBottom: 14, backgroundColor: "transparent" }}
+            src={celebrationGif}
+            width={100}
+            height={100}
             resizeMode="contain"
+            style={{ marginBottom: 14, backgroundColor: "transparent" }}
           />
-          <Text style={{ fontSize: 15, color: C.green, fontWeight: "600", textAlign: "center" }}>
+          <span className={styles.celebrationText} style={{ color: C.green }}>
             {saleComplete ? "Full payment complete!" : sSuccessMsg}
-          </Text>
-        </View>
-      </View>
+          </span>
+        </div>
+      </div>
     );
   }
 
+  let inert = saleComplete || amountLeftToPay <= 0 || cardIsProcessing;
+  let containerOpacity = saleComplete || amountLeftToPay <= 0 ? 0.2 : cardIsProcessing ? 0.4 : 1;
+  let canComplete = isEnabled && sPayAmount > 0 && (sIsCheck || sTenderAmount >= sPayAmount);
+
   return (
-    <View
-      pointerEvents={saleComplete || amountLeftToPay <= 0 || cardIsProcessing ? "none" : "auto"}
+    <div
+      className={styles.container}
       style={{
-        alignItems: "center",
-        paddingTop: 20,
-        width: "100%",
-        height: "48%",
-        borderRadius: 15,
-        ...SHADOW_RADIUS_PROTO,
-        justifyContent: "space-between",
-        paddingBottom: 20,
-        opacity: saleComplete || amountLeftToPay <= 0 ? 0.2 : cardIsProcessing ? 0.4 : 1,
+        opacity: containerOpacity,
+        pointerEvents: inert ? "none" : "auto",
       }}
     >
-      {/* Check checkbox */}
       {!!acceptChecks && (
-        <View
-          style={{ width: "100%", alignItems: "flex-start", paddingLeft: 10 }}
-        >
+        <div className={styles.checkBoxRow}>
           <CheckBox
             enabled={isEnabled}
             textStyle={{ fontSize: 12 }}
             text={"Paper Check"}
-            onCheck={() => { dlog(DCAT.CHECKBOX, "paperCheck_toggle", "CashPayment", { newValue: !sIsCheck }); _setIsCheck(!sIsCheck); }}
+            onCheck={() => {
+              dlog(DCAT.CHECKBOX, "paperCheck_toggle", "CashPayment", { newValue: !sIsCheck });
+              _setIsCheck(!sIsCheck);
+            }}
             isChecked={sIsCheck}
           />
-        </View>
+        </div>
       )}
 
-      {/* Title */}
-      <Text
-        style={{
-          fontSize: 25,
-          color: gray(0.6),
-          fontWeight: 600,
-        }}
-      >
+      <span className={styles.title} style={{ color: C.textSecondary }}>
         {sIsCheck ? "CHECK SALE" : "CASH SALE"}
-      </Text>
+      </span>
 
-      {/* Balance + Pay Amount Box */}
-      <View
+      <div
+        className={styles.payRow}
         style={{
-          flexDirection: "row",
-          justifyContent: "flex-end",
-          alignItems: "center",
-          marginTop: 5,
           backgroundColor: C.listItemWhite,
-          padding: 10,
-          borderRadius: 10,
-          borderWidth: 1,
           borderColor: C.buttonLightGreenOutline,
-          width: "70%",
         }}
       >
-        <View
-          style={{
-            alignItems: "flex-end",
-            justifyContent: "space-between",
-            height: "100%",
-            paddingRight: 5,
-          }}
-        >
-          <Text style={{ color: C.text, marginTop: 4 }}>Balance</Text>
-          <Text style={{ marginBottom: 15, color: C.text }}>Pay Amount</Text>
-        </View>
-        <View style={{ alignItems: "flex-end", marginLeft: 10 }}>
-          <Text
-            style={{
-              fontSize: 15,
-              padding: 5,
-              paddingRight: 1,
-              color: C.text,
-            }}
-          >
+        <div className={styles.labelsCol}>
+          <span className={styles.labelTop} style={{ color: C.text }}>Balance</span>
+          <span className={styles.labelBottom} style={{ color: C.text }}>Pay Amount</span>
+        </div>
+        <div className={styles.valuesCol}>
+          <span className={styles.balanceText} style={{ color: C.text }}>
             {"$ " + formatCurrencyDisp(amountLeftToPay)}
-          </Text>
-          <View
+          </span>
+          <div
+            className={styles.payAmountBox}
             style={{
-              marginLeft: 10,
               borderColor: C.buttonLightGreenOutline,
-              borderRadius: 10,
-              borderWidth: 2,
               backgroundColor: C.listItemWhite,
-              paddingVertical: 10,
-              paddingHorizontal: 10,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingBottom: 6,
-              paddingRight: 7,
             }}
           >
-            <Text style={{ fontSize: 15 }}>$</Text>
-            <View
-              style={{
-                width: 100,
-                alignItems: "flex-end",
-                paddingRight: 5,
-              }}
-            >
+            <span className={styles.dollarSign}>$</span>
+            <div className={styles.payInputWrap}>
               <TextInput
+                debounceMs={0}
                 onFocus={() => {
                   if (lockAmount) return;
                   _setFocused("pay");
@@ -276,133 +207,75 @@ export const CashPayment = memo(function CashPayment({
                   _setPayAmount(0);
                 }}
                 style={{
-                  fontSize: 20,
-                  outlineWidth: 0,
-                  outlineStyle: "none",
-                  color: lockAmount ? gray(0.5) : C.text,
-                  paddingRight: 2,
-                  textAlign: "right",
+                  color: lockAmount ? C.textMuted : C.text,
                 }}
+                className={styles.payInput}
                 placeholder="0.00"
-                placeholderTextColor={gray(0.3)}
+                placeholderTextColor={C.textDisabled}
                 value={sPayAmountDisp}
                 onChangeText={handlePayAmountChange}
                 editable={isEnabled && !lockAmount}
               />
-            </View>
-          </View>
-        </View>
-      </View>
+            </div>
+          </div>
+        </div>
+      </div>
 
-      {/* Tender Amount */}
       {!sIsCheck && (
-        <View
-          style={{
-            width: "100%",
-            alignItems: "center",
-            marginVertical: 5,
-          }}
-        >
-          <View
+        <div className={styles.tenderSection}>
+          <div
+            className={styles.tenderBox}
             style={{
               borderColor: C.buttonLightGreenOutline,
-              borderRadius: 10,
-              borderWidth: 2,
               backgroundColor: C.listItemWhite,
-              paddingVertical: 10,
-              paddingHorizontal: 10,
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              width: "35%",
-              paddingBottom: 6,
             }}
           >
-            <Text style={{ fontSize: 15, color: C.green }}>$</Text>
-            <View
-              style={{
-                width: "100%",
-                alignItems: "flex-end",
-                paddingRight: 5,
-              }}
-            >
+            <span className={styles.tenderDollar} style={{ color: C.green }}>$</span>
+            <div className={styles.tenderInputWrap}>
               <TextInput
                 ref={tenderInputRef}
+                debounceMs={0}
                 onFocus={() => {
                   _setFocused("tender");
                   _setTenderAmountDisp("");
                   _setTenderAmount(0);
                 }}
-                style={{
-                  outlineWidth: 0,
-                  outlineStyle: "none",
-                  fontSize: 25,
-                  textAlign: "right",
-                  color: C.green,
-                  width: "90%",
-                }}
+                style={{ color: C.green }}
+                className={styles.tenderInput}
                 placeholder="0.00"
-                placeholderTextColor={gray(0.3)}
+                placeholderTextColor={C.textDisabled}
                 value={sTenderAmountDisp}
                 onChangeText={handleTenderAmountChange}
                 editable={isEnabled}
               />
-              <Text
-                style={{
-                  fontStyle: "italic",
-                  color: "darkgray",
-                  fontSize: 12,
-                }}
-              >
-                Tender
-              </Text>
+              <span className={styles.tenderLabel}>Tender</span>
               {sTenderAmount > 0 && sPayAmount > 0 && sTenderAmount >= sPayAmount && (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: C.green,
-                    fontWeight: "600",
-                    marginTop: 2,
-                  }}
-                >
+                <span className={styles.changeText} style={{ color: C.green }}>
                   {"Change: $" + formatCurrencyDisp(sTenderAmount - sPayAmount)}
-                </Text>
+                </span>
               )}
-            </View>
-          </View>
-        </View>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Status Message */}
       {sStatusMessage ? (
-        <Text
-          style={{
-            fontSize: 11,
-            color: C.lightred,
-            fontStyle: "italic",
-            marginBottom: 4,
-          }}
-        >
+        <span className={styles.statusMsg} style={{ color: C.lightred }}>
           {sStatusMessage}
-        </Text>
+        </span>
       ) : null}
 
-      {/* Process Button */}
-      {(() => {
-        let canComplete = isEnabled && sPayAmount > 0 && (sIsCheck || sTenderAmount >= sPayAmount);
-        return (
-          <Button_
-            text="COMPLETE PAYMENT"
-            onPress={handleProcessPayment}
-            enabled={canComplete}
-            colorGradientArr={COLOR_GRADIENTS.green}
-            textStyle={{ color: C.textWhite, fontSize: 16 }}
-            buttonStyle={{
-              cursor: canComplete ? "inherit" : "default", borderRadius: 6
-            }}
-          />
-        );
-      })()}
-    </View>
+      <Button
+        text="COMPLETE PAYMENT"
+        onPress={handleProcessPayment}
+        enabled={canComplete}
+        colorGradientArr={COLOR_GRADIENTS.green}
+        textStyle={{ color: C.textWhite, fontSize: 16 }}
+        buttonStyle={{
+          cursor: canComplete ? "inherit" : "default",
+          borderRadius: 6,
+        }}
+      />
+    </div>
   );
 });

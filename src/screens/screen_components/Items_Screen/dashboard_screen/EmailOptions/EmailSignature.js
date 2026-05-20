@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { TouchableOpacity } from "../../../../../dom_components";
 import { C, Fonts } from "../../../../../styles";
-import { gray, lightenRGBByPercent } from "../../../../../utils";
+import { lightenRGBByPercent } from "../../../../../utils";
 import { BoxContainerInner, BoxContainerOuter } from "./_helpers";
 import { SignatureEditor } from "./SignatureEditor";
 
@@ -16,7 +16,7 @@ export const EmailSignature = ({ zSettingsObj, handleSettingsFieldChange }) => {
           <span style={{ fontWeight: Fonts.weight.textHeavy, color: C.text, fontSize: 16, marginBottom: 10, alignSelf: "center" }}>
             {"Email Signature"}
           </span>
-          <span style={{ fontSize: 13, color: gray(0.5), textAlign: "center", alignSelf: "center" }}>
+          <span style={{ fontSize: 13, color: C.textMuted, textAlign: "center", alignSelf: "center" }}>
             {"Add email accounts above to configure per-account signatures."}
           </span>
         </BoxContainerInner>

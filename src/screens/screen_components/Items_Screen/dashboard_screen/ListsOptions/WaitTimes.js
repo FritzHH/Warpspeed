@@ -1,7 +1,7 @@
 import React from "react";
 import { TextInput } from "../../../../../dom_components";
 import { C, ICONS } from "../../../../../styles";
-import { gray, moveItemInArr } from "../../../../../utils";
+import { moveItemInArr } from "../../../../../utils";
 import { BoxButton1, MoveArrows, BoxContainerInner } from "./_helpers";
 import styles from "./ListOptions.module.css";
 
@@ -58,7 +58,7 @@ export const WaitTimes = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   handleSettingsFieldChange("waitTimes", arr);
                 }}
                 placeholder="Wait time label"
-                placeholderTextColor={gray(0.15)}
+                placeholderTextColor={C.textDisabled}
                 className={styles.smallInput}
                 style={{
                   width: "70%",
@@ -78,7 +78,7 @@ export const WaitTimes = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   handleSettingsFieldChange("waitTimes", arr);
                 }}
                 placeholder="Days"
-                placeholderTextColor={gray(0.15)}
+                placeholderTextColor={C.textDisabled}
                 className={styles.smallInput}
                 style={{
                   width: "10%",

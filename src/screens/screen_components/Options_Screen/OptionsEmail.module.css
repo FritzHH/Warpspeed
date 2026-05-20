@@ -64,14 +64,14 @@
 .composeBtnText {
   font-size: 13px;
   font-weight: 800;
-  color: rgb(255, 255, 255);
+  color: var(--text-on-accent);
 }
 
 .divider {
   width: 100%;
   height: 1px;
   flex-shrink: 0;
-  background: rgb(224, 224, 224);
+  background: var(--border-subtle);
 }
 
 .listScroll {
@@ -80,7 +80,7 @@
   min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.08) transparent;
+  scrollbar-color: var(--surface-overlay-light) transparent;
 }
 
 .acctTab {
@@ -103,7 +103,7 @@
 .acctTabText {
   font-size: 13px;
   font-weight: 800;
-  color: rgb(255, 255, 255);
+  color: var(--text-on-accent);
 }
 
 .acctBadge {
@@ -113,7 +113,7 @@
   min-width: 18px;
   height: 18px;
   border-radius: 9px;
-  background: rgb(255, 255, 255);
+  background: var(--surface-base);
   padding: 0 5px;
   margin-left: 6px;
   box-sizing: border-box;
@@ -122,7 +122,7 @@
 .acctBadgeText {
   font-size: 11px;
   font-weight: 800;
-  color: rgb(153, 153, 153);
+  color: var(--text-secondary);
   line-height: 1;
 }
 
@@ -131,7 +131,7 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: row;
-  border-bottom: 1px solid rgb(224, 224, 224);
+  border-bottom: 1px solid var(--border-subtle);
   box-sizing: border-box;
   transition: opacity 120ms ease;
 }
@@ -170,7 +170,7 @@
 
 .emailRowDate {
   font-size: 11px;
-  color: rgb(128, 128, 128);
+  color: var(--text-muted);
   flex-shrink: 0;
 }
 
@@ -207,7 +207,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgb(217, 217, 217);
+  background: var(--border-subtle);
   border-radius: 8px;
   padding: 1px 5px;
   margin-left: 6px;
@@ -216,14 +216,14 @@
 
 .msgCountChipText {
   font-size: 10px;
-  color: rgb(153, 153, 153);
+  color: var(--text-secondary);
   line-height: 1;
 }
 
 .emailRowSnippet {
   display: block;
   font-size: 12px;
-  color: rgb(128, 128, 128);
+  color: var(--text-muted);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -292,14 +292,14 @@
 
 .centerStateText {
   font-size: 13px;
-  color: rgb(128, 128, 128);
+  color: var(--text-muted);
   text-align: center;
 }
 
 .spinner {
   border-radius: 50%;
   border-style: solid;
-  border-color: rgba(0, 0, 0, 0.1);
+  border-color: var(--surface-overlay-light);
   border-top-color: currentColor;
   animation: spin 0.75s linear infinite;
   display: inline-block;

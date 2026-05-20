@@ -3,7 +3,7 @@ import styles from "./CardReaderManager.module.css";
 import { DropdownMenu } from "../../../../dom_components";
 import { useAlertScreenStore } from "../../../../stores";
 import { C } from "../../../../styles";
-import { gray, localStorageWrapper } from "../../../../utils";
+import { localStorageWrapper } from "../../../../utils";
 import { CardReaderRowItem } from "./CardReaderRowItem";
 
 const LS_CARD_READER_KEY = "warpspeed_selected_card_reader";
@@ -77,7 +77,7 @@ export function CardReaderManager({
       label: (r.label || r.id) + (isOffline ? "  (offline)" : ""),
       disabled: isOffline,
       rawLabel: r.label,
-      textColor: isOffline ? gray(0.5) : C.text,
+      textColor: isOffline ? C.textMuted : C.text,
     };
   });
 
@@ -95,12 +95,12 @@ export function CardReaderManager({
           borderColor: C.buttonLightGreenOutline,
         }}
       >
-        <span className={styles.heading} style={{ color: gray(0.6) }}>
+        <span className={styles.heading} style={{ color: C.textSecondary }}>
           STRIPE CARD READERS
         </span>
 
         {mergedReaders.length === 0 && (
-          <span className={styles.emptyText} style={{ color: gray(0.4) }}>
+          <span className={styles.emptyText} style={{ color: C.textMuted }}>
             No readers found on account
           </span>
         )}

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { DropdownMenu, TextInput } from "../../../../../dom_components";
 import { C, ICONS } from "../../../../../styles";
-import { gray, localStorageWrapper } from "../../../../../utils";
+import { localStorageWrapper } from "../../../../../utils";
 import { useAlertScreenStore } from "../../../../../stores";
 import styles from "./CardReaderManager.module.css";
 
@@ -64,7 +64,7 @@ export function CardReaderManager({ liveReaders = [], savedReaders = [], onSaveR
       label: (r.label || r.id) + (isOffline ? "  (offline)" : ""),
       disabled: isOffline,
       rawLabel: r.label,
-      textColor: isOffline ? gray(0.5) : C.text,
+      textColor: isOffline ? C.textMuted : C.text,
     };
   });
 
@@ -76,10 +76,10 @@ export function CardReaderManager({ liveReaders = [], savedReaders = [], onSaveR
   return (
     <div className={styles.wrap}>
       <div className={styles.box} style={{ backgroundColor: C.backgroundListWhite }}>
-        <span className={styles.header} style={{ color: gray(0.6) }}>STRIPE CARD READERS</span>
+        <span className={styles.header} style={{ color: C.textSecondary }}>STRIPE CARD READERS</span>
 
         {mergedReaders.length === 0 && (
-          <span className={styles.emptyText} style={{ color: gray(0.4) }}>
+          <span className={styles.emptyText} style={{ color: C.textMuted }}>
             No readers found on account
           </span>
         )}
@@ -98,10 +98,10 @@ export function CardReaderManager({ liveReaders = [], savedReaders = [], onSaveR
               >
                 <span
                   className={styles.statusDot}
-                  style={{ backgroundColor: isOnline ? C.green : gray(0.4) }}
+                  style={{ backgroundColor: isOnline ? C.green : C.borderStrong }}
                 />
                 <div className={styles.readerInfo}>
-                  <span className={styles.readerId} style={{ color: gray(0.5) }}>
+                  <span className={styles.readerId} style={{ color: C.textMuted }}>
                     {reader.device_type ? reader.device_type + "  ·  " : ""}
                     {reader.id.length > 20 ? "..." + reader.id.slice(-12) : reader.id}
                   </span>
@@ -139,7 +139,7 @@ export function CardReaderManager({ liveReaders = [], savedReaders = [], onSaveR
                           saveLabel(reader.id, val);
                         }}
                         placeholder="Enter label..."
-                        placeholderTextColor={gray(0.4)}
+                        placeholderTextColor={C.textMuted}
                         style={{
                           outline: "none",
                           fontSize: 14,

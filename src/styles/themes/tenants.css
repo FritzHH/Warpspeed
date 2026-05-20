@@ -1,0 +1,27 @@
+/* ============================================================
+ * TENANT BRAND OVERRIDES
+ * ------------------------------------------------------------
+ * Override --brand-500 (and optionally other brand-* steps) per
+ * tenant. Activate at boot by setting:
+ *
+ *   document.documentElement.dataset.tenant = "<tenantID>";
+ *
+ * Recommended: override only --brand-500 unless the tenant needs
+ * a full rebrand. Surrounding stops can be derived programmatically
+ * in a future enhancement.
+ *
+ * Source of truth: docs/design-tokens.md (governance section)
+ * ============================================================ */
+
+/* Bonita Bikes (default brand - matches root) */
+[data-tenant="bonita"] {
+  --brand-500: rgb(33, 148, 86);
+}
+
+/* Add additional tenants below as they onboard.
+ *
+ * Example:
+ * [data-tenant="acme"] {
+ *   --brand-500: rgb(80, 120, 220);
+ * }
+ */

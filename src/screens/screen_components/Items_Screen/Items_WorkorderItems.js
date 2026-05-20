@@ -1,16 +1,5 @@
 /*eslint-disable*/
-import {
-  applyDiscountToWorkorderItem,
-  calculateRunningTotals,
-  deepEqual,
-  formatCurrencyDisp,
-  gray,
-  lightenRGBByPercent,
-  log,
-  replaceOrAddToArr,
-  resolveStatus,
-  showAlert,
-} from "../../../utils";
+import { applyDiscountToWorkorderItem, calculateRunningTotals, deepEqual, formatCurrencyDisp, lightenRGBByPercent, log, replaceOrAddToArr, resolveStatus, showAlert } from "../../../utils";
 import { DISCOUNT_TYPES } from "../../../constants";
 import {
   Button,
@@ -49,7 +38,6 @@ import { broadcastClear } from "../../../broadcastChannel";
 import { CustomItemModal } from "../modal_screens/CustomItemModal";
 import { calculateSaleTotals } from "../modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { deleteActiveSale, writeActiveSale } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
-import { DeliveryReceiptInstance } from "twilio/lib/rest/conversations/v1/conversation/message/deliveryReceipt";
 import styles from "./Items_WorkorderItems.module.css";
 import lineStyles from "./LineItemComponent.module.css";
 
@@ -519,7 +507,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     return (
       <div className={styles.container} style={previewBgStyle}>
         <div className={styles.emptyTextWrap}>
-          <div className={styles.emptyText} style={{ color: gray(0.07) }}>
+          <div className={styles.emptyText} style={{ color: C.textDisabled }}>
             {zOpenWorkorder.customerID ? "Empty\nWorkorder" : "Empty\nSale"}
           </div>
         </div>
@@ -544,17 +532,17 @@ export const Items_WorkorderItemsTab = ({}) => {
             text="Tax-Free"
             isChecked={!!zOpenWorkorder.taxFree}
             onCheck={handleTaxFreeToggle}
-            textStyle={{ fontSize: 12, color: zOpenWorkorder.taxFree ? C.green : gray(0.5) }}
+            textStyle={{ fontSize: 12, color: zOpenWorkorder.taxFree ? C.green : C.textMuted }}
           />
           <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
           <span className={styles.totalLabel}>
             {"SUBTOTAL: "}
-            <span className={styles.totalValue} style={{ color: gray(0.65) }}>$0.00</span>
+            <span className={styles.totalValue} style={{ color: C.textSecondary }}>$0.00</span>
           </span>
           <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
           <span className={styles.totalLabel}>
             {"TAX: "}
-            <span className={styles.totalValue} style={{ color: gray(0.65) }}>$0.00</span>
+            <span className={styles.totalValue} style={{ color: C.textSecondary }}>$0.00</span>
           </span>
           <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
           <div
@@ -562,8 +550,8 @@ export const Items_WorkorderItemsTab = ({}) => {
             style={{ borderColor: C.buttonLightGreenOutline }}
           >
             <div className={styles.totalBoxRow}>
-              <span className={styles.totalBoxLabel} style={{ color: gray(0.65) }}>{"TOTAL: "}</span>
-              <span className={styles.totalBoxValue} style={{ color: gray(0.65) }}>$0.00</span>
+              <span className={styles.totalBoxLabel} style={{ color: C.textSecondary }}>{"TOTAL: "}</span>
+              <span className={styles.totalBoxValue} style={{ color: C.textSecondary }}>$0.00</span>
             </div>
           </div>
           <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
@@ -691,7 +679,7 @@ export const Items_WorkorderItemsTab = ({}) => {
           isChecked={!!zOpenWorkorder.taxFree}
           onCheck={handleTaxFreeToggle}
           enabled={!isLocked}
-          textStyle={{ fontSize: 12, color: zOpenWorkorder.taxFree ? C.green : gray(0.5) }}
+          textStyle={{ fontSize: 12, color: zOpenWorkorder.taxFree ? C.green : C.textMuted }}
         />
         <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
 
@@ -741,7 +729,7 @@ export const Items_WorkorderItemsTab = ({}) => {
                 hasPaymentsForFooter && styles.totalBoxValueWithPayments,
                 hasPaymentsForFooter && styles.struck
               )}
-              style={{ color: hasPaymentsForFooter ? gray(0.5) : C.text }}
+              style={{ color: hasPaymentsForFooter ? C.textMuted : C.text }}
             >
               {"$" + formatCurrencyDisp(sTotals.finalTotal)}
             </span>
@@ -974,7 +962,7 @@ export const LineItemComponent = ({
                             });
                           }}
                           placeholder="Intake notes..."
-                          placeholderTextColor={gray(0.2)}
+                          placeholderTextColor={C.textDisabled}
                           value={workorderLine.intakeNotes || ""}
                         />
                       </div>
@@ -999,7 +987,7 @@ export const LineItemComponent = ({
                             });
                           }}
                           placeholder={receiptNoteRequired ? "Receipt note required for this item before checkout" : "Receipt notes..."}
-                          placeholderTextColor={receiptNoteRequired ? C.lightred : gray(0.2)}
+                          placeholderTextColor={receiptNoteRequired ? C.lightred : C.textDisabled}
                           value={workorderLine.receiptNotes || ""}
                         />
                       </div>

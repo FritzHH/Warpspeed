@@ -2,6 +2,10 @@
    PayrollModal — DOM/CSS migration of the RN-web original.
    Layout: three columns inside a centered card.
    Sizing: percentages of the parent card; flex-shrink: 0 locks them.
+
+   Theme colors (--c-*) and grayscale (--g-*) are set on .card via inline
+   style from JS, then consumed by every class below. Selection state is
+   expressed via .isSelected / .isActive modifier classes — never inline.
    ──────────────────────────────────────────────────────────────────────── */
 
 /* Radix Dialog primitives — give the content a definite viewport-sized box
@@ -9,7 +13,7 @@
 .radixOverlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--surface-overlay);
   z-index: 1000;
 }
 
@@ -40,7 +44,7 @@
   width: 92%;
   height: 94%;
   flex-shrink: 0;
-  background-color: var(--payroll-bg, #ffffff);
+  background-color: var(--payroll-bg, var(--surface-base));
   border-radius: 15px;
   overflow: hidden;
   display: flex;
@@ -109,10 +113,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  background-color: var(--c-blue);
+}
+
+.userRow.isSelected {
+  background-color: var(--c-orange);
 }
 
 .userRowText {
-  color: #ffffff;
+  color: var(--text-on-accent);
   font-size: 11px;
   font-weight: 600;
   text-align: center;
@@ -127,10 +136,19 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  background-color: var(--c-blue-lighter);
+}
+
+.shortcutRow.isPayPeriod {
+  background-color: var(--c-blue);
+}
+
+.shortcutRow.isActive {
+  background-color: var(--c-orange);
 }
 
 .shortcutRowText {
-  color: #ffffff;
+  color: var(--text-on-accent);
   font-size: 11px;
   font-weight: 600;
   text-align: center;
@@ -145,7 +163,40 @@
   flex-shrink: 0;
   height: 1px;
   margin: 6px 0;
+  background-color: var(--g-80);
 }
+
+/* ════════════ Static color helpers (consume --c-* and --g-* from .card) ════════════ */
+.textC          { color: var(--c-text); }
+.textOrange     { color: var(--c-orange); }
+.textBlue       { color: var(--c-blue); }
+.textRed        { color: var(--c-red); }
+.textGreen      { color: var(--c-green); }
+.textGreenLight { color: var(--c-green-light); }
+.textLightred   { color: var(--c-lightred); }
+.textWhite      { color: var(--text-on-accent); }
+.textG40        { color: var(--g-40); }
+.textG50        { color: var(--g-50); }
+.textG70        { color: var(--g-70); }
+
+.bgGreen        { background-color: var(--c-green); }
+.bgRed          { background-color: var(--c-red); }
+.bgBlue         { background-color: var(--c-blue); }
+.bgG20          { background-color: var(--g-20); }
+.bgListItem     { background-color: var(--c-list-item-white); }
+.bgRowAlt       { background-color: var(--g-075); }
+.bgPagination   { background-color: var(--g-95); }
+
+.dispBlock      { display: block; }
+.dimmed         { opacity: 0.3; }
+
+.borderTopGreen { border-top-color: var(--c-button-light-green-outline); }
+.borderTopG85   { border-top-color: var(--g-85); }
+
+/* Title/label `display: block` baked into the class so JS doesn't repeat it */
+.blockTitle      { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; text-align: center; color: var(--c-text); }
+.blockSection    { display: block; font-size: 9px;  font-weight: 600; margin-bottom: 3px; text-align: center; color: var(--g-50); }
+.blockPayPeriod  { display: block; font-size: 9px;  font-weight: 600; margin-bottom: 2px; text-align: center; color: var(--g-50); }
 
 .dropdownGroup {
   width: 100%;
@@ -168,7 +219,7 @@
 .calendarCard {
   width: 100%;
   flex-shrink: 0;
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: var(--surface-overlay-heavy);
   border-radius: 10px;
   padding: 6px 4px;
   display: flex;
@@ -288,16 +339,16 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: row;
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: var(--surface-overlay-heavy);
   padding: 6px 8px;
   box-sizing: border-box;
 }
 
-.thDate    { width: 16%; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #ffffff; }
-.thIn      { width: 30%; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #ffffff; text-align: center; }
-.thOut     { width: 30%; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #ffffff; text-align: center; }
-.thHours   { width: 16%; flex-shrink: 0; font-size: 11px; font-weight: 700; color: #ffffff; text-align: center; }
-.thEdit    { width: 8%;  flex-shrink: 0; font-size: 11px; font-weight: 700; color: #ffffff; text-align: center; }
+.thDate    { width: 16%; flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--text-on-accent); }
+.thIn      { width: 30%; flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--text-on-accent); text-align: center; }
+.thOut     { width: 30%; flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--text-on-accent); text-align: center; }
+.thHours   { width: 16%; flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--text-on-accent); text-align: center; }
+.thEdit    { width: 8%;  flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--text-on-accent); text-align: center; }
 
 /* When admin column is hidden, the four columns must still total 100% */
 .tableHeaderNoEdit .thDate  { width: 19%; }
@@ -371,8 +422,32 @@
   justify-content: center;
 }
 
+.addPillGreen {
+  background-color: var(--c-green-pill);
+}
+
+.addPillGreen .addPillText {
+  color: var(--c-green);
+}
+
+.addPillRed {
+  background-color: var(--c-red-pill);
+}
+
+.addPillRed .addPillText {
+  color: var(--c-lightred);
+}
+
 .addPillText {
   font-size: 11px;
+  font-weight: 600;
+}
+
+.cellInIcon {
+  margin-right: 4px;
+}
+
+.cellHoursValue {
   font-weight: 600;
 }
 
@@ -392,7 +467,7 @@
 
 .editableTimeChipText {
   font-size: 12px;
-  color: #ffffff;
+  color: var(--text-on-accent);
   font-weight: 600;
 }
 
@@ -458,7 +533,7 @@
   justify-content: space-evenly;
   align-items: center;
   padding: 10px;
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: var(--surface-overlay-heavy);
   border-top-width: 2px;
   border-top-style: solid;
   box-sizing: border-box;
@@ -480,7 +555,7 @@
 .summaryValue {
   font-size: 16px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-on-accent);
 }
 
 .summaryRow {
@@ -508,3 +583,65 @@
   font-weight: 600;
   margin-left: 8px;
 }
+
+/* ════════════ Button padding variants (pass via Button className) ════════════ */
+.btnClose {
+  padding: 8px 20px;
+}
+
+.btnGo {
+  padding: 10px 40px;
+}
+
+.btnClear {
+  padding: 10px 20px;
+}
+
+.btnSave {
+  padding: 8px 25px;
+}
+
+.btnEmail {
+  padding: 8px 15px;
+  margin-left: 8px;
+}
+
+.btnEmailSolo {
+  padding: 8px 15px;
+}
+
+.btnAddPunch {
+  padding: 4px 10px;
+  border-radius: 5px;
+  margin-right: 8px;
+}
+
+.btnClock {
+  padding: 3px 10px;
+  border-radius: 5px;
+}
+
+/* ════════════ DropdownMenu — payroll variant ════════════ */
+.payrollDropdown {
+  border: 1px solid var(--c-button-light-green-outline);
+  border-radius: 4px;
+  padding: 4px 6px;
+  background-color: var(--c-list-item-white);
+}
+
+.payrollDropdownText {
+  font-size: 11px;
+  color: var(--c-text);
+}
+
+/* ════════════ Loading indicator spacer ════════════ */
+.loadingSpacerLeft {
+  margin-left: 8px;
+}
+
+/* ════════════ Button text styles (textClassName) ════════════ */
+.btnTxt10  { font-size: 10px; font-weight: 600; }
+.btnTxt12  { font-size: 12px; }
+.btnTxt13  { font-size: 13px; font-weight: 700; }
+.btnTxt14  { font-size: 14px; font-weight: 700; }
+.btnTxt15  { font-size: 15px; font-weight: 700; }

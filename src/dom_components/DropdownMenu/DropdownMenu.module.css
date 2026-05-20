@@ -42,7 +42,7 @@
   z-index: 9500;
   border-width: 2px;
   border-style: solid;
-  background-color: white;
+  background-color: var(--surface-base);
   overflow-y: auto;
   overflow-x: hidden;
   pointer-events: auto;
@@ -63,7 +63,7 @@
 }
 
 .item:focus-visible {
-  outline: 2px solid #007bff;
+  outline: 2px solid var(--border-focus);
   outline-offset: -2px;
 }
 
@@ -101,7 +101,7 @@
   font-size: 13px;
   text-align: center;
   outline: none;
-  background-color: white;
+  background-color: var(--surface-base);
 }
 
 .customInputWide {

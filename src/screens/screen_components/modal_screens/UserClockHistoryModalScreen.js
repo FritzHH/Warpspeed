@@ -1,34 +1,17 @@
 /*eslint-disable*/
 import {
-  FlatList,
-  Text,
-  TextInput,
-  TouchableWithoutFeedback,
-  View,
-} from "react-native-web";
-import {
-  Button_,
+  Button,
   DateTimePicker,
   DropdownMenu,
-  Image_,
+  Image,
   ScreenModal,
-  SHADOW_RADIUS_PROTO,
-} from "../../../components";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
+} from "../../../dom_components";
+import { C, COLOR_GRADIENTS, ICONS, SHADOW_RADIUS_PROTO } from "../../../styles";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  convertMillisToHoursMins,
-  formatMillisForDisplay,
-  getPreviousMondayDayJS,
-  log,
-  gray,
-  trimToTwoDecimals,
-} from "../../../utils";
+import { convertMillisToHoursMins, formatMillisForDisplay, getPreviousMondayDayJS, log, trimToTwoDecimals } from "../../../utils";
 import dayjs from "dayjs";
-
 import cloneDeep from "lodash/cloneDeep";
 import sortBy from "lodash/sortBy";
-const isEven = (n) => n % 2 === 0;
 import { useLoginStore, useSettingsStore } from "../../../stores";
 import { deepEqual } from "../../../utils";
 import {
@@ -41,29 +24,24 @@ import {
   dbGetPunchesByTimeFrame,
   dbSavePunchObject,
 } from "../../../db_calls_wrapper";
+import styles from "./UserClockHistoryModalScreen.module.css";
 
-// eslint-disable-next-line no-lone-blocks
-{
-  /** typically the User Obj will contain the "id" field for the user. however in the punch card punches, the id field is used for the id of the punch, so in this component to access {userobj}.id for the punch object, user {userobj}.userID */
-}
+const isEven = (n) => n % 2 === 0;
+
+/** typically the User Obj will contain the "id" field for the user. however in the punch card punches, the id field is used for the id of the punch, so in this component to access {userobj}.id for the punch object, user {userobj}.userID */
 
 export const UserClockHistoryModal = ({ userObj, handleExit }) => {
-  // store getters //////////////////////////////////////////////////////
   const zCurrentUserObj = useLoginStore((state) => state.currentUser);
   const zUsers = useSettingsStore((state) => state.settings?.users, deepEqual);
 
-  // local state ////////////////////////////////////////////////////////
   const [sUserObj, _setUserObj] = useState(userObj);
   const [sUserDropdownDataArr, _setUserDropdownDataArr] = useState([]);
 
-  // testing ////////////////////////
   let date = dayjs();
   date = date.add(9, "days");
   const [sRange, _setRange] = useState({
-    // startDate: getPreviousMondayDayJS(),
-    // endDate: dayjs(),
-    startDate: dayjs(), //test
-    endDate: getPreviousMondayDayJS(date), //test
+    startDate: dayjs(),
+    endDate: getPreviousMondayDayJS(date),
   });
   const [sHistoryDisplay, _setHistoryDisplay] = useState([]);
   const [sTotalHours, _setTotalHours] = useState("");
@@ -74,39 +52,28 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
   const [sEditableRowIdx, _setEditableRowIdx] = useState(1);
 
   const userDropdownRef = useRef();
-  const amPMOUtDropdownRef = useRef([]);
-  const amPMINDropdownRef = useRef([]);
-  /////////////////////////////////////////////////////////////////////////
-  /////////////////////////////////////////////////////////////////////////
 
-  // app users dropdown menu init
   useEffect(() => {
     let selectedUserIdx;
     let idx = 0;
     let dataArr = zUsers.map((user_obj) => {
       if (user_obj.id === sUserObj.id) selectedUserIdx = idx;
-      // log(user_obj);
       idx++;
       return {
         label: user_obj.first + " " + user_obj.last,
         id: user_obj.id,
       };
     });
-
     _setSelectedUserIdx(selectedUserIdx);
     _setUserDropdownDataArr(dataArr);
-
-    // let selectedUserIdx = zS
   }, [zUsers, sUserObj, _setSelectedUserIdx, _setUserDropdownDataArr]);
 
-  // filter the set for the date range selected
   useEffect(() => {
     if (!sUserObj) return;
     if (!sRange.startDate || !sRange.endDate) return;
     let startMillis = sRange.startDate.valueOf();
     let endMillis = sRange.endDate.valueOf();
 
-    // set millis to begin and end of selected days
     let dayBegin = new Date(startMillis);
     let dayEnd = new Date(endMillis);
     dayBegin.setHours(0, 0, 1, 0);
@@ -114,11 +81,8 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
     dayBegin = dayBegin.getTime();
     dayEnd = dayEnd.getTime();
 
-    // old database getter need to replace
     dbGetPunchesByTimeFrame(dayBegin, dayEnd, sUserObj.id)
       .then((resArr) => {
-        // log(formatMillisForDisplay(dayBegin), formatMillisForDisplay(dayEnd));
-        // clog("res arr", resArr);
         resArr = sortBy(resArr, "millis");
         _setFilteredArr(resArr);
       })
@@ -129,15 +93,10 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
     let resArr = [];
     let counter = 0;
     let resObj = {};
-    let pairs = [];
-    // clog(sFilteredArr);
     let lastOneWasClockIn = false;
     sFilteredArr.forEach((obj) => {
       obj = cloneDeep(obj);
-      // clog(obj);
       if (counter === 0 && obj.option === "out") {
-        // log("edge 1");
-        // edge case, they either worked overnight or forgot to clock out the day before
         resObj.out = obj;
         resArr.push(resObj);
         resObj = {};
@@ -147,8 +106,6 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
       }
 
       if (counter === sFilteredArr.length - 1 && obj.option === "in") {
-        // edge case, they either are going to work overnight or forgot to clock out on this date
-        // log("edge 2");
         resObj.in = obj;
         resArr.push(resObj);
         lastOneWasClockIn = true;
@@ -160,58 +117,45 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
         resObj.in = obj;
         resArr.push(resObj);
         counter++;
-        // lastOneWasClockIn = true
         return;
       }
 
       if (obj.option === "in") {
         lastOneWasClockIn = true;
-        // log("in" + counter);
         resObj.in = obj;
       } else if (obj.option === "out") {
         lastOneWasClockIn = false;
-        // log("out" + counter);
         resObj.out = obj;
         resArr.push(resObj);
         resObj = {};
       }
       counter++;
     });
-    // log(counter);
-    // clog(resArr);
 
     let arr = [];
     let runningTotalMinutes = 0;
-    let runningTotalWages = 0;
-    // clog(resArr);
     resArr.forEach((obj) => {
       obj = cloneDeep(obj);
-      // log(obj);
-      // clog(obj);
       if (obj.in) {
         obj.in = {
           ...obj.in,
           ...formatMillisForDisplay(obj.in.millis, true, true),
         };
       }
-
       if (obj.out) {
         obj.out = {
           ...obj.out,
           ...formatMillisForDisplay(obj.out.millis, true, true),
         };
       }
-
       let total;
       if (obj.in && obj.out) {
         total = convertMillisToHoursMins(obj.out.millis - obj.in.millis);
-        // log("total", total);
         obj.hoursDiff = total.hours;
         obj.minutesDiff = total.minutes;
         obj.totalMinutes = total.totalMinutes;
         runningTotalMinutes += total.totalMinutes;
         if (Number(obj.minutesDiff) < 10) {
-          // log(obj.minutes);
           obj.minutesDiff = "0" + obj.minutesDiff.toString();
         }
       } else if (obj.in) {
@@ -225,8 +169,6 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
           ...formatMillisForDisplay(obj.out.millis, true, true),
         };
       }
-
-      // clog(obj);
       arr.push(obj);
     });
     _setRunningTotalWages(
@@ -234,16 +176,12 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
     );
     _setTotalMinutesWorked(runningTotalMinutes);
     _setHistoryDisplay(arr);
-
-    // clog(arr);
   }, [_setHistoryDisplay, sFilteredArr]);
 
-  // log(sRunningTotalWages);
   let Component = useCallback(() => {
     function handleNewPunchPress() {
       let usePrevious = false;
       let prevPunchObj = sFilteredArr[sFilteredArr.length - 1];
-      // log(prevPunchObj);
       if (prevPunchObj.option === "in") usePrevious = true;
 
       let punchObj = { ...TIME_PUNCH_PROTO };
@@ -254,31 +192,26 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
         : new Date().getTime();
       punchObj.option = usePrevious ? "out" : "in";
 
-      // update local punch array
       let filteredArr = cloneDeep(sFilteredArr);
       filteredArr.push(punchObj);
       _setFilteredArr(filteredArr);
 
-      // send to db
       dbSavePunchObject(punchObj);
     }
 
     function handleDeletePunchPress(punchObj) {
-      // log(sUserObj);
       dbSavePunchObject(punchObj);
       let arr = cloneDeep(sFilteredArr).filter((o) => o.id != punchObj.id);
       _setFilteredArr(arr);
     }
 
-    function handleUserSelect(item, idx) {
+    function handleUserSelect(item) {
       let user = zUsers?.find((o) => o.id === item.id);
       _setUserObj(user);
     }
 
     function handleTimeEdit(obj, option) {
       obj = cloneDeep(obj);
-
-      let userID = obj.in ? obj.in.userID : obj.out.userID;
       let millis;
 
       switch (option) {
@@ -318,16 +251,18 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
         case "out-minutes-down":
           millis = obj.out.millis - MILLIS_IN_MINUTE;
           break;
-        case "in-am-pm":
+        case "in-am-pm": {
           let val = 12 * MILLIS_IN_HOUR;
           if (obj.in.amPM === "PM") val = val * -1;
           millis = obj.in.millis + val;
           break;
-        case "out-am-pm":
+        }
+        case "out-am-pm": {
           let val1 = 12 * MILLIS_IN_HOUR;
           if (obj.out.amPM === "PM") val1 = val1 * -1;
           millis = obj.out.millis + val1;
           break;
+        }
       }
 
       let punchObj;
@@ -340,650 +275,370 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
         punchObj = sFilteredArr[idx];
       }
 
-      // make sure the new in time isn't more than the out time
       if (option.includes("in-") && obj.in && obj.out) {
         if (millis >= obj.out.millis) return;
       }
-
       if (option.includes("out-") && obj.in && obj.out) {
         if (millis <= obj.in.millis) return;
       }
 
-      // log("idx", idx);
       let filteredArr = cloneDeep(sFilteredArr);
       punchObj.millis = millis;
-      // update local state
       filteredArr[idx] = punchObj;
       _setFilteredArr(filteredArr);
-      // add to database
       dbSavePunchObject(punchObj);
     }
 
     const iconSize = 30;
-    // log(zCurrentUserObj);
+
+    const renderChevron = (icon, onClick) => (
+      <button
+        type="button"
+        className={styles.chevronBtn}
+        onClick={onClick}
+      >
+        <Image icon={icon} size={iconSize} />
+      </button>
+    );
+
     return (
-      <TouchableWithoutFeedback>
-        <View
+      <div
+        className={styles.modalCard}
+        style={{ "--card-bg": C.backgroundWhite }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className={styles.leftCol}>
+          {!!zCurrentUserObj?.permissions?.level >= 3 && (
+            <div className={styles.topRow}>
+              <DropdownMenu
+                buttonStyle={{
+                  width: 150,
+                  borderWidth: 1,
+                  borderStyle: "solid",
+                  borderColor: C.buttonLightGreenOutline,
+                  alignSelf: "center",
+                  borderRadius: 5,
+                }}
+                ref={userDropdownRef}
+                matchValue={sUserObj?.id}
+                useSelectedAsButtonTitle={true}
+                dataArr={sUserDropdownDataArr}
+                onSelect={handleUserSelect}
+              />
+              <Button
+                text={"Add Punch"}
+                onPress={handleNewPunchPress}
+                colorGradientArr={COLOR_GRADIENTS.blue}
+                icon={ICONS.tools1}
+                buttonStyle={{
+                  alignSelf: "center",
+                  borderRadius: 5,
+                }}
+              />
+            </div>
+          )}
+          <DateTimePicker range={sRange} handleDateRangeChange={_setRange} />
+          <div className={styles.totalsRow}>
+            <span className={styles.totalLabel}>{"Total Selected Time: "}</span>
+            <span className={styles.totalValue}>
+              {
+                convertMillisToHoursMins(
+                  sTotalMinutesWorked * MILLIS_IN_MINUTE
+                ).formattedHoursMin
+              }
+            </span>
+            <span>{sTotalHours}</span>
+          </div>
+          <div className={styles.totalsRow}>
+            <span className={styles.totalLabelWide}>{"Total Selected Wages: "}</span>
+            <span className={styles.totalValue}>
+              <span
+                className={styles.dollarPrefix}
+                style={{ "--label-color": C.textSecondary }}
+              >
+                $
+              </span>
+              {Number(sRunningTotalWages)?.toLocaleString()}
+            </span>
+          </div>
+        </div>
+        <div
+          className={styles.rightCol}
           style={{
-            width: "80%",
-            height: "85%",
-            backgroundColor: C.backgroundWhite,
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-evenly",
-            padding: 30,
-            borderRadius: 15,
+            "--list-bg": C.backgroundListWhite,
+            "--list-border": C.buttonLightGreenOutline,
+            ...SHADOW_RADIUS_PROTO,
           }}
         >
-          <View style={{ width: "35%" }}>
-            {!!zCurrentUserObj?.permissions?.level >= 3 && (
-              <View
-                style={{
-                  marginBottom: 30,
-                  flexDirection: "row",
-                  justifyContent: "space-around",
-                }}
-              >
-                <DropdownMenu
-                  buttonStyle={{
-                    width: 150,
-                    borderWidth: 1,
-                    borderColor: C.buttonLightGreenOutline,
-                    alignSelf: "center",
-                    borderRadius: 5,
-                  }}
-                  ref={userDropdownRef}
-                  modalCoordinateVars={{ x: 150, y: 50 }}
-                  selectedIdx={sSelectedUserIdx}
-                  useSelectedAsButtonTitle={true}
-                  dataArr={sUserDropdownDataArr}
-                  onSelect={handleUserSelect}
-                />
-                <Button_
-                  text={"Add Punch"}
-                  onPress={handleNewPunchPress}
-                  colorGradientArr={COLOR_GRADIENTS.blue}
-                  icon={ICONS.tools1}
-                  buttonStyle={{
-                    alignSelf: "center",
-                    borderRadius: 5,
-                  }}
-                />
-              </View>
-            )}
-            <DateTimePicker range={sRange} handleDateRangeChange={_setRange} />
-            <View
-              style={{
-                marginTop: 20,
-                flexDirection: "row",
-                justifyContent: "flex-end",
-                width: "100%",
-                alignItems: "center",
-                // backgroundColor: "green",
-              }}
-            >
-              <Text style={{ width: 300, textAlign: "right" }}>
-                {"Total Selected Time: "}
-              </Text>
-              <Text
-                style={{
-                  fontWeight: 500,
-                  fontSize: 16,
-                  width: 100,
-                  textAlign: "right",
-                }}
-              >
-                {
-                  convertMillisToHoursMins(
-                    sTotalMinutesWorked * MILLIS_IN_MINUTE
-                  ).formattedHoursMin
-                }
-              </Text>
-              <Text>{sTotalHours}</Text>
-            </View>
-            <View
-              style={{
-                marginTop: 20,
-                flexDirection: "row",
-                justifyContent: "flex-end",
-                width: "100%",
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ width: 400, textAlign: "right" }}>
-                {"Total Selected Wages: "}
-              </Text>
-              <Text
-                style={{
-                  fontWeight: 500,
-                  fontSize: 16,
-                  width: 100,
-                  textAlign: "right",
-                }}
-              >
-                <Text style={{ fontSize: 16, color: gray(0.6) }}>$</Text>
-                {Number(sRunningTotalWages)?.toLocaleString()}
-              </Text>
-            </View>
-          </View>
-          <View
-            style={{
-              marginLeft: 20,
-              width: "65%",
-              maxHeight: "97%",
-              // minHeight: "20%",
-              backgroundColor: C.backgroundListWhite,
-              borderColor: C.buttonLightGreenOutline,
-              borderWidth: 1,
-              ...SHADOW_RADIUS_PROTO,
-              // shadowColor: C.green,
-            }}
-          >
-            {/* "Flat list component" ////////////////////////////////////////*/}
-            {/* "Flat list component" ////////////////////////////////////////*/}
-            {!!sHistoryDisplay.length > 0 && (
-              <FlatList
-                // style={{ width: "100%" }}
-                data={sHistoryDisplay}
-                ItemSeparatorComponent={() => (
-                  <View
-                    style={{
-                      height: 0,
-                      backgroundColor: C.buttonLightGreen,
-                    }}
-                  />
-                )}
-                renderItem={(obj) => {
-                  let idx = obj.index;
-                  let item = obj.item;
-                  let editable = idx === sEditableRowIdx;
-                  return (
-                    <View
-                      style={{
-                        flexDirection: "row",
-                        alignItems: "center",
-                        width: "100%",
-                        opacity: editable ? 1 : !sEditableRowIdx ? 1 : 0.15,
-                        backgroundColor: isEven(idx)
-                          ? C.listItemWhite
-                          : gray(0.075),
-                        paddingVertical: 8,
-                        paddingHorizontal: 5,
-                      }}
-                    >
-                      <View
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          // marginRight: 3,
-                          width: "8%",
-                        }}
+          {!!sHistoryDisplay.length > 0 && (
+            <div className={styles.historyList}>
+              {sHistoryDisplay.map((item, idx) => {
+                let editable = idx === sEditableRowIdx;
+                const rowStyle = {
+                  opacity: editable ? 1 : !sEditableRowIdx ? 1 : 0.15,
+                  backgroundColor: isEven(idx)
+                    ? C.listItemWhite
+                    : C.surfaceAlt,
+                };
+                return (
+                  <div
+                    key={item.in?.id || item.out?.id || idx}
+                    className={styles.punchRow}
+                    style={rowStyle}
+                  >
+                    <div className={styles.yearCell}>
+                      <span
+                        className={styles.yearText}
+                        style={{ "--year-color": C.textMuted }}
                       >
-                        <Text style={{ color: gray(0.4), marginRight: 5 }}>
-                          {item.in?.year || item.out?.year}
-                        </Text>
-                      </View>
-                      {!!item.in && (
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            width: "32%",
-                            alignItems: "center",
-                            justifyContent: "flex-start",
-                            // marginRight: 0,
-                            // backgroundColor: "blue",
-                            // paddin
-                          }}
-                        >
-                          <Image_
-                            icon={ICONS.forwardGreen}
-                            size={17}
-                            style={{ marginRight: 15 }}
+                        {item.in?.year || item.out?.year}
+                      </span>
+                    </div>
+                    {!!item.in && (
+                      <div className={styles.inCell}>
+                        <Image
+                          icon={ICONS.forwardGreen}
+                          size={17}
+                          className={styles.iconChip}
+                        />
+                        <div className={styles.dateBlock}>
+                          <div className={styles.dateLabel}>
+                            <span
+                              className={styles.dayText}
+                              style={{ "--text-color": C.text }}
+                            >
+                              {item.in?.wordDayOfWeek + ", "}
+                            </span>
+                            <span style={{ color: C.text }}>
+                              {item.in.wordDayOfMonth}
+                            </span>
+                          </div>
+                          <div className={styles.dateColumn}>
+                            {!!editable &&
+                              renderChevron(ICONS.upChevron, () =>
+                                handleTimeEdit(item, "in-date-up")
+                              )}
+                            <span className={styles.dateValue}>
+                              {item.in.dayOfMonth}
+                            </span>
+                            {!!editable &&
+                              renderChevron(ICONS.downChevron, () =>
+                                handleTimeEdit(item, "in-date-down")
+                              )}
+                          </div>
+                        </div>
+                        <div className={styles.timeColumn}>
+                          {!!editable &&
+                            renderChevron(ICONS.upChevron, () =>
+                              handleTimeEdit(item, "in-hour-up")
+                            )}
+                          <span
+                            className={
+                              editable ? styles.timeValueEditable : styles.timeValue
+                            }
+                            style={{ width: iconSize }}
+                          >
+                            {item.in.hour}
+                          </span>
+                          {!!editable &&
+                            renderChevron(ICONS.downChevron, () =>
+                              handleTimeEdit(item, "in-hour-down")
+                            )}
+                        </div>
+                        <span className={styles.colon}>:</span>
+                        <div className={styles.timeColumn}>
+                          {!!editable &&
+                            renderChevron(ICONS.upChevron, () =>
+                              handleTimeEdit(item, "in-minutes-up")
+                            )}
+                          <span
+                            className={
+                              editable
+                                ? styles.timeValueEditable
+                                : styles.timeValueLeft
+                            }
+                            style={{ width: iconSize }}
+                          >
+                            {item.in.minutes}
+                          </span>
+                          {!!editable &&
+                            renderChevron(ICONS.downChevron, () =>
+                              handleTimeEdit(item, "in-minutes-down")
+                            )}
+                        </div>
+                        <div className={styles.amPmWrap}>
+                          <DropdownMenu
+                            dataArr={[{ label: "AM" }, { label: "PM" }]}
+                            useSelectedAsButtonTitle={true}
+                            matchValue={item.in.amPM}
+                            buttonStyle={{
+                              backgroundColor: "transparent",
+                              paddingLeft: 4,
+                              paddingRight: 4,
+                              borderRadius: 5,
+                            }}
+                            buttonTextStyle={{
+                              color: C.textSecondary,
+                              fontSize: 14,
+                            }}
+                            onSelect={() => {
+                              handleTimeEdit(item, "in-am-pm");
+                            }}
                           />
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              marginRight: 10,
-                              // backgroundColor: "green",
-                              width: "30%",
-                              justifyContent: "space-between",
+                        </div>
+                      </div>
+                    )}
+                    {!!item.out && (
+                      <div className={styles.outCell}>
+                        <Image
+                          icon={ICONS.backRed}
+                          size={15}
+                          className={styles.iconChip}
+                        />
+                        <div className={styles.dateBlockOut}>
+                          <div className={styles.dateLabel}>
+                            <span
+                              className={styles.dayText}
+                              style={{ "--text-color": C.text }}
+                            >
+                              {item.out?.wordDayOfWeek + ", "}
+                            </span>
+                            <span style={{ color: C.text }}>
+                              {item.out?.wordDayOfMonth}
+                            </span>
+                          </div>
+                          <div className={styles.dateColumnOut}>
+                            {!!editable &&
+                              renderChevron(ICONS.upChevron, () =>
+                                handleTimeEdit(item, "out-date-up")
+                              )}
+                            <span className={styles.dateValue}>
+                              {item.out.dayOfMonth}
+                            </span>
+                            {!!editable &&
+                              renderChevron(ICONS.downChevron, () =>
+                                handleTimeEdit(item, "out-date-down")
+                              )}
+                          </div>
+                        </div>
+                        <div className={styles.outTimeGroup}>
+                          <div>
+                            {!!editable &&
+                              renderChevron(ICONS.upChevron, () =>
+                                handleTimeEdit(item, "out-hour-up")
+                              )}
+                            <span
+                              className={
+                                editable
+                                  ? styles.timeValueEditable
+                                  : styles.timeValue
+                              }
+                              style={{ width: iconSize, display: "block" }}
+                            >
+                              {item.out.hour}
+                            </span>
+                            {!!editable &&
+                              renderChevron(ICONS.downChevron, () =>
+                                handleTimeEdit(item, "out-hour-down")
+                              )}
+                          </div>
+                          <span className={styles.colon}>:</span>
+                          <div>
+                            {!!editable &&
+                              renderChevron(ICONS.upChevron, () =>
+                                handleTimeEdit(item, "out-minutes-up")
+                              )}
+                            <span
+                              className={
+                                editable
+                                  ? styles.timeValueEditable
+                                  : styles.timeValueLeft
+                              }
+                              style={{ width: iconSize, display: "block" }}
+                            >
+                              {item.out.minutes}
+                            </span>
+                            {!!editable &&
+                              renderChevron(ICONS.downChevron, () =>
+                                handleTimeEdit(item, "out-minutes-down")
+                              )}
+                          </div>
+                        </div>
+                        <div className={styles.amPmWrap}>
+                          <DropdownMenu
+                            dataArr={[{ label: "AM" }, { label: "PM" }]}
+                            useSelectedAsButtonTitle={true}
+                            matchValue={item.out.amPM}
+                            buttonStyle={{
+                              backgroundColor: "transparent",
+                              paddingLeft: 4,
+                              paddingRight: 4,
+                              borderRadius: 5,
                             }}
-                          >
-                            <View style={{ flexDirection: "row" }}>
-                              <Text
-                                style={{
-                                  color: C.text,
-                                  marginRight: 1,
-                                }}
-                              >
-                                {item.in?.wordDayOfWeek + ", "}
-                              </Text>
-                              <Text style={{ color: C.text }}>
-                                {item.in.wordDayOfMonth}
-                              </Text>
-                            </View>
-                            <View
-                              style={{
-                                alignItems: "center",
-                              }}
-                            >
-                              {!!editable && (
-                                <Button_
-                                  icon={ICONS.upChevron}
-                                  iconSize={iconSize}
-                                  onPress={() =>
-                                    handleTimeEdit(item, "in-date-up")
-                                  }
-                                  buttonStyle={{
-                                    paddingVertical: 0,
-                                    paddingHorizontal: 0,
-                                  }}
-                                />
-                              )}
-                              <Text
-                                style={{
-                                  width: 20,
-                                  textAlign: "center",
-                                }}
-                              >
-                                {item.in.dayOfMonth}
-                              </Text>
-                              {!!editable && (
-                                <Button_
-                                  buttonStyle={{
-                                    paddingVertical: 0,
-                                    paddingHorizontal: 0,
-                                  }}
-                                  icon={ICONS.downChevron}
-                                  iconSize={iconSize}
-                                  onPress={() =>
-                                    handleTimeEdit(item, "in-date-down")
-                                  }
-                                />
-                              )}
-                            </View>
-                          </View>
-                          <View style={{ alignItems: "center" }}>
-                            {!!editable && (
-                              <Button_
-                                buttonStyle={{
-                                  paddingVertical: 0,
-                                  paddingHorizontal: 0,
-                                }}
-                                icon={ICONS.upChevron}
-                                iconSize={iconSize}
-                                onPress={() =>
-                                  handleTimeEdit(item, "in-hour-up")
-                                }
-                              />
-                            )}
-                            <Text
-                              style={{
-                                width: iconSize,
-                                textAlign: editable ? "center" : "right",
-                                outlineColor: C.green,
-                                paddingRight: 1,
-                                // backgroundColor: "blue",
-                                // borderWidth: 1,
-                                outlineColor: C.green,
-                                borderColor: C.buttonLightGreenOutline,
-                              }}
-                            >
-                              {item.in.hour}
-                            </Text>
-                            {!!editable && (
-                              <Button_
-                                buttonStyle={{
-                                  paddingVertical: 0,
-                                  paddingHorizontal: 0,
-                                }}
-                                icon={ICONS.downChevron}
-                                iconSize={iconSize}
-                                onPress={() =>
-                                  handleTimeEdit(item, "in-hour-down")
-                                }
-                              />
-                            )}
-                          </View>
-                          <Text style={{ paddingHorizontal: 1 }}>:</Text>
-                          <View style={{ alignItems: "center" }}>
-                            {!!editable && (
-                              <Button_
-                                icon={ICONS.upChevron}
-                                iconSize={iconSize}
-                                onPress={() =>
-                                  handleTimeEdit(item, "in-minutes-up")
-                                }
-                                buttonStyle={{
-                                  paddingVertical: 0,
-                                  paddingHorizontal: 0,
-                                }}
-                              />
-                            )}
-                            <Text
-                              style={{
-                                width: iconSize,
-                                textAlign: editable ? "center" : "left",
-                                // textAlign: editable ? center : ,
-                                outlineColor: C.green,
-                                outlineColor: C.green,
-                                borderColor: C.buttonLightGreenOutline,
-                              }}
-                            >
-                              {item.in.minutes}
-                            </Text>
-                            {!!editable && (
-                              <Button_
-                                buttonStyle={{
-                                  paddingVertical: 0,
-                                  paddingHorizontal: 0,
-                                }}
-                                icon={ICONS.downChevron}
-                                iconSize={iconSize}
-                                onPress={() =>
-                                  handleTimeEdit(item, "in-minutes-down")
-                                }
-                              />
-                            )}
-                          </View>
-                          <View
-                            ref={(el) => (amPMINDropdownRef.current[idx] = el)}
-                          >
-                            <DropdownMenu
-                              ref={amPMINDropdownRef.current[idx]}
-                              dataArr={[{ label: "AM" }, { label: "PM" }]}
-                              useSelectedAsButtonTitle={true}
-                              selectedIdx={item.in.amPM === "AM" ? 0 : 1}
-                              buttonStyle={{
-                                // width: 20,
-                                backgroundColor: "transparent",
-                                paddingHorizontal: 4,
-                                borderRadius: 5,
-                              }}
-                              buttonTextStyle={{
-                                color: gray(0.6),
-                                fontSize: 14,
-                                // paddingHorizontal: 0,
-                              }}
-                              onSelect={(val) => {
-                                handleTimeEdit(item, "in-am-pm");
-                              }}
-                            />
-                          </View>
-                        </View>
-                      )}
-                      {!!item.out && (
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            width: "35%",
-                            alignItems: "center",
-                          }}
-                        >
-                          <Image_
-                            icon={ICONS.backRed}
-                            size={15}
-                            style={{ marginRight: 15 }}
+                            buttonTextStyle={{
+                              color: C.textSecondary,
+                              fontSize: 14,
+                            }}
+                            onSelect={() => {
+                              handleTimeEdit(item, "out-am-pm");
+                            }}
                           />
-
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              // marginRight: 10,
-                              // backgroundColor: "green",
-                              width: "28%",
-                              justifyContent: "space-between",
-                            }}
+                        </div>
+                      </div>
+                    )}
+                    <div className={styles.totalsCell}>
+                      {!!(item.hoursDiff || item.minutesDiff) && (
+                        <div className={styles.totalsBlock}>
+                          <span
+                            className={styles.totalsLabel}
+                            style={{ "--label-color": C.textSecondary }}
                           >
-                            <View
-                              style={{
-                                flexDirection: "row",
-                                // alignItems: "center",
-                                // marginRight: 10,
-                                // backgroundColor: "green",
-                                // width: "40%",
-                                // justifyContent: "space-between",
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  color: C.text,
-                                  marginRight: 1,
-                                }}
-                              >
-                                {item.out?.wordDayOfWeek + ", "}
-                              </Text>
-                              <Text style={{ color: C.text }}>
-                                {item.out?.wordDayOfMonth}
-                              </Text>
-                            </View>
-
-                            <View
-                              style={{ alignItems: "center", marginLeft: 3 }}
-                            >
-                              {!!editable && (
-                                <Button_
-                                  icon={ICONS.upChevron}
-                                  iconSize={iconSize}
-                                  onPress={() =>
-                                    handleTimeEdit(item, "out-date-up")
-                                  }
-                                  buttonStyle={{
-                                    paddingVertical: 0,
-                                    paddingHorizontal: 0,
-                                  }}
-                                />
-                              )}
-                              <Text style={{ width: 20, textAlign: "center" }}>
-                                {item.out.dayOfMonth}
-                              </Text>
-                              {!!editable && (
-                                <Button_
-                                  buttonStyle={{
-                                    paddingVertical: 0,
-                                    paddingHorizontal: 0,
-                                  }}
-                                  icon={ICONS.downChevron}
-                                  iconSize={iconSize}
-                                  onPress={() =>
-                                    handleTimeEdit(item, "out-date-down")
-                                  }
-                                />
-                              )}
-                            </View>
-                          </View>
-
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              width: "100",
-                            }}
-                          >
-                            <View>
-                              {!!editable && (
-                                <Button_
-                                  icon={ICONS.upChevron}
-                                  iconSize={iconSize}
-                                  onPress={() =>
-                                    handleTimeEdit(item, "out-hour-up")
-                                  }
-                                  buttonStyle={{
-                                    paddingVertical: 0,
-                                    paddingHorizontal: 0,
-                                  }}
-                                />
-                              )}
-                              <Text
-                                style={{
-                                  // marginLeft: 10,
-                                  width: iconSize,
-                                  textAlign: editable ? "center" : "right",
-                                  outlineColor: C.green,
-                                  // borderWidth: 1,
-                                  paddingRight: 1,
-                                  borderColor: C.buttonLightGreenOutline,
-                                }}
-                              >
-                                {item.out.hour}
-                              </Text>
-
-                              {!!editable && (
-                                <Button_
-                                  buttonStyle={{
-                                    paddingVertical: 0,
-                                    paddingHorizontal: 0,
-                                  }}
-                                  icon={ICONS.downChevron}
-                                  iconSize={iconSize}
-                                  onPress={() =>
-                                    handleTimeEdit(item, "out-hour-down")
-                                  }
-                                />
-                              )}
-                            </View>
-                            <Text style={{ paddingHorizontal: 1 }}>:</Text>
-                            <View>
-                              {!!editable && (
-                                <Button_
-                                  icon={ICONS.upChevron}
-                                  iconSize={iconSize}
-                                  onPress={() =>
-                                    handleTimeEdit(item, "out-minutes-up")
-                                  }
-                                  buttonStyle={{
-                                    paddingVertical: 0,
-                                    paddingHorizontal: 0,
-                                  }}
-                                />
-                              )}
-                              <Text
-                                style={{
-                                  width: iconSize,
-                                  textAlign: editable ? "center" : "left",
-                                  outlineColor: C.green,
-                                  // borderWidth: 1,
-                                  paddingHorizontal: 0,
-                                  borderColor: C.buttonLightGreenOutline,
-                                }}
-                              >
-                                {item.out.minutes}
-                              </Text>
-                              {!!editable && (
-                                <Button_
-                                  buttonStyle={{
-                                    paddingVertical: 0,
-                                    paddingHorizontal: 0,
-                                  }}
-                                  icon={ICONS.downChevron}
-                                  iconSize={iconSize}
-                                  onPress={() =>
-                                    handleTimeEdit(item, "out-minutes-down")
-                                  }
-                                />
-                              )}
-                            </View>
-                          </View>
-                          <View
-                            ref={(el) => (amPMOUtDropdownRef.current[idx] = el)}
-                          >
-                            <DropdownMenu
-                              ref={amPMOUtDropdownRef.current[idx]}
-                              dataArr={[{ label: "AM" }, { label: "PM" }]}
-                              useSelectedAsButtonTitle={true}
-                              selectedIdx={item.out.amPM === "AM" ? 0 : 1}
-                              buttonStyle={{
-                                // width: 20,
-                                backgroundColor: "transparent",
-                                paddingHorizontal: 4,
-                                borderRadius: 5,
-                              }}
-                              buttonTextStyle={{
-                                color: gray(0.6),
-                                fontSize: 14,
-                                // paddingHorizontal: 0,
-                              }}
-                              onSelect={(val) => {
-                                handleTimeEdit(item, "out-am-pm");
-                              }}
-                            />
-                          </View>
-                        </View>
+                            Total:
+                          </span>
+                          <span className={styles.totalsValue}>
+                            {(item.hoursDiff ? item.hoursDiff : "") +
+                              " : " +
+                              item.minutesDiff}
+                          </span>
+                        </div>
                       )}
-                      <View
-                        style={{
-                          width: "25%",
-                          // backgroundColor: "green",
-                          flexDirection: "row",
-                          alignItems: "center",
-                        }}
-                      >
-                        {!!(item.hoursDiff || item.minutesDiff) && (
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              width: "45%",
-                              justifyContent: "space-between",
-                              paddingRight: 12,
-                              // backgroundColor: "blue",
-                            }}
-                          >
-                            <Text style={{ color: gray(0.6) }}>Total:</Text>
-                            <Text style={{ textAlign: "right", width: 50 }}>
-                              {(item.hoursDiff ? item.hoursDiff : "") +
-                                " : " +
-                                item.minutesDiff}
-                            </Text>
-                          </View>
-                        )}
-
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            width: "50%",
-                            justifyContent: "space-between",
+                      <div className={styles.actionsBlock}>
+                        <Button
+                          onPress={() => {
+                            if (sEditableRowIdx === idx) {
+                              _setEditableRowIdx(null);
+                            } else {
+                              _setEditableRowIdx(idx);
+                            }
                           }}
-                        >
-                          <Button_
+                          iconSize={20}
+                          icon={ICONS.editPencil}
+                        />
+                        {!!editable && (
+                          <Button
                             onPress={() => {
+                              handleDeletePunchPress(item.in || item.out);
                               if (sEditableRowIdx === idx) {
                                 _setEditableRowIdx(null);
                               } else {
                                 _setEditableRowIdx(idx);
                               }
                             }}
-                            iconSize={20}
-                            icon={ICONS.editPencil}
+                            iconSize={16}
+                            icon={ICONS.trash}
                           />
-                          {!!editable && (
-                            <Button_
-                              onPress={() => {
-                                handleDeletePunchPress(item.in || item.out);
-                                if (sEditableRowIdx === idx) {
-                                  _setEditableRowIdx(null);
-                                } else {
-                                  _setEditableRowIdx(idx);
-                                }
-                              }}
-                              iconSize={16}
-                              icon={ICONS.trash}
-                            />
-                          )}
-                        </View>
-                      </View>
-                    </View>
-                  );
-                }}
-              />
-            )}
-          </View>
-        </View>
-      </TouchableWithoutFeedback>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
     );
   }, [
-    // zCurrentUserObj?.permissions?.level,
     sRunningTotalWages,
     sTotalMinutesWorked,
     sSelectedUserIdx,

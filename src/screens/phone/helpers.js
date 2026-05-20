@@ -1,5 +1,5 @@
 import { C } from "../../styles";
-import { gray, calculateWaitEstimateLabel } from "../../utils";
+import { calculateWaitEstimateLabel } from "../../utils";
 import { useSettingsStore, useLoginStore } from "../../stores";
 
 const NUM_MILLIS_IN_DAY = 86400000;
@@ -91,7 +91,7 @@ export function computeWaitInfo(workorder) {
   let lowerLabel = label.toLowerCase();
 
   if (workorder.status === "finished") {
-    result.textColor = gray(0.4);
+    result.textColor = C.textMuted;
   } else if (lowerLabel === "waiting" || lowerLabel === "today") {
     result.waitEndDay = label;
     result.textColor = "red";

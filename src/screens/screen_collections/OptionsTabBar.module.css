@@ -43,8 +43,8 @@
   gap: 6px;
   padding: 2px 7px;
   margin-right: 5px;
-  border: 1px solid rgb(200, 228, 220);
-  background: rgb(232, 239, 245);
+  border: 1px solid var(--border-default);
+  background: var(--surface-accent-muted);
   cursor: pointer;
   font-family: inherit;
   font-size: 13px;
@@ -80,7 +80,7 @@
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  border: 2px solid rgba(0, 0, 0, 0.1);
+  border: 2px solid var(--surface-overlay-light);
   border-top-color: currentColor;
   animation: spin 0.75s linear infinite;
   display: inline-block;
@@ -168,7 +168,7 @@
   min-width: 18px;
   height: 18px;
   border-radius: 10px;
-  background: rgb(255, 28, 28);
+  background: var(--danger);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -178,7 +178,7 @@
 }
 
 .emailBadgeText {
-  color: rgb(255, 255, 255);
+  color: var(--text-on-accent);
   font-size: 10px;
   font-weight: 700;
   line-height: 1;

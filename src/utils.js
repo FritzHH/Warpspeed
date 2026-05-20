@@ -980,17 +980,6 @@ export function getConnectionStrength() {
   }
 }
 
-export function gray(u, alpha = 1) {
-  // u in [0,1]: 0 -> white (255), 1 -> black (0)
-  let x = Number(u);
-  if (!Number.isFinite(x)) x = 0;
-  x = Math.min(1, Math.max(0, x));
-  const v = Math.round((1 - x) * 255);
-
-  alpha = Math.min(1, Math.max(0, Number(alpha)));
-  return alpha === 1 ? `rgb(${v},${v},${v})` : `rgba(${v},${v},${v},${alpha})`;
-}
-
 // text formatting
 export function capitalizeFirstLetterOfString(str) {
   if (!str) return "";

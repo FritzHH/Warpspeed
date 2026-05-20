@@ -1,9 +1,9 @@
 /* eslint-disable */
 
 import React, { useState, useEffect } from "react";
-import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { C } from "../styles";
-import { gray, copyToClipboard } from "../utils";
+import { copyToClipboard } from "../utils";
+import styles from "./DatabaseViewerScreen.module.css";
 import { useSettingsStore } from "../stores";
 import { firestoreSubscribeCollection, firestoreDelete, firestoreWrite, firestoreRead } from "../db_calls";
 import { DB_NODES } from "../constants";
@@ -459,136 +459,164 @@ export function DatabaseViewerScreen() {
   }
 
   return (
-    <View style={{ height: "100vh", overflow: "hidden", backgroundColor: C.backgroundWhite }}>
-      <View style={{ flexDirection: "row", alignItems: "center", padding: 10, borderBottomWidth: 1, borderBottomColor: gray(0.15) }}>
-        <TouchableOpacity
-          onPress={() => { window.location.href = ROUTES.home; }}
-          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, borderWidth: 1, borderColor: gray(0.3), marginRight: 16 }}
+    <div className={styles.root}>
+      <div className={styles.toolbar}>
+        <button
+          type="button"
+          onClick={() => { window.location.href = ROUTES.home; }}
+          className={styles.toolbarBtnBack}
+          style={{ color: C.text }}
         >
-          <Text style={{ fontSize: 14, color: C.text }}>Back</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleReopenFirst}
-          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.orange, marginRight: 8 }}
+          Back
+        </button>
+        <button
+          type="button"
+          onClick={handleReopenFirst}
+          className={styles.toolbarBtn}
+          style={{ backgroundColor: C.orange }}
         >
-          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Reopen First</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleReopenAll}
-          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.orange, marginRight: 8 }}
+          Reopen First
+        </button>
+        <button
+          type="button"
+          onClick={handleReopenAll}
+          className={styles.toolbarBtn}
+          style={{ backgroundColor: C.orange }}
         >
-          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Reopen All</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleCleanLogs}
-          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: "rgb(103, 124, 231)", marginRight: 8 }}
+          Reopen All
+        </button>
+        <button
+          type="button"
+          onClick={handleCleanLogs}
+          className={styles.toolbarBtn}
+          style={{ backgroundColor: "rgb(103, 124, 231)" }}
         >
-          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Clean Logs</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleRefreshState}
-          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: "rgb(0, 128, 128)", marginRight: 8 }}
+          Clean Logs
+        </button>
+        <button
+          type="button"
+          onClick={handleRefreshState}
+          className={styles.toolbarBtn}
+          style={{ backgroundColor: "rgb(0, 128, 128)" }}
         >
-          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Refresh State</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleFreshWorkorders}
-          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: "rgb(34, 139, 34)", marginRight: 8 }}
+          Refresh State
+        </button>
+        <button
+          type="button"
+          onClick={handleFreshWorkorders}
+          className={styles.toolbarBtn}
+          style={{ backgroundColor: "rgb(34, 139, 34)" }}
         >
-          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Fresh workorders</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleStartHere}
-          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: "rgb(75, 0, 130)", marginRight: 8 }}
+          Fresh workorders
+        </button>
+        <button
+          type="button"
+          onClick={handleStartHere}
+          className={styles.toolbarBtn}
+          style={{ backgroundColor: "rgb(75, 0, 130)" }}
         >
-          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Start Here</Text>
-        </TouchableOpacity>
-        <Text style={{ fontSize: 18, fontWeight: "700", color: C.text, flex: 1 }}>Database Viewer</Text>
-        <TouchableOpacity
-          onPress={() => {
+          Start Here
+        </button>
+        <p className={styles.title} style={{ color: C.text }}>Database Viewer</p>
+        <button
+          type="button"
+          onClick={() => {
             let output = COLLECTIONS.map((col) => {
               return `=== ${col.label} (${sData[col.key].length}) ===\n${JSON.stringify(sData[col.key], null, 2)}`;
             }).join("\n\n");
             copyToClipboard(NOTIFY_HINT + "Examine the objects from the database after the transaction. Ignore change logs. summarize what happened, cross-check fields for errors, and make sure that any fields that were supposed to move or delete or change did so: " + output);
           }}
-          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.blue, marginRight: 8 }}
+          className={styles.toolbarBtn}
+          style={{ backgroundColor: C.blue }}
         >
-          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Summarize</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {
+          Summarize
+        </button>
+        <button
+          type="button"
+          onClick={() => {
             let output = COLLECTIONS.map((col) => {
               return `=== ${col.label} (${sData[col.key].length}) ===\n${JSON.stringify(sData[col.key], null, 2)}`;
             }).join("\n\n");
             copyToClipboard(NOTIFY_HINT + "Examine the db contents. Cross-check for errors in math and field updates. You must cross-reference every field pre and post-operation, across every object. Summarize the action you saw take place and report any errors. for errors, provide a numbered list of each error accompanied with the best possible solution for us to discuss. " + output);
           }}
-          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.purple, marginRight: 8 }}
+          className={styles.toolbarBtn}
+          style={{ backgroundColor: C.purple }}
         >
-          <Text style={{ fontSize: 14, color: "white", fontWeight: "600", backgroundColor: 'green' }}>Compare</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {
+          Compare
+        </button>
+        <button
+          type="button"
+          onClick={() => {
             let output = COLLECTIONS.map((col) => `=== ${col.label} ===\n${JSON.stringify(sData[col.key], null, 2)}`).join("\n\n");
             copyToClipboard(NOTIFY_HINT + output);
           }}
-          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.green, marginRight: 8 }}
+          className={styles.toolbarBtn}
+          style={{ backgroundColor: C.green }}
         >
-          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Contents Only</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => {
+          Contents Only
+        </button>
+        <button
+          type="button"
+          onClick={() => {
             let output = COLLECTIONS.map((col) => `=== ${col.label} (${sData[col.key].length}) ===\n${JSON.stringify(sData[col.key], null, 2)}`).join("\n\n");
             copyToClipboard(NOTIFY_HINT + "This is the current state of the database. Use it as a starting point for the upcoming tests of workorder changes, checkout screen and refund screen as well as any and other other changes to any object field. Ignore any logging issues you find, but check the logging moving forward against the logs at this point in time. Analyze it and report any inconsistencies or relics from previous delete operations, and summarize what has transpired." + output);
           }}
-          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.orange, marginRight: 8 }}
+          className={styles.toolbarBtn}
+          style={{ backgroundColor: C.orange }}
         >
-          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Starting Point</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          onPress={handleClearAll}
-          style={{ paddingVertical: 6, paddingHorizontal: 14, borderRadius: 5, backgroundColor: C.red }}
+          Starting Point
+        </button>
+        <button
+          type="button"
+          onClick={handleClearAll}
+          className={styles.toolbarBtn}
+          style={{ backgroundColor: C.red, marginRight: 0 }}
         >
-          <Text style={{ fontSize: 14, color: "white", fontWeight: "600" }}>Clear All</Text>
-        </TouchableOpacity>
-      </View>
-      <View style={{ flex: 1, padding: 8 }}>
+          Clear All
+        </button>
+      </div>
+      <div className={styles.gridArea}>
         {[0, 1].map((row) => (
-          <View key={row} style={{ flex: 1, flexDirection: "row" }}>
+          <div key={row} className={styles.gridRow}>
             {COLLECTIONS.slice(row * 3, row * 3 + 3).map((col) => {
               let docs = sData[col.key];
               return (
-                <View key={col.key} style={{ flex: 1, margin: 4, borderWidth: 1, borderColor: gray(0.2), borderRadius: 6, overflow: "hidden" }}>
-                  <View style={{ backgroundColor: gray(0.08), paddingVertical: 6, paddingHorizontal: 10, borderBottomWidth: 1, borderBottomColor: gray(0.2), flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                    <Text style={{ fontSize: 13, fontWeight: "600", color: C.text }}>{col.label} ({docs.length})</Text>
-                    <View style={{ flexDirection: "row", gap: 4 }}>
-                      <TouchableOpacity
-                        onPress={() => {
+                <div key={col.key} className={styles.collectionCard}>
+                  <div className={styles.collectionHeader} style={{ backgroundColor: C.surfaceAlt }}>
+                    <p className={styles.collectionTitle} style={{ color: C.text }}>{col.label} ({docs.length})</p>
+                    <div className={styles.headerBtnRow}>
+                      <button
+                        type="button"
+                        onClick={() => {
                           let output = `=== ${col.label} (${docs.length}) ===\n${JSON.stringify(docs, null, 2)}`;
                           copyToClipboard(NOTIFY_HINT + output);
                         }}
-                        style={{ paddingVertical: 2, paddingHorizontal: 8, borderRadius: 4, backgroundColor: C.blue }}
+                        className={styles.smallBtn}
+                        style={{ backgroundColor: C.blue }}
                       >
-                        <Text style={{ fontSize: 11, color: "white" }}>Copy</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => handleClearCollection(col)}
-                        style={{ paddingVertical: 2, paddingHorizontal: 8, borderRadius: 4, backgroundColor: C.red }}
+                        Copy
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleClearCollection(col)}
+                        className={styles.smallBtn}
+                        style={{ backgroundColor: C.red }}
                       >
-                        <Text style={{ fontSize: 11, color: "white" }}>Clear</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                  <ScrollView style={{ flex: 1, padding: 6 }}>
-                    <Text style={{ fontSize: 11, fontFamily: "monospace", color: C.text, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                        Clear
+                      </button>
+                    </div>
+                  </div>
+                  <div className={styles.scrollArea}>
+                    <pre className={styles.jsonText} style={{ color: C.text }}>
                       {JSON.stringify(docs, null, 2)}
-                    </Text>
-                  </ScrollView>
-                </View>
+                    </pre>
+                  </div>
+                </div>
               );
             })}
-          </View>
+          </div>
         ))}
-      </View>
-    </View>
+      </div>
+    </div>
   );
 }

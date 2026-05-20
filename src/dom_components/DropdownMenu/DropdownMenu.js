@@ -1,7 +1,7 @@
 import React, { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHandle } from "react";
 import ReactDOM from "react-dom";
 import { C, ICONS } from "../../styles";
-import { gray, lightenRGBByPercent, ifNumIsOdd, usdTypeMask } from "../../utils";
+import { lightenRGBByPercent, ifNumIsOdd, usdTypeMask } from "../../utils";
 import { DISCOUNT_TYPES } from "../../constants";
 import styles from "./DropdownMenu.module.css";
 
@@ -28,7 +28,7 @@ const CustomDiscountInput = ({ label, onApply, maxLength = 3, maxVal, currencyMo
 
   return (
     <div className={styles.customInputRow} onClick={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
-      <span className={styles.customInputLabel} style={{ color: gray(0.5) }}>{label}</span>
+      <span className={styles.customInputLabel} style={{ color: C.textMuted }}>{label}</span>
       <input
         className={`${styles.customInput} ${currencyMode ? styles.customInputWide : ""}`}
         value={val}
@@ -84,6 +84,8 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
     itemSeparatorStyle = {},
     disabled = false,
     className = "",
+    buttonClassName = "",
+    buttonTextClassName = "",
     "aria-label": ariaLabel,
     "data-testid": testId,
   },
@@ -254,7 +256,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
     <div style={{ display: "flex", flex: 1 }}>
       <div
         ref={anchorRef}
-        className={`${styles.trigger} ${displayText ? styles.triggerHasText : ""} ${isDisabled ? styles.disabled : ""} ${className}`}
+        className={`${styles.trigger} ${displayText ? styles.triggerHasText : ""} ${isDisabled ? styles.disabled : ""} ${className} ${buttonClassName}`}
         style={triggerStyle}
         onClick={() => { if (!isDisabled) { calcPosition(); setOpen(!isOpen); } }}
         role="combobox"
@@ -283,8 +285,8 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
         )}
         {displayText && (
           <span
-            className={styles.triggerText}
-            style={{ color: gray(0.55), fontFamily: SYSTEM_FONT, ...buttonTextStyle }}
+            className={`${styles.triggerText} ${buttonTextClassName}`}
+            style={{ color: C.textMuted, fontFamily: SYSTEM_FONT, ...buttonTextStyle }}
           >
             {displayText}
           </span>
@@ -309,7 +311,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
             }}
             className={styles.menu}
             style={{
-              borderColor: menuBorderColor || gray(0.08),
+              borderColor: menuBorderColor || C.borderSubtle,
               borderRadius: br,
               minWidth: menuPos.anchorWidth || undefined,
               maxHeight: menuMaxHeight || "calc(100vh - 20px)",
@@ -318,7 +320,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
           >
             {fullDataArr.map((item, idx) => {
               if (item._isDivider) {
-                return <div key={"div_" + idx} style={{ height: 1, backgroundColor: gray(0.15), width: "100%" }} />;
+                return <div key={"div_" + idx} style={{ height: 1, backgroundColor: C.borderSubtle, width: "100%" }} />;
               }
 
               if (item._isCustomInput || item.component) {
@@ -348,9 +350,9 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
                     paddingRight: isSelected ? 28 : undefined,
                     backgroundColor: isSelected && !preserveItemBackground
                       ? lightenRGBByPercent(C.blue, 85)
-                      : (getItemBg(item.backgroundColor, idx) || getItemBg(gray(0.036), idx)),
+                      : (getItemBg(item.backgroundColor, idx) || getItemBg(C.surfaceAlt, idx)),
                     opacity: isSelected && preserveItemBackground ? selectedItemOpacity : undefined,
-                    outline: isFocused ? "2px solid #007bff" : undefined,
+                    outline: isFocused ? `2px solid ${C.borderFocus}` : undefined,
                     ...itemBorderRadius(idx),
                     ...resolvedItemStyle,
                   }}
@@ -380,7 +382,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
                     </span>
                   )}
                   {item.subtitle && (
-                    <span className={styles.itemSubtitle} style={{ color: gray(0.5), fontFamily: SYSTEM_FONT }}>
+                    <span className={styles.itemSubtitle} style={{ color: C.textMuted, fontFamily: SYSTEM_FONT }}>
                       {item.subtitle}
                     </span>
                   )}

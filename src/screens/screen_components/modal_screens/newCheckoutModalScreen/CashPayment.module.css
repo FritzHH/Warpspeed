@@ -1,0 +1,210 @@
+.container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 0;
+  width: 100%;
+  height: 48%;
+  border-radius: 15px;
+  box-shadow: 2px 2px 15px rgba(60, 179, 113, 0.25);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.containerDone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 15px;
+  width: 100%;
+  height: 48%;
+  border-radius: 15px;
+  box-shadow: 2px 2px 15px rgba(60, 179, 113, 0.25);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.celebrationInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.celebrationGif {
+  width: 100px;
+  height: 100px;
+  margin-bottom: 14px;
+  background-color: transparent;
+  object-fit: contain;
+}
+
+.celebrationText {
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.checkBoxRow {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  justify-content: flex-start;
+  padding-left: 10px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.title {
+  font-size: 25px;
+  font-weight: 600;
+}
+
+.payRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 5px;
+  padding: 10px;
+  border-radius: 10px;
+  border: 1px solid;
+  width: 70%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.labelsCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: space-between;
+  height: 100%;
+  padding-right: 5px;
+  flex-shrink: 0;
+}
+
+.labelTop {
+  margin-top: 4px;
+}
+
+.labelBottom {
+  margin-bottom: 15px;
+}
+
+.valuesCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  margin-left: 10px;
+  flex-shrink: 0;
+}
+
+.balanceText {
+  font-size: 15px;
+  padding: 5px;
+  padding-right: 1px;
+}
+
+.payAmountBox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-left: 10px;
+  border: 2px solid;
+  border-radius: 10px;
+  padding: 10px 7px 6px 10px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.dollarSign {
+  font-size: 15px;
+}
+
+.payInputWrap {
+  width: 100px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-right: 5px;
+  flex-shrink: 0;
+}
+
+.payInput {
+  font-size: 20px;
+  outline: none;
+  padding-right: 2px;
+  text-align: right;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.tenderSection {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 5px 0;
+  flex-shrink: 0;
+}
+
+.tenderBox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  border: 2px solid;
+  border-radius: 10px;
+  padding: 10px 10px 6px 10px;
+  width: 35%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.tenderDollar {
+  font-size: 15px;
+}
+
+.tenderInputWrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  padding-right: 5px;
+  flex-shrink: 0;
+}
+
+.tenderInput {
+  outline: none;
+  font-size: 25px;
+  text-align: right;
+  width: 90%;
+  border: 0;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.tenderLabel {
+  font-style: italic;
+  color: darkgray;
+  font-size: 12px;
+}
+
+.changeText {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.statusMsg {
+  font-size: 11px;
+  font-style: italic;
+  margin-bottom: 4px;
+}

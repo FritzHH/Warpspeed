@@ -4,11 +4,29 @@ import { C } from "../../styles";
 import styles from "./DateTimePicker.module.css";
 import "react-day-picker/style.css";
 
+const DEFAULT_MODIFIERS_STYLES = {
+  today: {
+    borderColor: C.lightred,
+    borderWidth: 2,
+    borderStyle: "solid",
+    borderRadius: "50%",
+  },
+  selected: {
+    borderRadius: "50%",
+    backgroundColor: C.blue,
+    color: "white",
+  },
+};
+
 export const DateTimePicker = forwardRef(function DateTimePicker(
   {
     range,
     handleDateRangeChange,
     onChange,
+    month,
+    onMonthChange,
+    modifiersStyles,
+    numberOfMonths,
     style = {},
     className = "",
     disabled = false,
@@ -31,6 +49,10 @@ export const DateTimePicker = forwardRef(function DateTimePicker(
     });
   };
 
+  const mergedModifiersStyles = modifiersStyles
+    ? { ...DEFAULT_MODIFIERS_STYLES, ...modifiersStyles }
+    : DEFAULT_MODIFIERS_STYLES;
+
   return (
     <div
       ref={ref}
@@ -45,19 +67,10 @@ export const DateTimePicker = forwardRef(function DateTimePicker(
           selected={selected}
           onSelect={handleSelect}
           disabled={disabled}
-          modifiersStyles={{
-            today: {
-              borderColor: C.lightred,
-              borderWidth: 2,
-              borderStyle: "solid",
-              borderRadius: "50%",
-            },
-            selected: {
-              borderRadius: "50%",
-              backgroundColor: C.blue,
-              color: "white",
-            },
-          }}
+          month={month}
+          onMonthChange={onMonthChange}
+          numberOfMonths={numberOfMonths}
+          modifiersStyles={mergedModifiersStyles}
         />
       </div>
     </div>

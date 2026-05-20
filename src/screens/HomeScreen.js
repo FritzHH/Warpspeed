@@ -1,15 +1,12 @@
-/* eslint-disable */
-
-import React, { useState } from "react";
-import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { C, COLOR_GRADIENTS, ICONS } from "../styles";
-import { Button_, Image_ } from "../components";
-import { CheckBox } from "../dom_components";
+import { getTheme, setTheme, subscribeTheme } from "../styles/theme";
+import { Button, CheckBox } from "../dom_components";
 import { ROUTES } from "../routes";
 import { useSettingsStore, useLayoutStore } from "../stores";
-import { gray } from "../utils";
 import { dbLogout } from "../db_calls_wrapper";
+import styles from "./HomeScreen.module.css";
 
 export function HomeScreen() {
   const navigate = useNavigate();
@@ -20,13 +17,13 @@ export function HomeScreen() {
   const [sSmsSound, _setSmsSound] = useState(
     localStorage.getItem("warpspeed_sms_sound") !== "false"
   );
+  const [sDarkMode, _setDarkMode] = useState(() => getTheme() === "dark");
+  useEffect(() => subscribeTheme((t) => _setDarkMode(t === "dark")), []);
 
-  let isMobileOrTablet = deviceType === "mobile" || deviceType === "tablet";
-  let isDesktop = deviceType === "desktop";
+  const isMobileOrTablet = deviceType === "mobile" || deviceType === "tablet";
+  const isDesktop = deviceType === "desktop";
 
-  // Build link items based on device type
   let linkItems = [];
-
   if (deviceType === "tablet") {
     linkItems = [
       { label: "Bike Stand", path: ROUTES.stand, icon: ICONS.tools1, gradient: COLOR_GRADIENTS.green, recommended: true },
@@ -38,7 +35,6 @@ export function HomeScreen() {
       { label: "Bike Stand", path: ROUTES.stand, icon: ICONS.tools1, gradient: COLOR_GRADIENTS.blue },
     ];
   } else {
-    // Desktop
     linkItems = [
       { label: "Workorders", path: ROUTES.dashboard, icon: ICONS.gears1, gradient: COLOR_GRADIENTS.blue },
       { label: "Bike Stand", path: ROUTES.stand, icon: ICONS.tools1, gradient: COLOR_GRADIENTS.blue },
@@ -49,26 +45,26 @@ export function HomeScreen() {
 
   async function handleLinkPress(item) {
     if (item.popup) {
-      let storeName = useSettingsStore.getState().getSettings()?.storeInfo?.displayName || "";
-      let title = storeName ? `${storeName} Checkout Display` : "Checkout Display";
+      const storeName = useSettingsStore.getState().getSettings()?.storeInfo?.displayName || "";
+      const title = storeName ? `${storeName} Checkout Display` : "Checkout Display";
       let screenDetails = null;
       let secondScreen = null;
 
       if (window.getScreenDetails) {
         try {
           screenDetails = await window.getScreenDetails();
-          let currentScreen = screenDetails.currentScreen;
+          const currentScreen = screenDetails.currentScreen;
           secondScreen = screenDetails.screens.find(
             (s) => s.label !== currentScreen.label
           );
         } catch (e) {}
       }
 
-      let features = secondScreen
+      const features = secondScreen
         ? `popup,left=${secondScreen.left},top=${secondScreen.top},width=${secondScreen.width},height=${secondScreen.height}`
         : "popup,width=1024,height=768";
 
-      let win = window.open(item.path, "customerDisplay", features);
+      const win = window.open(item.path, "customerDisplay", features);
       if (win) {
         win.addEventListener("load", () => {
           win.document.title = title;
@@ -80,42 +76,27 @@ export function HomeScreen() {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={{
-        flexGrow: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        padding: isMobileOrTablet ? 20 : 40,
-      }}
-      style={{ flex: 1, backgroundColor: C.backgroundWhite }}
+    <div
+      className={`${styles.root} ${isMobileOrTablet ? styles.rootMobile : styles.rootDesktop}`}
+      style={{ backgroundColor: C.backgroundWhite }}
     >
-      <Text
-        style={{
-          fontSize: isMobileOrTablet ? 22 : 28,
-          fontWeight: "700",
-          color: C.text,
-          marginBottom: isMobileOrTablet ? 6 : 20,
-        }}
+      <h1
+        className={`${styles.title} ${isMobileOrTablet ? styles.titleMobile : styles.titleDesktop}`}
+        style={{ color: C.text }}
       >
         Warpspeed
-      </Text>
+      </h1>
 
-      {/* Device type indicator */}
-      <Text
-        style={{
-          fontSize: 11,
-          color: gray(0.4),
-          marginBottom: isMobileOrTablet ? 16 : 24,
-          textTransform: "uppercase",
-          letterSpacing: 1,
-        }}
+      <div
+        className={`${styles.deviceLabel} ${isMobileOrTablet ? styles.deviceLabelMobile : styles.deviceLabelDesktop}`}
+        style={{ color: C.textMuted }}
       >
         {deviceType} mode
-      </Text>
+      </div>
 
-      <View style={{ width: isMobileOrTablet ? "100%" : 300, maxWidth: 400 }}>
+      <div className={styles.linkGroup}>
         {linkItems.map((item) => (
-          <Button_
+          <Button
             key={item.path + item.label}
             onPress={() => handleLinkPress(item)}
             text={item.label}
@@ -124,23 +105,24 @@ export function HomeScreen() {
             colorGradientArr={item.gradient}
             buttonStyle={{
               borderRadius: 5,
-              paddingVertical: isMobileOrTablet ? 16 : 12,
-              paddingHorizontal: 20,
+              paddingTop: isMobileOrTablet ? 16 : 12,
+              paddingBottom: isMobileOrTablet ? 16 : 12,
+              paddingLeft: 20,
+              paddingRight: 20,
               marginBottom: isMobileOrTablet ? 10 : 12,
-              width: "100%",
+              width: 300,
             }}
             textStyle={{ fontSize: isMobileOrTablet ? 18 : 16 }}
           />
         ))}
-      </View>
+      </div>
 
-      {/* Secondary display checkbox — desktop only */}
       {isDesktop && (
         <CheckBox
           text="Secondary display attached"
           isChecked={sHasDisplay}
           onCheck={() => {
-            let newVal = !sHasDisplay;
+            const newVal = !sHasDisplay;
             _setHasDisplay(newVal);
             localStorage.setItem("warpspeed_has_secondary_display", String(newVal));
           }}
@@ -153,7 +135,7 @@ export function HomeScreen() {
           text="SMS notification sound"
           isChecked={sSmsSound}
           onCheck={() => {
-            let newVal = !sSmsSound;
+            const newVal = !sSmsSound;
             _setSmsSound(newVal);
             localStorage.setItem("warpspeed_sms_sound", String(newVal));
           }}
@@ -161,21 +143,31 @@ export function HomeScreen() {
           buttonStyle={{ marginTop: 10 }}
         />
       )}
+      {isDesktop && (
+        <CheckBox
+          text="Dark mode"
+          isChecked={sDarkMode}
+          onCheck={() => setTheme(sDarkMode ? "light" : "dark")}
+          textStyle={{ fontSize: 14, color: C.lightText }}
+          buttonStyle={{ marginTop: 10 }}
+        />
+      )}
 
-      <Button_
+      <Button
         onPress={async () => { await dbLogout(); navigate(ROUTES.login); }}
         text="Logout"
         colorGradientArr={COLOR_GRADIENTS.red}
         buttonStyle={{
           borderRadius: 5,
-          paddingVertical: isMobileOrTablet ? 14 : 10,
-          paddingHorizontal: 20,
+          paddingTop: isMobileOrTablet ? 14 : 10,
+          paddingBottom: isMobileOrTablet ? 14 : 10,
+          paddingLeft: 20,
+          paddingRight: 20,
           marginTop: 30,
-          width: isMobileOrTablet ? "100%" : 300,
-          maxWidth: 400,
+          width: 300,
         }}
         textStyle={{ fontSize: isMobileOrTablet ? 16 : 14 }}
       />
-    </ScrollView>
+    </div>
   );
 }

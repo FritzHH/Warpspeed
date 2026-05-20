@@ -1,9 +1,9 @@
 .card {
-  background-color: rgb(254, 254, 255);
+  background-color: var(--surface-raised);
   border-radius: 10px;
   border-width: 1px;
   border-style: solid;
-  border-color: rgb(200, 228, 220);
+  border-color: var(--border-default);
   padding: 12px;
   margin-bottom: 12px;
   box-sizing: border-box;
@@ -30,11 +30,11 @@
 .label {
   font-size: 15px;
   font-weight: 600;
-  color: rgb(140, 140, 140);
+  color: var(--text-muted);
 }
 
 .countBadge {
-  background-color: rgb(53, 135, 210);
+  background-color: var(--info);
   border-radius: 10px;
   padding-left: 6px;
   padding-right: 6px;
@@ -45,7 +45,7 @@
 }
 
 .countBadgeText {
-  color: white;
+  color: var(--text-on-accent);
   font-size: 13px;
   font-weight: 600;
 }
@@ -61,7 +61,7 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  background-color: rgb(232, 95, 95);
+  background-color: var(--danger);
   border-radius: 6px;
   padding-left: 12px;
   padding-right: 12px;
@@ -75,7 +75,7 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  background-color: rgb(53, 135, 210);
+  background-color: var(--info);
   border-radius: 6px;
   padding-left: 12px;
   padding-right: 12px;
@@ -86,7 +86,7 @@
 }
 
 .actionBtnText {
-  color: white;
+  color: var(--text-on-accent);
   font-size: 15px;
   font-weight: 600;
 }
@@ -104,21 +104,21 @@
 
 .progressLabel {
   font-size: 14px;
-  color: rgb(140, 140, 140);
+  color: var(--text-muted);
   margin-left: 6px;
 }
 
 .progressTrack {
   height: 4px;
   border-radius: 2px;
-  background-color: rgb(230, 230, 230);
+  background-color: var(--border-subtle);
   overflow: hidden;
 }
 
 .progressFill {
   height: 4px;
   border-radius: 2px;
-  background-color: rgb(53, 135, 210);
+  background-color: var(--info);
 }
 
 .completeText {
@@ -129,11 +129,11 @@
 }
 
 .completeTextSuccess {
-  color: rgb(76, 175, 80);
+  color: var(--accent);
 }
 
 .completeTextError {
-  color: rgb(232, 95, 95);
+  color: var(--danger);
 }
 
 .thumbGrid {
@@ -148,7 +148,7 @@
   aspect-ratio: 1;
   border-radius: 6px;
   overflow: hidden;
-  background-color: rgb(242, 242, 242);
+  background-color: var(--surface-alt);
   position: relative;
   cursor: pointer;
   flex-shrink: 0;
@@ -170,17 +170,17 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: rgba(0, 0, 0, 0.25);
+  background-color: var(--surface-overlay-light);
 }
 
 .videoOverlayIcon {
-  color: white;
+  color: var(--text-on-accent);
   font-size: 26px;
 }
 
 .emptyText {
   font-size: 15px;
-  color: rgb(128, 128, 128);
+  color: var(--text-muted);
 }
 
 .viewer {
@@ -189,7 +189,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.9);
+  background-color: var(--surface-overlay-heavy);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -214,7 +214,7 @@
 }
 
 .viewerCloseBtnText {
-  color: white;
+  color: var(--text-on-accent);
   font-size: 20px;
   font-weight: 700;
 }
@@ -226,7 +226,7 @@
 }
 
 .viewerFilename {
-  color: rgb(153, 153, 153);
+  color: var(--text-secondary);
   font-size: 12px;
   margin-top: 8px;
 }

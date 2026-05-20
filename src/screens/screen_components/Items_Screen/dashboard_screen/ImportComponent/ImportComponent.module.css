@@ -173,7 +173,7 @@
 }
 
 .lookupInput::placeholder {
-  color: rgb(102, 102, 102);
+  color: var(--text-muted);
 }
 
 .goButton {
@@ -190,7 +190,7 @@
 
 .goButtonText {
   font-size: 13px;
-  color: white;
+  color: var(--text-on-accent);
   font-weight: 600;
 }
 

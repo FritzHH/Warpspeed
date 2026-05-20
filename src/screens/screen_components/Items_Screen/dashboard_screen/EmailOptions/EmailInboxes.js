@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
 } from "../../../../../dom_components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../../styles";
-import { generate36CharUUID, gray, log } from "../../../../../utils";
+import { generate36CharUUID, log } from "../../../../../utils";
 import { useAlertScreenStore, useEmailStore } from "../../../../../stores";
 import {
   dbGmailDisconnect,
@@ -161,7 +161,7 @@ export const EmailInboxes = ({ zSettingsObj, handleSettingsFieldChange }) => {
                         onPress={() => { _sSetEditingKey(null); _sSetEditDisplayName(""); }}
                         style={{ padding: 2 }}
                       >
-                        <span style={{ fontSize: 13, color: gray(0.4), fontWeight: "700" }}>{"\u2715"}</span>
+                        <span style={{ fontSize: 13, color: C.textMuted, fontWeight: "700" }}>{"\u2715"}</span>
                       </TouchableOpacity>
                     </div>
                   ) : (
@@ -189,7 +189,7 @@ export const EmailInboxes = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   <span
                     style={{
                       fontSize: 12,
-                      color: gray(0.5),
+                      color: C.textMuted,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
                       whiteSpace: "nowrap",
@@ -207,7 +207,7 @@ export const EmailInboxes = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       handleSettingsFieldChange("emailAccounts", updated);
                     }}
                     buttonStyle={{ marginTop: 4 }}
-                    textStyle={{ fontSize: 11, color: gray(0.5) }}
+                    textStyle={{ fontSize: 11, color: C.textMuted }}
                   />
                 </div>
                 <div className={styles.inboxRowActions}>

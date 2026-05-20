@@ -13,11 +13,7 @@ import {
 import { TAB_NAMES } from "../../../data";
 import { startNewWorkorder, dbGetCustomer } from "../../../db_calls_wrapper";
 import defaultLogo from "../../../resources/default_app_logo_large.png";
-import {
-  capitalizeFirstLetterOfString,
-  formatPhoneForDisplay,
-  gray,
-} from "../../../utils";
+import { capitalizeFirstLetterOfString, formatPhoneForDisplay } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
 import styles from "./Items_RecentCustomers.module.css";
@@ -74,7 +70,7 @@ export function RecentCustomersComponent() {
                   capitalizeFirstLetterOfString(item.last)}
               </span>
               {!!item.customerCell && (
-                <span className={styles.phone} style={{ color: gray(0.45) }}>
+                <span className={styles.phone} style={{ color: C.textMuted }}>
                   {formatPhoneForDisplay(item.customerCell)}
                 </span>
               )}

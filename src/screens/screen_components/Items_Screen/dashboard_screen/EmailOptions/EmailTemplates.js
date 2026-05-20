@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
 } from "../../../../../dom_components";
 import { C, COLOR_GRADIENTS, ICONS, Z } from "../../../../../styles";
-import { gray } from "../../../../../utils";
+
 import { COLORS, SETTINGS_OBJ } from "../../../../../data";
 import {
   BoxButton1,
@@ -200,16 +200,16 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
     };
     return (
       <div style={{ display: "flex", flexDirection: "row", alignItems: "center", marginTop: 8 }}>
-        <span style={{ fontSize: 12, color: gray(0.5), marginRight: 8 }}>Align:</span>
+        <span style={{ fontSize: 12, color: C.textMuted, marginRight: 8 }}>Align:</span>
         <TouchableOpacity
           onPress={() => onAlignChange("center")}
-          style={{ ...btnBase, backgroundColor: currentAlign === "center" ? C.green : "transparent", borderColor: currentAlign === "center" ? C.green : gray(0.3), marginRight: 6 }}
+          style={{ ...btnBase, backgroundColor: currentAlign === "center" ? C.green : "transparent", borderColor: currentAlign === "center" ? C.green : C.borderStrong, marginRight: 6 }}
         >
           <span style={{ fontSize: 12, color: currentAlign === "center" ? "white" : C.text }}>Center</span>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={() => onAlignChange("left")}
-          style={{ ...btnBase, backgroundColor: currentAlign === "left" ? C.green : "transparent", borderColor: currentAlign === "left" ? C.green : gray(0.3) }}
+          style={{ ...btnBase, backgroundColor: currentAlign === "left" ? C.green : "transparent", borderColor: currentAlign === "left" ? C.green : C.borderStrong }}
         >
           <span style={{ fontSize: 12, color: currentAlign === "left" ? "white" : C.text }}>Left</span>
         </TouchableOpacity>
@@ -223,7 +223,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
   function renderColorPicker(selectedColorObj, onColorSelect) {
     return (
       <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", alignItems: "center", marginTop: 4 }}>
-        <span style={{ fontSize: 12, color: gray(0.5), marginRight: 8 }}>Button Color:</span>
+        <span style={{ fontSize: 12, color: C.textMuted, marginRight: 8 }}>Button Color:</span>
         {COLORS.map((c) => {
           let isActive = selectedColorObj?.label === c.label;
           return (
@@ -237,7 +237,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
                 backgroundColor: c.backgroundColor,
                 borderWidth: isActive ? 3 : 1,
                 borderStyle: "solid",
-                borderColor: isActive ? C.green : gray(0.4),
+                borderColor: isActive ? C.green : C.borderStrong,
                 marginRight: 4,
                 marginBottom: 4,
               }}
@@ -316,7 +316,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   <TouchableOpacity
                     key={c.label}
                     onPress={() => handleSettingsFieldChange("emailGreetingColorObj", c)}
-                    style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: c.backgroundColor, borderWidth: isActive ? 3 : 1, borderStyle: "solid", borderColor: isActive ? C.green : gray(0.4), marginRight: 4, marginBottom: 4 }}
+                    style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: c.backgroundColor, borderWidth: isActive ? 3 : 1, borderStyle: "solid", borderColor: isActive ? C.green : C.borderStrong, marginRight: 4, marginBottom: 4 }}
                   />
                 );
               })}
@@ -327,7 +327,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
 
         {/* ===== SHARED FOOTER ===== */}
         <div style={{ width: "100%", marginBottom: 20, flexShrink: 0 }}>
-          <span style={{ fontSize: 12, fontWeight: "600", color: gray(0.5), marginBottom: 6, display: "block" }}>FOOTER (shared)</span>
+          <span style={{ fontSize: 12, fontWeight: "600", color: C.textMuted, marginBottom: 6, display: "block" }}>FOOTER (shared)</span>
           <div style={{ backgroundColor: "#F5F5F5", borderRadius: 8, overflow: "hidden", borderWidth: 1, borderStyle: "solid", borderColor: "#E0E0E0" }}>
             {footerHasLogo && logoUrl ? (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 16, paddingBottom: 4 }}>
@@ -341,7 +341,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
               onChangeText={(val) => handleSettingsFieldChange("emailFooter", footerHasLogo ? "{storeLogo}\n" + val : val)}
               onSelect={(e) => { cursorRefs.current["footer"] = e.target.selectionStart; }}
               placeholder="Email footer..."
-              placeholderTextColor={gray(0.45)}
+              placeholderTextColor={C.textMuted}
               value={footerDisplayText}
               style={{ backgroundColor: "#F5F5F5", color: "#888888", fontSize: 13, lineHeight: "21px", padding: 20, paddingTop: footerHasLogo && logoUrl ? 8 : 20, minHeight: 60, overflow: "hidden", outline: "none", border: "none", borderRadius: 0, textAlign: footerAlign === "left" ? "left" : "center", width: "100%", boxSizing: "border-box" }}
             />
@@ -417,7 +417,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     onChangeText={(val) => handleFieldChange(templateObj, "label", val)}
                     onFocus={() => _setSelectedTemplateId(templateObj.id)}
                     placeholder="Template name..."
-                    placeholderTextColor={gray(0.3)}
+                    placeholderTextColor={C.textDisabled}
                     style={{ ...inputStyle, flex: 1, fontWeight: "500" }}
                     value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "label") ?? getLabel(templateObj)) : getLabel(templateObj)}
                   />
@@ -440,7 +440,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     onChangeText={(val) => handleFieldChange(templateObj, "subject", val)}
                     onFocus={() => _setSelectedTemplateId(templateObj.id)}
                     placeholder="Email subject..."
-                    placeholderTextColor={gray(0.3)}
+                    placeholderTextColor={C.textDisabled}
                     style={{ ...inputStyle }}
                     value={isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "subject") ?? templateObj.subject) : templateObj.subject}
                   />
@@ -455,7 +455,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   onFocus={() => _setSelectedTemplateId(templateObj.id)}
                   onSelect={(e) => { cursorRefs.current[templateObj.id + "_message"] = e.target.selectionStart; }}
                   placeholder="Email message..."
-                  placeholderTextColor={gray(0.3)}
+                  placeholderTextColor={C.textDisabled}
                   style={{
                     backgroundColor: "#ffffff",
                     color: "#333333",
@@ -500,7 +500,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
 
                 {/* Action button section - styled like email CTA area */}
                 <div style={{ backgroundColor: "#E8F5E9", padding: 16, marginTop: 8, display: "flex", flexDirection: "column", alignItems: "center" }}>
-                  <span style={{ fontSize: 11, fontWeight: "600", color: gray(0.45), marginBottom: 6, alignSelf: "flex-start" }}>
+                  <span style={{ fontSize: 11, fontWeight: "600", color: C.textMuted, marginBottom: 6, alignSelf: "flex-start" }}>
                     ACTION BUTTON {ticketLabel ? " - links to " + ticketLabel : " (optional)"}
                   </span>
                   <TextInput
@@ -508,7 +508,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
                     onChangeText={(val) => handleFieldChange(templateObj, "action", val)}
                     onFocus={() => _setSelectedTemplateId(templateObj.id)}
                     placeholder='Button label (e.g. "View Receipt")...'
-                    placeholderTextColor={gray(0.4)}
+                    placeholderTextColor={C.textMuted}
                     style={{ ...inputStyle, borderColor: "#C8E6C9", backgroundColor: "#ffffff", width: "100%", textAlign: "center" }}
                     value={actionVal}
                   />

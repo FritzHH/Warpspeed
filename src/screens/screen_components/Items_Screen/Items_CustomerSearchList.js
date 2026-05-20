@@ -1,23 +1,9 @@
 /* eslint-disable */
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Animated, View, Text, FlatList } from "react-native-web";
-import {
-  capitalizeFirstLetterOfString,
-  formatPhoneForDisplay,
-  gray,
-  log,
-} from "../../../utils";
-import {
-  Button_,
-  Image_,
-  ScreenModal,
-  SmallLoadingIndicator,
-  Tooltip,
-  TouchableOpacity_,
-} from "../../../components";
-import cloneDeep from "lodash/cloneDeep";
-import { SETTINGS_OBJ, TAB_NAMES, WORKORDER_PROTO } from "../../../data";
+import { useMemo, useState } from "react";
+import { capitalizeFirstLetterOfString, formatPhoneForDisplay } from "../../../utils";
+import { Button, Image, ScreenModal } from "../../../dom_components";
+import { TAB_NAMES } from "../../../data";
 import {
   useCurrentCustomerStore,
   useCustomerSearchStore,
@@ -30,6 +16,7 @@ import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoM
 import { startNewWorkorder } from "../../../db_calls_wrapper";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import defaultLogo from "../../../resources/default_app_logo_large.png";
+import styles from "./Items_CustomerSearchList.module.css";
 
 export function CustomerSearchListComponent({}) {
   // store getters //////////////////////////////////////////////////////////////////////
@@ -55,7 +42,6 @@ export function CustomerSearchListComponent({}) {
         (c.email || "").toLowerCase().includes(emailQ)
       );
     } else {
-      // name search — each word must match either first or last
       const words = zSearchQuery.toLowerCase().split(/\s+/).filter(Boolean);
       return zSearchResults.filter((c) => {
         const first = (c.first || "").toLowerCase();
@@ -86,141 +72,77 @@ export function CustomerSearchListComponent({}) {
     });
   }
 
-  // Spinning logo animation ///////////////////////////////////////////////////////////
-  const spinValue = useRef(new Animated.Value(0)).current;
-  const spinAnim = useRef(null);
-
-  useEffect(() => {
-    if (zIsSearching) {
-      spinValue.setValue(0);
-      spinAnim.current = Animated.loop(
-        Animated.timing(spinValue, {
-          toValue: 1,
-          duration: 5000,
-          useNativeDriver: false,
-        })
-      );
-      spinAnim.current.start();
-    } else {
-      if (spinAnim.current) spinAnim.current.stop();
-    }
-  }, [zIsSearching]);
-
-  const spin = spinValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: ["0deg", "360deg"],
-  });
-  ///////////////////////////////////////////////////////////////////////////////////////
-
   return (
-    <View
-      style={{
-        width: "100%",
-        height: "100%",
-        justifyContent: "center",
-        paddingHorizontal: 10,
-      }}
-    >
-      <Animated.Image
-        source={defaultLogo}
-        style={{
-          opacity: 0.1,
-          width: "90%",
-          height: "90%",
-          position: "absolute",
-          alignSelf: "center",
-          resizeMode: "contain",
-          transform: [{ rotate: spin }],
-        }}
+    <div className={styles.root}>
+      <img
+        src={defaultLogo}
+        alt=""
+        className={`${styles.logo} ${zIsSearching ? styles.logoSpinning : ""}`}
+        draggable={false}
       />
-      <FlatList
-        style={{
-          width: "100%",
-          flexGrow: 0,
-          maxHeight: "90%",
-        }}
-        contentContainerStyle={{
-          justifyContent: "center",
-          // alignItems: "center",
-          flexGrow: 1,
-          minHeight: "100%",
-        }}
-        data={filteredResults}
-        ListEmptyComponent={() => (
-          <View style={{ alignItems: "center", justifyContent: "center", paddingVertical: 30 }}>
+      <div className={styles.list}>
+        {filteredResults.length === 0 ? (
+          <div className={styles.emptyState}>
             {!zIsSearching && (
-              <Text style={{ color: gray(0.4), fontSize: 14 }}>No customers found</Text>
+              <span className={styles.emptyText} style={{ color: C.textMuted }}>
+                No customers found
+              </span>
             )}
-          </View>
-        )}
-        renderItem={(obj) => {
-          let customer = obj.item;
-          return (
-            <View
-              style={{
-                flexDirection: "row",
-                width: "100%",
-                height: 60,
-                paddingHorizontal: 10,
-                backgroundColor: "transparent",
-                borderBottomWidth: 1,
-                borderColor: gray(0.1),
-              }}
-            >
-              <TouchableOpacity_
-                style={{ flex: 1, height: "100%", flexDirection: "row" }}
-                onPress={(e) => {
-                  _setModalY(e.nativeEvent?.clientY ?? e.nativeEvent?.pageY ?? 0);
-                  _setModalX(e.nativeEvent?.clientX ?? e.nativeEvent?.pageX ?? 0);
+          </div>
+        ) : (
+          filteredResults.map((customer) => (
+            <div key={customer.id} className={styles.row}>
+              <button
+                type="button"
+                className={styles.rowButton}
+                onClick={(e) => {
+                  _setModalY(e.clientY ?? 0);
+                  _setModalX(e.clientX ?? 0);
                   _setSelectedCustomer(customer);
                 }}
               >
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, color: C.text }}>
-                    {capitalizeFirstLetterOfString(customer?.first) + " " + capitalizeFirstLetterOfString(customer?.last)}
-                  </Text>
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      marginTop: 5,
-                    }}
-                  >
-                    <Text style={{ color: C.text, fontSize: 14 }}>
-                      <Text style={{ color: gray(0.35), fontSize: 12 }}>{"cell:  "}</Text>
+                <div className={styles.rowContent}>
+                  <span className={styles.name} style={{ color: C.text }}>
+                    {capitalizeFirstLetterOfString(customer?.first) +
+                      " " +
+                      capitalizeFirstLetterOfString(customer?.last)}
+                  </span>
+                  <div className={styles.contactRow}>
+                    <span className={styles.contactField} style={{ color: C.text }}>
+                      <span className={styles.contactLabel} style={{ color: C.textDisabled }}>
+                        {"cell:  "}
+                      </span>
                       {formatPhoneForDisplay(customer?.customerCell)}
-                    </Text>
+                    </span>
                     {!!(customer?.customerLandline || customer?.land) && (
-                      <Text
-                        style={{ color: C.text, marginLeft: 30, fontSize: 14 }}
+                      <span
+                        className={`${styles.contactField} ${styles.contactFieldGap}`}
+                        style={{ color: C.text }}
                       >
-                        <Text style={{ color: gray(0.35), fontSize: 12 }}>
+                        <span className={styles.contactLabel} style={{ color: C.textDisabled }}>
                           {"landline:  "}
-                        </Text>
+                        </span>
                         {formatPhoneForDisplay(customer?.customerLandline || customer?.land)}
-                      </Text>
+                      </span>
                     )}
                     {!!customer?.email && (
-                      <Text
-                        style={{
-                          color: C.text,
-                          marginLeft: 30,
-                          fontSize: 14,
-                        }}
+                      <span
+                        className={`${styles.contactField} ${styles.contactFieldGap}`}
+                        style={{ color: C.text }}
                       >
-                        <Text style={{ color: gray(0.35), fontSize: 12 }}>
+                        <span className={styles.contactLabel} style={{ color: C.textDisabled }}>
                           {"email:  "}
-                        </Text>
+                        </span>
                         {customer?.email}
-                      </Text>
+                      </span>
                     )}
-                  </View>
-                </View>
-              </TouchableOpacity_>
-            </View>
-          );
-        }}
-      />
+                  </div>
+                </div>
+              </button>
+            </div>
+          ))
+        )}
+      </div>
       {useMemo(
         () => (
           <ScreenModal
@@ -244,41 +166,30 @@ export function CustomerSearchListComponent({}) {
         [sCustomerInfo]
       )}
       {sSelectedCustomer && (
-        <View
+        <div
+          className={styles.actionOverlay}
           onClick={() => _setSelectedCustomer(null)}
-          style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            zIndex: 999,
-          }}
         >
-          <View
+          <div
+            className={styles.actionPopup}
             onClick={(e) => e.stopPropagation()}
             style={{
-              position: "absolute",
               top: sModalY,
               left: sModalX,
               backgroundColor: C.backgroundWhite,
-              borderRadius: 10,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.25,
-              shadowRadius: 4,
-              elevation: 5,
             }}
           >
-            <View style={{ flexDirection: "row", justifyContent: "flex-end", padding: 10 }}>
-              <TouchableOpacity_
-                onPress={() => _setSelectedCustomer(null)}
+            <div className={styles.actionPopupHeader}>
+              <button
+                type="button"
+                className={styles.closeButton}
+                onClick={() => _setSelectedCustomer(null)}
               >
-                <Image_ icon={ICONS.close1} style={{ width: 28, height: 28 }} />
-              </TouchableOpacity_>
-            </View>
-            <View style={{ alignItems: "center", paddingHorizontal: 25, paddingBottom: 25 }}>
-              <Button_
+                <Image icon={ICONS.close1} className={styles.closeIcon} />
+              </button>
+            </div>
+            <div className={styles.actionPopupBody}>
+              <Button
                 text="New Workorder"
                 colorGradientArr={COLOR_GRADIENTS.green}
                 onPress={() => {
@@ -289,7 +200,7 @@ export function CustomerSearchListComponent({}) {
                 buttonStyle={{ width: 200, height: 45 }}
                 textStyle={{ fontSize: 16 }}
               />
-              <Button_
+              <Button
                 text="Customer Info"
                 colorGradientArr={COLOR_GRADIENTS.blue}
                 onPress={() => {
@@ -300,10 +211,10 @@ export function CustomerSearchListComponent({}) {
                 buttonStyle={{ width: 200, height: 45, marginTop: 15 }}
                 textStyle={{ fontSize: 16 }}
               />
-            </View>
-          </View>
-        </View>
+            </div>
+          </div>
+        </div>
       )}
-    </View>
+    </div>
   );
 }

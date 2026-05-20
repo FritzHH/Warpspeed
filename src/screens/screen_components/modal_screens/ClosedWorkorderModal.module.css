@@ -1,0 +1,503 @@
+/* ── Shell ─────────────────────────────────────────────────────── */
+.shell {
+  width: 85vw;
+  height: 90vh;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+/* ── Header ────────────────────────────────────────────────────── */
+.header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.headerRight {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.statusBadge {
+  padding: 4px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.woNumber {
+  font-size: 14px;
+  font-weight: 600;
+  margin-left: 12px;
+}
+
+.idText {
+  font-size: 13px;
+  margin-left: 12px;
+}
+
+.importBadge,
+.taxFreeBadge {
+  padding: 1px 6px;
+  border-radius: 8px;
+  margin-left: 8px;
+  font-size: 9px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+/* ── Banner ────────────────────────────────────────────────────── */
+.banner {
+  padding: 8px 20px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.bannerStatusBadge {
+  padding: 5px 14px;
+  border-radius: 8px;
+  margin-right: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.bannerTitle {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  flex: 1;
+}
+
+.viewSaleBtn {
+  background-color: black;
+  padding: 5px 16px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  color: gold;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* ── Body ──────────────────────────────────────────────────────── */
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  padding: 20px;
+  min-height: 0;
+}
+
+.col1 {
+  width: 25%;
+  padding-right: 15px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.col2 {
+  width: 40%;
+  padding: 0 15px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+.col3 {
+  width: 35%;
+  padding-left: 15px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+.divider {
+  width: 1px;
+  margin: 0 5px;
+  background-color: var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.scrollY {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* ── Section header ────────────────────────────────────────────── */
+.sectionHeader {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  margin: 14px 0 6px 0;
+  display: block;
+}
+
+/* ── Detail row (label + value) ───────────────────────────────── */
+.detailRow {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 6px;
+}
+
+.detailLabel {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.detailValue {
+  flex: 1;
+}
+
+/* ── Total row ─────────────────────────────────────────────────── */
+.totalRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+
+.totalRowLabel {
+  font-size: 14px;
+}
+
+.totalRowValue {
+  font-size: 14px;
+}
+
+.totalRowValueBold {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+/* ── Line item card ────────────────────────────────────────────── */
+.lineCard {
+  margin-bottom: 6px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  padding: 6px 10px;
+  width: 100%;
+}
+
+.lineHeaderRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.lineName {
+  font-size: 14px;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lineQty {
+  font-weight: 600;
+}
+
+.linePrice {
+  font-size: 13px;
+}
+
+.linePriceStruck {
+  text-decoration: line-through;
+}
+
+.lineDiscountRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.lineDiscountName {
+  font-size: 11px;
+}
+
+.lineDiscountPrice {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.lineWarranty {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.lineIntakeNote {
+  font-size: 12px;
+  margin-top: 3px;
+}
+
+.lineReceiptNote {
+  font-size: 12px;
+  margin-top: 2px;
+}
+
+/* ── Totals footer ─────────────────────────────────────────────── */
+.totalsFooter {
+  margin-top: 8px;
+  border-top: 1px solid var(--border-subtle);
+  padding-top: 8px;
+  flex-shrink: 0;
+}
+
+.hairline {
+  height: 1px;
+  background-color: var(--border-subtle);
+  margin: 4px 0;
+}
+
+/* ── Sale card ─────────────────────────────────────────────────── */
+.saleCard {
+  border-radius: 7px;
+  border: 1px solid;
+  padding: 10px;
+  margin-bottom: 8px;
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+  display: block;
+  font-family: inherit;
+}
+
+.saleCardStatic {
+  cursor: default;
+}
+
+.saleCardHeader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.saleIdText {
+  font-size: 12px;
+}
+
+.saleDateText {
+  font-size: 13px;
+  margin-bottom: 4px;
+}
+
+.saleTotalsBlock {
+  margin-bottom: 4px;
+}
+
+.saleRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
+
+.saleRowLabel {
+  font-size: 13px;
+}
+
+.saleRowValue {
+  font-size: 13px;
+}
+
+.saleTotalRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.saleTotalLabel {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.saleTotalValue {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.saleSectionTitle {
+  font-size: 12px;
+  font-weight: 600;
+  margin-bottom: 3px;
+  display: block;
+}
+
+.saleSection {
+  margin-top: 4px;
+}
+
+.saleEmphasisRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-top: 2px;
+}
+
+.saleEmphasisLabel {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.saleEmphasisValue {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* ── Note item ─────────────────────────────────────────────────── */
+.noteItem {
+  margin-bottom: 5px;
+  padding-left: 8px;
+  border-left: 2px solid;
+}
+
+.noteText {
+  font-size: 11px;
+  display: block;
+}
+
+.noteMeta {
+  font-size: 9px;
+  margin-top: 1px;
+  display: block;
+}
+
+/* ── Change log ────────────────────────────────────────────────── */
+.changeLogToggle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin: 14px 0 6px 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+
+.changeLogToggleTitle {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.changeLogToggleHint {
+  font-size: 10px;
+  margin-left: 6px;
+}
+
+.changeLogEntry {
+  margin-bottom: 4px;
+  padding: 4px 6px 4px 8px;
+  border-left: 2px solid;
+}
+
+.changeLogEntryAlt {
+  border-radius: 4px;
+}
+
+.changeLogMessage {
+  font-size: 10px;
+  display: block;
+}
+
+.changeLogMeta {
+  font-size: 9px;
+  margin-top: 1px;
+  display: block;
+}
+
+/* ── Standalone sale empty state ──────────────────────────────── */
+.standaloneEmpty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 30px;
+}
+
+.standaloneIcon {
+  width: 60px;
+  height: 60px;
+  opacity: 0.25;
+  object-fit: contain;
+}
+
+.standaloneTitle {
+  font-size: 13px;
+  margin-top: 12px;
+  font-weight: 600;
+}
+
+.standaloneSub {
+  font-size: 11px;
+  margin-top: 4px;
+  text-align: center;
+}
+
+/* ── Color chips ───────────────────────────────────────────────── */
+.colorChipsRow {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.colorChipsLabel {
+  font-size: 13px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+
+.colorChip {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  display: inline-block;
+}
+
+.colorChipSpaced {
+  margin-left: 4px;
+}
+
+/* ── Items header ──────────────────────────────────────────────── */
+.itemsList {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+/* ── Loading / empty text ──────────────────────────────────────── */
+.italicMuted {
+  font-size: 11px;
+  font-style: italic;
+  display: block;
+}
+
+.spacerBottom {
+  height: 20px;
+}

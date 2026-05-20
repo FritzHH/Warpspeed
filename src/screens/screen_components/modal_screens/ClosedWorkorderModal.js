@@ -1,64 +1,49 @@
-/*eslint-disable*/
-import { View, Text, FlatList, ScrollView, TouchableOpacity, Image } from "react-native-web";
 import { useState, useEffect } from "react";
-import {
-  calculateRunningTotals,
-  capitalizeFirstLetterOfString,
-  formatCurrencyDisp,
-  formatMillisForDisplay,
-  formatPhoneWithDashes,
-  gray,
-  lightenRGBByPercent,
-  resolveStatus,
-  formatWorkorderNumber,
-  localStorageWrapper,
-} from "../../../utils";
+import { calculateRunningTotals, capitalizeFirstLetterOfString, formatCurrencyDisp, formatMillisForDisplay, formatPhoneWithDashes, lightenRGBByPercent, resolveStatus, formatWorkorderNumber, localStorageWrapper } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
-import { useCheckoutStore, useSettingsStore, useLoginStore } from "../../../stores";
-import { Button_, SHADOW_RADIUS_PROTO, Dialog_ } from "../../../components";
+import { useSettingsStore, useLoginStore } from "../../../stores";
+import { Button, Dialog, SHADOW_PROTO } from "../../../dom_components";
 import { dbGetCompletedSale, dbSavePrintObj } from "../../../db_calls_wrapper";
 import { printBuilder } from "../../../utils";
 import { readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
-import { FullSaleModal } from "./FullSaleModal";
+import { FullSaleModal } from "../../../dom_components";
+import styles from "./ClosedWorkorderModal.module.css";
 
 // ─── Helper display components ──────────────────────────────────
 
 const DetailRow = ({ label, value, valueColor, valueStyle, labelSize = 11, valueSize = 12 }) => {
   if (!value) return null;
   return (
-    <View style={{ flexDirection: "row", marginBottom: 6 }}>
-      <Text style={{ fontSize: labelSize, color: gray(0.4), width: 110 }}>{label}</Text>
-      <Text style={{ fontSize: valueSize, color: valueColor || C.text, flex: 1, ...valueStyle }}>{value}</Text>
-    </View>
+    <div className={styles.detailRow}>
+      <span className={styles.detailLabel} style={{ fontSize: labelSize, color: C.textMuted }}>{label}</span>
+      <span className={styles.detailValue} style={{ fontSize: valueSize, color: valueColor || C.text, ...valueStyle }}>{value}</span>
+    </div>
   );
 };
 
 const TotalRow = ({ label, value, isNegative, bold }) => (
-  <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 3 }}>
-    <Text style={{ fontSize: 14, color: gray(0.45), fontWeight: bold ? "600" : "400" }}>
+  <div className={styles.totalRow}>
+    <span className={styles.totalRowLabel} style={{ color: C.textMuted, fontWeight: bold ? 600 : 400 }}>
       {label}
-    </Text>
-    <Text
-      style={{
-        fontSize: bold ? 16 : 14,
-        fontWeight: bold ? "700" : "400",
-        color: isNegative ? C.lightred : C.text,
-      }}
+    </span>
+    <span
+      className={bold ? styles.totalRowValueBold : styles.totalRowValue}
+      style={{ color: isNegative ? C.lightred : C.text }}
     >
       {(isNegative ? "-" : "") + "$" + formatCurrencyDisp(Math.abs(value || 0))}
-    </Text>
-  </View>
+    </span>
+  </div>
 );
 
 const SectionHeader = ({ text }) => (
-  <Text style={{ fontSize: 11, fontWeight: "600", color: gray(0.4), marginBottom: 6, marginTop: 14, letterSpacing: 0.5 }}>
+  <span className={styles.sectionHeader} style={{ color: C.textMuted }}>
     {text}
-  </Text>
+  </span>
 );
 
 // ─── Sale Card ──────────────────────────────────────────────────
 
-const SaleCard = ({ sale, transactions = [], onRefund, onPress }) => {
+const SaleCard = ({ sale, transactions = [], onPress }) => {
   const payments = transactions;
   const credits = [...(sale.creditsApplied || []), ...(sale.depositsApplied || [])];
   const allRefunds = transactions.flatMap((t) => (t.refunds || []).map((r) => ({ ...r, _parentMethod: t.method })));
@@ -66,112 +51,105 @@ const SaleCard = ({ sale, transactions = [], onRefund, onPress }) => {
   const hasRefunds = totalRefunded > 0;
 
   return (
-    <TouchableOpacity
-      onPress={() => onPress && onPress(sale)}
-      activeOpacity={onPress ? 0.7 : 1}
-      style={{
-        borderRadius: 7,
-        borderWidth: 1,
-        borderColor: C.buttonLightGreenOutline,
-        backgroundColor: C.listItemWhite,
-        padding: 10,
-        marginBottom: 8,
-      }}
+    <button
+      type="button"
+      onClick={() => onPress && onPress(sale)}
+      className={`${styles.saleCard} ${!onPress ? styles.saleCardStatic : ""}`}
+      style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
     >
-      {/* Header: date + payment status + refund button */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-        <Text style={{ fontSize: 12, color: gray(0.35) }}>
+      {/* Header */}
+      <div className={styles.saleCardHeader}>
+        <span className={styles.saleIdText} style={{ color: C.textDisabled }}>
           {"Sale ID: " + sale.id}
-        </Text>
-        <View style={{ flexDirection: "row", alignItems: "center" }} />
-      </View>
+        </span>
+      </div>
 
       {!!sale.millis && (
-        <Text style={{ fontSize: 13, color: gray(0.45), marginBottom: 4 }}>
+        <span className={styles.saleDateText} style={{ color: C.textMuted, display: "block" }}>
           {formatMillisForDisplay(sale.millis)}
-        </Text>
+        </span>
       )}
 
       {/* Totals */}
-      <View style={{ marginBottom: 4 }}>
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
-          <Text style={{ fontSize: 13, color: gray(0.45) }}>Subtotal</Text>
-          <Text style={{ fontSize: 13, color: C.text }}>{"$" + formatCurrencyDisp(sale.subtotal)}</Text>
-        </View>
+      <div className={styles.saleTotalsBlock}>
+        <div className={styles.saleRow}>
+          <span className={styles.saleRowLabel} style={{ color: C.textMuted }}>Subtotal</span>
+          <span className={styles.saleRowValue} style={{ color: C.text }}>{"$" + formatCurrencyDisp(sale.subtotal)}</span>
+        </div>
         {(sale.discount || 0) > 0 && (
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
-            <Text style={{ fontSize: 13, color: gray(0.45) }}>Discount</Text>
-            <Text style={{ fontSize: 13, color: C.lightred }}>{"-$" + formatCurrencyDisp(sale.discount)}</Text>
-          </View>
+          <div className={styles.saleRow}>
+            <span className={styles.saleRowLabel} style={{ color: C.textMuted }}>Discount</span>
+            <span className={styles.saleRowValue} style={{ color: C.lightred }}>{"-$" + formatCurrencyDisp(sale.discount)}</span>
+          </div>
         )}
         {(sale.salesTax || sale.tax || 0) > 0 && (
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
-            <Text style={{ fontSize: 13, color: gray(0.45) }}>Tax</Text>
-            <Text style={{ fontSize: 13, color: C.text }}>{"$" + formatCurrencyDisp(sale.salesTax || sale.tax)}</Text>
-          </View>
+          <div className={styles.saleRow}>
+            <span className={styles.saleRowLabel} style={{ color: C.textMuted }}>Tax</span>
+            <span className={styles.saleRowValue} style={{ color: C.text }}>{"$" + formatCurrencyDisp(sale.salesTax || sale.tax)}</span>
+          </div>
         )}
-        <View style={{ height: 1, backgroundColor: gray(0.1), marginVertical: 3 }} />
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Text style={{ fontSize: 14, fontWeight: "600", color: gray(0.4) }}>Total</Text>
-          <Text style={{ fontSize: 15, fontWeight: "700", color: C.text }}>{"$" + formatCurrencyDisp(sale.total)}</Text>
-        </View>
-      </View>
+        <div className={styles.hairline} style={{ backgroundColor: C.surfaceAlt }} />
+        <div className={styles.saleTotalRow}>
+          <span className={styles.saleTotalLabel} style={{ color: C.textMuted }}>Total</span>
+          <span className={styles.saleTotalValue} style={{ color: C.text }}>{"$" + formatCurrencyDisp(sale.total)}</span>
+        </div>
+      </div>
 
       {/* Payments */}
       {payments.length > 0 && (
-        <View style={{ marginTop: 4 }}>
-          <Text style={{ fontSize: 12, fontWeight: "600", color: gray(0.4), marginBottom: 3 }}>PAYMENTS</Text>
+        <div className={styles.saleSection}>
+          <span className={styles.saleSectionTitle} style={{ color: C.textMuted }}>PAYMENTS</span>
           {payments.map((p, idx) => (
-            <View key={p.id || idx} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
-              <Text style={{ fontSize: 13, color: gray(0.5) }}>
+            <div key={p.id || idx} className={styles.saleRow}>
+              <span className={styles.saleRowLabel} style={{ color: C.textMuted }}>
                 {p.method === "cash" ? "Cash" : p.method === "check" ? "Check" : (p.cardType || "Card") + (p.last4 ? " ..." + p.last4 : "")}
-              </Text>
-              <Text style={{ fontSize: 13, color: C.text }}>{"$" + formatCurrencyDisp(p.amountCaptured)}</Text>
-            </View>
+              </span>
+              <span className={styles.saleRowValue} style={{ color: C.text }}>{"$" + formatCurrencyDisp(p.amountCaptured)}</span>
+            </div>
           ))}
           {(sale.amountCaptured || 0) > 0 && (
-            <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 2 }}>
-              <Text style={{ fontSize: 13, fontWeight: "500", color: gray(0.4) }}>Amount Captured</Text>
-              <Text style={{ fontSize: 13, fontWeight: "500", color: C.text }}>{"$" + formatCurrencyDisp(sale.amountCaptured)}</Text>
-            </View>
+            <div className={styles.saleEmphasisRow}>
+              <span className={styles.saleEmphasisLabel} style={{ color: C.textMuted }}>Amount Captured</span>
+              <span className={styles.saleEmphasisValue} style={{ color: C.text }}>{"$" + formatCurrencyDisp(sale.amountCaptured)}</span>
+            </div>
           )}
-        </View>
+        </div>
       )}
 
       {/* Credits / Deposits */}
       {credits.length > 0 && (
-        <View style={{ marginTop: 4 }}>
-          <Text style={{ fontSize: 12, fontWeight: "600", color: C.orange, marginBottom: 3 }}>CREDITS / DEPOSITS</Text>
+        <div className={styles.saleSection}>
+          <span className={styles.saleSectionTitle} style={{ color: C.orange }}>CREDITS / DEPOSITS</span>
           {credits.map((c, idx) => (
-            <View key={c.id || idx} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
-              <Text style={{ fontSize: 13, color: C.orange }}>
+            <div key={c.id || idx} className={styles.saleRow}>
+              <span className={styles.saleRowLabel} style={{ color: C.orange }}>
                 {capitalizeFirstLetterOfString(c.type || "deposit")}
-              </Text>
-              <Text style={{ fontSize: 13, color: C.text }}>{"$" + formatCurrencyDisp(c.amount)}</Text>
-            </View>
+              </span>
+              <span className={styles.saleRowValue} style={{ color: C.text }}>{"$" + formatCurrencyDisp(c.amount)}</span>
+            </div>
           ))}
-        </View>
+        </div>
       )}
 
       {/* Refunds */}
       {hasRefunds && (
-        <View style={{ marginTop: 4 }}>
-          <Text style={{ fontSize: 12, fontWeight: "600", color: C.lightred, marginBottom: 3 }}>REFUNDS</Text>
+        <div className={styles.saleSection}>
+          <span className={styles.saleSectionTitle} style={{ color: C.lightred }}>REFUNDS</span>
           {allRefunds.map((r, idx) => (
-            <View key={r.id || idx} style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 2 }}>
-              <Text style={{ fontSize: 13, color: C.lightred }}>
+            <div key={r.id || idx} className={styles.saleRow}>
+              <span className={styles.saleRowLabel} style={{ color: C.lightred }}>
                 {r.notes ? (typeof r.notes === "string" ? r.notes : r.notes.reason || "") : (r.method || "card").toUpperCase() + " Refund"}
-              </Text>
-              <Text style={{ fontSize: 13, color: C.lightred }}>{"-$" + formatCurrencyDisp(r.amount)}</Text>
-            </View>
+              </span>
+              <span className={styles.saleRowValue} style={{ color: C.lightred }}>{"-$" + formatCurrencyDisp(r.amount)}</span>
+            </div>
           ))}
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 2 }}>
-            <Text style={{ fontSize: 13, fontWeight: "500", color: C.lightred }}>Total Refunded</Text>
-            <Text style={{ fontSize: 13, fontWeight: "500", color: C.lightred }}>{"-$" + formatCurrencyDisp(totalRefunded)}</Text>
-          </View>
-        </View>
+          <div className={styles.saleEmphasisRow}>
+            <span className={styles.saleEmphasisLabel} style={{ color: C.lightred }}>Total Refunded</span>
+            <span className={styles.saleEmphasisValue} style={{ color: C.lightred }}>{"-$" + formatCurrencyDisp(totalRefunded)}</span>
+          </div>
+        </div>
       )}
-    </TouchableOpacity>
+    </button>
   );
 };
 
@@ -184,14 +162,14 @@ const NoteItem = ({ note, color }) => {
   const user = note.user || note.userName || "";
   if (!text) return null;
   return (
-    <View style={{ marginBottom: 5, paddingLeft: 8, borderLeftWidth: 2, borderLeftColor: color }}>
-      <Text style={{ fontSize: 11, color: C.text }}>{text}</Text>
+    <div className={styles.noteItem} style={{ borderLeftColor: color }}>
+      <span className={styles.noteText} style={{ color: C.text }}>{text}</span>
       {(!!millis || !!user) && (
-        <Text style={{ fontSize: 9, color: gray(0.4), marginTop: 1 }}>
+        <span className={styles.noteMeta} style={{ color: C.textMuted }}>
           {[user, millis ? formatMillisForDisplay(millis) : ""].filter(Boolean).join(" - ")}
-        </Text>
+        </span>
       )}
-    </View>
+    </div>
   );
 };
 
@@ -217,14 +195,20 @@ const ChangeLogEntry = ({ entry, index }) => {
   const user = entry.user || entry.userName || "";
   const isAlt = index % 2 === 1;
   return (
-    <View style={{ marginBottom: 4, paddingLeft: 8, paddingVertical: 4, paddingRight: 6, borderLeftWidth: 2, borderLeftColor: gray(0.15), backgroundColor: isAlt ? gray(0.06) : "transparent", borderRadius: isAlt ? 4 : 0 }}>
-      <Text style={{ fontSize: 10, color: isAlt ? gray(0.45) : gray(0.5) }}>{message}</Text>
+    <div
+      className={`${styles.changeLogEntry} ${isAlt ? styles.changeLogEntryAlt : ""}`}
+      style={{
+        borderLeftColor: C.borderSubtle,
+        backgroundColor: isAlt ? C.surfaceAlt : "transparent",
+      }}
+    >
+      <span className={styles.changeLogMessage} style={{ color: isAlt ? C.textMuted : C.textMuted }}>{message}</span>
       {(!!millis || !!user) && (
-        <Text style={{ fontSize: 9, color: isAlt ? gray(0.3) : gray(0.35), marginTop: 1 }}>
+        <span className={styles.changeLogMeta} style={{ color: isAlt ? C.textDisabled : C.textDisabled }}>
           {[user, millis ? formatShortDate(millis) : ""].filter(Boolean).join(" - ")}
-        </Text>
+        </span>
       )}
-    </View>
+    </div>
   );
 };
 
@@ -287,11 +271,6 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
     onClose && onClose();
   }
 
-  function handleRefund(saleID) {
-    handleClose();
-    useCheckoutStore.getState().setStringOnly(saleID);
-  }
-
   function _getCustomerFromWorkorder() {
     return {
       customerCell: workorder.customerCell || "",
@@ -309,526 +288,421 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
     dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
   }
 
-  function handlePrintSale() {
-    if (sSales.length === 0) return;
-    const sale = sSales[0];
-    const _settings = useSettingsStore.getState().getSettings();
-    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
-    const transactions = sTransactionsMap[sale.id] || [];
-    let toPrint = printBuilder.sale(sale, transactions, _getCustomerFromWorkorder(), workorder, _settings?.salesTaxPercent, _ctx, [...(sale.creditsApplied || []), ...(sale.depositsApplied || [])]);
-    dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
-  }
-
   return (
   <>
-    <Dialog_ visible={true} onClose={onClose} overlayColor="rgba(50,50,50,.65)">
-        <View
+    <Dialog visible={true} onClose={onClose} overlayColor={C.surfaceOverlayHeavy}>
+      <div
+        className={styles.shell}
+        style={{
+          backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
+          ...SHADOW_PROTO,
+        }}
+      >
+        {/* ── Header ── */}
+        <div className={styles.header} style={{ backgroundColor: C.backgroundWhite }}>
+          <div className={styles.headerLeft}>
+            <span
+              className={styles.statusBadge}
+              style={{ backgroundColor: rs.backgroundColor, color: rs.textColor }}
+            >
+              {rs.label}
+            </span>
+            {!!workorder.workorderNumber && (
+              <span className={styles.woNumber} style={{ color: C.text }}>
+                {"#" + formatWorkorderNumber(workorder.workorderNumber)}
+              </span>
+            )}
+            <span className={styles.idText} style={{ color: C.textDisabled }}>
+              {"ID: " + workorder.id}
+            </span>
+            {!!workorder._importSource && (
+              <span
+                className={styles.importBadge}
+                style={{
+                  backgroundColor: lightenRGBByPercent(C.blue, 60),
+                  color: C.blue,
+                }}
+              >
+                {workorder._importSource}
+              </span>
+            )}
+            {!!workorder.taxFree && (
+              <span
+                className={styles.taxFreeBadge}
+                style={{
+                  backgroundColor: lightenRGBByPercent(C.orange, 60),
+                  color: C.orange,
+                }}
+              >
+                TAX FREE
+              </span>
+            )}
+          </div>
+          <div className={styles.headerRight}>
+            <Button
+              text="Print Workorder"
+              icon={ICONS.receipt}
+              iconSize={16}
+              onPress={handlePrintWorkorder}
+              buttonStyle={{ paddingHorizontal: 14, height: 32, marginRight: 8, outlineStyle: "none" }}
+              textStyle={{ fontSize: 12, color: C.text }}
+            />
+            <Button
+              text="Close"
+              colorGradientArr={COLOR_GRADIENTS.red}
+              onPress={handleClose}
+              buttonStyle={{ paddingHorizontal: 16, height: 32 }}
+              textStyle={{ color: C.textWhite, fontSize: 12 }}
+            />
+          </div>
+        </div>
+
+        {/* ── Active / Closed Banner ── */}
+        <div
+          className={styles.banner}
           style={{
-            width: "85vw",
-            height: "90vh",
-            backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
-            borderRadius: 8,
-            ...SHADOW_RADIUS_PROTO,
-            shadowColor: C.green,
-            overflow: "hidden",
-            flexDirection: "column",
+            backgroundColor: isClosed
+              ? lightenRGBByPercent(C.lightred, 55)
+              : lightenRGBByPercent(C.green, 55),
           }}
         >
-          {/* ── Header ── */}
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              paddingHorizontal: 20,
-              paddingVertical: 12,
-              borderBottomWidth: 1,
-              borderBottomColor: gray(0.1),
-              backgroundColor: C.backgroundWhite,
-            }}
+          <span
+            className={styles.bannerStatusBadge}
+            style={{ backgroundColor: rs.backgroundColor, color: rs.textColor }}
           >
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              {/* Status badge */}
-              <View
-                style={{
-                  backgroundColor: rs.backgroundColor,
-                  paddingHorizontal: 14,
-                  paddingVertical: 4,
-                  borderRadius: 10,
-                }}
-              >
-                <Text style={{ color: rs.textColor, fontSize: 12, fontWeight: "600" }}>
-                  {rs.label}
-                </Text>
-              </View>
-              {!!workorder.workorderNumber && (
-                <Text style={{ fontSize: 14, fontWeight: "600", color: C.text, marginLeft: 12 }}>
-                  {"#" + formatWorkorderNumber(workorder.workorderNumber)}
-                </Text>
-              )}
-              <Text style={{ fontSize: 13, color: gray(0.35), marginLeft: 12 }}>
-                {"ID: " + workorder.id}
-              </Text>
-              {!!workorder._importSource && (
-                <View
-                  style={{
-                    backgroundColor: lightenRGBByPercent(C.blue, 60),
-                    paddingHorizontal: 6,
-                    paddingVertical: 1,
-                    borderRadius: 8,
-                    marginLeft: 8,
-                  }}
-                >
-                  <Text style={{ fontSize: 9, fontWeight: "600", color: C.blue }}>
-                    {workorder._importSource}
-                  </Text>
-                </View>
-              )}
-              {!!workorder.taxFree && (
-                <View
-                  style={{
-                    backgroundColor: lightenRGBByPercent(C.orange, 60),
-                    paddingHorizontal: 6,
-                    paddingVertical: 1,
-                    borderRadius: 8,
-                    marginLeft: 8,
-                  }}
-                >
-                  <Text style={{ fontSize: 9, fontWeight: "600", color: C.orange }}>TAX FREE</Text>
-                </View>
-              )}
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Button_
-                text="Print Workorder"
-                icon={ICONS.receipt}
-                iconSize={16}
-                onPress={handlePrintWorkorder}
-                buttonStyle={{ paddingHorizontal: 14, height: 32, marginRight: 8, outlineStyle: "none" }}
-                textStyle={{ fontSize: 12, color: C.text }}
-              />
-              <Button_
-                text="Close"
-                colorGradientArr={COLOR_GRADIENTS.red}
-                onPress={handleClose}
-                buttonStyle={{ paddingHorizontal: 16, height: 32 }}
-                textStyle={{ color: C.textWhite, fontSize: 12 }}
-              />
-            </View>
-          </View>
-
-          {/* ── Active / Closed Banner ── */}
-          <View
-            style={{
-              backgroundColor: isClosed ? lightenRGBByPercent(C.lightred, 55) : lightenRGBByPercent(C.green, 55),
-              paddingVertical: 8,
-              paddingHorizontal: 20,
-              flexDirection: "row",
-              alignItems: "center",
-            }}
+            {rs.label}
+          </span>
+          <span
+            className={styles.bannerTitle}
+            style={{ color: isClosed ? C.lightred : C.green }}
           >
-            <View
-              style={{
-                backgroundColor: rs.backgroundColor,
-                paddingHorizontal: 14,
-                paddingVertical: 5,
-                borderRadius: 8,
-                marginRight: 12,
+            {isClosed ? "CLOSED WORKORDER" : "ACTIVE WORKORDER"}
+          </span>
+          {!isClosed && onGoToWorkorder && (
+            <Button
+              text="Go to Workorder"
+              colorGradientArr={COLOR_GRADIENTS.green}
+              onPress={() => onGoToWorkorder(workorder)}
+              buttonStyle={{ paddingHorizontal: 16, height: 32, marginRight: 8 }}
+              textStyle={{ color: C.textWhite, fontSize: 12 }}
+            />
+          )}
+          {sSales.length > 0 && (
+            <button
+              type="button"
+              className={styles.viewSaleBtn}
+              onClick={() => {
+                let sale = sSales[0];
+                let enriched = { ...sale, _transactions: sTransactionsMap[sale.id] || [] };
+                _sSetSaleForModal(enriched);
               }}
             >
-              <Text style={{ color: rs.textColor, fontSize: 13, fontWeight: "600" }}>
-                {rs.label}
-              </Text>
-            </View>
-            <Text
-              style={{
-                fontSize: 16,
-                fontWeight: "700",
-                color: isClosed ? C.lightred : C.green,
-                letterSpacing: 1,
-                flex: 1,
-              }}
-            >
-              {isClosed ? "CLOSED WORKORDER" : "ACTIVE WORKORDER"}
-            </Text>
-            {!isClosed && onGoToWorkorder && (
-              <Button_
-                text="Go to Workorder"
-                colorGradientArr={COLOR_GRADIENTS.green}
-                onPress={() => onGoToWorkorder(workorder)}
-                buttonStyle={{ paddingHorizontal: 16, height: 32, marginRight: 8 }}
-                textStyle={{ color: C.textWhite, fontSize: 12 }}
-              />
-            )}
-            {sSales.length > 0 && (
-              <TouchableOpacity
-                onPress={() => {
-                  let sale = sSales[0];
-                  let enriched = { ...sale, _transactions: sTransactionsMap[sale.id] || [] };
-                  _sSetSaleForModal(enriched);
-                }}
-                style={{
-                  backgroundColor: "black",
-                  paddingHorizontal: 16,
-                  paddingVertical: 5,
-                  borderRadius: 8,
-                }}
-              >
-                <Text style={{ color: "gold", fontSize: 13, fontWeight: "600" }}>View Sale</Text>
-              </TouchableOpacity>
-            )}
-          </View>
+              View Sale
+            </button>
+          )}
+        </div>
 
-          {/* ── Body: three columns ── */}
-          <View style={{ flex: 1, flexDirection: "row", padding: 20 }}>
-            {/* ── Column 1: customer info (narrow) ── */}
-            <ScrollView style={{ width: "25%", paddingRight: 15 }}>
-              {!workorder.customerID ? (
-                /* Standalone sale infographic */
-                <View style={{ alignItems: "center", paddingTop: 30 }}>
-                  <Image source={ICONS.workorder} style={{ width: 60, height: 60, opacity: 0.25 }} />
-                  <Text style={{ fontSize: 13, color: gray(0.35), marginTop: 12, fontWeight: "600" }}>
-                    Standalone Sale
-                  </Text>
-                  <Text style={{ fontSize: 11, color: gray(0.3), marginTop: 4, textAlign: "center" }}>
-                    No customer attached
-                  </Text>
-                </View>
-              ) : (
-                <View>
-                  {/* Customer */}
-                  <SectionHeader text="CUSTOMER" />
-                  <DetailRow label="Name" value={customerName || null} labelSize={13} valueSize={14} />
-                  {!!workorder.customerCell && (
-                    <DetailRow label="Phone" value={formatPhoneWithDashes(workorder.customerCell)} labelSize={13} valueSize={14} />
-                  )}
-                  {!!workorder.customerLandline && (
-                    <DetailRow label="Landline" value={formatPhoneWithDashes(workorder.customerLandline)} labelSize={13} valueSize={14} />
-                  )}
-                  {!!workorder.customerEmail && (
-                    <DetailRow label="Email" value={workorder.customerEmail} labelSize={13} valueSize={14} />
-                  )}
-                  {!!workorder.customerContactRestriction && (
-                    <DetailRow label="Contact Pref" value={workorder.customerContactRestriction} labelSize={13} valueSize={14} />
-                  )}
-                </View>
-              )}
-
-              {/* Bike */}
-              <SectionHeader text="BIKE" />
-              <DetailRow label="Brand" value={workorder.brand} labelSize={13} valueSize={14} />
-              <DetailRow label="Description" value={workorder.description} labelSize={13} valueSize={14} />
-
-              {/* Colors */}
-              {(!!workorder.color1?.label || !!workorder.color2?.label) && (
-                <View style={{ flexDirection: "row", marginBottom: 6, alignItems: "center", flexWrap: "wrap" }}>
-                  <Text style={{ fontSize: 13, color: gray(0.4), width: "100%", marginBottom: 4 }}>Colors</Text>
-                  {!!workorder.color1?.label && (
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        paddingHorizontal: 8,
-                        paddingVertical: 2,
-                        borderRadius: 100,
-                        backgroundColor: workorder.color1.backgroundColor,
-                        color: workorder.color1.textColor,
-                      }}
-                    >
-                      {workorder.color1.label}
-                    </Text>
-                  )}
-                  {!!workorder.color2?.label && (
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        paddingHorizontal: 8,
-                        paddingVertical: 2,
-                        borderRadius: 100,
-                        backgroundColor: workorder.color2.backgroundColor,
-                        color: workorder.color2.textColor,
-                        marginLeft: 4,
-                      }}
-                    >
-                      {workorder.color2.label}
-                    </Text>
-                  )}
-                </View>
-              )}
-
-              {/* Dates */}
-              <SectionHeader text="DATES" />
-              <DetailRow
-                label="Started"
-                labelSize={13}
-                valueSize={14}
-                value={
-                  workorder.startedOnMillis
-                    ? formatMillisForDisplay(workorder.startedOnMillis, true)
-                    : null
-                }
-              />
-              <DetailRow
-                label="Finished"
-                labelSize={13}
-                valueSize={14}
-                value={
-                  workorder.finishedOnMillis
-                    ? formatMillisForDisplay(workorder.finishedOnMillis, true)
-                    : null
-                }
-              />
-              <DetailRow
-                label="Ended"
-                labelSize={13}
-                valueSize={14}
-                value={
-                  workorder.endedOnMillis
-                    ? formatMillisForDisplay(workorder.endedOnMillis, true)
-                    : null
-                }
-              />
-              <DetailRow label="Started By" value={workorder.startedBy} labelSize={13} valueSize={14} />
-
-              {/* Service */}
-              <SectionHeader text="SERVICE" />
-              {!!workorder.waitTime?.label && (
-                <DetailRow label="Wait Time" value={workorder.waitTime.label} />
-              )}
-              {!!workorder.waitTimeEstimateLabel && (
-                <DetailRow label="Estimate" value={workorder.waitTimeEstimateLabel} />
-              )}
-              {!!workorder.partOrdered && (
-                <DetailRow label="Part Ordered" value={workorder.partOrdered} />
-              )}
-              {!!workorder.partSource && (
-                <DetailRow label="Part Source" value={workorder.partSource} />
-              )}
-              {!!workorder.partOrderedMillis && (
-                <DetailRow
-                  label="Part Order Date"
-                  value={formatMillisForDisplay(workorder.partOrderedMillis, true)}
-                />
-              )}
-              {!!workorder.partOrderEstimateMillis && (
-                <DetailRow
-                  label="Part ETA"
-                  value={formatMillisForDisplay(workorder.partOrderEstimateMillis, true)}
-                />
-              )}
-
-              {/* Payment status */}
-              {(() => {
-                let salePaid = sSales.reduce((sum, s) => sum + (s.amountCaptured || 0) - (s.amountRefunded || 0), 0);
-                if (workorder.paymentComplete) {
-                  return (
-                    <DetailRow
-                      label="Payment"
-                      value={"Paid - $" + formatCurrencyDisp(salePaid || totals.finalTotal)}
-                      valueColor={C.green}
-                      valueStyle={{ fontWeight: "600" }}
-                    />
-                  );
-                }
-                if (salePaid > 0) {
-                  return (
-                    <DetailRow
-                      label="Partial Paid"
-                      value={"$" + formatCurrencyDisp(salePaid)}
-                      valueColor={C.orange}
-                      valueStyle={{ fontWeight: "600" }}
-                    />
-                  );
-                }
-                return null;
-              })()}
-
-              {/* Media */}
-              {mediaCount > 0 && (
-                <DetailRow label="Media" value={mediaCount + " item" + (mediaCount > 1 ? "s" : "")} />
-              )}
-
-              {/* Tax free note */}
-              {!!workorder.taxFree && !!workorder.taxFreeReceiptNote && (
-                <DetailRow label="Tax Free Note" value={workorder.taxFreeReceiptNote} valueColor={C.orange} />
-              )}
-
-              {/* Internal Notes */}
-              {internalNotes.length > 0 && (
-                <View>
-                  <SectionHeader text={"INTERNAL NOTES (" + internalNotes.length + ")"} />
-                  {internalNotes.map((note, idx) => (
-                    <NoteItem key={idx} note={note} color={C.blue} />
-                  ))}
-                </View>
-              )}
-
-              {/* Customer Notes */}
-              {customerNotes.length > 0 && (
-                <View>
-                  <SectionHeader text={"CUSTOMER NOTES (" + customerNotes.length + ")"} />
-                  {customerNotes.map((note, idx) => (
-                    <NoteItem key={idx} note={note} color={C.green} />
-                  ))}
-                </View>
-              )}
-
-              {/* Change Log */}
-              {changeLog.length > 0 && (
-                <View>
-                  <TouchableOpacity
-                    onPress={() => _sSetShowChangeLog(!sShowChangeLog)}
-                    style={{ flexDirection: "row", alignItems: "center", marginTop: 14, marginBottom: 6 }}
-                  >
-                    <Text style={{ fontSize: 11, fontWeight: "600", color: gray(0.4), letterSpacing: 0.5 }}>
-                      {"CHANGE LOG (" + changeLog.length + ")"}
-                    </Text>
-                    <Text style={{ fontSize: 10, color: gray(0.35), marginLeft: 6 }}>
-                      {sShowChangeLog ? "Hide" : "Show"}
-                    </Text>
-                  </TouchableOpacity>
-                  {sShowChangeLog && changeLog.map((entry, idx) => (
-                    <ChangeLogEntry key={idx} entry={entry} index={idx} />
-                  ))}
-                </View>
-              )}
-
-              {/* Bottom spacer */}
-              <View style={{ height: 20 }} />
-            </ScrollView>
-
-            {/* ── Vertical divider ── */}
-            <View style={{ width: 1, backgroundColor: gray(0.1), marginHorizontal: 5 }} />
-
-            {/* ── Column 2: line items + totals ── */}
-            <View style={{ width: "40%", paddingHorizontal: 15 }}>
-              {/* Line items */}
-              <SectionHeader text={"ITEMS (" + lines.length + ")"} />
-              <FlatList
-                data={lines}
-                keyExtractor={(item, idx) => item.id || String(idx)}
-                style={{ flex: 1 }}
-                renderItem={({ item }) => {
-                  const inv = item.inventoryItem || {};
-                  const name = inv.formalName || inv.informalName || "Item";
-                  const price = item.useSalePrice ? (inv.salePrice || inv.price || 0) : (inv.price || 0);
-                  const hasDiscount = !!item.discountObj?.name;
-
-                  return (
-                    <View
-                      style={{
-                        marginBottom: 6,
-                        borderRadius: 6,
-                        borderWidth: 1,
-                        borderColor: gray(0.1),
-                        backgroundColor: C.listItemWhite,
-                        paddingVertical: 6,
-                        paddingHorizontal: 10,
-                        width: "100%",
-                      }}
-                    >
-                      {/* Qty x Name + Price */}
-                      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                        <Text style={{ fontSize: 14, color: C.text, flex: 1 }} numberOfLines={1}>
-                          <Text style={{ fontWeight: "600" }}>{item.qty + "x  "}</Text>
-                          {name}
-                        </Text>
-                        <Text
-                          style={{
-                            fontSize: 13,
-                            color: hasDiscount ? C.lightred : C.text,
-                            textDecorationLine: hasDiscount ? "line-through" : "none",
-                          }}
-                        >
-                          {"$" + formatCurrencyDisp(price * item.qty)}
-                        </Text>
-                      </View>
-
-                      {/* Discount info */}
-                      {hasDiscount && (
-                        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 2 }}>
-                          <Text style={{ fontSize: 11, color: C.lightred }}>
-                            {item.discountObj.name}
-                          </Text>
-                          <Text style={{ fontSize: 13, color: C.green, fontWeight: "500" }}>
-                            {"$" + formatCurrencyDisp(item.discountObj.newPrice * item.qty)}
-                          </Text>
-                        </View>
-                      )}
-
-                      {/* Warranty */}
-                      {!!item.warranty && (
-                        <Text style={{ fontSize: 11, color: C.blue, marginTop: 2 }}>Warranty</Text>
-                      )}
-
-                      {/* Intake notes */}
-                      {!!item.intakeNotes && (
-                        <Text style={{ fontSize: 12, color: C.orange, marginTop: 3 }}>
-                          {"Intake: " + item.intakeNotes}
-                        </Text>
-                      )}
-
-                      {/* Receipt notes */}
-                      {!!item.receiptNotes && (
-                        <Text style={{ fontSize: 12, color: C.green, marginTop: 2 }}>
-                          {"Receipt: " + item.receiptNotes}
-                        </Text>
-                      )}
-                    </View>
-                  );
-                }}
-              />
-
-              {/* Totals */}
-              <View
-                style={{
-                  marginTop: 8,
-                  borderTopWidth: 1,
-                  borderTopColor: gray(0.1),
-                  paddingTop: 8,
-                }}
-              >
-                <TotalRow label="Subtotal" value={totals.runningSubtotal} />
-                {totals.runningDiscount > 0 && (
-                  <TotalRow label="Discount" value={totals.runningDiscount} isNegative />
+        {/* ── Body: three columns ── */}
+        <div className={styles.body}>
+          {/* ── Column 1: customer info (narrow) ── */}
+          <div className={styles.col1}>
+            {!workorder.customerID ? (
+              <div className={styles.standaloneEmpty}>
+                <img src={ICONS.workorder} alt="" className={styles.standaloneIcon} />
+                <span className={styles.standaloneTitle} style={{ color: C.textDisabled }}>
+                  Standalone Sale
+                </span>
+                <span className={styles.standaloneSub} style={{ color: C.textDisabled }}>
+                  No customer attached
+                </span>
+              </div>
+            ) : (
+              <div>
+                <SectionHeader text="CUSTOMER" />
+                <DetailRow label="Name" value={customerName || null} labelSize={13} valueSize={14} />
+                {!!workorder.customerCell && (
+                  <DetailRow label="Phone" value={formatPhoneWithDashes(workorder.customerCell)} labelSize={13} valueSize={14} />
                 )}
-                {!!totals.runningTax && <TotalRow label="Tax" value={totals.runningTax} />}
-                <View style={{ height: 1, backgroundColor: gray(0.15), marginVertical: 4 }} />
-                <TotalRow label="Total" value={totals.finalTotal} bold />
-              </View>
-            </View>
+                {!!workorder.customerLandline && (
+                  <DetailRow label="Landline" value={formatPhoneWithDashes(workorder.customerLandline)} labelSize={13} valueSize={14} />
+                )}
+                {!!workorder.customerEmail && (
+                  <DetailRow label="Email" value={workorder.customerEmail} labelSize={13} valueSize={14} />
+                )}
+                {!!workorder.customerContactRestriction && (
+                  <DetailRow label="Contact Pref" value={workorder.customerContactRestriction} labelSize={13} valueSize={14} />
+                )}
+              </div>
+            )}
 
-            {/* ── Vertical divider ── */}
-            <View style={{ width: 1, backgroundColor: gray(0.1), marginHorizontal: 5 }} />
+            {/* Bike */}
+            <SectionHeader text="BIKE" />
+            <DetailRow label="Brand" value={workorder.brand} labelSize={13} valueSize={14} />
+            <DetailRow label="Description" value={workorder.description} labelSize={13} valueSize={14} />
 
-            {/* ── Column 3: sales ── */}
-            <View style={{ width: "35%", paddingLeft: 15 }}>
-              <SectionHeader text={"SALES (" + sSales.length + ")"} />
-              {sLoadingSales ? (
-                <Text style={{ fontSize: 11, color: gray(0.4), fontStyle: "italic" }}>Loading sales...</Text>
-              ) : sSales.length > 0 ? (
-                <ScrollView style={{ flex: 1 }}>
-                  {sSales.map((sale) => (
-                    <SaleCard
-                      key={sale.id}
-                      sale={sale}
-                      transactions={sTransactionsMap[sale.id] || []}
-                      onRefund={handleRefund}
-                      onPress={(s) => {
-                        let enriched = { ...s, _transactions: sTransactionsMap[s.id] || [] };
-                        _sSetSaleForModal(enriched);
-                      }}
-                    />
-                  ))}
-                </ScrollView>
-              ) : (
-                <Text style={{ fontSize: 11, color: gray(0.3), fontStyle: "italic" }}>
-                  No associated sales
-                </Text>
+            {/* Colors */}
+            {(!!workorder.color1?.label || !!workorder.color2?.label) && (
+              <div className={styles.colorChipsRow}>
+                <span className={styles.colorChipsLabel} style={{ color: C.textMuted }}>Colors</span>
+                {!!workorder.color1?.label && (
+                  <span
+                    className={styles.colorChip}
+                    style={{
+                      backgroundColor: workorder.color1.backgroundColor,
+                      color: workorder.color1.textColor,
+                    }}
+                  >
+                    {workorder.color1.label}
+                  </span>
+                )}
+                {!!workorder.color2?.label && (
+                  <span
+                    className={`${styles.colorChip} ${styles.colorChipSpaced}`}
+                    style={{
+                      backgroundColor: workorder.color2.backgroundColor,
+                      color: workorder.color2.textColor,
+                    }}
+                  >
+                    {workorder.color2.label}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* Dates */}
+            <SectionHeader text="DATES" />
+            <DetailRow
+              label="Started"
+              labelSize={13}
+              valueSize={14}
+              value={workorder.startedOnMillis ? formatMillisForDisplay(workorder.startedOnMillis, true) : null}
+            />
+            <DetailRow
+              label="Finished"
+              labelSize={13}
+              valueSize={14}
+              value={workorder.finishedOnMillis ? formatMillisForDisplay(workorder.finishedOnMillis, true) : null}
+            />
+            <DetailRow
+              label="Ended"
+              labelSize={13}
+              valueSize={14}
+              value={workorder.endedOnMillis ? formatMillisForDisplay(workorder.endedOnMillis, true) : null}
+            />
+            <DetailRow label="Started By" value={workorder.startedBy} labelSize={13} valueSize={14} />
+
+            {/* Service */}
+            <SectionHeader text="SERVICE" />
+            {!!workorder.waitTime?.label && (
+              <DetailRow label="Wait Time" value={workorder.waitTime.label} />
+            )}
+            {!!workorder.waitTimeEstimateLabel && (
+              <DetailRow label="Estimate" value={workorder.waitTimeEstimateLabel} />
+            )}
+            {!!workorder.partOrdered && (
+              <DetailRow label="Part Ordered" value={workorder.partOrdered} />
+            )}
+            {!!workorder.partSource && (
+              <DetailRow label="Part Source" value={workorder.partSource} />
+            )}
+            {!!workorder.partOrderedMillis && (
+              <DetailRow
+                label="Part Order Date"
+                value={formatMillisForDisplay(workorder.partOrderedMillis, true)}
+              />
+            )}
+            {!!workorder.partOrderEstimateMillis && (
+              <DetailRow
+                label="Part ETA"
+                value={formatMillisForDisplay(workorder.partOrderEstimateMillis, true)}
+              />
+            )}
+
+            {/* Payment status */}
+            {(() => {
+              let salePaid = sSales.reduce((sum, s) => sum + (s.amountCaptured || 0) - (s.amountRefunded || 0), 0);
+              if (workorder.paymentComplete) {
+                return (
+                  <DetailRow
+                    label="Payment"
+                    value={"Paid - $" + formatCurrencyDisp(salePaid || totals.finalTotal)}
+                    valueColor={C.green}
+                    valueStyle={{ fontWeight: "600" }}
+                  />
+                );
+              }
+              if (salePaid > 0) {
+                return (
+                  <DetailRow
+                    label="Partial Paid"
+                    value={"$" + formatCurrencyDisp(salePaid)}
+                    valueColor={C.orange}
+                    valueStyle={{ fontWeight: "600" }}
+                  />
+                );
+              }
+              return null;
+            })()}
+
+            {/* Media */}
+            {mediaCount > 0 && (
+              <DetailRow label="Media" value={mediaCount + " item" + (mediaCount > 1 ? "s" : "")} />
+            )}
+
+            {/* Tax free note */}
+            {!!workorder.taxFree && !!workorder.taxFreeReceiptNote && (
+              <DetailRow label="Tax Free Note" value={workorder.taxFreeReceiptNote} valueColor={C.orange} />
+            )}
+
+            {/* Internal Notes */}
+            {internalNotes.length > 0 && (
+              <div>
+                <SectionHeader text={"INTERNAL NOTES (" + internalNotes.length + ")"} />
+                {internalNotes.map((note, idx) => (
+                  <NoteItem key={idx} note={note} color={C.blue} />
+                ))}
+              </div>
+            )}
+
+            {/* Customer Notes */}
+            {customerNotes.length > 0 && (
+              <div>
+                <SectionHeader text={"CUSTOMER NOTES (" + customerNotes.length + ")"} />
+                {customerNotes.map((note, idx) => (
+                  <NoteItem key={idx} note={note} color={C.green} />
+                ))}
+              </div>
+            )}
+
+            {/* Change Log */}
+            {changeLog.length > 0 && (
+              <div>
+                <button
+                  type="button"
+                  className={styles.changeLogToggle}
+                  onClick={() => _sSetShowChangeLog(!sShowChangeLog)}
+                >
+                  <span className={styles.changeLogToggleTitle} style={{ color: C.textMuted }}>
+                    {"CHANGE LOG (" + changeLog.length + ")"}
+                  </span>
+                  <span className={styles.changeLogToggleHint} style={{ color: C.textDisabled }}>
+                    {sShowChangeLog ? "Hide" : "Show"}
+                  </span>
+                </button>
+                {sShowChangeLog && changeLog.map((entry, idx) => (
+                  <ChangeLogEntry key={idx} entry={entry} index={idx} />
+                ))}
+              </div>
+            )}
+
+            <div className={styles.spacerBottom} />
+          </div>
+
+          {/* ── Vertical divider ── */}
+          <div className={styles.divider} />
+
+          {/* ── Column 2: line items + totals ── */}
+          <div className={styles.col2}>
+            <SectionHeader text={"ITEMS (" + lines.length + ")"} />
+            <div className={styles.itemsList}>
+              {lines.map((item, idx) => {
+                const inv = item.inventoryItem || {};
+                const name = inv.formalName || inv.informalName || "Item";
+                const price = item.useSalePrice ? (inv.salePrice || inv.price || 0) : (inv.price || 0);
+                const hasDiscount = !!item.discountObj?.name;
+                return (
+                  <div
+                    key={item.id || idx}
+                    className={styles.lineCard}
+                    style={{ backgroundColor: C.listItemWhite }}
+                  >
+                    <div className={styles.lineHeaderRow}>
+                      <span className={styles.lineName} style={{ color: C.text }}>
+                        <span className={styles.lineQty}>{item.qty + "x  "}</span>
+                        {name}
+                      </span>
+                      <span
+                        className={`${styles.linePrice} ${hasDiscount ? styles.linePriceStruck : ""}`}
+                        style={{ color: hasDiscount ? C.lightred : C.text }}
+                      >
+                        {"$" + formatCurrencyDisp(price * item.qty)}
+                      </span>
+                    </div>
+
+                    {hasDiscount && (
+                      <div className={styles.lineDiscountRow}>
+                        <span className={styles.lineDiscountName} style={{ color: C.lightred }}>
+                          {item.discountObj.name}
+                        </span>
+                        <span className={styles.lineDiscountPrice} style={{ color: C.green }}>
+                          {"$" + formatCurrencyDisp(item.discountObj.newPrice * item.qty)}
+                        </span>
+                      </div>
+                    )}
+
+                    {!!item.warranty && (
+                      <span className={styles.lineWarranty} style={{ color: C.blue, display: "block" }}>Warranty</span>
+                    )}
+
+                    {!!item.intakeNotes && (
+                      <span className={styles.lineIntakeNote} style={{ color: C.orange, display: "block" }}>
+                        {"Intake: " + item.intakeNotes}
+                      </span>
+                    )}
+
+                    {!!item.receiptNotes && (
+                      <span className={styles.lineReceiptNote} style={{ color: C.green, display: "block" }}>
+                        {"Receipt: " + item.receiptNotes}
+                      </span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Totals */}
+            <div className={styles.totalsFooter}>
+              <TotalRow label="Subtotal" value={totals.runningSubtotal} />
+              {totals.runningDiscount > 0 && (
+                <TotalRow label="Discount" value={totals.runningDiscount} isNegative />
               )}
-            </View>
-          </View>
-        </View>
-    </Dialog_>
+              {!!totals.runningTax && <TotalRow label="Tax" value={totals.runningTax} />}
+              <div className={styles.hairline} style={{ backgroundColor: C.surfaceAlt }} />
+              <TotalRow label="Total" value={totals.finalTotal} bold />
+            </div>
+          </div>
+
+          {/* ── Vertical divider ── */}
+          <div className={styles.divider} />
+
+          {/* ── Column 3: sales ── */}
+          <div className={styles.col3}>
+            <SectionHeader text={"SALES (" + sSales.length + ")"} />
+            {sLoadingSales ? (
+              <span className={styles.italicMuted} style={{ color: C.textMuted }}>Loading sales...</span>
+            ) : sSales.length > 0 ? (
+              <div className={styles.scrollY}>
+                {sSales.map((sale) => (
+                  <SaleCard
+                    key={sale.id}
+                    sale={sale}
+                    transactions={sTransactionsMap[sale.id] || []}
+                    onPress={(s) => {
+                      let enriched = { ...s, _transactions: sTransactionsMap[s.id] || [] };
+                      _sSetSaleForModal(enriched);
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <span className={styles.italicMuted} style={{ color: C.textDisabled }}>
+                No associated sales
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    </Dialog>
     {!!sSaleForModal && (
       <FullSaleModal
         item={{ saleID: sSaleForModal.id }}

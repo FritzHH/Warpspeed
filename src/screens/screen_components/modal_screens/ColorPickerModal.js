@@ -1,11 +1,10 @@
 /* eslint-disable */
 import React, { useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
-import { C, COLOR_GRADIENTS, Z } from "../../../styles";
-import { Button_ } from "../../../components";
+import { COLOR_GRADIENTS } from "../../../styles";
+import { Button } from "../../../dom_components";
 import { ColorWheel } from "../../../ColorWheel";
-import { bestForegroundHex, gray } from "../../../utils";
+import styles from "./ColorPickerModal.module.css";
 
 export const ColorPickerModal = ({
   onClose,
@@ -43,115 +42,65 @@ export const ColorPickerModal = ({
   }, []);
 
   return createPortal(
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        zIndex: Z.modal,
-      }}
-    >
+    <div onClick={onClose} className={styles.overlay}>
       <div
         ref={measureRef}
         onClick={(e) => e.stopPropagation()}
+        className={styles.anchored}
         style={{
-          position: "fixed",
           top: sLayout?.top ?? (anchorPosition?.y ?? 100),
           left: sLayout?.left ?? Math.max(10, (window.innerWidth - modalMaxWidth) / 2),
           opacity: sLayout ? 1 : 0,
         }}
       >
-        <View
-          style={{
-            backgroundColor: C.backgroundListWhite,
-            borderRadius: 10,
-            padding: 30,
-            maxWidth: modalMaxWidth,
-            borderWidth: 2,
-            borderColor: C.buttonLightGreenOutline,
-            flexDirection: hasSchemes ? "row" : "column",
-            alignItems: hasSchemes ? "stretch" : "center",
-          }}
+        <div
+          className={`${styles.modal} ${hasSchemes ? styles.modalWithSchemes : styles.modalNoSchemes}`}
+          style={{ maxWidth: modalMaxWidth }}
         >
           {/* Color schemes sidebar */}
-          {hasSchemes && (<>
-            <View
-              style={{
-                width: 200,
-                marginRight: 0,
-                paddingRight: 15,
-              }}
-            >
-              <Text style={{ fontSize: 13, fontWeight: "600", color: gray(0.45), marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.5 }}>
-                Existing Schemes
-              </Text>
-              <ScrollView style={{ flex: 1, maxHeight: 460 }}>
-                {colorSchemes.map((scheme, idx) => (
-                  <TouchableOpacity
-                    key={idx}
-                    onPress={() => {
-                      _setBgColor(scheme.backgroundColor);
-                      _setTextColor(scheme.textColor);
-                    }}
-                    style={{
-                      backgroundColor: scheme.backgroundColor,
-                      borderRadius: 6,
-                      paddingVertical: 8,
-                      paddingHorizontal: 10,
-                      marginBottom: 6,
-                      borderWidth: 1,
-                      borderColor: gray(0.15),
-                    }}
-                  >
-                    <Text
-                      style={{
-                        color: scheme.textColor,
-                        fontSize: 12,
-                        fontWeight: "500",
+          {hasSchemes && (
+            <>
+              <div className={styles.schemesPanel}>
+                <div className={styles.schemesTitle}>Existing Schemes</div>
+                <div className={styles.schemesScroll}>
+                  {colorSchemes.map((scheme, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => {
+                        _setBgColor(scheme.backgroundColor);
+                        _setTextColor(scheme.textColor);
                       }}
-                      numberOfLines={2}
+                      className={styles.schemeItem}
+                      style={{ backgroundColor: scheme.backgroundColor }}
                     >
-                      {scheme.name}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-            <View style={{ width: 1, backgroundColor: gray(0.15), marginHorizontal: 15 }} />
-          </>)}
+                      <span
+                        className={styles.schemeText}
+                        style={{ color: scheme.textColor }}
+                      >
+                        {scheme.name}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className={styles.schemesDivider} />
+            </>
+          )}
 
           {/* Main color picker area */}
-          <View style={{ flex: 1, alignItems: "center" }}>
-            <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginBottom: 20 }}>
-              {title || "Edit Colors"}
-            </Text>
+          <div className={styles.pickerArea}>
+            <div className={styles.pickerTitle}>{title || "Edit Colors"}</div>
 
-            <View
-              style={{
-                backgroundColor: sBgColor,
-                borderRadius: 5,
-                paddingVertical: 10,
-                paddingHorizontal: 30,
-                alignItems: "center",
-                justifyContent: "center",
-                minWidth: 200,
-                marginBottom: 25,
-              }}
-            >
-              <Text style={{ color: sTextColor, fontSize: 14, fontWeight: "500" }}>
+            <div className={styles.previewBox} style={{ backgroundColor: sBgColor }}>
+              <span className={styles.previewText} style={{ color: sTextColor }}>
                 {previewText || "Preview"}
-              </Text>
-            </View>
+              </span>
+            </div>
 
-            <View style={{ flexDirection: "row", justifyContent: "center", flexWrap: "wrap", gap: 30 }}>
-              <View style={{ alignItems: "center" }}>
-                <Text style={{ fontSize: 13, color: C.text, marginBottom: 8, fontWeight: "500" }}>
-                  Background Color
-                </Text>
+            <div className={styles.colorRows}>
+              <div className={styles.colorColumn}>
+                <div className={styles.colorLabel}>Background Color</div>
                 <ColorWheel
                   key={"bg-" + sBgColor}
                   initialColor={sBgColor}
@@ -159,11 +108,9 @@ export const ColorPickerModal = ({
                     _setBgColor(val.hex);
                   }}
                 />
-              </View>
-              <View style={{ alignItems: "center" }}>
-                <Text style={{ fontSize: 13, color: C.text, marginBottom: 8, fontWeight: "500" }}>
-                  Text Color
-                </Text>
+              </div>
+              <div className={styles.colorColumn}>
+                <div className={styles.colorLabel}>Text Color</div>
                 <ColorWheel
                   key={"text-" + sTextColor}
                   initialColor={sTextColor}
@@ -171,11 +118,11 @@ export const ColorPickerModal = ({
                     _setTextColor(val.hex);
                   }}
                 />
-              </View>
-            </View>
+              </div>
+            </div>
 
-            <View style={{ flexDirection: "row", justifyContent: "center", marginTop: 25, gap: 15 }}>
-              <Button_
+            <div className={styles.buttonsRow}>
+              <Button
                 text={saveButtonText || "Save Changes"}
                 colorGradientArr={COLOR_GRADIENTS.green}
                 onPress={() => {
@@ -183,14 +130,14 @@ export const ColorPickerModal = ({
                   onClose();
                 }}
               />
-              <Button_
+              <Button
                 text={exitButtonText || "Exit (discard any changes)"}
                 colorGradientArr={COLOR_GRADIENTS.grey}
                 onPress={onClose}
               />
-            </View>
-          </View>
-        </View>
+            </div>
+          </div>
+        </div>
       </div>
     </div>,
     document.body

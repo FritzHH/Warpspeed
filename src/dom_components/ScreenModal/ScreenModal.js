@@ -4,7 +4,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Button } from "../Button/Button";
 import { SHADOW_NONE } from "../shadows";
-import { Z } from "../../styles";
+import { C, Z } from "../../styles";
 import styles from "./ScreenModal.module.css";
 
 export const ScreenModal = ({
@@ -94,7 +94,7 @@ export const ScreenModal = ({
               <div
                 className={styles.overlay}
                 style={{
-                  backgroundColor: outerModalStyle?.backgroundColor || "rgba(0,0,0,0.5)",
+                  backgroundColor: outerModalStyle?.backgroundColor || C.surfaceOverlay,
                   opacity: sFadedIn ? 1 : 0,
                   transition: "opacity 150ms ease-in",
                 }}

@@ -12,7 +12,7 @@ const StatusPickerRow = ({ status, idx, total, onPress, itemHeight, itemTextStyl
         height: itemHeight,
         backgroundColor: status.backgroundColor || C.listItemWhite,
         borderBottomWidth: idx < total - 1 ? 1 : 0,
-        borderBottomColor: "rgba(0,0,0,0.08)",
+        borderBottomColor: C.borderSubtle,
         borderBottomStyle: idx < total - 1 ? "solid" : "none",
       }}
     >

@@ -1,0 +1,115 @@
+.container {
+  flex: 1 1 0;
+  min-height: 0;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  font-size: 15px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.cardInfo {
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.cardInfoLine {
+  font-size: 12px;
+}
+
+.cardInfoSub {
+  font-size: 11px;
+}
+
+.noCardSelected {
+  font-size: 11px;
+  font-style: italic;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.amountSection {
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+
+.amountLabel {
+  font-size: 11px;
+  margin-bottom: 3px;
+}
+
+.inputWrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background-color: white;
+}
+
+.dollar {
+  font-size: 14px;
+  margin-right: 2px;
+}
+
+.input {
+  flex: 1 1 0;
+  outline: none;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  text-align: right;
+  min-width: 0;
+}
+
+.input::placeholder {
+  color: var(--text-muted);
+}
+
+.statusRow {
+  min-height: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.statusFlex {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.statusFlexSm {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.statusText {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.errorText {
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.checkIcon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  flex-shrink: 0;
+}

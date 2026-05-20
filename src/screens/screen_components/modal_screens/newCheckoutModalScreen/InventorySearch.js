@@ -1,50 +1,33 @@
 /* eslint-disable */
-import { View, Text, ScrollView } from "react-native-web";
-import { TouchableOpacity } from "react-native";
 import { useState, memo } from "react";
 import cloneDeep from "lodash/cloneDeep";
-import { TextInput_, Button_ } from "../../../../components";
+import { Button, TextInput, TouchableOpacity } from "../../../../dom_components";
 import { C, COLOR_GRADIENTS } from "../../../../styles";
-import {
-  formatCurrencyDisp,
-  gray,
-  generateEAN13Barcode,
-  normalizeBarcode,
-} from "../../../../utils";
+import { formatCurrencyDisp, generateEAN13Barcode, normalizeBarcode } from "../../../../utils";
 import { workerSearchInventory } from "../../../../inventorySearchManager";
 import { INVENTORY_ITEM_PROTO } from "../../../../data";
 import { dlog, DCAT } from "./checkoutDebugLog";
+import styles from "./InventorySearch.module.css";
 
 function SearchResultRow({ item, onAdd }) {
-  let name = item.formalName || item.informalName || "Unknown";
   let price = item.price || 0;
 
   return (
     <TouchableOpacity
       onPress={() => onAdd(item)}
-      style={{
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        width: "100%",
-        marginBottom: 3,
-        borderWidth: 1,
-        borderColor: C.buttonLightGreenOutline,
-        borderRadius: 5,
-        padding: 5,
-        borderLeftWidth: 3,
-      }}
+      className={styles.resultRow}
+      style={{ borderColor: C.buttonLightGreenOutline }}
     >
-      <View>
-        <Text style={{ color: C.text }}>{item.formalName}</Text>
-        <Text style={{ color: C.text }}>{item.informalName}</Text>
-      </View>
-      <View style={{ alignItems: "flex-end" }}>
-        <Text style={{ color: C.text }}>
-          <Text style={{ color: C.text, fontSize: 13 }}>{"$  "}</Text>
+      <div className={styles.resultNameCol}>
+        <span style={{ color: C.text }}>{item.formalName}</span>
+        <span style={{ color: C.text }}>{item.informalName}</span>
+      </div>
+      <div className={styles.resultPriceCol}>
+        <span style={{ color: C.text }}>
+          <span className={styles.resultDollar} style={{ color: C.text }}>{"$  "}</span>
           {formatCurrencyDisp(price)}
-        </Text>
-      </View>
+        </span>
+      </div>
     </TouchableOpacity>
   );
 }
@@ -69,7 +52,6 @@ export const InventorySearch = memo(function InventorySearch({
       return;
     }
 
-    // Check for exact barcode match (12 or 13-digit scan)
     let trimmed = val.trim();
     if (/^\d{12,13}$/.test(trimmed)) {
       let normalized = normalizeBarcode(trimmed);
@@ -83,7 +65,6 @@ export const InventorySearch = memo(function InventorySearch({
         _setSearchResults([]);
         return;
       }
-      // Not found in inventory
       dlog(DCAT.ACTION, "barcodeScan_notFound", "InventorySearch", { barcode: trimmed });
       _setNotFoundBarcode(trimmed);
       _setSearchString("");
@@ -91,7 +72,6 @@ export const InventorySearch = memo(function InventorySearch({
       return;
     }
 
-    // Fuzzy search (off main thread)
     workerSearchInventory(val, (results) => {
       _setSearchResults(results?.slice(0, 15) || []);
     });
@@ -115,80 +95,55 @@ export const InventorySearch = memo(function InventorySearch({
   }
 
   return (
-    <View style={{ flex: 1 }}>
-      {/* Search Input */}
-      <View
-        style={{
-          flexDirection: "row",
-          paddingHorizontal: 10,
-        }}
-      >
-        <TextInput_
+    <div className={styles.container}>
+      <div className={styles.searchRow}>
+        <TextInput
+          debounceMs={0}
+          className={styles.searchInput}
           style={{
-            borderBottomColor: gray(0.3),
-            borderBottomWidth: 1,
-            width: "100%",
-            marginBottom: 10,
-            fontSize: 16,
+            borderBottomColor: C.borderStrong,
             color: C.text,
-            outlineWidth: 0,
-            outlineStyle: "none",
           }}
           value={sSearchString}
           onChangeText={handleSearch}
           placeholder="Scan or search inventory..."
-          placeholderTextColor={gray(0.3)}
+          placeholderTextColor={C.textDisabled}
           onFocus={() => _setFocused(true)}
           onBlur={() => _setFocused(false)}
         />
-      </View>
+      </div>
 
-      {/* Barcode Not Found */}
       {!!sNotFoundBarcode && (
-        <View
-          style={{
-            marginHorizontal: 6,
-            marginBottom: 8,
-            padding: 10,
-            borderRadius: 6,
-            backgroundColor: "rgb(255, 248, 240)",
-            borderWidth: 1,
-            borderColor: C.orange,
-          }}
+        <div
+          className={styles.notFoundBox}
+          style={{ borderColor: C.orange }}
         >
-          <Text style={{ fontSize: 12, color: C.text, marginBottom: 6 }}>
-            Barcode <Text style={{ fontWeight: "600" }}>{sNotFoundBarcode}</Text> not found in inventory.
-          </Text>
-          <View style={{ flexDirection: "row", gap: 8 }}>
-            <Button_
+          <div className={styles.notFoundText} style={{ color: C.text }}>
+            Barcode <span className={styles.notFoundBarcode}>{sNotFoundBarcode}</span> not found in inventory.
+          </div>
+          <div className={styles.notFoundActions}>
+            <Button
               text="Create Item"
               onPress={handleCreateNewItem}
               colorGradientArr={COLOR_GRADIENTS.blue}
               textStyle={{ color: C.textWhite, fontSize: 11 }}
-              buttonStyle={{ paddingVertical: 5, paddingHorizontal: 10 }}
+              buttonStyle={{ paddingTop: 5, paddingBottom: 5, paddingLeft: 10, paddingRight: 10 }}
             />
-            <Button_
+            <Button
               text="Dismiss"
               onPress={() => _setNotFoundBarcode("")}
               colorGradientArr={COLOR_GRADIENTS.grey}
               textStyle={{ color: C.textWhite, fontSize: 11 }}
-              buttonStyle={{ paddingVertical: 5, paddingHorizontal: 10 }}
+              buttonStyle={{ paddingTop: 5, paddingBottom: 5, paddingLeft: 10, paddingRight: 10 }}
             />
-          </View>
-        </View>
+          </div>
+        </div>
       )}
 
-      {/* Search Results */}
       {sSearchResults.length > 0 && (
-        <ScrollView
-          style={{
-            maxHeight: 140,
-            marginHorizontal: 6,
-            borderWidth: 1,
-            borderColor: gray(0.1),
-            borderRadius: 4,
-            backgroundColor: "white",
-          }}
+        <div
+          className={styles.resultsScroll}
+          style={{ borderColor: C.borderSubtle }}
         >
           {sSearchResults.map((item, idx) => (
             <SearchResultRow
@@ -197,8 +152,8 @@ export const InventorySearch = memo(function InventorySearch({
               onAdd={handleAddItem}
             />
           ))}
-        </ScrollView>
+        </div>
       )}
-    </View>
+    </div>
   );
 });

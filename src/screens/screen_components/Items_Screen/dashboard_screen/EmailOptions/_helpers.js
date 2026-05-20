@@ -1,7 +1,7 @@
 import React from "react";
 import { Button } from "../../../../../dom_components";
 import { C, ICONS } from "../../../../../styles";
-import { gray } from "../../../../../utils";
+
 
 export const MAX_EMAIL_ACCOUNTS = 5;
 
@@ -137,12 +137,12 @@ export function BoxButton1({
       text={label}
       icon={icon || ICONS.add}
       iconSize={iconSize || 30}
-      textStyle={{ fontSize: 14, color: gray(0.6), ...textStyle }}
+      textStyle={{ fontSize: 14, color: C.textSecondary, ...textStyle }}
       buttonStyle={{
         paddingHorizontal: 0,
         paddingVertical: 0,
         borderRadius: 5,
-        backgroundColor: gray(0.2),
+        backgroundColor: C.surfaceAlt,
         marginBottom: 0,
         ...style,
       }}

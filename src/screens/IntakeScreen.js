@@ -1,5 +1,4 @@
 /* eslint-disable */
-import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { useState, useEffect, useRef } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../styles";
@@ -9,21 +8,14 @@ import {
   useInventoryStore,
   useLoginStore,
 } from "../stores";
-import {
-  createNewWorkorder,
-  resolveStatus,
-  formatCurrencyDisp,
-  gray,
-  deepEqual,
-  formatWorkorderNumber,
-} from "../utils";
+import { createNewWorkorder, resolveStatus, formatCurrencyDisp, deepEqual, formatWorkorderNumber } from "../utils";
 import { WORKORDER_ITEM_PROTO, COLORS } from "../data";
 import {
-  Button_,
-  TextInput_,
-  Image_,
+  Button,
+  TextInput,
+  Image,
   DropdownMenu,
-} from "../components";
+} from "../dom_components";
 import {
   dbListenToSettings,
   dbListenToInventory,
@@ -31,6 +23,7 @@ import {
   dbSaveOpenWorkorder,
   startNewWorkorder,
 } from "../db_calls_wrapper";
+import styles from "./IntakeScreen.module.css";
 
 const ON_THE_STAND_STATUS_ID = "34kttdkfekj";
 const DROPDOWN_SELECTED_OPACITY = 0.3;
@@ -161,40 +154,36 @@ export function IntakeScreen() {
   let statuses = zSettings?.statuses || [];
 
   return (
-    <View style={{ flex: 1, backgroundColor: C.backgroundWhite }}>
+    <div
+      className={styles.root}
+      style={{ backgroundColor: C.backgroundWhite }}
+    >
       {/* Top Bar */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          padding: 12,
-          borderBottomWidth: 1,
-          borderBottomColor: gray(0.15),
-          backgroundColor: "white",
-        }}
+      <div
+        className={styles.topBar}
+        style={{ borderBottomColor: C.borderSubtle }}
       >
-        <Text
+        <span
+          className={styles.title}
           style={{
-            fontSize: 18,
             fontWeight: Fonts.weight.textHeavy,
             color: C.text,
-            marginRight: 16,
           }}
         >
           Intake
-        </Text>
+        </span>
 
         {/* Workorder Selector */}
-        <View style={{ flex: 1, marginRight: 10 }}>
+        <div className={styles.selectorWrap}>
           <WorkorderSelector
             workorders={zWorkorders}
             statuses={statuses}
             selectedID={sSelectedWorkorderID}
             onSelect={_setSelectedWorkorderID}
           />
-        </View>
+        </div>
 
-        <Button_
+        <Button
           text="New Workorder"
           icon={ICONS.add}
           iconSize={18}
@@ -203,19 +192,15 @@ export function IntakeScreen() {
           buttonStyle={{ paddingHorizontal: 14, paddingVertical: 6 }}
           textStyle={{ fontSize: 13 }}
         />
-      </View>
+      </div>
 
       {/* Main Content */}
       {selectedWorkorder ? (
-        <View style={{ flex: 1 }}>
+        <div className={styles.mainContent}>
           {/* Detail Fields */}
-          <View
-            style={{
-              padding: 12,
-              borderBottomWidth: 1,
-              borderBottomColor: gray(0.1),
-              backgroundColor: "white",
-            }}
+          <div
+            className={styles.detailFieldsWrap}
+            style={{ borderBottomColor: C.borderSubtle }}
           >
             <WorkorderDetailFields
               workorder={selectedWorkorder}
@@ -223,36 +208,25 @@ export function IntakeScreen() {
               updateField={updateField}
               setBikeColor={setBikeColor}
             />
-          </View>
+          </div>
 
           {/* Items List */}
-          <View
-            style={{
-              flex: 1,
-              borderBottomWidth: 1,
-              borderBottomColor: gray(0.1),
-            }}
+          <div
+            className={styles.itemsSection}
+            style={{ borderBottomColor: C.borderSubtle }}
           >
-            <View
-              style={{
-                flexDirection: "row",
-                justifyContent: "space-between",
-                alignItems: "center",
-                paddingHorizontal: 12,
-                paddingVertical: 8,
-              }}
-            >
-              <Text
+            <div className={styles.itemsHeaderRow}>
+              <span
+                className={styles.itemsHeaderLabel}
                 style={{
-                  fontSize: 12,
                   fontWeight: Fonts.weight.textHeavy,
                   color: C.blue,
                 }}
               >
                 ITEMS ({selectedWorkorder.workorderLines?.length || 0})
-              </Text>
-            </View>
-            <ScrollView style={{ flex: 1, paddingHorizontal: 12 }}>
+              </span>
+            </div>
+            <div className={styles.itemsScroll}>
               {(selectedWorkorder.workorderLines || []).map((line, idx) => (
                 <LineItemRow
                   key={line.id || idx}
@@ -262,77 +236,63 @@ export function IntakeScreen() {
               ))}
               {(!selectedWorkorder.workorderLines ||
                 selectedWorkorder.workorderLines.length === 0) && (
-                <Text
-                  style={{
-                    fontSize: 13,
-                    color: gray(0.4),
-                    textAlign: "center",
-                    paddingVertical: 30,
-                  }}
+                <p
+                  className={styles.itemsEmpty}
+                  style={{ color: C.textMuted }}
                 >
                   No items yet. Press an intake button below to add items.
-                </Text>
+                </p>
               )}
-            </ScrollView>
-          </View>
+            </div>
+          </div>
 
           {/* Intake Buttons */}
-          <View
-            style={{
-              padding: 12,
-              backgroundColor: "white",
-              borderTopWidth: 1,
-              borderTopColor: gray(0.1),
-            }}
+          <div
+            className={styles.intakeButtonsSection}
+            style={{ borderTopColor: C.borderSubtle }}
           >
-            <Text
+            <span
+              className={styles.intakeButtonsLabel}
               style={{
-                fontSize: 12,
                 fontWeight: Fonts.weight.textHeavy,
                 color: C.blue,
-                marginBottom: 8,
               }}
             >
               INTAKE BUTTONS
-            </Text>
-            <ScrollView
-              horizontal={false}
-              style={{ maxHeight: 200 }}
-              contentContainerStyle={{
-                flexDirection: "row",
-                flexWrap: "wrap",
-              }}
-            >
-              {intakeButtons.map((btn) => (
-                <IntakeButtonCard
-                  key={btn.id}
-                  btn={btn}
-                  onPress={() => handleIntakeButtonPress(btn)}
-                  zInventory={zInventory}
-                />
-              ))}
-              {intakeButtons.length === 0 && (
-                <Text style={{ fontSize: 13, color: gray(0.4), padding: 10 }}>
-                  No intake buttons configured. Set them up in Dashboard Admin.
-                </Text>
-              )}
-            </ScrollView>
-          </View>
-        </View>
+            </span>
+            <div className={styles.intakeButtonsScroll}>
+              <div className={styles.intakeButtonsInner}>
+                {intakeButtons.map((btn) => (
+                  <IntakeButtonCard
+                    key={btn.id}
+                    btn={btn}
+                    onPress={() => handleIntakeButtonPress(btn)}
+                    zInventory={zInventory}
+                  />
+                ))}
+                {intakeButtons.length === 0 && (
+                  <span
+                    className={styles.intakeButtonsEmpty}
+                    style={{ color: C.textMuted }}
+                  >
+                    No intake buttons configured. Set them up in Dashboard Admin.
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       ) : (
-        <View
-          style={{
-            flex: 1,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <Text style={{ fontSize: 15, color: gray(0.4) }}>
+        <div className={styles.emptyState}>
+          <span
+            className={styles.emptyStateText}
+            style={{ color: C.textMuted }}
+          >
             Select a workorder or create a new one to begin.
-          </Text>
-        </View>
+          </span>
+        </div>
       )}
-    </View>
+    </div>
   );
 }
 
@@ -351,108 +311,81 @@ const WorkorderSelector = ({ workorders, statuses, selectedID, onSelect }) => {
     : "Select Workorder...";
 
   return (
-    <View>
-      <TouchableOpacity
-        onPress={() => _setOpen(!sOpen)}
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          borderWidth: 1,
-          borderColor: C.buttonLightGreenOutline,
-          borderRadius: 6,
-          paddingHorizontal: 10,
-          paddingVertical: 6,
-          backgroundColor: "white",
-        }}
+    <div className={styles.selectorRoot}>
+      <button
+        type="button"
+        onClick={() => _setOpen(!sOpen)}
+        className={styles.selectorTrigger}
+        style={{ borderColor: C.buttonLightGreenOutline }}
       >
-        <Text
-          style={{
-            flex: 1,
-            fontSize: 14,
-            color: selected ? C.text : gray(0.4),
-          }}
-          numberOfLines={1}
+        <span
+          className={styles.selectorTriggerLabel}
+          style={{ color: selected ? C.text : C.textMuted }}
         >
           {label}
-        </Text>
-        <Image_
+        </span>
+        <Image
           icon={sOpen ? ICONS.upArrow : ICONS.downArrow}
           size={12}
           style={{ marginLeft: 6 }}
         />
-      </TouchableOpacity>
+      </button>
 
       {sOpen && (
-        <ScrollView
-          style={{
-            position: "absolute",
-            top: 36,
-            left: 0,
-            right: 0,
-            maxHeight: 300,
-            backgroundColor: "white",
-            borderWidth: 1,
-            borderColor: gray(0.2),
-            borderRadius: 6,
-            zIndex: 100,
-          }}
+        <div
+          className={styles.selectorDropdown}
+          style={{ borderColor: C.borderSubtle }}
         >
           {workorders.map((wo) => {
             let status = resolveStatus(wo.status, statuses);
             return (
-              <TouchableOpacity
+              <button
+                type="button"
                 key={wo.id}
-                onPress={() => {
+                onClick={() => {
                   onSelect(wo.id);
                   _setOpen(false);
                 }}
+                className={styles.selectorRow}
                 style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  padding: 8,
-                  borderBottomWidth: 1,
-                  borderBottomColor: gray(0.08),
+                  borderBottomColor: C.borderSubtle,
                   backgroundColor:
                     wo.id === selectedID ? "rgb(230,240,252)" : "white",
                 }}
               >
-                <View
+                <div
+                  className={styles.selectorRowDot}
                   style={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: 4,
-                    backgroundColor: status.backgroundColor || gray(0.3),
-                    marginRight: 8,
+                    backgroundColor: status.backgroundColor || C.borderStrong,
                   }}
                 />
-                <Text
-                  style={{ fontSize: 13, color: C.text, flex: 1 }}
-                  numberOfLines={1}
+                <span
+                  className={styles.selectorRowLabel}
+                  style={{ color: C.text }}
                 >
                   #{formatWorkorderNumber(wo.workorderNumber) || "?"} — {wo.customerFirst || wo.brand || "(no name)"}{" "}
                   {wo.customerLast || ""}
-                </Text>
-                <Text style={{ fontSize: 11, color: gray(0.5) }}>
+                </span>
+                <span
+                  className={styles.selectorRowStatus}
+                  style={{ color: C.textMuted }}
+                >
                   {status.label}
-                </Text>
-              </TouchableOpacity>
+                </span>
+              </button>
             );
           })}
           {workorders.length === 0 && (
-            <Text
-              style={{
-                fontSize: 13,
-                color: gray(0.4),
-                padding: 12,
-                textAlign: "center",
-              }}
+            <p
+              className={styles.selectorEmpty}
+              style={{ color: C.textMuted }}
             >
               No open workorders.
-            </Text>
+            </p>
           )}
-        </ScrollView>
+        </div>
       )}
-    </View>
+    </div>
   );
 };
 
@@ -467,16 +400,10 @@ const WorkorderDetailFields = ({
   setBikeColor,
 }) => {
   return (
-    <View>
+    <div className={styles.detailFieldsRoot}>
       {/* Brand Row */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          marginBottom: 8,
-        }}
-      >
-        <TextInput_
+      <div className={styles.detailRow}>
+        <TextInput
           placeholder="Brand"
           style={{
             width: "30%",
@@ -493,15 +420,8 @@ const WorkorderDetailFields = ({
           value={workorder?.brand || ""}
           onChangeText={(val) => updateField("brand", val)}
         />
-        <View
-          style={{
-            flexDirection: "row",
-            marginLeft: 8,
-            flex: 1,
-            justifyContent: "space-between",
-          }}
-        >
-          <View style={{ width: "48%" }}>
+        <div className={styles.detailRowDropdowns}>
+          <div className={styles.detailDropdownHalf}>
             <DropdownMenu
               dataArr={zSettings?.bikeBrands || []}
               onSelect={(item) => updateField("brand", item)}
@@ -509,10 +429,9 @@ const WorkorderDetailFields = ({
               buttonStyle={{
                 opacity: workorder?.brand ? DROPDOWN_SELECTED_OPACITY : 1,
               }}
-              modalCoordX={-6}
             />
-          </View>
-          <View style={{ width: "48%" }}>
+          </div>
+          <div className={styles.detailDropdownHalf}>
             <DropdownMenu
               dataArr={zSettings?.bikeOptionalBrands || []}
               onSelect={(item) => updateField("brand", item)}
@@ -520,21 +439,14 @@ const WorkorderDetailFields = ({
               buttonStyle={{
                 opacity: workorder?.brand ? DROPDOWN_SELECTED_OPACITY : 1,
               }}
-              modalCoordX={0}
             />
-          </View>
-        </View>
-      </View>
+          </div>
+        </div>
+      </div>
 
       {/* Description Row */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          marginBottom: 8,
-        }}
-      >
-        <TextInput_
+      <div className={styles.detailRow}>
+        <TextInput
           placeholder="Model/Description"
           style={{
             width: "30%",
@@ -551,7 +463,7 @@ const WorkorderDetailFields = ({
           value={workorder?.description || ""}
           onChangeText={(val) => updateField("description", val)}
         />
-        <View style={{ marginLeft: 8, flex: 1 }}>
+        <div className={styles.detailDescriptionDropdownWrap}>
           <DropdownMenu
             dataArr={zSettings?.bikeDescriptions || []}
             onSelect={(item) => updateField("description", item)}
@@ -559,19 +471,13 @@ const WorkorderDetailFields = ({
             buttonStyle={{
               opacity: workorder?.description ? DROPDOWN_SELECTED_OPACITY : 1,
             }}
-            modalCoordX={55}
           />
-        </View>
-      </View>
+        </div>
+      </div>
 
       {/* Color Row */}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-        }}
-      >
-        <TextInput_
+      <div className={styles.detailRowLast}>
+        <TextInput
           placeholder="Color 1"
           value={workorder?.color1?.label || ""}
           style={{
@@ -589,8 +495,8 @@ const WorkorderDetailFields = ({
           }}
           onChangeText={(val) => setBikeColor(val, "color1")}
         />
-        <View style={{ width: 5 }} />
-        <TextInput_
+        <div className={styles.colorSpacer} />
+        <TextInput
           placeholder="Color 2"
           value={workorder?.color2?.label || ""}
           style={{
@@ -608,15 +514,8 @@ const WorkorderDetailFields = ({
           }}
           onChangeText={(val) => setBikeColor(val, "color2")}
         />
-        <View
-          style={{
-            flexDirection: "row",
-            marginLeft: 8,
-            flex: 1,
-            justifyContent: "space-between",
-          }}
-        >
-          <View style={{ width: "48%" }}>
+        <div className={styles.detailRowDropdowns}>
+          <div className={styles.detailDropdownHalf}>
             <DropdownMenu
               itemSeparatorStyle={{ height: 0 }}
               dataArr={COLORS}
@@ -628,10 +527,9 @@ const WorkorderDetailFields = ({
                   ? DROPDOWN_SELECTED_OPACITY
                   : 1,
               }}
-              modalCoordX={0}
             />
-          </View>
-          <View style={{ width: "48%" }}>
+          </div>
+          <div className={styles.detailDropdownHalf}>
             <DropdownMenu
               itemSeparatorStyle={{ height: 0 }}
               dataArr={COLORS}
@@ -643,12 +541,11 @@ const WorkorderDetailFields = ({
                   ? DROPDOWN_SELECTED_OPACITY
                   : 1,
               }}
-              modalCoordX={0}
             />
-          </View>
-        </View>
-      </View>
-    </View>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 
@@ -662,36 +559,26 @@ const LineItemRow = ({ line, onDelete }) => {
   let price = inv?.price || 0;
 
   return (
-    <View
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        justifyContent: "space-between",
-        paddingVertical: 6,
-        paddingHorizontal: 8,
-        marginBottom: 3,
-        backgroundColor: "rgb(230, 240, 252)",
-        borderRadius: 4,
-        borderLeftWidth: 3,
-        borderLeftColor: C.blue,
-      }}
+    <div
+      className={styles.lineItemRow}
+      style={{ borderLeftColor: C.blue }}
     >
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 13, color: C.text }}>{name}</Text>
-        <Text style={{ fontSize: 11, color: C.lightText }}>
+      <div className={styles.lineItemInfo}>
+        <span className={styles.lineItemName} style={{ color: C.text }}>
+          {name}
+        </span>
+        <span className={styles.lineItemMeta} style={{ color: C.lightText }}>
           Qty: {line.qty || 1} | ${formatCurrencyDisp(price)}
-        </Text>
-      </View>
-      <TouchableOpacity
-        onPress={onDelete}
-        style={{
-          paddingHorizontal: 8,
-          paddingVertical: 6,
-        }}
+        </span>
+      </div>
+      <button
+        type="button"
+        onClick={onDelete}
+        className={styles.lineItemDeleteBtn}
       >
-        <Image_ icon={ICONS.trash} size={14} />
-      </TouchableOpacity>
-    </View>
+        <Image icon={ICONS.trash} size={14} />
+      </button>
+    </div>
   );
 };
 
@@ -703,56 +590,26 @@ const IntakeButtonCard = ({ btn, onPress, zInventory }) => {
   let itemCount = btn.itemsToAdd?.length || 0;
 
   return (
-    <TouchableOpacity
-      onPress={onPress}
+    <button
+      type="button"
+      onClick={onPress}
+      className={styles.intakeCard}
       style={{
-        width: 140,
-        minHeight: 50,
-        margin: 4,
-        padding: 8,
-        borderWidth: 1,
         borderColor: C.buttonLightGreenOutline,
-        borderRadius: 8,
         backgroundColor: C.listItemWhite,
-        alignItems: "center",
-        justifyContent: "center",
       }}
     >
-      <Text
-        style={{
-          fontSize: 13,
-          textAlign: "center",
-          color: C.text,
-          fontWeight: "500",
-        }}
-        numberOfLines={2}
-      >
+      <span className={styles.intakeCardLabel} style={{ color: C.text }}>
         {btn.label || "(unnamed)"}
-      </Text>
+      </span>
       {itemCount > 0 && (
-        <View
-          style={{
-            backgroundColor: C.blue,
-            borderRadius: 8,
-            minWidth: 16,
-            height: 16,
-            alignItems: "center",
-            justifyContent: "center",
-            marginTop: 4,
-          }}
+        <div
+          className={styles.intakeCardBadge}
+          style={{ backgroundColor: C.blue }}
         >
-          <Text
-            style={{
-              color: "white",
-              fontSize: 10,
-              fontWeight: "bold",
-              paddingHorizontal: 4,
-            }}
-          >
-            {itemCount}
-          </Text>
-        </View>
+          <span className={styles.intakeCardBadgeText}>{itemCount}</span>
+        </div>
       )}
-    </TouchableOpacity>
+    </button>
   );
 };

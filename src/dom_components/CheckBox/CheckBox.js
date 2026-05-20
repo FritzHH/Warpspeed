@@ -42,15 +42,15 @@ export const CheckBox = forwardRef(function CheckBox(
       >
         {isChecked ? (
           <>
-            <rect x="1" y="1" width="14" height="14" rx="3" fill={C.green} stroke={C.green} strokeWidth="1.5" />
-            <path d="M4.5 8.5L7 11L11.5 5.5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <rect x="1" y="1" width="14" height="14" rx="3" style={{ fill: C.accent, stroke: C.accent }} strokeWidth="1.5" />
+            <path d="M4.5 8.5L7 11L11.5 5.5" style={{ stroke: C.textOnAccent }} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
           </>
         ) : (
-          <rect x="1" y="1" width="14" height="14" rx="3" fill="none" stroke="#aaa" strokeWidth="1.5" />
+          <rect x="1" y="1" width="14" height="14" rx="3" fill="none" style={{ stroke: C.borderStrong }} strokeWidth="1.5" />
         )}
       </svg>
       {text && (
-        <span className={styles.text} style={{ color: C.text, fontSize: 15, ...textStyle }}>
+        <span className={styles.text} style={{ color: C.textDefault, fontSize: 15, ...textStyle }}>
           {text}
         </span>
       )}

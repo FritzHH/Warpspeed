@@ -1,0 +1,596 @@
+/* NewCheckoutModalScreen CSS module
+   Static layout / sizing / borders / font-sizes live here.
+   Dynamic colors and opacity stay inline. */
+
+/* ─── SplitDepositModal ──────────────────────────────────────── */
+.splitOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--surface-overlay);
+}
+
+.splitBox {
+  display: flex;
+  flex-direction: column;
+  width: 360px;
+  border-radius: 12px;
+  border-width: 2px;
+  border-style: solid;
+  padding: 16px;
+  flex-shrink: 0;
+}
+
+.splitTitle {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 10px;
+  display: block;
+}
+
+.splitRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  flex-shrink: 0;
+}
+
+.splitRowText {
+  font-size: 12px;
+}
+
+.splitInputWrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 7px;
+  margin-top: 8px;
+  margin-bottom: 6px;
+  padding: 0 10px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+.splitDollar {
+  font-size: 16px;
+  margin-right: 4px;
+}
+
+.splitRemainderText {
+  font-size: 11px;
+  margin-bottom: 8px;
+  display: block;
+}
+
+.splitButtonsRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-top: 6px;
+  flex-shrink: 0;
+}
+
+.splitButtonsRight {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+}
+
+/* ─── Main checkout modal ────────────────────────────────────── */
+.modalCard {
+  display: flex;
+  flex-direction: column;
+  width: 85%;
+  height: 90%;
+  align-self: center;
+  border-radius: 6px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.loadingOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 998;
+}
+
+.mainRow {
+  display: flex;
+  flex-direction: row;
+  flex: 1 1 0;
+  padding: 20px;
+  min-height: 0;
+}
+
+.leftCol {
+  display: flex;
+  flex-direction: column;
+  width: 29%;
+  height: 100%;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.zeroTotalBox {
+  display: flex;
+  flex-direction: column;
+  height: 48%;
+  justify-content: center;
+  align-items: center;
+  border-radius: 15px;
+  padding: 20px;
+  flex-shrink: 0;
+}
+
+.zeroTotalTitle {
+  font-size: 16px;
+  margin-bottom: 20px;
+  display: block;
+}
+
+.completeButton {
+  display: flex;
+  flex-direction: column;
+  width: 80%;
+  height: 50px;
+  border-radius: 8px;
+  justify-content: center;
+  align-items: center;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.completeButton:active {
+  opacity: 0.7;
+}
+
+.completeButtonText {
+  font-size: 15px;
+  color: white;
+}
+
+.fullyPaidLabel {
+  font-size: 14px;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.fullyPaidAmount {
+  font-size: 28px;
+  margin-bottom: 20px;
+  display: block;
+}
+
+.fullyPaidTotal {
+  font-size: 14px;
+  margin-bottom: 20px;
+  display: block;
+}
+
+/* ── Middle column (deposit mode) ── */
+.depositCol {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  padding-left: 10px;
+  min-height: 0;
+}
+
+.depositSummaryCard {
+  display: flex;
+  flex-direction: column;
+  border-width: 2px;
+  border-style: solid;
+  border-radius: 8px;
+  padding: 14px;
+  flex-shrink: 0;
+}
+
+.depositSummaryHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+}
+
+.depositTypePill {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 8px;
+  border-radius: 8px;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.depositTypePillText {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.depositAmountText {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.depositNoteText {
+  font-size: 15px;
+  margin-bottom: 4px;
+  display: block;
+  word-wrap: break-word;
+}
+
+.depositCustomerName {
+  font-size: 15px;
+  display: block;
+}
+
+.depositInfoBanner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 6px;
+  padding: 6px 10px;
+  margin-top: 8px;
+  flex-shrink: 0;
+}
+
+.depositInfoBannerIcon {
+  width: 18px;
+  height: 18px;
+  margin-right: 8px;
+}
+
+.depositInfoBannerText {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.paymentsListWrap {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  margin-top: 3px;
+  min-height: 0;
+}
+
+.bottomButtonsRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  width: 100%;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 6px;
+  padding: 2px 3px;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.bottomButtonsRowMain {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 5px;
+  padding: 4px 3px;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.iconButton {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.iconButton:active {
+  opacity: 0.7;
+}
+
+/* ── Middle column (main mode) ── */
+.midCol {
+  display: flex;
+  flex-direction: column;
+  width: 29%;
+  flex: 1 1 0;
+  padding-left: 10px;
+  min-height: 0;
+}
+
+.customerInfoCard {
+  display: flex;
+  flex-direction: column;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 6px;
+  padding: 5px 10px;
+  flex-shrink: 0;
+}
+
+.customerInfoTopRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.customerInfoCol {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.customerNameText {
+  text-transform: uppercase;
+  display: block;
+}
+
+.customerContactRestrictionText {
+  /* Inline span inside customerNameText */
+}
+
+.customerEmailText {
+  font-size: 12px;
+  display: block;
+}
+
+.customerAddressText {
+  font-size: 13px;
+  display: block;
+}
+
+.depositsListCard {
+  display: flex;
+  flex-direction: column;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 6px;
+  background-color: var(--surface-warning-muted);
+  margin-top: 5px;
+  padding: 5px 8px;
+  flex-shrink: 0;
+}
+
+.depositsListHeader {
+  display: flex;
+  flex-direction: column;
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-bottom: 5px;
+  flex-shrink: 0;
+}
+
+.depositsListHeaderText {
+  font-size: 13px;
+  display: block;
+}
+
+.depositRow {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0;
+  flex-shrink: 0;
+}
+
+.depositRowInner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.depositTypeBadge {
+  display: flex;
+  flex-direction: column;
+  padding: 2px 7px;
+  border-radius: 6px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.depositTypeBadgeText {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.depositAmountInList {
+  font-size: 16px;
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.depositReservedText {
+  font-size: 11px;
+  font-weight: 600;
+  margin-right: 8px;
+}
+
+.depositNoteInList {
+  font-size: 13px;
+  flex: 1 1 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.depositReasonToggle {
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.depositReasonExpanded {
+  font-size: 13px;
+  margin-left: 34px;
+  margin-top: 2px;
+  display: block;
+}
+
+.paymentsContainer {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 1;
+}
+
+.paymentsScroll {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.flexSpacer {
+  flex: 1 1 0;
+  min-height: 0;
+}
+
+.langSelectCol {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.langSelectLabel {
+  font-size: 12px;
+}
+
+/* ── Right column ── */
+.rightCol {
+  display: flex;
+  flex-direction: column;
+  width: 42%;
+  padding-left: 10px;
+  flex-shrink: 0;
+}
+
+.rightScroll {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.workorderCombinerSpacer {
+  margin-top: 15px;
+  flex-shrink: 0;
+}
+
+/* ── Overlays ── */
+.confirmOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  border-radius: 6px;
+  z-index: 100;
+}
+
+.confirmOverlayTaxFree {
+  background-color: var(--surface-overlay);
+}
+
+.confirmOverlayPop {
+  background-color: var(--surface-overlay);
+}
+
+.confirmBoxTaxFree {
+  display: flex;
+  flex-direction: column;
+  border-radius: 6px;
+  align-items: center;
+  justify-content: space-around;
+  min-width: 32%;
+  min-height: 24%;
+  padding: 25px 20px;
+  flex-shrink: 0;
+}
+
+.confirmBoxPop {
+  display: flex;
+  flex-direction: column;
+  border-radius: 6px;
+  align-items: center;
+  justify-content: center;
+  padding: 30px 40px;
+  flex-shrink: 0;
+}
+
+.confirmTitle {
+  font-weight: 500;
+  color: red;
+  font-size: 25px;
+  text-align: center;
+  display: block;
+}
+
+.confirmMessage {
+  text-align: center;
+  width: 90%;
+  margin-top: 10px;
+  font-size: 18px;
+  display: block;
+}
+
+.confirmActions {
+  display: flex;
+  flex-direction: row;
+  margin-top: 25px;
+  justify-content: center;
+  gap: 20px;
+  flex-shrink: 0;
+}
+
+.popRegisterIcon {
+  width: 60px;
+  height: 60px;
+  margin-bottom: 12px;
+}
+
+.popRegisterText {
+  font-size: 18px;
+  font-weight: 600;
+  display: block;
+}

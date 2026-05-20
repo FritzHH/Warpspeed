@@ -4,6 +4,7 @@ import { compressImage } from "../../../utils";
 import { dbUploadWorkorderMedia } from "../../../db_calls_wrapper";
 import { SmallLoadingIndicator } from "../../../dom_components";
 import { VideoRecorder } from "../VideoRecorder/VideoRecorder";
+import { C } from "../../../styles";
 import styles from "./MediaSection.module.css";
 
 export function MediaSection({ workorder, zSettings }) {
@@ -118,7 +119,7 @@ export function MediaSection({ workorder, zSettings }) {
         {zUploadProgress && !zUploadProgress.done && (
           <div className={styles.progressWrap}>
             <div className={styles.progressTopRow}>
-              <SmallLoadingIndicator text="" color="rgb(53, 135, 210)" />
+              <SmallLoadingIndicator text="" color={C.blue} />
               <span className={styles.progressLabel}>
                 Uploading {zUploadProgress.completed}/{zUploadProgress.total} - don't leave this page
               </span>

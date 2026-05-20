@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { C } from "../../styles";
 import styles from "./Dialog.module.css";
 
 export const Dialog = ({
   visible,
   onClose,
-  overlayColor = "rgba(50,50,50,.65)",
+  overlayColor = C.surfaceOverlay,
   children,
   contentStyle = {},
   preventClose = false,
   title = "Dialog",
+  onOpenAutoFocus,
+  onCloseAutoFocus,
   "aria-label": ariaLabel,
   "aria-labelledby": ariaLabelledBy,
   "aria-describedby": ariaDescribedBy,
@@ -45,6 +48,8 @@ export const Dialog = ({
           asChild
           onPointerDownOutside={(e) => { if (preventClose) e.preventDefault(); }}
           onEscapeKeyDown={(e) => { if (preventClose) e.preventDefault(); }}
+          onOpenAutoFocus={onOpenAutoFocus}
+          onCloseAutoFocus={onCloseAutoFocus}
           aria-label={ariaLabel}
           aria-labelledby={ariaLabelledBy}
           aria-describedby={ariaDescribedBy}

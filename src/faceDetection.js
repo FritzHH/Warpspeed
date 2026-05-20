@@ -1,6 +1,5 @@
 /*eslint-disable*/
 import React, { useRef, useEffect, useState, useCallback } from "react";
-import { View, Text } from "react-native-web";
 import * as faceapi from "face-api.js";
 import { localStorageWrapper, log } from "./utils";
 import {
@@ -9,8 +8,9 @@ import {
   PAUSE_USER_CLOCK_IN_CHECK_MILLIS,
 } from "./constants";
 import { useAlertScreenStore, useLoginStore, useSettingsStore } from "./stores";
-import { Button_, SmallLoadingIndicator } from "./components";
+import { Button, SmallLoadingIndicator } from "./dom_components";
 import { C, COLOR_GRADIENTS } from "./styles";
+import styles from "./faceDetection.module.css";
 
 const MODEL_URL = "./models";
 const DEFAULT_LOGOUT_GRACE_SECONDS = 7;
@@ -520,7 +520,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
   // render /////////////////////////////////////////////////////////////////
 
   return (
-    <View style={{}}>
+    <div className={styles.root}>
       <video
         ref={videoRef}
         width={zRunBackgroundRecognition ? 0 : 500}
@@ -528,18 +528,15 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
         autoPlay={true}
         muted
         onLoadedMetadata={handleLoadedMetadata}
-        style={{}}
       />
       {!zRunBackgroundRecognition && (
-        <View style={{ alignItems: "center" }}>
+        <div className={styles.controls}>
           {!sReady && (
             <SmallLoadingIndicator text="Loading recognition" color="#007AFF" />
           )}
-          <Text style={{ marginBottom: 20, color: "#007AFF", fontSize: 18, fontWeight: 400 }}>
-            {sStatus}
-          </Text>
+          <p className={styles.statusText}>{sStatus}</p>
           {!!sReady && (
-            <Button_
+            <Button
               buttonStyle={{ marginBottom: 20 }}
               colorGradientArr={COLOR_GRADIENTS.blue}
               textStyle={{ color: C.textWhite }}
@@ -547,8 +544,8 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
               onPress={handleEnroll}
             />
           )}
-        </View>
+        </div>
       )}
-    </View>
+    </div>
   );
 }

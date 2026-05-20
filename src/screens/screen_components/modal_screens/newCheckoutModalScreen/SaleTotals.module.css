@@ -1,0 +1,126 @@
+.totalRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.totalRowLabel {
+  font-size: 13px;
+}
+
+.totalRowValueWrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.dollarSign {
+  font-size: 13px;
+  margin-right: 10px;
+}
+
+.totalRowValue {
+  font-size: 17px;
+}
+
+.divider {
+  width: 100%;
+  height: 1px;
+  margin: 10px 0;
+  flex-shrink: 0;
+}
+
+/* PaymentStatus */
+.statusContainer {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  width: 100%;
+  margin-top: 15px;
+  flex-shrink: 0;
+}
+
+.amountText {
+  font-size: 18px;
+  font-weight: 500;
+}
+
+@keyframes saleSuccessIn {
+  0%   { opacity: 0; transform: scale(0);    }
+  60%  { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1);    }
+}
+
+@keyframes saleSuccessPulse {
+  0%, 100% { transform: scale(1);    }
+  50%      { transform: scale(1.06); }
+}
+
+.successPill {
+  border-radius: 10px;
+  padding: 8px 20px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  animation:
+    saleSuccessIn 500ms cubic-bezier(0.34, 1.56, 0.64, 1) forwards,
+    saleSuccessPulse 1600ms ease-in-out 500ms infinite;
+  transform-origin: center;
+}
+
+.successText {
+  font-size: 18px;
+  font-weight: 700;
+  text-align: center;
+}
+
+/* SaleTotals box */
+.totalsWrap {
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.totalsBox {
+  background-color: var(--surface-warning-muted);
+  border-radius: 10px;
+  border-width: 1px;
+  border-style: solid;
+  padding: 7px 10px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+/* CashChangeNeeded */
+.changeBox {
+  border-radius: 10px;
+  border-width: 2px;
+  border-style: solid;
+  padding: 10px;
+  margin-top: 5px;
+  width: 60%;
+  align-self: center;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.changeLabel {
+  font-size: 11px;
+  width: 100%;
+  text-align: left;
+  padding-bottom: 3px;
+}
+
+.changeAmount {
+  text-align: right;
+  font-size: 25px;
+}
+
+.changeAmountDollar {
+  font-size: 15px;
+  padding-right: 7px;
+}

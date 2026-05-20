@@ -1,20 +1,16 @@
 /* eslint-disable */
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { View, Text, TextInput, TouchableOpacity } from "react-native-web";
-import { C, COLOR_GRADIENTS, ICONS, Z } from "../../../styles";
-import { Button_, TextInput_, Image_ } from "../../../components";
-import {
-  usdTypeMask,
-  applyDiscountToWorkorderItem,
-  gray,
-  generateEAN13Barcode,
-} from "../../../utils";
+import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
+import { Button, TextInput, Image } from "../../../dom_components";
+import { usdTypeMask, applyDiscountToWorkorderItem, generateEAN13Barcode } from "../../../utils";
 import { INVENTORY_ITEM_PROTO, WORKORDER_ITEM_PROTO } from "../../../data";
 import { DISCOUNT_TYPES } from "../../../constants";
 
 import { useSettingsStore } from "../../../stores";
 import cloneDeep from "lodash/cloneDeep";
+
+import styles from "./CustomItemModal.module.css";
 
 export const CustomItemModal = ({
   visible,
@@ -176,6 +172,18 @@ export const CustomItemModal = ({
     onClose();
   }
 
+  function submitCustomPct() {
+    const num = Number(sCustomPctVal);
+    if (!num) return;
+    handleDiscountSelect({ id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
+  }
+
+  function submitCustomDollar() {
+    if (!sCustomDollarCents) return;
+    const dollars = (sCustomDollarCents / 100).toFixed(2);
+    handleDiscountSelect({ id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(sCustomDollarCents), type: DISCOUNT_TYPES.dollar, custom: true });
+  }
+
   // Compute discounted price preview
   let discountedCents = null;
   if (sDiscountObj && sPriceCents > 0) {
@@ -204,308 +212,152 @@ export const CustomItemModal = ({
   if (top < margin) top = margin;
 
   return createPortal(
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        zIndex: Z.modal,
-      }}
-    >
-      <div onClick={(e) => e.stopPropagation()} style={{ position: "absolute", top, left }}>
-        <View
-          style={{
-            width: modalWidth,
-            backgroundColor: C.backgroundWhite,
-            borderRadius: 10,
-            borderWidth: 2,
-            borderColor: C.buttonLightGreenOutline,
-            padding: 20,
-          }}
-        >
+    <div onClick={onClose} className={styles.overlay}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={styles.anchored}
+        style={{ top, left }}
+      >
+        <div className={styles.modal}>
           {/* Header */}
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 15,
-            }}
-          >
-            <Text
-              style={{
-                fontSize: 18,
-                fontWeight: "600",
-                color: C.text,
-              }}
-            >
+          <div className={styles.header}>
+            <span className={styles.headerTitle}>
               {isEditing ? "Edit" : "Add"} Custom {isLabor ? "Labor" : "Item"}
-            </Text>
-            <Button_
-              icon={ICONS.redx}
-              iconSize={18}
-              buttonStyle={{
-                backgroundColor: "transparent",
-                paddingHorizontal: 0,
-                paddingVertical: 0,
-              }}
-              onPress={onClose}
-            />
-          </View>
+            </span>
+            <button type="button" className={styles.closeBtn} onClick={onClose}>
+              <Image icon={ICONS.redx} size={18} />
+            </button>
+          </div>
 
           {/* Item Name */}
-          <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 3 }}>
-            Item Name *
-          </Text>
-          <TextInput_
+          <span className={styles.fieldLabel}>Item Name *</span>
+          <TextInput
             placeholder={isLabor ? "Labor description" : "Item name"}
             value={sName}
             onChangeText={(val) => _setName(val.length === 1 ? val.toUpperCase() : val.charAt(0).toUpperCase() + val.slice(1))}
             debounceMs={0}
             autoFocus={true}
-            style={{
-              borderWidth: 1,
-              borderColor: C.buttonLightGreenOutline,
-              borderRadius: 5,
-              paddingVertical: 6,
-              paddingHorizontal: 8,
-              fontSize: 15,
-              color: C.text,
-              outlineWidth: 0,
-              backgroundColor: C.listItemWhite,
-            }}
+            className={`${styles.input} ${styles.inputName}`}
           />
 
           {/* Minutes (labor only) */}
           {isLabor && (
-            <View style={{ marginTop: 12 }}>
-              <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 3 }}>
-                Minutes
-              </Text>
-              <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <div className={styles.fieldGroup}>
+              <span className={styles.fieldLabel}>Minutes</span>
+              <div className={styles.fieldRow}>
                 <TextInput
                   placeholder="0"
-                  placeholderTextColor={gray(0.2)}
+                  placeholderTextColor={C.textDisabled}
                   value={sMinutes}
                   onChangeText={(val) => handleMinutesChange(val.replace(/\D/g, ""))}
                   onFocus={handleMinutesFocus}
+                  debounceMs={0}
                   inputMode="numeric"
-                  style={{
-                    width: 80,
-                    borderWidth: 1,
-                    borderColor: C.buttonLightGreenOutline,
-                    borderRadius: 5,
-                    paddingVertical: 6,
-                    paddingHorizontal: 8,
-                    fontSize: 15,
-                    color: C.text,
-                    outlineWidth: 0,
-                    outlineStyle: "none",
-                    backgroundColor: C.listItemWhite,
-                    textAlign: "center",
-                  }}
+                  className={`${styles.input} ${styles.inputMinutes}`}
                 />
-                <Text
-                  style={{
-                    marginLeft: 8,
-                    fontSize: 12,
-                    color: gray(0.5),
-                  }}
-                >
+                <span className={styles.minutesLabel}>
                   {"@ $" + usdTypeMask(zLaborRate, { withDollar: false }).display + "/hr"}
-                </Text>
-              </View>
-            </View>
+                </span>
+              </div>
+            </div>
           )}
 
           {/* Price */}
-          <View style={{ marginTop: 12 }}>
-            <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 3 }}>
-              Price *
-            </Text>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Text style={{ fontSize: 16, color: C.text, marginRight: 4 }}>$</Text>
+          <div className={styles.fieldGroup}>
+            <span className={styles.fieldLabel}>Price *</span>
+            <div className={styles.fieldRow}>
+              <span className={styles.priceCurrency}>$</span>
               <TextInput
                 placeholder="0.00"
-                placeholderTextColor={gray(0.2)}
+                placeholderTextColor={C.textDisabled}
                 value={sPriceDisplay}
                 onChangeText={handlePriceChange}
                 onFocus={handlePriceFocus}
+                debounceMs={0}
                 inputMode="numeric"
-                style={{
-                  width: 120,
-                  borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
-                  borderRadius: 5,
-                  paddingVertical: 6,
-                  paddingHorizontal: 8,
-                  fontSize: 15,
-                  color: C.text,
-                  outlineWidth: 0,
-                  outlineStyle: "none",
-                  backgroundColor: C.listItemWhite,
-                  textAlign: "right",
-                }}
+                className={`${styles.input} ${styles.inputPrice}`}
               />
-            </View>
-          </View>
+            </div>
+          </div>
 
           {/* Intake Notes */}
-          <View style={{ marginTop: 12 }}>
-            <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 3 }}>
-              Intake Notes
-            </Text>
-            <TextInput_
+          <div className={styles.fieldGroup}>
+            <span className={styles.fieldLabel}>Intake Notes</span>
+            <TextInput
               placeholder="Intake notes..."
               value={sIntakeNotes}
               onChangeText={(val) => _setIntakeNotes(val.charAt(0).toUpperCase() + val.slice(1))}
               multiline={true}
               numberOfLines={3}
-              style={{
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                borderRadius: 5,
-                paddingVertical: 6,
-                paddingHorizontal: 8,
-                fontSize: 14,
-                color: "orange",
-                outlineWidth: 0,
-                backgroundColor: C.listItemWhite,
-              }}
+              debounceMs={0}
+              className={`${styles.input} ${styles.inputArea} ${styles.inputAreaIntake}`}
             />
-          </View>
+          </div>
 
           {/* Receipt Notes */}
-          <View style={{ marginTop: 12 }}>
-            <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 3 }}>
-              Receipt Notes
-            </Text>
-            <TextInput_
+          <div className={styles.fieldGroup}>
+            <span className={styles.fieldLabel}>Receipt Notes</span>
+            <TextInput
               placeholder="Receipt notes..."
               value={sReceiptNotes}
               onChangeText={(val) => _setReceiptNotes(val.charAt(0).toUpperCase() + val.slice(1))}
               multiline={true}
               numberOfLines={3}
-              style={{
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                borderRadius: 5,
-                paddingVertical: 6,
-                paddingHorizontal: 8,
-                fontSize: 14,
-                color: "green",
-                outlineWidth: 0,
-                backgroundColor: C.listItemWhite,
-              }}
+              debounceMs={0}
+              className={`${styles.input} ${styles.inputArea} ${styles.inputAreaReceipt}`}
             />
-          </View>
+          </div>
 
           {/* Discount */}
-          <View style={{ marginTop: 12 }}>
-            <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 3 }}>
-              Discount
-            </Text>
-            <div ref={discountBtnRef}>
-              <TouchableOpacity
-                onPress={() => { if (sPriceCents > 0) _setDiscountDropdownOpen(!sDiscountDropdownOpen); }}
-                style={{
-                  borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
-                  borderRadius: 5,
-                  backgroundColor: C.listItemWhite,
-                  paddingVertical: 8,
-                  paddingHorizontal: 10,
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  opacity: sPriceCents > 0 ? 1 : 0.4,
-                }}
-              >
-                <Text style={{ color: sDiscountObj ? C.lightred : gray(0.5), fontSize: 14 }}>
-                  {sDiscountObj?.name || "No Discount"}
-                </Text>
-                <Text style={{ fontSize: 10, color: gray(0.4) }}>{sDiscountDropdownOpen ? "\u25B2" : "\u25BC"}</Text>
-              </TouchableOpacity>
-            </div>
-          </View>
+          <div className={styles.fieldGroup}>
+            <span className={styles.fieldLabel}>Discount</span>
+            <button
+              type="button"
+              ref={discountBtnRef}
+              onClick={() => { if (sPriceCents > 0) _setDiscountDropdownOpen(!sDiscountDropdownOpen); }}
+              className={`${styles.discountTrigger} ${sPriceCents > 0 ? "" : styles.discountTriggerDisabled}`}
+            >
+              <span className={`${styles.discountTriggerLabel} ${sDiscountObj ? styles.discountTriggerLabelActive : ""}`}>
+                {sDiscountObj?.name || "No Discount"}
+              </span>
+              <span className={styles.discountTriggerCaret}>
+                {sDiscountDropdownOpen ? "\u25B2" : "\u25BC"}
+              </span>
+            </button>
+          </div>
 
           {/* Discount preview */}
           {discountedCents !== null && (
-            <View
-              style={{
-                marginTop: 10,
-                flexDirection: "row",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 14,
-                  color: gray(0.5),
-                  textDecorationLine: "line-through",
-                }}
-              >
+            <div className={styles.discountPreviewRow}>
+              <span className={styles.discountPreviewOld}>
                 {"$" + usdTypeMask(sPriceCents, { withDollar: false }).display}
-              </Text>
-              <Text
-                style={{
-                  fontSize: 16,
-                  fontWeight: "600",
-                  color: C.green,
-                }}
-              >
+              </span>
+              <span className={styles.discountPreviewNew}>
                 {"$" + usdTypeMask(discountedCents, { withDollar: false }).display}
-              </Text>
-              <Text style={{ fontSize: 12, color: C.lightred }}>
+              </span>
+              <span className={styles.discountPreviewBadge}>
                 {sDiscountObj.type === DISCOUNT_TYPES.percent
                   ? sDiscountObj.value + "% off"
                   : "$" + usdTypeMask(sDiscountObj.value, { withDollar: false }).display + " off"}
-              </Text>
-            </View>
+              </span>
+            </div>
           )}
 
           {/* Action Buttons */}
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "flex-end",
-              marginTop: 20,
-              gap: 10,
-            }}
-          >
-            <Button_
+          <div className={styles.actionsRow}>
+            <Button
               text="Cancel"
               onPress={onClose}
-              buttonStyle={{
-                backgroundColor: "transparent",
-                borderWidth: 1,
-                borderColor: gray(0.2),
-                borderRadius: 5,
-                paddingHorizontal: 20,
-                paddingVertical: 8,
-              }}
-              textStyle={{ color: C.text, fontSize: 14 }}
+              colorGradientArr={COLOR_GRADIENTS.grey}
             />
-            <Button_
+            <Button
               text={isEditing ? "Save" : "Add"}
               onPress={handleSave}
-              disabled={!canSave}
+              enabled={canSave}
               colorGradientArr={canSave ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
-              buttonStyle={{
-                borderRadius: 5,
-                paddingHorizontal: 20,
-                paddingVertical: 8,
-                opacity: canSave ? 1 : 0.4,
-              }}
-              textStyle={{ color: C.textWhite, fontSize: 14, fontWeight: "600" }}
             />
-          </View>
-        </View>
+          </div>
+        </div>
       </div>
       {sDiscountDropdownOpen && (() => {
         const pos = getDropdownPosition();
@@ -514,37 +366,16 @@ export const CustomItemModal = ({
           <>
             <div
               onClick={(e) => { e.stopPropagation(); _setDiscountDropdownOpen(false); }}
-              style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, zIndex: 10000 }}
+              className={styles.dropdownBackdrop}
             />
             <div
               onClick={(e) => e.stopPropagation()}
-              style={{
-                position: "fixed",
-                top: pos.top,
-                left: pos.left,
-                width: pos.width,
-                zIndex: 10001,
-                backgroundColor: "white",
-                borderRadius: 6,
-                borderWidth: 2,
-                borderStyle: "solid",
-                borderColor: gray(0.08),
-                boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
-                maxHeight: 340,
-                overflowY: "auto",
-              }}
+              className={styles.dropdown}
+              style={{ top: pos.top, left: pos.left, width: pos.width }}
             >
               <div
                 onClick={() => handleDiscountSelect(null)}
-                style={{
-                  padding: 8,
-                  cursor: "pointer",
-                  fontSize: 13,
-                  color: C.text,
-                  backgroundColor: gray(0.036),
-                }}
-                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.1); }}
-                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = gray(0.036); }}
+                className={`${styles.dropdownItem} ${styles.dropdownItemNone}`}
               >
                 No Discount
               </div>
@@ -552,80 +383,62 @@ export const CustomItemModal = ({
                 <div
                   key={o.name}
                   onClick={() => handleDiscountSelect(o)}
-                  style={{
-                    padding: 8,
-                    cursor: "pointer",
-                    fontSize: 13,
-                    color: C.text,
-                    backgroundColor: idx % 2 === 0 ? "white" : gray(0.036),
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.1); }}
-                  onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = idx % 2 === 0 ? "white" : gray(0.036); }}
+                  className={`${styles.dropdownItem} ${idx % 2 === 0 ? styles.dropdownItemEven : styles.dropdownItemOdd}`}
                 >
                   {o.name}
                 </div>
               ))}
-              <div style={{ height: 1, backgroundColor: gray(0.15) }} />
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", height: 36, paddingHorizontal: 6, backgroundColor: "rgb(198,218,240)" }}>
-                <Text style={{ fontSize: 13, color: gray(0.5), marginRight: 6 }}>Custom %</Text>
+              <div className={styles.dropdownDivider} />
+              <div className={styles.customRow}>
+                <span className={styles.customLabel}>Custom %</span>
                 <TextInput
                   value={sCustomPctVal}
                   placeholder="0"
-                  placeholderTextColor={gray(0.3)}
+                  placeholderTextColor={C.textDisabled}
                   maxLength={3}
+                  debounceMs={0}
+                  inputMode="numeric"
                   onChangeText={(v) => {
                     let cleaned = v.replace(/[^0-9]/g, "");
                     if (Number(cleaned) > 100) cleaned = "100";
                     _setCustomPctVal(cleaned);
                   }}
-                  onSubmitEditing={() => {
-                    const num = Number(sCustomPctVal);
-                    if (!num) return;
-                    handleDiscountSelect({ id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
-                  }}
-                  style={{ width: 50, height: 28, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 4, paddingHorizontal: 6, fontSize: 13, color: C.text, textAlign: "center", outlineWidth: 0, backgroundColor: "white" }}
+                  onKeyDown={(e) => { if (e.key === "Enter") submitCustomPct(); }}
+                  className={`${styles.customInput} ${styles.customInputPct}`}
                 />
-                <TouchableOpacity
-                  onPress={() => {
-                    const num = Number(sCustomPctVal);
-                    if (!num) return;
-                    handleDiscountSelect({ id: "custom_" + Date.now(), name: num + "% Off", value: String(num), type: DISCOUNT_TYPES.percent, custom: true });
-                  }}
-                  style={{ marginLeft: 4, width: 24, height: 24, borderRadius: 4, backgroundColor: C.green, alignItems: "center", justifyContent: "center" }}
+                <button
+                  type="button"
+                  onClick={submitCustomPct}
+                  className={styles.customSubmit}
                 >
-                  <Image_ icon={ICONS.check1} size={14} />
-                </TouchableOpacity>
-              </View>
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", height: 36, paddingHorizontal: 6, backgroundColor: "rgb(198,218,240)" }}>
-                <Text style={{ fontSize: 13, color: gray(0.5), marginRight: 6 }}>Custom $</Text>
+                  <Image icon={ICONS.check1} size={14} />
+                </button>
+              </div>
+              <div className={styles.customRow}>
+                <span className={styles.customLabel}>Custom $</span>
                 <TextInput
                   value={sCustomDollarVal}
                   placeholder="0.00"
-                  placeholderTextColor={gray(0.3)}
+                  placeholderTextColor={C.textDisabled}
+                  debounceMs={0}
+                  inputMode="numeric"
                   onChangeText={(v) => {
                     let result = usdTypeMask(v);
                     if (sPriceCents && result.cents > sPriceCents) result = usdTypeMask(String(sPriceCents));
                     _setCustomDollarVal(result.display);
                     _setCustomDollarCents(result.cents);
                   }}
-                  onSubmitEditing={() => {
-                    if (!sCustomDollarCents) return;
-                    const dollars = (sCustomDollarCents / 100).toFixed(2);
-                    handleDiscountSelect({ id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(sCustomDollarCents), type: DISCOUNT_TYPES.dollar, custom: true });
-                  }}
-                  style={{ width: 70, height: 28, borderWidth: 1, borderColor: C.buttonLightGreenOutline, borderRadius: 4, paddingHorizontal: 6, fontSize: 13, color: C.text, textAlign: "center", outlineWidth: 0, backgroundColor: "white" }}
+                  onKeyDown={(e) => { if (e.key === "Enter") submitCustomDollar(); }}
+                  className={`${styles.customInput} ${styles.customInputDollar}`}
                 />
-                <TouchableOpacity
-                  onPress={() => {
-                    if (!sCustomDollarCents) return;
-                    const dollars = (sCustomDollarCents / 100).toFixed(2);
-                    handleDiscountSelect({ id: "custom_" + Date.now(), name: "$" + dollars + " Off", value: String(sCustomDollarCents), type: DISCOUNT_TYPES.dollar, custom: true });
-                  }}
-                  style={{ marginLeft: 4, width: 24, height: 24, borderRadius: 4, backgroundColor: C.green, alignItems: "center", justifyContent: "center" }}
+                <button
+                  type="button"
+                  onClick={submitCustomDollar}
+                  className={styles.customSubmit}
                 >
-                  <Image_ icon={ICONS.check1} size={14} />
-                </TouchableOpacity>
-              </View>
+                  <Image icon={ICONS.check1} size={14} />
+                </button>
+              </div>
             </div>
           </>
         );

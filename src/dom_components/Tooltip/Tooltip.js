@@ -21,8 +21,8 @@ export const Tooltip = ({
     return <div style={style}>{children}</div>;
   }
 
-  const bgColor = backgroundColor || (alert ? C.orange : "rgba(105,105,105,0.88)");
-  const textColor = color || "white";
+  const bgColor = backgroundColor || (alert ? C.warning : C.surfaceOverlayHeavy);
+  const textColor = color || C.textOnAccent;
   const sideOffset = 6 + (position === "top" || position === "left" ? offsetY : -offsetY);
 
   return (

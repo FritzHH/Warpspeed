@@ -1,11 +1,10 @@
 /* eslint-disable */
 import { memo, useState } from "react";
-import { View, Text, ScrollView, TextInput } from "react-native-web";
-import { TouchableOpacity } from "react-native";
 import { C, Fonts } from "../../../../styles";
-import { formatCurrencyDisp, gray, usdTypeMask } from "../../../../utils";
+import { formatCurrencyDisp, usdTypeMask } from "../../../../utils";
 import dayjs from "dayjs";
 import { dlog, DCAT } from "./checkoutDebugLog";
+import styles from "./RefundPaymentSelector.module.css";
 
 function formatTransactionDate(millis) {
   let d = dayjs(millis);
@@ -45,160 +44,181 @@ const CreditDepositRow = memo(function CreditDepositRow({
   let badgeColor = BADGE_COLORS[item.type] || "rgb(103, 124, 231)";
   let badgeLabel = BADGE_LABELS[item.type] || "CREDIT";
 
+  let rowBg = isSelected
+    ? "rgb(237, 232, 252)"
+    : fullyRefunded
+    ? C.surfaceAlt
+    : "transparent";
+
+  let interactionDisabled = isDisabled || fullyRefunded;
+
+  function handleRowClick() {
+    if (!interactionDisabled) {
+      dlog(DCAT.BUTTON, "selectCreditDeposit", "RefundPaymentSelector", { id: item.id, type: item.type, amount: item.amount });
+      onSelect(item);
+    }
+  }
+
   return (
-    <TouchableOpacity
-      onPress={() => {
-        if (!isDisabled && !fullyRefunded) {
-          dlog(DCAT.BUTTON, "selectCreditDeposit", "RefundPaymentSelector", { id: item.id, type: item.type, amount: item.amount });
-          onSelect(item);
-        }
-      }}
-      activeOpacity={fullyRefunded || isDisabled ? 1 : 0.7}
+    <button
+      type="button"
+      onClick={handleRowClick}
+      disabled={interactionDisabled}
+      className={styles.creditRow}
       style={{
-        paddingVertical: 8,
-        paddingHorizontal: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: gray(0.05),
-        backgroundColor: isSelected ? "rgb(237, 232, 252)" : fullyRefunded ? gray(0.04) : "transparent",
-        borderRadius: 4,
-        opacity: fullyRefunded || isDisabled ? 0.4 : 1,
+        borderBottomColor: C.borderSubtle,
+        backgroundColor: rowBg,
+        opacity: interactionDisabled ? 0.4 : 1,
       }}
     >
-      {/* Return mode toggle - deposits and gift cards only, only when selected */}
       {!isCredit && isSelected && (
-        <View style={{ flexDirection: "row", marginBottom: 6, gap: 4 }}>
-          <TouchableOpacity
-            onPress={(e) => { e.stopPropagation(); onReturnModeChange("account"); }}
+        <div className={styles.returnModeRow}>
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onReturnModeChange("account"); }}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onReturnModeChange("account"); } }}
+            className={styles.returnModeBtn}
             style={{
-              flex: 1,
-              paddingVertical: 4,
-              borderRadius: 4,
-              backgroundColor: returnMode === "account" ? "rgb(103, 124, 231)" : gray(0.08),
-              alignItems: "center",
+              backgroundColor: returnMode === "account" ? "rgb(103, 124, 231)" : C.surfaceAlt,
             }}
           >
-            <Text style={{ fontSize: 9, fontWeight: Fonts.weight.textHeavy, color: returnMode === "account" ? "white" : C.lightText }}>
+            <span
+              className={styles.returnModeText}
+              style={{
+                fontWeight: Fonts.weight.textHeavy,
+                color: returnMode === "account" ? "white" : C.lightText,
+              }}
+            >
               RETURN TO ACCOUNT
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            onPress={(e) => { e.stopPropagation(); onReturnModeChange("customer"); }}
+            </span>
+          </span>
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => { e.stopPropagation(); onReturnModeChange("customer"); }}
+            onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.stopPropagation(); onReturnModeChange("customer"); } }}
+            className={styles.returnModeBtn}
             style={{
-              flex: 1,
-              paddingVertical: 4,
-              borderRadius: 4,
-              backgroundColor: returnMode === "customer" ? C.green : gray(0.08),
-              alignItems: "center",
+              backgroundColor: returnMode === "customer" ? C.green : C.surfaceAlt,
             }}
           >
-            <Text style={{ fontSize: 9, fontWeight: Fonts.weight.textHeavy, color: returnMode === "customer" ? "white" : C.lightText }}>
+            <span
+              className={styles.returnModeText}
+              style={{
+                fontWeight: Fonts.weight.textHeavy,
+                color: returnMode === "customer" ? "white" : C.lightText,
+              }}
+            >
               RETURN TO CUSTOMER
-            </Text>
-          </TouchableOpacity>
-        </View>
+            </span>
+          </span>
+        </div>
       )}
 
-      <View style={{ flexDirection: "row", alignItems: "center" }}>
-        {/* Checkbox */}
-        <View
+      <div className={styles.rowMain}>
+        <div
+          className={styles.checkbox}
           style={{
-            width: 16,
-            height: 16,
-            borderRadius: 3,
-            borderWidth: 2,
-            borderColor: isSelected ? badgeColor : gray(0.2),
+            borderColor: isSelected ? badgeColor : C.borderSubtle,
             backgroundColor: isSelected ? badgeColor : "transparent",
-            marginRight: 10,
-            alignItems: "center",
-            justifyContent: "center",
           }}
         >
-          {isSelected && (
-            <Text style={{ color: "white", fontSize: 11, fontWeight: "700", marginTop: -1 }}>
-              ✓
-            </Text>
-          )}
-        </View>
+          {isSelected && <span className={styles.checkboxTick}>✓</span>}
+        </div>
 
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <View style={{ backgroundColor: badgeColor, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1 }}>
-              <Text style={{ fontSize: 9, fontWeight: Fonts.weight.textHeavy, color: "white" }}>
+        <div className={styles.rowMiddle}>
+          <div className={styles.badgeRow}>
+            <span className={styles.badge} style={{ backgroundColor: badgeColor }}>
+              <span
+                className={styles.badgeText}
+                style={{ fontWeight: Fonts.weight.textHeavy }}
+              >
                 {badgeLabel}
-              </Text>
-            </View>
-            <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.text }}>
+              </span>
+            </span>
+            <span
+              className={styles.amountText}
+              style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}
+            >
               {formatCurrencyDisp(item.amount)}
-            </Text>
-          </View>
+            </span>
+          </div>
 
           {(item._note || item._method) && (
-            <Text style={{ fontSize: 11, color: C.lightText, marginTop: 2 }}>
+            <span className={styles.cardLine} style={{ color: C.lightText }}>
               {item._note || ""}{item._last4 ? ` ****${item._last4}` : ""}
-            </Text>
+            </span>
           )}
 
           {amountRefunded > 0 && !fullyRefunded && (
-            <Text style={{ fontSize: 10, color: C.lightred, marginTop: 2 }}>
+            <span className={styles.refundedText} style={{ color: C.lightred }}>
               Previously refunded: {formatCurrencyDisp(amountRefunded)}
-            </Text>
+            </span>
           )}
 
           {!fullyRefunded && (
-            <Text style={{ fontSize: 10, color: C.green, marginTop: 1 }}>
+            <span className={styles.availableText} style={{ color: C.green }}>
               Available: {formatCurrencyDisp(available)}
-            </Text>
+            </span>
           )}
 
           {fullyRefunded && (
-            <Text style={{ fontSize: 10, color: C.lightred, fontStyle: "italic", marginTop: 2 }}>
+            <span className={styles.fullyRefundedText} style={{ color: C.lightred }}>
               Fully refunded
-            </Text>
+            </span>
           )}
-        </View>
-      </View>
+        </div>
+      </div>
 
-      {/* Custom Amount - only when selected and in "account" mode (or credit which is always account) */}
       {isSelected && (isCredit || returnMode === "account") && !fullyRefunded && (
-        <View style={{ flexDirection: "row", alignItems: "center", marginTop: 6, gap: 6 }}>
-          <TouchableOpacity
-            onPress={(e) => {
+        <div className={styles.customAmountRow}>
+          <span
+            role="button"
+            tabIndex={0}
+            onClick={(e) => {
               e.stopPropagation();
               let next = !sShowCustom;
               _setShowCustom(next);
               if (!next) onCustomAmountChange(0, "");
             }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.stopPropagation();
+                let next = !sShowCustom;
+                _setShowCustom(next);
+                if (!next) onCustomAmountChange(0, "");
+              }
+            }}
+            className={styles.customAmountBtn}
             style={{
-              paddingVertical: 4,
-              paddingHorizontal: 8,
-              borderRadius: 4,
-              backgroundColor: sShowCustom ? "rgb(103, 124, 231)" : gray(0.08),
+              backgroundColor: sShowCustom ? "rgb(103, 124, 231)" : C.surfaceAlt,
             }}
           >
-            <Text style={{ fontSize: 9, fontWeight: Fonts.weight.textHeavy, color: sShowCustom ? "white" : C.lightText }}>
+            <span
+              className={styles.returnModeText}
+              style={{
+                fontWeight: Fonts.weight.textHeavy,
+                color: sShowCustom ? "white" : C.lightText,
+              }}
+            >
               CUSTOM AMOUNT
-            </Text>
-          </TouchableOpacity>
+            </span>
+          </span>
           {sShowCustom && (
-            <View style={{
-              flex: 1,
-              borderWidth: 1,
-              borderColor: gray(0.15),
-              borderRadius: 4,
-              paddingHorizontal: 6,
-              paddingVertical: 3,
-              backgroundColor: "white",
-            }}>
-              <TextInput
-                style={{
-                  fontSize: 13,
-                  color: C.text,
-                  outlineWidth: 0,
-                  outlineStyle: "none",
-                  textAlign: "right",
-                }}
+            <div
+              className={styles.customAmountInputWrap}
+              style={{ borderColor: C.borderSubtle }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <input
+                type="text"
+                className={styles.customAmountInput}
+                style={{ color: C.text }}
                 value={customAmountDisp}
-                onChangeText={(val) => {
+                onClick={(e) => e.stopPropagation()}
+                onChange={(e) => {
+                  let val = e.target.value;
                   let result = usdTypeMask(val, { withDollar: false });
                   let maxCents = available;
                   if (result.cents > maxCents) {
@@ -208,14 +228,12 @@ const CreditDepositRow = memo(function CreditDepositRow({
                   }
                 }}
                 placeholder="0.00"
-                placeholderTextColor={gray(0.3)}
-                keyboardType="numeric"
               />
-            </View>
+            </div>
           )}
-        </View>
+        </div>
       )}
-    </TouchableOpacity>
+    </button>
   );
 });
 
@@ -228,141 +246,111 @@ const PaymentSelectRow = memo(function PaymentSelectRow({ payment, isSelected, o
   let available = payment.amountCaptured - amountRefunded;
   let fullyRefunded = available <= 0;
 
+  let interactionDisabled = isDisabled || fullyRefunded;
+
+  let rowBg = isSelected
+    ? "rgb(230, 240, 252)"
+    : isLightspeedCard
+    ? "rgb(255, 248, 230)"
+    : fullyRefunded
+    ? C.surfaceAlt
+    : "transparent";
+
+  function handleClick() {
+    if (!interactionDisabled) {
+      dlog(DCAT.BUTTON, "selectPayment", "RefundPaymentSelector", { paymentId: payment.id, method: payment.method });
+      onSelect(payment);
+    }
+  }
+
   return (
-    <TouchableOpacity
-      onPress={() => {
-        if (!isDisabled && !fullyRefunded) {
-          dlog(DCAT.BUTTON, "selectPayment", "RefundPaymentSelector", { paymentId: payment.id, method: payment.method });
-          onSelect(payment);
-        }
-      }}
+    <button
+      type="button"
+      onClick={handleClick}
+      disabled={interactionDisabled}
+      className={styles.row}
       style={{
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 8,
-        paddingHorizontal: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: gray(0.05),
-        backgroundColor: isSelected
-          ? "rgb(230, 240, 252)"
-          : isLightspeedCard
-          ? "rgb(255, 248, 230)"
-          : fullyRefunded
-          ? gray(0.04)
-          : "transparent",
-        borderRadius: 4,
-        opacity: fullyRefunded || isDisabled ? 0.4 : 1,
+        borderBottomColor: C.borderSubtle,
+        backgroundColor: rowBg,
+        opacity: interactionDisabled ? 0.4 : 1,
       }}
     >
-      {/* Selection indicator */}
-      <View
+      <div
+        className={styles.checkbox}
         style={{
-          width: 16,
-          height: 16,
-          borderRadius: 3,
-          borderWidth: 2,
-          borderColor: isSelected ? C.blue : gray(0.2),
+          borderColor: isSelected ? C.blue : C.borderSubtle,
           backgroundColor: isSelected ? C.blue : "transparent",
-          marginRight: 10,
-          alignItems: "center",
-          justifyContent: "center",
         }}
       >
-        {isSelected && (
-          <Text style={{ color: "white", fontSize: 11, fontWeight: "700", marginTop: -1 }}>
-            ✓
-          </Text>
-        )}
-      </View>
+        {isSelected && <span className={styles.checkboxTick}>✓</span>}
+      </div>
 
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <View
-            style={{
-              backgroundColor: isCash || isCheck ? C.green : C.blue,
-              borderRadius: 3,
-              paddingHorizontal: 5,
-              paddingVertical: 1,
-            }}
+      <div className={styles.rowMiddle}>
+        <div className={styles.badgeRow}>
+          <span
+            className={styles.badge}
+            style={{ backgroundColor: isCash || isCheck ? C.green : C.blue }}
           >
-            <Text
-              style={{
-                fontSize: 9,
-                fontWeight: Fonts.weight.textHeavy,
-                color: "white",
-              }}
+            <span
+              className={styles.badgeText}
+              style={{ fontWeight: Fonts.weight.textHeavy }}
             >
               {typeLabel}
-            </Text>
-          </View>
-          <Text
-            style={{
-              fontSize: 13,
-              fontWeight: Fonts.weight.textHeavy,
-              color: C.text,
-            }}
+            </span>
+          </span>
+          <span
+            className={styles.amountText}
+            style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}
           >
             {formatCurrencyDisp(payment.amountCaptured)}
-          </Text>
-        </View>
+          </span>
+        </div>
 
-        {/* Card details */}
         {!isCash && !isCheck && payment.last4 && (
-          <Text style={{ fontSize: 11, color: C.lightText, marginTop: 2 }}>
+          <span className={styles.cardLine} style={{ color: C.lightText }}>
             {payment.cardIssuer} ****{payment.last4} {payment.expMonth}/{payment.expYear}
-          </Text>
+          </span>
         )}
 
-        {/* Lightspeed import indicator */}
         {isLightspeedCard && (
-          <View style={{ flexDirection: "row", alignItems: "center", marginTop: 3, backgroundColor: "rgb(255, 237, 180)", borderRadius: 3, paddingHorizontal: 5, paddingVertical: 2, alignSelf: "flex-start" }}>
-            <Text style={{ fontSize: 9, fontWeight: Fonts.weight.textHeavy, color: "rgb(140, 100, 0)" }}>
+          <span
+            className={styles.lsIndicator}
+            style={{ backgroundColor: "rgb(255, 237, 180)" }}
+          >
+            <span
+              className={styles.lsIndicatorText}
+              style={{ fontWeight: Fonts.weight.textHeavy, color: "rgb(140, 100, 0)" }}
+            >
               LIGHTSPEED - CASH REFUND ONLY
-            </Text>
-          </View>
+            </span>
+          </span>
         )}
 
-        {/* Refund history */}
         {amountRefunded > 0 && (
-          <Text style={{ fontSize: 10, color: C.lightred, marginTop: 2 }}>
+          <span className={styles.refundedText} style={{ color: C.lightred }}>
             Previously refunded: {formatCurrencyDisp(amountRefunded)}
-          </Text>
+          </span>
         )}
 
-        {/* Available to refund */}
         {!fullyRefunded && !isCash && !isCheck && (
-          <Text style={{ fontSize: 10, color: C.green, marginTop: 1 }}>
+          <span className={styles.availableText} style={{ color: C.green }}>
             Available: {formatCurrencyDisp(available)}
-          </Text>
+          </span>
         )}
 
         {fullyRefunded && (
-          <Text
-            style={{
-              fontSize: 10,
-              color: C.lightred,
-              fontStyle: "italic",
-              marginTop: 2,
-            }}
-          >
+          <span className={styles.fullyRefundedText} style={{ color: C.lightred }}>
             Fully refunded
-          </Text>
+          </span>
         )}
 
         {!!payment.millis && (
-          <Text
-            style={{
-              fontSize: 10,
-              color: C.lightText,
-              fontStyle: "italic",
-              marginTop: 2,
-            }}
-          >
+          <span className={styles.dateText} style={{ color: C.lightText }}>
             {formatTransactionDate(payment.millis)}
-          </Text>
+          </span>
         )}
-      </View>
-    </TouchableOpacity>
+      </div>
+    </button>
   );
 });
 
@@ -385,39 +373,35 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
   let hasPaymentsSelected = selectedPayments.length > 0;
   let allCreditsAndDeposits = [...creditsApplied, ...depositsApplied];
 
+  let allRefunds = [];
+  payments.forEach((t) => {
+    (t.refunds || []).forEach((r) => {
+      allRefunds.push({ ...r, _parentMethod: t.method, _parentLast4: t.last4, _parentCardIssuer: t.cardIssuer });
+    });
+  });
+
   return (
-    <View style={{ padding: 10 }}>
-      <Text
+    <div className={styles.container}>
+      <div
+        className={styles.title}
         style={{
-          fontSize: 13,
           fontWeight: Fonts.weight.textHeavy,
           color: C.text,
-          marginBottom: 6,
-          borderBottomWidth: 1,
-          borderBottomColor: gray(0.1),
-          paddingBottom: 4,
+          borderBottomColor: C.borderSubtle,
         }}
       >
         ORIGINAL PAYMENTS
-      </Text>
-      <Text
-        style={{
-          fontSize: 10,
-          color: C.lightText,
-          fontStyle: "italic",
-          marginBottom: 6,
-        }}
-      >
+      </div>
+      <div className={styles.subtitle} style={{ color: C.lightText }}>
         Select payments to refund
-      </Text>
+      </div>
 
-      <ScrollView>
+      <div>
         {payments.map((payment, idx) => {
           let isSelected = selectedPayments.some((p) => p.id === payment.id);
           let paymentIsCash = payment.method === "cash" || payment.method === "check";
           let isLsCard = !paymentIsCash && payment._importSource === "lightspeed";
 
-          // Disable logic
           let rowDisabled = disabled || (hasItemSelected && !isReturnToCustomer);
           if (!rowDisabled && selectedPayments.length > 0 && !isSelected) {
             let selFirst = selectedPayments[0];
@@ -441,19 +425,17 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
           );
         })}
 
-        {/* Credits & Deposits */}
         {allCreditsAndDeposits.length > 0 && (
-          <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: gray(0.1), paddingTop: 6 }}>
-            <Text
-              style={{
-                fontSize: 11,
-                fontWeight: Fonts.weight.textHeavy,
-                color: C.lightText,
-                marginBottom: 4,
-              }}
+          <div
+            className={styles.section}
+            style={{ borderTopColor: C.borderSubtle }}
+          >
+            <div
+              className={styles.sectionTitle}
+              style={{ fontWeight: Fonts.weight.textHeavy, color: C.lightText }}
             >
               CREDITS & DEPOSITS
-            </Text>
+            </div>
             {allCreditsAndDeposits.map((item, idx) => {
               let isSelected = selectedItem?.id === item.id;
               let rowDisabled = disabled || hasPaymentsSelected || (hasItemSelected && !isSelected);
@@ -471,93 +453,62 @@ export const RefundPaymentSelector = memo(function RefundPaymentSelector({
                 />
               );
             })}
-          </View>
+          </div>
         )}
 
-        {/* Show previous refunds summary from transaction refunds arrays */}
-        {(() => {
-          let allRefunds = [];
-          payments.forEach((t) => {
-            (t.refunds || []).forEach((r) => {
-              allRefunds.push({ ...r, _parentMethod: t.method, _parentLast4: t.last4, _parentCardIssuer: t.cardIssuer });
-            });
-          });
-          if (allRefunds.length === 0) return null;
-          return (
-            <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: gray(0.1), paddingTop: 6 }}>
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: Fonts.weight.textHeavy,
-                  color: C.lightText,
-                  marginBottom: 4,
-                }}
-              >
-                PREVIOUS REFUNDS
-              </Text>
-              {allRefunds.map((refund, idx) => {
-                let methodLabel = refund.method === "cash" ? "CASH" : refund.method === "check" ? "CHECK" : "CARD";
-                return (
-                  <View
-                    key={refund.id || "r" + idx}
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      paddingVertical: 6,
-                      paddingHorizontal: 8,
-                      borderBottomWidth: 1,
-                      borderBottomColor: gray(0.05),
-                      borderRadius: 4,
-                    }}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <View
-                          style={{
-                            backgroundColor: C.lightred,
-                            borderRadius: 3,
-                            paddingHorizontal: 5,
-                            paddingVertical: 1,
-                          }}
+        {allRefunds.length > 0 && (
+          <div
+            className={styles.section}
+            style={{ borderTopColor: C.borderSubtle }}
+          >
+            <div
+              className={styles.sectionTitle}
+              style={{ fontWeight: Fonts.weight.textHeavy, color: C.lightText }}
+            >
+              PREVIOUS REFUNDS
+            </div>
+            {allRefunds.map((refund, idx) => {
+              let methodLabel = refund.method === "cash" ? "CASH" : refund.method === "check" ? "CHECK" : "CARD";
+              return (
+                <div
+                  key={refund.id || "r" + idx}
+                  className={styles.refundRow}
+                  style={{ borderBottomColor: C.borderSubtle }}
+                >
+                  <div className={styles.rowMiddle}>
+                    <div className={styles.badgeRow}>
+                      <span className={styles.badge} style={{ backgroundColor: C.lightred }}>
+                        <span
+                          className={styles.badgeText}
+                          style={{ fontWeight: Fonts.weight.textHeavy }}
                         >
-                          <Text
-                            style={{
-                              fontSize: 9,
-                              fontWeight: Fonts.weight.textHeavy,
-                              color: "white",
-                            }}
-                          >
-                            {methodLabel} REFUND
-                          </Text>
-                        </View>
-                        <Text
-                          style={{
-                            fontSize: 13,
-                            fontWeight: Fonts.weight.textHeavy,
-                            color: C.lightred,
-                          }}
-                        >
-                          -{formatCurrencyDisp(refund.amount)}
-                        </Text>
-                      </View>
-                      {refund._parentLast4 && (
-                        <Text style={{ fontSize: 11, color: C.lightText, marginTop: 2 }}>
-                          {refund._parentCardIssuer} ****{refund._parentLast4}
-                        </Text>
-                      )}
-                      {!!refund.millis && (
-                        <Text style={{ fontSize: 10, color: C.lightText, fontStyle: "italic", marginTop: 2 }}>
-                          {formatTransactionDate(refund.millis)}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          );
-        })()}
-      </ScrollView>
-    </View>
+                          {methodLabel} REFUND
+                        </span>
+                      </span>
+                      <span
+                        className={styles.amountText}
+                        style={{ fontWeight: Fonts.weight.textHeavy, color: C.lightred }}
+                      >
+                        -{formatCurrencyDisp(refund.amount)}
+                      </span>
+                    </div>
+                    {refund._parentLast4 && (
+                      <span className={styles.cardLine} style={{ color: C.lightText }}>
+                        {refund._parentCardIssuer} ****{refund._parentLast4}
+                      </span>
+                    )}
+                    {!!refund.millis && (
+                      <span className={styles.dateText} style={{ color: C.lightText }}>
+                        {formatTransactionDate(refund.millis)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
   );
 });

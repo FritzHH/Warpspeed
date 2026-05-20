@@ -1,0 +1,79 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 15px;
+  padding: 25px 30px;
+  width: 360px;
+  box-sizing: border-box;
+}
+
+.title {
+  font-size: 20px;
+  margin-bottom: 20px;
+}
+
+.field {
+  width: 100%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.fieldPhone {
+  margin-bottom: 12px;
+}
+
+.fieldEmail {
+  margin-bottom: 16px;
+}
+
+.label {
+  font-size: 11px;
+  margin-bottom: 4px;
+  display: block;
+}
+
+.input {
+  font-size: 16px;
+  outline: none;
+  border: 2px solid;
+  border-radius: 8px;
+  padding: 8px 10px;
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+}
+
+.statusOk {
+  background-color: rgba(0, 160, 0, 0.1);
+  border-radius: 8px;
+  padding: 5px 14px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.statusErr {
+  background-color: rgba(220, 50, 50, 0.1);
+  border-radius: 8px;
+  padding: 5px 14px;
+  margin-bottom: 6px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.statusText {
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+
+.actions {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  width: 100%;
+  margin-top: 10px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}

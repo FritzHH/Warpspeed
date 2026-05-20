@@ -1,9 +1,8 @@
 /* eslint-disable */
-import { View, Text, TextInput, Animated, Image } from "react-native-web";
 import { useState, useRef, memo } from "react";
-import { Button_, SHADOW_RADIUS_PROTO, SmallLoadingIndicator } from "../../../../components";
+import { Button, TextInput, Image, SmallLoadingIndicator } from "../../../../dom_components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
-import { usdTypeMask, formatCurrencyDisp, log, gray } from "../../../../utils";
+import { usdTypeMask, formatCurrencyDisp, log } from "../../../../utils";
 import { takeId, getId } from "../../../../idPool";
 import { loadStripe } from "@stripe/stripe-js";
 import { Elements, CardNumberElement, CardExpiryElement, CardCvcElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -11,12 +10,10 @@ import { STRIPE_PUBLISHABLE_KEY } from "../../../../private_user_constants";
 import { buildManualCardTransaction } from "./newCheckoutUtils";
 import { newCheckoutProcessManualCardPayment } from "./newCheckoutFirebaseCalls";
 import { dlog, DCAT } from "./checkoutDebugLog";
+import styles from "./CardPayment.module.css";
 
 const stripePromise = loadStripe(STRIPE_PUBLISHABLE_KEY);
 
-// Stripe Element appearance (renders inside Stripe's secure iframe)
-// Defined at module level so the reference is stable across renders —
-// new object refs cause Stripe to call element.update() and flash the iframe
 const STRIPE_ELEMENT_STYLE = {
   base: {
     fontSize: "14px",
@@ -46,22 +43,17 @@ function CardPaymentForm({
   const stripe = useStripe();
   const elements = useElements();
 
-  // ── Amount state ──
   const [sRequestedAmount, _setRequestedAmount] = useState("");
   const [sRequestedAmountDisp, _setRequestedAmountDisp] = useState("");
 
-  // ── Zip (not handled by Stripe Elements) ──
-  const [sZip, _setZip] = useState("33900"); // DEV default — remove for production
+  const [sZip, _setZip] = useState("33900");
 
-  // ── Stripe Element completeness ──
   const [sCardComplete, _setCardComplete] = useState(false);
   const [sExpComplete, _setExpComplete] = useState(false);
   const [sCvcComplete, _setCvcComplete] = useState(false);
 
-  // ── Elements ready state ──
   const [sCardReady, _setCardReady] = useState(false);
 
-  // ── Process state ──
   const [sProcessing, _setProcessing] = useState(false);
   const [sDone, _setDone] = useState(false);
   const [sError, _setError] = useState("");
@@ -74,7 +66,6 @@ function CardPaymentForm({
   const zipRef = useRef(null);
   const startBtnRef = useRef(null);
 
-  // ── Focus chain: Amount → Card → Zip → Exp → CVC → Start button ──
   function focusCardNumber() {
     if (!elements) return;
     let el = elements.getElement(CardNumberElement);
@@ -97,7 +88,6 @@ function CardPaymentForm({
     if (startBtnRef.current) startBtnRef.current.focus();
   }
 
-  // ── Amount handler ──
   function handleAmountChange(val) {
     let result = usdTypeMask(val, { withDollar: false });
     dlog(DCAT.INPUT, "amount_change", "CardPayment", { cents: result.cents, capped: result.cents > amountLeftToPay });
@@ -111,13 +101,12 @@ function CardPaymentForm({
   }
 
   function handleZipChange(val) {
-    let digits = val.replace(/\D/g, "").slice(0, 5);
+    let digits = (val || "").replace(/\D/g, "").slice(0, 5);
     dlog(DCAT.INPUT, "zip_change", "CardPayment", { length: digits.length });
     _setZip(digits);
     if (digits.length >= 5) focusExpiry();
   }
 
-  // ── Validation ──
   function validate() {
     if (!sRequestedAmount || sRequestedAmount < 50) return "Minimum card payment is $0.50";
     if (sRequestedAmount > amountLeftToPay) return "Amount exceeds balance due";
@@ -128,7 +117,6 @@ function CardPaymentForm({
     return null;
   }
 
-  // ── Charge handler ──
   async function handleCharge() {
     dlog(DCAT.BUTTON, "START_MANUAL_CARD_PAYMENT", "CardPayment", { amount: sRequestedAmount, saleID });
     let err = validate();
@@ -142,14 +130,13 @@ function CardPaymentForm({
       return;
     }
 
-    // Grab the element ref synchronously BEFORE any state changes
     const cardElement = elements.getElement(CardNumberElement);
 
-    // Lock the form and show loading — React batches these into one render
     _setProcessing(true);
     _setError("");
     _setSuccess("");
 
+    let transactionID;
     try {
       const { paymentMethod, error: pmError } = await stripe.createPaymentMethod({
         type: "card",
@@ -165,9 +152,8 @@ function CardPaymentForm({
 
       if (onCardProcessingStart) onCardProcessingStart(sRequestedAmount);
 
-      let transactionID = takeId("transactions") || await getId("transactions");
+      transactionID = takeId("transactions") || await getId("transactions");
 
-      // Notify parent to add pending ID to sale before payment starts
       if (onPaymentStarted) onPaymentStarted(transactionID);
 
       let result = await newCheckoutProcessManualCardPayment(
@@ -188,7 +174,6 @@ function CardPaymentForm({
         if (onPaymentCapture) onPaymentCapture(payment);
         if (onCardProcessingEnd) onCardProcessingEnd();
 
-        // If partial payment, reset back to form after a brief celebration
         let newRemaining = amountLeftToPay - payment.amountCaptured;
         if (newRemaining > 0) {
           setTimeout(() => {
@@ -212,7 +197,6 @@ function CardPaymentForm({
     }
   }
 
-  // ── Auto-load amount ──
   if (amountLeftToPay > 0 && !autoLoadedRef.current) {
     autoLoadedRef.current = true;
     prevAmountRef.current = amountLeftToPay;
@@ -231,165 +215,99 @@ function CardPaymentForm({
     }
   }
 
-  // ── Success animation ──
-  // ── Derived ──
   let formLocked = sProcessing || sDone || saleComplete;
   let chargeEnabled = !formLocked && sRequestedAmount >= 50 && sCardReady && sCardComplete && sExpComplete && sCvcComplete && sZip.length >= 5 && !!stripe;
 
   let elementContainerStyle = {
     borderColor: C.buttonLightGreenOutline,
-    borderRadius: 8,
-    borderWidth: 2,
     backgroundColor: C.listItemWhite,
-    paddingTop: 8,
-    paddingBottom: 8,
-    paddingLeft: 8,
-    paddingRight: 8,
-  };
-
-  let inputStyle = {
-    fontSize: 14,
-    outlineWidth: 0,
-    outlineStyle: "none",
-    color: C.text,
-    borderColor: C.buttonLightGreenOutline,
-    borderRadius: 8,
-    borderWidth: 2,
-    backgroundColor: C.listItemWhite,
-    paddingVertical: 6,
-    paddingHorizontal: 8,
   };
 
   let labelStyle = {
-    fontSize: 10,
-    color: gray(0.5),
-    marginBottom: 2,
+    color: C.textMuted,
     fontWeight: Fonts.weight.textHeavy,
   };
 
-  // ── Success celebration ──
   let celebrationGif = saleComplete ? ICONS.guyCelebrating : ICONS.popperCelebration;
 
   if (sDone) {
     return (
-      <View
-        style={{
-          alignItems: "center",
-          width: "100%",
-          height: "48%",
-          borderRadius: 6,
-          ...SHADOW_RADIUS_PROTO,
-          justifyContent: "center",
-          paddingHorizontal: 15,
-        }}
-      >
-        <View style={{ alignItems: "center" }}>
+      <div className={styles.containerDone}>
+        <div className={styles.celebrationInner}>
           <Image
-            source={celebrationGif}
-            style={{ width: 100, height: 100, marginBottom: 14, backgroundColor: "transparent" }}
+            src={celebrationGif}
+            width={100}
+            height={100}
             resizeMode="contain"
+            style={{ marginBottom: 14, backgroundColor: "transparent" }}
           />
-          <Text style={{ fontSize: 15, color: C.green, fontWeight: "600", textAlign: "center" }}>
+          <span className={styles.celebrationText} style={{ color: C.green }}>
             {saleComplete ? "Full payment complete!" : sSuccess}
-          </Text>
-        </View>
-      </View>
+          </span>
+        </div>
+      </div>
     );
   }
 
-  // ── Form ──
+  let inert = saleComplete || sProcessing;
+
   return (
-    <View
-      pointerEvents={saleComplete || sProcessing ? "none" : "auto"}
+    <div
+      className={styles.container}
       style={{
-        alignItems: "center",
-        paddingTop: 15,
-        width: "100%",
-        height: "48%",
-        borderRadius: 6,
-        ...SHADOW_RADIUS_PROTO,
-        justifyContent: "space-between",
-        paddingBottom: 15,
-        paddingHorizontal: 15,
         opacity: saleComplete ? 0.2 : 1,
+        pointerEvents: inert ? "none" : "auto",
       }}
     >
-      {/* Processing overlay — covers form + Stripe iframes immediately */}
       {sProcessing && (
-        <View
-          style={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: "rgba(255,255,255,0.88)",
-            justifyContent: "center",
-            alignItems: "center",
-            borderRadius: 6,
-            zIndex: 10,
-          }}
-        >
+        <div className={styles.overlay}>
           <SmallLoadingIndicator color={C.green} text="" message="" containerStyle={{ padding: 2 }} />
-          <Text style={{ fontSize: 13, color: gray(0.5), fontWeight: "600", marginTop: 8 }}>Processing payment...</Text>
+          <span className={styles.overlayText} style={{ color: C.textMuted }}>Processing payment...</span>
           {!!sError && (
-            <Text style={{ fontSize: 13, color: C.lightred, fontWeight: "600", textAlign: "center", marginTop: 8 }}>{sError}</Text>
+            <span className={styles.overlayError} style={{ color: C.lightred }}>{sError}</span>
           )}
-        </View>
+        </div>
       )}
 
-      {/* Title */}
-      <Text style={{ fontSize: 22, color: gray(0.6), fontWeight: 500 }}>
+      <span className={styles.title} style={{ color: C.textSecondary }}>
         MANUAL CARD SALE
-      </Text>
+      </span>
 
-      {/* Payment Amount Input */}
-      <View
-        pointerEvents={formLocked ? "none" : "auto"}
+      <div
+        className={styles.amountBox}
         style={{
           borderColor: C.buttonLightGreenOutline,
-          borderRadius: 10,
-          borderWidth: 2,
           backgroundColor: C.listItemWhite,
-          paddingVertical: 6,
-          paddingHorizontal: 10,
-          flexDirection: "row",
-          alignItems: "center",
-          justifyContent: "space-between",
-          width: "60%",
+          pointerEvents: formLocked ? "none" : "auto",
         }}
       >
-        <Text style={{ fontSize: 15 }}>$</Text>
-        <View style={{ width: 100, alignItems: "flex-end", paddingRight: 5 }}>
+        <span className={styles.amountDollar}>$</span>
+        <div className={styles.amountInputWrap}>
           <TextInput
+            debounceMs={0}
             onFocus={() => {
               if (lockAmount) return;
               _setRequestedAmountDisp("");
               _setRequestedAmount(0);
             }}
-            style={{
-              fontSize: 18,
-              outlineWidth: 0,
-              outlineStyle: "none",
-              color: lockAmount ? gray(0.5) : C.text,
-              paddingRight: 2,
-              textAlign: "right",
-            }}
+            style={{ color: lockAmount ? C.textMuted : C.text }}
+            className={styles.amountInput}
             placeholder="0.00"
-            placeholderTextColor={gray(0.3)}
+            placeholderTextColor={C.textDisabled}
             value={sRequestedAmountDisp}
             onChangeText={handleAmountChange}
             editable={!formLocked && !lockAmount}
-            onSubmitEditing={focusCardNumber}
           />
-        </View>
-      </View>
+        </div>
+      </div>
 
-      {/* Card Number + Zip row */}
-      <View pointerEvents={formLocked ? "none" : "auto"} style={{ flexDirection: "row", width: "100%", opacity: formLocked ? 0.5 : 1 }}>
-        <View style={{ flex: 3, marginRight: 6 }}>
-          <Text style={labelStyle}>Card Number</Text>
-          <View style={elementContainerStyle}>
+      <div
+        className={styles.rowSplit}
+        style={{ opacity: formLocked ? 0.5 : 1, pointerEvents: formLocked ? "none" : "auto" }}
+      >
+        <div className={styles.cardCol}>
+          <div className={styles.label} style={labelStyle}>Card Number</div>
+          <div className={styles.elementContainer} style={elementContainerStyle}>
             <CardNumberElement
               options={STRIPE_ELEMENT_OPTIONS}
               onReady={() => _setCardReady(true)}
@@ -399,30 +317,37 @@ function CardPaymentForm({
                 if (e.complete) focusZip();
               }}
             />
-          </View>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={labelStyle}>Zip</Text>
+          </div>
+        </div>
+        <div className={styles.zipCol}>
+          <div className={styles.label} style={labelStyle}>Zip</div>
           <TextInput
             ref={zipRef}
-            style={inputStyle}
+            debounceMs={0}
+            className={styles.zipInput}
+            style={{
+              color: C.text,
+              borderColor: C.buttonLightGreenOutline,
+              backgroundColor: C.listItemWhite,
+            }}
             value={sZip}
             onChangeText={handleZipChange}
             placeholder="00000"
-            placeholderTextColor={gray(0.3)}
+            placeholderTextColor={C.textDisabled}
             editable={!formLocked}
-            onSubmitEditing={focusExpiry}
             autoComplete="off"
             name="zp-inp"
           />
-        </View>
-      </View>
+        </div>
+      </div>
 
-      {/* Exp + CVC row */}
-      <View pointerEvents={formLocked ? "none" : "auto"} style={{ flexDirection: "row", width: "100%", opacity: formLocked ? 0.5 : 1 }}>
-        <View style={{ flex: 1, marginRight: 6 }}>
-          <Text style={labelStyle}>Expiration</Text>
-          <View style={elementContainerStyle}>
+      <div
+        className={styles.rowSplit}
+        style={{ opacity: formLocked ? 0.5 : 1, pointerEvents: formLocked ? "none" : "auto" }}
+      >
+        <div className={styles.halfColLeft}>
+          <div className={styles.label} style={labelStyle}>Expiration</div>
+          <div className={styles.elementContainer} style={elementContainerStyle}>
             <CardExpiryElement
               options={STRIPE_ELEMENT_OPTIONS}
               onChange={(e) => {
@@ -431,11 +356,11 @@ function CardPaymentForm({
                 if (e.complete) focusCvc();
               }}
             />
-          </View>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={labelStyle}>CVC</Text>
-          <View style={elementContainerStyle}>
+          </div>
+        </div>
+        <div className={styles.halfCol}>
+          <div className={styles.label} style={labelStyle}>CVC</div>
+          <div className={styles.elementContainer} style={elementContainerStyle}>
             <CardCvcElement
               options={STRIPE_ELEMENT_OPTIONS}
               onChange={(e) => {
@@ -444,64 +369,61 @@ function CardPaymentForm({
                 if (e.complete) focusStartButton();
               }}
             />
-          </View>
-        </View>
-      </View>
+          </div>
+        </div>
+      </div>
 
-      {/* Status messages */}
-      <View style={{ alignItems: "center", justifyContent: "center", minHeight: 30 }}>
+      <div className={styles.statusRow}>
         {sProcessing && !sError && (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <div className={styles.statusInline}>
             <SmallLoadingIndicator color={C.green} text="" message="" containerStyle={{ padding: 2 }} />
-            <Text style={{ fontSize: 13, color: gray(0.5), fontWeight: "600" }}>Processing payment...</Text>
-          </View>
+            <span className={styles.statusText} style={{ color: C.textMuted }}>Processing payment...</span>
+          </div>
         )}
         {!!sError && (
-          <Text style={{ fontSize: 13, color: C.lightred, fontWeight: "600", textAlign: "center" }}>{sError}</Text>
+          <span className={styles.statusError} style={{ color: C.lightred }}>{sError}</span>
         )}
-      </View>
+      </div>
 
-      {/* Action Buttons */}
-      <View style={{ flexDirection: "row", alignItems: "center", width: "100%" }}>
-        <View style={{ width: "33%", alignItems: "flex-start", paddingLeft: 7 }} />
-        <View
+      <div className={styles.actionRow}>
+        <div className={styles.actionLeft} />
+        <div
           ref={startBtnRef}
           tabIndex={0}
           onFocus={() => _setButtonFocused(true)}
           onBlur={() => _setButtonFocused(false)}
           onKeyDown={(e) => { if (e.key === "Enter" && chargeEnabled) handleCharge(); }}
-          style={{ width: "33%", alignItems: "center", outlineStyle: "none" }}
+          className={styles.actionCenter}
         >
-          <Button_
+          <Button
             text="Start Sale"
             onPress={handleCharge}
             enabled={chargeEnabled}
             colorGradientArr={COLOR_GRADIENTS.green}
             textStyle={{ color: C.textWhite, fontSize: 16 }}
             buttonStyle={{
-              paddingHorizontal: 30,
+              paddingLeft: 30,
+              paddingRight: 30,
               cursor: chargeEnabled ? "inherit" : "default",
-              borderWidth: sButtonFocused ? 1 : 0,
-              borderColor: sButtonFocused ? gray(0.4) : "transparent",
+              border: sButtonFocused ? `1px solid ${C.borderStrong}` : "1px solid transparent",
             }}
           />
-        </View>
-        <View style={{ width: "33%", alignItems: "flex-end", paddingRight: 7 }}>
-          <Button_
+        </div>
+        <div className={styles.actionRight}>
+          <Button
             text="Card Reader"
             onPress={() => { dlog(DCAT.BUTTON, "SWITCH_TO_READER", "CardPayment", {}); if (onSwitchToReader) onSwitchToReader(); }}
             enabled={!formLocked}
             colorGradientArr={COLOR_GRADIENTS.blue}
             textStyle={{ color: C.textWhite, fontSize: 11 }}
-            buttonStyle={{ paddingVertical: 2, paddingRight: 10, width: 90, cursor: formLocked ? "default" : "inherit" }}
+            buttonStyle={{ paddingTop: 2, paddingBottom: 2, paddingRight: 10, width: 90, cursor: formLocked ? "default" : "inherit" }}
           />
-        </View>
-      </View>
-    </View>
+        </div>
+      </div>
+    </div>
   );
 }
 
-// Wrapper provides Stripe Elements context
 export const CardPayment = memo(function CardPayment(props) {
   return (
     <Elements stripe={stripePromise}>

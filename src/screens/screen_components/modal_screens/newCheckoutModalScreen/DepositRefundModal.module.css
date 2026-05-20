@@ -1,0 +1,342 @@
+.card {
+  display: flex;
+  flex-direction: column;
+  width: 420px;
+  border-radius: 15px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 15px;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.headerTitle {
+  font-size: 14px;
+}
+
+.headerNote {
+  font-size: 11px;
+  margin-top: 2px;
+}
+
+.loadingState {
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.loadingText {
+  font-size: 14px;
+  font-style: italic;
+}
+
+.notFoundState {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.notFoundTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.notFoundSub {
+  font-size: 12px;
+  text-align: center;
+  margin-top: 6px;
+}
+
+.depositBadge {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 6px;
+  border-radius: 6px;
+  padding: 5px 10px;
+}
+
+.depositBadgeText {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.actionRow {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.removedState {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.removedBanner {
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 8px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.removedTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.removedSub {
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.mainBody {
+  padding: 15px;
+}
+
+.txnCard {
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 8px;
+  padding: 10px;
+  margin-bottom: 12px;
+  background-color: white;
+  box-sizing: border-box;
+}
+
+.txnCardTopRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.txnLeft {
+  display: flex;
+  flex-direction: column;
+}
+
+.txnRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.txnMethodRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.methodPill {
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-right: 6px;
+}
+
+.methodPillText {
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.cardInfo {
+  font-size: 12px;
+}
+
+.importPill {
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-left: 6px;
+}
+
+.importPillText {
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.txnDate {
+  font-size: 11px;
+}
+
+.txnAmount {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.importedNotice {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border-radius: 6px;
+  padding: 5px 8px;
+  margin-top: 8px;
+}
+
+.importedNoticeText {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.receiptOptionsRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: 12px;
+  padding: 0 2px;
+}
+
+.refundAmountBox {
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.refundAmountLabel {
+  font-size: 11px;
+  margin-bottom: 4px;
+}
+
+.refundAmountValue {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.refundAmountSub {
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.errorMessage {
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.processingRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.processingText {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.fullyRefundedBox {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.fullyRefundedTitle {
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.fullyRefundedSub {
+  font-size: 12px;
+  text-align: center;
+}
+
+.successBox {
+  padding: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+.successTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.successSub {
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.closeRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  margin-top: 15px;
+}
+
+.confirmOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--surface-overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.confirmCard {
+  border-radius: 15px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  min-width: 32%;
+  min-height: 24%;
+  box-sizing: border-box;
+}
+
+.confirmTitle {
+  font-weight: 500;
+  margin-top: 25px;
+  font-size: 25px;
+  text-align: center;
+}
+
+.confirmMessage {
+  text-align: center;
+  width: 90%;
+  margin-top: 10px;
+  font-size: 18px;
+}
+
+.confirmActions {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  margin-top: 25px;
+  margin-bottom: 25px;
+  width: 100%;
+  padding: 0 20px;
+  gap: 20px;
+  box-sizing: border-box;
+}

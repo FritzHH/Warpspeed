@@ -1,12 +1,10 @@
 /* eslint-disable */
 import { memo } from "react";
-import { View, Text, ScrollView } from "react-native-web";
-import { C, Fonts } from "../../../../styles";
-import { Button_ } from "../../../../components";
-import { CheckBox } from "../../../../dom_components";
-import { COLOR_GRADIENTS } from "../../../../styles";
-import { formatCurrencyDisp, gray, formatWorkorderNumber } from "../../../../utils";
+import { C, Fonts, COLOR_GRADIENTS } from "../../../../styles";
+import { Button, CheckBox } from "../../../../dom_components";
+import { formatCurrencyDisp, formatWorkorderNumber } from "../../../../utils";
 import { dlog, DCAT } from "./checkoutDebugLog";
+import styles from "./RefundItemSelector.module.css";
 
 const RefundItemRow = memo(function RefundItemRow({
   line,
@@ -24,22 +22,19 @@ const RefundItemRow = memo(function RefundItemRow({
     ? line.discountObj.newPrice
     : line.inventoryItem?.price || 0;
 
+  let rowBg = isRefunded
+    ? C.surfaceAlt
+    : isSelected
+    ? "rgb(252, 235, 235)"
+    : "transparent";
+
   return (
-    <View
+    <div
+      className={styles.row}
       style={{
-        flexDirection: "row",
-        alignItems: "center",
-        paddingVertical: 6,
-        paddingHorizontal: 4,
-        borderBottomWidth: 1,
-        borderBottomColor: gray(0.05),
-        backgroundColor: isRefunded
-          ? gray(0.04)
-          : isSelected
-          ? "rgb(252, 235, 235)"
-          : "transparent",
+        borderBottomColor: C.borderSubtle,
+        backgroundColor: rowBg,
         opacity: isRefunded || isDisabled ? 0.5 : 1,
-        borderRadius: 3,
       }}
     >
       <CheckBox
@@ -53,54 +48,50 @@ const RefundItemRow = memo(function RefundItemRow({
         enabled={!isRefunded && !isDisabled}
         buttonStyle={{ marginRight: 8 }}
       />
-      <View style={{ flex: 1 }}>
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-          <Text
+      <div className={styles.rowMiddle}>
+        <div className={styles.rowNameLine}>
+          <span
+            className={styles.itemName}
             style={{
-              fontSize: 12,
               color: isRefunded ? C.lightText : C.text,
               textDecorationLine: isRefunded ? "line-through" : "none",
             }}
           >
             {name}
-          </Text>
+          </span>
           {isRefunded && (
-            <View
-              style={{
-                backgroundColor: C.lightred,
-                borderRadius: 3,
-                paddingHorizontal: 4,
-                paddingVertical: 1,
-              }}
+            <div
+              className={styles.refundedBadge}
+              style={{ backgroundColor: C.lightred }}
             >
-              <Text
-                style={{
-                  fontSize: 9,
-                  color: "white",
-                  fontWeight: Fonts.weight.textHeavy,
-                }}
+              <span
+                className={styles.refundedBadgeText}
+                style={{ fontWeight: Fonts.weight.textHeavy }}
               >
                 REFUNDED
-              </Text>
-            </View>
+              </span>
+            </div>
           )}
-        </View>
+        </div>
         {workorderNumber && (
-          <Text style={{ fontSize: 10, color: C.lightText }}>
+          <div
+            className={styles.workorderSubLabel}
+            style={{ color: C.lightText }}
+          >
             WO #{formatWorkorderNumber(workorderNumber)}
-          </Text>
+          </div>
         )}
-      </View>
-      <Text
+      </div>
+      <span
+        className={styles.itemPrice}
         style={{
-          fontSize: 12,
           fontWeight: Fonts.weight.textHeavy,
           color: isRefunded ? C.lightText : C.text,
         }}
       >
         {formatCurrencyDisp(price)}
-      </Text>
-    </View>
+      </span>
+    </div>
   );
 });
 
@@ -127,128 +118,90 @@ export const RefundItemSelector = memo(function RefundItemSelector({
   // Active/partial sales — restrict to payment-level refunds only
   if (isActiveSale) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 20 }}>
-        <View
-          style={{
-            backgroundColor: "rgb(252, 243, 225)",
-            borderRadius: 10,
-            padding: 20,
-            maxWidth: 340,
-            alignItems: "center",
-          }}
+      <div className={styles.partialContainer}>
+        <div
+          className={styles.partialBox}
+          style={{ backgroundColor: "rgb(252, 243, 225)" }}
         >
-          <Text style={{ fontSize: 22, marginBottom: 10 }}>
-            {"\u26A0"}
-          </Text>
-          <Text
-            style={{
-              fontSize: 14,
-              fontWeight: Fonts.weight.textHeavy,
-              color: C.orange,
-              textAlign: "center",
-              marginBottom: 10,
-            }}
+          <div className={styles.partialWarnIcon}>{"\u26A0"}</div>
+          <div
+            className={styles.partialTitle}
+            style={{ fontWeight: Fonts.weight.textHeavy, color: C.orange }}
           >
             PARTIAL SALE
-          </Text>
-          <Text
-            style={{
-              fontSize: 12,
-              color: C.text,
-              textAlign: "center",
-              lineHeight: 18,
-              marginBottom: 12,
-            }}
+          </div>
+          <div
+            className={styles.partialDescription}
+            style={{ color: C.text }}
           >
             Item-level refunds are not available for sales that are still in progress. Select a payment on the left to refund by amount.
-          </Text>
-          <View
-            style={{
-              borderTopWidth: 1,
-              borderTopColor: "rgb(230, 215, 185)",
-              paddingTop: 10,
-              width: "100%",
-            }}
+          </div>
+          <div
+            className={styles.partialDivider}
+            style={{ borderTopColor: "rgb(230, 215, 185)" }}
           >
-            <Text
-              style={{
-                fontSize: 11,
-                color: C.lightText,
-                textAlign: "center",
-                fontStyle: "italic",
-                lineHeight: 16,
-              }}
+            <div
+              className={styles.partialFooter}
+              style={{ color: C.lightText }}
             >
               Complete the sale first, then reopen this screen to refund individual items.
-            </Text>
-          </View>
-        </View>
-      </View>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 
   return (
-    <View style={{ flex: 1 }}>
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          paddingHorizontal: 6,
-          paddingBottom: 6,
-          borderBottomWidth: 1,
-          borderBottomColor: gray(0.1),
-        }}
+    <div className={styles.container}>
+      <div
+        className={styles.header}
+        style={{ borderBottomColor: C.borderSubtle }}
       >
-        <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <div className={styles.headerLeft}>
           {hasPaymentSelection ? (
-            <Text style={{ fontSize: 11, color: C.orange, fontWeight: Fonts.weight.textHeavy }}>
+            <span
+              className={styles.headerWarn}
+              style={{ color: C.orange, fontWeight: Fonts.weight.textHeavy }}
+            >
               UNCHECK ALL PAYMENTS TO SELECT ITEMS
-            </Text>
+            </span>
           ) : (
-            <Text
-              style={{
-                fontSize: 13,
-                fontWeight: Fonts.weight.textHeavy,
-                color: C.text,
-              }}
+            <span
+              className={styles.headerTitle}
+              style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}
             >
               SELECT ITEMS TO REFUND
-            </Text>
+            </span>
           )}
-        </View>
-        <Button_
+        </div>
+        <Button
           text="CLEAR LIST"
           onPress={() => { dlog(DCAT.BUTTON, "clearList", "RefundItemSelector"); onClearItems(); }}
           enabled={selectedItems.length > 0}
           colorGradientArr={COLOR_GRADIENTS.grey}
           textStyle={{ fontSize: 10 }}
           buttonStyle={{
-            paddingVertical: 3,
-            paddingHorizontal: 10,
+            paddingTop: 3,
+            paddingBottom: 3,
+            paddingLeft: 10,
+            paddingRight: 10,
             borderRadius: 4,
             opacity: selectedItems.length > 0 ? 1 : 0.3,
           }}
         />
-      </View>
+      </div>
 
-      <ScrollView style={{ flex: 1, paddingTop: 4 }}>
+      <div className={styles.scroll}>
         {workordersInSale.map((wo) => (
-          <View key={wo.id}>
-            {/* Workorder header */}
+          <div key={wo.id}>
             {workordersInSale.length > 1 && (
-              <Text
-                style={{
-                  fontSize: 11,
-                  fontWeight: Fonts.weight.textHeavy,
-                  color: C.lightText,
-                  paddingHorizontal: 6,
-                  paddingTop: 6,
-                  paddingBottom: 2,
-                }}
+              <div
+                className={styles.workorderHeader}
+                style={{ fontWeight: Fonts.weight.textHeavy, color: C.lightText }}
               >
                 WO #{formatWorkorderNumber(wo.workorderNumber) || wo.id?.slice(-4)}
-              </Text>
+              </div>
             )}
 
             {(wo.workorderLines || []).map((line, idx) => (
@@ -266,9 +219,9 @@ export const RefundItemSelector = memo(function RefundItemSelector({
                 onToggle={onToggleItem}
               />
             ))}
-          </View>
+          </div>
         ))}
-      </ScrollView>
-    </View>
+      </div>
+    </div>
   );
 });

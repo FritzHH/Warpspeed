@@ -1,0 +1,254 @@
+.modalCard {
+  width: 80%;
+  height: 85%;
+  background-color: var(--card-bg);
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-evenly;
+  padding: 30px;
+  border-radius: 15px;
+  box-sizing: border-box;
+}
+
+.leftCol {
+  width: 35%;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.rightCol {
+  margin-left: 20px;
+  width: 65%;
+  max-height: 97%;
+  background-color: var(--list-bg);
+  border: 1px solid var(--list-border);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.topRow {
+  margin-bottom: 30px;
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+}
+
+.totalsRow {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  width: 100%;
+  align-items: center;
+}
+
+.totalLabelWide {
+  width: 400px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.totalLabel {
+  width: 300px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.totalValue {
+  font-weight: 500;
+  font-size: 16px;
+  width: 100px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.historyList {
+  overflow-y: auto;
+  width: 100%;
+}
+
+.punchRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 100%;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  padding-left: 5px;
+  padding-right: 5px;
+  box-sizing: border-box;
+}
+
+.yearCell {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 8%;
+  flex-shrink: 0;
+}
+
+.yearText {
+  color: var(--year-color);
+  margin-right: 5px;
+}
+
+.inCell {
+  display: flex;
+  flex-direction: row;
+  width: 32%;
+  align-items: center;
+  justify-content: flex-start;
+  flex-shrink: 0;
+}
+
+.outCell {
+  display: flex;
+  flex-direction: row;
+  width: 35%;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.dateBlock {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-right: 10px;
+  width: 30%;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.dateBlockOut {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  width: 28%;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.dateLabel {
+  display: flex;
+  flex-direction: row;
+}
+
+.dayText {
+  color: var(--text-color);
+  margin-right: 1px;
+}
+
+.dateColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.dateColumnOut {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-left: 3px;
+}
+
+.dateValue {
+  width: 20px;
+  text-align: center;
+}
+
+.timeColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.timeValue {
+  text-align: right;
+  padding-right: 1px;
+}
+
+.timeValueEditable {
+  text-align: center;
+  padding-right: 1px;
+}
+
+.timeValueLeft {
+  text-align: left;
+}
+
+.colon {
+  padding-left: 1px;
+  padding-right: 1px;
+}
+
+.outTimeGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.totalsCell {
+  width: 25%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.totalsBlock {
+  display: flex;
+  flex-direction: row;
+  width: 45%;
+  justify-content: space-between;
+  padding-right: 12px;
+  flex-shrink: 0;
+}
+
+.totalsLabel {
+  color: var(--label-color);
+}
+
+.totalsValue {
+  text-align: right;
+  width: 50px;
+  flex-shrink: 0;
+}
+
+.actionsBlock {
+  display: flex;
+  flex-direction: row;
+  width: 50%;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+
+.iconChip {
+  margin-right: 15px;
+  flex-shrink: 0;
+}
+
+.dollarPrefix {
+  font-size: 16px;
+  color: var(--label-color);
+}
+
+.amPmWrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.chevronBtn {
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.chevronBtn:disabled {
+  cursor: default;
+  opacity: 0.5;
+}

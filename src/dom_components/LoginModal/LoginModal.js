@@ -1,7 +1,7 @@
 import React, { forwardRef, useState, useRef, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { C, Fonts, ICONS } from "../../styles";
-import { gray, deepEqual, localStorageWrapper } from "../../utils";
+import { deepEqual, localStorageWrapper } from "../../utils";
 import { PRIVILEDGE_LEVELS } from "../../data";
 import { useLoginStore, useSettingsStore, useAlertScreenStore } from "../../stores";
 import { LOCAL_DB_KEYS, PAUSE_USER_CLOCK_IN_CHECK_MILLIS } from "../../constants";
@@ -166,8 +166,8 @@ export const LoginModal = forwardRef(function LoginModal(
 
         {/* Privilege badge */}
         {!!zAdminPrivilege && !sSuccess && (
-          <div className={styles.privilegeBadge} style={{ backgroundColor: gray(0.05) }}>
-            <span className={styles.privilegeText} style={{ color: gray(0.5) }}>
+          <div className={styles.privilegeBadge} style={{ backgroundColor: C.surfaceAlt }}>
+            <span className={styles.privilegeText} style={{ color: C.textMuted }}>
               Requires: <span style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}>{zAdminPrivilege}</span> or higher
             </span>
           </div>
@@ -176,7 +176,7 @@ export const LoginModal = forwardRef(function LoginModal(
         {/* PIN input */}
         {!sSuccess && (
           <div className={styles.pinSection}>
-            <span className={styles.pinLabel} style={{ color: gray(0.5) }}>Enter PIN</span>
+            <span className={styles.pinLabel} style={{ color: C.textMuted }}>Enter PIN</span>
             <div
               className={styles.pinBoxes}
               onClick={() => pinInputRef.current?.focus()}
@@ -189,9 +189,9 @@ export const LoginModal = forwardRef(function LoginModal(
                     key={i}
                     className={styles.pinBox}
                     style={{
-                      borderColor: sError ? C.red : isCursor ? C.cursorRed : isFilled ? "#007bff" : "#ddd",
-                      backgroundColor: isCursor ? C.cursorRed : isFilled ? "#fff" : "#f8f9fa",
-                      boxShadow: isCursor ? "0 0 10px rgba(255, 107, 107, 0.5)" : "none",
+                      borderColor: sError ? C.danger : isCursor ? C.dangerStrong : isFilled ? C.borderFocus : C.borderSubtle,
+                      backgroundColor: isCursor ? C.dangerStrong : isFilled ? C.surfaceBase : C.surfaceAlt,
+                      boxShadow: isCursor ? `0 0 10px ${C.dangerStrong}` : "none",
                     }}
                   >
                     {isFilled && <div className={styles.pinDot} style={{ backgroundColor: C.text }} />}

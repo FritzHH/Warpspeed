@@ -1,9 +1,16 @@
 /* eslint-disable */
-import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { useState, memo, useMemo } from "react";
 import cloneDeep from "lodash/cloneDeep";
-import { ScreenModal, SHADOW_RADIUS_PROTO, Image_, Tooltip, DropdownMenu, TextInput_ } from "../../../../components";
+import {
+  Image,
+  Tooltip,
+  DropdownMenu,
+  TextInput,
+  TouchableOpacity,
+  Dialog,
+} from "../../../../dom_components";
 import { C, Fonts, ICONS } from "../../../../styles";
+import styles from "./NewRefundModalScreen.module.css";
 import {
   useSettingsStore,
   useLoginStore,
@@ -11,19 +18,7 @@ import {
   useAlertScreenStore,
   useCurrentCustomerStore,
 } from "../../../../stores";
-import {
-  lightenRGBByPercent,
-  formatCurrencyDisp,
-  findTemplateByType,
-  log,
-  gray,
-  printBuilder,
-  localStorageWrapper,
-  capitalizeFirstLetterOfString,
-  formatPhoneWithDashes,
-  formatMillisForDisplay,
-  generateEAN13Barcode,
-} from "../../../../utils";
+import { lightenRGBByPercent, formatCurrencyDisp, findTemplateByType, log, printBuilder, localStorageWrapper, capitalizeFirstLetterOfString, formatPhoneWithDashes, formatMillisForDisplay, generateEAN13Barcode } from "../../../../utils";
 import { dbSavePrintObj, dbSaveCustomer } from "../../../../db_calls_wrapper";
 import {
   calculateRefundLimits,
@@ -846,534 +841,407 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     if (onClose) onClose();
   }
 
+  let formLocked = sCardRefundProcessing;
+
   // ─── Render ───────────────────────────────────────────────
   return (
-    <ScreenModal
-      modalVisible={visible}
-      showOuterModal={true}
-      outerModalStyle={{
-        backgroundColor: "rgba(50,50,50,.65)",
-      }}
-      buttonVisible={false}
-      Component={() => (
-        <View
-          style={{
-            flexDirection: "column",
-            backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
-            width: "85%",
-            height: "95%",
-            borderRadius: 15,
-            ...SHADOW_RADIUS_PROTO,
-            shadowColor: C.lightred,
-            overflow: "hidden",
-          }}
-        >
-          {/* ── Header ──────────────────────────────────── */}
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              paddingHorizontal: 15,
-              paddingVertical: 10,
-              borderBottomWidth: 1,
-              borderBottomColor: gray(0.1),
-            }}
-          >
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 12 }}
+    <Dialog
+      visible={visible}
+      onClose={handleClose}
+      preventClose={formLocked}
+      title="Refund"
+      aria-label="Refund"
+    >
+      <div
+        className={styles.modalBox}
+        style={{ backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35) }}
+      >
+        {/* ── Header ──────────────────────────────────── */}
+        <div className={styles.header} style={{ borderBottomColor: C.borderSubtle }}>
+          <div className={styles.headerLeft}>
+            <span
+              className={styles.headerSaleID}
+              style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}
             >
-              <Text
+              Sale: {saleID || sOriginalSale?.id || saleProp?.id || ""}
+            </span>
+            {sOriginalSale && (
+              <span className={styles.headerSubInfo} style={{ color: C.lightText }}>
+                Original: {formatCurrencyDisp(sOriginalSale.total)}
+              </span>
+            )}
+            {sOriginalSale?.millis ? (
+              <span className={styles.headerSubInfo} style={{ color: C.lightText }}>
+                {formatMillisForDisplay(sOriginalSale.millis)}
+              </span>
+            ) : null}
+            {(() => {
+              let wo = sWorkordersInSale[0];
+              let custFirst = wo?.customerFirst || "";
+              let custLast = wo?.customerLast || "";
+              let custPhone = wo?.customerCell || "";
+              if (!custFirst && !custLast && !custPhone) return null;
+              let custName = (capitalizeFirstLetterOfString(custFirst) + " " + capitalizeFirstLetterOfString(custLast)).trim();
+              return (
+                <div className={styles.headerCustomerInfo}>
+                  {custName ? (
+                    <span className={styles.headerSubInfo} style={{ color: C.text, fontWeight: Fonts.weight.textHeavy }}>
+                      {custName}
+                    </span>
+                  ) : null}
+                  {custPhone ? (
+                    <span className={styles.headerSubInfo} style={{ color: C.lightText }}>
+                      {formatPhoneWithDashes(custPhone)}
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })()}
+          </div>
+
+          {/* Center: REFUND SCREEN label */}
+          <div className={styles.headerCenter}>
+            <div className={styles.headerCenterPill} style={{ backgroundColor: C.lightred }}>
+              <span className={styles.headerCenterText} style={{ fontWeight: Fonts.weight.textHeavy }}>
+                REFUND SCREEN
+              </span>
+            </div>
+          </div>
+
+          <div className={styles.headerRight} />
+        </div>
+
+        {/* ── Loading State ───────────────────────────── */}
+        {sLoading && (
+          <div className={styles.loadingWrap}>
+            <span className={styles.loadingText} style={{ color: C.lightText }}>
+              {sLoadMessage}
+            </span>
+          </div>
+        )}
+
+        {/* ── Main Content ────────────────────────────── */}
+        {!sLoading && sOriginalSale && (
+          <div className={styles.body}>
+            {/* ── LEFT COLUMN: Refund Methods ─────────── */}
+            <div className={styles.leftCol} style={{ borderRightColor: C.borderSubtle }}>
+              <div
+                className={styles.refundPane}
                 style={{
-                  fontSize: 14,
-                  fontWeight: Fonts.weight.textHeavy,
-                  color: C.text,
+                  opacity: sCardRefundProcessing || selectedIsCard || creditReturnToAccount || !hasCashPayments || needsPaymentSelection ? 0.3 : 1,
+                  pointerEvents: sCardRefundProcessing || selectedIsCard || creditReturnToAccount || !hasCashPayments || needsPaymentSelection ? "none" : "auto",
                 }}
               >
-                Sale: {saleID || sOriginalSale?.id || saleProp?.id || ""}
-              </Text>
-              {sOriginalSale && (
-                <Text style={{ fontSize: 12, color: C.lightText }}>
-                  Original: {formatCurrencyDisp(sOriginalSale.total)}
-                </Text>
-              )}
-              {sOriginalSale?.millis ? (
-                <Text style={{ fontSize: 12, color: C.lightText }}>
-                  {formatMillisForDisplay(sOriginalSale.millis)}
-                </Text>
-              ) : null}
-              {(() => {
-                let wo = sWorkordersInSale[0];
-                let custFirst = wo?.customerFirst || "";
-                let custLast = wo?.customerLast || "";
-                let custPhone = wo?.customerCell || "";
-                if (!custFirst && !custLast && !custPhone) return null;
-                let custName = (capitalizeFirstLetterOfString(custFirst) + " " + capitalizeFirstLetterOfString(custLast)).trim();
-                return (
-                  <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginLeft: 4 }}>
-                    {custName ? (
-                      <Text style={{ fontSize: 12, color: C.text, fontWeight: Fonts.weight.textHeavy }}>
-                        {custName}
-                      </Text>
-                    ) : null}
-                    {custPhone ? (
-                      <Text style={{ fontSize: 12, color: C.lightText }}>
-                        {formatPhoneWithDashes(custPhone)}
-                      </Text>
-                    ) : null}
-                  </View>
-                );
-              })()}
-            </View>
+                <CashRefund
+                  maxCashRefund={maxCashRefund}
+                  onProcessRefund={handleProcessRefund}
+                  refundComplete={sRefundComplete}
+                  suggestedAmount={hasItemSelection ? itemCashAmount : 0}
+                  onManualInput={handleManualAmountInput}
+                  reasonMissing={reasonMissing}
+                />
+              </div>
+              <div
+                className={styles.refundPane}
+                style={{
+                  opacity: selectedIsCash || creditReturnToAccount || !hasCardPayments || needsPaymentSelection ? 0.3 : 1,
+                  pointerEvents: selectedIsCash || creditReturnToAccount || !hasCardPayments || needsPaymentSelection ? "none" : "auto",
+                }}
+              >
+                <CardRefund
+                  selectedPayment={selectedIsCard ? sSelectedPayments[0] : null}
+                  maxCardRefund={maxCardRefund}
+                  onProcessRefund={handleProcessRefund}
+                  onRefundStarted={handleRefundStarted}
+                  onRefundFailed={handleRefundFailed}
+                  onProcessingChange={(val) => _setCardRefundProcessing(val)}
+                  workorderLines={sSelectedItems}
+                  salesTaxPercent={zSalesTaxPercent}
+                  refundComplete={sRefundComplete}
+                  suggestedAmount={
+                    hasItemSelection ? itemCardAmount
+                    : !selectedIsCash ? suggestedRefundTotal
+                    : 0
+                  }
+                  onManualInput={handleManualAmountInput}
+                  reasonMissing={reasonMissing}
+                />
+              </div>
+            </div>
 
-            {/* Center: REFUND SCREEN label */}
-            <View
+            {/* ── MIDDLE COLUMN: Totals & Payments ─────── */}
+            <div
+              className={styles.midCol}
               style={{
-                position: "absolute",
-                left: "50%",
-                transform: [{ translateX: "-50%" }],
+                borderRightColor: C.borderSubtle,
+                opacity: sCardRefundProcessing ? 0.4 : 1,
+                pointerEvents: sCardRefundProcessing ? "none" : "auto",
               }}
             >
-              <View
-                style={{
-                  backgroundColor: C.lightred,
-                  borderRadius: 6,
-                  paddingHorizontal: 14,
-                  paddingVertical: 4,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: Fonts.weight.textHeavy,
-                    color: "white",
-                    letterSpacing: 1,
-                  }}
-                >
-                  REFUND SCREEN
-                </Text>
-              </View>
-            </View>
+              <div className={styles.midScroll}>
+                <RefundTotals
+                  originalSale={sOriginalSale}
+                  selectedItemsTotal={selectedItemsTotal}
+                  itemRefundTotal={itemRefundTotal}
+                  selectedPaymentsTotal={selectedPaymentsTotal}
+                  previouslyRefunded={refundLimits.previouslyRefunded}
+                  maxRefundAllowed={refundLimits.maxRefund}
+                  cardFeeDeduction={refundLimits.cardFeeDeduction}
+                  salesTaxPercent={zSalesTaxPercent}
+                  hasItemSelection={hasItemSelection}
+                  refundComplete={sRefundComplete}
+                  lastRefundAmount={sLastRefundAmount}
+                  customerFirst={sWorkordersInSale[0]?.customerFirst || ""}
+                />
 
-            <View
-              style={{ flexDirection: "row", alignItems: "center", gap: 8 }}
-            />
-          </View>
+                <RefundPaymentSelector
+                  payments={sTransactions}
+                  selectedPayments={sSelectedPayments}
+                  onSelectPayment={handleSelectPayment}
+                  creditsApplied={getAllAppliedCredits(sOriginalSale).filter((c) => c.type === "credit")}
+                  depositsApplied={getAllAppliedCredits(sOriginalSale).filter((c) => c.type !== "credit")}
+                  selectedItem={sSelectedCreditItem}
+                  onSelectItem={handleSelectCreditItem}
+                  returnMode={sCreditReturnMode}
+                  onReturnModeChange={handleCreditReturnModeChange}
+                  customAmountDisp={sCreditCustomAmountDisp}
+                  onCustomAmountChange={handleCreditCustomAmountChange}
+                  disabled={sRefundComplete}
+                />
 
-          {/* ── Loading State ───────────────────────────── */}
-          {sLoading && (
-            <View
-              style={{
-                flex: 1,
-                alignItems: "center",
-                justifyContent: "center",
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: C.lightText,
-                  fontStyle: "italic",
-                }}
-              >
-                {sLoadMessage}
-              </Text>
-            </View>
-          )}
-
-          {/* ── Main Content ────────────────────────────── */}
-          {!sLoading && sOriginalSale && (
-            <View
-              style={{
-                flex: 1,
-                flexDirection: "row",
-                padding: 10,
-              }}
-            >
-              {/* ── LEFT COLUMN: Refund Methods ─────────── */}
-              <View
-                style={{
-                  width: "29%",
-                  borderRightWidth: 1,
-                  borderRightColor: gray(0.1),
-                  flexDirection: "column",
-                }}
-              >
-                <View
-                  style={{ flex: 1, opacity: sCardRefundProcessing || selectedIsCard || creditReturnToAccount || !hasCashPayments || needsPaymentSelection ? 0.3 : 1 }}
-                  pointerEvents={sCardRefundProcessing || selectedIsCard || creditReturnToAccount || !hasCashPayments || needsPaymentSelection ? "none" : "auto"}
-                >
-                  <CashRefund
-                    maxCashRefund={maxCashRefund}
-                    onProcessRefund={handleProcessRefund}
-                    refundComplete={sRefundComplete}
-                    suggestedAmount={
-                      hasItemSelection ? itemCashAmount : 0
-                    }
-                    onManualInput={handleManualAmountInput}
-                    reasonMissing={reasonMissing}
-                  />
-                </View>
-                <View
-                  style={{ flex: 1, opacity: selectedIsCash || creditReturnToAccount || !hasCardPayments || needsPaymentSelection ? 0.3 : 1 }}
-                  pointerEvents={selectedIsCash || creditReturnToAccount || !hasCardPayments || needsPaymentSelection ? "none" : "auto"}
-                >
-                  <CardRefund
-                    selectedPayment={selectedIsCard ? sSelectedPayments[0] : null}
-                    maxCardRefund={maxCardRefund}
-                    onProcessRefund={handleProcessRefund}
-                    onRefundStarted={handleRefundStarted}
-                    onRefundFailed={handleRefundFailed}
-                    onProcessingChange={(val) => _setCardRefundProcessing(val)}
-                    workorderLines={sSelectedItems}
-                    salesTaxPercent={zSalesTaxPercent}
-                    refundComplete={sRefundComplete}
-                    suggestedAmount={
-                      hasItemSelection ? itemCardAmount
-                      : !selectedIsCash ? suggestedRefundTotal
-                      : 0
-                    }
-                    onManualInput={handleManualAmountInput}
-                    reasonMissing={reasonMissing}
-                  />
-                </View>
-              </View>
-
-              {/* ── MIDDLE COLUMN: Totals & Payments ─────── */}
-              <View
-                style={{
-                  width: "29%",
-                  borderRightWidth: 1,
-                  borderRightColor: gray(0.1),
-                  opacity: sCardRefundProcessing ? 0.4 : 1,
-                }}
-                pointerEvents={sCardRefundProcessing ? "none" : "auto"}
-              >
-                <ScrollView style={{ flex: 1 }}>
-                  <RefundTotals
-                    originalSale={sOriginalSale}
-                    selectedItemsTotal={selectedItemsTotal}
-                    itemRefundTotal={itemRefundTotal}
-                    selectedPaymentsTotal={selectedPaymentsTotal}
-                    previouslyRefunded={refundLimits.previouslyRefunded}
-                    maxRefundAllowed={refundLimits.maxRefund}
-                    cardFeeDeduction={refundLimits.cardFeeDeduction}
-                    salesTaxPercent={zSalesTaxPercent}
-                    hasItemSelection={hasItemSelection}
-                    refundComplete={sRefundComplete}
-                    lastRefundAmount={sLastRefundAmount}
-                    customerFirst={sWorkordersInSale[0]?.customerFirst || ""}
-                  />
-
-                  <RefundPaymentSelector
-                    payments={sTransactions}
-                    selectedPayments={sSelectedPayments}
-                    onSelectPayment={handleSelectPayment}
-                    creditsApplied={getAllAppliedCredits(sOriginalSale).filter((c) => c.type === "credit")}
-                    depositsApplied={getAllAppliedCredits(sOriginalSale).filter((c) => c.type !== "credit")}
-                    selectedItem={sSelectedCreditItem}
-                    onSelectItem={handleSelectCreditItem}
-                    returnMode={sCreditReturnMode}
-                    onReturnModeChange={handleCreditReturnModeChange}
-                    customAmountDisp={sCreditCustomAmountDisp}
-                    onCustomAmountChange={handleCreditCustomAmountChange}
-                    disabled={sRefundComplete}
-                  />
-
-                  {/* ── Refund Notes ──────────��───────────────── */}
-                  <View style={{ padding: 10 }}>
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        fontWeight: Fonts.weight.textHeavy,
-                        color: C.text,
-                        marginBottom: 6,
-                        borderBottomWidth: 1,
-                        borderBottomColor: gray(0.1),
-                        paddingBottom: 4,
-                      }}
-                    >
-                      REFUND NOTES
-                    </Text>
-
-                    {/* Previous refund notes */}
-                    {(() => {
-                      let allNotes = [];
-                      sTransactions.forEach((t) => {
-                        (t.refunds || []).forEach((r) => {
-                          if (r.notes && r.notes.reason) {
-                            allNotes.push(r.notes);
-                          }
-                        });
-                      });
-                      if (allNotes.length === 0) return null;
-                      return allNotes.map((note, idx) => (
-                        <View
-                          key={"rn" + idx}
-                          style={{
-                            backgroundColor: gray(0.03),
-                            borderRadius: 4,
-                            padding: 6,
-                            marginBottom: 4,
-                          }}
-                        >
-                          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                            <Text style={{ fontSize: 10, color: C.lightText, fontStyle: "italic" }}>
-                              {note.millis ? formatMillisForDisplay(note.millis) : ""}
-                            </Text>
-                            {note.userInitials ? (
-                              <Text style={{ fontSize: 10, color: C.lightText, fontWeight: Fonts.weight.textHeavy }}>
-                                {note.userInitials}
-                              </Text>
-                            ) : null}
-                          </View>
-                          <Text style={{ fontSize: 11, color: C.text, marginTop: 2 }}>
-                            {note.reason}
-                          </Text>
-                        </View>
-                      ));
-                    })()}
-
-                    {/* New note input */}
-                    {!sRefundComplete && (
-                      <View
-                        style={{
-                          borderWidth: reasonMissing ? 2 : 1,
-                          borderColor: reasonMissing ? C.red : gray(0.15),
-                          borderRadius: 6,
-                          paddingHorizontal: 8,
-                          paddingVertical: 6,
-                          backgroundColor: "white",
-                          marginTop: 4,
-                        }}
-                      >
-                        <TextInput_
-                          style={{
-                            fontSize: 15,
-                            color: C.text,
-                            minHeight: 70,
-                            outlineWidth: 0,
-                            outlineStyle: "none",
-                          }}
-                          value={sRefundNote}
-                          onChangeText={_setRefundNote}
-                          placeholder={reasonMissing ? "Refund reason required (min 10 characters)" : "Reason for refund..."}
-                          placeholderTextColor={reasonMissing ? C.red : gray(0.3)}
-                          multiline
-                          capitalize
-                        />
-                      </View>
-                    )}
-
-                    {/* ── Credit Refund Button ────────────────── */}
-                    {creditReturnToAccount && !sRefundComplete && (() => {
-                      let refunded = (sSelectedCreditItem?.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
-                      let available = (sSelectedCreditItem?.amount || 0) - refunded;
-                      let buttonAmount = sCreditCustomAmount > 0 ? Math.min(sCreditCustomAmount, available) : (hasItemSelection ? itemRefundTotal : available);
-                      return (
-                        <TouchableOpacity
-                          onPress={!reasonMissing && buttonAmount > 0 ? handleCreditRefund : undefined}
-                          style={{
-                            backgroundColor: "rgb(103, 124, 231)",
-                            borderRadius: 8,
-                            paddingVertical: 12,
-                            alignItems: "center",
-                            justifyContent: "center",
-                            marginTop: 8,
-                            opacity: reasonMissing || buttonAmount <= 0 ? 0.4 : 1,
-                          }}
-                        >
-                          <Text
-                            style={{
-                              fontSize: 13,
-                              fontWeight: Fonts.weight.textHeavy,
-                              color: "white",
-                              letterSpacing: 0.5,
-                            }}
-                          >
-                            REAPPLY TO CUSTOMER ACCOUNT
-                          </Text>
-                          <Text style={{ fontSize: 11, color: "rgba(255,255,255,0.8)", marginTop: 3 }}>
-                            {formatCurrencyDisp(buttonAmount)} back to {sSelectedCreditItem?.type === "credit" ? "store credit" : "account"}
-                          </Text>
-                        </TouchableOpacity>
-                      );
-                    })()}
-                  </View>
-
-                </ScrollView>
-
-                <View style={{ flexDirection: "row", justifyContent: "space-evenly", alignItems: "center", paddingVertical: 8, borderTopWidth: 1, borderTopColor: gray(0.1) }}>
-                  <View style={{ flexDirection: "column", alignItems: "center" }}>
-                    <Text style={{ fontSize: 12, color: gray(0.5) }}>Receipt text</Text>
-                    <DropdownMenu
-                      dataArr={Object.keys(CUSTOMER_LANGUAGES).map((key) => ({ label: CUSTOMER_LANGUAGES[key], key }))}
-                      selectedIdx={Object.keys(CUSTOMER_LANGUAGES).indexOf(sReceiptLanguage || "english")}
-                      useSelectedAsButtonTitle={true}
-                      onSelect={(item) => { dlog(DCAT.DROPDOWN, "receiptLanguageSelect", "RefundModal", { language: item?.key }); _setReceiptLanguage(item.key); }}
-                      buttonStyle={{ marginLeft: 5, paddingHorizontal: 2, paddingVertical: 3 }}
-                      buttonTextStyle={{ fontSize: 12 }}
-                      buttonIcon={null}
-                      buttonIconSize={0}
-                      modalCoordX={80}
-                      openUpward={true}
-                    />
-                  </View>
-                  {sRefundComplete ? (
-                    <Tooltip text="Reprint receipt" position="top">
-                      <TouchableOpacity
-                        onPress={() => {
-                          dlog(DCAT.BUTTON, "reprint_refund_receipt", "RefundModal", { hasReceipt: !!sLastRefundReceipt });
-                          let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
-                          if (printerID && sLastRefundReceipt) {
-                            dbSavePrintObj(sLastRefundReceipt, printerID);
-                          }
-                        }}
-                        style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                      >
-                        <Image_ icon={ICONS.print} size={35} />
-                      </TouchableOpacity>
-                    </Tooltip>
-                  ) : (
-                    <View style={{ alignItems: "center", justifyContent: "center", padding: 6, opacity: 0.3 }}>
-                      <Image_ icon={ICONS.print} size={35} />
-                    </View>
-                  )}
-                  {sRefundComplete ? (
-                    <Tooltip text="Send receipt" position="top">
-                      <TouchableOpacity
-                        onPress={handleSendRefundReceipt}
-                        style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                      >
-                        <Image_ icon={ICONS.paperPlane} size={35} />
-                      </TouchableOpacity>
-                    </Tooltip>
-                  ) : (
-                    <View style={{ alignItems: "center", justifyContent: "center", padding: 6, opacity: 0.3 }}>
-                      <Image_ icon={ICONS.paperPlane} size={35} />
-                    </View>
-                  )}
-                  <Tooltip text="Pop register" position="top">
-                    <TouchableOpacity
-                      onPress={handlePopRegister}
-                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                    >
-                      <Image_ icon={ICONS.openCashRegister} size={30} />
-                    </TouchableOpacity>
-                  </Tooltip>
-                  <Tooltip text="Close" position="top">
-                    <TouchableOpacity
-                      onPress={handleClose}
-                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                    >
-                      <Image_ icon={ICONS.close1} size={35} />
-                    </TouchableOpacity>
-                  </Tooltip>
-                </View>
-              </View>
-
-              {/* ── RIGHT COLUMN: Item Selector ──────────── */}
-              <View
-                style={{
-                  width: "42%",
-                  paddingLeft: 10,
-                  opacity: sCardRefundProcessing || sRefundComplete || sOriginalSale?.isDepositSale || needsPaymentSelection || sCreditCustomAmount > 0 ? 0.3 : 1,
-                }}
-                pointerEvents={sCardRefundProcessing || sRefundComplete || sOriginalSale?.isDepositSale || needsPaymentSelection || sCreditCustomAmount > 0 ? "none" : "auto"}
-              >
-                {needsPaymentSelection ? (
-                  <View
+                {/* ── Refund Notes ───────────────────────────── */}
+                <div className={styles.notesSection}>
+                  <span
+                    className={styles.notesTitle}
                     style={{
-                      flex: 1,
-                      alignItems: "center",
-                      justifyContent: "center",
+                      fontWeight: Fonts.weight.textHeavy,
+                      color: C.text,
+                      borderBottomColor: C.borderSubtle,
+                      display: "block",
                     }}
                   >
-                    <Text
+                    REFUND NOTES
+                  </span>
+
+                  {/* Previous refund notes */}
+                  {(() => {
+                    let allNotes = [];
+                    sTransactions.forEach((t) => {
+                      (t.refunds || []).forEach((r) => {
+                        if (r.notes && r.notes.reason) {
+                          allNotes.push(r.notes);
+                        }
+                      });
+                    });
+                    if (allNotes.length === 0) return null;
+                    return allNotes.map((note, idx) => (
+                      <div
+                        key={"rn" + idx}
+                        className={styles.prevNoteBox}
+                        style={{ backgroundColor: C.surfaceAlt }}
+                      >
+                        <div className={styles.prevNoteHeader}>
+                          <span className={styles.prevNoteMeta} style={{ color: C.lightText }}>
+                            {note.millis ? formatMillisForDisplay(note.millis) : ""}
+                          </span>
+                          {note.userInitials ? (
+                            <span className={styles.prevNoteInitials} style={{ color: C.lightText, fontWeight: Fonts.weight.textHeavy }}>
+                              {note.userInitials}
+                            </span>
+                          ) : null}
+                        </div>
+                        <span className={styles.prevNoteReason} style={{ color: C.text }}>
+                          {note.reason}
+                        </span>
+                      </div>
+                    ));
+                  })()}
+
+                  {/* New note input */}
+                  {!sRefundComplete && (
+                    <div
+                      className={styles.newNoteWrap}
                       style={{
-                        fontSize: 14,
-                        color: C.lightText,
-                        textAlign: "center",
+                        borderWidth: reasonMissing ? 2 : 1,
+                        borderColor: reasonMissing ? C.red : C.borderSubtle,
                       }}
                     >
-                      Select a payment to begin
-                    </Text>
-                  </View>
-                ) : (
-                  <RefundItemSelector
-                    workordersInSale={sWorkordersInSale}
-                    selectedItems={sSelectedItems}
-                    onToggleItem={handleToggleItem}
-                    onClearItems={() => { dlog(DCAT.BUTTON, "clear_selected_items", "RefundModal"); _setSelectedItems([]); }}
-                    previouslyRefundedIDs={previouslyRefundedIDs}
-                    disabledItemIDs={disabledItemIDs}
-                    hasPaymentSelection={false}
-                    isDepositSale={!!sOriginalSale?.isDepositSale}
-                    isActiveSale={sIsActiveSale}
+                      <TextInput
+                        debounceMs={0}
+                        style={{
+                          fontSize: 15,
+                          color: C.text,
+                          minHeight: 70,
+                          outline: "none",
+                          border: "none",
+                          width: "100%",
+                          background: "transparent",
+                          resize: "vertical",
+                        }}
+                        value={sRefundNote}
+                        onChangeText={_setRefundNote}
+                        placeholder={reasonMissing ? "Refund reason required (min 10 characters)" : "Reason for refund..."}
+                        placeholderTextColor={reasonMissing ? C.red : C.textDisabled}
+                        multiline
+                        capitalize
+                      />
+                    </div>
+                  )}
+
+                  {/* ── Credit Refund Button ────────────────── */}
+                  {creditReturnToAccount && !sRefundComplete && (() => {
+                    let refunded = (sSelectedCreditItem?.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
+                    let available = (sSelectedCreditItem?.amount || 0) - refunded;
+                    let buttonAmount = sCreditCustomAmount > 0 ? Math.min(sCreditCustomAmount, available) : (hasItemSelection ? itemRefundTotal : available);
+                    let disabled = reasonMissing || buttonAmount <= 0;
+                    return (
+                      <button
+                        type="button"
+                        className={styles.creditRefundBtn}
+                        disabled={disabled}
+                        onClick={disabled ? undefined : handleCreditRefund}
+                        style={{
+                          backgroundColor: "rgb(103, 124, 231)",
+                          opacity: disabled ? 0.4 : 1,
+                        }}
+                      >
+                        <span className={styles.creditRefundTitle} style={{ fontWeight: Fonts.weight.textHeavy }}>
+                          REAPPLY TO CUSTOMER ACCOUNT
+                        </span>
+                        <span className={styles.creditRefundSub}>
+                          {formatCurrencyDisp(buttonAmount)} back to {sSelectedCreditItem?.type === "credit" ? "store credit" : "account"}
+                        </span>
+                      </button>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              <div className={styles.footerRow} style={{ borderTopColor: C.borderSubtle }}>
+                <div className={styles.footerCol}>
+                  <span className={styles.footerLabel} style={{ color: C.textMuted }}>Receipt text</span>
+                  <DropdownMenu
+                    dataArr={Object.keys(CUSTOMER_LANGUAGES).map((key) => ({ id: key, label: CUSTOMER_LANGUAGES[key], key }))}
+                    matchValue={sReceiptLanguage || "english"}
+                    useSelectedAsButtonTitle={true}
+                    onSelect={(item) => { dlog(DCAT.DROPDOWN, "receiptLanguageSelect", "RefundModal", { language: item?.key }); _setReceiptLanguage(item.key); }}
+                    buttonStyle={{ marginLeft: 5, paddingHorizontal: 2, paddingVertical: 3 }}
+                    buttonTextStyle={{ fontSize: 12 }}
+                    buttonIcon={null}
+                    buttonIconSize={0}
                   />
+                </div>
+                {sRefundComplete ? (
+                  <Tooltip text="Reprint receipt" position="top">
+                    <TouchableOpacity
+                      onPress={() => {
+                        dlog(DCAT.BUTTON, "reprint_refund_receipt", "RefundModal", { hasReceipt: !!sLastRefundReceipt });
+                        let printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
+                        if (printerID && sLastRefundReceipt) {
+                          dbSavePrintObj(sLastRefundReceipt, printerID);
+                        }
+                      }}
+                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                    >
+                      <Image icon={ICONS.print} size={35} />
+                    </TouchableOpacity>
+                  </Tooltip>
+                ) : (
+                  <div className={styles.footerIconDisabled}>
+                    <Image icon={ICONS.print} size={35} />
+                  </div>
                 )}
-              </View>
-            </View>
-          )}
+                {sRefundComplete ? (
+                  <Tooltip text="Send receipt" position="top">
+                    <TouchableOpacity
+                      onPress={handleSendRefundReceipt}
+                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                    >
+                      <Image icon={ICONS.paperPlane} size={35} />
+                    </TouchableOpacity>
+                  </Tooltip>
+                ) : (
+                  <div className={styles.footerIconDisabled}>
+                    <Image icon={ICONS.paperPlane} size={35} />
+                  </div>
+                )}
+                <Tooltip text="Pop register" position="top">
+                  <TouchableOpacity
+                    onPress={handlePopRegister}
+                    style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                  >
+                    <Image icon={ICONS.openCashRegister} size={30} />
+                  </TouchableOpacity>
+                </Tooltip>
+                <Tooltip text="Close" position="top">
+                  <TouchableOpacity
+                    onPress={handleClose}
+                    style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                  >
+                    <Image icon={ICONS.close1} size={35} />
+                  </TouchableOpacity>
+                </Tooltip>
+              </div>
+            </div>
 
-          {/* ── No Sale Found ───────────────────────────── */}
-          {!sLoading && !sOriginalSale && sLoadMessage && (
-            <View
+            {/* ── RIGHT COLUMN: Item Selector ──────────── */}
+            <div
+              className={styles.rightCol}
               style={{
-                flex: 1,
-                alignItems: "center",
-                justifyContent: "center",
+                opacity: sCardRefundProcessing || sRefundComplete || sOriginalSale?.isDepositSale || needsPaymentSelection || sCreditCustomAmount > 0 ? 0.3 : 1,
+                pointerEvents: sCardRefundProcessing || sRefundComplete || sOriginalSale?.isDepositSale || needsPaymentSelection || sCreditCustomAmount > 0 ? "none" : "auto",
               }}
             >
-              <Text
-                style={{
-                  fontSize: 16,
-                  color: C.lightred,
-                }}
-              >
-                {sLoadMessage}
-              </Text>
-            </View>
-          )}
+              {needsPaymentSelection ? (
+                <div className={styles.rightEmpty}>
+                  <span className={styles.rightEmptyText} style={{ color: C.lightText }}>
+                    Select a payment to begin
+                  </span>
+                </div>
+              ) : (
+                <RefundItemSelector
+                  workordersInSale={sWorkordersInSale}
+                  selectedItems={sSelectedItems}
+                  onToggleItem={handleToggleItem}
+                  onClearItems={() => { dlog(DCAT.BUTTON, "clear_selected_items", "RefundModal"); _setSelectedItems([]); }}
+                  previouslyRefundedIDs={previouslyRefundedIDs}
+                  disabledItemIDs={disabledItemIDs}
+                  hasPaymentSelection={false}
+                  isDepositSale={!!sOriginalSale?.isDepositSale}
+                  isActiveSale={sIsActiveSale}
+                />
+              )}
+            </div>
+          </div>
+        )}
 
-          {/* ── Send Receipt Modal ───────────────────── */}
-          <SendReceiptModal
-            visible={sShowSendReceiptModal}
-            onSend={handleSendRefundReceiptFromModal}
-            onClose={() => _sSetShowSendReceiptModal(false)}
-          />
+        {/* ── No Sale Found ───────────────────────────── */}
+        {!sLoading && !sOriginalSale && sLoadMessage && (
+          <div className={styles.noSaleWrap}>
+            <span className={styles.noSaleText} style={{ color: C.lightred }}>
+              {sLoadMessage}
+            </span>
+          </div>
+        )}
 
-          {sShowPopConfirm && (
-            <View
-              style={{
-                position: "absolute",
-                top: 0, left: 0, right: 0, bottom: 0,
-                backgroundColor: "rgba(0, 0, 0, 0.35)",
-                justifyContent: "center",
-                alignItems: "center",
-                borderRadius: 6,
-                zIndex: 100,
-              }}
-            >
-              <View
-                style={{
-                  backgroundColor: C.backgroundWhite,
-                  borderRadius: 6,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  paddingVertical: 30,
-                  paddingHorizontal: 40,
-                }}
-              >
-                <Image_ icon={ICONS.openCashRegister} size={60} />
-                <Text style={{ fontSize: 18, fontWeight: "600", color: C.text, marginTop: 12 }}>
-                  Register Opened
-                </Text>
-              </View>
-            </View>
-          )}
-        </View>
-      )}
-    />
+        {/* ── Send Receipt Modal ───────────────────── */}
+        <SendReceiptModal
+          visible={sShowSendReceiptModal}
+          onSend={handleSendRefundReceiptFromModal}
+          onClose={() => _sSetShowSendReceiptModal(false)}
+        />
+
+        {sShowPopConfirm && (
+          <div className={styles.popOverlay}>
+            <div className={styles.popBox} style={{ backgroundColor: C.backgroundWhite }}>
+              <Image icon={ICONS.openCashRegister} size={60} />
+              <span className={styles.popText} style={{ color: C.text }}>
+                Register Opened
+              </span>
+            </div>
+          </div>
+        )}
+      </div>
+    </Dialog>
   );
 });

@@ -1,5 +1,5 @@
 .container {
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: var(--surface-overlay-heavy);
   display: flex;
   align-items: center;
   justify-content: center;

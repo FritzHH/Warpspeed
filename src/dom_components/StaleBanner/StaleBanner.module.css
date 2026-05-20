@@ -1,5 +1,5 @@
 .banner {
-  background-color: rgb(230, 126, 34);
+  background-color: var(--warning);
   padding: 4px 12px;
   border-radius: 5px;
   display: flex;
@@ -21,7 +21,7 @@
 }
 
 .text {
-  color: white;
+  color: var(--text-on-accent);
   font-size: 11px;
   font-weight: 600;
 }

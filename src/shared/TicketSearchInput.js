@@ -1,17 +1,15 @@
 /* eslint-disable */
-import { View, TextInput } from "react-native-web";
 import { useState, useRef } from "react";
-import { gray } from "../utils";
-import { SmallLoadingIndicator, Button_ } from "../components";
+import { SmallLoadingIndicator, Button, FullSaleModal } from "../dom_components";
 import { C, ICONS } from "../styles";
 import { executeTicketSearch, executeLiveSearch } from "./ticketSearch";
 import { ClosedWorkorderModal } from "../screens/screen_components/modal_screens/ClosedWorkorderModal";
 import { TransactionModal } from "../screens/screen_components/modal_screens/TransactionModal";
-import { FullSaleModal } from "../screens/screen_components/modal_screens/FullSaleModal";
 import { NewRefundModalScreen } from "../screens/screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
 import { findSaleByTransactionID } from "../screens/screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { useAlertScreenStore, useTicketSearchStore, useTabNamesStore } from "../stores";
 import { TAB_NAMES } from "../data";
+import styles from "./TicketSearchInput.module.css";
 
 export function TicketSearchInput({}) {
   const [sTicketSearch, _setTicketSearch] = useState("");
@@ -68,97 +66,91 @@ export function TicketSearchInput({}) {
     }
   }
 
-  return (
-    <View onClick={(e) => e.stopPropagation()} style={{ width: "100%" }}>
-      <View
-        style={{
-          width: "100%",
-          paddingTop: 10,
-          paddingHorizontal: 20,
-          flexDirection: "row",
-          alignItems: "center",
-        }}
-      >
-        <TextInput
-          value={sTicketSearch}
-          placeholder={"Scan ticket or enter WO number"}
-          placeholderTextColor={gray(0.35)}
-          maxLength={16}
-          onChangeText={(val) => {
-            // Auto-format "wo" → "WO-"
-            let upper = val.toUpperCase();
-            // Backspace on "WO-" or partial → clear completely
-            if (sTicketSearch === "WO-" && val.length < 3) { _setTicketSearch(""); return; }
-            if (upper === "W" && val.length === 1) { _setTicketSearch("WO-"); return; }
-            if (upper === "WO" && val.length === 2) { _setTicketSearch("WO-"); return; }
+  function handleInputChange(e) {
+    const val = e.target.value;
+    let upper = val.toUpperCase();
+    // Backspace on "WO-" or partial → clear completely
+    if (sTicketSearch === "WO-" && val.length < 3) { _setTicketSearch(""); return; }
+    if (upper === "W" && val.length === 1) { _setTicketSearch("WO-"); return; }
+    if (upper === "WO" && val.length === 2) { _setTicketSearch("WO-"); return; }
 
-            // Only allow letters and numbers (no special characters)
-            if (/[^a-zA-Z0-9\-]/.test(val)) return;
-            let hasWoPrefix = /^WO-/i.test(val);
-            let trimmed = stripWoPrefix(val).trim();
-            // Cap actual input at 13 characters (excluding WO- prefix)
-            if (trimmed.length > 13) { return; }
-            _setTicketSearch(val);
-            if (debounceRef.current) clearTimeout(debounceRef.current);
-            if (!/^\d+$/.test(trimmed)) return;
-            let clearOnMatch = () => _setTicketSearch("");
-            // 13 digits (new prefixed EAN-13) — fire immediately via exact search
-            if (trimmed.length === 13) {
-              executeTicketSearch(trimmed, clearOnMatch, searchCallbacks);
-              return;
-            }
-            // All other searches debounce 300ms so barcode scanners finish before any search fires
-            debounceRef.current = setTimeout(() => {
-              // 12 digits (old barcodes) — exact search
-              if (trimmed.length === 12) {
-                executeTicketSearch(trimmed, clearOnMatch, searchCallbacks);
-                return;
-              }
-              // WO mode: auto-search workorderNumber after 1+ digits typed
-              if (hasWoPrefix && trimmed.length >= 1) {
-                executeLiveSearch(trimmed, "woNumber", {
-                  onSingleResult: clearOnMatch,
-                  ...searchCallbacks,
-                });
-                return;
-              }
-              // Non-WO mode: auto-search sales + transactions after 4 digits typed
-              if (!hasWoPrefix && trimmed.length >= 4) {
-                executeLiveSearch(trimmed, "salesTransactions", {
-                  onSingleResult: clearOnMatch,
-                  ...searchCallbacks,
-                });
-              }
-            }, 300);
-          }}
-          onSubmitEditing={() => handleExecuteTicketSearch()}
+    // Only allow letters and numbers (no special characters)
+    if (/[^a-zA-Z0-9\-]/.test(val)) return;
+    let hasWoPrefix = /^WO-/i.test(val);
+    let trimmed = stripWoPrefix(val).trim();
+    // Cap actual input at 13 characters (excluding WO- prefix)
+    if (trimmed.length > 13) { return; }
+    _setTicketSearch(val);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    if (!/^\d+$/.test(trimmed)) return;
+    let clearOnMatch = () => _setTicketSearch("");
+    // 13 digits (new prefixed EAN-13) — fire immediately via exact search
+    if (trimmed.length === 13) {
+      executeTicketSearch(trimmed, clearOnMatch, searchCallbacks);
+      return;
+    }
+    // All other searches debounce 300ms so barcode scanners finish before any search fires
+    debounceRef.current = setTimeout(() => {
+      // 12 digits (old barcodes) — exact search
+      if (trimmed.length === 12) {
+        executeTicketSearch(trimmed, clearOnMatch, searchCallbacks);
+        return;
+      }
+      // WO mode: auto-search workorderNumber after 1+ digits typed
+      if (hasWoPrefix && trimmed.length >= 1) {
+        executeLiveSearch(trimmed, "woNumber", {
+          onSingleResult: clearOnMatch,
+          ...searchCallbacks,
+        });
+        return;
+      }
+      // Non-WO mode: auto-search sales + transactions after 4 digits typed
+      if (!hasWoPrefix && trimmed.length >= 4) {
+        executeLiveSearch(trimmed, "salesTransactions", {
+          onSingleResult: clearOnMatch,
+          ...searchCallbacks,
+        });
+      }
+    }, 300);
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleExecuteTicketSearch();
+    }
+  }
+
+  return (
+    <div className={styles.container} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.row}>
+        <input
+          type="text"
+          className={styles.input}
+          value={sTicketSearch}
+          placeholder="Scan ticket or enter WO number"
+          maxLength={16}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyDown}
           style={{
-            flex: 1,
             caretColor: C.cursorRed,
             color: C.text,
-            borderWidth: 1,
-            borderColor: gray(0.15),
-            borderRadius: 7,
-            height: 35,
-            outlineStyle: "none",
-            fontSize: 14,
-            paddingHorizontal: 10,
+            borderColor: C.borderSubtle,
             backgroundColor: C.listItemWhite,
           }}
         />
-        <Button_
+        <Button
           icon={ICONS.reset1}
           iconSize={20}
           onPress={clearSearch}
-          useColorGradient={false}
           enabled={!!sTicketSearch}
         />
         {sTicketSearching && (
-          <View style={{ marginLeft: 8 }}>
+          <div className={styles.loaderWrap}>
             <SmallLoadingIndicator />
-          </View>
+          </div>
         )}
-      </View>
+      </div>
       <ClosedWorkorderModal
         workorder={sClosedWorkorder}
         onClose={() => _sSetClosedWorkorder(null)}
@@ -186,6 +178,6 @@ export function TicketSearchInput({}) {
           onClose={() => { _sSetRefundSaleID(null); _sSetRefundInitialPayment(null); }}
         />
       )}
-    </View>
+    </div>
   );
 }

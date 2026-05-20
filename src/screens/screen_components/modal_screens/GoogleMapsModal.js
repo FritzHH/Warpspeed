@@ -1,12 +1,12 @@
 /* eslint-disable */
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { View, Text } from "react-native-web";
 import { C, COLOR_GRADIENTS, ICONS, Z } from "../../../styles";
-import { Button_ } from "../../../components";
-import { gray } from "../../../utils";
+import { Button } from "../../../dom_components";
+
 import { useLayoutStore } from "../../../stores";
 import { GOOGLE_MAPS_API_KEY } from "../../../private_user_constants";
+import styles from "./GoogleMapsModal.module.css";
 
 let googleMapsLoadPromise = null;
 
@@ -162,80 +162,53 @@ export const GoogleMapsModal = ({
 
   return createPortal(
     <div
+      className={styles.overlay}
       onClick={onClose}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.55)",
-        zIndex: Z.modal,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
+      style={{ zIndex: Z.modal }}
     >
       <div
+        className={styles.innerWrap}
         onClick={(e) => e.stopPropagation()}
-        style={{
-          width: isTablet ? "95%" : "70%",
-          height: "95%",
-        }}
+        style={{ width: isTablet ? "95%" : "70%" }}
       >
-        <View
+        <div
+          className={styles.modal}
           style={{
-            width: "100%",
-            height: "100%",
             backgroundColor: C.backgroundWhite,
-            borderRadius: 12,
-            borderWidth: 2,
             borderColor: C.buttonLightGreenOutline,
-            overflow: "hidden",
           }}
         >
-          {/* Header */}
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              paddingHorizontal: 18,
-              paddingVertical: 10,
-              backgroundColor: "rgb(255, 253, 235)",
-              borderBottomWidth: 1,
-              borderBottomColor: C.buttonLightGreenOutline,
-            }}
+          <div
+            className={styles.header}
+            style={{ borderBottomColor: C.buttonLightGreenOutline }}
           >
-            {/* Drive time & distance */}
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <div className={styles.headerLeft}>
               {!sLoading && !sError && sDuration ? (
                 <>
-                  <Text style={{ fontSize: 11, color: gray(0.45), marginRight: 4 }}>
+                  <span className={styles.routeLabel} style={{ color: C.textMuted }}>
                     Time:
-                  </Text>
-                  <Text style={{ fontSize: 15, fontWeight: "700", color: C.green }}>
+                  </span>
+                  <span className={styles.routeValueGreen} style={{ color: C.green }}>
                     {sDuration}
-                  </Text>
-                  <Text style={{ fontSize: 13, color: gray(0.4), marginHorizontal: 10 }}>
+                  </span>
+                  <span className={styles.routeSep} style={{ color: C.textMuted }}>
                     |
-                  </Text>
-                  <Text style={{ fontSize: 11, color: gray(0.45), marginRight: 4 }}>
+                  </span>
+                  <span className={styles.routeLabel} style={{ color: C.textMuted }}>
                     Distance:
-                  </Text>
-                  <Text style={{ fontSize: 15, fontWeight: "700", color: C.blue }}>
+                  </span>
+                  <span className={styles.routeValueBlue} style={{ color: C.blue }}>
                     {sDistance}
-                  </Text>
+                  </span>
                 </>
               ) : (
-                <Text style={{ fontSize: 15, fontWeight: "600", color: C.text }}>
+                <span className={styles.routeFallback} style={{ color: C.text }}>
                   {sLoading && !sError ? "Loading route..." : sError ? "Route error" : "Route"}
-                </Text>
+                </span>
               )}
-            </View>
+            </div>
 
-            {/* Close button */}
-            <Button_
+            <Button
               text="Close"
               icon={ICONS.redx}
               iconSize={14}
@@ -243,78 +216,48 @@ export const GoogleMapsModal = ({
               buttonStyle={{
                 backgroundColor: "transparent",
                 borderWidth: 1,
-                borderColor: gray(0.15),
+                borderColor: C.borderSubtle,
                 borderRadius: 5,
                 paddingHorizontal: 12,
                 paddingVertical: 5,
               }}
               textStyle={{ color: C.text, fontSize: 13 }}
             />
-          </View>
+          </div>
 
-          {/* Map Container */}
-          <View style={{ flex: 1, position: "relative" }}>
-            <div
-              ref={mapContainerRef}
-              style={{
-                width: "100%",
-                height: "100%",
-              }}
-            />
+          <div className={styles.mapContainer}>
+            <div ref={mapContainerRef} className={styles.mapHost} />
 
-            {/* Loading overlay */}
             {sLoading && !sError && (
-              <View
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  backgroundColor: "rgba(255,255,255,0.85)",
-                }}
-              >
-                <Text style={{ fontSize: 15, color: gray(0.4) }}>
+              <div className={styles.loadingOverlay}>
+                <span className={styles.loadingText} style={{ color: C.textMuted }}>
                   Loading map...
-                </Text>
-              </View>
+                </span>
+              </div>
             )}
 
-            {/* Error overlay */}
             {sError && (
-              <View
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  justifyContent: "center",
-                  alignItems: "center",
-                  backgroundColor: "rgba(255,255,255,0.9)",
-                }}
-              >
-                <Text style={{ fontSize: 15, color: C.lightred, textAlign: "center", paddingHorizontal: 30 }}>
+              <div className={styles.errorOverlay}>
+                <span className={styles.errorText} style={{ color: C.lightred }}>
                   {sError}
-                </Text>
-                <Button_
-                  text="Retry"
-                  onPress={initMap}
-                  colorGradientArr={COLOR_GRADIENTS.blue}
-                  buttonStyle={{
-                    borderRadius: 5,
-                    paddingHorizontal: 20,
-                    paddingVertical: 8,
-                    marginTop: 12,
-                  }}
-                  textStyle={{ color: C.textWhite, fontSize: 14 }}
-                />
-              </View>
+                </span>
+                <div className={styles.retryBtnWrap}>
+                  <Button
+                    text="Retry"
+                    onPress={initMap}
+                    colorGradientArr={COLOR_GRADIENTS.blue}
+                    buttonStyle={{
+                      borderRadius: 5,
+                      paddingHorizontal: 20,
+                      paddingVertical: 8,
+                    }}
+                    textStyle={{ color: C.textWhite, fontSize: 14 }}
+                  />
+                </div>
+              </div>
             )}
-          </View>
-        </View>
+          </div>
+        </div>
       </div>
     </div>,
     document.body

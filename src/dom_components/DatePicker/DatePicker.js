@@ -1,6 +1,6 @@
 import React, { forwardRef, useState, useRef, useEffect, useCallback } from "react";
-import { ICONS } from "../../styles";
-import { gray } from "../../utils";
+import { C, ICONS } from "../../styles";
+
 import styles from "./DatePicker.module.css";
 
 const ITEM_H = 36;
@@ -67,7 +67,7 @@ function ScrollColumn({ items, selected, setter, formatFn, initialValue }) {
               <span style={{
                 fontSize: i === selIdx ? 19 : 17,
                 fontWeight: i === selIdx ? "600" : "400",
-                color: i === selIdx ? "#fff" : gray(0.55),
+                color: i === selIdx ? C.textOnAccent : C.textMuted,
               }}>
                 {formatFn(item)}
               </span>

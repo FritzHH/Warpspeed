@@ -6,7 +6,7 @@ import {
   TouchableOpacity,
 } from "../../../../../dom_components";
 import { C, ICONS } from "../../../../../styles";
-import { gray, log } from "../../../../../utils";
+import { log } from "../../../../../utils";
 import { useAlertScreenStore, useSettingsStore } from "../../../../../stores";
 import {
   FONT_FAMILIES,
@@ -383,7 +383,7 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
 
         {/* Font Family */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
-          <span style={{ fontSize: 11, color: gray(0.4), fontWeight: "500", marginRight: 5 }}>{"Font"}</span>
+          <span style={{ fontSize: 11, color: C.textMuted, fontWeight: "500", marginRight: 5 }}>{"Font"}</span>
           <DropdownMenu
             dataArr={FONT_FAMILIES.map((f) => ({ label: f, value: f }))}
             onSelect={(item) => { if (!applyStyleToSelection("fontFamily", item.value)) _sSetActiveFontFamily(item.value); }}
@@ -406,7 +406,7 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
 
         {/* Font Size */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
-          <span style={{ fontSize: 11, color: gray(0.4), fontWeight: "500", marginRight: 5 }}>{"Size"}</span>
+          <span style={{ fontSize: 11, color: C.textMuted, fontWeight: "500", marginRight: 5 }}>{"Size"}</span>
           <div style={{ display: "flex", flexDirection: "row", alignItems: "center", borderColor: C.buttonLightGreenOutline, borderRadius: 6, borderWidth: 1, borderStyle: "solid", backgroundColor: C.listItemWhite, overflow: "hidden" }}>
             <TouchableOpacity
               onPress={() => { let newSize = sActiveFontSize - 1; if (newSize < 10) return; if (!applyStyleToSelection("fontSize", newSize)) _sSetActiveFontSize(newSize); }}
@@ -426,7 +426,7 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
 
         {/* Font Weight */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
-          <span style={{ fontSize: 11, color: gray(0.4), fontWeight: "500", marginRight: 5 }}>{"Weight"}</span>
+          <span style={{ fontSize: 11, color: C.textMuted, fontWeight: "500", marginRight: 5 }}>{"Weight"}</span>
           <DropdownMenu
             dataArr={FONT_WEIGHTS.map((w) => ({ label: w.label, value: w.value }))}
             onSelect={(item) => { if (!applyStyleToSelection("fontWeight", item.value)) _sSetActiveFontWeight(item.value); }}
@@ -470,7 +470,7 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
       </div>
 
       {/* Signature text editor */}
-      <span style={{ fontSize: 13, color: gray(0.4), marginBottom: 5, fontWeight: "500" }}>{"Signature Text"}</span>
+      <span style={{ fontSize: 13, color: C.textMuted, marginBottom: 5, fontWeight: "500" }}>{"Signature Text"}</span>
       <div style={{ width: "100%", marginBottom: 15, position: "relative" }}>
         {sSegments.length === 0 && (
           <div style={{
@@ -529,7 +529,7 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
       </div>
 
       {/* Image upload */}
-      <span style={{ fontSize: 13, color: gray(0.4), marginBottom: 5, fontWeight: "500" }}>{"Signature Image"}</span>
+      <span style={{ fontSize: 13, color: C.textMuted, marginBottom: 5, fontWeight: "500" }}>{"Signature Image"}</span>
       <div style={{ display: "flex", flexDirection: "row", alignItems: "center", marginBottom: 15, gap: 10 }}>
         <input
           ref={imageInputRef}
@@ -593,13 +593,13 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
             >
               <span style={{ fontSize: 14, color: C.text, fontWeight: "600" }}>{"-"}</span>
             </TouchableOpacity>
-            <span style={{ fontSize: 11, color: gray(0.4), textAlign: "center" }}>{(sig.imageScale || 100) + "%"}</span>
+            <span style={{ fontSize: 11, color: C.textMuted, textAlign: "center" }}>{(sig.imageScale || 100) + "%"}</span>
           </div>
         </div>
       )}
 
       {/* Live preview */}
-      <span style={{ fontSize: 13, color: gray(0.4), marginBottom: 8, fontWeight: "500" }}>{"Preview"}</span>
+      <span style={{ fontSize: 13, color: C.textMuted, marginBottom: 8, fontWeight: "500" }}>{"Preview"}</span>
       <div style={{
         width: "100%",
         borderWidth: 1,
@@ -610,7 +610,7 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
         padding: 15,
         boxSizing: "border-box",
       }}>
-        <div style={{ borderTopWidth: 1, borderTopStyle: "solid", borderTopColor: gray(0.15), paddingTop: 10 }}>
+        <div style={{ borderTopWidth: 1, borderTopStyle: "solid", borderTopColor: C.borderSubtle, paddingTop: 10 }}>
           {hasSegmentText ? (
             <div style={{ whiteSpace: "pre-wrap" }}>
               {sSegments.map((seg, i) => {
@@ -637,7 +637,7 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
               })}
             </div>
           ) : (
-            !sigImageUrl && <span style={{ fontSize: 13, color: gray(0.3), fontStyle: "italic" }}>{"No signature configured"}</span>
+            !sigImageUrl && <span style={{ fontSize: 13, color: C.textDisabled, fontStyle: "italic" }}>{"No signature configured"}</span>
           )}
         </div>
       </div>

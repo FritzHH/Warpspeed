@@ -1,24 +1,19 @@
-import React, { forwardRef, useState, useCallback } from "react";
-import ReactDOM from "react-dom";
-import { C, COLOR_GRADIENTS } from "../../styles";
-import { gray, usdTypeMask } from "../../utils";
+import React, { useState, useCallback } from "react";
+import { C } from "../../styles";
+import { usdTypeMask } from "../../utils";
 import { CUSTOMER_DEPOST_TYPES } from "../../data";
+import { Dialog } from "../Dialog/Dialog";
 import styles from "./DepositModal.module.css";
 
-export const DepositModal = forwardRef(function DepositModal(
-  {
-    visible,
-    onClose,
-    onPay,
-    onCredit,
-    inline,
-    inlineStyle = {},
-    customer,
-    className = "",
-    "data-testid": testId,
-  },
-  ref
-) {
+export const DepositModal = function DepositModal({
+  visible,
+  onClose,
+  onPay,
+  onCredit,
+  customer,
+  className = "",
+  "data-testid": testId,
+}) {
   const [sDepositType, _sSetDepositType] = useState(CUSTOMER_DEPOST_TYPES.deposit);
   const [sDepositAmount, _sSetDepositAmount] = useState("");
   const [sDepositAmountCents, _sSetDepositAmountCents] = useState(0);
@@ -57,18 +52,18 @@ export const DepositModal = forwardRef(function DepositModal(
     resetAndClose();
   }
 
-  if (!visible) return null;
-
   const confirmReady = isCredit ? creditReady : isGiftCard ? giftCardReady : depositReady;
 
-  const innerCard = (
-    <div
-      ref={ref}
-      className={`${styles.card} ${className}`}
-      style={inline ? { position: "absolute", zIndex: 200, ...inlineStyle } : undefined}
-      data-testid={testId}
-      role="dialog"
+  return (
+    <Dialog
+      visible={visible}
+      onClose={resetAndClose}
+      title="Add Deposit / Credit / Gift Card"
       aria-label="Add Deposit or Credit"
+    >
+    <div
+      className={`${styles.card} ${className}`}
+      data-testid={testId}
     >
       <span className={styles.title} style={{ color: C.text }}>
         Add Deposit / Credit / Gift Card
@@ -104,7 +99,7 @@ export const DepositModal = forwardRef(function DepositModal(
 
       {/* Amount input */}
       <div className={styles.amountRow} style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}>
-        <span className={styles.dollarSign} style={{ color: gray(0.4) }}>$</span>
+        <span className={styles.dollarSign} style={{ color: C.textMuted }}>$</span>
         <input
           type="text"
           inputMode="decimal"
@@ -131,7 +126,7 @@ export const DepositModal = forwardRef(function DepositModal(
           _sSetDepositNote(val.length === 1 ? val.toUpperCase() : val.charAt(0).toUpperCase() + val.slice(1));
         }}
         style={{
-          borderColor: isCredit && sDepositNote.trim().length === 0 ? C.orange : gray(0.08),
+          borderColor: isCredit && sDepositNote.trim().length === 0 ? C.warning : C.borderSubtle,
           backgroundColor: C.listItemWhite,
           color: C.text,
         }}
@@ -140,7 +135,7 @@ export const DepositModal = forwardRef(function DepositModal(
       {/* Send receipt */}
       {showSendReceipt && (
         <div className={styles.receiptSection}>
-          <span className={styles.receiptLabel} style={{ color: gray(0.45) }}>Send Receipt</span>
+          <span className={styles.receiptLabel} style={{ color: C.textMuted }}>Send Receipt</span>
           <div className={styles.receiptCheckboxes}>
             {hasPhone && (
               <button className={styles.checkBtn} onClick={() => _sSetSendSMS(!sSendSMS)}>
@@ -186,16 +181,6 @@ export const DepositModal = forwardRef(function DepositModal(
         </button>
       </div>
     </div>
+    </Dialog>
   );
-
-  if (inline) return innerCard;
-
-  return ReactDOM.createPortal(
-    <div className={styles.backdrop} onClick={resetAndClose}>
-      <div onClick={(e) => e.stopPropagation()}>
-        {innerCard}
-      </div>
-    </div>,
-    document.body
-  );
-});
+};

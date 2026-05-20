@@ -11,13 +11,7 @@ import {
 } from "../../../stores";
 import { Button, ScreenModal, Tooltip } from "../../../dom_components";
 import { TicketSearchInput } from "../../../shared/TicketSearchInput";
-import {
-  generateEAN13Barcode,
-  gray,
-  formatCurrencyDisp,
-  formatMillisForDisplay,
-  localStorageWrapper,
-} from "../../../utils";
+import { generateEAN13Barcode, formatCurrencyDisp, formatMillisForDisplay, localStorageWrapper } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { dbSavePrintObj } from "../../../db_calls_wrapper";
 import styles from "./Info_StandaloneSale.module.css";
@@ -77,7 +71,7 @@ export const StandaloneSaleComponent = ({}) => {
       <TicketSearchInput />
 
       <div className={styles.titleBlock}>
-        <span className={styles.titleText} style={{ color: gray(0.08) }}>SALE</span>
+        <span className={styles.titleText} style={{ color: C.textDisabled }}>SALE</span>
         <Button
           text={`Active Sales (${standaloneSales.length})`}
           enabled={standaloneSales.length > 0}
@@ -104,7 +98,7 @@ export const StandaloneSaleComponent = ({}) => {
             <div className={styles.modalContent} style={{ backgroundColor: C.backgroundWhite }}>
               <span className={styles.modalTitle} style={{ color: C.text }}>Active Sales</span>
               {standaloneSales.length === 0 ? (
-                <span className={styles.emptyText} style={{ color: gray(0.5) }}>No active sales</span>
+                <span className={styles.emptyText} style={{ color: C.textMuted }}>No active sales</span>
               ) : (
                 <div className={styles.salesList}>
                   {standaloneSales.map((item) => (
@@ -122,12 +116,12 @@ export const StandaloneSaleComponent = ({}) => {
                         <span className={styles.saleRowTotal} style={{ color: C.text }}>
                           {"$" + formatCurrencyDisp(item.total || 0)}
                         </span>
-                        <span className={styles.saleRowDate} style={{ color: gray(0.5) }}>
+                        <span className={styles.saleRowDate} style={{ color: C.textMuted }}>
                           {item.millis ? formatMillisForDisplay(item.millis) : ""}
                         </span>
                       </div>
                       <div className={styles.saleRowBottom}>
-                        <span className={styles.saleRowMoney} style={{ color: gray(0.5) }}>
+                        <span className={styles.saleRowMoney} style={{ color: C.textMuted }}>
                           {"Paid: $" + formatCurrencyDisp(item.amountCaptured || 0)}
                         </span>
                         <span className={styles.saleRowMoney} style={{ color: C.green }}>
@@ -135,7 +129,7 @@ export const StandaloneSaleComponent = ({}) => {
                         </span>
                       </div>
                       {item.createdBy && (
-                        <span className={styles.saleRowAuthor} style={{ color: gray(0.4) }}>
+                        <span className={styles.saleRowAuthor} style={{ color: C.textMuted }}>
                           {"By " + item.createdBy}
                         </span>
                       )}

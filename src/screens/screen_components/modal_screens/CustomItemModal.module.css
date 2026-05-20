@@ -1,0 +1,291 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--surface-overlay);
+  z-index: 9000;
+}
+
+.anchored {
+  position: absolute;
+}
+
+.modal {
+  width: 420px;
+  background-color: var(--surface-raised);
+  border-radius: 10px;
+  border: 2px solid var(--border-default);
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 15px;
+}
+
+.headerTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-default);
+}
+
+.closeBtn {
+  background-color: transparent;
+  padding: 0;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.closeBtn:hover {
+  opacity: 0.7;
+}
+
+.fieldLabel {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+
+.fieldGroup {
+  margin-top: 12px;
+}
+
+.input {
+  border: 1px solid var(--border-default);
+  border-radius: 5px;
+  padding: 6px 8px;
+  font-size: 15px;
+  color: var(--text-default);
+  outline: none;
+  background-color: var(--surface-raised);
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.inputName {
+  width: 100%;
+}
+
+.inputMinutes {
+  width: 80px;
+  text-align: center;
+}
+
+.inputPrice {
+  width: 120px;
+  text-align: right;
+}
+
+.inputArea {
+  width: 100%;
+  font-size: 14px;
+  resize: none;
+}
+
+.inputAreaIntake {
+  color: var(--warning);
+}
+
+.inputAreaReceipt {
+  color: var(--accent);
+}
+
+.fieldRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.minutesLabel {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.priceCurrency {
+  font-size: 16px;
+  color: var(--text-default);
+  margin-right: 4px;
+}
+
+.discountTrigger {
+  width: 100%;
+  border: 1px solid var(--border-default);
+  border-radius: 5px;
+  background-color: var(--surface-raised);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.discountTriggerDisabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.discountTriggerLabel {
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.discountTriggerLabelActive {
+  color: var(--danger-muted);
+}
+
+.discountTriggerCaret {
+  font-size: 10px;
+  color: var(--text-disabled);
+}
+
+.discountPreviewRow {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.discountPreviewOld {
+  font-size: 14px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+}
+
+.discountPreviewNew {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.discountPreviewBadge {
+  font-size: 12px;
+  color: var(--danger-muted);
+}
+
+.actionsRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  margin-top: 20px;
+  gap: 10px;
+}
+
+.dropdownBackdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10000;
+}
+
+.dropdown {
+  position: fixed;
+  z-index: 10001;
+  background-color: var(--surface-base);
+  border-radius: 6px;
+  border: 2px solid var(--border-subtle);
+  box-shadow: 0 4px 16px var(--shadow-color-default);
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.dropdownItem {
+  padding: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-default);
+  transition: background-color 80ms ease;
+}
+
+.dropdownItemNone {
+  background-color: var(--surface-alt);
+}
+
+.dropdownItemOdd {
+  background-color: var(--surface-alt);
+}
+
+.dropdownItemEven {
+  background-color: var(--surface-base);
+}
+
+.dropdownItem:hover {
+  background-color: var(--surface-alt);
+}
+
+.dropdownDivider {
+  height: 1px;
+  background-color: var(--border-subtle);
+}
+
+.customRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  height: 36px;
+  padding: 0 6px;
+  background-color: var(--surface-accent-muted);
+}
+
+.customLabel {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-right: 6px;
+}
+
+.customInput {
+  height: 28px;
+  border: 1px solid var(--border-default);
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 13px;
+  color: var(--text-default);
+  text-align: center;
+  outline: none;
+  background-color: var(--surface-base);
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.customInputPct {
+  width: 50px;
+}
+
+.customInputDollar {
+  width: 70px;
+}
+
+.customSubmit {
+  margin-left: 4px;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background-color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.customSubmit:hover {
+  opacity: 0.85;
+}

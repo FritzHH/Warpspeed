@@ -1,4 +1,4 @@
-import { ICONS } from "../../../styles";
+import { ICONS, C } from "../../../styles";
 import { Image, DropdownMenu, TouchableOpacity, AlertBox } from "../../../dom_components";
 import { useAlertScreenStore } from "../../../stores";
 import { WorkorderCard } from "../WorkorderCard/WorkorderCard";
@@ -9,14 +9,14 @@ const USER_DROPDOWN_BUTTON_STYLE = {
   paddingHorizontal: 7,
   paddingVertical: 2,
   borderWidth: 1,
-  borderColor: "rgb(200, 228, 220)",
-  backgroundColor: "rgb(232, 239, 245)",
+  borderColor: C.borderDefault,
+  backgroundColor: C.surfaceAccentMuted,
   borderRadius: 5,
 };
 
 const USER_DROPDOWN_TEXT_STYLE = {
   fontSize: 13,
-  color: "rgb(71, 71, 71)",
+  color: C.textDefault,
 };
 
 export function ListShell({

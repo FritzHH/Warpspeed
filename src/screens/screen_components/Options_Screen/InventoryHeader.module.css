@@ -28,7 +28,7 @@
 }
 
 .iconBtn:not(:disabled):hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: var(--surface-overlay-light);
 }
 
 .resetBtn {
@@ -57,14 +57,14 @@
   flex: 1;
   min-width: 0;
   font-size: 18px;
-  color: rgb(71, 71, 71);
+  color: var(--text-default);
   background: transparent;
   border: none;
-  border-bottom: 1px solid rgb(204, 204, 204);
+  border-bottom: 1px solid var(--border-subtle);
   outline: none;
   padding: 0;
 }
 
 .input::placeholder {
-  color: rgb(204, 204, 204);
+  color: var(--border-subtle);
 }

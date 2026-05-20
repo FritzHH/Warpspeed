@@ -1,0 +1,250 @@
+.container {
+  width: 45vw;
+  max-width: 600px;
+  height: 70vh;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  border-bottom: 1px solid;
+  flex-shrink: 0;
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.headerRight {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.methodBadge {
+  padding: 4px 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.txnIdLabel {
+  font-size: 10px;
+  margin-left: 12px;
+}
+
+.banner {
+  padding: 8px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.bannerText {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+.dateBanner {
+  padding: 8px 20px;
+  flex-shrink: 0;
+}
+
+.dateBannerText {
+  font-size: 13px;
+}
+
+.scroll {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.sectionHeader {
+  font-size: 11px;
+  font-weight: 600;
+  margin-top: 14px;
+  margin-bottom: 6px;
+  letter-spacing: 0.5px;
+  display: block;
+}
+
+.amountCard {
+  border-radius: 7px;
+  border-width: 1px;
+  border-style: solid;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.amountRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.amountLabelMain {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.amountValueMain {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.amountLabelSub {
+  font-size: 13px;
+}
+
+.amountValueSub {
+  font-size: 14px;
+}
+
+.refundInfoCard {
+  border-radius: 7px;
+  border-width: 1px;
+  border-style: solid;
+  padding: 12px;
+  margin-bottom: 12px;
+}
+
+.refundInfoLabelsRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.refundInfoCol {
+  display: flex;
+  flex-direction: column;
+}
+
+.refundInfoColRight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.refundInfoSmallLabel {
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+
+.refundInfoAmount {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.refundBar {
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.refundBarFill {
+  height: 8px;
+  border-radius: 4px;
+}
+
+.refundInfoPercent {
+  font-size: 10px;
+  margin-top: 4px;
+  text-align: center;
+}
+
+.refundCard {
+  margin-bottom: 6px;
+  border-radius: 7px;
+  border-width: 1px;
+  border-style: solid;
+  padding: 10px;
+}
+
+.refundCardHeader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.refundCardLeft {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.refundBadge {
+  padding: 2px 8px;
+  border-radius: 4px;
+  margin-right: 8px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.refundIndex {
+  font-size: 12px;
+}
+
+.refundAmount {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.refundNotes {
+  font-size: 11px;
+  margin-top: 4px;
+}
+
+.refundDate {
+  font-size: 10px;
+  margin-top: 3px;
+}
+
+.detailRow {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 6px;
+}
+
+.detailRowButton {
+  display: flex;
+  flex-direction: row;
+  margin-bottom: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
+.detailLabel {
+  font-size: 12px;
+  width: 140px;
+  flex-shrink: 0;
+}
+
+.detailValue {
+  font-size: 13px;
+  flex: 1;
+}
+
+.bottomSpacer {
+  height: 20px;
+}

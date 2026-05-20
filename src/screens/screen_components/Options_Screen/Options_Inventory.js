@@ -3,26 +3,14 @@ import React, { useEffect, useImperativeHandle, useRef, useState } from "react";
 import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO, QUICK_BUTTON_ITEM_PROTO, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../data";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 
-import {
-  applyDiscountToWorkorderItem,
-  formatCurrencyDisp,
-  gray,
-  lightenRGBByPercent,
-  log,
-  resolveStatus,
-  generateEAN13Barcode,
-  normalizeBarcode,
-  showAlert,
-  localStorageWrapper,
-  replaceOrAddToArr,
-} from "../../../utils";
+import { applyDiscountToWorkorderItem, formatCurrencyDisp, lightenRGBByPercent, log, resolveStatus, generateEAN13Barcode, normalizeBarcode, showAlert, localStorageWrapper, replaceOrAddToArr } from "../../../utils";
 import { workerSearchInventory } from "../../../inventorySearchManager";
 import {
-  Image_,
+  Image as DomImage,
   NoteHelper,
-  TextInput_,
-  Tooltip,
-} from "../../../components";
+  TextInput as DomTextInput,
+  Tooltip as DomTooltip,
+} from "../../../dom_components";
 import { InventoryItemModalScreen } from "../modal_screens/InventoryItemModalScreen";
 import { CustomItemModal } from "../modal_screens/CustomItemModal";
 import { ColorPickerModal } from "../modal_screens/ColorPickerModal";
@@ -304,58 +292,25 @@ const QuickItemCanvasCard = ({
         e.preventDefault();
         if (onRightClick) onRightClick(itemObj.inventoryItemID);
       }}
+      className={[
+        styles.canvasCard,
+        isSelected && styles.canvasCardSelected,
+        sEditMode && styles.canvasCardEdit,
+        !sEditMode && sShowActions && styles.canvasCardWithActions,
+      ].filter(Boolean).join(" ")}
       style={{
-        position: "absolute",
         left: (itemObj.x || 0) + "%",
         top: (itemObj.y || 0) + "%",
         width: w + "%",
         height: h + "%",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        borderWidth: isSelected ? 2 : 1,
-        borderStyle: "solid",
-        borderColor: isSelected ? C.blue : C.buttonLightGreenOutline,
-        borderRadius: 8,
         backgroundColor: itemObj.backgroundColor || (isInWorkorder ? lightenRGBByPercent(C.blue, 70) : C.buttonLightGreenOutline),
         cursor: sEditMode ? (sDragging ? "grabbing" : (sResizing ? "auto" : "grab")) : "pointer",
         opacity: sPressed ? 0.7 : (sDragging ? 0.7 : 1),
-        boxSizing: "border-box",
-        paddingLeft: 4,
-        paddingRight: 4,
-        paddingTop: 2,
-        paddingBottom: sEditMode ? 2 : (sShowActions ? 20 : 2),
-        userSelect: "none",
-        overflow: sEditMode ? "visible" : "hidden",
       }}
     >
       {/* Formal name helper - above card in edit mode */}
       {sEditMode && invItem?.formalName && (labelMode === "all" || (labelMode === "active" && isSelected)) && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "100%",
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "200%",
-            fontSize: 12,
-            color: gray(0.5),
-            backgroundColor: "rgba(255,255,255,0.95)",
-            borderRadius: 4,
-            paddingTop: 1,
-            paddingBottom: 1,
-            paddingLeft: 4,
-            paddingRight: 4,
-            pointerEvents: "none",
-            zIndex: 10,
-            textAlign: "center",
-            overflow: "hidden",
-            display: "-webkit-box",
-            WebkitLineClamp: 3,
-            WebkitBoxOrient: "vertical",
-          }}
-        >
+        <div className={styles.formalNameHelper}>
           {invItem.formalName}
         </div>
       )}
@@ -365,29 +320,20 @@ const QuickItemCanvasCard = ({
         <div
           key={handle.id}
           onMouseDown={(e) => handleResizeMouseDown(e, handle.axes)}
-          style={{
-            position: "absolute",
-            ...handle.style,
-            cursor: handle.cursor,
-            zIndex: 4,
-            // Show small visible dots on corners
-            ...(handle.id.length === 2 ? {
-              borderRadius: RESIZE_HANDLE_SIZE / 2,
-              backgroundColor: C.blue,
-              opacity: 0.7,
-            } : {
-              backgroundColor: "transparent",
-            }),
-          }}
+          className={[
+            styles.resizeHandle,
+            handle.id.length === 2 && styles.resizeHandleCorner,
+          ].filter(Boolean).join(" ")}
+          style={{ ...handle.style, cursor: handle.cursor }}
         />
       ))}
 
       {sEditMode ? (
-        <div onClick={(e) => e.stopPropagation()} style={{ width: "86%", display: "flex", alignItems: "center", overflow: "hidden" }}>
-          <TextInput_
+        <div onClick={(e) => e.stopPropagation()} className={styles.cardLabelWrap}>
+          <DomTextInput
             value={invItem?.informalName || ""}
             placeholder={defaultName}
-            placeholderTextColor={gray(0.4)}
+            placeholderTextColor={C.textMuted}
             onFocus={() => { if (!isSelected) onSelect(itemObj.inventoryItemID); }}
             onChangeText={(val) => {
               if (onLabelChange) onLabelChange(itemObj.inventoryItemID, val);
@@ -395,32 +341,21 @@ const QuickItemCanvasCard = ({
             debounceMs={400}
             multiline
             numberOfLines={99}
+            className={styles.cardLabelInput}
             style={{
               fontSize: itemObj.fontSize || 10,
               color: itemObj.textColor || C.text,
-              textAlign: "center",
-              borderWidth: 0,
-              paddingTop: 2,
-              paddingBottom: 2,
-              width: "100%",
-              fontFamily: "inherit",
-              fontWeight: "500",
-              backgroundColor: "transparent",
-              lineHeight: (itemObj.fontSize || 10) + 6,
-              outlineWidth: 0,
-              overflow: "hidden",
-              resize: "none",
+              lineHeight: ((itemObj.fontSize || 10) + 6) + "px",
             }}
           />
         </div>
       ) : (
-          <div title={defaultName} style={{ display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", width: "100%", height: "100%" }}>
+          <div title={defaultName} className={styles.cardNameWrap}>
             <span
+              className={styles.cardNameText}
               style={{
                 fontSize: itemObj.fontSize || 10,
-                color: itemObj.textColor || (invItem ? C.text : gray(0.35)),
-                textAlign: "center",
-                fontWeight: 500,
+                color: itemObj.textColor || (invItem ? C.text : C.textDisabled),
                 lineHeight: ((itemObj.fontSize || 10) + 6) + "px",
               }}
             >
@@ -432,30 +367,21 @@ const QuickItemCanvasCard = ({
         <>
           {/* Caret toggle */}
           <div
-            style={{
-              position: "absolute",
-              bottom: sShowActions ? 18 : 1,
-              right: 1,
-              zIndex: 4,
-            }}
+            className={[
+              styles.caretToggleWrap,
+              sShowActions && styles.caretToggleWrapWithActions,
+            ].filter(Boolean).join(" ")}
           >
-            <Tooltip text={sShowActions ? "Hide actions" : "Show actions"} position="left">
+            <DomTooltip text={sShowActions ? "Hide actions" : "Show actions"} position="left">
               <div
                 onClick={(e) => { e.stopPropagation(); _setShowActions((v) => !v); }}
                 onMouseDown={(e) => e.stopPropagation()}
                 onContextMenu={(e) => e.stopPropagation()}
-                style={{
-                  width: 14,
-                  height: 14,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                }}
+                className={styles.caretToggle}
               >
-                <span style={{ fontSize: 8, color: itemObj.textColor || C.text, opacity: 0.12, lineHeight: "14px" }}>{sShowActions ? "\u25BC" : "\u25B6"}</span>
+                <span className={styles.caretGlyph} style={{ color: itemObj.textColor || C.text }}>{sShowActions ? "\u25BC" : "\u25B6"}</span>
               </div>
-            </Tooltip>
+            </DomTooltip>
           </div>
           {/* Action row */}
           {sShowActions && (
@@ -463,40 +389,26 @@ const QuickItemCanvasCard = ({
               onClick={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               onContextMenu={(e) => e.stopPropagation()}
-              style={{
-                position: "absolute",
-                bottom: 0,
-                left: 0,
-                right: 0,
-                display: "flex",
-                flexDirection: "row",
-                justifyContent: "space-evenly",
-                alignItems: "center",
-                borderTopWidth: 1,
-                borderTopStyle: "solid",
-                borderTopColor: gray(0.15),
-                height: 18,
-                backgroundColor: C.buttonLightGreenOutline,
-              }}
+              className={styles.cardActionRow}
             >
               {(useLoginStore.getState().currentUser?.permissions?.level || 0) >= 3 && (
                 <div
                   title="Edit item"
                   onClick={() => { if (onRightClick) onRightClick(itemObj.inventoryItemID); _setShowActions(false); }}
-                  style={{ cursor: "pointer", padding: 2, display: "flex", alignItems: "center", justifyContent: "center" }}
+                  className={styles.cardActionBtn}
                 >
-                  <Image_ icon={ICONS.editPencil} size={13} />
+                  <DomImage icon={ICONS.editPencil} size={13} />
                 </div>
               )}
               <div
                 title="Item info"
                 onClick={() => { if (invItem && onInfoPress) onInfoPress(); }}
-                style={{ cursor: "pointer", padding: 2, display: "flex", alignItems: "center", justifyContent: "center" }}
+                className={styles.cardActionBtn}
               >
-                <Image_ icon={ICONS.info} size={13} />
+                <DomImage icon={ICONS.info} size={13} />
               </div>
               {!!price && (
-                <span style={{ fontSize: 12, color: gray(0.45) }}>
+                <span className={styles.cardActionPrice}>
                   ${price}
                 </span>
               )}
@@ -513,39 +425,20 @@ const QuickItemCanvasCard = ({
               <div
                 onClick={(e) => e.stopPropagation()}
                 onMouseDown={(e) => e.stopPropagation()}
-                style={{
-                  position: "absolute",
-                  bottom: 20,
-                  left: 0,
-                  zIndex: 10,
-                  backgroundColor: "white",
-                  borderRadius: 6,
-                  border: "1px solid " + gray(0.2),
-                  boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
-                  minWidth: 120,
-                  overflow: "hidden",
-                }}
+                className={styles.printPicker}
               >
                 {qpEntries.map(([slug, template]) => (
                   <div
                     key={slug}
                     onClick={() => handlePrintWithTemplate(slug)}
-                    style={{
-                      padding: "5px 8px",
-                      cursor: "pointer",
-                      fontSize: 10,
-                      color: C.text,
-                      borderBottom: "1px solid " + gray(0.1),
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = gray(0.05); }}
-                    onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "white"; }}
+                    className={styles.printPickerItem}
                   >
                     {template.name}
                   </div>
                 ))}
                 <div
                   onClick={() => _setShowPrintPicker(false)}
-                  style={{ padding: "4px 8px", cursor: "pointer", fontSize: 9, color: gray(0.5), textAlign: "center" }}
+                  className={styles.printPickerCancel}
                 >
                   Cancel
                 </div>
@@ -554,8 +447,8 @@ const QuickItemCanvasCard = ({
           })()}
           {/* Print success flash */}
           {sPrintSuccess && (
-            <div style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0, display: "flex", alignItems: "center", justifyContent: "center", backgroundColor: "rgba(88,145,65,0.15)", borderRadius: 8, zIndex: 5, pointerEvents: "none" }}>
-              <span style={{ fontSize: 9, color: C.green, fontWeight: 600 }}>Sent!</span>
+            <div className={styles.printSuccessOverlay}>
+              <span className={styles.printSuccessText}>Sent!</span>
             </div>
           )}
         </>
@@ -836,23 +729,16 @@ const QuickItemCanvas = React.forwardRef(({
   }
 
   return (
-    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", minHeight: 0 }}>
+    <div className={styles.canvasWrap}>
       {/* Canvas */}
       <div
         ref={canvasRef}
         onMouseDown={handleCanvasMouseDown}
-        style={{
-          flex: 1,
-          position: "relative",
-          overflow: sEditMode ? "visible" : "hidden",
-          borderRadius: 6,
-          minHeight: 200,
-          ...(sEditMode ? {
-            backgroundImage: `radial-gradient(circle, ${gray(0.12)} 1px, transparent 1px)`,
-            backgroundSize: `${SNAP_PCT}% ${SNAP_PCT}%`,
-            ...(sPaintStyle ? { backgroundColor: lightenRGBByPercent(C.red, 70) } : {}),
-          } : {}),
-        }}
+        className={[
+          styles.canvas,
+          sEditMode && styles.canvasEdit,
+          sEditMode && sPaintStyle && styles.canvasPaint,
+        ].filter(Boolean).join(" ")}
       >
         {rawItems.map((itemObj) => {
           let invItem = findInvItem(itemObj.inventoryItemID);
@@ -903,41 +789,26 @@ const QuickItemCanvas = React.forwardRef(({
             <>
               <div
                 onClick={() => handleDeleteItem(sSelectedItemId)}
+                className={styles.deletePill}
                 style={{
-                  position: "absolute",
                   left: `calc(${(sel.x || 0) + (sel.w || DEFAULT_ITEM_W)}% - 8px)`,
                   top: `calc(${(sel.y || 0)}% - 6px)`,
-                  width: 16,
-                  height: 16,
-                  borderRadius: 8,
-                  backgroundColor: C.lightred,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  zIndex: 10,
                 }}
               >
-                <Image_ icon={ICONS.trash} size={10} />
+                <DomImage icon={ICONS.trash} size={10} />
               </div>
               <div
                 onClick={() => sPaintStyle ? _setPaintStyle(null) : handleCopyStyle()}
+                className={[
+                  styles.paintPill,
+                  sPaintStyle && styles.paintPillActive,
+                ].filter(Boolean).join(" ")}
                 style={{
-                  position: "absolute",
                   left: `calc(${(sel.x || 0) + (sel.w || DEFAULT_ITEM_W)}% - 8px)`,
                   top: `calc(${(sel.y || 0)}% + 14px)`,
-                  width: 16,
-                  height: 16,
-                  borderRadius: 8,
-                  backgroundColor: sPaintStyle ? C.blue : C.green,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  cursor: "pointer",
-                  zIndex: 10,
                 }}
               >
-                <Image_ icon={ICONS.colorWheel} size={10} />
+                <DomImage icon={ICONS.colorWheel} size={10} />
               </div>
             </>
           );
@@ -946,22 +817,7 @@ const QuickItemCanvas = React.forwardRef(({
         {sEditMode && (
           <div
             onClick={() => _setLabelMode(sLabelMode === "none" ? "active" : sLabelMode === "active" ? "all" : "none")}
-            style={{
-              position: "absolute",
-              top: 4,
-              left: 4,
-              fontSize: 12,
-              fontWeight: "600",
-              backgroundColor: C.orange,
-              color: "white",
-              borderRadius: 4,
-              paddingTop: 2,
-              paddingBottom: 2,
-              paddingLeft: 6,
-              paddingRight: 6,
-              cursor: "pointer",
-              zIndex: 12,
-            }}
+            className={styles.labelModeToggle}
           >
             {sLabelMode === "none" ? "Labels: Off" : sLabelMode === "active" ? "Labels: Active" : "Labels: All"}
           </div>
@@ -970,22 +826,7 @@ const QuickItemCanvas = React.forwardRef(({
         {sEditMode && sPaintStyle && (
           <div
             onClick={() => _setPaintStyle(null)}
-            style={{
-              position: "absolute",
-              top: 4,
-              right: 4,
-              fontSize: 12,
-              fontWeight: "600",
-              backgroundColor: C.orange,
-              color: "white",
-              borderRadius: 4,
-              paddingTop: 2,
-              paddingBottom: 2,
-              paddingLeft: 6,
-              paddingRight: 6,
-              cursor: "pointer",
-              zIndex: 12,
-            }}
+            className={styles.paintModeIndicator}
           >
             Paint Mode (click to exit)
           </div>
@@ -994,26 +835,19 @@ const QuickItemCanvas = React.forwardRef(({
         {/* Rubber-band selection rectangle */}
         {sSelectionRect && (
           <div
+            className={styles.selectionRect}
             style={{
-              position: "absolute",
               left: sSelectionRect.x + "%",
               top: sSelectionRect.y + "%",
               width: sSelectionRect.w + "%",
               height: sSelectionRect.h + "%",
-              backgroundColor: "rgba(59,130,246,0.1)",
-              borderWidth: 1,
-              borderStyle: "solid",
-              borderColor: C.blue,
-              pointerEvents: "none",
-              zIndex: 20,
-              boxSizing: "border-box",
             }}
           />
         )}
 
         {rawItems.length === 0 && (
-          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", paddingTop: 60, boxSizing: "border-box" }}>
-            <span style={{ fontSize: 13, color: gray(0.4) }}>No items in this button</span>
+          <div className={styles.canvasEmpty}>
+            <span className={styles.canvasEmptyText}>No items in this button</span>
           </div>
         )}
       </div>
@@ -1567,7 +1401,7 @@ export function InventoryComponent({}) {
           </span>
           {sCanvasSelectedItemId && (
             <div className={styles.editBarControls}>
-              <Tooltip text="Card Colors" position="bottom">
+              <DomTooltip text="Card Colors" position="bottom">
                 <button
                   type="button"
                   className={`${styles.editBarIconBtn} ${styles.editBarIconBtnSpacer}`}
@@ -1576,9 +1410,9 @@ export function InventoryComponent({}) {
                     _setShowColorPickerModal(true);
                   }}
                 >
-                  <Image_ icon={ICONS.colorWheel} size={18} />
+                  <DomImage icon={ICONS.colorWheel} size={18} />
                 </button>
-              </Tooltip>
+              </DomTooltip>
               <span className={styles.editBarLabel}>Font size:</span>
               <button
                 type="button"
@@ -1618,7 +1452,7 @@ export function InventoryComponent({}) {
             value={sSearchTerm}
             onChange={(e) => handleSearch(e.target.value)}
           />
-          <Tooltip text="New Item" position="bottom">
+          <DomTooltip text="New Item" position="bottom">
             <button
               type="button"
               className={`${headerStyles.iconBtn} ${headerStyles.newBtn}`}
@@ -1632,7 +1466,7 @@ export function InventoryComponent({}) {
             >
               <img src={ICONS.new} alt="" className={headerStyles.newIcon} />
             </button>
-          </Tooltip>
+          </DomTooltip>
         </div>
       )}
       <div className={styles.body}>
@@ -1755,7 +1589,7 @@ export function InventoryComponent({}) {
               if (!activeBtn || !activeBtn.items || activeBtn.items.length === 0) {
                 return (
                   <div className={styles.emptyState}>
-                    <Image_ icon={ICONS.info} size={40} />
+                    <DomImage icon={ICONS.info} size={40} />
                     <div className={styles.emptyStateText}>No items in menu</div>
                   </div>
                 );
@@ -1781,7 +1615,7 @@ export function InventoryComponent({}) {
             })()
           ) : sSearchResults.length === 0 && sSelectedButtonID && !sSearchTerm ? (
             <div className={styles.emptyState}>
-              <Image_ icon={ICONS.info} size={40} />
+              <DomImage icon={ICONS.info} size={40} />
               <div className={styles.emptyStateText}>No items in menu</div>
             </div>
           ) : (

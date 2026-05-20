@@ -7,7 +7,7 @@ import {
   TextInput,
   TimePicker,
 } from "../../../../../dom_components";
-import { COLOR_GRADIENTS, ICONS } from "../../../../../styles";
+import { COLOR_GRADIENTS, ICONS, C } from "../../../../../styles";
 import {
   checkInputForNumbersOnly,
   formatPhoneWithDashes,
@@ -89,7 +89,7 @@ export const StoreInfoComponent = ({
         style={{
           width: "50%",
           marginLeft: 10,
-          border: "1px solid rgb(200, 228, 220)",
+          border: `1px solid ${C.borderDefault}`,
           padding: "3px 7px 3px 3px",
           textAlign: "right",
           outline: "none",
@@ -344,7 +344,7 @@ export const StoreInfoComponent = ({
                   <Dialog
                     visible={isOpenPicker}
                     onClose={closePicker}
-                    overlayColor="rgba(0,0,0,0.3)"
+                    overlayColor={C.surfaceOverlay}
                   >
                     <TimePicker
                       initialHour={openH}
@@ -359,7 +359,7 @@ export const StoreInfoComponent = ({
                   <Dialog
                     visible={isClosePicker}
                     onClose={closePicker}
-                    overlayColor="rgba(0,0,0,0.3)"
+                    overlayColor={C.surfaceOverlay}
                   >
                     <TimePicker
                       initialHour={closeH}
@@ -401,7 +401,7 @@ export const StoreInfoComponent = ({
                 outline: "none",
                 borderRadius: 5,
                 textAlign: "right",
-                border: "1px solid rgb(200, 228, 220)",
+                border: `1px solid ${C.borderDefault}`,
                 padding: "3px 5px",
                 marginRight: 3,
                 width: 75,

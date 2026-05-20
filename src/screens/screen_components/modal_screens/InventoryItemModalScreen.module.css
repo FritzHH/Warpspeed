@@ -1,0 +1,372 @@
+/* Outer card */
+.card {
+  width: 760px;
+  max-width: 90vw;
+  height: 90vh;
+  background-color: var(--surface-base);
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 3px 3px 12px var(--shadow-color-default);
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* Header */
+.header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.headerTitle {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.headerRight {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.printWrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-right: 10px;
+}
+
+.printSent {
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+/* Scroll body */
+.scrollBody {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.scrollBodyInner {
+  flex: 1;
+}
+
+/* Section cards */
+.sectionCard {
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 10px;
+}
+
+.sectionCardRow {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+}
+
+.sectionCardRowPrices {
+  display: flex;
+  flex-direction: row;
+}
+
+/* Field */
+.field {
+  display: flex;
+  flex-direction: column;
+  margin-right: 10px;
+}
+
+.fieldLast {
+  margin-right: 0;
+}
+
+.fieldLabel {
+  font-style: italic;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.fieldHint {
+  font-weight: normal;
+}
+
+.fieldValue {
+  font-size: 15px;
+  margin-top: 2px;
+}
+
+.fieldValueMultiline {
+  white-space: pre-wrap;
+}
+
+.fieldInput {
+  font-size: 15px;
+  margin-top: 2px;
+  border: none;
+  border-bottom: 1px solid;
+  padding: 4px 0;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+}
+
+.fieldTextarea {
+  padding: 6px 8px;
+  line-height: 18px;
+  font-size: 15px;
+  outline: none;
+  resize: none;
+  border: none;
+  border-radius: 5px;
+  margin-top: 2px;
+  font-family: inherit;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Category select */
+.categoryWrap {
+  width: 120px;
+}
+
+.categorySelect {
+  width: 120px;
+  margin-top: 4px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  border: 1px solid;
+  font-size: 14px;
+  outline: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+/* Brand wrap */
+.brandWrap {
+  flex: 1;
+}
+
+/* Prices */
+.minutesWrap {
+  width: 80px;
+  margin-right: 10px;
+}
+
+/* Barcodes */
+.barcodesCol {
+  flex: 1;
+}
+
+.barcodeRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.barcodeInputFlex {
+  flex: 1;
+}
+
+.barcodeDeleteBtn {
+  background: none;
+  border: none;
+  padding: 4px;
+  margin-left: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+.barcodeAddBtn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  margin-top: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.barcodeAddText {
+  font-size: 13px;
+  margin-left: 4px;
+}
+
+/* Checkbox row */
+.receiptNoteRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 10px 0;
+}
+
+/* Two-column section row (Quick button + Auto note) */
+.twoCol {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.twoColItem {
+  flex: 1;
+  margin-top: 0;
+  border: 1px solid;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.sectionHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.sectionHeaderLeft {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sectionInfoIcon {
+  margin-left: 6px;
+  opacity: 0.4;
+}
+
+.sectionAddBtn {
+  background: none;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+/* Quick button placements */
+.placementsEmpty {
+  font-size: 13px;
+  margin-bottom: 6px;
+}
+
+.placementsWrap {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.placementChip {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 5px 8px;
+  background-color: white;
+  border-radius: 6px;
+}
+
+.placementChipText {
+  font-size: 13px;
+}
+
+.placementChipDelete {
+  background: none;
+  border: none;
+  padding: 4px;
+  margin-left: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}
+
+/* Auto note */
+.autoNoteAddBtn {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border: 1px solid;
+  border-radius: 5px;
+  padding: 4px 10px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.autoNoteAddText {
+  font-size: 13px;
+  margin-left: 4px;
+}
+
+.autoNoteChipsRow {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.autoNoteChip {
+  background-color: rgb(240, 200, 200);
+  border-radius: 6px;
+  padding: 5px 10px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.autoNoteChipLabel {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.autoNoteChipX {
+  font-size: 11px;
+  margin-left: 6px;
+}
+
+/* Footer */
+.footer {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.footerLeft {
+  display: flex;
+  align-items: center;
+}
+
+.footerRight {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.iconBtn {
+  background: none;
+  border: none;
+  padding: 6px;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+}

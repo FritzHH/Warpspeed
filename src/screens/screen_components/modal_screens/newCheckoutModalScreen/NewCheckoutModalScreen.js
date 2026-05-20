@@ -1,11 +1,21 @@
 /* eslint-disable */
-import { View, Text, ScrollView, Image, TouchableOpacity } from "react-native-web";
 import { useState, useRef, useEffect } from "react";
 import cloneDeep from "lodash/cloneDeep";
-import { ScreenModal, SHADOW_RADIUS_PROTO, Button_, Tooltip, Image_, StaleBanner, TextInput_, LoadingIndicator, ReceiptSentOverlay } from "../../../../components";
 import { DropdownMenu } from "../../../../dom_components/DropdownMenu/DropdownMenu";
-import { CheckBox } from "../../../../dom_components";
-import { C, Fonts, COLOR_GRADIENTS, ICONS } from "../../../../styles";
+import {
+  Button,
+  CheckBox,
+  Dialog,
+  Image,
+  LoadingIndicator,
+  ReceiptSentOverlay,
+  StaleBanner,
+  TextInput,
+  Tooltip,
+  TouchableOpacity,
+} from "../../../../dom_components";
+import styles from "./NewCheckoutModalScreen.module.css";
+import { C, Fonts, COLOR_GRADIENTS, ICONS, SHADOW_RADIUS_PROTO } from "../../../../styles";
 import {
   useCheckoutStore,
   useOpenWorkordersStore,
@@ -20,22 +30,7 @@ import {
   getChangeLogUser,
   diffWorkorderLines,
 } from "../../../../stores";
-import {
-  lightenRGBByPercent,
-  formatCurrencyDisp,
-  log,
-  printBuilder,
-  gray,
-  replaceOrAddToArr,
-  formatPhoneWithDashes,
-  formatPhoneForDisplay,
-  findTemplateByType,
-  resolveStatus,
-  usdTypeMask,
-  generateEAN13Barcode,
-  createNewWorkorder,
-  localStorageWrapper,
-} from "../../../../utils";
+import { lightenRGBByPercent, formatCurrencyDisp, log, printBuilder, replaceOrAddToArr, formatPhoneWithDashes, formatPhoneForDisplay, findTemplateByType, resolveStatus, usdTypeMask, generateEAN13Barcode, createNewWorkorder, localStorageWrapper } from "../../../../utils";
 import { WORKORDER_ITEM_PROTO, WORKORDER_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, TRANSACTION_PROTO, CREDIT_APPLIED_PROTO, CUSTOMER_DEPOST_TYPES, CUSTOMER_DEPOSIT_PROTO, TAB_NAMES, CUSTOMER_PROTO } from "../../../../data";
 import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer, dbDeleteWorkorder } from "../../../../db_calls_wrapper";
 import { takeId, getId } from "../../../../idPool";
@@ -136,54 +131,35 @@ function SplitDepositModal({ payment, maxAvailable, onConfirm, onRemove, onClose
   let typeLabel = payment.type === "credit" ? "Credit" : "Deposit";
 
   return (
-    <View
-      style={{
-        position: "absolute",
-        top: 0, left: 0, right: 0, bottom: 0,
-        zIndex: 200,
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: "rgba(0,0,0,0.3)",
-      }}
-    >
-      <View
-        style={{
-          width: 360,
-          backgroundColor: C.backgroundWhite,
-          borderRadius: 12,
-          borderWidth: 2,
-          borderColor: C.buttonLightGreenOutline,
-          padding: 16,
-        }}
+    <div className={styles.splitOverlay}>
+      <div
+        className={styles.splitBox}
+        style={{ backgroundColor: C.backgroundWhite, borderColor: C.buttonLightGreenOutline }}
       >
-        <Text style={{ fontSize: 15, fontWeight: "600", color: C.text, marginBottom: 10 }}>
+        <span className={styles.splitTitle} style={{ color: C.text }}>
           {"Adjust " + typeLabel + " Amount"}
-        </Text>
+        </span>
 
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-          <Text style={{ fontSize: 12, color: C.green }}>Currently applied</Text>
-          <Text style={{ fontSize: 12, color: C.green }}>{formatCurrencyDisp(payment.amount, true)}</Text>
-        </View>
+        <div className={styles.splitRow}>
+          <span className={styles.splitRowText} style={{ color: C.green }}>Currently applied</span>
+          <span className={styles.splitRowText} style={{ color: C.green }}>{formatCurrencyDisp(payment.amount, true)}</span>
+        </div>
 
         {maxAmount !== payment.amount && (
-          <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-            <Text style={{ fontSize: 12, color: gray(0.4) }}>Full amount available</Text>
-            <Text style={{ fontSize: 12, color: gray(0.4) }}>{formatCurrencyDisp(maxAmount, true)}</Text>
-          </View>
+          <div className={styles.splitRow}>
+            <span className={styles.splitRowText} style={{ color: C.textMuted }}>Full amount available</span>
+            <span className={styles.splitRowText} style={{ color: C.textMuted }}>{formatCurrencyDisp(maxAmount, true)}</span>
+          </div>
         )}
 
-        <View
-          style={{
-            flexDirection: "row", alignItems: "center",
-            borderColor: C.buttonLightGreenOutline, borderWidth: 1, borderRadius: 7,
-            backgroundColor: C.listItemWhite, marginTop: 8, marginBottom: 6,
-            paddingHorizontal: 10, height: 40,
-          }}
+        <div
+          className={styles.splitInputWrap}
+          style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
         >
-          <Text style={{ fontSize: 16, color: gray(0.4), marginRight: 4 }}>$</Text>
-          <TextInput_
+          <span className={styles.splitDollar} style={{ color: C.textMuted }}>$</span>
+          <TextInput
             placeholder="0.00"
-            placeholderTextColor={gray(0.35)}
+            placeholderTextColor={C.textDisabled}
             value={sAmount}
             onChangeText={(val) => {
               let cleaned = val.replace(/[^0-9.]/g, "");
@@ -201,16 +177,16 @@ function SplitDepositModal({ payment, maxAvailable, onConfirm, onRemove, onClose
               borderWidth: 0, height: 38, color: C.text,
             }}
           />
-        </View>
+        </div>
 
         {isValid && !isUnchanged && (
-          <Text style={{ fontSize: 11, color: gray(0.5), marginBottom: 8 }}>
+          <span className={styles.splitRemainderText} style={{ color: C.textMuted }}>
             {formatCurrencyDisp(maxAmount - sAmountCents, true) + " remainder available for future use"}
-          </Text>
+          </span>
         )}
 
-        <View style={{ flexDirection: "row", justifyContent: "space-between", marginTop: 6 }}>
-          <Button_
+        <div className={styles.splitButtonsRow}>
+          <Button
             text="Remove From Sale"
             icon={ICONS.trash}
             iconSize={14}
@@ -219,25 +195,25 @@ function SplitDepositModal({ payment, maxAvailable, onConfirm, onRemove, onClose
             buttonStyle={{ height: 32, borderRadius: 5, paddingHorizontal: 10 }}
             onPress={onRemove}
           />
-          <View style={{ flexDirection: "row" }}>
-            <Button_
+          <div className={styles.splitButtonsRight}>
+            <Button
               text="Cancel"
               colorGradientArr={COLOR_GRADIENTS.grey}
               textStyle={{ color: C.textWhite, fontSize: 12 }}
               buttonStyle={{ height: 32, borderRadius: 5, paddingHorizontal: 10, marginRight: 8 }}
               onPress={onClose}
             />
-            <Button_
+            <Button
               text={isUnchanged ? "No Change" : "Apply"}
               colorGradientArr={isValid && !isUnchanged ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
               textStyle={{ color: C.textWhite, fontSize: 12 }}
               buttonStyle={{ height: 32, borderRadius: 5, paddingHorizontal: 10, opacity: isValid && !isUnchanged ? 1 : 0.5 }}
               onPress={() => { if (isValid && !isUnchanged) onConfirm(sAmountCents); }}
             />
-          </View>
-        </View>
-      </View>
-    </View>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1626,80 +1602,60 @@ export function NewCheckoutModalScreen() {
 
   // ─── Render ───────────────────────────────────────────────
   return (<>
-    <ScreenModal
-      modalVisible={zIsCheckingOut}
-      showOuterModal={true}
-      outerModalStyle={{
-        backgroundColor: "rgba(50,50,50,.65)",
-      }}
-      buttonVisible={false}
-      Component={() => (
-        <View
+    <Dialog
+      visible={zIsCheckingOut}
+      onClose={closeModal}
+      preventClose={cardIsProcessing}
+      title="Checkout"
+      aria-label="Checkout"
+    >
+        <div
+          className={styles.modalCard}
           style={{
-            flexDirection: "column",
             backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
-            width: "85%",
-            height: "90%",
-            alignSelf: "center",
-            borderRadius: 6,
             ...SHADOW_RADIUS_PROTO,
             shadowColor: C.green,
-            overflow: "hidden",
           }}
         >
           {/* Loading overlay */}
           {!sSale && (
-            <View
-              style={{
-                position: "absolute",
-                top: 0, left: 0, right: 0, bottom: 0,
-                justifyContent: "center",
-                alignItems: "center",
-                backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
-                zIndex: 998,
-              }}
+            <div
+              className={styles.loadingOverlay}
+              style={{ backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35) }}
             >
               <LoadingIndicator />
-            </View>
+            </div>
           )}
           {/* ── Main 3-Column Layout ────────────────────── */}
-          <View
-            style={{
-              flex: 1,
-              flexDirection: "row",
-              padding: 20,
-            }}
-          >
+          <div className={styles.mainRow}>
             {/* ── LEFT COLUMN: Payment Methods ──────────── */}
-            <View
-              style={{
-                width: "29%",
-                height: "100%",
-                justifyContent: "space-between",
-              }}
-            >
+            <div className={styles.leftCol}>
               {isZeroTotal ? (
-                <View style={{ height: "48%", justifyContent: "center", alignItems: "center", borderRadius: 15, ...SHADOW_RADIUS_PROTO, padding: 20 }}>
-                  <Text style={{ fontSize: 16, fontWeight: Fonts.weight.textHeavy, color: C.text, marginBottom: 20 }}>Total is $0.00</Text>
-                  <TouchableOpacity
-                    onPress={handleZeroTotalComplete}
-                    style={{ width: "80%", height: 50, backgroundColor: C.green, borderRadius: 8, justifyContent: "center", alignItems: "center" }}
+                <div className={styles.zeroTotalBox} style={{ ...SHADOW_RADIUS_PROTO }}>
+                  <span className={styles.zeroTotalTitle} style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}>Total is $0.00</span>
+                  <button
+                    type="button"
+                    onClick={handleZeroTotalComplete}
+                    className={styles.completeButton}
+                    style={{ backgroundColor: C.green }}
                   >
-                    <Text style={{ fontSize: 15, fontWeight: Fonts.weight.textHeavy, color: "white" }}>Complete Workorder</Text>
-                  </TouchableOpacity>
-                </View>
+                    <span className={styles.completeButtonText} style={{ fontWeight: Fonts.weight.textHeavy }}>Complete Workorder</span>
+                  </button>
+                </div>
               ) : isFullyPaid ? (
-                <View style={{ height: "48%", justifyContent: "center", alignItems: "center", borderRadius: 15, ...SHADOW_RADIUS_PROTO, padding: 20 }}>
-                  <Text style={{ fontSize: 14, color: gray(0.5), marginBottom: 6 }}>AMOUNT PAID</Text>
-                  <Text style={{ fontSize: 28, fontWeight: Fonts.weight.textSuperheavy, color: C.green, marginBottom: 20 }}>{"$" + formatCurrencyDisp(sSale?.amountCaptured || 0)}</Text>
-                  <Text style={{ fontSize: 14, color: gray(0.5), marginBottom: 20 }}>{"Sale total: $" + formatCurrencyDisp(sSale?.total || 0)}</Text>
-                  <TouchableOpacity
-                    onPress={handleFullyPaidComplete}
-                    style={{ width: "80%", height: 50, backgroundColor: C.green, borderRadius: 8, justifyContent: "center", alignItems: "center" }}
+                <div className={styles.zeroTotalBox} style={{ ...SHADOW_RADIUS_PROTO }}>
+                  <span className={styles.fullyPaidLabel} style={{ color: C.textMuted }}>AMOUNT PAID</span>
+                  <span className={styles.fullyPaidAmount} style={{ fontWeight: Fonts.weight.textSuperheavy, color: C.green }}>{"$" + formatCurrencyDisp(sSale?.amountCaptured || 0)}</span>
+                  <span className={styles.fullyPaidTotal} style={{ color: C.textMuted }}>{"Sale total: $" + formatCurrencyDisp(sSale?.total || 0)}</span>
+                  <button
+                    type="button"
+                    onClick={handleFullyPaidComplete}
+                    className={styles.completeButton}
+                    style={{ backgroundColor: C.green }}
                   >
-                    <Text style={{ fontSize: 15, fontWeight: Fonts.weight.textHeavy, color: "white" }}>Complete Sale</Text>
-                  </TouchableOpacity>
-                </View>
+                    <span className={styles.completeButtonText} style={{ fontWeight: Fonts.weight.textHeavy }}>Complete Sale</span>
+                  </button>
+                </div>
               ) : (
                 <CashPayment
                   amountLeftToPay={cashAmountLeftToPay}
@@ -1749,227 +1705,174 @@ export function NewCheckoutModalScreen() {
                     lockAmount={isDepositMode}
                   />
               ))}
-            </View>
+            </div>
 
             {isDepositMode ? (
               /* ── DEPOSIT MODE: Combined middle+right ───── */
-              <View style={{ flex: 1, paddingLeft: 10, opacity: cardIsProcessing ? 0.4 : 1 }} pointerEvents={cardIsProcessing ? "none" : "auto"}>
+              <div
+                className={styles.depositCol}
+                style={{ opacity: cardIsProcessing ? 0.4 : 1, pointerEvents: cardIsProcessing ? "none" : "auto" }}
+              >
                 {/* Deposit Summary Card */}
-                <View
+                <div
+                  className={styles.depositSummaryCard}
                   style={{
-                    borderWidth: 2,
                     borderColor: zDepositInfo?.type === CUSTOMER_DEPOST_TYPES.credit ? C.blue : C.green,
-                    borderRadius: 8,
-                    padding: 14,
                     backgroundColor: C.backgroundListWhite,
                   }}
                 >
-                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 6 }}>
-                    <View
+                  <div className={styles.depositSummaryHeader}>
+                    <div
+                      className={styles.depositTypePill}
                       style={{
                         backgroundColor: zDepositInfo?.type === CUSTOMER_DEPOST_TYPES.credit
                           ? lightenRGBByPercent(C.blue, 70)
                           : lightenRGBByPercent(C.green, 70),
-                        paddingHorizontal: 8,
-                        paddingVertical: 2,
-                        borderRadius: 8,
-                        marginRight: 10,
                       }}
                     >
-                      <Text
-                        style={{
-                          fontSize: 16,
-                          fontWeight: "600",
-                          color: zDepositInfo?.type === CUSTOMER_DEPOST_TYPES.credit ? C.blue : C.green,
-                        }}
+                      <span
+                        className={styles.depositTypePillText}
+                        style={{ color: zDepositInfo?.type === CUSTOMER_DEPOST_TYPES.credit ? C.blue : C.green }}
                       >
                         {zDepositInfo?.type === CUSTOMER_DEPOST_TYPES.credit ? "Credit" : "Deposit"}
-                      </Text>
-                    </View>
-                    <Text style={{ fontSize: 24, fontWeight: "700", color: C.text }}>
+                      </span>
+                    </div>
+                    <span className={styles.depositAmountText} style={{ color: C.text }}>
                       {"$" + formatCurrencyDisp(zDepositInfo?.amountCents || 0)}
-                    </Text>
-                  </View>
+                    </span>
+                  </div>
                   {!!zDepositInfo?.note && (
-                    <Text style={{ fontSize: 15, color: gray(0.5), marginBottom: 4, flexWrap: "wrap" }}>
+                    <span className={styles.depositNoteText} style={{ color: C.textMuted }}>
                       {zDepositInfo.note}
-                    </Text>
+                    </span>
                   )}
                   {zCustomer && (
-                    <Text style={{ fontSize: 15, color: C.text }}>
+                    <span className={styles.depositCustomerName} style={{ color: C.text }}>
                       {zCustomer.first} {zCustomer.last}
-                    </Text>
+                    </span>
                   )}
-                </View>
+                </div>
 
                 {/* Deposit info banner */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    backgroundColor: C.backgroundListWhite,
-                    borderWidth: 1,
-                    borderColor: C.orange,
-                    borderRadius: 6,
-                    paddingVertical: 6,
-                    paddingHorizontal: 10,
-                    marginTop: 8,
-                  }}
+                <div
+                  className={styles.depositInfoBanner}
+                  style={{ backgroundColor: C.backgroundListWhite, borderColor: C.orange }}
                 >
-                  <Image_
-                    source={ICONS.info}
+                  <Image
+                    src={ICONS.info}
                     style={{ width: 18, height: 18, marginRight: 8, tintColor: C.orange }}
                   />
-                  <Text style={{ fontSize: 13, color: C.orange, fontWeight: "500" }}>
+                  <span className={styles.depositInfoBannerText} style={{ color: C.orange }}>
                     {sSale?.depositType === "giftcard" ? "Gift card" : "Deposit"} requires full payment - partial payments are not allowed.
-                  </Text>
-                </View>
+                  </span>
+                </div>
 
                 <SaleTotals
                   sale={sSale}
                   settings={zSettings}
                 />
 
-                <View style={{ flex: 1, marginTop: 3 }}>
+                <div className={styles.paymentsListWrap}>
                   <PaymentsList
                     payments={sTransactions}
                     credits={sCredits}
                     onRefund={(payment) => { dlog(DCAT.BUTTON, "openRefundModal_deposit", "CheckoutModal", { transactionID: payment?.id, method: payment?.method, amountCaptured: payment?.amountCaptured }); _setRefundPayment(payment); _setShowRefundModal(true); }}
                     onPrintReceipt={handlePrintReceipt}
                   />
-                </View>
+                </div>
 
                 <CashChangeNeeded cashChangeNeeded={sCashChangeNeeded} />
 
                 {/* Bottom Buttons */}
-                <View
-                  style={{
-                    width: "100%",
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "flex-end",
-                    borderWidth: 1,
-                    borderColor: C.buttonLightGreenOutline,
-                    backgroundColor: C.backgroundListWhite,
-                    borderRadius: 6,
-                    paddingVertical: 2,
-                    paddingHorizontal: 3,
-                    marginTop: 5,
-                  }}
+                <div
+                  className={styles.bottomButtonsRow}
+                  style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.backgroundListWhite }}
                 >
                   {saleComplete && (
                     <Tooltip text="Reprint receipt" position="top">
-                      <TouchableOpacity
-                        onPress={handleReprint}
-                        style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                      >
-                        <Image_ icon={ICONS.print} size={35} />
-                      </TouchableOpacity>
+                      <button type="button" onClick={handleReprint} className={styles.iconButton}>
+                        <Image icon={ICONS.print} size={35} />
+                      </button>
                     </Tooltip>
                   )}
                   {saleComplete && (
                     <Tooltip text="Send receipt" position="top">
-                      <TouchableOpacity
-                        onPress={handleSendSaleReceipt}
-                        style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                      >
-                        <Image_ icon={ICONS.paperPlane} size={35} />
-                      </TouchableOpacity>
+                      <button type="button" onClick={handleSendSaleReceipt} className={styles.iconButton}>
+                        <Image icon={ICONS.paperPlane} size={35} />
+                      </button>
                     </Tooltip>
                   )}
                   <Tooltip text={saleComplete ? "Close" : isStandalone ? "Cancel sale" : "Cancel"} position="top">
-                    <TouchableOpacity
-                      onPress={closeModal}
-                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                    >
-                      <Image_ icon={ICONS.close1} size={35} />
-                    </TouchableOpacity>
+                    <button type="button" onClick={closeModal} className={styles.iconButton}>
+                      <Image icon={ICONS.close1} size={35} />
+                    </button>
                   </Tooltip>
                   <Tooltip text="Pop register" position="top">
-                    <TouchableOpacity
-                      onPress={handlePopRegister}
-                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                    >
-                      <Image_ icon={ICONS.openCashRegister} size={30} />
-                    </TouchableOpacity>
+                    <button type="button" onClick={handlePopRegister} className={styles.iconButton}>
+                      <Image icon={ICONS.openCashRegister} size={30} />
+                    </button>
                   </Tooltip>
-                </View>
-              </View>
+                </div>
+              </div>
             ) : (
               <>
             {/* ── MIDDLE COLUMN: Totals & Payments ──────── */}
-            <View
-              style={{
-                width: "29%",
-                flex: 1,
-                paddingLeft: 10,
-                opacity: cardIsProcessing ? 0.4 : 1,
-              }}
-              pointerEvents={cardIsProcessing ? "none" : "auto"}
+            <div
+              className={styles.midCol}
+              style={{ opacity: cardIsProcessing ? 0.4 : 1, pointerEvents: cardIsProcessing ? "none" : "auto" }}
             >
               {/* Customer Info */}
               {zCustomer && (
-                <View
-                  style={{
-                    borderWidth: 1,
-                    borderColor: C.buttonLightGreenOutline,
-                    borderRadius: 6,
-                    paddingVertical: 5,
-                    paddingHorizontal: 10,
-                    backgroundColor: C.backgroundListWhite,
-                  }}
+                <div
+                  className={styles.customerInfoCard}
+                  style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.backgroundListWhite }}
                 >
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <View>
-                      <Text style={{ color: C.text, textTransform: "uppercase" }}>
+                  <div className={styles.customerInfoTopRow}>
+                    <div className={styles.customerInfoCol}>
+                      <span className={styles.customerNameText} style={{ color: C.text }}>
                         {zCustomer.first} {zCustomer.last}
                         {!!zCustomer.contactRestriction && (
-                          <Text style={{ color: C.red }}>
+                          <span style={{ color: C.red }}>
                             {zCustomer.contactRestriction === CONTACT_RESTRICTIONS.call
                               ? "    (CALL ONLY)"
                               : "    (EMAIL ONLY)"}
-                          </Text>
+                          </span>
                         )}
-                      </Text>
+                      </span>
                       {zCustomer.email && (
-                        <Text style={{ color: gray(0.6), fontSize: 12 }}>
+                        <span className={styles.customerEmailText} style={{ color: C.textSecondary }}>
                           {zCustomer.email}
-                        </Text>
+                        </span>
                       )}
-                    </View>
-                    <View>
+                    </div>
+                    <div className={styles.customerInfoCol}>
                       {zCustomer.customerCell ? (
-                        <Text style={{ color: C.text }}>
+                        <span style={{ color: C.text }}>
                           {formatPhoneForDisplay(zCustomer.customerCell)}
-                        </Text>
+                        </span>
                       ) : !!zCustomer.land && (
-                        <Text style={{ color: C.text }}>
+                        <span style={{ color: C.text }}>
                           {formatPhoneForDisplay(zCustomer.land)}
-                        </Text>
+                        </span>
                       )}
-                    </View>
-                  </View>
+                    </div>
+                  </div>
                   {!!zCustomer.streetAddress && (
-                    <Text style={{ color: C.text, fontSize: 13 }}>
+                    <span className={styles.customerAddressText} style={{ color: C.text }}>
                       {zCustomer.streetAddress}
                       {!!zCustomer.unit && (
-                        <Text style={{ color: C.text, fontSize: 13 }}>
+                        <span style={{ color: C.text, fontSize: 13 }}>
                           {"  |  Unit " + zCustomer.unit}
-                        </Text>
+                        </span>
                       )}
                       {!!zCustomer.city && (
-                        <Text style={{ color: C.text, fontSize: 13 }}>
+                        <span style={{ color: C.text, fontSize: 13 }}>
                           {"   |   " + zCustomer.city}
-                        </Text>
+                        </span>
                       )}
-                    </Text>
+                    </span>
                   )}
-                </View>
+                </div>
               )}
 
               {/* Customer Deposits / Credits */}
@@ -1981,20 +1884,13 @@ export function NewCheckoutModalScreen() {
                 let saleComplete = sSale?.paymentComplete;
                       if (allAvailable.length === 0 || saleComplete) return null;
                 return (
-                  <View
-                    style={{
-                      borderWidth: 1,
-                      borderColor: C.buttonLightGreenOutline,
-                      borderRadius: 6,
-                      backgroundColor: "#FFFACD",
-                      marginTop: 5,
-                      paddingHorizontal: 8,
-                      paddingVertical: 5,
-                    }}
+                  <div
+                    className={styles.depositsListCard}
+                    style={{ borderColor: C.buttonLightGreenOutline }}
                   >
-                    <View style={{ borderRadius: 4, paddingVertical: 4, paddingHorizontal: 8, marginBottom: 5 }}>
-                      <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.text }}>DEPOSITS, CREDITS & GIFT CARDS</Text>
-                    </View>
+                    <div className={styles.depositsListHeader}>
+                      <span className={styles.depositsListHeaderText} style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}>DEPOSITS, CREDITS & GIFT CARDS</span>
+                    </div>
                     {allAvailable.map((item) => {
                       let isCredit = item._type === "credit";
                       let isGiftCard = item._type === "giftcard";
@@ -2002,13 +1898,8 @@ export function NewCheckoutModalScreen() {
                       let noteText = item.note || item.text || "";
                       let isExpanded = sExpandedCreditIds.includes(item.id);
                       return (
-                        <View key={item.id} style={{ paddingVertical: 4 }}>
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                            }}
-                          >
+                        <div key={item.id} className={styles.depositRow}>
+                          <div className={styles.depositRowInner}>
                             <CheckBox
                               text=""
                               isChecked={false}
@@ -2016,61 +1907,52 @@ export function NewCheckoutModalScreen() {
                               buttonStyle={{ marginRight: 6 }}
                               iconSize={20}
                             />
-                            <View
-                              style={{
-                                backgroundColor: lightenRGBByPercent(badgeColor, 70),
-                                paddingHorizontal: 7,
-                                paddingVertical: 2,
-                                borderRadius: 6,
-                                marginRight: 8,
-                              }}
+                            <div
+                              className={styles.depositTypeBadge}
+                              style={{ backgroundColor: lightenRGBByPercent(badgeColor, 70) }}
                             >
-                              <Text
-                                style={{
-                                  fontSize: 13,
-                                  fontWeight: "600",
-                                  color: badgeColor,
-                                }}
-                              >
+                              <span className={styles.depositTypeBadgeText} style={{ color: badgeColor }}>
                                 {isGiftCard ? "Gift Card" : isCredit ? "Credit" : "Deposit"}
-                              </Text>
-                            </View>
-                            <Text style={{ fontSize: 16, fontWeight: "600", color: C.text, marginRight: 8 }}>
+                              </span>
+                            </div>
+                            <span className={styles.depositAmountInList} style={{ color: C.text }}>
                               {"$" + formatCurrencyDisp(item.amountCents)}
-                            </Text>
+                            </span>
                             {(item.reservedCents || 0) > 0 && (
-                              <Text style={{ fontSize: 11, color: C.orange, fontWeight: "600", marginRight: 8 }}>
+                              <span className={styles.depositReservedText} style={{ color: C.orange }}>
                                 {"$" + formatCurrencyDisp(item.reservedCents) + "/$" + formatCurrencyDisp(item.amountCents + item.reservedCents) + (item.amountCents <= 0 ? " Used" : " In use")}
-                              </Text>
+                              </span>
                             )}
                             {!isCredit && !isGiftCard && !!noteText && (
-                              <Text numberOfLines={1} style={{ fontSize: 13, color: gray(0.5), flex: 1 }}>
+                              <span className={styles.depositNoteInList} style={{ color: C.textMuted }}>
                                 {noteText}
-                              </Text>
+                              </span>
                             )}
                             {isCredit && !!noteText && (
-                              <Text
-                                onPress={() => {
+                              <button
+                                type="button"
+                                onClick={() => {
                                   _setExpandedCreditIds(isExpanded
                                     ? sExpandedCreditIds.filter((id) => id !== item.id)
                                     : [...sExpandedCreditIds, item.id]
                                   );
                                 }}
-                                style={{ fontSize: 12, color: C.blue, fontWeight: "600" }}
+                                className={styles.depositReasonToggle}
+                                style={{ color: C.blue }}
                               >
                                 {"Reason " + (isExpanded ? "▾" : "▸")}
-                              </Text>
+                              </button>
                             )}
-                          </View>
+                          </div>
                           {isCredit && isExpanded && !!noteText && (
-                            <Text style={{ fontSize: 13, color: gray(0.5), marginLeft: 34, marginTop: 2 }}>
+                            <span className={styles.depositReasonExpanded} style={{ color: C.textMuted }}>
                               {noteText}
-                            </Text>
+                            </span>
                           )}
-                        </View>
+                        </div>
                       );
                     })}
-                  </View>
+                  </div>
                 );
               })()}
 
@@ -2081,12 +1963,8 @@ export function NewCheckoutModalScreen() {
               />
 
                     {/* Payments container */}
-              <View
-                style={{
-                        flexShrink: 1,
-                }}
-              >
-                <ScrollView style={{ flexShrink: 1 }}>
+              <div className={styles.paymentsContainer}>
+                <div className={styles.paymentsScroll}>
                       <PaymentsList
                           payments={sTransactions}
                           credits={sCredits}
@@ -2095,7 +1973,7 @@ export function NewCheckoutModalScreen() {
                   onPrintDepositReceipt={handlePrintDepositReceipt}
                   onRemoveDeposit={!saleComplete ? (credit) => _setSplitDepositPayment(credit) : null}
                 />
-                </ScrollView>
+                </div>
 
                       {!!sSplitDepositPayment && (() => {
                         let isCredit = sSplitDepositPayment.type === "credit";
@@ -2123,27 +2001,16 @@ export function NewCheckoutModalScreen() {
                         amountRemaining={Math.max(0, (sSale?.total || 0) - (sSale?.amountCaptured || 0))}
                       />
 
-              </View>
+              </div>
 
-              <View style={{ flex: 1 }} />
+              <div className={styles.flexSpacer} />
 
               <CashChangeNeeded cashChangeNeeded={sCashChangeNeeded} />
 
               {/* Bottom Buttons: Cancel/Close + Reprint */}
-              <View
-                style={{
-                  width: "100%",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  borderWidth: 1,
-                  borderColor: C.buttonLightGreenOutline,
-                  backgroundColor: C.backgroundListWhite,
-                        borderRadius: 5,
-                        paddingVertical: 4,
-                  paddingHorizontal: 3,
-                  marginTop: 5
-                }}
+              <div
+                className={styles.bottomButtonsRowMain}
+                style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.backgroundListWhite }}
               >
                 {/* Tax-Free & Receipt Language */}
 
@@ -2152,13 +2019,13 @@ export function NewCheckoutModalScreen() {
                     text="Tax-Free"
                     isChecked={!!sCombinedWorkorders[0]?.taxFree}
                     onCheck={handleTaxFreeToggle}
-                    textStyle={{ fontSize: 13, color: gray(0.5) }}
+                    textStyle={{ fontSize: 13, color: C.textMuted }}
                   />
                 )}
 
 
-                <View style={{ flexDirection: "column", alignItems: "center" }}>
-                  <Text style={{ fontSize: 12, color: gray(0.5) }}>Receipt text</Text>
+                <div className={styles.langSelectCol}>
+                  <span className={styles.langSelectLabel} style={{ color: C.textMuted }}>Receipt text</span>
 
                   <DropdownMenu
                     dataArr={Object.keys(CUSTOMER_LANGUAGES).map((key) => ({ label: CUSTOMER_LANGUAGES[key], key }))}
@@ -2170,15 +2037,12 @@ export function NewCheckoutModalScreen() {
                     buttonIcon={null}
                     buttonIconSize={0}
                   />
-                </View>
+                </div>
                 {(saleComplete || hasRealPayments) && (
                   <Tooltip text={saleComplete ? "Reprint receipt" : "Print partial payment receipt"} position="top">
-                    <TouchableOpacity
-                      onPress={handleReprint}
-                      style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                    >
-                      <Image_ icon={ICONS.print} size={35} />
-                    </TouchableOpacity>
+                    <button type="button" onClick={handleReprint} className={styles.iconButton}>
+                      <Image icon={ICONS.print} size={35} />
+                    </button>
                   </Tooltip>
                 )}
                 {(saleComplete || hasRealPayments) && (() => {
@@ -2186,45 +2050,36 @@ export function NewCheckoutModalScreen() {
                   if (!hasContact) return null;
                   return (
                     <Tooltip text={saleComplete ? "Send receipt" : "Send partial payment receipt"} position="top">
-                      <TouchableOpacity
-                        onPress={handleSendSaleReceipt}
-                        style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                      >
-                        <Image_ icon={ICONS.paperPlane} size={35} />
-                      </TouchableOpacity>
+                      <button type="button" onClick={handleSendSaleReceipt} className={styles.iconButton}>
+                        <Image icon={ICONS.paperPlane} size={35} />
+                      </button>
                     </Tooltip>
                   );
                 })()}
                 <Tooltip text={hasRealPayments && !saleComplete ? "Close with partial payment" : saleComplete ? "Close" : isStandalone ? "Cancel sale" : "Close checkout"} position="top">
-                  <TouchableOpacity
-                    onPress={hasRealPayments && !saleComplete ? handlePartialPayment : closeModal}
-                    style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
+                  <button
+                    type="button"
+                    onClick={hasRealPayments && !saleComplete ? handlePartialPayment : closeModal}
+                    className={styles.iconButton}
                   >
-                    <Image_ icon={ICONS.close1} size={35} />
-                  </TouchableOpacity>
+                    <Image icon={ICONS.close1} size={35} />
+                  </button>
                 </Tooltip>
                 <Tooltip text="Pop register" position="top">
-                  <TouchableOpacity
-                    onPress={handlePopRegister}
-                    style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                  >
-                    <Image_ icon={ICONS.openCashRegister} size={35} />
-                  </TouchableOpacity>
+                  <button type="button" onClick={handlePopRegister} className={styles.iconButton}>
+                    <Image icon={ICONS.openCashRegister} size={35} />
+                  </button>
                 </Tooltip>
 
-              </View>
-            </View>
+              </div>
+            </div>
 
             {/* ── RIGHT COLUMN: Workorders & Inventory ───── */}
-            <View
-              style={{
-                width: "42%",
-                paddingLeft: 10,
-                opacity: cardIsProcessing ? 0.4 : 1,
-              }}
-              pointerEvents={cardIsProcessing ? "none" : "auto"}
+            <div
+              className={styles.rightCol}
+              style={{ opacity: cardIsProcessing ? 0.4 : 1, pointerEvents: cardIsProcessing ? "none" : "auto" }}
             >
-              <ScrollView style={{ flex: 1 }}>
+              <div className={styles.rightScroll}>
                 {/* {hasRealPayments ? (
                   <StaleBanner
                     text="Sale In Progress"
@@ -2241,7 +2096,7 @@ export function NewCheckoutModalScreen() {
                 )}
 
                       {/* Workorders (combiner + line items) */}
-                      <View style={{ marginTop: 15 }} />
+                      <div className={styles.workorderCombinerSpacer} />
                       {(
                   <WorkorderCombiner
                     combinedWorkorders={sCombinedWorkorders}
@@ -2254,70 +2109,22 @@ export function NewCheckoutModalScreen() {
                           amountCaptured={sSale?.amountCaptured || 0}
                   />
                 )}
-              </ScrollView>
-            </View>
+              </div>
+            </div>
               </>
             )}
-          </View>
+          </div>
 
           {/* Tax-Free Confirmation Overlay (inline to avoid z-index issues with global AlertBox_) */}
           {sShowTaxFreeConfirm && (
-            <View
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(0, 0, 0, 0.4)",
-                justifyContent: "center",
-                alignItems: "center",
-                borderRadius: 6,
-                zIndex: 100,
-              }}
-            >
-              <View
-                style={{
-                  backgroundColor: C.backgroundWhite,
-                  borderRadius: 6,
-                  alignItems: "center",
-                  justifyContent: "space-around",
-                  minWidth: "32%",
-                  minHeight: "24%",
-                  paddingVertical: 25,
-                  paddingHorizontal: 20,
-                }}
-              >
-                <Text
-                  style={{
-                    fontWeight: "500",
-                    color: "red",
-                    fontSize: 25,
-                    textAlign: "center",
-                  }}
-                >
-                  Tax-Free Confirmation
-                </Text>
-                <Text
-                  style={{
-                    textAlign: "center",
-                    width: "90%",
-                    marginTop: 10,
-                    color: C.text,
-                    fontSize: 18,
-                  }}
-                >
+            <div className={`${styles.confirmOverlay} ${styles.confirmOverlayTaxFree}`}>
+              <div className={styles.confirmBoxTaxFree} style={{ backgroundColor: C.backgroundWhite }}>
+                <span className={styles.confirmTitle}>Tax-Free Confirmation</span>
+                <span className={styles.confirmMessage} style={{ color: C.text }}>
                   No shop parts, even a drop of oil, must leave with the customer for this workorder to qualify as tax-free.
-                </Text>
-                <View
-                  style={{
-                    marginTop: 25,
-                    flexDirection: "row",
-                    justifyContent: "center",
-                    gap: 20,
-                  }}
-                >
-                  <Button_
+                </span>
+                <div className={styles.confirmActions}>
+                  <Button
                     colorGradientArr={COLOR_GRADIENTS.green}
                     text="Confirm Tax-Free"
                     textStyle={{ color: C.textWhite }}
@@ -2326,52 +2133,30 @@ export function NewCheckoutModalScreen() {
                       applyTaxFree(true);
                     }}
                   />
-                  <Button_
+                  <Button
                     colorGradientArr={COLOR_GRADIENTS.blue}
                     text="Cancel"
                     textStyle={{ color: C.textWhite }}
                     onPress={() => _setShowTaxFreeConfirm(false)}
                   />
-                </View>
-              </View>
-            </View>
+                </div>
+              </div>
+            </div>
           )}
 
           {/* Pop Register Confirmation */}
           {sShowPopConfirm && (
-            <View
-              style={{
-                position: "absolute",
-                top: 0,
-                left: 0,
-                right: 0,
-                bottom: 0,
-                backgroundColor: "rgba(0, 0, 0, 0.35)",
-                justifyContent: "center",
-                alignItems: "center",
-                borderRadius: 6,
-                zIndex: 100,
-              }}
-            >
-              <View
-                style={{
-                  backgroundColor: C.backgroundWhite,
-                  borderRadius: 6,
-                  alignItems: "center",
-                  justifyContent: "center",
-                  paddingVertical: 30,
-                  paddingHorizontal: 40,
-                }}
-              >
-                <Image_
-                  source={ICONS.openCashRegister}
+            <div className={`${styles.confirmOverlay} ${styles.confirmOverlayPop}`}>
+              <div className={styles.confirmBoxPop} style={{ backgroundColor: C.backgroundWhite }}>
+                <Image
+                  src={ICONS.openCashRegister}
                   style={{ width: 60, height: 60, marginBottom: 12 }}
                 />
-                <Text style={{ fontSize: 18, fontWeight: "600", color: C.text }}>
+                <span className={styles.popRegisterText} style={{ color: C.text }}>
                   Register Opened
-                </Text>
-              </View>
-            </View>
+                </span>
+              </div>
+            </div>
           )}
           <ReceiptSentOverlay visible={!!sReceiptSentOverlay} sentSMS={sReceiptSentOverlay?.sentSMS} sentEmail={sReceiptSentOverlay?.sentEmail} onDone={() => _setReceiptSentOverlay(null)} />
           {sNewItemModal && (
@@ -2380,12 +2165,10 @@ export function NewCheckoutModalScreen() {
               item={sNewItemModal}
               isNew={true}
               handleExit={() => _setNewItemModal(null)}
-              skipPortal={true}
             />
           )}
-        </View>
-      )}
-    />
+        </div>
+    </Dialog>
     <SendReceiptModal
       visible={sShowSendReceiptModal}
       onSend={handleSendSaleReceiptFromModal}

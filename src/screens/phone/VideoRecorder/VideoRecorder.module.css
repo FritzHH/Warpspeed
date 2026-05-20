@@ -36,7 +36,7 @@
 }
 
 .closeIcon {
-  color: white;
+  color: var(--text-on-accent);
   font-size: 20px;
   font-weight: 700;
 }
@@ -53,11 +53,11 @@
   border-radius: 5px;
   margin-right: 6px;
   flex-shrink: 0;
-  background-color: rgb(255, 26, 26);
+  background-color: var(--danger);
 }
 
 .timerText {
-  color: white;
+  color: var(--text-on-accent);
   font-size: 16px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
@@ -91,7 +91,7 @@
 }
 
 .errorText {
-  color: white;
+  color: var(--text-on-accent);
   font-size: 16px;
   text-align: center;
 }
@@ -116,7 +116,7 @@
 }
 
 .startingText {
-  color: white;
+  color: var(--text-on-accent);
   font-size: 14px;
   margin-top: 8px;
 }
@@ -139,7 +139,7 @@
   border-radius: 35px;
   border-width: 4px;
   border-style: solid;
-  border-color: white;
+  border-color: var(--text-on-accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -151,7 +151,7 @@
   height: 54px;
   border-radius: 27px;
   flex-shrink: 0;
-  background-color: rgb(255, 26, 26);
+  background-color: var(--danger);
 }
 
 .stopSquare {
@@ -159,7 +159,7 @@
   height: 28px;
   border-radius: 6px;
   flex-shrink: 0;
-  background-color: rgb(255, 26, 26);
+  background-color: var(--danger);
 }
 
 .previewActions {
@@ -184,11 +184,11 @@
   border: none;
   cursor: pointer;
   flex-shrink: 0;
-  background-color: rgb(33, 148, 86);
+  background-color: var(--accent);
 }
 
 .btnText {
-  color: white;
+  color: var(--text-on-accent);
   font-size: 16px;
   font-weight: 600;
 }

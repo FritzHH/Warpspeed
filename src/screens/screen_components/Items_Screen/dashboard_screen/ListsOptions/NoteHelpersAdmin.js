@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import { Tooltip, TouchableOpacity, Image } from "../../../../../dom_components";
 import { C, ICONS } from "../../../../../styles";
-import { gray } from "../../../../../utils";
+
 import { NOTE_HELPER_PROTO } from "../../../../../data";
 import { BoxButton1, BoxContainerInner } from "./_helpers";
 import { NoteHelperEditorModal } from "./NoteHelperEditorModal";
@@ -120,7 +120,7 @@ export const NoteHelpersAdmin = ({
                   <span className={styles.categoryLabel} style={{ color: C.text }}>
                     {cat.label}
                   </span>
-                  <span className={styles.categoryItemCount} style={{ color: gray(0.4) }}>
+                  <span className={styles.categoryItemCount} style={{ color: C.textMuted }}>
                     {(cat.items || []).length} items
                   </span>
                   <Tooltip text="Edit category">
@@ -151,13 +151,13 @@ export const NoteHelpersAdmin = ({
                     <div
                       className={styles.targetCheckboxBox}
                       style={{
-                        borderColor: cat.intakeNotes ? C.blue : gray(0.3),
+                        borderColor: cat.intakeNotes ? C.blue : C.borderStrong,
                         backgroundColor: cat.intakeNotes
                           ? C.blue
                           : "transparent",
                       }}
                     />
-                    <span className={styles.targetCheckboxLabel} style={{ color: gray(0.5) }}>
+                    <span className={styles.targetCheckboxLabel} style={{ color: C.textMuted }}>
                       Intake
                     </span>
                   </button>
@@ -171,13 +171,13 @@ export const NoteHelpersAdmin = ({
                     <div
                       className={styles.targetCheckboxBox}
                       style={{
-                        borderColor: cat.receiptNotes ? C.blue : gray(0.3),
+                        borderColor: cat.receiptNotes ? C.blue : C.borderStrong,
                         backgroundColor: cat.receiptNotes
                           ? C.blue
                           : "transparent",
                       }}
                     />
-                    <span className={styles.targetCheckboxLabel} style={{ color: gray(0.5) }}>
+                    <span className={styles.targetCheckboxLabel} style={{ color: C.textMuted }}>
                       Receipt
                     </span>
                   </button>

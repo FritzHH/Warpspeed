@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { gray, resolveStatus, lightenRGBByPercent, capitalizeFirstLetterOfString } from "../../../utils";
+import { resolveStatus, lightenRGBByPercent, capitalizeFirstLetterOfString } from "../../../utils";
 import { Image } from "../../../dom_components/Image/Image";
 import { TouchableOpacity } from "../../../dom_components/TouchableOpacity/TouchableOpacity";
 import { TextInput } from "../../../dom_components/TextInput/TextInput";
@@ -183,7 +183,7 @@ export function Notes_MainComponent() {
               onPress={() => outsideClicked("customer")}
               className={styles.headerAction}
             >
-              <span className={styles.headerActionText} style={{ color: gray(0.18) }}>
+              <span className={styles.headerActionText} style={{ color: C.textDisabled }}>
                 Click to add
               </span>
             </TouchableOpacity>
@@ -211,11 +211,11 @@ export function Notes_MainComponent() {
                           />
                         </TouchableOpacity>
                       </Tooltip>
-                      <span className={styles.noteName} style={{ color: gray(0.4) }}>
+                      <span className={styles.noteName} style={{ color: C.textMuted }}>
                         {item.name}
                       </span>
                     </div>
-                    <span className={styles.noteDate} style={{ color: gray(0.5) }}>
+                    <span className={styles.noteDate} style={{ color: C.textMuted }}>
                       {formatNoteDateShort(item.createdAt)}
                     </span>
                   </div>
@@ -240,7 +240,7 @@ export function Notes_MainComponent() {
                     >
                       <span
                         className={styles.noteText}
-                        style={{ color: item.value ? C.text : gray(0.5) }}
+                        style={{ color: item.value ? C.text : C.textMuted }}
                       >
                         {capitalizeFirstLetterOfString(item.value) || "Empty note"}
                       </span>
@@ -266,7 +266,7 @@ export function Notes_MainComponent() {
                   Internal Notes
                 </span>
               </div>
-              <span className={styles.headerActionInternal} style={{ color: gray(0.18) }}>
+              <span className={styles.headerActionInternal} style={{ color: C.textDisabled }}>
                 Click to add
               </span>
             </TouchableOpacity>
@@ -294,11 +294,11 @@ export function Notes_MainComponent() {
                           />
                         </TouchableOpacity>
                       </Tooltip>
-                      <span className={styles.noteName} style={{ color: gray(0.4) }}>
+                      <span className={styles.noteName} style={{ color: C.textMuted }}>
                         {item.name}
                       </span>
                     </div>
-                    <span className={styles.noteDate} style={{ color: gray(0.5) }}>
+                    <span className={styles.noteDate} style={{ color: C.textMuted }}>
                       {formatNoteDateShort(item.createdAt)}
                     </span>
                   </div>
@@ -323,7 +323,7 @@ export function Notes_MainComponent() {
                     >
                       <span
                         className={styles.noteText}
-                        style={{ color: item.value ? C.text : gray(0.5) }}
+                        style={{ color: item.value ? C.text : C.textMuted }}
                       >
                         {capitalizeFirstLetterOfString(item.value) || "Empty note"}
                       </span>

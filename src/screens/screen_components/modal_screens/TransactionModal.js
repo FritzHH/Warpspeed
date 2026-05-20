@@ -1,38 +1,40 @@
 /*eslint-disable*/
-import { View, Text, ScrollView, TouchableOpacity, Linking } from "react-native-web";
-import {
-  formatCurrencyDisp,
-  formatMillisForDisplay,
-  gray,
-  lightenRGBByPercent,
-  localStorageWrapper,
-} from "../../../utils";
+import { formatCurrencyDisp, formatMillisForDisplay, lightenRGBByPercent, localStorageWrapper } from "../../../utils";
 import { C, ICONS, COLOR_GRADIENTS } from "../../../styles";
-import { Button_, SHADOW_RADIUS_PROTO, Dialog_ } from "../../../components";
+import { Button, Dialog, SHADOW_PROTO } from "../../../dom_components";
 import { useSettingsStore, useLoginStore } from "../../../stores";
 import { printBuilder, log } from "../../../utils";
 import { dbSavePrintObj } from "../../../db_calls_wrapper";
+import styles from "./TransactionModal.module.css";
 
 // ─── Helper components ──────────────────────────────────
 
 const DetailRow = ({ label, value, valueColor, valueStyle, onPress }) => {
   if (!value) return null;
-  const content = (
-    <View style={{ flexDirection: "row", marginBottom: 6 }}>
-      <Text style={{ fontSize: 12, color: gray(0.4), width: 140 }}>{label}</Text>
-      <Text style={{ fontSize: 13, color: valueColor || C.text, flex: 1, ...valueStyle }}>{value}</Text>
-    </View>
+  const labelEl = <span className={styles.detailLabel} style={{ color: C.textMuted }}>{label}</span>;
+  const valueEl = (
+    <span className={styles.detailValue} style={{ color: valueColor || C.text, ...valueStyle }}>
+      {value}
+    </span>
   );
   if (onPress) {
-    return <TouchableOpacity onPress={onPress}>{content}</TouchableOpacity>;
+    return (
+      <button type="button" className={styles.detailRowButton} onClick={onPress}>
+        {labelEl}
+        {valueEl}
+      </button>
+    );
   }
-  return content;
+  return (
+    <div className={styles.detailRow}>
+      {labelEl}
+      {valueEl}
+    </div>
+  );
 };
 
 const SectionHeader = ({ text }) => (
-  <Text style={{ fontSize: 11, fontWeight: "600", color: gray(0.4), marginBottom: 6, marginTop: 14, letterSpacing: 0.5 }}>
-    {text}
-  </Text>
+  <span className={styles.sectionHeader} style={{ color: C.textMuted }}>{text}</span>
 );
 
 // ─── Refund Infographic ─────────────────────────────────
@@ -43,54 +45,43 @@ const RefundInfoGraphic = ({ amountCaptured, totalRefunded }) => {
   let fullyRefunded = remaining === 0;
 
   return (
-    <View
+    <div
+      className={styles.refundInfoCard}
       style={{
-        borderRadius: 7,
-        borderWidth: 1,
         borderColor: lightenRGBByPercent(C.lightred, 40),
         backgroundColor: C.listItemWhite,
-        padding: 12,
-        marginBottom: 12,
       }}
     >
-      {/* Labels row */}
-      <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 8 }}>
-        <View style={{ alignItems: "flex-start" }}>
-          <Text style={{ fontSize: 10, color: gray(0.45), marginBottom: 2 }}>REFUNDED</Text>
-          <Text style={{ fontSize: 15, fontWeight: "700", color: C.lightred }}>
+      <div className={styles.refundInfoLabelsRow}>
+        <div className={styles.refundInfoCol}>
+          <span className={styles.refundInfoSmallLabel} style={{ color: C.textMuted }}>REFUNDED</span>
+          <span className={styles.refundInfoAmount} style={{ color: C.lightred }}>
             {"$" + formatCurrencyDisp(totalRefunded)}
-          </Text>
-        </View>
-        <View style={{ alignItems: "flex-end" }}>
-          <Text style={{ fontSize: 10, color: gray(0.45), marginBottom: 2 }}>REMAINING</Text>
-          <Text style={{ fontSize: 15, fontWeight: "700", color: fullyRefunded ? gray(0.3) : C.green }}>
+          </span>
+        </div>
+        <div className={styles.refundInfoColRight}>
+          <span className={styles.refundInfoSmallLabel} style={{ color: C.textMuted }}>REMAINING</span>
+          <span
+            className={styles.refundInfoAmount}
+            style={{ color: fullyRefunded ? C.textDisabled : C.green }}
+          >
             {"$" + formatCurrencyDisp(remaining)}
-          </Text>
-        </View>
-      </View>
-      {/* Progress bar */}
-      <View
-        style={{
-          height: 8,
-          borderRadius: 4,
-          backgroundColor: lightenRGBByPercent(C.green, 55),
-          overflow: "hidden",
-        }}
+          </span>
+        </div>
+      </div>
+      <div
+        className={styles.refundBar}
+        style={{ backgroundColor: lightenRGBByPercent(C.green, 55) }}
       >
-        <View
-          style={{
-            height: 8,
-            borderRadius: 4,
-            width: refundedPercent + "%",
-            backgroundColor: C.lightred,
-          }}
+        <div
+          className={styles.refundBarFill}
+          style={{ width: refundedPercent + "%", backgroundColor: C.lightred }}
         />
-      </View>
-      {/* Percent label */}
-      <Text style={{ fontSize: 10, color: gray(0.4), marginTop: 4, textAlign: "center" }}>
+      </div>
+      <div className={styles.refundInfoPercent} style={{ color: C.textMuted }}>
         {refundedPercent + "% of $" + formatCurrencyDisp(amountCaptured) + " refunded"}
-      </Text>
-    </View>
+      </div>
+    </div>
   );
 };
 
@@ -99,48 +90,43 @@ const RefundInfoGraphic = ({ amountCaptured, totalRefunded }) => {
 const RefundCard = ({ refund, index }) => {
   let r = refund;
   return (
-    <View
+    <div
+      className={styles.refundCard}
       style={{
-        marginBottom: 6,
-        borderRadius: 7,
-        borderWidth: 1,
         borderColor: lightenRGBByPercent(C.lightred, 45),
         backgroundColor: C.listItemWhite,
-        padding: 10,
       }}
     >
-      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
-          <View
+      <div className={styles.refundCardHeader}>
+        <div className={styles.refundCardLeft}>
+          <span
+            className={styles.refundBadge}
             style={{
               backgroundColor: lightenRGBByPercent(C.lightred, 55),
-              paddingHorizontal: 8,
-              paddingVertical: 2,
-              borderRadius: 4,
-              marginRight: 8,
+              color: C.lightred,
             }}
           >
-            <Text style={{ fontSize: 10, fontWeight: "600", color: C.lightred }}>
-              {(r.method || "card").toUpperCase()}
-            </Text>
-          </View>
-          <Text style={{ fontSize: 12, color: gray(0.45) }}>
+            {(r.method || "card").toUpperCase()}
+          </span>
+          <span className={styles.refundIndex} style={{ color: C.textMuted }}>
             {"Refund #" + (index + 1)}
-          </Text>
-        </View>
-        <Text style={{ fontSize: 14, fontWeight: "700", color: C.lightred }}>
+          </span>
+        </div>
+        <span className={styles.refundAmount} style={{ color: C.lightred }}>
           {"-$" + formatCurrencyDisp(r.amount)}
-        </Text>
-      </View>
+        </span>
+      </div>
       {!!r.notes && (
-        <Text style={{ fontSize: 11, color: gray(0.45), marginTop: 4 }}>{typeof r.notes === "string" ? r.notes : r.notes.reason || ""}</Text>
+        <div className={styles.refundNotes} style={{ color: C.textMuted }}>
+          {typeof r.notes === "string" ? r.notes : r.notes.reason || ""}
+        </div>
       )}
       {!!r.millis && (
-        <Text style={{ fontSize: 10, color: gray(0.35), marginTop: 3 }}>
+        <div className={styles.refundDate} style={{ color: C.textDisabled }}>
           {formatMillisForDisplay(r.millis, true)}
-        </Text>
+        </div>
       )}
-    </View>
+    </div>
   );
 };
 
@@ -176,214 +162,176 @@ export const TransactionModal = ({ transaction, onClose, onRefund }) => {
   }
 
   return (
-    <Dialog_ visible={true} onClose={onClose} overlayColor="rgba(50,50,50,.65)">
-        <View
-          style={{
-            width: "45vw",
-            maxWidth: 600,
-            height: "70vh",
-            backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
-            borderRadius: 8,
-            ...SHADOW_RADIUS_PROTO,
-            shadowColor: C.green,
-            overflow: "hidden",
-            flexDirection: "column",
-          }}
+    <Dialog visible={true} onClose={onClose} overlayColor={C.surfaceOverlayHeavy} title="Transaction">
+      <div
+        className={styles.container}
+        style={{
+          backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
+          ...SHADOW_PROTO,
+        }}
+      >
+        {/* ── Header ── */}
+        <div
+          className={styles.header}
+          style={{ borderBottomColor: C.borderSubtle, backgroundColor: C.backgroundWhite }}
         >
-          {/* ── Header ── */}
-          <View
-            style={{
-              flexDirection: "row",
-              justifyContent: "space-between",
-              alignItems: "center",
-              paddingHorizontal: 20,
-              paddingVertical: 12,
-              borderBottomWidth: 1,
-              borderBottomColor: gray(0.1),
-              backgroundColor: C.backgroundWhite,
-            }}
-          >
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              {/* Method badge */}
-              <View
-                style={{
-                  backgroundColor: isCard
-                    ? lightenRGBByPercent(C.blue, 60)
-                    : lightenRGBByPercent(C.green, 60),
-                  paddingHorizontal: 14,
-                  paddingVertical: 4,
-                  borderRadius: 10,
-                }}
-              >
-                <Text
-                  style={{
-                    fontSize: 12,
-                    fontWeight: "600",
-                    color: isCard ? C.blue : C.green,
-                  }}
-                >
-                  {(txn.method || "unknown").toUpperCase()}
-                </Text>
-              </View>
-              <Text style={{ fontSize: 10, color: gray(0.35), marginLeft: 12 }}>
-                {"Txn ID: " + txn.id}
-              </Text>
-            </View>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
-              <Button_
-                text="Refund"
-                colorGradientArr={COLOR_GRADIENTS.red}
-                onPress={handleRefund}
-                buttonStyle={{ paddingHorizontal: 16, height: 32, marginRight: 8 }}
-                textStyle={{ fontSize: 12, color: "#fff" }}
-              />
-              <Button_
-                text="Print Transaction"
-                icon={ICONS.receipt}
-                iconSize={16}
-                onPress={handlePrintTransaction}
-                buttonStyle={{ paddingHorizontal: 14, height: 32, marginRight: 8, borderWidth: 1, borderColor: C.buttonLightGreenOutline }}
-                textStyle={{ fontSize: 12, color: C.text }}
-              />
-              <Button_
-                text="Close"
-                icon={ICONS.close1}
-                iconSize={14}
-                onPress={handleClose}
-                buttonStyle={{ paddingHorizontal: 16, height: 32 }}
-                textStyle={{ color: gray(0.5), fontSize: 12 }}
-              />
-            </View>
-          </View>
-
-          {/* ── Transaction Viewer Banner ── */}
-          <View
-            style={{
-              backgroundColor: lightenRGBByPercent(C.green, 55),
-              paddingVertical: 8,
-              paddingHorizontal: 20,
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            <Text style={{ fontSize: 15, fontWeight: "700", color: C.green, letterSpacing: 0.5, textAlign: "center" }}>
-              Transaction View
-            </Text>
-          </View>
-
-          {/* ── Date Banner ── */}
-          {!!txn.millis && (
-            <View style={{ paddingHorizontal: 20, paddingVertical: 8, backgroundColor: gray(0.03) }}>
-              <Text style={{ fontSize: 13, color: gray(0.4) }}>
-                {formatMillisForDisplay(txn.millis, true)}
-              </Text>
-            </View>
-          )}
-
-          {/* ── Body ── */}
-          <ScrollView style={{ flex: 1, padding: 20 }}>
-            {/* Amount section */}
-            <SectionHeader text="AMOUNT" />
-            <View
+          <div className={styles.headerLeft}>
+            <span
+              className={styles.methodBadge}
               style={{
-                borderRadius: 7,
-                borderWidth: 1,
-                borderColor: C.buttonLightGreenOutline,
-                backgroundColor: C.listItemWhite,
-                padding: 12,
-                marginBottom: 12,
+                backgroundColor: isCard
+                  ? lightenRGBByPercent(C.blue, 60)
+                  : lightenRGBByPercent(C.green, 60),
+                color: isCard ? C.blue : C.green,
               }}
             >
-              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-                <Text style={{ fontSize: 15, color: gray(0.45), fontWeight: "600" }}>Amount Captured</Text>
-                <Text style={{ fontSize: 17, fontWeight: "700", color: C.text }}>
-                  {"$" + formatCurrencyDisp(txn.amountCaptured || 0)}
-                </Text>
-              </View>
-              {(txn.salesTax || 0) > 0 && (
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-                  <Text style={{ fontSize: 13, color: gray(0.45) }}>Sales Tax</Text>
-                  <Text style={{ fontSize: 14, color: C.text }}>
-                    {"$" + formatCurrencyDisp(txn.salesTax)}
-                  </Text>
-                </View>
-              )}
-              {isCash && !!txn.amountTendered && (
-                <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 4 }}>
-                  <Text style={{ fontSize: 13, color: gray(0.45) }}>Amount Tendered</Text>
-                  <Text style={{ fontSize: 14, color: C.text }}>
-                    {"$" + formatCurrencyDisp(txn.amountTendered)}
-                  </Text>
-                </View>
-              )}
-              {changeGiven > 0 && (
-                <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                  <Text style={{ fontSize: 13, color: gray(0.45) }}>Change Given</Text>
-                  <Text style={{ fontSize: 14, color: C.green }}>
-                    {"$" + formatCurrencyDisp(changeGiven)}
-                  </Text>
-                </View>
-              )}
-            </View>
+              {(txn.method || "unknown").toUpperCase()}
+            </span>
+            <span className={styles.txnIdLabel} style={{ color: C.textDisabled }}>
+              {"Txn ID: " + txn.id}
+            </span>
+          </div>
+          <div className={styles.headerRight}>
+            <Button
+              text="Refund"
+              colorGradientArr={COLOR_GRADIENTS.red}
+              onPress={handleRefund}
+              buttonStyle={{ paddingHorizontal: 16, height: 32 }}
+              textStyle={{ fontSize: 12, color: C.textOnAccent }}
+            />
+            <Button
+              text="Print Transaction"
+              icon={ICONS.receipt}
+              iconSize={16}
+              onPress={handlePrintTransaction}
+              buttonStyle={{ paddingHorizontal: 14, height: 32, borderWidth: 1, borderColor: C.buttonLightGreenOutline }}
+              textStyle={{ fontSize: 12, color: C.text }}
+            />
+            <Button
+              text="Close"
+              icon={ICONS.close1}
+              iconSize={14}
+              onPress={handleClose}
+              buttonStyle={{ paddingHorizontal: 16, height: 32 }}
+              textStyle={{ color: C.textMuted, fontSize: 12 }}
+            />
+          </div>
+        </div>
 
-            {/* Refund infographic + card list (only if refunds exist) */}
-            {hasRefunds && (
-              <View>
-                <SectionHeader text={"REFUNDS (" + refunds.length + ")"} />
-                <RefundInfoGraphic
-                  amountCaptured={txn.amountCaptured || 0}
-                  totalRefunded={totalRefunded}
-                />
-                {refunds.map((r, idx) => (
-                  <RefundCard key={r.id || idx} refund={r} index={idx} />
-                ))}
-              </View>
+        {/* ── Transaction Viewer Banner ── */}
+        <div className={styles.banner} style={{ backgroundColor: lightenRGBByPercent(C.green, 55) }}>
+          <span className={styles.bannerText} style={{ color: C.green }}>
+            Transaction View
+          </span>
+        </div>
+
+        {/* ── Date Banner ── */}
+        {!!txn.millis && (
+          <div className={styles.dateBanner} style={{ backgroundColor: C.surfaceAlt }}>
+            <span className={styles.dateBannerText} style={{ color: C.textMuted }}>
+              {formatMillisForDisplay(txn.millis, true)}
+            </span>
+          </div>
+        )}
+
+        {/* ── Body ── */}
+        <div className={styles.scroll}>
+          {/* Amount section */}
+          <SectionHeader text="AMOUNT" />
+          <div
+            className={styles.amountCard}
+            style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
+          >
+            <div className={styles.amountRow}>
+              <span className={styles.amountLabelMain} style={{ color: C.textMuted }}>Amount Captured</span>
+              <span className={styles.amountValueMain} style={{ color: C.text }}>
+                {"$" + formatCurrencyDisp(txn.amountCaptured || 0)}
+              </span>
+            </div>
+            {(txn.salesTax || 0) > 0 && (
+              <div className={styles.amountRow}>
+                <span className={styles.amountLabelSub} style={{ color: C.textMuted }}>Sales Tax</span>
+                <span className={styles.amountValueSub} style={{ color: C.text }}>
+                  {"$" + formatCurrencyDisp(txn.salesTax)}
+                </span>
+              </div>
             )}
+            {isCash && !!txn.amountTendered && (
+              <div className={styles.amountRow}>
+                <span className={styles.amountLabelSub} style={{ color: C.textMuted }}>Amount Tendered</span>
+                <span className={styles.amountValueSub} style={{ color: C.text }}>
+                  {"$" + formatCurrencyDisp(txn.amountTendered)}
+                </span>
+              </div>
+            )}
+            {changeGiven > 0 && (
+              <div className={styles.amountRow} style={{ marginBottom: 0 }}>
+                <span className={styles.amountLabelSub} style={{ color: C.textMuted }}>Change Given</span>
+                <span className={styles.amountValueSub} style={{ color: C.green }}>
+                  {"$" + formatCurrencyDisp(changeGiven)}
+                </span>
+              </div>
+            )}
+          </div>
 
-            {/* Card details */}
-            {isCard && (
-              <View>
-                <SectionHeader text="CARD DETAILS" />
-                <DetailRow label="Card Type" value={txn.cardType} />
-                <DetailRow label="Last 4" value={txn.last4 ? "..." + txn.last4 : null} />
+          {/* Refund infographic + card list (only if refunds exist) */}
+          {hasRefunds && (
+            <div>
+              <SectionHeader text={"REFUNDS (" + refunds.length + ")"} />
+              <RefundInfoGraphic
+                amountCaptured={txn.amountCaptured || 0}
+                totalRefunded={totalRefunded}
+              />
+              {refunds.map((r, idx) => (
+                <RefundCard key={r.id || idx} refund={r} index={idx} />
+              ))}
+            </div>
+          )}
+
+          {/* Card details */}
+          {isCard && (
+            <div>
+              <SectionHeader text="CARD DETAILS" />
+              <DetailRow label="Card Type" value={txn.cardType} />
+              <DetailRow label="Last 4" value={txn.last4 ? "..." + txn.last4 : null} />
+              <DetailRow
+                label="Expiration"
+                value={txn.expMonth && txn.expYear ? txn.expMonth + "/" + txn.expYear : null}
+              />
+              <DetailRow label="Card Issuer" value={txn.cardIssuer} />
+              <DetailRow label="Auth Code" value={txn.authorizationCode} />
+              <DetailRow label="Processor" value={txn.paymentProcessor} />
+
+              <SectionHeader text="STRIPE" />
+              <DetailRow label="Charge ID" value={txn.chargeID} valueStyle={{ fontSize: 11 }} />
+              <DetailRow label="Payment Intent" value={txn.paymentIntentID} valueStyle={{ fontSize: 11 }} />
+              <DetailRow label="Network Txn ID" value={txn.networkTransactionID} valueStyle={{ fontSize: 11 }} />
+              {!!txn.receiptURL && (
                 <DetailRow
-                  label="Expiration"
-                  value={txn.expMonth && txn.expYear ? txn.expMonth + "/" + txn.expYear : null}
+                  label="Receipt URL"
+                  value="View Receipt"
+                  valueColor={C.blue}
+                  valueStyle={{ textDecoration: "underline" }}
+                  onPress={() => {
+                    try { window.open(txn.receiptURL, "_blank"); } catch (e) {}
+                  }}
                 />
-                <DetailRow label="Card Issuer" value={txn.cardIssuer} />
-                <DetailRow label="Auth Code" value={txn.authorizationCode} />
-                <DetailRow label="Processor" value={txn.paymentProcessor} />
+              )}
+            </div>
+          )}
 
-                <SectionHeader text="STRIPE" />
-                <DetailRow label="Charge ID" value={txn.chargeID} valueStyle={{ fontSize: 11 }} />
-                <DetailRow label="Payment Intent" value={txn.paymentIntentID} valueStyle={{ fontSize: 11 }} />
-                <DetailRow label="Network Txn ID" value={txn.networkTransactionID} valueStyle={{ fontSize: 11 }} />
-                {!!txn.receiptURL && (
-                  <DetailRow
-                    label="Receipt URL"
-                    value="View Receipt"
-                    valueColor={C.blue}
-                    valueStyle={{ textDecorationLine: "underline" }}
-                    onPress={() => {
-                      try { window.open(txn.receiptURL, "_blank"); } catch (e) {}
-                    }}
-                  />
-                )}
-              </View>
-            )}
+          {/* Cash details */}
+          {isCash && (
+            <div>
+              <SectionHeader text="CASH DETAILS" />
+              <DetailRow label="Processor" value={txn.paymentProcessor || "cash"} />
+            </div>
+          )}
 
-            {/* Cash details */}
-            {isCash && (
-              <View>
-                <SectionHeader text="CASH DETAILS" />
-                <DetailRow label="Processor" value={txn.paymentProcessor || "cash"} />
-              </View>
-            )}
-
-            {/* Bottom spacer */}
-            <View style={{ height: 20 }} />
-          </ScrollView>
-        </View>
-    </Dialog_>
+          {/* Bottom spacer */}
+          <div className={styles.bottomSpacer} />
+        </div>
+      </div>
+    </Dialog>
   );
 };

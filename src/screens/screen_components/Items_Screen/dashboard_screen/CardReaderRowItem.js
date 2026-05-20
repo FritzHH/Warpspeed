@@ -2,7 +2,7 @@ import React from "react";
 import styles from "./CardReaderRowItem.module.css";
 import { Button, Image, TextInput } from "../../../../dom_components";
 import { C, ICONS } from "../../../../styles";
-import { gray } from "../../../../utils";
+
 
 export function CardReaderRowItem({
   reader,
@@ -28,10 +28,10 @@ export function CardReaderRowItem({
     >
       <div
         className={styles.statusDot}
-        style={{ backgroundColor: isOnline ? C.green : gray(0.4) }}
+        style={{ backgroundColor: isOnline ? C.green : C.borderStrong }}
       />
       <div className={styles.readerInfo}>
-        <span className={styles.readerSubtitle} style={{ color: gray(0.5) }}>
+        <span className={styles.readerSubtitle} style={{ color: C.textMuted }}>
           {reader.device_type ? reader.device_type + "  ·  " : ""}
           {shortId}
         </span>
@@ -55,7 +55,7 @@ export function CardReaderRowItem({
               value={isEditing ? labelDraft : ""}
               onChangeText={onLabelChange}
               placeholder="Enter label..."
-              placeholderTextColor={gray(0.4)}
+              placeholderTextColor={C.textMuted}
               style={{
                 outlineWidth: 0,
                 fontSize: 14,

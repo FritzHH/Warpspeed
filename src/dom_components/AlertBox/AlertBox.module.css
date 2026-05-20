@@ -5,7 +5,7 @@
   right: 0;
   bottom: 0;
   z-index: 5000;
-  background-color: rgba(0, 0, 0, 0.4);
+  background-color: var(--surface-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -38,7 +38,7 @@
 .title {
   font-weight: 500;
   margin-top: 25px;
-  color: red;
+  color: var(--danger);
   font-size: 25px;
   text-align: center;
 }

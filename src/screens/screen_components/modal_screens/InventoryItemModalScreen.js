@@ -1,13 +1,4 @@
 /*eslint-disable*/
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  TouchableWithoutFeedback,
-  ScrollView,
-} from "react-native-web";
-import { createPortal } from "react-dom";
 import { useState, useRef } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import debounce from "lodash/debounce";
@@ -17,32 +8,25 @@ import {
   useLoginStore,
 } from "../../../stores";
 import {
-  Image_,
-  Button_,
-  TextInput_,
-  DropdownMenu,
-  LoginModalScreen,
+  CheckBox,
+  CurrencyInput,
   CustomerQuickNotes,
+  Dialog,
+  DropdownMenu,
+  Image,
+  LoginModal,
   Tooltip,
-  SHADOW_RADIUS_PROTO,
-} from "../../../components";
-import { CheckBox } from "../../../dom_components";
-import { C, ICONS, Z } from "../../../styles";
-import {
-  formatCurrencyDisp,
-  usdTypeMask,
-  gray,
-  log,
-  showAlert,
-  deepEqual,
-  localStorageWrapper,
-} from "../../../utils";
+} from "../../../dom_components";
+import { C, ICONS } from "../../../styles";
+import styles from "./InventoryItemModalScreen.module.css";
+import { formatCurrencyDisp, showAlert, deepEqual, localStorageWrapper } from "../../../utils";
 import {
   dbSaveInventoryItem,
   dbDeleteInventoryItem,
   dbSavePrintObj,
 } from "../../../db_calls_wrapper";
 import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
+import { QuickButtonPickerModal } from "./QuickButtonPickerModal";
 
 const CATEGORIES = ["Item", "Labor"];
 
@@ -76,252 +60,9 @@ function getButtonsContainingItem(itemID, allButtons) {
     }));
 }
 
-// ─── Quick Button Picker Modal ─────────────────────────────────────────────
-
-const SubMenuRow = ({ parentID, itemID, quickButtons, onToggle, expandedIDs, toggleExpanded, depth }) => {
-  let children = quickButtons.filter((b) => b.parentID === parentID);
-  if (children.length === 0) return null;
-  let expandedChildren = children.filter((c) => expandedIDs.includes(c.id));
-  return (
-    <View style={{ marginTop: 6, marginLeft: depth * 8 }}>
-      {/* All chips on the same row */}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
-        {children.map((child) => {
-          let childIsIn = buttonHasItem(child, itemID);
-          let hasGrandchildren = quickButtons.some((b) => b.parentID === child.id);
-          let isExpanded = expandedIDs.includes(child.id);
-          return (
-            <TouchableOpacity
-              key={child.id}
-              onPress={() => {
-                if (hasGrandchildren) toggleExpanded(child.id);
-                else onToggle(child.id);
-              }}
-              style={{
-                paddingHorizontal: 8,
-                paddingVertical: 4,
-                borderRadius: 5,
-                backgroundColor: isExpanded ? "rgb(245,166,35)" : childIsIn ? C.green : gray(0.1),
-                borderWidth: (isExpanded || childIsIn) ? 0 : 1,
-                borderColor: gray(0.15),
-                flexDirection: "row",
-                alignItems: "center",
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: 12,
-                  color: (isExpanded || childIsIn) ? "white" : C.text,
-                  fontWeight: (isExpanded || childIsIn) ? "600" : "400",
-                }}
-              >
-                {child.name || "(unnamed)"}
-              </Text>
-              {hasGrandchildren && (
-                <Text style={{ fontSize: 11, color: (isExpanded || childIsIn) ? "white" : gray(0.4), marginLeft: 4 }}>
-                  {isExpanded ? "\u25BC" : "\u25B6"}
-                </Text>
-              )}
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-      {/* Expanded sub-menus rendered below the row */}
-      {expandedChildren.map((child) => (
-        <SubMenuRow
-          key={child.id}
-          parentID={child.id}
-          itemID={itemID}
-          quickButtons={quickButtons}
-          onToggle={onToggle}
-          expandedIDs={expandedIDs}
-          toggleExpanded={toggleExpanded}
-          depth={depth + 1}
-        />
-      ))}
-    </View>
-  );
-};
-
-const QuickButtonPickerModal = ({ itemID, quickButtons, onToggle, onClose }) => {
-  const [sExpandedIDs, _setExpandedIDs] = useState([]);
-
-  function toggleExpanded(id) {
-    _setExpandedIDs((prev) =>
-      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
-    );
-  }
-
-  let rootButtons = quickButtons.filter((b) => !b.parentID);
-
-  return createPortal(
-    <div
-      onClick={onClose}
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,.4)",
-        zIndex: 10002,
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "center",
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "45%",
-          maxHeight: "calc(100vh - 40px)",
-          display: "flex",
-          flexDirection: "column",
-        }}
-      >
-            <View
-              style={{
-                backgroundColor: "white",
-                borderRadius: 12,
-                padding: 20,
-                ...SHADOW_RADIUS_PROTO,
-                shadowOffset: { width: 3, height: 3 },
-              }}
-            >
-              {/* Header */}
-              <View
-                style={{
-                  flexDirection: "row",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  marginBottom: 12,
-                }}
-              >
-                <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>
-                  Add to Quick Button Menu
-                </Text>
-                <TouchableOpacity onPress={onClose} style={{ padding: 4 }}>
-                  <Image_ icon={ICONS.close1} size={16} />
-                </TouchableOpacity>
-              </View>
-
-              {/* Button list */}
-              <ScrollView showsVerticalScrollIndicator={true} style={{ flex: 1 }}>
-                {rootButtons.length === 0 ? (
-                  <Text style={{ fontSize: 14, color: gray(0.5), paddingVertical: 10 }}>
-                    No quick buttons configured
-                  </Text>
-                ) : (
-                  rootButtons.map((btn) => {
-                    let hasChildren = quickButtons.some((b) => b.parentID === btn.id);
-                    let isIn = buttonHasItem(btn, itemID);
-                    let isExpanded = sExpandedIDs.includes(btn.id);
-                    return (
-                      <View
-                        key={btn.id}
-                        style={{
-                          paddingVertical: 8,
-                          paddingHorizontal: 10,
-                          marginBottom: 4,
-                          backgroundColor: isIn ? "rgba(88,145,65,0.08)" : gray(0.03),
-                          borderRadius: 8,
-                          borderWidth: isIn ? 1 : 0,
-                          borderColor: isIn ? C.green : "transparent",
-                        }}
-                      >
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                          }}
-                        >
-                          <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-                            <Text style={{ fontSize: 15, color: C.text }}>
-                              {btn.name || "(unnamed)"}
-                            </Text>
-                            {hasChildren && (
-                              <TouchableOpacity
-                                onPress={() => toggleExpanded(btn.id)}
-                                style={{
-                                  marginLeft: 8,
-                                  paddingHorizontal: 6,
-                                  paddingVertical: 2,
-                                  borderRadius: 4,
-                                  backgroundColor: isExpanded ? "rgb(245,166,35)" : gray(0.12),
-                                }}
-                              >
-                                <Text style={{ fontSize: 12, color: isExpanded ? "white" : gray(0.5) }}>
-                                  {isExpanded ? "\u25BC" : "\u25B6"}
-                                </Text>
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                          <TouchableOpacity
-                            onPress={() => onToggle(btn.id)}
-                            style={{
-                              paddingHorizontal: 14,
-                              paddingVertical: 6,
-                              borderRadius: 5,
-                              backgroundColor: isIn ? C.red : C.green,
-                            }}
-                          >
-                            <Text style={{ fontSize: 13, color: "white", fontWeight: "600" }}>
-                              {isIn ? "Remove" : "Add"}
-                            </Text>
-                          </TouchableOpacity>
-                        </View>
-                        {isExpanded && (
-                          <SubMenuRow
-                            parentID={btn.id}
-                            itemID={itemID}
-                            quickButtons={quickButtons}
-                            onToggle={onToggle}
-                            expandedIDs={sExpandedIDs}
-                            toggleExpanded={toggleExpanded}
-                            depth={0}
-                          />
-                        )}
-                      </View>
-                    );
-                  })
-                )}
-              </ScrollView>
-            </View>
-      </div>
-    </div>,
-    document.body
-  );
-};
-
-const CurrencyField = ({ style, cents, onChangeText, placeholder }) => {
-  const [sFocused, _setFocused] = useState(false);
-  const [sLocalDisplay, _setLocalDisplay] = useState("");
-
-  return (
-    <TextInput
-      style={style}
-      value={sFocused ? sLocalDisplay : formatCurrencyDisp(cents)}
-      placeholder={placeholder}
-      placeholderTextColor={gray(0.35)}
-      onFocus={() => {
-        _setFocused(true);
-        _setLocalDisplay("");
-      }}
-      onBlur={() => _setFocused(false)}
-      onChangeText={(v) => {
-        let digits = v.replace(/\D/g, "");
-        let { display } = usdTypeMask(digits);
-        _setLocalDisplay(display);
-        onChangeText(digits);
-      }}
-    />
-  );
-};
-
 // ─── main component ────────────────────────────────────────────────────────
 
-export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }) => {
+export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
   const zQuickItemButtons = useSettingsStore((s) => s.settings?.quickItemButtons, deepEqual);
   const zAutoCustomerNoteTexts = useSettingsStore((s) => s.settings?.autoCustomerNoteTexts, deepEqual);
   const zShowLoginScreen = useLoginStore((state) => state.showLoginScreen);
@@ -388,8 +129,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
     handleExit();
   }
 
-  function handlePriceChange(fieldName, rawInput) {
-    const { cents } = usdTypeMask(rawInput);
+  function handlePriceChange(fieldName, cents) {
     let updated = { ...sItem, [fieldName]: cents };
     if (fieldName === "price" && cents > 0) updated.minutes = 0;
     _setItem(updated);
@@ -533,19 +273,13 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
 
   // ─── render helpers ────────────────────────────────────────────────────
 
-  const sectionCardStyle = { borderWidth: 1, borderColor: gray(0.15), borderRadius: 10, backgroundColor: gray(0.03), padding: 12, marginTop: 10 };
-  const labelStyle = { fontStyle: "italic", color: gray(0.45), fontSize: 13, marginTop: 4 };
-  const valueStyle = { fontSize: 15, color: C.text, marginTop: 2 };
-  const inputStyle = {
-    fontSize: 15,
+  const sectionCardInline = { borderColor: C.borderSubtle, backgroundColor: C.surfaceAlt };
+  const inputInline = { color: C.text, borderBottomColor: C.buttonLightGreenOutline };
+  const textareaInline = {
     color: C.text,
-    marginTop: 2,
-    borderBottomWidth: 1,
-    borderBottomColor: C.buttonLightGreenOutline,
-    paddingVertical: 4,
-    outlineStyle: "none",
+    backgroundColor: C.listItemWhite,
+    boxShadow: "inset 0 0 0 1px " + C.buttonLightGreenOutline,
   };
-  const sectionTitle = { fontSize: 14, fontWeight: "600", color: C.text, marginTop: 20, marginBottom: 6 };
 
   function renderField(label, fieldName, opts = {}) {
     let val = sItem[fieldName];
@@ -554,64 +288,66 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
     if (!opts.currency && !sEditing && (val === "" || val === 0)) val = "-";
 
     return (
-      <View style={{ flex: opts.flex, marginRight: opts.last ? 0 : 10 }}>
-        <Text style={labelStyle}>{label}{sEditing && opts.hint ? <Text style={{ fontWeight: "normal", color: gray(0.4) }}>{opts.hint}</Text> : null}</Text>
+      <div
+        className={`${styles.field}${opts.last ? " " + styles.fieldLast : ""}`}
+        style={opts.flex ? { flex: opts.flex } : undefined}
+      >
+        <label className={styles.fieldLabel} style={{ color: C.textMuted }}>
+          {label}
+          {sEditing && opts.hint ? (
+            <span className={styles.fieldHint} style={{ color: C.textMuted }}>{opts.hint}</span>
+          ) : null}
+        </label>
         {sEditing ? (
           opts.currency ? (
-            <CurrencyField
-              style={inputStyle}
+            <CurrencyInput
+              className={styles.fieldInput}
+              style={inputInline}
               cents={sItem[fieldName]}
-              onChangeText={(v) => handlePriceChange(fieldName, v)}
+              onChangeCents={(c) => handlePriceChange(fieldName, c)}
               placeholder="$0.00"
             />
           ) : opts.numeric ? (
-            <TextInput
-              style={inputStyle}
+            <input
+              type="text"
+              inputMode="numeric"
+              className={styles.fieldInput}
+              style={inputInline}
               value={String(sItem[fieldName] || "")}
-              onChangeText={(v) => handleMinutesChange(v)}
-              keyboardType="numeric"
+              onChange={(e) => handleMinutesChange(e.target.value)}
             />
           ) : opts.multiline ? (
-            <TextInput_
-              style={{
-                padding: 6,
-                paddingLeft: 8,
-                lineHeight: 18,
-                fontSize: 15,
-                color: C.text,
-                outlineWidth: 0,
-                outlineStyle: "none",
-                overflow: "hidden",
-                resize: "none",
-                borderWidth: 0,
-                borderRadius: 5,
-                backgroundColor: C.listItemWhite,
-                marginTop: 2,
-                boxShadow: "inset 0 0 0 1px " + C.buttonLightGreenOutline,
-              }}
+            <textarea
+              className={styles.fieldTextarea}
+              style={textareaInline}
+              rows={10}
               value={String(sItem[fieldName] || "")}
-              onChangeText={(v) => handleFieldChange(fieldName, v)}
-              multiline={true}
-              numberOfLines={10}
-              debounceMs={0}
+              onChange={(e) => handleFieldChange(fieldName, e.target.value)}
             />
           ) : (
-            <TextInput
-              style={inputStyle}
+            <input
+              type="text"
+              inputMode={opts.numbersOnly ? "numeric" : undefined}
+              className={styles.fieldInput}
+              style={inputInline}
               value={String(sItem[fieldName] || "")}
-              onChangeText={(v) => {
+              onChange={(e) => {
+                let v = e.target.value;
                 if (opts.numbersOnly) v = v.replace(/[^0-9]/g, "");
                 handleFieldChange(fieldName, v);
               }}
               autoFocus={opts.autoFocus}
-              keyboardType={opts.numbersOnly ? "numeric" : undefined}
-              inputMode={opts.numbersOnly ? "numeric" : undefined}
             />
           )
         ) : (
-          <Text style={{ ...valueStyle, ...(opts.multiline ? { whiteSpace: "pre-wrap" } : {}) }}>{String(val ?? "-")}</Text>
+          <span
+            className={`${styles.fieldValue}${opts.multiline ? " " + styles.fieldValueMultiline : ""}`}
+            style={{ color: C.text }}
+          >
+            {String(val ?? "-")}
+          </span>
         )}
-      </View>
+      </div>
     );
   }
 
@@ -622,37 +358,18 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
   // ─── main render ───────────────────────────────────────────────────────
 
   const modalContent = (
-    <TouchableWithoutFeedback onPress={() => {}}>
-      <View
-        style={{
-          width: "55%",
-          height: "90vh",
-          backgroundColor: "white",
-          borderRadius: 15,
-          padding: 20,
-          ...SHADOW_RADIUS_PROTO,
-          shadowOffset: { width: 3, height: 3 },
-          flexDirection: "column",
-        }}
-      >
-          {zShowLoginScreen && <LoginModalScreen modalVisible={true} />}
+      <div className={styles.card}>
+          {zShowLoginScreen && <LoginModal modalVisible={true} />}
 
           {/* HEADER */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 5,
-            }}
-          >
-            <Text style={{ fontSize: 18, fontWeight: "600", color: C.text }}>
+          <div className={styles.header}>
+            <span className={styles.headerTitle} style={{ color: C.text }}>
               {isNew ? "New Inventory Item" : "Inventory Item"}
-            </Text>
-            <View style={{ flexDirection: "row", alignItems: "center" }}>
+            </span>
+            <div className={styles.headerRight}>
               {/* Print Label */}
               {!isNew && templateEntries.length > 0 && (
-                <View style={{ flexDirection: "row", alignItems: "center", marginRight: 10 }}>
+                <div className={styles.printWrap}>
                   <DropdownMenu
                     dataArr={templateEntries.map(([slug, t]) => t.name)}
                     onSelect={(name, idx) => handleQuickPrint(templateEntries[idx][0])}
@@ -666,45 +383,37 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
                     }}
                   />
                   {sPrintSuccess && (
-                    <Text style={{ fontSize: 11, color: C.green, marginLeft: 4 }}>Sent!</Text>
+                    <span className={styles.printSent} style={{ color: C.green }}>Sent!</span>
                   )}
-                </View>
+                </div>
               )}
-            </View>
-          </View>
+            </div>
+          </div>
 
-          <ScrollView style={{ flex: 1 }} contentContainerStyle={{ justifyContent: "space-between", flexGrow: 1 }}>
-            <View>
+          <div className={styles.scrollBody}>
+            <div className={styles.scrollBodyInner}>
             {/* Names */}
-            <View style={sectionCardStyle}>
+            <div className={styles.sectionCard} style={sectionCardInline}>
               {renderField("Catalog Name", "formalName", { autoFocus: true })}
               {renderField("Quick Button/Descriptive Name", "informalName", { multiline: true, hint: " -- use enter key to space name to fit quick button card if desired" })}
-            </View>
+            </div>
 
-            {/* Brand + Category + Minutes */}
-            <View style={{ ...sectionCardStyle, flexDirection: "row", gap: 10 }}>
-              <View style={{ flex: 1 }}>
+            {/* Brand + Category */}
+            <div className={`${styles.sectionCard} ${styles.sectionCardRow}`} style={sectionCardInline}>
+              <div className={styles.brandWrap}>
                 {renderField("Brand", "brand")}
-              </View>
-              <View style={{ width: 120 }}>
-                <Text style={labelStyle}>Category</Text>
+              </div>
+              <div className={styles.categoryWrap}>
+                <label className={styles.fieldLabel} style={{ color: C.textMuted }}>Category</label>
                 {sEditing ? (
                   <select
                     value={sItem.category || "Item"}
                     onChange={(e) => handleFieldChange("category", e.target.value)}
+                    className={styles.categorySelect}
                     style={{
-                      width: 120,
-                      marginTop: 4,
-                      paddingVertical: 4,
-                      paddingHorizontal: 6,
-                      borderRadius: 6,
-                      borderWidth: 1,
                       borderColor: C.buttonLightGreenOutline,
                       backgroundColor: C.listItemWhite,
-                      fontSize: 14,
                       color: C.text,
-                      outlineStyle: "none",
-                      cursor: "pointer",
                     }}
                   >
                     {CATEGORIES.map((cat) => (
@@ -712,173 +421,163 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
                     ))}
                   </select>
                 ) : (
-                  <Text style={valueStyle}>{sItem.category || "Item"}</Text>
+                  <span className={styles.fieldValue} style={{ color: C.text }}>{sItem.category || "Item"}</span>
                 )}
-              </View>
-            </View>
+              </div>
+            </div>
 
             {/* Prices */}
-            <View style={{ ...sectionCardStyle, flexDirection: "row" }}>
+            <div className={`${styles.sectionCard} ${styles.sectionCardRowPrices}`} style={sectionCardInline}>
               {sItem.category === "Labor" && (
-                <View style={{ width: 80, marginRight: 10 }}>
+                <div className={styles.minutesWrap}>
                   {renderField("Minutes", "minutes", { numeric: true })}
-                </View>
+                </div>
               )}
               {renderField("Price", "price", { currency: true, flex: 1 })}
               {renderField("Sale Price", "salePrice", { currency: true, flex: 1 })}
               {renderField("Cost", "cost", { currency: true, flex: 1, last: true })}
-            </View>
+            </div>
 
             {/* Barcodes */}
-            <View style={{ ...sectionCardStyle, flexDirection: "row", gap: 10 }}>
-              <View style={{ flex: 1 }}>
+            <div className={`${styles.sectionCard} ${styles.sectionCardRow}`} style={sectionCardInline}>
+              <div className={styles.barcodesCol}>
                 {renderField("Primary Barcode", "primaryBarcode", { numbersOnly: true })}
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={labelStyle}>Additional Barcodes</Text>
+              </div>
+              <div className={styles.barcodesCol}>
+                <label className={styles.fieldLabel} style={{ color: C.textMuted }}>Additional Barcodes</label>
                 {(sItem.barcodes || []).map((code, i) => (
-                  <View key={i} style={{ flexDirection: "row", alignItems: "center", marginTop: 4 }}>
+                  <div key={i} className={styles.barcodeRow}>
                     {sEditing ? (
-                      <TextInput
-                        style={{ ...inputStyle, flex: 1 }}
-                        value={code}
-                        keyboardType="numeric"
+                      <input
+                        type="text"
                         inputMode="numeric"
-                        onChangeText={(v) => {
-                          v = v.replace(/[^0-9]/g, "");
+                        className={`${styles.fieldInput} ${styles.barcodeInputFlex}`}
+                        style={inputInline}
+                        value={code}
+                        onChange={(e) => {
+                          let v = e.target.value.replace(/[^0-9]/g, "");
                           let updated = [...(sItem.barcodes || [])];
                           updated[i] = v;
                           handleFieldChange("barcodes", updated);
                         }}
                       />
                     ) : (
-                      <Text style={{ ...valueStyle, flex: 1 }}>{code}</Text>
+                      <span className={`${styles.fieldValue} ${styles.barcodeInputFlex}`} style={{ color: C.text }}>{code}</span>
                     )}
                     {sEditing && (
-                      <TouchableOpacity
-                        onPress={() => {
+                      <button
+                        type="button"
+                        className={styles.barcodeDeleteBtn}
+                        onClick={() => {
                           let updated = (sItem.barcodes || []).filter((_, idx) => idx !== i);
                           handleFieldChange("barcodes", updated);
                         }}
-                        style={{ padding: 4, marginLeft: 6 }}
                       >
-                        <Image_ icon={ICONS.trash} size={16} />
-                      </TouchableOpacity>
+                        <Image icon={ICONS.trash} size={16} />
+                      </button>
                     )}
-                  </View>
+                  </div>
                 ))}
                 {sEditing && (
-                  <TouchableOpacity
-                    onPress={() => {
+                  <button
+                    type="button"
+                    className={styles.barcodeAddBtn}
+                    onClick={() => {
                       let updated = [...(sItem.barcodes || []), ""];
                       handleFieldChange("barcodes", updated);
                     }}
-                    style={{ marginTop: 6, flexDirection: "row", alignItems: "center" }}
                   >
-                    <Image_ icon={ICONS.add} size={20} style={{ tintColor: C.green }} />
-                    <Text style={{ fontSize: 13, color: C.green, marginLeft: 4 }}>Add Barcode</Text>
-                  </TouchableOpacity>
+                    <Image icon={ICONS.add} size={20} />
+                    <span className={styles.barcodeAddText} style={{ color: C.green }}>Add Barcode</span>
+                  </button>
                 )}
                 {!sEditing && (sItem.barcodes || []).length === 0 && (
-                  <Text style={valueStyle}>-</Text>
+                  <span className={styles.fieldValue} style={{ color: C.text }}>-</span>
                 )}
-              </View>
-            </View>
+              </div>
+            </div>
 
-            <View style={{ alignItems: "center", marginVertical: 10 }}>
+            <div className={styles.receiptNoteRow}>
               <CheckBox
                 text="Receipt Note Required"
                 isChecked={!!sItem.receiptNoteRequired}
                 onCheck={() => handleFieldChange("receiptNoteRequired", !sItem.receiptNoteRequired)}
-                textStyle={{ fontSize: 14, color: sItem.receiptNoteRequired ? C.green : gray(0.5) }}
+                textStyle={{ fontSize: 14, color: sItem.receiptNoteRequired ? C.green : C.textMuted }}
               />
-            </View>
+            </div>
 
-            <View style={{ flexDirection: "row", gap: 10, marginTop: 10 }}>
+            <div className={styles.twoCol}>
               {/* SECTION 2: Quick Button Placement */}
-              <View style={{ ...sectionCardStyle, flex: 1, marginTop: 0 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
+              <div className={styles.twoColItem} style={sectionCardInline}>
+                <div className={styles.sectionHeader}>
+                  <div className={styles.sectionHeaderLeft}>
+                    <span className={styles.sectionTitle} style={{ color: C.text }}>
                       Quick Button Placement
-                    </Text>
+                    </span>
                     <Tooltip text="Assign this item to quick button menus for fast access" position="right">
-                      <Image_ icon={ICONS.info} size={16} style={{ marginLeft: 6, opacity: 0.4 }} />
+                      <Image icon={ICONS.info} size={16} className={styles.sectionInfoIcon} />
                     </Tooltip>
-                  </View>
-                  <TouchableOpacity
-                    onPress={() => _setShowQBPicker(true)}
-                    style={{ padding: 4 }}
+                  </div>
+                  <button
+                    type="button"
+                    className={styles.sectionAddBtn}
+                    onClick={() => _setShowQBPicker(true)}
                   >
-                    <Image_ icon={ICONS.add} size={30} style={{ tintColor: C.green }} />
-                  </TouchableOpacity>
-                </View>
+                    <Image icon={ICONS.add} size={30} />
+                  </button>
+                </div>
                 {placements.length === 0 ? (
-                  <Text style={{ fontSize: 13, color: gray(0.5), marginBottom: 6 }}>
+                  <span className={styles.placementsEmpty} style={{ color: C.textMuted }}>
                     Not assigned to any quick button menu
-                  </Text>
+                  </span>
                 ) : (
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 4 }}>
+                  <div className={styles.placementsWrap}>
                     {placements.map((p) => (
-                      <View
-                        key={p.buttonID}
-                        style={{
-                          flexDirection: "row",
-                          alignItems: "center",
-                          paddingVertical: 5,
-                          paddingHorizontal: 8,
-                          backgroundColor: "white",
-                          borderRadius: 6,
-                        }}
-                      >
-                        <Text style={{ fontSize: 13, color: C.text }}>{p.path}</Text>
-                        <TouchableOpacity
-                          onPress={() => handleRemoveFromButton(p.buttonID)}
-                          style={{ padding: 4, marginLeft: 4 }}
+                      <div key={p.buttonID} className={styles.placementChip}>
+                        <span className={styles.placementChipText} style={{ color: C.text }}>{p.path}</span>
+                        <button
+                          type="button"
+                          className={styles.placementChipDelete}
+                          onClick={() => handleRemoveFromButton(p.buttonID)}
                         >
-                          <Image_ icon={ICONS.trash} size={18} />
-                        </TouchableOpacity>
-                      </View>
+                          <Image icon={ICONS.trash} size={18} />
+                        </button>
+                      </div>
                     ))}
-                  </View>
+                  </div>
                 )}
-              </View>
+              </div>
 
               {/* SECTION 3: Auto Customer Note */}
-              <View style={{ ...sectionCardStyle, flex: 1, marginTop: 0 }}>
-                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-                  <View style={{ flexDirection: "row", alignItems: "center" }}>
-                    <Text style={{ fontSize: 14, fontWeight: "600", color: C.text }}>
+              <div className={styles.twoColItem} style={sectionCardInline}>
+                <div className={styles.sectionHeader}>
+                  <div className={styles.sectionHeaderLeft}>
+                    <span className={styles.sectionTitle} style={{ color: C.text }}>
                       Auto Customer Note
-                    </Text>
+                    </span>
                     <Tooltip text="When this item is added to a workorder, these notes will automatically appear in Customer Notes" position="right">
-                      <Image_ icon={ICONS.info} size={16} style={{ marginLeft: 6, opacity: 0.4 }} />
+                      <Image icon={ICONS.info} size={16} className={styles.sectionInfoIcon} />
                     </Tooltip>
-                  </View>
+                  </div>
                   <Tooltip text="Select from pre-configured customer quick notes to auto-add when this item is used" position="bottom">
-                    <TouchableOpacity
-                      onPress={(e) => {
-                        const nativeEvent = e.nativeEvent || e;
-                        _setShowQuickNotePicker({ x: nativeEvent.pageX, y: nativeEvent.pageY });
+                    <button
+                      type="button"
+                      className={styles.autoNoteAddBtn}
+                      onClick={(e) => {
+                        _setShowQuickNotePicker({ x: e.pageX, y: e.pageY });
                       }}
                       style={{
-                        flexDirection: "row",
-                        alignItems: "center",
                         backgroundColor: C.buttonLightGreen,
-                        borderWidth: 1,
                         borderColor: C.buttonLightGreenOutline,
-                        borderRadius: 5,
-                        paddingHorizontal: 10,
-                        paddingVertical: 4,
                       }}
                     >
-                      <Image_ icon={ICONS.add} size={16} style={{ tintColor: C.green }} />
-                      <Text style={{ fontSize: 13, color: C.text, marginLeft: 4 }}>Quick Notes</Text>
-                    </TouchableOpacity>
+                      <Image icon={ICONS.add} size={16} />
+                      <span className={styles.autoNoteAddText} style={{ color: C.text }}>Quick Notes</span>
+                    </button>
                   </Tooltip>
-                </View>
+                </div>
                 {sAutoQuickNoteIDs.length > 0 && (
-                  <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 5, marginBottom: 8 }}>
+                  <div className={styles.autoNoteChipsRow}>
                     {sAutoQuickNoteIDs.map((qnID) => {
                       let label = "";
                       zCustomerQuickNotes.forEach((cat) => {
@@ -887,50 +586,39 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
                       });
                       if (!label) return null;
                       return (
-                        <TouchableOpacity
+                        <button
                           key={qnID}
-                          onPress={() => handleAutoQuickNoteToggle({ id: qnID })}
-                          style={{
-                            backgroundColor: "rgb(240, 200, 200)",
-                            borderRadius: 6,
-                            paddingHorizontal: 10,
-                            paddingVertical: 5,
-                            flexDirection: "row",
-                            alignItems: "center",
-                          }}
+                          type="button"
+                          className={styles.autoNoteChip}
+                          onClick={() => handleAutoQuickNoteToggle({ id: qnID })}
                         >
-                          <Text style={{ fontSize: 13, color: C.lightred, fontWeight: "500" }}>
+                          <span className={styles.autoNoteChipLabel} style={{ color: C.lightred }}>
                             {label}
-                          </Text>
-                          <Text style={{ fontSize: 11, color: C.lightred, marginLeft: 6 }}>✕</Text>
-                        </TouchableOpacity>
+                          </span>
+                          <span className={styles.autoNoteChipX} style={{ color: C.lightred }}>✕</span>
+                        </button>
                       );
                     })}
-                  </View>
+                  </div>
                 )}
 
-                <TextInput_
-                  multiline={true}
-                  numberOfLines={10}
-                  debounceMs={0}
-                  onChangeText={handleAutoNoteChange}
-                  value={sAutoNoteText}
-                  placeholder="Enter custom receipt note here"
-                  placeholderTextColor={gray(0.3)}
+                <textarea
+                  className={styles.fieldTextarea}
                   style={{
-                    fontSize: 14,
-                    lineHeight: 18,
-                    paddingVertical: 6,
-                    paddingHorizontal: 4,
-                    outlineWidth: 0,
-                    outlineStyle: "none",
                     color: C.text,
-                    width: "100%",
+                    backgroundColor: "transparent",
+                    fontSize: 14,
+                    lineHeight: "18px",
+                    padding: "6px 4px",
                   }}
+                  rows={10}
+                  value={sAutoNoteText}
+                  onChange={(e) => handleAutoNoteChange(e.target.value)}
+                  placeholder="Enter custom receipt note here"
                 />
-              </View>
-            </View>
-            </View>
+              </div>
+            </div>
+            </div>
 
             <CustomerQuickNotes
               visible={!!sShowQuickNotePicker}
@@ -941,85 +629,56 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit, skipPortal }
               activeChips={sAutoQuickNoteIDs}
             />
 
-          </ScrollView>
-          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginTop: 10 }}>
+          </div>
+          <div className={styles.footer}>
             {!isNew ? (
               <Tooltip text="Delete this item" position="top">
-                <TouchableOpacity
-                  onPress={handleDeleteItem}
-                  style={{ padding: 6, borderRadius: 6 }}
-                >
-                  <Image_ icon={ICONS.trash} size={40} />
-                </TouchableOpacity>
+                <button type="button" className={styles.iconBtn} onClick={handleDeleteItem}>
+                  <Image icon={ICONS.trash} size={40} />
+                </button>
               </Tooltip>
-            ) : <View />}
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            ) : <div className={styles.footerLeft} />}
+            <div className={styles.footerRight}>
               {isNew && !!sItem.formalName?.trim() && (
                 <Tooltip text="Save new item" position="top">
-                  <TouchableOpacity
-                    onPress={handleSaveNewItem}
-                    style={{ padding: 6, borderRadius: 6 }}
-                  >
-                    <Image_ icon={ICONS.check1} size={36} />
-                  </TouchableOpacity>
+                  <button type="button" className={styles.iconBtn} onClick={handleSaveNewItem}>
+                    <Image icon={ICONS.check1} size={36} />
+                  </button>
                 </Tooltip>
               )}
               {!isNew && sDirty && (
                 <Tooltip text="Save changes" position="top">
-                  <TouchableOpacity
-                    onPress={handleExit}
-                    style={{ padding: 6, borderRadius: 6 }}
-                  >
-                    <Image_ icon={ICONS.check1} size={36} />
-                  </TouchableOpacity>
+                  <button type="button" className={styles.iconBtn} onClick={handleExit}>
+                    <Image icon={ICONS.check1} size={36} />
+                  </button>
                 </Tooltip>
               )}
               <Tooltip text="Close" position="top">
-                <TouchableOpacity
-                  onPress={handleExit}
-                  style={{ padding: 6, borderRadius: 6 }}
-                >
-                  <Image_ icon={ICONS.close1} size={36} />
-                </TouchableOpacity>
+                <button type="button" className={styles.iconBtn} onClick={handleExit}>
+                  <Image icon={ICONS.close1} size={36} />
+                </button>
               </Tooltip>
-            </View>
-          </View>
-        </View>
-      </TouchableWithoutFeedback>
+            </div>
+          </div>
+      </div>
   );
 
-  const portalContent = (
+  return (
     <>
-      <div
-        onClick={handleExit}
-        style={{
-          position: "fixed",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: "rgba(50,50,50,.5)",
-          zIndex: Z.modal,
-          display: "flex",
-          justifyContent: "center",
-          alignItems: "center",
-        }}
+      <Dialog
+        visible={true}
+        onClose={handleExit}
+        aria-label={isNew ? "New Inventory Item" : "Inventory Item"}
       >
-        <div onClick={(e) => e.stopPropagation()} style={{ width: "100%", display: "flex", justifyContent: "center" }}>
-          {modalContent}
-        </div>
-      </div>
-      {sShowQBPicker && (
-        <QuickButtonPickerModal
-          itemID={sItem.id}
-          quickButtons={quickButtons}
-          onToggle={handleToggleInButton}
-          onClose={() => _setShowQBPicker(false)}
-        />
-      )}
+        {modalContent}
+      </Dialog>
+      <QuickButtonPickerModal
+        visible={sShowQBPicker}
+        itemID={sItem.id}
+        quickButtons={quickButtons}
+        onToggle={handleToggleInButton}
+        onClose={() => _setShowQBPicker(false)}
+      />
     </>
   );
-
-  if (skipPortal) return portalContent;
-  return createPortal(portalContent, document.body);
 };

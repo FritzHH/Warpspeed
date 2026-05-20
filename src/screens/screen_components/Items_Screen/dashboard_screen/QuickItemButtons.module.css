@@ -35,7 +35,7 @@
   padding: 0;
   border: none;
   border-radius: 5px;
-  background-color: rgb(204, 204, 204); /* gray(0.2) */
+  background-color: var(--border-subtle);
   cursor: pointer;
   margin-bottom: 0;
   transition: opacity 0.15s ease;
@@ -430,7 +430,7 @@
 .modalOverlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.45);
+  background-color: var(--surface-overlay);
   display: flex;
   justify-content: center;
   align-items: center;

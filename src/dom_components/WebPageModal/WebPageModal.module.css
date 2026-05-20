@@ -22,7 +22,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--surface-overlay);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -32,7 +32,7 @@
 .modal {
   width: 80vw;
   height: 85vh;
-  background-color: rgb(255, 255, 255);
+  background-color: var(--surface-base);
   border-radius: 12px;
   overflow: hidden;
   display: flex;

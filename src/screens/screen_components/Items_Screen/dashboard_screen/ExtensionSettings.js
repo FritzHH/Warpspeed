@@ -1,21 +1,19 @@
 /*eslint-disable*/
-import { View, Text, TextInput, TouchableOpacity, ScrollView } from "react-native-web";
 import { useState } from "react";
-import { Button_ } from "../../../../components";
-import { CheckBox } from "../../../../dom_components";
+import { Button, CheckBox, TouchableOpacity } from "../../../../dom_components";
 import { useSettingsStore } from "../../../../stores";
-import { C, gray } from "../../../../styles";
+import { C } from "../../../../styles";
 import { copyToClipboard } from "../../../../utils";
 import { dbSaveSettingsField } from "../../../../db_calls_wrapper";
+import styles from "./ExtensionSettings.module.css";
 
 export function ExtensionSettingsComponent({ zSettingsObj, handleSettingsFieldChange }) {
   const [isLoading, _setIsLoading] = useState(false);
   const [message, _setMessage] = useState({ text: "", type: "" });
-  
+
   const extension = zSettingsObj.amazonExtension || {};
   const address = extension.shippingAddress || {};
-  
-  // Auto-generate Store ID from tenantID + storeID
+
   const generatedStoreId = `${zSettingsObj.tenantID}_${zSettingsObj.storeID}`;
 
   const handleAddressChange = (field, value) => {
@@ -23,8 +21,8 @@ export function ExtensionSettingsComponent({ zSettingsObj, handleSettingsFieldCh
       ...extension,
       shippingAddress: {
         ...address,
-        [field]: value
-      }
+        [field]: value,
+      },
     };
     handleSettingsFieldChange("amazonExtension", newExtension);
   };
@@ -34,8 +32,8 @@ export function ExtensionSettingsComponent({ zSettingsObj, handleSettingsFieldCh
       ...extension,
       features: {
         ...extension.features,
-        [feature]: !extension.features?.[feature]
-      }
+        [feature]: !extension.features?.[feature],
+      },
     };
     handleSettingsFieldChange("amazonExtension", newExtension);
   };
@@ -45,15 +43,14 @@ export function ExtensionSettingsComponent({ zSettingsObj, handleSettingsFieldCh
     _setMessage({ text: "", type: "" });
 
     try {
-      // Add store ID to extension settings
       const updatedExtension = {
         ...extension,
         storeId: generatedStoreId,
-        lastSync: new Date().toISOString()
+        lastSync: new Date().toISOString(),
       };
 
       const result = await dbSaveSettingsField("amazonExtension", updatedExtension);
-      
+
       if (result.success) {
         _setMessage({ text: "✓ Extension settings saved successfully!", type: "success" });
         setTimeout(() => _setMessage({ text: "", type: "" }), 5000);
@@ -68,9 +65,8 @@ export function ExtensionSettingsComponent({ zSettingsObj, handleSettingsFieldCh
   };
 
   const handleDownloadExtension = () => {
-    // Trigger download of extension files
     const extensionPath = "/amazon-simplifier-extension.zip";
-    window.open(extensionPath, '_blank');
+    window.open(extensionPath, "_blank");
   };
 
   const handleCopyStoreId = () => {
@@ -80,75 +76,63 @@ export function ExtensionSettingsComponent({ zSettingsObj, handleSettingsFieldCh
   };
 
   return (
-    <ScrollView style={{ width: "100%", padding: 20 }}>
+    <div className={styles.scrollRoot}>
       {/* Header */}
-      <View style={{ marginBottom: 30 }}>
-        <Text style={{ fontSize: 24, fontWeight: "bold", color: C.buttonLightGreenOutline, marginBottom: 10 }}>
+      <div className={styles.headerSection}>
+        <span
+          className={styles.headerTitle}
+          style={{ color: C.buttonLightGreenOutline, display: "block" }}
+        >
           🚀 Amazon Extension Settings
-        </Text>
-        <Text style={{ fontSize: 14, color: gray(0.6) }}>
+        </span>
+        <span className={styles.headerSubtitle} style={{ color: C.textSecondary }}>
           Configure the browser extension for streamlined Amazon ordering
-        </Text>
-      </View>
+        </span>
+      </div>
 
       {/* Message Banner */}
       {message.text && (
-        <View style={{
-          padding: 15,
-          borderRadius: 5,
-          backgroundColor: message.type === "success" ? "#d4edda" : "#f8d7da",
-          borderLeft: `4px solid ${message.type === "success" ? "#28a745" : "#dc3545"}`,
-          marginBottom: 20
-        }}>
-          <Text style={{ color: message.type === "success" ? "#155724" : "#721c24" }}>
+        <div
+          className={`${styles.messageBanner} ${
+            message.type === "success" ? styles.messageBannerSuccess : styles.messageBannerError
+          }`}
+        >
+          <span
+            className={styles.messageText}
+            style={{ color: message.type === "success" ? "#155724" : "#721c24" }}
+          >
             {message.text}
-          </Text>
-        </View>
+          </span>
+        </div>
       )}
 
-      {/* Store ID (Read-only) */}
-      <View style={{ marginBottom: 25 }}>
-        <Text style={{ fontSize: 16, fontWeight: "600", marginBottom: 10 }}>
-          Store ID (Auto-Generated)
-        </Text>
-        <View style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: 10
-        }}>
-          <View style={{
-            flex: 1,
-            padding: 12,
-            backgroundColor: gray(0.95),
-            borderRadius: 5,
-            border: `1px solid ${gray(0.8)}`
-          }}>
-            <Text style={{ fontFamily: "monospace", fontSize: 14 }}>
-              {generatedStoreId}
-            </Text>
-          </View>
-          <TouchableOpacity
-            onPress={handleCopyStoreId}
-            style={{
-              padding: 12,
-              backgroundColor: C.buttonLightGreenOutline,
-              borderRadius: 5,
-              cursor: "pointer"
-            }}
+      {/* Store ID */}
+      <div className={styles.section}>
+        <span className={styles.sectionTitleSmall}>Store ID (Auto-Generated)</span>
+        <div className={styles.storeIdRow}>
+          <div
+            className={styles.storeIdBox}
+            style={{ backgroundColor: C.surfaceAlt, border: `1px solid ${C.borderStrong}` }}
           >
-            <Text style={{ color: "white", fontWeight: "600" }}>Copy</Text>
-          </TouchableOpacity>
-        </View>
-        <Text style={{ fontSize: 12, color: gray(0.6), marginTop: 5 }}>
+            <span className={styles.storeIdText}>{generatedStoreId}</span>
+          </div>
+          <button
+            type="button"
+            className={styles.copyButton}
+            onClick={handleCopyStoreId}
+            style={{ backgroundColor: C.buttonLightGreenOutline }}
+          >
+            <span className={styles.copyButtonText}>Copy</span>
+          </button>
+        </div>
+        <span className={styles.helperText} style={{ color: C.textSecondary }}>
           Use this Store ID when configuring the browser extension
-        </Text>
-      </View>
+        </span>
+      </div>
 
-      {/* Shipping Address Section */}
-      <View style={{ marginBottom: 25 }}>
-        <Text style={{ fontSize: 18, fontWeight: "600", marginBottom: 15 }}>
-          Shipping Address (Auto-Fill)
-        </Text>
+      {/* Shipping Address */}
+      <div className={styles.section}>
+        <span className={styles.sectionTitle}>Shipping Address (Auto-Fill)</span>
 
         <InputField
           label="Full Name *"
@@ -171,16 +155,16 @@ export function ExtensionSettingsComponent({ zSettingsObj, handleSettingsFieldCh
           placeholder="Suite 100 (optional)"
         />
 
-        <View style={{ flexDirection: "row", gap: 15 }}>
-          <View style={{ flex: 2 }}>
+        <div className={styles.row}>
+          <div className={styles.col2}>
             <InputField
               label="City *"
               value={address.city || ""}
               onChange={(val) => handleAddressChange("city", val)}
               placeholder="Miami"
             />
-          </View>
-          <View style={{ flex: 1 }}>
+          </div>
+          <div className={styles.col1}>
             <InputField
               label="State *"
               value={address.state || ""}
@@ -188,34 +172,32 @@ export function ExtensionSettingsComponent({ zSettingsObj, handleSettingsFieldCh
               placeholder="FL"
               maxLength={2}
             />
-          </View>
-        </View>
+          </div>
+        </div>
 
-        <View style={{ flexDirection: "row", gap: 15 }}>
-          <View style={{ flex: 1 }}>
+        <div className={styles.row}>
+          <div className={styles.col1}>
             <InputField
               label="ZIP Code *"
               value={address.zipCode || ""}
               onChange={(val) => handleAddressChange("zipCode", val)}
               placeholder="33101"
             />
-          </View>
-          <View style={{ flex: 1 }}>
+          </div>
+          <div className={styles.col1}>
             <InputField
               label="Phone Number *"
               value={address.phoneNumber || ""}
               onChange={(val) => handleAddressChange("phoneNumber", val)}
               placeholder="(555) 123-4567"
             />
-          </View>
-        </View>
-      </View>
+          </div>
+        </div>
+      </div>
 
       {/* Feature Toggles */}
-      <View style={{ marginBottom: 25 }}>
-        <Text style={{ fontSize: 18, fontWeight: "600", marginBottom: 15 }}>
-          Extension Features
-        </Text>
+      <div className={styles.section}>
+        <span className={styles.sectionTitle}>Extension Features</span>
 
         <FeatureToggle
           label="Auto-Fill Forms"
@@ -244,124 +226,109 @@ export function ExtensionSettingsComponent({ zSettingsObj, handleSettingsFieldCh
           checked={extension.features?.quickSearch ?? true}
           onToggle={() => handleFeatureToggle("quickSearch")}
         />
-      </View>
+      </div>
 
       {/* Action Buttons */}
-      <View style={{ flexDirection: "row", gap: 15, marginTop: 30 }}>
-        <Button_
-          text={isLoading ? "Saving..." : "Save Settings"}
-          onPress={handleSaveExtensionSettings}
-          disabled={isLoading}
-          style={{ 
-            flex: 1, 
-            backgroundColor: isLoading ? gray(0.7) : C.buttonLightGreenOutline,
-            opacity: isLoading ? 0.6 : 1
-          }}
-        />
-        
-        <Button_
-          text="Download Extension"
-          onPress={handleDownloadExtension}
-          style={{ flex: 1, backgroundColor: "#ff9900" }}
-        />
-      </View>
+      <div className={styles.actionRow}>
+        <div className={styles.actionButton}>
+          <Button
+            text={isLoading ? "Saving..." : "Save Settings"}
+            onPress={handleSaveExtensionSettings}
+            enabled={!isLoading}
+            buttonStyle={{
+              backgroundColor: isLoading ? C.borderStrong : C.buttonLightGreenOutline,
+              opacity: isLoading ? 0.6 : 1,
+              width: "100%",
+            }}
+          />
+        </div>
+        <div className={styles.actionButton}>
+          <Button
+            text="Download Extension"
+            onPress={handleDownloadExtension}
+            buttonStyle={{ backgroundColor: "#ff9900", width: "100%" }}
+          />
+        </div>
+      </div>
 
       {/* Instructions */}
-      <View style={{
-        marginTop: 30,
-        padding: 20,
-        backgroundColor: "#fffbea",
-        borderRadius: 8,
-        border: "1px solid #ffd700"
-      }}>
-        <Text style={{ fontSize: 16, fontWeight: "600", marginBottom: 10 }}>
-          📖 Installation Instructions
-        </Text>
-        <View style={{ fontSize: 14, lineHeight: 1.6, color: gray(0.3) }}>
-          <Text style={{ marginBottom: 5 }}>1. Click "Download Extension" above</Text>
-          <Text style={{ marginBottom: 5 }}>2. Extract the ZIP file</Text>
-          <Text style={{ marginBottom: 5 }}>3. Open Chrome and go to chrome://extensions/</Text>
-          <Text style={{ marginBottom: 5 }}>4. Enable "Developer mode" (top right)</Text>
-          <Text style={{ marginBottom: 5 }}>5. Click "Load unpacked" and select the extracted folder</Text>
-          <Text style={{ marginBottom: 5 }}>6. Enter your Store ID: <Text style={{ fontWeight: "bold", fontFamily: "monospace" }}>{generatedStoreId}</Text></Text>
-          <Text>7. Click "Sync Now" in the extension popup</Text>
-        </View>
-      </View>
+      <div className={styles.instructionsBox}>
+        <span className={styles.instructionsTitle}>📖 Installation Instructions</span>
+        <div className={styles.instructionsList} style={{ color: C.textDisabled }}>
+          <span className={styles.instructionsItem}>
+            1. Click "Download Extension" above
+          </span>
+          <span className={styles.instructionsItem}>2. Extract the ZIP file</span>
+          <span className={styles.instructionsItem}>
+            3. Open Chrome and go to chrome://extensions/
+          </span>
+          <span className={styles.instructionsItem}>
+            4. Enable "Developer mode" (top right)
+          </span>
+          <span className={styles.instructionsItem}>
+            5. Click "Load unpacked" and select the extracted folder
+          </span>
+          <span className={styles.instructionsItem}>
+            6. Enter your Store ID:{" "}
+            <span style={{ fontWeight: "bold", fontFamily: "monospace" }}>
+              {generatedStoreId}
+            </span>
+          </span>
+          <span className={styles.instructionsItemLast}>
+            7. Click "Sync Now" in the extension popup
+          </span>
+        </div>
+      </div>
 
       {/* Status Info */}
       {extension.lastSync && (
-        <View style={{
-          marginTop: 20,
-          padding: 15,
-          backgroundColor: "#e7f3ff",
-          borderRadius: 8,
-          border: "1px solid #2196f3"
-        }}>
-          <Text style={{ fontSize: 14, color: gray(0.4) }}>
+        <div className={styles.statusBox}>
+          <span className={styles.statusText} style={{ color: C.textMuted }}>
             Last synced: {new Date(extension.lastSync).toLocaleString()}
-          </Text>
-        </View>
+          </span>
+        </div>
       )}
-    </ScrollView>
+    </div>
   );
 }
 
-// Helper Components
 function InputField({ label, value, onChange, placeholder, maxLength }) {
   return (
-    <View style={{ marginBottom: 15 }}>
-      <Text style={{ fontSize: 14, fontWeight: "500", marginBottom: 5, color: gray(0.3) }}>
+    <div className={styles.fieldWrapper}>
+      <span className={styles.fieldLabel} style={{ color: C.textDisabled }}>
         {label}
-      </Text>
-      <TextInput
+      </span>
+      <input
+        type="text"
+        className={styles.fieldInput}
         value={value}
-        onChangeText={onChange}
+        onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         maxLength={maxLength}
-        style={{
-          padding: 10,
-          borderRadius: 5,
-          border: `1px solid ${gray(0.8)}`,
-          fontSize: 14,
-          width: "100%",
-          backgroundColor: "white"
-        }}
+        style={{ border: `1px solid ${C.borderStrong}` }}
       />
-    </View>
+    </div>
   );
 }
 
 function FeatureToggle({ label, description, checked, onToggle }) {
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       onPress={onToggle}
-      style={{
-        flexDirection: "row",
-        alignItems: "center",
-        padding: 15,
-        marginBottom: 10,
-        backgroundColor: "white",
-        borderRadius: 8,
-        border: `1px solid ${gray(0.9)}`,
-        cursor: "pointer"
-      }}
+      className={styles.featureRow}
+      style={{ border: `1px solid ${C.borderStrong}` }}
     >
-      <CheckBox
-        isChecked={checked}
-        onPress={onToggle}
-        style={{ marginRight: 15 }}
-      />
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 15, fontWeight: "500", marginBottom: 3, color: gray(0.2) }}>
+      <div className={styles.featureCheckboxWrap}>
+        <CheckBox isChecked={checked} onPress={onToggle} />
+      </div>
+      <div className={styles.featureContent}>
+        <span className={styles.featureLabel} style={{ color: C.textDisabled }}>
           {label}
-        </Text>
-        <Text style={{ fontSize: 13, color: gray(0.6) }}>
+        </span>
+        <span className={styles.featureDescription} style={{ color: C.textSecondary }}>
           {description}
-        </Text>
-      </View>
+        </span>
+      </div>
     </TouchableOpacity>
   );
 }
-
-
-

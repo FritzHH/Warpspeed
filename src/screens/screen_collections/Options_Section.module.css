@@ -1,0 +1,237 @@
+/* Options_Section root */
+.sectionRoot {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+}
+
+/* ───── UserClockModal ───── */
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--surface-overlay);
+}
+
+.modalBackdropBtn {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  cursor: default;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+}
+
+.modalBackdropBtn:active {
+  opacity: 0.7;
+}
+
+.modalCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background-color: var(--surface-base);
+  border-radius: 15px;
+  min-width: 700px;
+  max-width: 800px;
+  width: 50%;
+  overflow: hidden;
+  position: relative;
+}
+
+.modalTitle {
+  font-weight: 500;
+  margin-top: 25px;
+  font-size: 25px;
+  color: red;
+  text-align: center;
+  margin-bottom: 0;
+}
+
+.modalClockMessage {
+  text-align: center;
+  width: 90%;
+  margin-top: 10px;
+  font-size: 18px;
+  margin-bottom: 0;
+}
+
+.modalButtonsRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 0 20px;
+  margin-top: 25px;
+  margin-bottom: 25px;
+  box-sizing: border-box;
+}
+
+.scheduleWrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border-top: 1px solid;
+  padding: 16px 20px;
+  box-sizing: border-box;
+}
+
+/* ───── ScheduleWeekRow ───── */
+.weekRow {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-bottom: 10px;
+}
+
+.weekLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+  margin-top: 0;
+}
+
+.weekDaysRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.dayCell {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  margin: 0 3px;
+  border-radius: 10px;
+  padding: 10px 0;
+  min-height: 70px;
+  box-sizing: border-box;
+}
+
+.dayName {
+  font-size: 14px;
+  margin: 0;
+}
+
+.dayOff {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  font-weight: 600;
+  margin-bottom: 0;
+}
+
+.dayShift {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 3px;
+}
+
+.dayShiftTime {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-default);
+  margin: 0;
+}
+
+.dayEmpty {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
+  margin-bottom: 0;
+}
+
+/* ───── CameraPreviewModal ───── */
+.camOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--surface-overlay);
+}
+
+.camCard {
+  display: flex;
+  flex-direction: column;
+  width: 520px;
+  background-color: var(--surface-base);
+  border-radius: 12px;
+  border: 2px solid var(--border-default);
+  padding: 20px;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.camHeader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.camTitle {
+  font-size: 18px;
+  color: var(--text-default);
+  margin: 0;
+}
+
+.camCloseBtn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.camCloseBtn:active {
+  opacity: 0.7;
+}
+
+.camCloseIcon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  display: block;
+}
+
+.camVideoWrap {
+  border-radius: 10px;
+  overflow: hidden;
+  border: 2px solid var(--border-default);
+  background-color: black;
+}
+
+.camVideo {
+  width: 100%;
+  display: block;
+  border-radius: 8px;
+}
+
+.camNoStream {
+  font-size: 14px;
+  color: var(--danger);
+  text-align: center;
+  margin-top: 12px;
+  margin-bottom: 0;
+}

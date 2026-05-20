@@ -1,19 +1,12 @@
 /* eslint-disable */
 import React from "react";
-import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { useNavigate } from "react-router-dom";
 import { C, ICONS } from "../../styles";
-import { Image_ } from "../../components";
+import { Image } from "../../dom_components";
 import { useOpenWorkordersStore, useSettingsStore } from "../../stores";
-import {
-  capitalizeFirstLetterOfString,
-  formatMillisForDisplay,
-  formatPhoneWithDashes,
-  resolveStatus,
-  gray,
-  deepEqual,
-} from "../../utils";
+import { capitalizeFirstLetterOfString, formatMillisForDisplay, formatPhoneWithDashes, resolveStatus, deepEqual } from "../../utils";
 import { dbGetOpenWorkorders } from "../../db_calls_wrapper";
+import styles from "./MobileWorkorderListScreen.module.css";
 
 export function MobileWorkorderListScreen() {
   const navigate = useNavigate();
@@ -23,280 +16,126 @@ export function MobileWorkorderListScreen() {
   const groups = groupWorkordersByStatus(zWorkorders, zStatuses);
 
   return (
-    <ScrollView
-      style={{ flex: 1, backgroundColor: C.backgroundWhite }}
-      contentContainerStyle={{ paddingHorizontal: 12, paddingVertical: 8 }}
+    <div
+      className={styles.scroll}
+      style={{ backgroundColor: C.backgroundWhite }}
     >
-      {/* Refresh button */}
-      <TouchableOpacity
-        onPress={async () => {
+      <button
+        type="button"
+        className={styles.refreshBtn}
+        onClick={async () => {
           const workorders = await dbGetOpenWorkorders();
           if (workorders) useOpenWorkordersStore.getState().setOpenWorkorders(workorders);
         }}
-        style={{
-          alignSelf: "center",
-          flexDirection: "row",
-          alignItems: "center",
-          paddingVertical: 8,
-          marginBottom: 4,
-        }}
       >
-        <Image_ icon={ICONS.reset1} size={16} style={{ marginRight: 6 }} />
-        <Text style={{ color: C.green, fontSize: 14, fontWeight: "500" }}>Refresh</Text>
-      </TouchableOpacity>
+        <Image icon={ICONS.reset1} size={16} style={{ marginRight: 6 }} />
+        <span className={styles.refreshText} style={{ color: C.green }}>Refresh</span>
+      </button>
 
       {groups.map((group) => (
-        <View key={group.status.id} style={{ marginBottom: 20 }}>
-          {/* Status Section Header */}
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              marginBottom: 8,
-              paddingHorizontal: 4,
-            }}
-          >
-            <View
-              style={{
-                width: 12,
-                height: 12,
-                borderRadius: 6,
-                backgroundColor: group.status.backgroundColor,
-                marginRight: 8,
-              }}
+        <div key={group.status.id} className={styles.group}>
+          <div className={styles.groupHeader}>
+            <div
+              className={styles.groupDot}
+              style={{ backgroundColor: group.status.backgroundColor }}
             />
-            <Text
-              style={{
-                fontSize: 16,
-                fontWeight: "600",
-                color: C.text,
-              }}
-            >
+            <span className={styles.groupHeaderText} style={{ color: C.text }}>
               {group.status.label} ({group.items.length})
-            </Text>
-          </View>
+            </span>
+          </div>
 
-          {/* Workorder Cards */}
           {group.items.map((workorder) => {
             const rs = resolveStatus(workorder.status, zStatuses);
             return (
-              <TouchableOpacity
+              <button
+                type="button"
                 key={workorder.id}
-                onPress={() => navigate(`/workorder/${workorder.id}`)}
-                activeOpacity={0.7}
-                style={{
-                  backgroundColor: rs.backgroundColor,
-                  borderRadius: 10,
-                  paddingVertical: 14,
-                  paddingHorizontal: 16,
-                  marginBottom: 8,
-                }}
+                onClick={() => navigate(`/workorder/${workorder.id}`)}
+                className={styles.card}
+                style={{ backgroundColor: rs.backgroundColor }}
               >
-                {/* Customer Name + hasNewSMS dot */}
-                <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
-                  {workorder.hasNewSMS && (
-                    <View
-                      style={{
-                        width: 8,
-                        height: 8,
-                        borderRadius: 4,
-                        backgroundColor: "gold",
-                        marginRight: 5,
-                      }}
-                    />
-                  )}
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      fontSize: 17,
-                      fontWeight: "600",
-                      color: rs.textColor,
-                      flex: 1,
-                    }}
-                  >
+                <div className={styles.cardRow}>
+                  {workorder.hasNewSMS && <div className={styles.smsDot} />}
+                  <span className={styles.customerName} style={{ color: rs.textColor }}>
                     {capitalizeFirstLetterOfString(workorder.customerFirst) +
                       " " +
                       capitalizeFirstLetterOfString(workorder.customerLast)}
-                  </Text>
-                </View>
+                  </span>
+                </div>
 
-                {/* Phone number */}
                 {!!workorder.customerCell && (
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      fontSize: 13,
-                      color: rs.textColor,
-                      opacity: 0.7,
-                      marginBottom: 4,
-                    }}
-                  >
+                  <span className={styles.phone} style={{ color: rs.textColor }}>
                     {formatPhoneWithDashes(workorder.customerCell)}
-                  </Text>
+                  </span>
                 )}
 
-                {/* Brand + Description + Item count badge */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    marginBottom: 4,
-                  }}
-                >
-                  <Text
-                    numberOfLines={1}
-                    style={{
-                      fontSize: 15,
-                      fontWeight: "500",
-                      color: rs.textColor,
-                    }}
-                  >
+                <div className={styles.brandRow}>
+                  <span className={styles.brand} style={{ color: rs.textColor }}>
                     {workorder.brand || "No Brand"}
-                  </Text>
+                  </span>
                   {!!workorder.description && (
                     <>
-                      <Text
-                        style={{
-                          fontSize: 15,
-                          color: rs.textColor,
-                          opacity: 0.6,
-                          marginHorizontal: 6,
-                        }}
-                      >
+                      <span className={styles.dotSep} style={{ color: rs.textColor }}>
                         {"\u2022"}
-                      </Text>
-                      <Text
-                        numberOfLines={1}
-                        style={{
-                          fontSize: 15,
-                          color: rs.textColor,
-                          flex: 1,
-                        }}
-                      >
+                      </span>
+                      <span className={styles.description} style={{ color: rs.textColor }}>
                         {workorder.description}
-                      </Text>
+                      </span>
                     </>
                   )}
                   {workorder.workorderLines?.length > 0 && (
-                    <View
-                      style={{
-                        backgroundColor: "rgba(0,0,0,0.15)",
-                        borderRadius: 10,
-                        paddingHorizontal: 7,
-                        paddingVertical: 1,
-                        marginLeft: 8,
-                      }}
-                    >
-                      <Text
-                        style={{
-                          color: rs.textColor,
-                          fontSize: 11,
-                          fontWeight: "600",
-                        }}
-                      >
+                    <div className={styles.lineCountBadge}>
+                      <span className={styles.lineCountText} style={{ color: rs.textColor }}>
                         {workorder.workorderLines.length}
-                      </Text>
-                    </View>
+                      </span>
+                    </div>
                   )}
-                </View>
+                </div>
 
-                {/* Intake Date + Time Estimate */}
-                <View
-                  style={{
-                    flexDirection: "row",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 13,
-                      color: rs.textColor,
-                      opacity: 0.8,
-                    }}
-                  >
+                <div className={styles.metaRow}>
+                  <span className={styles.metaText} style={{ color: rs.textColor }}>
                     {formatMillisForDisplay(workorder.startedOnMillis)}
-                  </Text>
+                  </span>
                   {!!workorder.waitTime?.label && (
-                    <Text
-                      style={{
-                        fontSize: 13,
-                        color: rs.textColor,
-                        opacity: 0.8,
-                        fontStyle: "italic",
-                      }}
-                    >
+                    <span className={styles.metaTextItalic} style={{ color: rs.textColor }}>
                       est: {workorder.waitTime.label}
-                    </Text>
+                    </span>
                   )}
-                </View>
+                </div>
 
-                {/* Part ordered + source */}
                 {!!(workorder.partOrdered || workorder.partSource) && (
-                  <View
-                    style={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      marginTop: 4,
-                    }}
-                  >
+                  <div className={styles.partRow}>
                     {!!workorder.partOrdered && (
-                      <Text
-                        numberOfLines={1}
-                        style={{
-                          fontSize: 12,
-                          color: rs.textColor,
-                          fontWeight: "500",
-                        }}
-                      >
+                      <span className={styles.partText} style={{ color: rs.textColor }}>
                         {workorder.partOrdered}
-                      </Text>
+                      </span>
                     )}
                     {!!(workorder.partOrdered && workorder.partSource) && (
-                      <Text
-                        style={{
-                          color: rs.textColor,
-                          opacity: 0.4,
-                          marginHorizontal: 4,
-                        }}
-                      >
+                      <span className={styles.partDot} style={{ color: rs.textColor }}>
                         {"\u2022"}
-                      </Text>
+                      </span>
                     )}
                     {!!workorder.partSource && (
-                      <Text
-                        numberOfLines={1}
-                        style={{
-                          fontSize: 12,
-                          color: rs.textColor,
-                          opacity: 0.8,
-                        }}
-                      >
+                      <span className={styles.partSource} style={{ color: rs.textColor }}>
                         {workorder.partSource}
-                      </Text>
+                      </span>
                     )}
-                  </View>
+                  </div>
                 )}
-              </TouchableOpacity>
+              </button>
             );
           })}
-        </View>
+        </div>
       ))}
 
       {groups.length === 0 && (
-        <View
-          style={{
-            justifyContent: "center",
-            alignItems: "center",
-            paddingVertical: 60,
-          }}
-        >
-          <Text style={{ fontSize: 16, color: C.lightText }}>
+        <div className={styles.empty}>
+          <span className={styles.emptyText} style={{ color: C.lightText }}>
             No open workorders
-          </Text>
-        </View>
+          </span>
+        </div>
       )}
-    </ScrollView>
+    </div>
   );
 }
 

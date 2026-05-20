@@ -1,14 +1,16 @@
 /* eslint-disable */
 
-import { View, Text, TouchableOpacity, ScrollView, FlatList, ActivityIndicator } from "react-native-web";
 import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../styles";
-import { Button_, Image_, TextInput_ } from "../../../components";
 import { Image } from "../../../dom_components/Image/Image";
+import { Button } from "../../../dom_components/Button/Button";
+import { TextInput } from "../../../dom_components/TextInput/TextInput";
+import { TouchableOpacity } from "../../../dom_components/TouchableOpacity/TouchableOpacity";
+import { LoadingIndicator } from "../../../dom_components/LoadingIndicator/LoadingIndicator";
 import styles from "./Items_EmailView.module.css";
 import { useEmailStore, useLoginStore, useSettingsStore } from "../../../stores";
 import { dbGmailSendEmail, dbGmailModifyLabels, dbGmailGetAttachment } from "../../../db_calls_wrapper";
-import { log, gray } from "../../../utils";
+import { log } from "../../../utils";
 import { uploadFileToStorage } from "../../../db_calls";
 import dayjs from "dayjs";
 import DOMPurify from "dompurify";
@@ -92,7 +94,7 @@ export const Items_EmailView = React.memo(() => {
     content = (
       <div className={styles.emptyState}>
         <Image icon={ICONS.paperPlane} size={64} className={styles.emptyStateIcon} />
-        <span className={styles.emptyStateText} style={{ color: gray(0.5) }}>
+        <span className={styles.emptyStateText} style={{ color: C.textMuted }}>
           Select an email to read, or compose a new message
         </span>
       </div>
@@ -214,36 +216,29 @@ const ThreadView = React.memo(() => {
   const isUnread = zThreadMessages.some((m) => m.isUnread);
 
   return (
-    <View style={{ flex: 1 }}>
+    <div className={styles.threadRoot}>
       {/* Thread header */}
-      <View
-        style={{
-          paddingHorizontal: 16,
-          paddingVertical: 12,
-          borderBottomWidth: 1,
-          borderBottomColor: gray(0.12),
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-        }}
-      >
-        <View style={{ flex: 1, marginRight: 12 }}>
-          <Text style={{ fontSize: 18, fontWeight: Fonts.weight.textHeavy, color: C.text }}>
+      <div className={styles.threadHeader} style={{ borderBottomColor: C.borderSubtle }}>
+        <div className={styles.threadHeaderTitleCol}>
+          <span
+            className={styles.threadSubject}
+            style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}
+          >
             {subject}
-          </Text>
-          <Text style={{ fontSize: 12, color: gray(0.5), marginTop: 2 }}>
+          </span>
+          <span className={styles.threadMeta} style={{ color: C.textMuted }}>
             {zThreadMessages.length} message{zThreadMessages.length > 1 ? "s" : ""} in thread
-          </Text>
-        </View>
-        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          </span>
+        </div>
+        <div className={styles.threadHeaderActions}>
           <ActionButton label={isUnread ? "Mark Read" : "Mark Unread"} onPress={() => handleMarkRead(!isUnread)} />
           {isInbox && <ActionButton label="Archive" onPress={handleArchive} />}
           <ActionButton label="Trash" onPress={handleTrash} color={C.red} />
-        </View>
-      </View>
+        </div>
+      </div>
 
       {/* Messages */}
-      <ScrollView style={{ flex: 1, padding: 16 }}>
+      <div className={styles.threadScroll}>
         {zThreadMessages.map((message, index) => {
           const isLast = index === zThreadMessages.length - 1;
           const isExpanded = isLast || sExpandedMessages[message.id];
@@ -257,44 +252,35 @@ const ThreadView = React.memo(() => {
             />
           );
         })}
-        <View style={{ height: 20 }} />
-      </ScrollView>
+        <div className={styles.threadScrollSpacer} />
+      </div>
 
       {/* Reply bar */}
-      <View
-        style={{
-          flexDirection: "row",
-          padding: 12,
-          borderTopWidth: 1,
-          borderTopColor: gray(0.12),
-          justifyContent: "flex-start",
-          alignItems: "center",
-        }}
-      >
-        <View style={{ marginRight: 12 }}>
-          <Button_
+      <div className={styles.replyBar} style={{ borderTopColor: C.borderSubtle }}>
+        <div className={styles.replyButtonWrap}>
+          <Button
             text="Reply"
             onPress={handleReply}
             colorGradientArr={COLOR_GRADIENTS.blue}
-            buttonStyle={{ paddingHorizontal: 20 }}
+            buttonStyle={{ paddingLeft: 20, paddingRight: 20 }}
           />
-        </View>
-        <View style={{ marginRight: 12 }}>
-          <Button_
+        </div>
+        <div className={styles.replyButtonWrap}>
+          <Button
             text="Reply All"
             onPress={handleReplyAll}
             colorGradientArr={COLOR_GRADIENTS.lightBlue}
-            buttonStyle={{ paddingHorizontal: 16 }}
+            buttonStyle={{ paddingLeft: 16, paddingRight: 16 }}
           />
-        </View>
-        <Button_
+        </div>
+        <Button
           text="Forward"
           onPress={handleForward}
           colorGradientArr={COLOR_GRADIENTS.grey}
-          buttonStyle={{ paddingHorizontal: 16 }}
+          buttonStyle={{ paddingLeft: 16, paddingRight: 16 }}
         />
-      </View>
-    </View>
+      </div>
+    </div>
   );
 });
 
@@ -353,128 +339,107 @@ const MessageBubble = React.memo(({ message, isExpanded, onToggleExpand, isLast 
   }
 
   return (
-    <View
-      style={{
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: gray(0.12),
-        borderRadius: 10,
-        overflow: "hidden",
-        backgroundColor: C.listItemWhite,
-      }}
+    <div
+      className={styles.bubble}
+      style={{ borderColor: C.borderSubtle, backgroundColor: C.listItemWhite }}
     >
       {/* Header */}
       <TouchableOpacity
         onPress={onToggleExpand}
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          padding: 12,
-          backgroundColor: isExpanded ? "transparent" : gray(0.03),
-        }}
+        className={styles.bubbleHeader}
+        style={{ backgroundColor: isExpanded ? "transparent" : C.surfaceAlt }}
       >
-        <View style={{ flex: 1, marginRight: 8 }}>
-          <Text style={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy, color: C.text }}>
+        <div className={styles.bubbleHeaderTextCol}>
+          <span
+            className={styles.bubbleFrom}
+            style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}
+          >
             {message.fromName || message.from}
-          </Text>
+          </span>
           {isExpanded && (
-            <Text style={{ fontSize: 11, color: gray(0.5), marginTop: 2 }}>
+            <span className={styles.bubbleRecipients} style={{ color: C.textMuted }}>
               To: {(message.to || []).join(", ")}
               {message.cc?.length > 0 && `  CC: ${message.cc.join(", ")}`}
-            </Text>
+            </span>
           )}
-        </View>
-        <Text style={{ fontSize: 11, color: gray(0.5), flexShrink: 0 }}>{dateStr}</Text>
+        </div>
+        <span className={styles.bubbleDate} style={{ color: C.textMuted }}>{dateStr}</span>
       </TouchableOpacity>
 
       {/* Body */}
       {isExpanded && (
-        <View style={{ paddingHorizontal: 12, paddingBottom: 12 }}>
+        <div className={styles.bubbleBody}>
           {/* Show images button */}
           {!sShowImages && message.bodyHtml?.match(/<img[^>]*src=["']https?:\/\//i) && (
             <TouchableOpacity
               onPress={() => _sSetShowImages(true)}
-              style={{
-                paddingVertical: 4,
-                paddingHorizontal: 10,
-                backgroundColor: gray(0.07),
-                borderRadius: 6,
-                alignSelf: "flex-start",
-                marginBottom: 8,
-              }}
+              className={styles.showImagesBtn}
+              style={{ backgroundColor: C.surfaceAlt }}
             >
-              <Text style={{ fontSize: 12, color: C.blue }}>Show images</Text>
+              <span className={styles.showImagesText} style={{ color: C.blue }}>Show images</span>
             </TouchableOpacity>
           )}
 
           {sanitizedHtml ? (
             <div
+              className={styles.bubbleHtmlBody}
               dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
-              style={{
-                fontSize: 14,
-                lineHeight: "1.5",
-                color: "#333",
-                wordBreak: "break-word",
-                overflowWrap: "break-word",
-                maxWidth: "100%",
-                overflow: "hidden",
-              }}
             />
           ) : (
-            <Text style={{ fontSize: 14, color: C.text, lineHeight: 20 }}>
+            <span className={styles.bubbleTextBody} style={{ color: C.text }}>
               {message.bodyText || message.snippet || ""}
-            </Text>
+            </span>
           )}
 
           {/* Attachments */}
           {message.attachments?.length > 0 && (
-            <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: gray(0.1), paddingTop: 8 }}>
-              <Text style={{ fontSize: 12, fontWeight: Fonts.weight.textHeavy, color: gray(0.5), marginBottom: 6 }}>
+            <div className={styles.attachmentsBlock} style={{ borderTopColor: C.borderSubtle }}>
+              <span
+                className={styles.attachmentsHeader}
+                style={{ fontWeight: Fonts.weight.textHeavy, color: C.textMuted }}
+              >
                 Attachments ({message.attachments.length})
-              </Text>
+              </span>
               {message.attachments.map((att) => (
                 <TouchableOpacity
                   key={att.attachmentId || att.filename}
                   onPress={() => handleDownloadAttachment(att)}
                   disabled={sDownloadingAttachment === att.attachmentId}
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    paddingVertical: 6,
-                    paddingHorizontal: 10,
-                    backgroundColor: gray(0.05),
-                    borderRadius: 6,
-                    marginBottom: 4,
-                  }}
+                  className={styles.attachmentRow}
+                  style={{ backgroundColor: C.surfaceAlt }}
                 >
                   {sDownloadingAttachment === att.attachmentId ? (
-                    <ActivityIndicator size="small" color={C.blue} style={{ marginRight: 8 }} />
+                    <LoadingIndicator
+                      size="small"
+                      color={C.blue}
+                      centered={false}
+                      className={styles.attachmentSpinner}
+                    />
                   ) : (
-                    <Text style={{ fontSize: 14, marginRight: 8 }}>📎</Text>
+                    <span className={styles.attachmentIcon}>📎</span>
                   )}
-                  <Text style={{ fontSize: 12, color: C.blue, flex: 1 }} numberOfLines={1}>
+                  <span className={styles.attachmentName} style={{ color: C.blue }}>
                     {att.filename}
-                  </Text>
-                  <Text style={{ fontSize: 11, color: gray(0.5), marginLeft: 8 }}>
+                  </span>
+                  <span className={styles.attachmentSize} style={{ color: C.textMuted }}>
                     {att.size ? formatFileSize(att.size) : ""}
-                  </Text>
+                  </span>
                 </TouchableOpacity>
               ))}
-            </View>
+            </div>
           )}
-        </View>
+        </div>
       )}
 
       {/* Collapsed snippet */}
       {!isExpanded && (
-        <TouchableOpacity onPress={onToggleExpand} style={{ paddingHorizontal: 12, paddingBottom: 8 }}>
-          <Text style={{ fontSize: 13, color: gray(0.5) }} numberOfLines={1}>
+        <TouchableOpacity onPress={onToggleExpand} className={styles.snippetRow}>
+          <span className={styles.snippetText} style={{ color: C.textMuted }}>
             {message.snippet || ""}
-          </Text>
+          </span>
         </TouchableOpacity>
       )}
-    </View>
+    </div>
   );
 });
 
@@ -559,8 +524,8 @@ const EmailAutocompleteInput = React.memo(({ value, onChangeText, placeholder })
   }
 
   return (
-    <div ref={wrapperRef} onKeyDown={handleKeyDown} style={{ flex: 1, position: "relative" }}>
-      <TextInput_
+    <div ref={wrapperRef} onKeyDown={handleKeyDown} className={styles.autocompleteWrap}>
+      <TextInput
         value={value}
         onChangeText={(val) => {
           onChangeText(val);
@@ -571,47 +536,46 @@ const EmailAutocompleteInput = React.memo(({ value, onChangeText, placeholder })
         style={{ fontSize: 14, outline: "none" }}
         debounceMs={0}
       />
-      <div style={{ position: "absolute", left: 0, right: 0, top: "100%", zIndex: 999 }}>
+      <div className={styles.autocompleteDropdownAnchor}>
         {showDropdown && (
-          <View
+          <div
+            className={styles.autocompleteDropdown}
             style={{
               backgroundColor: C.backgroundWhite,
-              borderWidth: 1,
-              borderColor: gray(0.18),
-              borderRadius: 8,
-              maxHeight: 220,
-              overflow: "auto",
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.15,
-              shadowRadius: 6,
+              borderColor: C.borderSubtle,
+              boxShadow: "0 2px 6px rgba(0, 0, 0, 0.15)",
             }}
           >
             {suggestions.map((contact, idx) => (
               <TouchableOpacity
                 key={contact.email}
                 onPress={() => selectSuggestion(contact)}
+                className={`${styles.autocompleteItem} ${idx < suggestions.length - 1 ? styles.autocompleteItemBorder : ""}`}
                 style={{
-                  paddingVertical: 8,
-                  paddingHorizontal: 12,
-                  backgroundColor: idx === sSelectedIndex ? gray(0.08) : "transparent",
-                  borderBottomWidth: idx < suggestions.length - 1 ? 1 : 0,
-                  borderBottomColor: gray(0.07),
+                  backgroundColor: idx === sSelectedIndex ? C.surfaceAlt : "transparent",
+                  borderBottomColor: C.borderSubtle,
                 }}
               >
                 {contact.name ? (
-                  <View>
-                    <Text style={{ fontSize: 13, color: C.text, fontWeight: Fonts.weight.textHeavy }}>
+                  <>
+                    <span
+                      className={styles.autocompleteItemName}
+                      style={{ color: C.text, fontWeight: Fonts.weight.textHeavy }}
+                    >
                       {contact.name}
-                    </Text>
-                    <Text style={{ fontSize: 12, color: gray(0.45) }}>{contact.email}</Text>
-                  </View>
+                    </span>
+                    <span className={styles.autocompleteItemEmail} style={{ color: C.textMuted }}>
+                      {contact.email}
+                    </span>
+                  </>
                 ) : (
-                  <Text style={{ fontSize: 13, color: C.text }}>{contact.email}</Text>
+                  <span className={styles.autocompleteItemName} style={{ color: C.text }}>
+                    {contact.email}
+                  </span>
                 )}
               </TouchableOpacity>
             ))}
-          </View>
+          </div>
         )}
       </div>
     </div>
@@ -816,96 +780,86 @@ const ComposeView = React.memo(() => {
   }
 
   return (
-    <View style={{ flex: 1 }}>
+    <div className={styles.composeRoot}>
       {/* Header */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-          paddingHorizontal: 16,
-          paddingVertical: 10,
-          borderBottomWidth: 1,
-          borderBottomColor: gray(0.12),
-        }}
-      >
-        <Text style={{ fontSize: 16, fontWeight: Fonts.weight.textHeavy, color: C.text }}>
+      <div className={styles.composeHeader} style={{ borderBottomColor: C.borderSubtle }}>
+        <span
+          className={styles.composeModeLabel}
+          style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}
+        >
           {modeLabel}
-        </Text>
-        <Text style={{ fontSize: 12, color: gray(0.5) }}>From: {myEmail}</Text>
-      </View>
+        </span>
+        <span className={styles.composeFromLabel} style={{ color: C.textMuted }}>
+          From: {myEmail}
+        </span>
+      </div>
 
-      <ScrollView style={{ flex: 1, padding: 16 }}>
+      <div className={styles.composeScroll}>
         {/* To field */}
-        <View style={{ marginBottom: 8 }}>
-          <View style={{ flexDirection: "row", alignItems: "center" }}>
-            <Text style={{ fontSize: 13, color: gray(0.5), width: 40 }}>To:</Text>
+        <div className={styles.fieldBlock}>
+          <div className={styles.fieldRow}>
+            <span className={styles.fieldLabel} style={{ color: C.textMuted }}>To:</span>
             <EmailAutocompleteInput
               value={sToInput}
               onChangeText={_sSetToInput}
               placeholder="recipient@example.com"
             />
             {!sShowCc && (
-              <TouchableOpacity onPress={() => _sSetShowCc(true)} style={{ marginLeft: 8 }}>
-                <Text style={{ fontSize: 12, color: C.blue }}>Cc</Text>
+              <TouchableOpacity onPress={() => _sSetShowCc(true)} className={styles.fieldToggle}>
+                <span className={styles.fieldToggleText} style={{ color: C.blue }}>Cc</span>
               </TouchableOpacity>
             )}
             {!sShowBcc && (
-              <TouchableOpacity onPress={() => _sSetShowBcc(true)} style={{ marginLeft: 8 }}>
-                <Text style={{ fontSize: 12, color: C.blue }}>Bcc</Text>
+              <TouchableOpacity onPress={() => _sSetShowBcc(true)} className={styles.fieldToggle}>
+                <span className={styles.fieldToggleText} style={{ color: C.blue }}>Bcc</span>
               </TouchableOpacity>
             )}
-          </View>
-        </View>
+          </div>
+        </div>
 
         {/* Cc field */}
         {sShowCc && (
-          <View style={{ marginBottom: 8, flexDirection: "row", alignItems: "center" }}>
-            <Text style={{ fontSize: 13, color: gray(0.5), width: 40 }}>Cc:</Text>
-            <EmailAutocompleteInput
-              value={sCcInput}
-              onChangeText={_sSetCcInput}
-              placeholder="cc@example.com"
-            />
-          </View>
+          <div className={styles.fieldBlock}>
+            <div className={styles.fieldRow}>
+              <span className={styles.fieldLabel} style={{ color: C.textMuted }}>Cc:</span>
+              <EmailAutocompleteInput
+                value={sCcInput}
+                onChangeText={_sSetCcInput}
+                placeholder="cc@example.com"
+              />
+            </div>
+          </div>
         )}
 
         {/* Bcc field */}
         {sShowBcc && (
-          <View style={{ marginBottom: 8, flexDirection: "row", alignItems: "center" }}>
-            <Text style={{ fontSize: 13, color: gray(0.5), width: 40 }}>Bcc:</Text>
-            <EmailAutocompleteInput
-              value={sBccInput}
-              onChangeText={_sSetBccInput}
-              placeholder="bcc@example.com"
-            />
-          </View>
+          <div className={styles.fieldBlock}>
+            <div className={styles.fieldRow}>
+              <span className={styles.fieldLabel} style={{ color: C.textMuted }}>Bcc:</span>
+              <EmailAutocompleteInput
+                value={sBccInput}
+                onChangeText={_sSetBccInput}
+                placeholder="bcc@example.com"
+              />
+            </div>
+          </div>
         )}
 
         {/* Subject field */}
-        <View style={{ marginBottom: 12, flexDirection: "row", alignItems: "center" }}>
-          <Text style={{ fontSize: 13, color: gray(0.5), width: 40 }}>Subj:</Text>
-          <View style={{ flex: 1 }}>
-            <TextInput_
+        <div className={styles.subjectFieldRow}>
+          <span className={styles.fieldLabel} style={{ color: C.textMuted }}>Subj:</span>
+          <div className={styles.subjectInputWrap}>
+            <TextInput
               value={zComposeDraft.subject}
               onChangeText={handleSubjectChange}
               placeholder="Subject"
               style={{ fontSize: 14, outline: "none" }}
             />
-          </View>
-        </View>
+          </div>
+        </div>
 
         {/* Rich text editor */}
-        <View
-          style={{
-            borderWidth: 1,
-            borderColor: gray(0.15),
-            borderRadius: 8,
-            overflow: "hidden",
-            minHeight: 250,
-            marginBottom: 12,
-          }}
-        >
+        <div className={styles.editorWrapper} style={{ borderColor: C.borderSubtle }}>
           <ReactQuill
             ref={quillCallbackRef}
             theme="snow"
@@ -916,36 +870,33 @@ const ComposeView = React.memo(() => {
             placeholder="Write your message..."
             style={{ minHeight: 200 }}
           />
-        </View>
+        </div>
 
         {/* Attachment buttons */}
-        <View style={{ flexDirection: "row", marginBottom: 12 }}>
+        <div className={styles.attachBtnRow}>
           <TouchableOpacity
             onPress={handleAddPhoto}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingVertical: 6,
-              paddingHorizontal: 12,
-              backgroundColor: C.blue,
-              borderRadius: 6,
-              marginRight: 8,
-            }}
+            className={styles.attachBtn}
+            style={{ backgroundColor: C.blue }}
           >
-            <Text style={{ fontSize: 13, color: C.textWhite, fontWeight: Fonts.weight.textHeavy }}>Add Photo</Text>
+            <span
+              className={styles.attachBtnText}
+              style={{ color: C.textWhite, fontWeight: Fonts.weight.textHeavy }}
+            >
+              Add Photo
+            </span>
           </TouchableOpacity>
           <TouchableOpacity
             onPress={handleAddVideo}
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              paddingVertical: 6,
-              paddingHorizontal: 12,
-              backgroundColor: C.blue,
-              borderRadius: 6,
-            }}
+            className={styles.attachBtn}
+            style={{ backgroundColor: C.blue }}
           >
-            <Text style={{ fontSize: 13, color: C.textWhite, fontWeight: Fonts.weight.textHeavy }}>Add Video</Text>
+            <span
+              className={styles.attachBtnText}
+              style={{ color: C.textWhite, fontWeight: Fonts.weight.textHeavy }}
+            >
+              Add Video
+            </span>
           </TouchableOpacity>
           <input
             ref={fileInputRef}
@@ -953,106 +904,81 @@ const ComposeView = React.memo(() => {
             accept="image/*"
             multiple
             onChange={handlePhotoSelected}
-            style={{ display: "none" }}
+            className={styles.hiddenFileInput}
           />
           <input
             ref={videoInputRef}
             type="file"
             accept="video/*"
             onChange={handleVideoSelected}
-            style={{ display: "none" }}
+            className={styles.hiddenFileInput}
           />
-        </View>
+        </div>
 
         {/* Attachment list */}
         {zComposeDraft.attachments?.length > 0 && (
-          <View style={{ marginBottom: 12 }}>
+          <div className={styles.composeAttachmentList}>
             {zComposeDraft.attachments.map((att, index) => (
-              <View
+              <div
                 key={`${att.filename}-${index}`}
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingVertical: 6,
-                  paddingHorizontal: 10,
-                  backgroundColor: gray(0.05),
-                  borderRadius: 6,
-                  marginBottom: 4,
-                }}
+                className={styles.composeAttachmentRow}
+                style={{ backgroundColor: C.surfaceAlt }}
               >
-                <Text style={{ fontSize: 13, marginRight: 8 }}>
+                <span className={styles.composeAttachmentEmoji}>
                   {att.type === "video" ? "🎥" : "📎"}
-                </Text>
-                <Text style={{ fontSize: 12, color: C.text, flex: 1 }} numberOfLines={1}>
+                </span>
+                <span className={styles.composeAttachmentName} style={{ color: C.text }}>
                   {att.filename}
-                </Text>
-                <Text style={{ fontSize: 11, color: gray(0.5), marginRight: 8 }}>
+                </span>
+                <span className={styles.composeAttachmentSize} style={{ color: C.textMuted }}>
                   {formatFileSize(att.size)}
-                </Text>
+                </span>
                 {att.uploading ? (
-                  <ActivityIndicator size="small" color={C.blue} />
+                  <LoadingIndicator size="small" color={C.blue} centered={false} />
                 ) : (
                   <TouchableOpacity onPress={() => handleRemoveAttachment(index)}>
-                    <Text style={{ fontSize: 14, color: C.red }}>✕</Text>
+                    <span className={styles.removeAttachmentBtn} style={{ color: C.red }}>✕</span>
                   </TouchableOpacity>
                 )}
-              </View>
+              </div>
             ))}
-          </View>
+          </div>
         )}
 
         {/* Quoted message for replies */}
         {(zComposeMode === "reply" || zComposeMode === "replyAll") && (
-          <View
-            style={{
-              borderLeftWidth: 3,
-              borderLeftColor: gray(0.2),
-              paddingLeft: 12,
-              marginTop: 8,
-              opacity: 0.6,
-            }}
-          >
-            <Text style={{ fontSize: 12, color: gray(0.5), marginBottom: 4 }}>
+          <div className={styles.quoteBlock} style={{ borderLeftColor: C.borderSubtle }}>
+            <span className={styles.quoteHeader} style={{ color: C.textMuted }}>
               Original message
-            </Text>
-          </View>
+            </span>
+          </div>
         )}
 
         {/* Error */}
         {sError ? (
-          <Text style={{ fontSize: 13, color: C.red, marginTop: 8 }}>{sError}</Text>
+          <span className={styles.errorText} style={{ color: C.red }}>{sError}</span>
         ) : null}
 
-        <View style={{ height: 20 }} />
-      </ScrollView>
+        <div className={styles.composeScrollSpacer} />
+      </div>
 
       {/* Send/Discard bar */}
-      <View
-        style={{
-          flexDirection: "row",
-          padding: 12,
-          borderTopWidth: 1,
-          borderTopColor: gray(0.12),
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Button_
+      <div className={styles.composeActionBar} style={{ borderTopColor: C.borderSubtle }}>
+        <Button
           text="Discard"
           onPress={handleDiscard}
           colorGradientArr={COLOR_GRADIENTS.grey}
-          style={{ paddingHorizontal: 20 }}
+          buttonStyle={{ paddingLeft: 20, paddingRight: 20 }}
         />
-        <Button_
+        <Button
           text={zSendingEmail ? "Sending..." : "Send"}
           onPress={handleSend}
-          loading={zSendingEmail}
-          disabled={zSendingEmail}
+          enabled={!zSendingEmail}
           colorGradientArr={COLOR_GRADIENTS.green}
-          style={{ paddingHorizontal: 30 }}
+          buttonStyle={{ paddingLeft: 30, paddingRight: 30 }}
         />
-      </View>
-    </View>
+      </div>
+    </div>
   );
 });
 
@@ -1063,17 +989,15 @@ const ComposeView = React.memo(() => {
 const ActionButton = ({ label, onPress, color }) => (
   <TouchableOpacity
     onPress={onPress}
-    style={{
-      paddingVertical: 4,
-      paddingHorizontal: 10,
-      borderRadius: 6,
-      backgroundColor: gray(0.07),
-      marginLeft: 6,
-    }}
+    className={styles.actionButton}
+    style={{ backgroundColor: C.surfaceAlt }}
   >
-    <Text style={{ fontSize: 12, color: color || C.text, fontWeight: Fonts.weight.textHeavy }}>
+    <span
+      className={styles.actionButtonText}
+      style={{ color: color || C.text, fontWeight: Fonts.weight.textHeavy }}
+    >
       {label}
-    </Text>
+    </span>
   </TouchableOpacity>
 );
 

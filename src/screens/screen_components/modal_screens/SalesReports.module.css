@@ -8,7 +8,7 @@
 .radixOverlay {
   position: fixed;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background-color: var(--surface-overlay);
   z-index: 1000;
 }
 
@@ -39,7 +39,7 @@
   width: 92%;
   height: 94%;
   flex-shrink: 0;
-  background-color: var(--reports-bg, #ffffff);
+  background-color: var(--reports-bg, var(--surface-base));
   border-radius: 15px;
   overflow: hidden;
   display: flex;
@@ -94,7 +94,7 @@
 }
 
 .shortcutRowText {
-  color: #ffffff;
+  color: var(--text-on-accent);
   font-size: 14px;
   font-weight: 600;
   text-align: center;
@@ -115,7 +115,7 @@
 .calendarCard {
   width: 100%;
   flex-shrink: 0;
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: var(--surface-overlay-heavy);
   border-radius: 10px;
   padding: 6px 4px;
   display: flex;
@@ -146,7 +146,7 @@
 .dateSummaryText {
   font-size: 13px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-on-accent);
 }
 
 .endCalNavRow {
@@ -161,7 +161,7 @@
 }
 
 .endCalNavText {
-  color: #ffffff;
+  color: var(--text-on-accent);
   font-size: 13px;
   font-weight: 600;
 }
@@ -174,7 +174,7 @@
 }
 
 .endCalNavArrow {
-  color: #ffffff;
+  color: var(--text-on-accent);
   font-size: 16px;
   font-weight: 700;
 }
@@ -293,7 +293,7 @@
   flex-direction: row;
   align-items: center;
   padding: 6px 10px;
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: var(--surface-overlay-heavy);
   border-bottom-width: 2px;
   border-bottom-style: solid;
   box-sizing: border-box;
@@ -364,7 +364,7 @@
 .activeBadgeText {
   font-size: 10px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-on-accent);
 }
 
 .row {
@@ -490,7 +490,7 @@
   justify-content: space-evenly;
   align-items: center;
   padding: 8px 10px;
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: var(--surface-overlay-heavy);
   border-top-width: 2px;
   border-top-style: solid;
   box-sizing: border-box;
@@ -512,7 +512,7 @@
 .summaryValue {
   font-size: 16px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-on-accent);
 }
 
 .txModeNote {
@@ -528,7 +528,7 @@
 .txModalCard {
   width: 400px;
   flex-shrink: 0;
-  background-color: var(--reports-bg, #ffffff);
+  background-color: var(--reports-bg, var(--surface-base));
   border-radius: 12px;
   overflow: hidden;
   display: flex;
@@ -538,7 +538,7 @@
 .txModalHeader {
   width: 100%;
   flex-shrink: 0;
-  background-color: rgba(0, 0, 0, 0.75);
+  background-color: var(--surface-overlay-heavy);
   padding: 12px 16px;
   display: flex;
   align-items: center;
@@ -549,7 +549,7 @@
 .txModalHeaderText {
   font-size: 15px;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-on-accent);
 }
 
 .txModalBody {
@@ -606,7 +606,7 @@
 .loadingOverlay {
   position: absolute;
   inset: 0;
-  background-color: rgba(0, 0, 0, 0.6);
+  background-color: var(--surface-overlay-heavy);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -615,7 +615,7 @@
 
 .loadingCard {
   flex-shrink: 0;
-  background-color: var(--reports-bg, #ffffff);
+  background-color: var(--reports-bg, var(--surface-base));
   border-radius: 15px;
   padding: 30px;
   display: flex;

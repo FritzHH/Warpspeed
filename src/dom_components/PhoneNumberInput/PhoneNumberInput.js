@@ -1,6 +1,6 @@
 import React, { forwardRef, useState, useRef, useEffect, useCallback } from "react";
 import { C } from "../../styles";
-import { gray } from "../../utils";
+
 import styles from "./PhoneNumberInput.module.css";
 
 export const PhoneNumberInput = forwardRef(function PhoneNumberInput(
@@ -15,11 +15,11 @@ export const PhoneNumberInput = forwardRef(function PhoneNumberInput(
     filledBoxStyle = {},
     placeholderBoxStyle = {},
     cursorBoxStyle = {},
-    placeholderTextColor = "#999",
-    cursorTextColor = "#fff",
+    placeholderTextColor = C.textDisabled,
+    cursorTextColor = C.textOnAccent,
     showDashes = true,
     dashStyle = {},
-    dashColor = "#666",
+    dashColor = C.textSecondary,
     dashSize = 16,
     maxLength = 10,
     autoFocus = false,
@@ -29,7 +29,7 @@ export const PhoneNumberInput = forwardRef(function PhoneNumberInput(
     onFocus,
     onBlur,
     fontSize,
-    textColor = gray(0.55),
+    textColor = C.textMuted,
     disabled = false,
     className = "",
     "aria-label": ariaLabel,
@@ -102,9 +102,9 @@ export const PhoneNumberInput = forwardRef(function PhoneNumberInput(
       const boxInlineStyle = {
         width: width || 30,
         height: height || 40,
-        borderColor: isCursorPos ? C.cursorRed : isEmpty ? "#ddd" : "#007bff",
-        backgroundColor: isCursorPos ? C.cursorRed : isEmpty ? "#f8f9fa" : "#fff",
-        boxShadow: isCursorPos ? "0 0 10px rgba(255, 107, 107, 0.5)" : "none",
+        borderColor: isCursorPos ? C.dangerStrong : isEmpty ? C.borderSubtle : C.borderFocus,
+        backgroundColor: isCursorPos ? C.dangerStrong : isEmpty ? C.surfaceAlt : C.surfaceBase,
+        boxShadow: isCursorPos ? `0 0 10px ${C.dangerStrong}` : "none",
         ...boxStyle,
         ...(isCursorPos ? cursorBoxStyle : isEmpty ? placeholderBoxStyle : filledBoxStyle),
       };

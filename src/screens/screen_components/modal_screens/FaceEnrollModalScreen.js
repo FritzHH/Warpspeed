@@ -1,10 +1,9 @@
 /*eslint-disable*/
 
-import { View } from "react-native-web";
 import { useLoginStore } from "../../../stores";
-import { Button_, Dialog_ } from "../../../components";
+import { Button, Dialog } from "../../../dom_components";
 import { log } from "../../../utils";
-import { COLOR_GRADIENTS } from "../../../styles";
+import { COLOR_GRADIENTS, C } from "../../../styles";
 import { useEffect, Suspense, lazy } from "react";
 
 const FaceDetectionClientComponent = lazy(() =>
@@ -18,30 +17,26 @@ export function FaceEnrollModalScreen({
   handleDescriptorCapture,
   userObj,
 }) {
-  // store setters ///////////////////////////////////////////////////////////
   const _zSetRunBackgroundFacialRecognition = useLoginStore(
     (state) => state.setRunBackgroundRecognition
   );
 
-  // local state ///////////////////////////////////////////////////////////
   useEffect(() => {
     _zSetRunBackgroundFacialRecognition(false);
     return () => _zSetRunBackgroundFacialRecognition(true);
   }, []);
 
-  ///////////////////////////////////////////////////////////
-  ///////////////////////////////////////////////////////////
-
   function handleDescriptor(descriptor) {
-    // log(descriptor);
     handleDescriptorCapture(userObj, descriptor);
     handleExitPress();
   }
 
   return (
-    <Dialog_ visible={!!userObj} onClose={handleExitPress} overlayColor="rgba(0, 0, 0, 0.85)" preventClose>
-      <View
+    <Dialog visible={!!userObj} onClose={handleExitPress} overlayColor={C.surfaceOverlayHeavy} preventClose>
+      <div
         style={{
+          display: "flex",
+          flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
         }}
@@ -51,13 +46,13 @@ export function FaceEnrollModalScreen({
             __handleEnrollDescriptor={handleDescriptor}
           />
         </Suspense>
-        <Button_
+        <Button
           text={"Exit"}
           colorGradientArr={COLOR_GRADIENTS.green}
-          buttonStyle={{ paddingHorizontal: 20 }}
+          buttonStyle={{ paddingLeft: 20, paddingRight: 20 }}
           onPress={handleExitPress}
         />
-      </View>
-    </Dialog_>
+      </div>
+    </Dialog>
   );
 }

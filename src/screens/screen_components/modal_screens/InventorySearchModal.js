@@ -1,11 +1,11 @@
 /* eslint-disable */
-import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
 import { useState, useRef } from "react";
 import { C, Z } from "../../../styles";
-import { gray, formatCurrencyDisp } from "../../../utils";
-import { CheckBox } from "../../../dom_components";
+import { formatCurrencyDisp } from "../../../utils";
+import { CheckBox, Pressable, Button } from "../../../dom_components";
 import { workerSearchInventory } from "../../../inventorySearchManager";
 import { StandKeypad } from "../../../shared/StandKeypad";
+import styles from "./InventorySearchModal.module.css";
 
 const InventorySearchModal = ({ onAddItems, onClose }) => {
   const [sSearchText, _setSearchText] = useState("");
@@ -64,30 +64,8 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
   let checkedCount = sCheckedIDs.size;
 
   return (
-    <div
-      onClick={onClose}
-      style={{
-        position: "absolute",
-        top: 0, left: 0, right: 0, bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: Z.modal,
-      }}
-    >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          width: "95%",
-          height: "95%",
-          backgroundColor: "white",
-          borderRadius: 12,
-          display: "flex",
-          flexDirection: "column",
-          overflow: "hidden",
-        }}
-      >
+    <div onClick={onClose} className={styles.backdrop} style={{ zIndex: Z.modal }}>
+      <div onClick={(e) => e.stopPropagation()} className={styles.dialog}>
         {/* Header */}
         <div
           onClick={onClose}
@@ -99,48 +77,31 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
               headerSwipeRef.current = null;
             }
           }}
-          style={{
-            display: "flex",
-            flexDirection: "row",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: 20,
-            borderBottom: "1px solid " + gray(0.1),
-            cursor: "pointer",
-            gap: 8,
-          }}
+          className={styles.header}
+          style={{ borderBottomColor: C.borderSubtle }}
         >
-          <Text style={{ fontSize: 16, fontWeight: "600", color: C.text }}>Search Inventory</Text>
-          <Text style={{ fontSize: 36, fontStyle: "italic", color: gray(0.35) }}>Tap/swipe down to close</Text>
+          <span className={styles.headerTitle} style={{ color: C.text }}>Search Inventory</span>
+          <span className={styles.headerHint} style={{ color: C.textDisabled }}>Tap/swipe down to close</span>
         </div>
 
         {/* Search display */}
-        <div style={{ padding: 12, paddingBottom: 8 }}>
+        <div className={styles.searchWrap}>
           <div
+            className={styles.searchBox}
             style={{
-              width: "100%",
-              minHeight: 88,
-              borderRadius: 8,
-              borderWidth: 2,
-              borderStyle: "solid",
               borderColor: C.buttonLightGreenOutline,
               backgroundColor: C.listItemWhite,
-              paddingLeft: 12,
-              paddingRight: 12,
-              display: "flex",
-              alignItems: "center",
-              boxSizing: "border-box",
             }}
           >
-            <Text style={{ fontSize: 40, fontWeight: "500", color: sSearchText ? C.text : gray(0.4) }}>
+            <span className={styles.searchText} style={{ color: sSearchText ? C.text : C.textMuted }}>
               {sSearchText || "Search inventory..."}
-              {sSearchText ? <Text style={{ color: C.blue }}>|</Text> : null}
-            </Text>
+              {sSearchText ? <span style={{ color: C.blue }}>|</span> : null}
+            </span>
           </div>
         </div>
 
         {/* Keypad */}
-        <div onMouseDown={(e) => e.preventDefault()} style={{ paddingLeft: 12, paddingRight: 12, paddingBottom: 8 }}>
+        <div onMouseDown={(e) => e.preventDefault()} className={styles.keypadWrap}>
           <StandKeypad
             mode={sKeypadMode}
             onKeyPress={handleKeyPress}
@@ -155,9 +116,9 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
         </div>
 
         {/* Results */}
-        <ScrollView style={{ flex: 1, paddingHorizontal: 12 }}>
+        <div className={styles.results}>
           {sSearching && (
-            <Text style={{ fontSize: 13, color: gray(0.4), textAlign: "center", paddingVertical: 10 }}>Searching...</Text>
+            <span className={styles.statusText} style={{ color: C.textMuted }}>Searching...</span>
           )}
           {sSearchResults.map((item, idx) => {
             let isChecked = sCheckedIDs.has(item.id);
@@ -167,18 +128,9 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
             return (
               <div
                 key={item.id}
+                className={styles.resultRow}
                 style={{
-                  display: "flex",
-                  flexDirection: "row",
-                  alignItems: "center",
-                  paddingTop: 14,
-                  paddingBottom: 14,
-                  paddingLeft: 10,
-                  paddingRight: 10,
-                  borderRadius: 0,
-                  backgroundColor: isChecked ? "rgb(235,250,240)" : (idx % 2 === 0 ? C.listItemWhite : gray(0.03)),
-                  cursor: "pointer",
-                  gap: 10,
+                  backgroundColor: isChecked ? C.surfaceSuccessMuted : (idx % 2 === 0 ? C.listItemWhite : C.surfaceAlt),
                 }}
               >
                 <div onClick={(e) => { e.stopPropagation(); toggleCheck(item.id); }}>
@@ -188,42 +140,41 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
                     size={40}
                   />
                 </div>
-                <TouchableOpacity
+                <Pressable
                   onPress={() => handleTapItem(item)}
-                  style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+                  className={styles.rowTapArea}
                 >
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 30, fontWeight: "600", color: C.text }} numberOfLines={1}>{name}</Text>
-                    {brand ? <Text style={{ fontSize: 24, color: gray(0.45) }} numberOfLines={1}>{brand}</Text> : null}
-                  </View>
-                  <Text style={{ fontSize: 28, fontWeight: "600", color: C.green, marginLeft: 8 }}>
+                  <div className={styles.rowMain}>
+                    <span className={styles.rowName} style={{ color: C.text }}>{name}</span>
+                    {brand ? <span className={styles.rowBrand} style={{ color: C.textMuted }}>{brand}</span> : null}
+                  </div>
+                  <span className={styles.rowPrice} style={{ color: C.green }}>
                     ${formatCurrencyDisp(price)}
-                  </Text>
-                </TouchableOpacity>
+                  </span>
+                </Pressable>
               </div>
             );
           })}
           {!sSearching && sSearchText.length >= 2 && sSearchResults.length === 0 && (
-            <Text style={{ fontSize: 13, color: gray(0.4), textAlign: "center", paddingVertical: 10 }}>No results found.</Text>
+            <span className={styles.statusText} style={{ color: C.textMuted }}>No results found.</span>
           )}
-        </ScrollView>
+        </div>
 
         {/* Add checked button */}
         {checkedCount > 0 && (
-          <div style={{ padding: 12, borderTop: "1px solid " + gray(0.1) }}>
-            <TouchableOpacity
+          <div className={styles.addBtnWrap} style={{ borderTopColor: C.borderSubtle }}>
+            <Button
               onPress={handleAddChecked}
-              style={{
-                paddingVertical: 24,
+              text={`Add ${checkedCount} Item${checkedCount > 1 ? "s" : ""}`}
+              buttonStyle={{
+                width: "100%",
+                paddingTop: 24,
+                paddingBottom: 24,
                 borderRadius: 8,
                 backgroundColor: C.green,
-                alignItems: "center",
               }}
-            >
-              <Text style={{ fontSize: 24, fontWeight: "600", color: "white" }}>
-                Add {checkedCount} Item{checkedCount > 1 ? "s" : ""}
-              </Text>
-            </TouchableOpacity>
+              textStyle={{ fontSize: 24, fontWeight: "600", color: "white" }}
+            />
           </div>
         )}
       </div>

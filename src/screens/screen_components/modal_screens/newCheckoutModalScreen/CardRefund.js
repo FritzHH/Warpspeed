@@ -1,18 +1,17 @@
 /* eslint-disable */
-import { View, Text, TextInput, Image } from "react-native-web";
 import { useState, useRef, memo } from "react";
-import { Button_, SmallLoadingIndicator, Tooltip } from "../../../../components";
+import { Button, SmallLoadingIndicator, Tooltip } from "../../../../dom_components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
-import {
-  usdTypeMask,
-  formatCurrencyDisp,
-  log,
-  gray,
-  generateEAN13Barcode,
-} from "../../../../utils";
+import { usdTypeMask, formatCurrencyDisp, log, generateEAN13Barcode } from "../../../../utils";
 import { useSettingsStore } from "../../../../stores";
 import { newCheckoutProcessStripeRefund } from "./newCheckoutFirebaseCalls";
 import { dlog, DCAT } from "./checkoutDebugLog";
+import styles from "./CardRefund.module.css";
+
+function resolveIcon(src) {
+  if (!src) return null;
+  return typeof src === "object" ? src.default || src : src;
+}
 
 export const CardRefund = memo(function CardRefund({
   selectedPayment,
@@ -53,7 +52,6 @@ export const CardRefund = memo(function CardRefund({
     if (onManualInput) onManualInput();
     dlog(DCAT.INPUT, "handleAmountChange", "CardRefund", { cents: usdTypeMask(val, { withDollar: false }).cents });
     let result = usdTypeMask(val, { withDollar: false });
-    // Cap to the lesser of max card refund and selected card's available amount
     let maxAllowed = maxCardRefund;
     if (selectedPayment) {
       let cardAvailable = selectedPayment.amountCaptured - ((selectedPayment.refunds || []).reduce((s, r) => s + (r.amount || 0), 0));
@@ -94,9 +92,6 @@ export const CardRefund = memo(function CardRefund({
       return;
     }
 
-    // If items are attached, the refund amount must cover items+tax exactly
-    // or higher — otherwise the receipt's items/tax block will not match
-    // refund.amount (the bug that produced the $1 receipt for $2.13 of items).
     if (workorderLines.length > 0) {
       let itemsSum = 0;
       workorderLines.forEach((item) => {
@@ -124,7 +119,6 @@ export const CardRefund = memo(function CardRefund({
       let { tenantID, storeID } = useSettingsStore.getState().getSettings();
       refundId = generateEAN13Barcode();
 
-      // Persist pending refund marker before calling Cloud Function (crash recovery)
       if (onRefundStarted) onRefundStarted({ refundId, transactionID: selectedPayment.id, amount: sRefundAmount });
 
       let result = await newCheckoutProcessStripeRefund(
@@ -160,7 +154,6 @@ export const CardRefund = memo(function CardRefund({
         }
       } else {
         dlog(DCAT.ACTION, "refundFailed", "CardRefund", { error: result?.message || "Refund failed" });
-        // Cloud Function returned explicit failure — refund did not happen
         if (onRefundFailed) onRefundFailed(refundId);
         _setErrorMessage(result?.message || "Refund failed");
         _setSuccessMessage("");
@@ -188,151 +181,122 @@ export const CardRefund = memo(function CardRefund({
     ? selectedPayment.amountCaptured - ((selectedPayment.refunds || []).reduce((s, r) => s + (r.amount || 0), 0))
     : 0;
 
+  let buttonStyle = {
+    paddingTop: 8,
+    paddingBottom: 8,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  };
+  let buttonTextStyle = { fontSize: 13, fontWeight: Fonts.weight.textHeavy };
+
   return (
-    <View style={{ flex: 1, padding: 10 }}>
-      <Text
-        style={{
-          fontSize: 15,
-          fontWeight: Fonts.weight.textHeavy,
-          color: C.text,
-          marginBottom: 8,
-        }}
+    <div className={styles.container}>
+      <div
+        className={styles.title}
+        style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}
       >
         CARD REFUND
-      </Text>
+      </div>
 
-      {/* Selected Card Info */}
       {selectedPayment ? (
-        <View
-          style={{
-            backgroundColor: "rgb(230, 240, 252)",
-            borderRadius: 6,
-            padding: 8,
-            marginBottom: 8,
-          }}
+        <div
+          className={styles.cardInfo}
+          style={{ backgroundColor: C.surfaceAccentMuted }}
         >
-          <Text style={{ fontSize: 12, color: C.text }}>
+          <div className={styles.cardInfoLine} style={{ color: C.text }}>
             {selectedPayment.cardIssuer || selectedPayment.cardType} ****
             {selectedPayment.last4}
-          </Text>
-          <Text style={{ fontSize: 11, color: C.lightText }}>
+          </div>
+          <div className={styles.cardInfoSub} style={{ color: C.lightText }}>
             Exp: {selectedPayment.expMonth}/{selectedPayment.expYear} |
             Available: {formatCurrencyDisp(available)}
-          </Text>
-        </View>
+          </div>
+        </div>
       ) : (
-        <Text
-          style={{
-            fontSize: 11,
-            color: C.lightText,
-            fontStyle: "italic",
-            marginBottom: 8,
-          }}
-        >
+        <div className={styles.noCardSelected} style={{ color: C.lightText }}>
           Select a card payment from the list
-        </Text>
+        </div>
       )}
 
-      {/* Refund Amount Input */}
-      <View style={{ marginBottom: 8 }}>
-        <Text style={{ fontSize: 11, color: C.lightText, marginBottom: 3 }}>
+      <div className={styles.amountSection}>
+        <div className={styles.amountLabel} style={{ color: C.lightText }}>
           Refund Amount
-        </Text>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            borderWidth: 1,
-            borderColor: sFocused ? C.green : gray(0.15),
-            borderRadius: 6,
-            paddingHorizontal: 8,
-            paddingVertical: 6,
-            backgroundColor: "white",
-          }}
+        </div>
+        <div
+          className={styles.inputWrap}
+          style={{ borderColor: sFocused ? C.green : C.borderSubtle }}
         >
-          <Text style={{ fontSize: 14, color: C.lightred, marginRight: 2 }}>$</Text>
-          <TextInput
+          <span className={styles.dollar} style={{ color: C.lightred }}>$</span>
+          <input
             ref={inputRef}
-            style={{
-              flex: 1,
-              outlineWidth: 0,
-              outlineStyle: "none",
-              fontSize: 14,
-              color: C.lightred,
-              textAlign: "right",
-            }}
+            type="text"
+            className={styles.input}
+            style={{ color: C.lightred }}
             value={sRefundAmountDisp}
-            onChangeText={handleAmountChange}
+            onChange={(e) => handleAmountChange(e.target.value)}
             placeholder="0.00"
-            placeholderTextColor={gray(0.3)}
             onFocus={() => _setFocused(true)}
             onBlur={() => _setFocused(false)}
-            editable={inputEditable}
+            disabled={!inputEditable}
           />
-        </View>
-      </View>
+        </div>
+      </div>
 
-      {/* Status Messages */}
-      <View style={{ minHeight: 28, justifyContent: "center", marginBottom: 4 }}>
+      <div className={styles.statusRow}>
         {sProcessing && (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+          <div className={styles.statusFlex}>
             <SmallLoadingIndicator color={C.orange} text="" message="" containerStyle={{ padding: 2 }} />
-            <Text style={{ fontSize: 12, color: gray(0.5), fontWeight: "600" }}>
+            <span className={styles.statusText} style={{ color: C.textMuted }}>
               {sSuccessMessage || "Processing refund..."}
-            </Text>
-          </View>
+            </span>
+          </div>
         )}
         {!sProcessing && !!sErrorMessage && (
-          <Text style={{ fontSize: 11, color: C.lightred, fontWeight: "600" }}>
+          <span className={styles.errorText} style={{ color: C.lightred }}>
             {sErrorMessage}
-          </Text>
+          </span>
         )}
         {!sProcessing && !!sSuccessMessage && (
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-            <Image source={ICONS.check} style={{ width: 14, height: 14, tintColor: C.green }} resizeMode="contain" />
-            <Text style={{ fontSize: 12, color: C.green, fontWeight: "600" }}>
+          <div className={styles.statusFlexSm}>
+            <img
+              src={resolveIcon(ICONS.check)}
+              alt=""
+              className={styles.checkIcon}
+            />
+            <span className={styles.statusText} style={{ color: C.green }}>
               {sSuccessMessage}
-            </Text>
-          </View>
+            </span>
+          </div>
         )}
-      </View>
+      </div>
 
-      {/* Button */}
       {reasonMissing ? (
         <Tooltip text="Enter a refund reason first (min 10 characters)" position="bottom">
-          <View>
-            <Button_
+          <div>
+            <Button
               text="PROCESS CARD REFUND"
               onPress={() => {}}
               enabled={false}
               colorGradientArr={COLOR_GRADIENTS.green}
-              textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
-              buttonStyle={{
-                paddingVertical: 8,
-                borderRadius: 6,
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: 0.4,
-              }}
+              textStyle={buttonTextStyle}
+              buttonStyle={{ ...buttonStyle, opacity: 0.4 }}
             />
-          </View>
+          </div>
         </Tooltip>
       ) : (
-        <Button_
+        <Button
           text={sProcessing ? "PROCESSING..." : "PROCESS CARD REFUND"}
           onPress={handleProcessRefund}
           enabled={isEnabled && sRefundAmount >= 50 && !sProcessing}
           colorGradientArr={COLOR_GRADIENTS.green}
-          textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
+          textStyle={buttonTextStyle}
           buttonStyle={{
-            paddingVertical: 8,
-            borderRadius: 6,
-            alignItems: "center",
-            justifyContent: "center",
+            ...buttonStyle,
             opacity: isEnabled && sRefundAmount >= 50 && !sProcessing ? 1 : 0.4,
           }}
         />
       )}
-    </View>
+    </div>
   );
 });

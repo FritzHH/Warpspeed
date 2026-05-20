@@ -1,10 +1,10 @@
 /* eslint-disable */
-import { View, Text, TextInput } from "react-native-web";
 import { useState, useRef, memo } from "react";
-import { Button_, Tooltip } from "../../../../components";
+import { Button, Tooltip } from "../../../../dom_components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
-import { usdTypeMask, formatCurrencyDisp, gray } from "../../../../utils";
+import { usdTypeMask, formatCurrencyDisp } from "../../../../utils";
 import { dlog, DCAT } from "./checkoutDebugLog";
+import styles from "./CashRefund.module.css";
 
 export const CashRefund = memo(function CashRefund({
   maxCashRefund = 0,
@@ -69,115 +69,83 @@ export const CashRefund = memo(function CashRefund({
   let isEnabled = !refundComplete && maxCashRefund > 0;
   let inputEditable = isEnabled;
 
+  let buttonStyle = {
+    paddingTop: 8,
+    paddingBottom: 8,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  };
+  let buttonTextStyle = { fontSize: 13, fontWeight: Fonts.weight.textHeavy };
+
   return (
-    <View
-      style={{
-        flex: 1,
-        padding: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: gray(0.1),
-      }}
+    <div
+      className={styles.container}
+      style={{ borderBottomColor: C.borderSubtle }}
     >
-      <Text
-        style={{
-          fontSize: 15,
-          fontWeight: Fonts.weight.textHeavy,
-          color: C.text,
-          marginBottom: 8,
-        }}
+      <div
+        className={styles.title}
+        style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}
       >
         CASH REFUND
-      </Text>
+      </div>
 
-      {/* Amount Input */}
-      <View style={{ marginBottom: 8 }}>
-        <Text style={{ fontSize: 11, color: C.lightText, marginBottom: 3 }}>
+      <div className={styles.amountSection}>
+        <div className={styles.amountLabel} style={{ color: C.lightText }}>
           Refund Amount (max: {formatCurrencyDisp(maxCashRefund)})
-        </Text>
-        <View
-          style={{
-            flexDirection: "row",
-            alignItems: "center",
-            borderWidth: 1,
-            borderColor: sFocused ? C.green : gray(0.15),
-            borderRadius: 6,
-            paddingHorizontal: 8,
-            paddingVertical: 6,
-            backgroundColor: "white",
-          }}
+        </div>
+        <div
+          className={styles.inputWrap}
+          style={{ borderColor: sFocused ? C.green : C.borderSubtle }}
         >
-          <Text style={{ fontSize: 14, color: C.lightred, marginRight: 2 }}>$</Text>
-          <TextInput
+          <span className={styles.dollar} style={{ color: C.lightred }}>$</span>
+          <input
             ref={inputRef}
-            style={{
-              flex: 1,
-              outlineWidth: 0,
-              outlineStyle: "none",
-              fontSize: 14,
-              color: C.lightred,
-              textAlign: "right",
-            }}
+            type="text"
+            className={styles.input}
+            style={{ color: C.lightred }}
             value={sRefundAmountDisp}
-            onChangeText={handleAmountChange}
+            onChange={(e) => handleAmountChange(e.target.value)}
             placeholder="0.00"
-            placeholderTextColor={gray(0.3)}
             onFocus={() => _setFocused(true)}
             onBlur={() => _setFocused(false)}
-            editable={inputEditable}
+            disabled={!inputEditable}
           />
-        </View>
-      </View>
+        </div>
+      </div>
 
-      {/* Status */}
       {sStatusMessage ? (
-        <Text
-          style={{
-            fontSize: 11,
-            color: C.lightred,
-            fontStyle: "italic",
-            marginBottom: 4,
-          }}
-        >
+        <div className={styles.statusMsg} style={{ color: C.lightred }}>
           {sStatusMessage}
-        </Text>
+        </div>
       ) : null}
 
-      {/* Button */}
       {reasonMissing ? (
         <Tooltip text="Enter a refund reason first (min 10 characters)" position="top">
-          <View>
-            <Button_
+          <div>
+            <Button
               text="PROCESS CASH REFUND"
               onPress={() => {}}
               enabled={false}
               colorGradientArr={COLOR_GRADIENTS.green}
-              textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
-              buttonStyle={{
-                paddingVertical: 8,
-                borderRadius: 6,
-                alignItems: "center",
-                justifyContent: "center",
-                opacity: 0.4,
-              }}
+              textStyle={buttonTextStyle}
+              buttonStyle={{ ...buttonStyle, opacity: 0.4 }}
             />
-          </View>
+          </div>
         </Tooltip>
       ) : (
-        <Button_
+        <Button
           text="PROCESS CASH REFUND"
           onPress={handleProcessRefund}
           enabled={isEnabled && sRefundAmount > 0}
           colorGradientArr={COLOR_GRADIENTS.green}
-          textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
+          textStyle={buttonTextStyle}
           buttonStyle={{
-            paddingVertical: 8,
-            borderRadius: 6,
-            alignItems: "center",
-            justifyContent: "center",
+            ...buttonStyle,
             opacity: isEnabled && sRefundAmount > 0 ? 1 : 0.4,
           }}
         />
       )}
-    </View>
+    </div>
   );
 });

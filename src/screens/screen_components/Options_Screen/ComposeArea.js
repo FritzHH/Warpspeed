@@ -91,7 +91,7 @@ export function ComposeArea({
         onToggleForward={onToggleForward}
       />
 
-      <div className={s.inputRow} style={{ borderColor: "rgba(0,0,0,0.15)" }}>
+      <div className={s.inputRow} style={{ borderColor: C.surfaceOverlayLight }}>
         <TextInputDom
           ref={textInputRef}
           value={value}

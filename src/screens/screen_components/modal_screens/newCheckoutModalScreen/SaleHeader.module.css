@@ -1,0 +1,14 @@
+.header {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 10px 20px 5px 20px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.reprintWrap {
+  margin-right: 10px;
+  flex-shrink: 0;
+}

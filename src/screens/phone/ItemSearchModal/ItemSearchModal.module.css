@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgb(254, 254, 254);
+  background-color: var(--surface-base);
   display: flex;
   flex-direction: column;
 }
@@ -17,10 +17,10 @@
   padding-right: 12px;
   padding-top: 10px;
   padding-bottom: 10px;
-  background-color: rgb(225, 244, 235);
+  background-color: var(--surface-accent-muted);
   border-bottom-width: 1px;
   border-bottom-style: solid;
-  border-bottom-color: rgb(200, 228, 220);
+  border-bottom-color: var(--border-default);
   flex-shrink: 0;
 }
 
@@ -43,14 +43,14 @@
   width: 100%;
   border-width: 1px;
   border-style: solid;
-  border-color: rgb(200, 228, 220);
+  border-color: var(--border-default);
   border-radius: 8px;
   padding-top: 10px;
   padding-bottom: 10px;
   padding-left: 12px;
   padding-right: 12px;
   font-size: 16px;
-  background-color: rgb(254, 254, 255);
+  background-color: var(--surface-raised);
   outline: none;
   box-sizing: border-box;
 }
@@ -76,11 +76,11 @@
 .resultRowDivider {
   border-top-width: 1px;
   border-top-style: solid;
-  border-top-color: rgb(235, 235, 235);
+  border-top-color: var(--border-subtle);
 }
 
 .resultRowSelected {
-  background-color: rgb(229, 245, 230);
+  background-color: var(--surface-success-muted);
 }
 
 .resultName {
@@ -95,7 +95,7 @@
 
 .resultPrice {
   font-size: 14px;
-  color: rgb(76, 175, 80);
+  color: var(--success);
   font-weight: 500;
   flex-shrink: 0;
 }
@@ -109,5 +109,5 @@
 
 .emptyText {
   font-size: 14px;
-  color: rgb(128, 128, 128);
+  color: var(--text-muted);
 }

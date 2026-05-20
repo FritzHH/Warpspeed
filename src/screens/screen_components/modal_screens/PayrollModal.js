@@ -15,7 +15,6 @@ import {
   formatMillisForDisplay,
   convertMillisToHoursMins,
   trimToTwoDecimals,
-  gray,
   log,
   lightenRGBByPercent,
   deepEqual,
@@ -591,6 +590,31 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
   let beginMatchLabel = BEGIN_OPTIONS.find((o) => o.value === tf.begin)?.label;
   let endMatchLabel = END_OPTIONS.find((o) => o.value === tf.end)?.label;
 
+  // Theme + grayscale CSS variables injected once on .card; all CSS classes consume these.
+  let cardThemeVars = {
+    backgroundColor: C.backgroundWhite,
+    "--c-text": C.text,
+    "--c-blue": C.blue,
+    "--c-blue-lighter": lightenRGBByPercent(C.blue, 30),
+    "--c-orange": C.orange,
+    "--c-red": C.red,
+    "--c-green": C.green,
+    "--c-lightred": C.lightred,
+    "--c-green-light": lightenRGBByPercent(C.green, 30),
+    "--c-green-pill": lightenRGBByPercent(C.green, 60),
+    "--c-red-pill": lightenRGBByPercent(C.lightred, 60),
+    "--c-list-item-white": C.listItemWhite,
+    "--c-button-light-green-outline": C.buttonLightGreenOutline,
+    "--g-40": "rgb(153,153,153)",
+    "--g-50": "rgb(128,128,128)",
+    "--g-70": "rgb(77,77,77)",
+    "--g-80": "rgb(51,51,51)",
+    "--g-85": "rgb(38,38,38)",
+    "--g-95": "rgb(13,13,13)",
+    "--g-20": "rgb(204,204,204)",
+    "--g-075": "rgb(236,236,236)",
+  };
+
   return (
     <DialogPrimitive.Root open={true} onOpenChange={(open) => { if (!open) handleExit(); }}>
       <DialogPrimitive.Portal>
@@ -601,29 +625,22 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
           aria-label="Payroll"
         >
           <DialogPrimitive.Title className={styles.srOnly}>Payroll</DialogPrimitive.Title>
-          <div className={styles.card} style={{ backgroundColor: C.backgroundWhite }}>
+          <div className={styles.card} style={cardThemeVars}>
         {/* ═══ LEFT RAIL ═══ */}
         <div className={styles.leftRail}>
           <div className={styles.leftRailTop}>
-            {isAdmin && (
-              <span className={styles.title} style={{ color: C.text, display: "block" }}>
-                Payroll
-              </span>
-            )}
+            {isAdmin && <span className={styles.blockTitle}>Payroll</span>}
 
             {isAdmin && (
               <>
-                <span className={styles.sectionLabel} style={{ color: gray(0.5), display: "block" }}>
-                  SELECT USER
-                </span>
+                <span className={styles.blockSection}>SELECT USER</span>
                 {(zUsers || []).map((user) => {
                   let isSelected = sSelectedUser?.id === user.id;
                   return (
                     <TouchableOpacity
                       key={user.id}
                       onPress={() => handleUserSelect(user)}
-                      className={styles.userRow}
-                      style={{ backgroundColor: isSelected ? C.orange : C.blue }}
+                      className={`${styles.userRow} ${isSelected ? styles.isSelected : ""}`}
                     >
                       <span className={styles.userRowText}>
                         {user.first} {user.last}
@@ -632,18 +649,14 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
                   );
                 })}
 
-                <div className={styles.divider} style={{ backgroundColor: gray(0.8) }} />
+                <div className={styles.divider} />
               </>
             )}
 
             {/* Pay Period button */}
             <TouchableOpacity
               onPress={handleDefaultRangeShortcut}
-              className={styles.shortcutRow}
-              style={{
-                backgroundColor:
-                  sActiveShortcut === "Pay Period" ? C.orange : C.blue,
-              }}
+              className={`${styles.shortcutRow} ${sActiveShortcut === "Pay Period" ? styles.isActive : styles.isPayPeriod}`}
             >
               <span className={styles.shortcutRowText}>
                 Pay Period{" "}
@@ -659,12 +672,7 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
                 <TouchableOpacity
                   key={sc.label}
                   onPress={() => handleShortcut(sc)}
-                  className={styles.shortcutRow}
-                  style={{
-                    backgroundColor: isActive
-                      ? C.orange
-                      : lightenRGBByPercent(C.blue, 30),
-                  }}
+                  className={`${styles.shortcutRow} ${isActive ? styles.isActive : ""}`}
                 >
                   <span className={styles.shortcutRowText}>{sc.label}</span>
                 </TouchableOpacity>
@@ -673,49 +681,29 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
 
             {isAdmin && (
               <>
-                <div className={styles.divider} style={{ backgroundColor: gray(0.8) }} />
+                <div className={styles.divider} />
 
-                <span className={styles.payPeriodLabel} style={{ color: gray(0.5), display: "block" }}>
-                  PAY PERIOD
-                </span>
+                <span className={styles.blockPayPeriod}>PAY PERIOD</span>
                 <div className={styles.dropdownGroup}>
-                  <span className={styles.smallLabel} style={{ color: gray(0.5) }}>
-                    Start Day
-                  </span>
+                  <span className={`${styles.smallLabel} ${styles.textG50}`}>Start Day</span>
                   <DropdownMenu
                     dataArr={BEGIN_OPTIONS}
                     matchValue={beginMatchLabel}
                     useSelectedAsButtonTitle={true}
                     onSelect={(item) => handleTimeFrameChange("begin", item.value)}
-                    buttonStyle={{
-                      borderWidth: 1,
-                      borderColor: C.buttonLightGreenOutline,
-                      borderRadius: 4,
-                      paddingVertical: 4,
-                      paddingHorizontal: 6,
-                      backgroundColor: C.listItemWhite,
-                    }}
-                    buttonTextStyle={{ fontSize: 11, color: C.text }}
+                    buttonClassName={styles.payrollDropdown}
+                    buttonTextClassName={styles.payrollDropdownText}
                   />
                 </div>
                 <div className={styles.dropdownGroup}>
-                  <span className={styles.smallLabel} style={{ color: gray(0.5) }}>
-                    End Day
-                  </span>
+                  <span className={`${styles.smallLabel} ${styles.textG50}`}>End Day</span>
                   <DropdownMenu
                     dataArr={END_OPTIONS}
                     matchValue={endMatchLabel}
                     useSelectedAsButtonTitle={true}
                     onSelect={(item) => handleTimeFrameChange("end", item.value)}
-                    buttonStyle={{
-                      borderWidth: 1,
-                      borderColor: C.buttonLightGreenOutline,
-                      borderRadius: 4,
-                      paddingVertical: 4,
-                      paddingHorizontal: 6,
-                      backgroundColor: C.listItemWhite,
-                    }}
-                    buttonTextStyle={{ fontSize: 11, color: C.text }}
+                    buttonClassName={styles.payrollDropdown}
+                    buttonTextClassName={styles.payrollDropdownText}
                   />
                 </div>
               </>
@@ -728,12 +716,8 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
               text="CLOSE"
               colorGradientArr={COLOR_GRADIENTS.red}
               onPress={handleExit}
-              buttonStyle={{
-                paddingLeft: 20,
-                paddingRight: 20,
-                paddingVertical: 8,
-              }}
-              textStyle={{ fontSize: 13, fontWeight: "700" }}
+              innerClassName={styles.btnClose}
+              textClassName={styles.btnTxt13}
             />
           </div>
         </div>
@@ -741,9 +725,7 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
         {/* ═══ MIDDLE COLUMN ═══ */}
         <div className={styles.middleColumn}>
           <div className={styles.calendarCard}>
-            <span className={styles.calendarHeader} style={{ color: C.orange }}>
-              Date Range
-            </span>
+            <span className={`${styles.calendarHeader} ${styles.textOrange}`}>Date Range</span>
             <div style={dayPickerWrapperStyle}>
               <DayPicker
                 mode="range"
@@ -754,23 +736,23 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
             </div>
           </div>
 
-          <div className={styles.dateSummary} style={{ backgroundColor: gray(0.2) }}>
+          <div className={`${styles.dateSummary} ${styles.bgG20}`}>
             {dateChips.length === 0 ? (
-              <span className={styles.dateSummaryEmpty} style={{ color: gray(0.5) }}>
+              <span className={`${styles.dateSummaryEmpty} ${styles.textG50}`}>
                 No range selected
               </span>
             ) : dateChips.length === 1 ? (
-              <span className={styles.dateSummaryText} style={{ color: gray(0.7) }}>
+              <span className={`${styles.dateSummaryText} ${styles.textG70}`}>
                 {dayjs(displayStart).format("ddd M/D/YYYY")}
               </span>
             ) : (
-              <span className={styles.dateSummaryText} style={{ color: gray(0.7) }}>
+              <span className={`${styles.dateSummaryText} ${styles.textG70}`}>
                 {dateChips.length} days:{" "}
-                <span style={{ color: C.blue }}>
+                <span className={styles.textBlue}>
                   {dayjs(displayStart).format("ddd M/D/YYYY")}
                 </span>
                 {"  "}→{"  "}
-                <span style={{ color: C.red }}>
+                <span className={styles.textRed}>
                   {dayjs(displayEnd).format("ddd M/D/YYYY")}
                 </span>
               </span>
@@ -789,12 +771,8 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
                   }
                   onPress={handleGoButton}
                   enabled={canGo}
-                  buttonStyle={{
-                    paddingLeft: 40,
-                    paddingRight: 40,
-                    paddingVertical: 10,
-                  }}
-                  textStyle={{ fontSize: 15, fontWeight: "700" }}
+                  innerClassName={styles.btnGo}
+                  textClassName={styles.btnTxt15}
                 />
                 <div className={styles.actionRowSpacer} />
                 <Button
@@ -804,12 +782,8 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
                   }
                   onPress={handleClearRange}
                   enabled={hasRange}
-                  buttonStyle={{
-                    paddingLeft: 20,
-                    paddingRight: 20,
-                    paddingVertical: 10,
-                  }}
-                  textStyle={{ fontSize: 13, fontWeight: "700" }}
+                  innerClassName={styles.btnClear}
+                  textClassName={styles.btnTxt13}
                 />
               </>
             )}
@@ -837,7 +811,7 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
 
           {!sSelectedUser ? (
             <div className={styles.emptyState}>
-              <span className={styles.emptyStateText} style={{ color: gray(0.5) }}>
+              <span className={`${styles.emptyStateText} ${styles.textG50}`}>
                 Select a user to view payroll
               </span>
             </div>
@@ -852,7 +826,7 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
           )}
 
           {/* Summary Footer */}
-          <div className={styles.footer} style={{ borderTopColor: C.buttonLightGreenOutline }}>
+          <div className={`${styles.footer} ${styles.borderTopGreen}`}>
             <PayrollSummaryItem
               label="Total Hours"
               value={
@@ -882,10 +856,7 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
                     <Image icon={sShowRate ? ICONS.downArrow : ICONS.greenRightArrow} size={16} />
                   </TouchableOpacity>
                 </div>
-                <span
-                  className={styles.summaryValue}
-                  style={{ color: lightenRGBByPercent(C.green, 30) }}
-                >
+                <span className={`${styles.summaryValue} ${styles.textGreenLight}`}>
                   {sShowRate ? "$" + Number(totalWages).toLocaleString() : "***"}
                 </span>
               </div>
@@ -899,12 +870,8 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
                   }
                   onPress={handleSave}
                   enabled={sHasUnsavedChanges && !sSaving}
-                  buttonStyle={{
-                    paddingLeft: 25,
-                    paddingRight: 25,
-                    paddingVertical: 8,
-                  }}
-                  textStyle={{ fontSize: 14, fontWeight: "700" }}
+                  innerClassName={styles.btnSave}
+                  textClassName={styles.btnTxt14}
                 />
               )}
               <Button
@@ -925,32 +892,20 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
                 }
                 icon={ICONS.notes}
                 iconSize={16}
-                buttonStyle={{
-                  paddingLeft: 15,
-                  paddingRight: 15,
-                  paddingVertical: 8,
-                  marginLeft: isAdmin ? 8 : 0,
-                }}
-                textStyle={{ fontSize: 14, fontWeight: "700" }}
+                innerClassName={isAdmin ? styles.btnEmail : styles.btnEmailSolo}
+                textClassName={styles.btnTxt14}
               />
               {sEmailing && !isAdmin && (
-                <SmallLoadingIndicator color="white" style={{ marginLeft: 8 }} />
+                <SmallLoadingIndicator color="white" className={styles.loadingSpacerLeft} />
               )}
               {sEmailStatus === "sent" && (
-                <span
-                  className={styles.statusMsg}
-                  style={{ color: lightenRGBByPercent(C.green, 30) }}
-                >
-                  Sent!
-                </span>
+                <span className={`${styles.statusMsg} ${styles.textGreenLight}`}>Sent!</span>
               )}
               {sEmailStatus === "error" && (
-                <span className={styles.statusMsg} style={{ color: C.lightred }}>
-                  Failed
-                </span>
+                <span className={`${styles.statusMsg} ${styles.textLightred}`}>Failed</span>
               )}
               {sEmailStatus === "no-email" && (
-                <span className={styles.statusMsg} style={{ color: C.orange }}>
+                <span className={`${styles.statusMsg} ${styles.textOrange}`}>
                   No email on file
                 </span>
               )}
@@ -971,14 +926,13 @@ const EditableTimeCell = ({ timeObj, prefix, onTimeChange }) => {
     <div className={styles.editableTimeWrap}>
       <TouchableOpacity
         onPress={() => _sSetShowPicker(true)}
-        className={styles.editableTimeChip}
-        style={{ backgroundColor: C.blue }}
+        className={`${styles.editableTimeChip} ${styles.bgBlue}`}
       >
         <span className={styles.editableTimeChipText}>
           {timeObj.hour}:{String(timeObj.minutes).padStart(2, "0")} {timeObj.amPM}
         </span>
       </TouchableOpacity>
-      <Dialog visible={sShowPicker} onClose={() => _sSetShowPicker(false)} overlayColor="rgba(0,0,0,0.4)">
+      <Dialog visible={sShowPicker} onClose={() => _sSetShowPicker(false)} overlayColor={C.surfaceOverlay}>
         <TimePicker
           initialHour={timeObj.hour}
           initialMinute={timeObj.minutes}
@@ -995,7 +949,7 @@ const EditableTimeCell = ({ timeObj, prefix, onTimeChange }) => {
 };
 
 /** "+ Add" pill that opens a TimePicker; chosen time fills this row's missing slot */
-const AddMissingPunchCell = ({ option, referencePunch, onAdd, textColor, bgColor }) => {
+const AddMissingPunchCell = ({ option, referencePunch, onAdd, pillClassName }) => {
   const [sShowPicker, _sSetShowPicker] = useState(false);
 
   let initHour = 12;
@@ -1014,15 +968,14 @@ const AddMissingPunchCell = ({ option, referencePunch, onAdd, textColor, bgColor
     <>
       <TouchableOpacity
         onPress={() => _sSetShowPicker(true)}
-        className={styles.addPill}
-        style={{ backgroundColor: bgColor }}
+        className={`${styles.addPill} ${pillClassName || ""}`}
       >
-        <span className={styles.addPillText} style={{ color: textColor }}>+ Add</span>
+        <span className={styles.addPillText}>+ Add</span>
       </TouchableOpacity>
       <Dialog
         visible={sShowPicker}
         onClose={() => _sSetShowPicker(false)}
-        overlayColor="rgba(0,0,0,0.4)"
+        overlayColor={C.surfaceOverlay}
       >
         <TimePicker
           initialHour={initHour}
@@ -1042,10 +995,7 @@ const AddMissingPunchCell = ({ option, referencePunch, onAdd, textColor, bgColor
 const PayrollSummaryItem = ({ label, value, highlight }) => (
   <div className={styles.summaryItem}>
     <span className={styles.summaryLabel}>{label}</span>
-    <span
-      className={styles.summaryValue}
-      style={{ color: highlight ? lightenRGBByPercent(C.green, 30) : "#ffffff" }}
-    >
+    <span className={`${styles.summaryValue} ${highlight ? styles.textGreenLight : ""}`}>
       {value}
     </span>
   </div>
@@ -1065,7 +1015,7 @@ const PunchListHeader = ({ sSelectedUser, isAdmin, sLoading, displayArr, handleN
   return (
     <div className={styles.empHeader}>
       <div className={styles.empNameWrap}>
-        <span className={styles.empName} style={{ color: C.text }}>
+        <span className={`${styles.empName} ${styles.textC}`}>
           {sSelectedUser
             ? sSelectedUser.first + " " + sSelectedUser.last
             : "Select a user"}
@@ -1073,22 +1023,16 @@ const PunchListHeader = ({ sSelectedUser, isAdmin, sLoading, displayArr, handleN
       </div>
       {!!sSelectedUser && (
         <div className={styles.clockWrap}>
-          <div
-            className={styles.clockDot}
-            style={{ backgroundColor: isClockedIn ? C.green : C.red }}
-          />
-          <span
-            className={styles.clockText}
-            style={{ color: isClockedIn ? C.green : C.red }}
-          >
+          <div className={`${styles.clockDot} ${isClockedIn ? styles.bgGreen : styles.bgRed}`} />
+          <span className={`${styles.clockText} ${isClockedIn ? styles.textGreen : styles.textRed}`}>
             {isClockedIn ? "Clocked In" : "Clocked Out"}
           </span>
           <Button
             text={isClockedIn ? "CLOCK OUT" : "CLOCK IN"}
             onPress={handleClockToggle}
             colorGradientArr={isClockedIn ? COLOR_GRADIENTS.red : COLOR_GRADIENTS.green}
-            buttonStyle={{ paddingVertical: 3, paddingHorizontal: 10, borderRadius: 5 }}
-            textStyle={{ fontSize: 10, fontWeight: "600" }}
+            innerClassName={styles.btnClock}
+            textClassName={styles.btnTxt10}
           />
         </div>
       )}
@@ -1098,17 +1042,12 @@ const PunchListHeader = ({ sSelectedUser, isAdmin, sLoading, displayArr, handleN
             text="Add Punch"
             onPress={handleNewPunchPress}
             colorGradientArr={COLOR_GRADIENTS.blue}
-            buttonStyle={{
-              paddingVertical: 4,
-              paddingHorizontal: 10,
-              borderRadius: 5,
-              marginRight: 8,
-            }}
-            textStyle={{ fontSize: 12 }}
+            innerClassName={styles.btnAddPunch}
+            textClassName={styles.btnTxt12}
           />
         )}
         {!!sSelectedUser && !sLoading && (
-          <span className={styles.entryCount} style={{ color: gray(0.4) }}>
+          <span className={`${styles.entryCount} ${styles.textG40}`}>
             {displayArr.length} entries
           </span>
         )}
@@ -1147,23 +1086,20 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
         {pageData.map((item, index) => {
           let globalIdx = page * PAGE_SIZE + index;
           let editable = globalIdx === sEditableRowIdx;
-          let bgColor = index % 2 === 0 ? C.listItemWhite : gray(0.075);
+          let altBg = index % 2 !== 0;
 
           return (
             <div
               key={(item.in?.id || "") + (item.out?.id || "") + globalIdx}
-              className={`${styles.row} ${editable ? styles.rowEditable : ""} ${!isAdmin ? styles.rowNoEdit : ""}`}
-              style={{
-                backgroundColor: bgColor,
-                opacity: editable ? 1 : sEditableRowIdx != null ? 0.3 : 1,
-              }}
+              className={`${styles.row} ${editable ? styles.rowEditable : ""} ${!isAdmin ? styles.rowNoEdit : ""} ${altBg ? styles.bgRowAlt : styles.bgListItem}`}
+              style={{ opacity: editable ? 1 : sEditableRowIdx != null ? 0.3 : 1 }}
             >
               {/* Date */}
               <div className={styles.cellDate}>
-                <span className={styles.cellTextPrimary} style={{ color: C.text, display: "block" }}>
+                <span className={`${styles.cellTextPrimary} ${styles.textC} ${styles.dispBlock}`}>
                   {item.in?.wordDayOfWeek || item.out?.wordDayOfWeek}
                 </span>
-                <span className={styles.cellTextSecondary} style={{ color: gray(0.5), display: "block" }}>
+                <span className={`${styles.cellTextSecondary} ${styles.textG50} ${styles.dispBlock}`}>
                   {item.in?.wordDayOfMonth || item.out?.wordDayOfMonth}{" "}
                   {item.in?.dayOfMonth || item.out?.dayOfMonth}
                 </span>
@@ -1173,7 +1109,7 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
               <div className={styles.cellIn}>
                 {item.in ? (
                   <div className={styles.editableTimeWrap}>
-                    <Image icon={ICONS.forwardGreen} size={12} style={{ marginRight: 4 }} />
+                    <Image icon={ICONS.forwardGreen} size={12} className={styles.cellInIcon} />
                     {editable ? (
                       <EditableTimeCell
                         timeObj={item.in}
@@ -1183,7 +1119,7 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
                         }
                       />
                     ) : (
-                      <span className={styles.cellTime} style={{ color: C.text }}>
+                      <span className={`${styles.cellTime} ${styles.textC}`}>
                         {item.in.hour}:{String(item.in.minutes).padStart(2, "0")} {item.in.amPM}
                       </span>
                     )}
@@ -1193,11 +1129,10 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
                     option="in"
                     referencePunch={item.out}
                     onAdd={(customTime) => handleCreateMissingPunch(item, "in", customTime)}
-                    textColor={C.green}
-                    bgColor={lightenRGBByPercent(C.green, 60)}
+                    pillClassName={styles.addPillGreen}
                   />
                 ) : (
-                  <span className={styles.cellTimeMuted} style={{ color: gray(0.5) }}>--</span>
+                  <span className={`${styles.cellTimeMuted} ${styles.textG50}`}>--</span>
                 )}
               </div>
 
@@ -1214,7 +1149,7 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
                         }
                       />
                     ) : (
-                      <span className={styles.cellTime} style={{ color: C.text }}>
+                      <span className={`${styles.cellTime} ${styles.textC}`}>
                         {item.out.hour}:{String(item.out.minutes).padStart(2, "0")} {item.out.amPM}
                       </span>
                     )}
@@ -1224,22 +1159,21 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
                     option="out"
                     referencePunch={item.in}
                     onAdd={(customTime) => handleCreateMissingPunch(item, "out", customTime)}
-                    textColor={C.lightred}
-                    bgColor={lightenRGBByPercent(C.lightred, 60)}
+                    pillClassName={styles.addPillRed}
                   />
                 ) : (
-                  <span className={styles.cellTimeMuted} style={{ color: gray(0.5) }}>--</span>
+                  <span className={`${styles.cellTimeMuted} ${styles.textG50}`}>--</span>
                 )}
               </div>
 
               {/* Hours */}
               <div className={styles.cellHours}>
                 {item.hoursDiff != null || item.minutesDiff != null ? (
-                  <span className={styles.cellTime} style={{ fontWeight: 600, color: C.text }}>
+                  <span className={`${styles.cellTime} ${styles.cellHoursValue} ${styles.textC}`}>
                     {item.hoursDiff || 0}:{item.minutesDiff || "00"}
                   </span>
                 ) : (
-                  <span className={styles.cellTimeMuted} style={{ color: gray(0.5) }}>--</span>
+                  <span className={`${styles.cellTimeMuted} ${styles.textG50}`}>--</span>
                 )}
               </div>
 
@@ -1303,26 +1237,21 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
 
       {/* Pagination bar */}
       {totalPages > 1 && (
-        <div
-          className={styles.pagination}
-          style={{ backgroundColor: gray(0.95), borderTopColor: gray(0.85) }}
-        >
+        <div className={`${styles.pagination} ${styles.bgPagination} ${styles.borderTopG85}`}>
           <TouchableOpacity
             onPress={() => goPage(page - 1)}
             disabled={page === 0}
-            className={styles.pagBtn}
-            style={{ opacity: page === 0 ? 0.3 : 1 }}
+            className={`${styles.pagBtn} ${page === 0 ? styles.dimmed : ""}`}
           >
             <Image icon={ICONS.greenLeftArrow} size={16} />
           </TouchableOpacity>
-          <span className={styles.pagText} style={{ color: C.text }}>
+          <span className={`${styles.pagText} ${styles.textC}`}>
             Page {page + 1} of {totalPages}
           </span>
           <TouchableOpacity
             onPress={() => goPage(page + 1)}
             disabled={page >= totalPages - 1}
-            className={styles.pagBtn}
-            style={{ opacity: page >= totalPages - 1 ? 0.3 : 1 }}
+            className={`${styles.pagBtn} ${page >= totalPages - 1 ? styles.dimmed : ""}`}
           >
             <Image icon={ICONS.greenRightArrow} size={16} />
           </TouchableOpacity>

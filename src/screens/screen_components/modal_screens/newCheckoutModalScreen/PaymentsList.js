@@ -1,9 +1,9 @@
 /* eslint-disable */
 import { memo } from "react";
-import { View, Text, ScrollView, TouchableOpacity } from "react-native-web";
-import { C, Fonts } from "../../../../styles";
-import { Tooltip, Pressable_ } from "../../../../components";
-import { formatCurrencyDisp, formatMillisForDisplay, gray } from "../../../../utils";
+import styles from "./PaymentsList.module.css";
+import { C } from "../../../../styles";
+import { Tooltip, Pressable } from "../../../../dom_components";
+import { formatCurrencyDisp, formatMillisForDisplay } from "../../../../utils";
 import { dlog, DCAT } from "./checkoutDebugLog";
 
 const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress }) {
@@ -27,120 +27,84 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress }) {
   }
 
   let content = (
-    <View
-      style={{
-        padding: 5,
-        backgroundColor: C.listItemWhite,
-        width: "100%",
-        borderRadius: 8,
-        marginBottom: 5,
-      }}
+    <div
+      className={styles.card}
+      style={{ backgroundColor: C.listItemWhite }}
     >
-      {/* Type label + Refund button */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Text style={{ color: C.green, fontWeight: "600" }}>
+      <div className={styles.cardTopRow}>
+        <span className={styles.typeLabel} style={{ color: C.green }}>
           {getPaymentLabel()}
-        </Text>
+        </span>
         {fullyRefunded && (
-          <View style={{ backgroundColor: gray(0.5), borderRadius: 5, paddingVertical: 2, paddingHorizontal: 8 }}>
-            <Text style={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}>Fully Refunded</Text>
-          </View>
+          <div className={styles.pill} style={{ backgroundColor: C.borderStrong }}>
+            <span className={styles.pillText} style={{ color: C.textWhite }}>Fully Refunded</span>
+          </div>
         )}
         {onRefund && !fullyRefunded && (
           <Tooltip text="Refund this payment" position="top">
-            <TouchableOpacity
-              onPress={(e) => { e.stopPropagation(); dlog(DCAT.BUTTON, "refund", "PaymentsList", { paymentId: payment.id, method: payment.method, amount: payment.amountCaptured }); onRefund(); }}
-              style={{
-                backgroundColor: C.green,
-                borderRadius: 5,
-                paddingVertical: 2,
-                paddingHorizontal: 8,
+            <Pressable
+              onPress={(e) => {
+                if (e && e.stopPropagation) e.stopPropagation();
+                dlog(DCAT.BUTTON, "refund", "PaymentsList", { paymentId: payment.id, method: payment.method, amount: payment.amountCaptured });
+                onRefund();
               }}
+              className={styles.pill}
+              style={{ backgroundColor: C.green }}
             >
-              <Text style={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}>
+              <span className={styles.pillText} style={{ color: C.textWhite }}>
                 REFUND
-              </Text>
-            </TouchableOpacity>
+              </span>
+            </Pressable>
           </Tooltip>
         )}
-      </View>
+      </div>
 
-      {/* Amount line */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-        }}
-      >
-        <Text style={{ color: C.text }}>{getAmountLabel()}</Text>
-        <Text style={{ color: C.text }}>{formatCurrencyDisp(payment.amountCaptured, true)}</Text>
-      </View>
+      <div className={styles.row}>
+        <span style={{ color: C.text }}>{getAmountLabel()}</span>
+        <span style={{ color: C.text }}>{formatCurrencyDisp(payment.amountCaptured, true)}</span>
+      </div>
 
-      {/* Card details */}
       {(isCard && payment.last4) ? (
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-          }}
-        >
-          <Text style={{ color: gray(0.4), fontSize: 13 }}>
+        <div className={styles.row}>
+          <span className={styles.cardSmall} style={{ color: C.textMuted }}>
             {(payment.cardType || payment.cardIssuer || "").split(" ")[0].toUpperCase() + "  ***" + payment.last4}
-          </Text>
+          </span>
           {payment.expMonth && (
-            <Text style={{ color: gray(0.4), fontSize: 13 }}>
+            <span className={styles.cardSmall} style={{ color: C.textMuted }}>
               {payment.expMonth + "/" + payment.expYear}
-            </Text>
+            </span>
           )}
-        </View>
+        </div>
       ) : null}
 
-      {/* Previous refunds */}
       {amountRefunded > 0 && (
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-          }}
-        >
-          <Text style={{ color: C.red, fontSize: 13 }}>
+        <div className={styles.row}>
+          <span className={styles.cardSmall} style={{ color: C.red }}>
             Previous Refund amount
-          </Text>
-          <Text style={{ color: C.red, fontSize: 13 }}>
+          </span>
+          <span className={styles.cardSmall} style={{ color: C.red }}>
             {formatCurrencyDisp(amountRefunded, true)}
-          </Text>
-        </View>
+          </span>
+        </div>
       )}
 
-      {/* Cash tender */}
       {!!isCash && (
-        <View
-          style={{
-            flexDirection: "row",
-            justifyContent: "space-between",
-          }}
-        >
-          <Text style={{ color: C.text }}>Amount Tendered</Text>
-          <Text style={{ color: C.text }}>{formatCurrencyDisp(payment.amountTendered, true)}</Text>
-        </View>
+        <div className={styles.row}>
+          <span style={{ color: C.text }}>Amount Tendered</span>
+          <span style={{ color: C.text }}>{formatCurrencyDisp(payment.amountTendered, true)}</span>
+        </div>
       )}
-    </View>
+    </div>
   );
 
   return (
     <Tooltip text="Click to print paper receipt" position="top">
-      <Pressable_
+      <Pressable
         onPress={onPress || undefined}
         activeOpacity={onPress ? 0.6 : 1}
       >
         {content}
-      </Pressable_>
+      </Pressable>
     </Tooltip>
   );
 });
@@ -162,70 +126,49 @@ const CreditRow = memo(function CreditRow({ credit, onPrintDepositReceipt, onRem
   let labelColor = isGiftCard ? C.orange : isCredit ? C.orange : C.blue;
 
   let content = (
-    <View
-      style={{
-        padding: 5,
-        backgroundColor: C.listItemWhite,
-        width: "100%",
-        borderRadius: 8,
-        marginBottom: 5,
-      }}
+    <div
+      className={styles.card}
+      style={{ backgroundColor: C.listItemWhite }}
     >
-      {/* Type label */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}
-      >
-        <Text style={{ color: labelColor, fontWeight: "600" }}>
+      <div className={styles.cardTopRow}>
+        <span className={styles.typeLabel} style={{ color: labelColor }}>
           {getCreditLabel()}
-        </Text>
-      </View>
+        </span>
+      </div>
 
-      {/* Amount line */}
-      <View
-        style={{
-          flexDirection: "row",
-          justifyContent: "space-between",
-        }}
-      >
-        <Text style={{ color: C.text }}>Amount applied</Text>
-        <Text style={{ color: C.text }}>{formatCurrencyDisp(credit.amount, true)}</Text>
-      </View>
+      <div className={styles.row}>
+        <span style={{ color: C.text }}>Amount applied</span>
+        <span style={{ color: C.text }}>{formatCurrencyDisp(credit.amount, true)}</span>
+      </div>
 
-      {/* Partial application indicator */}
       {credit._originalAmount && credit.amount < credit._originalAmount && (
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Text style={{ color: gray(0.4), fontSize: 11 }}>
+        <div className={styles.row}>
+          <span className={styles.noteSmall} style={{ color: C.textMuted }}>
             {"of " + formatCurrencyDisp(credit._originalAmount, true) + " total"}
-          </Text>
-          <Text style={{ color: C.blue, fontSize: 11, fontWeight: "500" }}>PARTIAL</Text>
-        </View>
+          </span>
+          <span className={styles.partialTag} style={{ color: C.blue }}>PARTIAL</span>
+        </div>
       )}
 
-      {/* Date and payment details */}
       {credit._millis ? (
-        <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-          <Text style={{ color: gray(0.4), fontSize: 12 }}>
+        <div className={styles.row}>
+          <span className={styles.dateSmall} style={{ color: C.textMuted }}>
             {formatMillisForDisplay(credit._millis)}
-          </Text>
+          </span>
           {!isCredit && (
-            <Text style={{ color: gray(0.4), fontSize: 12 }}>
+            <span className={styles.dateSmall} style={{ color: C.textMuted }}>
               {paidByCard && credit._last4 ? "Card ***" + credit._last4 : paidByCash ? "Cash" : ""}
-            </Text>
+            </span>
           )}
-        </View>
+        </div>
       ) : null}
 
-      {/* Note */}
       {!!credit._note && (
-        <Text numberOfLines={2} style={{ color: gray(0.4), fontSize: 13 }}>
+        <span className={styles.noteLines} style={{ color: C.textMuted }}>
           {credit._note}
-        </Text>
+        </span>
       )}
-    </View>
+    </div>
   );
 
   let tooltipText = onRemoveDeposit
@@ -236,13 +179,13 @@ const CreditRow = memo(function CreditRow({ credit, onPrintDepositReceipt, onRem
 
   return (
     <Tooltip text={tooltipText} position="top">
-      <Pressable_
+      <Pressable
         onPress={handlePress}
         onRightPress={onRemoveDeposit || undefined}
         activeOpacity={handlePress ? 0.6 : 1}
       >
         {content}
-      </Pressable_>
+      </Pressable>
     </Tooltip>
   );
 });
@@ -250,15 +193,8 @@ const CreditRow = memo(function CreditRow({ credit, onPrintDepositReceipt, onRem
 export const PaymentsList = memo(function PaymentsList({ payments = [], credits = [], onRefund, onPrintReceipt, onPrintDepositReceipt, onRemoveDeposit }) {
   if ((!payments || payments.length === 0) && (!credits || credits.length === 0)) return null;
   return (
-    <View
-      style={{
-        marginTop: 10,
-        alignItems: "center",
-        width: "100%",
-      }}
-    >
-      <View style={{ width: "100%" }}>
-        {/* Credit rows first */}
+    <div className={styles.list}>
+      <div className={styles.listInner}>
         {credits.map((credit, idx) => (
           <CreditRow
             key={credit.id || idx}
@@ -267,7 +203,6 @@ export const PaymentsList = memo(function PaymentsList({ payments = [], credits 
             onRemoveDeposit={onRemoveDeposit ? () => onRemoveDeposit(credit) : null}
           />
         ))}
-        {/* Transaction rows, sorted: fully-refunded last */}
         {payments.sort((a, b) => {
           let aRefunded = (a.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
           let bRefunded = (b.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
@@ -282,7 +217,7 @@ export const PaymentsList = memo(function PaymentsList({ payments = [], credits 
             onPress={onPrintReceipt ? () => onPrintReceipt(payment) : null}
           />
         ))}
-      </View>
-    </View>
+      </div>
+    </div>
   );
 });

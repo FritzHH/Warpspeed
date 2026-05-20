@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
 import { C, Colors, COLOR_GRADIENTS, ICONS } from "../../styles";
-import { gray } from "../../utils";
+
 import { useAlertScreenStore } from "../../stores";
 import { Button } from "../Button/Button";
 import styles from "./AlertBox.module.css";
@@ -142,9 +142,9 @@ export const AlertBox = ({ showAlert }) => {
               <div className={styles.cancelWrapper}>
                 <AlertDialogPrimitive.Cancel asChild>
                   <Button
-                    textStyle={{ color: gray(0.4) }}
+                    textStyle={{ color: C.textMuted }}
                     buttonStyle={{
-                      backgroundColor: gray(0.09),
+                      backgroundColor: C.surfaceAlt,
                       borderRadius: 0,
                       borderBottomRightRadius: 15,
                       borderBottomLeftRadius: 15,

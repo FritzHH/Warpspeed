@@ -1,12 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { calculateRunningTotals, capitalizeFirstLetterOfString, formatCurrencyDisp, formatMillisForDisplay, formatPhoneWithDashes, lightenRGBByPercent, resolveStatus, formatWorkorderNumber, localStorageWrapper } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useSettingsStore, useLoginStore } from "../../../stores";
-import { Button, Dialog, SHADOW_PROTO } from "../../../dom_components";
+import { Button, Dialog, SHADOW_PROTO, SmallLoadingIndicator } from "../../../dom_components";
 import { dbGetCompletedSale, dbSavePrintObj } from "../../../db_calls_wrapper";
 import { printBuilder } from "../../../utils";
 import { readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
-import { FullSaleModal } from "../../../dom_components";
+const FullSaleModal = lazy(() =>
+  import("../../../dom_components/FullSaleModal/FullSaleModal").then((m) => ({ default: m.FullSaleModal }))
+);
 import styles from "./ClosedWorkorderModal.module.css";
 
 // ─── Helper display components ──────────────────────────────────
@@ -704,10 +706,12 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
       </div>
     </Dialog>
     {!!sSaleForModal && (
-      <FullSaleModal
-        item={{ saleID: sSaleForModal.id }}
-        onClose={() => _sSetSaleForModal(null)}
-      />
+      <Suspense fallback={<SmallLoadingIndicator />}>
+        <FullSaleModal
+          item={{ saleID: sSaleForModal.id }}
+          onClose={() => _sSetSaleForModal(null)}
+        />
+      </Suspense>
     )}
   </>
   );

@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, lazy, Suspense } from "react";
 import {
   Button,
   Dialog,
@@ -15,7 +15,9 @@ import {
   queryTransactionsByDateRange,
 } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { useActiveSalesStore, useCheckoutStore } from "../../../stores";
-import { FullSaleModal } from "../../../dom_components";
+const FullSaleModal = lazy(() =>
+  import("../../../dom_components/FullSaleModal/FullSaleModal").then((m) => ({ default: m.FullSaleModal }))
+);
 import styles from "./SalesReports.module.css";
 
 const PAGE_SIZE = 50;
@@ -898,11 +900,13 @@ export const SalesReportsModal = ({ handleExit }) => {
 
       {/* Full Sale Modal (nested) */}
       {!!sSaleModalItem && (
-        <FullSaleModal
-          item={sSaleModalItem}
-          onClose={() => _setSaleModalItem(null)}
-          onRefund={handleRefundFromSaleModal}
-        />
+        <Suspense fallback={<LoadingIndicator />}>
+          <FullSaleModal
+            item={sSaleModalItem}
+            onClose={() => _setSaleModalItem(null)}
+            onRefund={handleRefundFromSaleModal}
+          />
+        </Suspense>
       )}
 
       {/* Transaction Viewer Modal (nested) */}

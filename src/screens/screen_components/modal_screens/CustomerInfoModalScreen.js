@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { calculateRunningTotals, capitalizeFirstLetterOfString, checkInputForNumbersOnly, formatCurrencyDisp, formatMillisForDisplay, formatPhoneForDisplay, formatPhoneWithDashes, generateEAN13Barcode, lightenRGBByPercent, formatWorkorderNumber, localStorageWrapper, printBuilder, removeDashesFromPhone, resolveStatus, usdTypeMask } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import {
@@ -63,8 +63,12 @@ import {
 } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { sendCreditReceipt } from "./newCheckoutModalScreen/newCheckoutUtils";
 import { ClosedWorkorderModal } from "./ClosedWorkorderModal";
-import { DepositRefundModal } from "./newCheckoutModalScreen/DepositRefundModal";
-import { FullSaleModal } from "../../../dom_components";
+const DepositRefundModal = lazy(() =>
+  import("./newCheckoutModalScreen/DepositRefundModal").then((m) => ({ default: m.DepositRefundModal }))
+);
+const FullSaleModal = lazy(() =>
+  import("../../../dom_components/FullSaleModal/FullSaleModal").then((m) => ({ default: m.FullSaleModal }))
+);
 import { GoogleMapsModal } from "./GoogleMapsModal";
 import styles from "./CustomerInfoModalScreen.module.css";
 
@@ -847,13 +851,17 @@ export const CustomerInfoScreenModalComponent = ({
           }
         }}
       />
-      <DepositRefundModal
-        visible={!!sRefundDeposit}
-        deposit={sRefundDeposit}
-        customer={sCustomerInfo}
-        onClose={() => _sSetRefundDeposit(null)}
-        onCustomerUpdated={(updatedCustomer) => { _setCustomerInfo(updatedCustomer); }}
-      />
+      {!!sRefundDeposit && (
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <DepositRefundModal
+            visible={!!sRefundDeposit}
+            deposit={sRefundDeposit}
+            customer={sCustomerInfo}
+            onClose={() => _sSetRefundDeposit(null)}
+            onCustomerUpdated={(updatedCustomer) => { _setCustomerInfo(updatedCustomer); }}
+          />
+        </Suspense>
+      )}
       <ClosedWorkorderModal
         workorder={sClosedWorkorder}
         onClose={() => _sSetClosedWorkorder(null)}
@@ -913,15 +921,17 @@ export const CustomerInfoScreenModalComponent = ({
         }}
       />
       {!!sSaleModalItem && (
-        <FullSaleModal
-          item={sSaleModalItem}
-          onClose={() => _sSetSaleModalItem(null)}
-          onRefund={(saleID) => {
-            _sSetSaleModalItem(null);
-            if (handleButton2Press) handleButton2Press();
-            useCheckoutStore.getState().setPendingRefundSaleID(saleID);
-          }}
-        />
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <FullSaleModal
+            item={sSaleModalItem}
+            onClose={() => _sSetSaleModalItem(null)}
+            onRefund={(saleID) => {
+              _sSetSaleModalItem(null);
+              if (handleButton2Press) handleButton2Press();
+              useCheckoutStore.getState().setPendingRefundSaleID(saleID);
+            }}
+          />
+        </Suspense>
       )}
       <GoogleMapsModal
         visible={sShowMapsModal}

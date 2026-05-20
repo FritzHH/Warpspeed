@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { formatCurrencyDisp, formatMillisForDisplay, formatWorkorderNumber, lightenRGBByPercent } from "../../../utils";
 import {
   SmallLoadingIndicator,
@@ -17,8 +17,12 @@ import { TAB_NAMES } from "../../../data";
 import { C } from "../../../styles";
 import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
 import { TransactionModal } from "../modal_screens/TransactionModal";
-import { FullSaleModal } from "../../../dom_components";
-import { NewRefundModalScreen } from "../modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
+const FullSaleModal = lazy(() =>
+  import("../../../dom_components/FullSaleModal/FullSaleModal").then((m) => ({ default: m.FullSaleModal }))
+);
+const NewRefundModalScreen = lazy(() =>
+  import("../modal_screens/newCheckoutModalScreen/NewRefundModalScreen").then((m) => ({ default: m.NewRefundModalScreen }))
+);
 import {
   readTransactions,
   findSaleByTransactionID,
@@ -277,21 +281,25 @@ export function Items_TicketSearchResults({}) {
         onRefund={handleTransactionRefund}
       />
       {!!sSale && (
-        <FullSaleModal
-          item={{ saleID: sSale.id }}
-          onClose={() => _sSetSale(null)}
-        />
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <FullSaleModal
+            item={{ saleID: sSale.id }}
+            onClose={() => _sSetSale(null)}
+          />
+        </Suspense>
       )}
       {!!sRefundSaleID && (
-        <NewRefundModalScreen
-          visible={true}
-          saleID={sRefundSaleID}
-          initialPayment={sRefundInitialPayment}
-          onClose={() => {
-            _sSetRefundSaleID(null);
-            _sSetRefundInitialPayment(null);
-          }}
-        />
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <NewRefundModalScreen
+            visible={true}
+            saleID={sRefundSaleID}
+            initialPayment={sRefundInitialPayment}
+            onClose={() => {
+              _sSetRefundSaleID(null);
+              _sSetRefundInitialPayment(null);
+            }}
+          />
+        </Suspense>
       )}
     </div>
   );

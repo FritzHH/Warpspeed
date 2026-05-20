@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import { DropdownMenu } from "../../../../dom_components/DropdownMenu/DropdownMenu";
 import {
@@ -65,12 +65,19 @@ import { CardPayment } from "./CardPayment";
 import { CardReaderPayment } from "./CardReaderPayment";
 import { SaleTotals, PaymentStatus, CashChangeNeeded } from "./SaleTotals";
 import { PaymentsList } from "./PaymentsList";
-import { WorkorderCombiner } from "./WorkorderCombiner";
 import { InventorySearch } from "./InventorySearch";
 import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "../../../../broadcastChannel";
 import { InventoryItemModalScreen } from "../InventoryItemModalScreen";
-import { NewRefundModalScreen } from "./NewRefundModalScreen";
-import { SendReceiptModal } from "./SendReceiptModal";
+
+const WorkorderCombiner = lazy(() =>
+  import("./WorkorderCombiner").then((m) => ({ default: m.WorkorderCombiner }))
+);
+const NewRefundModalScreen = lazy(() =>
+  import("./NewRefundModalScreen").then((m) => ({ default: m.NewRefundModalScreen }))
+);
+const SendReceiptModal = lazy(() =>
+  import("./SendReceiptModal").then((m) => ({ default: m.SendReceiptModal }))
+);
 import { dlog, DCAT } from "./checkoutDebugLog";
 
 // Stable empty array reference to prevent re-renders from || [] patterns
@@ -2097,18 +2104,18 @@ export function NewCheckoutModalScreen() {
 
                       {/* Workorders (combiner + line items) */}
                       <div className={styles.workorderCombinerSpacer} />
-                      {(
-                  <WorkorderCombiner
-                    combinedWorkorders={sCombinedWorkorders}
-                    otherCustomerWorkorders={getOtherCustomerWorkorders()}
-                    onToggle={handleToggleWorkorder}
-                    onLineChange={handleWorkorderLineChange}
-                    primaryWorkorderID={zOpenWorkorder?.id}
-                    salesTaxPercent={zSettings?.salesTaxPercent || 0}
+                      <Suspense fallback={<LoadingIndicator />}>
+                        <WorkorderCombiner
+                          combinedWorkorders={sCombinedWorkorders}
+                          otherCustomerWorkorders={getOtherCustomerWorkorders()}
+                          onToggle={handleToggleWorkorder}
+                          onLineChange={handleWorkorderLineChange}
+                          primaryWorkorderID={zOpenWorkorder?.id}
+                          salesTaxPercent={zSettings?.salesTaxPercent || 0}
                           saleTotal={sSale?.total || 0}
                           amountCaptured={sSale?.amountCaptured || 0}
-                  />
-                )}
+                        />
+                      </Suspense>
               </div>
             </div>
               </>
@@ -2169,12 +2176,17 @@ export function NewCheckoutModalScreen() {
           )}
         </div>
     </Dialog>
-    <SendReceiptModal
-      visible={sShowSendReceiptModal}
-      onSend={handleSendSaleReceiptFromModal}
-      onClose={() => _sSetShowSendReceiptModal(false)}
-    />
+    {sShowSendReceiptModal && (
+      <Suspense fallback={<LoadingIndicator />}>
+        <SendReceiptModal
+          visible={sShowSendReceiptModal}
+          onSend={handleSendSaleReceiptFromModal}
+          onClose={() => _sSetShowSendReceiptModal(false)}
+        />
+      </Suspense>
+    )}
     {sShowRefundModal && (
+      <Suspense fallback={<LoadingIndicator />}>
       <NewRefundModalScreen
         visible={true}
         sale={prepareSaleForPersist(sSale)}
@@ -2206,6 +2218,7 @@ export function NewCheckoutModalScreen() {
           }
         }}
       />
+      </Suspense>
     )}
   </>
   );

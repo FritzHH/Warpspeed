@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { useState, memo, useMemo } from "react";
+import { useState, memo, useMemo, lazy, Suspense } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import {
   Image,
@@ -8,6 +8,7 @@ import {
   TextInput,
   TouchableOpacity,
   Dialog,
+  LoadingIndicator,
 } from "../../../../dom_components";
 import { C, Fonts, ICONS } from "../../../../styles";
 import styles from "./NewRefundModalScreen.module.css";
@@ -48,7 +49,9 @@ import { CardRefund } from "./CardRefund";
 import { RefundTotals } from "./RefundTotals";
 import { RefundItemSelector } from "./RefundItemSelector";
 import { RefundPaymentSelector } from "./RefundPaymentSelector";
-import { SendReceiptModal } from "./SendReceiptModal";
+const SendReceiptModal = lazy(() =>
+  import("./SendReceiptModal").then((m) => ({ default: m.SendReceiptModal }))
+);
 
 export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible, saleID, sale: saleProp, transactions: transactionsProp, initialPayment, onClose, onSaleUpdated }) {
   const zSalesTaxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent);
@@ -1225,11 +1228,15 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
         )}
 
         {/* ── Send Receipt Modal ───────────────────── */}
-        <SendReceiptModal
-          visible={sShowSendReceiptModal}
-          onSend={handleSendRefundReceiptFromModal}
-          onClose={() => _sSetShowSendReceiptModal(false)}
-        />
+        {sShowSendReceiptModal && (
+          <Suspense fallback={<LoadingIndicator />}>
+            <SendReceiptModal
+              visible={sShowSendReceiptModal}
+              onSend={handleSendRefundReceiptFromModal}
+              onClose={() => _sSetShowSendReceiptModal(false)}
+            />
+          </Suspense>
+        )}
 
         {sShowPopConfirm && (
           <div className={styles.popOverlay}>

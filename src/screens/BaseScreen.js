@@ -36,8 +36,12 @@ const FaceDetectionClientComponent = lazy(() =>
   }))
 );
 import { NewCheckoutModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewCheckoutModalScreen";
-import { NewRefundModalScreen } from "./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen";
-import { FullSaleModal } from "../dom_components";
+const NewRefundModalScreen = lazy(() =>
+  import("./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen").then((m) => ({ default: m.NewRefundModalScreen }))
+);
+const FullSaleModal = lazy(() =>
+  import("../dom_components/FullSaleModal/FullSaleModal").then((m) => ({ default: m.FullSaleModal }))
+);
 import { isSaleID, isLightspeedID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { decodeLightspeedBarcode, lightenRGBByPercent } from "../utils";
 import { newCheckoutGetStripeReaders, readActiveSale, recoverPendingActiveSales } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
@@ -517,20 +521,26 @@ export function BaseScreen() {
         }
       `}</style>
       {!!zSaleModalObj && (
-        <FullSaleModal
-          item={{ saleID: zSaleModalObj.id }}
-          onClose={() => useOpenWorkordersStore.getState().setSaleModalObj(null)}
-        />
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <FullSaleModal
+            item={{ saleID: zSaleModalObj.id }}
+            onClose={() => useOpenWorkordersStore.getState().setSaleModalObj(null)}
+          />
+        </Suspense>
       )}
       <NewCheckoutModalScreen />
-      <NewRefundModalScreen
-        visible={sRefundModalVisible}
-        saleID={sRefundSaleID}
-        onClose={() => {
-          _setRefundModalVisible(false);
-          _setRefundSaleID("");
-        }}
-      />
+      {sRefundModalVisible && (
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <NewRefundModalScreen
+            visible={sRefundModalVisible}
+            saleID={sRefundSaleID}
+            onClose={() => {
+              _setRefundModalVisible(false);
+              _setRefundSaleID("");
+            }}
+          />
+        </Suspense>
+      )}
       {zShowLoginScreen && !zLoginModalVisible && (
         <LoginModal modalVisible={true} />
       )}

@@ -8,6 +8,29 @@ import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+function migrationDataPlugin() {
+  const dataDir = path.resolve(__dirname, '_migration_data');
+  const prefixes = ['/lightspeed/', '/import_data/'];
+  const handler = (req, res, next) => {
+    const url = req.url || '';
+    const prefix = prefixes.find((p) => url.startsWith(p));
+    if (!prefix) return next();
+    const rel = url.slice(1).split('?')[0];
+    const filePath = path.join(dataDir, rel);
+    if (!filePath.startsWith(dataDir)) return next();
+    fs.stat(filePath, (err, stat) => {
+      if (err || !stat.isFile()) return next();
+      res.setHeader('Content-Type', 'text/csv');
+      fs.createReadStream(filePath).pipe(res);
+    });
+  };
+  return {
+    name: 'migration-data-serve',
+    configureServer(server) { server.middlewares.use(handler); },
+    configurePreviewServer(server) { server.middlewares.use(handler); },
+  };
+}
+
 const httpsConfig = (() => {
   if (!process.env.HTTPS && !process.argv.includes('--https')) return undefined;
   try {
@@ -20,7 +43,11 @@ const httpsConfig = (() => {
   }
 })();
 
-export default defineConfig({
+export default defineConfig(async () => {
+  // rollup-plugin-visualizer is ESM-only; load via dynamic import so the
+  // Vite CJS config loader can consume it.
+  const { visualizer } = await import('rollup-plugin-visualizer');
+  return {
   plugins: [
     react({
       babel: {
@@ -31,17 +58,29 @@ export default defineConfig({
       },
     }),
     viteCommonjs(),
+    migrationDataPlugin(),
     nodePolyfills({
       globals: { Buffer: true, process: true, global: true },
       protocolImports: true,
     }),
+    visualizer({
+      filename: 'build/stats.html',
+      gzipSize: true,
+      brotliSize: true,
+      template: 'treemap',
+    }),
+    visualizer({
+      filename: 'build/stats.json',
+      gzipSize: true,
+      brotliSize: true,
+      template: 'raw-data',
+    }),
   ],
   resolve: {
     alias: [
-      { find: /^react-native$/, replacement: 'react-native-web' },
       { find: '@tensorflow/tfjs-node', replacement: path.resolve(__dirname, 'src/empty-shim.js') },
     ],
-    extensions: ['.web.js', '.web.jsx', '.js', '.jsx', '.json'],
+    extensions: ['.js', '.jsx', '.json'],
   },
   define: {
     __DEV__: JSON.stringify(process.env.NODE_ENV !== 'production'),
@@ -55,15 +94,9 @@ export default defineConfig({
   optimizeDeps: {
     esbuildOptions: {
       loader: { '.js': 'jsx' },
-      resolveExtensions: ['.web.js', '.web.jsx', '.web.ts', '.web.tsx', '.js', '.jsx', '.ts', '.tsx', '.json'],
+      resolveExtensions: ['.js', '.jsx', '.ts', '.tsx', '.json'],
       mainFields: ['browser', 'module', 'main'],
     },
-    include: [
-      'react-native-web',
-      'react-native-vector-icons',
-      'react-native-web-linear-gradient',
-      'react-native-svg',
-    ],
   },
   server: { port: 3000, open: true, https: httpsConfig },
   preview: { port: 3000, https: httpsConfig },
@@ -71,5 +104,21 @@ export default defineConfig({
     outDir: 'build',
     sourcemap: false,
     commonjsOptions: { transformMixedEsModules: true },
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return;
+          if (id.includes('firebase')) return 'firebase';
+          if (id.includes('@stripe')) return 'stripe';
+          if (id.includes('xlsx')) return 'xlsx';
+          if (id.includes('react-quill') || id.includes(path.sep + 'quill')) return 'quill';
+          if (id.includes('@radix-ui')) return 'radix';
+          if (id.includes('lodash')) return 'lodash';
+          if (id.includes('dayjs')) return 'dayjs';
+          if (id.includes('dompurify')) return 'dompurify';
+        },
+      },
+    },
   },
+  };
 });

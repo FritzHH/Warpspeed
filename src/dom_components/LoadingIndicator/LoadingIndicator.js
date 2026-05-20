@@ -1,4 +1,5 @@
 import React, { forwardRef } from "react";
+import { C } from "../../styles";
 import styles from "./LoadingIndicator.module.css";
 
 const SIZES = { small: 20, medium: 40, large: 60 };
@@ -6,7 +7,7 @@ const SIZES = { small: 20, medium: 40, large: 60 };
 export const LoadingIndicator = forwardRef(function LoadingIndicator(
   {
     size = "medium",
-    color = "#007bff",
+    color = C.info,
     text = "",
     message = "Loading...",
     centered = true,
@@ -45,18 +46,6 @@ export const LoadingIndicator = forwardRef(function LoadingIndicator(
   );
 });
 
-export const InlineLoadingIndicator = (props) => (
-  <LoadingIndicator centered={false} {...props} />
-);
-
-export const FullScreenLoadingIndicator = (props) => (
-  <LoadingIndicator centered={true} {...props} />
-);
-
 export const SmallLoadingIndicator = (props) => (
   <LoadingIndicator size="small" centered={false} {...props} />
-);
-
-export const LargeLoadingIndicator = (props) => (
-  <LoadingIndicator size="large" {...props} />
 );

@@ -103,6 +103,7 @@ export default defineConfig(async () => {
   build: {
     outDir: 'build',
     sourcemap: false,
+    assetsInlineLimit: 1024,
     commonjsOptions: { transformMixedEsModules: true },
     rollupOptions: {
       output: {

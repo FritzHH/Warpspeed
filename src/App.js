@@ -4,10 +4,23 @@ import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { BaseScreen } from "./screens/BaseScreen";
 import { LoginScreen } from "./screens/LoginScreen";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { LoadingIndicator } from "./dom_components";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
-import { CustomerDisplayScreen } from "./screens/CustomerDisplayScreen";
-import { TranslateScreen } from "./screens/TranslateScreen";
-import { IntakeScreen } from "./screens/IntakeScreen";
+const CustomerDisplayScreen = lazy(() =>
+  import("./screens/CustomerDisplayScreen").then((m) => ({
+    default: m.CustomerDisplayScreen,
+  }))
+);
+const TranslateScreen = lazy(() =>
+  import("./screens/TranslateScreen").then((m) => ({
+    default: m.TranslateScreen,
+  }))
+);
+const IntakeScreen = lazy(() =>
+  import("./screens/IntakeScreen").then((m) => ({
+    default: m.IntakeScreen,
+  }))
+);
 const BikeStandScreen = lazy(() =>
   import("./screens/BikeStandScreen").then((m) => ({
     default: m.BikeStandScreen,
@@ -15,8 +28,16 @@ const BikeStandScreen = lazy(() =>
 );
 import { PhoneScreen } from "./screens/phone/PhoneScreen";
 import { HomeScreen } from "./screens/HomeScreen";
-import { DatabaseViewerScreen } from "./screens/DatabaseViewerScreen";
-import { TokensScreen } from "./screens/TokensScreen";
+const DatabaseViewerScreen = lazy(() =>
+  import("./screens/DatabaseViewerScreen").then((m) => ({
+    default: m.DatabaseViewerScreen,
+  }))
+);
+const TokensScreen = lazy(() =>
+  import("./screens/TokensScreen").then((m) => ({
+    default: m.TokensScreen,
+  }))
+);
 import {
   onAuthStateChange,
   loadTenantAndSettings,
@@ -297,30 +318,55 @@ function App() {
         <Route path={ROUTES.home} element={<DeviceAwareHome user={user} />} />
 
         {/* Database Viewer */}
-        <Route path={ROUTES.dbViewer} element={<DatabaseViewerScreen />} />
+        <Route
+          path={ROUTES.dbViewer}
+          element={
+            <Suspense fallback={<LoadingIndicator />}>
+              <DatabaseViewerScreen />
+            </Suspense>
+          }
+        />
 
         {/* Protected route - Design Tokens (admin-gated inside the screen) */}
         <Route
           path={ROUTES.tokens}
           element={
             <ProtectedRoute user={user}>
-              <TokensScreen />
+              <Suspense fallback={<LoadingIndicator />}>
+                <TokensScreen />
+              </Suspense>
             </ProtectedRoute>
           }
         />
 
         {/* Public route - Customer Display */}
-        <Route path={ROUTES.display} element={<CustomerDisplayScreen />} />
+        <Route
+          path={ROUTES.display}
+          element={
+            <Suspense fallback={<LoadingIndicator />}>
+              <CustomerDisplayScreen />
+            </Suspense>
+          }
+        />
 
         {/* Public route - Translation Display */}
-        <Route path={ROUTES.translate} element={<TranslateScreen />} />
+        <Route
+          path={ROUTES.translate}
+          element={
+            <Suspense fallback={<LoadingIndicator />}>
+              <TranslateScreen />
+            </Suspense>
+          }
+        />
 
         {/* Protected route - Intake Screen */}
         <Route
           path={ROUTES.intake}
           element={
             <ProtectedRoute user={user}>
-              <IntakeScreen />
+              <Suspense fallback={<LoadingIndicator />}>
+                <IntakeScreen />
+              </Suspense>
             </ProtectedRoute>
           }
         />

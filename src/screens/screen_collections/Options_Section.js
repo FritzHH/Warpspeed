@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import { checkInternetConnection, convertMillisToHoursMins, dim, localStorageWrapper, log } from "../../utils";
-import { Button, Tooltip } from "../../dom_components";
+import { Button, Tooltip, LoadingIndicator } from "../../dom_components";
 import { TabMenuButton } from "../../dom_components/TabMenuButton/TabMenuButton";
 import { C, COLOR_GRADIENTS, Fonts, ICONS, Z } from "../../styles";
 import { TAB_NAMES } from "../../data";
@@ -12,8 +12,20 @@ import ReactDOM from "react-dom";
 import React, { useEffect, useRef, useState, useCallback, Suspense, lazy } from "react";
 import { WorkordersComponent } from "../screen_components/Options_Screen/Options_Workorders";
 import { InventoryComponent } from "../screen_components/Options_Screen/Options_Inventory";
-import { MessagesComponent } from "../screen_components/Options_Screen/Options_Messages";
-import { EmailOptionsPanel } from "../screen_components/Options_Screen/Options_Email";
+const MessagesComponent = lazy(() =>
+  import("../screen_components/Options_Screen/Options_Messages").then((m) => ({
+    default: m.MessagesComponent,
+  }))
+);
+const preloadMessagesComponent = () =>
+  import("../screen_components/Options_Screen/Options_Messages");
+const EmailOptionsPanel = lazy(() =>
+  import("../screen_components/Options_Screen/Options_Email").then((m) => ({
+    default: m.EmailOptionsPanel,
+  }))
+);
+const preloadEmailOptionsPanel = () =>
+  import("../screen_components/Options_Screen/Options_Email");
 import {
   useTabNamesStore,
   useLoginStore,
@@ -53,9 +65,17 @@ export const Options_Section = React.memo(({}) => {
       case TAB_NAMES.optionsTab.inventory:
         return <InventoryComponent />;
       case TAB_NAMES.optionsTab.messages:
-        return <MessagesComponent />;
+        return (
+          <Suspense fallback={<LoadingIndicator />}>
+            <MessagesComponent />
+          </Suspense>
+        );
       case TAB_NAMES.optionsTab.email:
-        return <EmailOptionsPanel />;
+        return (
+          <Suspense fallback={<LoadingIndicator />}>
+            <EmailOptionsPanel />
+          </Suspense>
+        );
       case TAB_NAMES.optionsTab.inventory:
         return <InventoryComponent />;
       case TAB_NAMES.optionsTab.workorders:
@@ -268,6 +288,8 @@ export const TabBar = ({
         />
         <TabMenuButton
           onPress={() => useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.messages)}
+          onMouseEnter={preloadMessagesComponent}
+          onFocus={preloadMessagesComponent}
           text={TAB_NAMES.optionsTab.messages}
           isSelected={zOptionsTabName === TAB_NAMES.optionsTab.messages}
         />
@@ -325,8 +347,14 @@ const EmailTabButton = ({ zOptionsTabName }) => {
           useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.email);
           useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.emailView);
         }}
-        onMouseEnter={preloadItemsEmailView}
-        onFocus={preloadItemsEmailView}
+        onMouseEnter={() => {
+          preloadItemsEmailView();
+          preloadEmailOptionsPanel();
+        }}
+        onFocus={() => {
+          preloadItemsEmailView();
+          preloadEmailOptionsPanel();
+        }}
         text={TAB_NAMES.optionsTab.email}
         isSelected={isSelected}
       />

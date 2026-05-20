@@ -300,6 +300,33 @@ This is a SaaS-grade system, not a free-for-all. Token changes need a low-fricti
 
 ---
 
+## Z-Index Registry
+
+Stacking is centralized to avoid the "increment until it works" antipattern. Tokens live in `src/styles/tokens.css` as `--z-*` and are mirrored on the `Z` object in `src/styles.js` (values must match by hand - no runtime read).
+
+CSS modules consume via `var(--z-*)`. Inline styles / Radix portal props consume via `Z.<name>`.
+
+| Token (CSS / JS) | Value | Purpose |
+|---|---|---|
+| `--z-modal-inner-overlay` / `Z.modalInnerOverlay` | 100 | Overlays painted inside a modal card (split confirm, search picker, etc). Requires `isolation: isolate` on the modal card so the local z-index does not compete with the modal's own backdrop. |
+| `--z-modal-loading` / `Z.modalLoading` | 200 | Loading spinner overlay inside a modal card. Sits above inner overlays. |
+| `--z-modal` / `Z.modal` | 9000 | Modal backdrop scrim layer (Radix `.overlay`). |
+| `--z-modal-content` / `Z.modalContent` | 9001 | Modal card itself (Radix `.content`). One unit above its scrim. |
+| `--z-dropdown` / `Z.dropdown` | 9500 | Popover/dropdown surfaces - above all modals so they can open from inside one. |
+| `--z-tooltip` / `Z.tooltip` | 9700 | Tooltips - above dropdowns so they can label dropdown items. |
+| `--z-toast` / `Z.toast` | 9800 | Toast notifications - above tooltips. |
+| `--z-alert` / `Z.alert` | 9900 | Alert dialogs - always on top. |
+
+### Nested modal stacking
+
+Radix portals append to `document.body` in mount order. A child Dialog opened from a parent Dialog gets the same z-index (9000/9001) but stacks above by DOM order. This is the intended behavior - do not depth-offset z-index per dialog instance.
+
+### Adding a new layer
+
+Stay inside the bands above. If a real new tier is needed (very rare), pick a value with breathing room (e.g. 6000 for a hypothetical "above-modal-but-below-dropdown" tier) and document it here, in `tokens.css`, and in `styles.js` in the same commit.
+
+---
+
 ## Open Questions Resolved by Defaults
 
 | Question | Resolution (default chosen) |
@@ -326,3 +353,4 @@ Approximate size: ~100 lines for Layer 1, ~25 lines for Layer 2, ~30 lines for d
 ## Changelog
 
 - **2026-05-19** - Phase 2 vocabulary v1 (this doc). 22 semantic tokens, 10-stop gray scale, decisions locked.
+- **2026-05-20** - Added Z-index registry: 8 stacking tokens (`--z-modal-inner-overlay`, `--z-modal-loading`, `--z-modal`, `--z-modal-content`, `--z-dropdown`, `--z-tooltip`, `--z-toast`, `--z-alert`). Mirrored on `Z` in `src/styles.js`. Tooltip/toast/alert raised above modals so they can sit on top of any open modal.

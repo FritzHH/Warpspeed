@@ -1,12 +1,20 @@
 import { dim, getRgbFromNamedColor, lightenRGBByPercent } from "./utils";
 // const { getDefaultConfig } = require("metro"); // Or require('metro-config') for bare React Native
 
+// Z-index registry. MUST match the --z-* tokens in src/styles/tokens.css.
+// CSS modules should prefer var(--z-*); JS/inline styles consume these.
+// Tier order (low to high): inner overlays inside a modal card (100, 200) <
+// modal + content (9000, 9001) < dropdowns (9500) < tooltips (9700) <
+// toasts (9800) < alerts (9900, always on top).
 export const Z = {
+  modalInnerOverlay: 100,
+  modalLoading: 200,
   modal: 9000,
+  modalContent: 9001,
   dropdown: 9500,
-  tooltip: 3000,
-  toast: 4000,
-  alert: 5000,
+  tooltip: 9700,
+  toast: 9800,
+  alert: 9900,
 };
 
 export const Colors = {

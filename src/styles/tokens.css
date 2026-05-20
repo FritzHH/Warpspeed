@@ -115,6 +115,34 @@
   --shadow-color-subtle:  rgba(0, 0, 0, 0.08);
   --shadow-color-default: rgba(0, 0, 0, 0.15);
   --shadow-color-accent:  rgba(76, 175, 80, 0.25);  /* matches existing SHADOW_PROTO */
+
+  /* ============================================================
+   * Z-INDEX REGISTRY
+   *
+   * Single source of truth for stacking. CSS consumes via var();
+   * JS consumes via the mirrored Z object in src/styles.js (values
+   * MUST match - the bridge is a hand-maintained mirror, not a
+   * runtime read).
+   *
+   * Layers (low to high):
+   *   inner overlays inside a modal card    100 - 200
+   *   modal + its content                  9000 - 9001
+   *   dropdown menus                       9500
+   *   tooltips                             9700
+   *   toast notifications                  9800
+   *   alert dialogs (always on top)        9900
+   *
+   * Inner overlays use isolation:isolate on the parent modal card
+   * to scope themselves below the modal's own backdrop layer.
+   * ============================================================ */
+  --z-modal-inner-overlay: 100;
+  --z-modal-loading:       200;
+  --z-modal:               9000;
+  --z-modal-content:       9001;
+  --z-dropdown:            9500;
+  --z-tooltip:             9700;
+  --z-toast:               9800;
+  --z-alert:               9900;
 }
 
 /* ============================================================

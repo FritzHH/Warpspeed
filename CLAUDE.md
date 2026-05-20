@@ -45,6 +45,14 @@ Follow these steps before acting on any user request:
 
 **We are transitioning to a DOM-based system, moving away from React-Native-Web and inline JSX styling. Use CSS Modules and modern components to build new components. Use the same approach when asked to refactor react-native-web components.**
 
+**Color usage — design tokens.** This app uses a two-layer design token system. Source of truth: `docs/design-tokens.md`. CSS variables live in `src/styles/tokens.css`. JS bridge aliases live on the `C` object in `src/styles.js`.
+
+- **New components MUST consume semantic tokens.** In CSS Modules use `var(--text-muted)`, `var(--border-default)`, etc. In inline-styled (RN-web era) components use the new aliases `C.textMuted`, `C.borderDefault`, `C.surfaceBase`, etc.
+- **Do NOT introduce new raw colors.** No new `gray(0.x)` calls, no raw `rgb()`/`rgba()`/`#hex` literals in `src/screens/` or `src/dom_components/`. The bridge layer in `src/styles.js` is the only exemption.
+- **If no token fits the use case**, propose a new token in `docs/design-tokens.md` BEFORE hardcoding. Token addition is a 3-file change: doc + `tokens.css` + `styles.js` bridge alias.
+- **For non-CSS contexts** (canvas, jsPDF, chart libs, programmatic color math) use `resolveToken("text-muted")` from `src/styles.js` to get the computed RGB literal.
+- **Legacy `gray()` and old `C.*` names keep working** during migration (Phases 5-9). They will be retired in Phase 9. Do not migrate existing files unrelated to the task at hand - migration is opportunistic ("touch-it-fix-it"), never a dedicated refactor.
+
 **Sizing rule:
 This app uses percentage-based sizing as the default for all width and height values. Layouts in this codebase are deliberate — most boxes have a specific proportion of their parent, not a "fill remaining space" relationship. Percentages express that intent directly and produce consistent proportions across all screen sizes.
 Default: percentages.
@@ -106,7 +114,7 @@ Multi-tenant POS/service management system for Bonita Bikes. React frontend + Fi
 - **Frontend:** React 19.1 (Create React App), React Native Web 0.20 (transitioning out of), React/DOM/CSS Modules, Zustand 5
 - **Backend:** Firebase 11.6 (Firestore, Realtime DB, Auth, Storage, Cloud Functions Node 22)
 - **Payments:** Stripe Terminal (server-driven, physical card readers)
-- **SMS:** Vonage / Twilio
+- **SMS:** Twilio
 - **UI:** WAS react-native-web + @rneui/base — inline flexbox styling only -- transitioning incrementally to pure DOM environment with CSS modules 
 - **Other:** face-api.js (facial recognition), jsPDF, dayjs, lodash
 
@@ -157,7 +165,7 @@ functions/
 **`COLOR_GRADIENTS`** — Gradient arrays for `Button_` colorGradientArr prop: `red`, `green`, `blue`, `greenblue`, `purple`, `lightBlue`, `grey`
 **`Fonts`** — Weight constants: `Fonts.weight.textRegular`, `textHeavy`, `textSuperheavy`
 **`ICONS`** — 40+ image asset references (workorder, receipt, bicycle, tools, editPencil, etc.)
-**`SHADOW_RADIUS_PROTO`** — Reusable shadow style object (imported from components.js)
+**`SHADOW_RADIUS_PROTO`** — Reusable shadow style object exported from `src/styles.js`
 
 Common style patterns:
 ```js

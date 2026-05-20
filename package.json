@@ -57,6 +57,7 @@
     "dfun": "firebase deploy --only functions",
     "dprocess": "firebase deploy --only functions:processServerDrivenStripePayment",
     "auth": "firebase login --reauth",
+    "lint:tokens": "node scripts/check-tokens.js",
     "begin": "yarn build && vite preview --https --host --port 3000",
     "serveit": "vite preview --host --port 3000",
     "host": "yarn build && firebase deploy --only hosting",

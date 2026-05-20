@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef, Suspense, lazy } from "react";
 
 import { TAB_NAMES } from "../../data";
 import {
@@ -11,9 +11,16 @@ import {
   Button,
   TextInput,
   DropdownMenu,
+  LoadingIndicator,
 } from "../../dom_components";
 import sectionStyles from "./Items_Section.module.css";
-import { Items_Dashboard } from "../screen_components/Items_Screen/Items_Dashboard";
+const Items_Dashboard = lazy(() =>
+  import("../screen_components/Items_Screen/Items_Dashboard").then((m) => ({
+    default: m.Items_Dashboard,
+  }))
+);
+const preloadItemsDashboard = () =>
+  import("../screen_components/Items_Screen/Items_Dashboard");
 import { CustomerSearchListComponent } from "../screen_components/Items_Screen/Items_CustomerSearchList";
 import { Items_WorkorderItemsTab } from "../screen_components/Items_Screen/Items_WorkorderItems";
 
@@ -62,7 +69,11 @@ export const Items_Section = React.memo(({}) => {
       case TAB_NAMES.itemsTab.customerList:
         return <CustomerSearchListComponent />;
       case TAB_NAMES.itemsTab.dashboard:
-        return <Items_Dashboard />;
+        return (
+          <Suspense fallback={<LoadingIndicator />}>
+            <Items_Dashboard />
+          </Suspense>
+        );
       case TAB_NAMES.itemsTab.workorderItems:
         return <Items_WorkorderItemsTab />;
       case TAB_NAMES.itemsTab.ticketSearchResults:
@@ -365,6 +376,8 @@ const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
               useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.dashboard);
             }
           }}
+          onMouseEnter={preloadItemsDashboard}
+          onFocus={preloadItemsDashboard}
           text={TAB_NAMES.itemsTab.dashboard}
           isSelected={zItemsTabName === TAB_NAMES.itemsTab.dashboard}
         />

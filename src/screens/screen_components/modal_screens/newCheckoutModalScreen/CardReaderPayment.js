@@ -576,6 +576,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
                 _setRequestedAmount(0);
               }}
               style={{
+                width: "100%",
                 fontSize: 20,
                 outlineWidth: 0,
                 outlineStyle: "none",

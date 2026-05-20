@@ -23,6 +23,7 @@ export const Button = forwardRef(function Button(
     },
     shadow = false,
     allCaps = false,
+    fullWidth = false,
     colorGradientArr = [],
     buttonStyle = {},
     textStyle = {},
@@ -44,7 +45,7 @@ export const Button = forwardRef(function Button(
   const shadowStyle = shadow ? SHADOW_PROTO : SHADOW_NONE;
 
   const HEIGHT = buttonStyle.height;
-  const WIDTH = buttonStyle.width;
+  const WIDTH = buttonStyle.width != null ? buttonStyle.width : (fullWidth ? "100%" : undefined);
 
   if (!visible) {
     return (
@@ -105,6 +106,7 @@ export const Button = forwardRef(function Button(
     }),
     ...shadowStyle,
     ...buttonStyle,
+    ...(WIDTH != null ? { width: WIDTH } : {}),
     background: gradient || undefined,
     backgroundColor: gradient ? undefined : (icon && !displayText ? undefined : getBackgroundColor()),
     opacity: enabled ? (buttonStyle.opacity ?? 1) : 0.2,
@@ -139,7 +141,10 @@ export const Button = forwardRef(function Button(
   return (
     <div
       className={styles.wrapper}
-      style={{ cursor: !enabled ? "default" : undefined }}
+      style={{
+        cursor: !enabled ? "default" : undefined,
+        ...(WIDTH != null ? { width: WIDTH } : {}),
+      }}
     >
       <div
         ref={ref}
@@ -147,6 +152,7 @@ export const Button = forwardRef(function Button(
         style={{
           opacity: getOpacity(),
           cursor: !enabled ? "default" : "pointer",
+          ...(WIDTH != null ? { width: "100%" } : {}),
           ...viewStyle,
         }}
         onClick={handleButtonPress}

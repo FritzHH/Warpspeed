@@ -584,21 +584,23 @@ export const CustomerInfoScreenModalComponent = ({
           value={capitalizeFirstLetterOfString(sCustomerInfo.streetAddress)}
           capitalize={true}
         />
-        <TextInput
-          onChangeText={(val) => saveField("unit", val)}
-          placeholder="Unit"
-          className={styles.input}
-          style={INPUT_BASE_STYLE}
-          value={sCustomerInfo.unit}
-        />
-        <TextInput
-          onChangeText={(val) => saveField("city", capitalizeFirstLetterOfString(val))}
-          placeholder="City"
-          className={styles.input}
-          style={INPUT_BASE_STYLE}
-          value={capitalizeFirstLetterOfString(sCustomerInfo.city)}
-          capitalize={true}
-        />
+        <div className={styles.unitCityRow}>
+          <TextInput
+            onChangeText={(val) => saveField("unit", val)}
+            placeholder="Unit"
+            className={styles.input}
+            style={{ ...INPUT_BASE_STYLE, marginTop: 0, width: "20%", height: 40, flexShrink: 0 }}
+            value={sCustomerInfo.unit}
+          />
+          <TextInput
+            onChangeText={(val) => saveField("city", capitalizeFirstLetterOfString(val))}
+            placeholder="City"
+            className={styles.input}
+            style={{ ...INPUT_BASE_STYLE, marginTop: 0, width: "70%", height: 40, flexShrink: 0 }}
+            value={capitalizeFirstLetterOfString(sCustomerInfo.city)}
+            capitalize={true}
+          />
+        </div>
         <TextInput
           onChangeText={(val) => saveField("state", val.toUpperCase())}
           placeholder="State"
@@ -615,25 +617,25 @@ export const CustomerInfoScreenModalComponent = ({
             }}
             placeholder="Zip code"
             className={styles.input}
-            style={{ ...INPUT_BASE_STYLE, marginTop: 0, flex: 1 }}
+            style={{ ...INPUT_BASE_STYLE, marginTop: 0, height: 40, flex: 1 }}
             value={sCustomerInfo.zip}
           />
           {!!sCustomerInfo.streetAddress && !!sCustomerInfo.city && !!sCustomerInfo.state && (
             <Button
               text="Maps"
               icon={ICONS.map}
-              iconSize={30}
+              iconSize={16}
               onPress={() => _sSetShowMapsModal(true)}
               colorGradientArr={COLOR_GRADIENTS.blue}
               buttonStyle={{
-                paddingTop: 3,
-                paddingBottom: 3,
-                height: "100%",
+                paddingTop: 2,
+                paddingBottom: 2,
+                height: 40,
                 borderRadius: 7,
                 marginLeft: 10,
                 justifyContent: "center",
               }}
-              textStyle={{ color: C.textWhite, fontSize: 15, fontWeight: "600" }}
+              textStyle={{ color: C.textWhite, fontSize: 13, fontWeight: "600" }}
             />
           )}
         </div>
@@ -642,9 +644,9 @@ export const CustomerInfoScreenModalComponent = ({
           onChangeText={(val) => saveField("notes", capitalizeFirstLetterOfString(val))}
           placeholder="Address notes"
           multiline={true}
-          numberOfLines={6}
+          numberOfLines={3}
           className={styles.notes}
-          style={INPUT_BASE_STYLE}
+          style={{ ...INPUT_BASE_STYLE, minHeight: 60, maxHeight: 60 }}
           value={capitalizeFirstLetterOfString(sCustomerInfo.notes)}
           capitalize={true}
         />
@@ -662,8 +664,6 @@ export const CustomerInfoScreenModalComponent = ({
           <DropdownMenu
             dataArr={Object.values(CUSTOMER_LANGUAGES).map((lang) => ({ label: lang, value: lang }))}
             buttonText={sCustomerInfo.language || CUSTOMER_LANGUAGES.english}
-            buttonStyle={{ ...INPUT_BASE_STYLE, marginTop: 0, flex: 1, height: 40, borderWidth: 1, borderRadius: 7 }}
-            buttonTextStyle={{ fontSize: 14, color: C.text }}
             onSelect={(item) => saveField("language", item.value)}
             useSelectedAsButtonTitle={false}
           />
@@ -678,11 +678,11 @@ export const CustomerInfoScreenModalComponent = ({
                 sCellDuplicateStatus !== "error" &&
                 sCellDuplicateStatus !== "checking"
               }
+              fullWidth
               colorGradientArr={COLOR_GRADIENTS.yellow}
               buttonStyle={{
                 marginTop: 20,
                 height: 40,
-                width: "90%",
                 borderWidth: 1,
                 borderColor: C.borderSubtle,
               }}
@@ -697,9 +697,10 @@ export const CustomerInfoScreenModalComponent = ({
               <div style={{ marginTop: 20 }}>
                 <Button
                   onPress={() => _sSetShowDepositModal(true)}
+                  fullWidth
                   colorGradientArr={COLOR_GRADIENTS.green}
                   icon={ICONS.greenDollar}
-                  buttonStyle={{ height: 36, width: "90%" }}
+                  buttonStyle={{ height: 36 }}
                   iconSize={16}
                   textStyle={{ color: C.textWhite, fontSize: 13 }}
                   text={"Add Money"}
@@ -714,9 +715,10 @@ export const CustomerInfoScreenModalComponent = ({
             <div style={{ marginTop: 20, marginBottom: 10 }}>
               <Button
                 icon={ICONS.close1}
+                fullWidth
                 colorGradientArr={COLOR_GRADIENTS.blue}
                 onPress={handleButton2Press}
-                buttonStyle={{ height: 40, width: "90%" }}
+                buttonStyle={{ height: 40 }}
                 iconSize={17}
                 textStyle={{ marginLeft: 15, color: C.textWhite }}
                 text={button2Text}

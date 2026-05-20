@@ -26,6 +26,8 @@ export function WorkordersComponent({}) {
   const zActiveSales = useActiveSalesStore((state) => state.activeSales);
   const zCurrentUser = useLoginStore((state) => state.currentUser);
   const [sSearchTerm, _setSearchTerm] = useState("");
+  const [sOpenedFlash, _setOpenedFlash] = useState("");
+  const openedFlashTimerRef = useRef(null);
 
   const hasRehydratedMsgsRef = useRef(false);
   useEffect(() => {
@@ -57,8 +59,21 @@ export function WorkordersComponent({}) {
     if (matches.length === 1) {
       let wo = matches[0].wo;
       _setSearchTerm("");
+      searchInputRef.current?.blur();
+      showOpenedFlash(wo);
       workorderSelected(wo);
     }
+  }
+
+  function showOpenedFlash(wo) {
+    let label = `${wo.customerFirst || ""} ${wo.customerLast || ""}`.trim();
+    if (!label) label = wo.workorderNumber ? `WO #${wo.workorderNumber}` : "Workorder";
+    _setOpenedFlash(label);
+    if (openedFlashTimerRef.current) clearTimeout(openedFlashTimerRef.current);
+    openedFlashTimerRef.current = setTimeout(() => {
+      _setOpenedFlash("");
+      openedFlashTimerRef.current = null;
+    }, 1200);
   }
 
   const searchInputRef = useRef(null);
@@ -227,15 +242,22 @@ export function WorkordersComponent({}) {
         >
           <img src={ICONS.reset1} alt="" className={styles.resetIcon} />
         </button>
-        <input
-          ref={searchInputRef}
-          type="text"
-          className={styles.input}
-          placeholder="Find open workorder"
-          value={sSearchTerm}
-          onChange={(e) => handleSearchChange(e.target.value)}
-          autoFocus
-        />
+        <div className={styles.inputWrap}>
+          <input
+            ref={searchInputRef}
+            type="text"
+            className={styles.input}
+            placeholder="Find open workorder"
+            value={sSearchTerm}
+            onChange={(e) => handleSearchChange(e.target.value)}
+            autoFocus
+          />
+          {sOpenedFlash && (
+            <div className={styles.openedPill} key={sOpenedFlash}>
+              Opened: {sOpenedFlash}
+            </div>
+          )}
+        </div>
       </div>
 
       <div className={styles.list}>

@@ -112,17 +112,28 @@
   padding: 8px;
   outline: none;
   border-radius: 7px;
-  min-height: 40px;
+  min-height: 60px;
+  max-height: 60px;
   box-sizing: border-box;
   font-family: inherit;
   font-size: 14px;
-  resize: vertical;
+  resize: none;
+  overflow-y: auto;
 }
 
 .zipMapsRow {
   display: flex;
   flex-direction: row;
   align-items: center;
+  margin-top: 15px;
+  flex-shrink: 0;
+}
+
+.unitCityRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
   margin-top: 15px;
   flex-shrink: 0;
 }

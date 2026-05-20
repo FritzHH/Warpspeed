@@ -28,3 +28,7 @@ scripts/.env
 scripts/serviceAccountKey.json
 scripts/csv/
 src/assets/import_data/
+
+# Claude Terminal / Claude Code local tool state
+.claude-terminal
+.claude/scheduled_tasks.lock

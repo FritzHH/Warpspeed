@@ -28,6 +28,7 @@ const PayrollModal = lazy(() =>
   }))
 );
 import { getWeekStart, formatTimeShort, getStoreHoursForDayIndex } from "../screen_components/modal_screens/ScheduleModal";
+import { preloadItemsEmailView } from "./Items_Section";
 import dayjs from "dayjs";
 
 
@@ -324,6 +325,8 @@ const EmailTabButton = ({ zOptionsTabName }) => {
           useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.email);
           useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.emailView);
         }}
+        onMouseEnter={preloadItemsEmailView}
+        onFocus={preloadItemsEmailView}
         text={TAB_NAMES.optionsTab.email}
         isSelected={isSelected}
       />

@@ -34,10 +34,22 @@ import {
 import { C, ICONS } from "../../styles";
 import { ROUTES } from "../../routes";
 import { EmptyItemsComponent } from "../screen_components/Items_Screen/Items_Empty";
-import { Items_ChangeLog } from "../screen_components/Items_Screen/Items_ChangeLog";
+const Items_ChangeLog = lazy(() =>
+  import("../screen_components/Items_Screen/Items_ChangeLog").then((m) => ({
+    default: m.Items_ChangeLog,
+  }))
+);
+const preloadItemsChangeLog = () =>
+  import("../screen_components/Items_Screen/Items_ChangeLog");
 import { Items_TicketSearchResults } from "../screen_components/Items_Screen/Items_TicketSearchResults";
 import { Items_WorkorderSearchList } from "../screen_components/Items_Screen/Items_WorkorderSearchList";
-import { Items_EmailView } from "../screen_components/Items_Screen/Items_EmailView";
+const Items_EmailView = lazy(() =>
+  import("../screen_components/Items_Screen/Items_EmailView").then((m) => ({
+    default: m.Items_EmailView,
+  }))
+);
+export const preloadItemsEmailView = () =>
+  import("../screen_components/Items_Screen/Items_EmailView");
 import { RecentCustomersComponent } from "../screen_components/Items_Screen/Items_RecentCustomers";
 import { log, lightenRGBByPercent } from "../../utils";
 import { useTranslation } from "../../useTranslation";
@@ -65,7 +77,11 @@ export const Items_Section = React.memo(({}) => {
 
     switch (zItemsTabName) {
       case TAB_NAMES.itemsTab.changeLog:
-        return <Items_ChangeLog />;
+        return (
+          <Suspense fallback={<LoadingIndicator />}>
+            <Items_ChangeLog />
+          </Suspense>
+        );
       case TAB_NAMES.itemsTab.customerList:
         return <CustomerSearchListComponent />;
       case TAB_NAMES.itemsTab.dashboard:
@@ -81,7 +97,12 @@ export const Items_Section = React.memo(({}) => {
       case TAB_NAMES.itemsTab.workorderSearchResults:
         return <Items_WorkorderSearchList />;
       case TAB_NAMES.itemsTab.emailView:
-        if (zOptionsTabName === TAB_NAMES.optionsTab.email) return <Items_EmailView />;
+        if (zOptionsTabName === TAB_NAMES.optionsTab.email)
+          return (
+            <Suspense fallback={<LoadingIndicator />}>
+              <Items_EmailView />
+            </Suspense>
+          );
         if (zOpenWorkorderID) return <Items_WorkorderItemsTab />;
         return <EmptyItemsComponent />;
       case TAB_NAMES.itemsTab.recentCustomers:
@@ -339,6 +360,8 @@ const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
         {!!zOpenWorkorderID && (
           <TabMenuButton
             onPress={() => useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.changeLog)}
+            onMouseEnter={preloadItemsChangeLog}
+            onFocus={preloadItemsChangeLog}
             text={TAB_NAMES.itemsTab.changeLog}
             isSelected={zItemsTabName === TAB_NAMES.itemsTab.changeLog}
           />

@@ -7,7 +7,7 @@ import { TabMenuButton } from "../../../dom_components/TabMenuButton/TabMenuButt
 import { useEmailStore, useLoginStore, useSettingsStore, useTabNamesStore } from "../../../stores";
 import { TAB_NAMES } from "../../../data";
 import { dbGmailDisconnect, dbGmailModifyLabels } from "../../../db_calls_wrapper";
-import { buildSignOffHtml } from "../Items_Screen/Items_EmailView";
+import { buildSignOffHtml } from "../Items_Screen/emailSignOff";
 import { log, lightenRGBByPercent } from "../../../utils";
 import dayjs from "dayjs";
 import styles from "./OptionsEmail.module.css";

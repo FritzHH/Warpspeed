@@ -184,82 +184,6 @@ export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
   };
 }
 
-export const FileInputComponent = ({
-  handleBinaryString,
-  buttonStyle = {},
-  textStyle = {},
-  text,
-}) => {
-  const fileInputRef = useRef(null);
-  const onDrop = useCallback((acceptedFiles) => {
-    acceptedFiles.forEach((file) => {
-      const reader = new FileReader();
-
-      reader.onabort = () => console.log("file reading was aborted");
-      reader.onerror = () => console.log("file reading has failed");
-      reader.onload = () => {
-        const binaryStr = reader.result;
-        handleBinaryString(binaryStr);
-      };
-      reader.readAsArrayBuffer(file);
-    });
-  }, []);
-
-  const handleFileUpload = (e) => {
-    // const file = e.target.files[0];
-    // e.target.value = null;
-    clog("files", e.target);
-    return file;
-    const binaryStr = readAsBinaryString(file);
-    handleBinaryString(binaryStr);
-  };
-
-  return (
-    <TouchableOpacity onPress={() => fileInputRef.current.open()}>
-      <View
-        style={{
-          width: 170,
-          height: 30,
-          backgroundColor: null,
-          alignItems: "center",
-          justifyContent: "center",
-          ...SHADOW_RADIUS_PROTO,
-          ...buttonStyle,
-        }}
-      >
-        <Text style={{ ...textStyle }}>{text || "Drag File / Click Here"}</Text>
-        <Dropzone onDrop={onDrop} ref={fileInputRef}>
-          {({ getInputProps }) => (
-            <section>
-              <input {...getInputProps()} />
-            </section>
-          )}
-        </Dropzone>
-      </View>
-    </TouchableOpacity>
-  );
-  return (
-    <TouchableOpacity onClick={() => openFilePicker()}>
-      <View
-        style={{
-          width: 200,
-          height: 30,
-          backgroundColor: null,
-          ...buttonStyle,
-        }}
-      >
-        <input
-          ref={fileInputRef}
-          // style={{ display: "none" }}
-          type="file"
-          onChange={(e) => handleFileUpload(e)}
-        />
-        <Text style={{ ...textStyle }}>Upload File</Text>
-      </View>
-    </TouchableOpacity>
-  );
-};
-
 /**
  * searchInventory(query, items)
  *
@@ -1065,7 +989,6 @@ export function gray(u, alpha = 1) {
 
   alpha = Math.min(1, Math.max(0, Number(alpha)));
   return alpha === 1 ? `rgb(${v},${v},${v})` : `rgba(${v},${v},${v},${alpha})`;
-  return "rgba(0,0,0," + opacity + ")";
 }
 
 // text formatting
@@ -1861,7 +1784,7 @@ export function bestForegroundHex(bgHex) {
   const contrastWithWhite = contrastRatio(bgLum, whiteLum);
   const contrastWithBlack = contrastRatio(bgLum, blackLum);
 
-  return contrastWithWhite >= contrastWithBlack ? C.textWhite : C.darkText;
+  return contrastWithWhite >= contrastWithBlack ? C.textWhite : C.text;
 }
 // utils
 export const localStorageWrapper = {

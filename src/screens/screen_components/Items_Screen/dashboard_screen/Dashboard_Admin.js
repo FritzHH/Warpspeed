@@ -53,7 +53,9 @@ const PayrollModal = lazy(() =>
     default: m.PayrollModal,
   }))
 );
-import { ScheduleModal } from "../../modal_screens/ScheduleModal";
+const ScheduleModal = lazy(() =>
+  import("../../modal_screens/ScheduleModal").then((m) => ({ default: m.ScheduleModal }))
+);
 import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection, dbSaveInventoryItem, dbGmailDisconnect, dbGmailInitiateAuth } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses, mapEmployees, mapPunchHistory, parseCSV } from "../../../../lightspeed_import";
 import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead, firestoreQuery, firestoreDelete, firestoreWrite, firestoreBatchWrite } from "../../../../db_calls";
@@ -180,7 +182,9 @@ export function Dashboard_Admin({}) {
         </Suspense>
       )}
       {!!sShowScheduleModal && (
-        <ScheduleModal handleExit={() => _setShowScheduleModal(false)} />
+        <Suspense fallback={null}>
+          <ScheduleModal handleExit={() => _setShowScheduleModal(false)} />
+        </Suspense>
       )}
       {!!sShowLabelDesigner && (
         <LabelDesignerModal

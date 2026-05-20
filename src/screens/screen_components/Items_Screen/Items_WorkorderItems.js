@@ -20,7 +20,7 @@ import {
   SETTINGS_OBJ,
   TAB_NAMES,
 } from "../../../data";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, lazy, Suspense } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import {
   useCheckoutStore,
@@ -35,7 +35,9 @@ import {
   broadcastFullWorkorderToDisplay,
 } from "../../../stores";
 import { broadcastClear } from "../../../broadcastChannel";
-import { CustomItemModal } from "../modal_screens/CustomItemModal";
+const CustomItemModal = lazy(() =>
+  import("../modal_screens/CustomItemModal").then((m) => ({ default: m.CustomItemModal }))
+);
 import { calculateSaleTotals } from "../modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { deleteActiveSale, writeActiveSale } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import styles from "./Items_WorkorderItems.module.css";
@@ -764,15 +766,17 @@ export const Items_WorkorderItemsTab = ({}) => {
         </Tooltip>
       </div>
       {sEditingCustomLine && (
-        <CustomItemModal
-          visible={!!sEditingCustomLine}
-          onClose={() => _setEditingCustomLine(null)}
-          onSave={handleCustomItemEditSave}
-          type={sEditingCustomLine.line?.inventoryItem?.customLabor ? "labor" : "part"}
-          existingLine={sEditingCustomLine.line}
-          anchorX={sEditingCustomLine.anchorX}
-          anchorY={sEditingCustomLine.anchorY}
-        />
+        <Suspense fallback={null}>
+          <CustomItemModal
+            visible={!!sEditingCustomLine}
+            onClose={() => _setEditingCustomLine(null)}
+            onSave={handleCustomItemEditSave}
+            type={sEditingCustomLine.line?.inventoryItem?.customLabor ? "labor" : "part"}
+            existingLine={sEditingCustomLine.line}
+            anchorX={sEditingCustomLine.anchorX}
+            anchorY={sEditingCustomLine.anchorY}
+          />
+        </Suspense>
       )}
       <NoteHelper
         visible={!!sNoteHelperDropdown}

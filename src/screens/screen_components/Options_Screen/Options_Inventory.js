@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import React, { useEffect, useImperativeHandle, useRef, useState } from "react";
+import React, { useEffect, useImperativeHandle, useRef, useState, lazy, Suspense } from "react";
 import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO, QUICK_BUTTON_ITEM_PROTO, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../data";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 
@@ -11,9 +11,15 @@ import {
   TextInput as DomTextInput,
   Tooltip as DomTooltip,
 } from "../../../dom_components";
-import { InventoryItemModalScreen } from "../modal_screens/InventoryItemModalScreen";
-import { CustomItemModal } from "../modal_screens/CustomItemModal";
-import { ColorPickerModal } from "../modal_screens/ColorPickerModal";
+const InventoryItemModalScreen = lazy(() =>
+  import("../modal_screens/InventoryItemModalScreen").then((m) => ({ default: m.InventoryItemModalScreen }))
+);
+const CustomItemModal = lazy(() =>
+  import("../modal_screens/CustomItemModal").then((m) => ({ default: m.CustomItemModal }))
+);
+const ColorPickerModal = lazy(() =>
+  import("../modal_screens/ColorPickerModal").then((m) => ({ default: m.ColorPickerModal }))
+);
 import cloneDeep from "lodash/cloneDeep";
 import {
   useSettingsStore,
@@ -1701,21 +1707,27 @@ export function InventoryComponent({}) {
           )}
         </div>
         {sModalItem && (
-          <InventoryItemModalScreen
-            key={sModalItem.id}
-            item={sModalItem}
-            isNew={!!(sModalItem.id && !sModalItem.formalName)}
-            handleExit={() => _setModalItem(null)}
-          />
+          <Suspense fallback={null}>
+            <InventoryItemModalScreen
+              key={sModalItem.id}
+              item={sModalItem}
+              isNew={!!(sModalItem.id && !sModalItem.formalName)}
+              handleExit={() => _setModalItem(null)}
+            />
+          </Suspense>
         )}
-        <CustomItemModal
-          visible={!!sCustomItemModal}
-          onClose={() => _setCustomItemModal(null)}
-          onSave={handleCustomItemSave}
-          type={sCustomItemModal?.type}
-          anchorX={sCustomItemModal?.anchorX || 0}
-          anchorY={sCustomItemModal?.anchorY || 0}
-        />
+        {!!sCustomItemModal && (
+          <Suspense fallback={null}>
+            <CustomItemModal
+              visible={!!sCustomItemModal}
+              onClose={() => _setCustomItemModal(null)}
+              onSave={handleCustomItemSave}
+              type={sCustomItemModal?.type}
+              anchorX={sCustomItemModal?.anchorX || 0}
+              anchorY={sCustomItemModal?.anchorY || 0}
+            />
+          </Suspense>
+        )}
         <NoteHelper
           visible={!!sNoteHelperDropdown}
           onClose={() => _setNoteHelperDropdown(null)}
@@ -1726,18 +1738,20 @@ export function InventoryComponent({}) {
           noteHelpers={zNoteHelpers || []}
         />
         {sShowColorPickerModal && (
-          <ColorPickerModal
-            onClose={() => _setShowColorPickerModal(false)}
-            onSave={(bg, text) => {
-              quickCanvasRef.current?.setColorSelected(bg, text);
-            }}
-            title="Edit Card Colors"
-            previewText={canvasSelectedName || "Preview"}
-            initialBgColor={canvasSelectedBgColor || C.buttonLightGreenOutline}
-            initialTextColor={canvasSelectedTextColor || C.text}
-            anchorPosition={sColorPickerAnchor}
-            colorSchemes={existingColorSchemes}
-          />
+          <Suspense fallback={null}>
+            <ColorPickerModal
+              onClose={() => _setShowColorPickerModal(false)}
+              onSave={(bg, text) => {
+                quickCanvasRef.current?.setColorSelected(bg, text);
+              }}
+              title="Edit Card Colors"
+              previewText={canvasSelectedName || "Preview"}
+              initialBgColor={canvasSelectedBgColor || C.buttonLightGreenOutline}
+              initialTextColor={canvasSelectedTextColor || C.text}
+              anchorPosition={sColorPickerAnchor}
+              colorSchemes={existingColorSchemes}
+            />
+          </Suspense>
         )}
       </div>
       </div>

@@ -32,7 +32,7 @@ import {
   ITEM_ORDERED_PROTO,
 } from "../../../data";
 import { MILLIS_IN_DAY, build_db_path } from "../../../constants";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState, lazy, Suspense } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import {
   useCurrentCustomerStore,
@@ -43,8 +43,12 @@ import {
   useAlertScreenStore,
   useUploadProgressStore,
 } from "../../../stores";
-import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
-import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
+const CustomerInfoScreenModalComponent = lazy(() =>
+  import("../modal_screens/CustomerInfoModalScreen").then((m) => ({ default: m.CustomerInfoScreenModalComponent }))
+);
+const WorkorderMediaModal = lazy(() =>
+  import("../modal_screens/WorkorderMediaModal").then((m) => ({ default: m.WorkorderMediaModal }))
+);
 import { dbSavePrintObj, dbSendReceipt, startNewWorkorder } from "../../../db_calls_wrapper";
 import styles from "./Info_ActiveWorkorder.module.css";
 
@@ -412,17 +416,19 @@ export const ActiveWorkorderComponent = ({}) => {
 
   // Stable reference so ScreenModal doesn't remount the modal content on parent re-renders
   const CustomerInfoComponent = useCallback(() => (
-    <CustomerInfoScreenModalComponent
-      customerID={zOpenWorkorder?.customerID}
-      button1Text={"New Workorder"}
-      button2Text={"Close"}
-      handleButton1Press={(customerInfoFromModal) =>
-        handleCustomerNewWorkorderPress(
-          customerInfoFromModal || useCurrentCustomerStore.getState().customer
-        )
-      }
-      handleButton2Press={() => _setShowCustomerInfoScreen(false)}
-    />
+    <Suspense fallback={null}>
+      <CustomerInfoScreenModalComponent
+        customerID={zOpenWorkorder?.customerID}
+        button1Text={"New Workorder"}
+        button2Text={"Close"}
+        handleButton1Press={(customerInfoFromModal) =>
+          handleCustomerNewWorkorderPress(
+            customerInfoFromModal || useCurrentCustomerStore.getState().customer
+          )
+        }
+        handleButton2Press={() => _setShowCustomerInfoScreen(false)}
+      />
+    </Suspense>
   ), [zOpenWorkorder?.customerID]);
 
   ///////////////////////////////////////////////////////////////////////////////
@@ -2046,13 +2052,15 @@ export const ActiveWorkorderComponent = ({}) => {
         </Tooltip>
       </div>
       {sShowMediaModal && (
-        <WorkorderMediaModal
-          visible={sShowMediaModal}
-          onClose={() => _setShowMediaModal(false)}
-          workorderID={zOpenWorkorder?.id}
-          mode="view"
-          isDonePaid={isDonePaid}
-        />
+        <Suspense fallback={null}>
+          <WorkorderMediaModal
+            visible={sShowMediaModal}
+            onClose={() => _setShowMediaModal(false)}
+            workorderID={zOpenWorkorder?.id}
+            mode="view"
+            isDonePaid={isDonePaid}
+          />
+        </Suspense>
       )}
       <PrinterAlert
         visible={!!sPrinterAlert}

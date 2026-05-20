@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, lazy, Suspense } from "react";
 import { capitalizeFirstLetterOfString, formatPhoneForDisplay } from "../../../utils";
 import { Button, Image, ScreenModal } from "../../../dom_components";
 import { TAB_NAMES } from "../../../data";
@@ -12,7 +12,9 @@ import {
   useRecentCustomersStore,
   useTabNamesStore,
 } from "../../../stores";
-import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
+const CustomerInfoScreenModalComponent = lazy(() =>
+  import("../modal_screens/CustomerInfoModalScreen").then((m) => ({ default: m.CustomerInfoScreenModalComponent }))
+);
 import { startNewWorkorder } from "../../../db_calls_wrapper";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import defaultLogo from "../../../resources/default_app_logo_large.png";
@@ -150,16 +152,18 @@ export function CustomerSearchListComponent({}) {
             modalVisible={sCustomerInfo}
             buttonVisible={false}
             Component={() => (
-              <CustomerInfoScreenModalComponent
-                isCurrentCustomer={false}
-                incomingCustomer={sCustomerInfo}
-                button1Text={"New Workorder"}
-                button2Text={"Close"}
-                handleButton1Press={(customerInfo) =>
-                  handleCustomerSelected(customerInfo)
-                }
-                handleButton2Press={() => _setCustomerInfo()}
-              />
+              <Suspense fallback={null}>
+                <CustomerInfoScreenModalComponent
+                  isCurrentCustomer={false}
+                  incomingCustomer={sCustomerInfo}
+                  button1Text={"New Workorder"}
+                  button2Text={"Close"}
+                  handleButton1Press={(customerInfo) =>
+                    handleCustomerSelected(customerInfo)
+                  }
+                  handleButton2Press={() => _setCustomerInfo()}
+                />
+              </Suspense>
             )}
           />
         ),

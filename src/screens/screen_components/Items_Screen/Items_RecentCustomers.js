@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, lazy, Suspense } from "react";
 import { Button, Image, ScreenModal } from "../../../dom_components";
 import {
   useRecentCustomersStore,
@@ -15,7 +15,9 @@ import { startNewWorkorder, dbGetCustomer } from "../../../db_calls_wrapper";
 import defaultLogo from "../../../resources/default_app_logo_large.png";
 import { capitalizeFirstLetterOfString, formatPhoneForDisplay } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
-import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
+const CustomerInfoScreenModalComponent = lazy(() =>
+  import("../modal_screens/CustomerInfoModalScreen").then((m) => ({ default: m.CustomerInfoScreenModalComponent }))
+);
 import styles from "./Items_RecentCustomers.module.css";
 
 export function RecentCustomersComponent() {
@@ -85,16 +87,18 @@ export function RecentCustomersComponent() {
             modalVisible={sCustomerInfo}
             buttonVisible={false}
             Component={() => (
-              <CustomerInfoScreenModalComponent
-                isCurrentCustomer={false}
-                incomingCustomer={sCustomerInfo}
-                button1Text={"New Workorder"}
-                button2Text={"Close"}
-                handleButton1Press={(customerInfo) =>
-                  handleRecentCustomerSelected(customerInfo)
-                }
-                handleButton2Press={() => _setCustomerInfo(null)}
-              />
+              <Suspense fallback={null}>
+                <CustomerInfoScreenModalComponent
+                  isCurrentCustomer={false}
+                  incomingCustomer={sCustomerInfo}
+                  button1Text={"New Workorder"}
+                  button2Text={"Close"}
+                  handleButton1Press={(customerInfo) =>
+                    handleRecentCustomerSelected(customerInfo)
+                  }
+                  handleButton2Press={() => _setCustomerInfo(null)}
+                />
+              </Suspense>
             )}
           />
         ),

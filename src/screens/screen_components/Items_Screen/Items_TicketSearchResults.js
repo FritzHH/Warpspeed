@@ -15,8 +15,12 @@ import {
 } from "../../../stores";
 import { TAB_NAMES } from "../../../data";
 import { C } from "../../../styles";
-import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
-import { TransactionModal } from "../modal_screens/TransactionModal";
+const ClosedWorkorderModal = lazy(() =>
+  import("../modal_screens/ClosedWorkorderModal").then((m) => ({ default: m.ClosedWorkorderModal }))
+);
+const TransactionModal = lazy(() =>
+  import("../modal_screens/TransactionModal").then((m) => ({ default: m.TransactionModal }))
+);
 const FullSaleModal = lazy(() =>
   import("../../../dom_components/FullSaleModal/FullSaleModal").then((m) => ({ default: m.FullSaleModal }))
 );
@@ -271,15 +275,23 @@ export function Items_TicketSearchResults({}) {
           zResults.map((item, index) => renderItem(item, index))
         )}
       </div>
-      <ClosedWorkorderModal
-        workorder={sClosedWorkorder}
-        onClose={() => _sSetClosedWorkorder(null)}
-      />
-      <TransactionModal
-        transaction={sTransaction}
-        onClose={() => _sSetTransaction(null)}
-        onRefund={handleTransactionRefund}
-      />
+      {!!sClosedWorkorder && (
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <ClosedWorkorderModal
+            workorder={sClosedWorkorder}
+            onClose={() => _sSetClosedWorkorder(null)}
+          />
+        </Suspense>
+      )}
+      {!!sTransaction && (
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <TransactionModal
+            transaction={sTransaction}
+            onClose={() => _sSetTransaction(null)}
+            onRefund={handleTransactionRefund}
+          />
+        </Suspense>
+      )}
       {!!sSale && (
         <Suspense fallback={<SmallLoadingIndicator />}>
           <FullSaleModal

@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import React, { useEffect, useRef, useState, useMemo } from "react";
+import React, { useEffect, useRef, useState, useMemo, lazy, Suspense } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import { formatPhoneWithDashes, removeDashesFromPhone, stringIsNumeric, capitalizeAllWordsInSentence } from "../../../utils";
 import { Button, ScreenModal, PhoneNumberInput, Tooltip } from "../../../dom_components";
@@ -26,7 +26,9 @@ import {
 } from "../../../db_calls_wrapper";
 import { TicketSearchInput } from "../../../shared/TicketSearchInput";
 import { readTransaction } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
-import { CustomerInfoScreenModalComponent } from "../modal_screens/CustomerInfoModalScreen";
+const CustomerInfoScreenModalComponent = lazy(() =>
+  import("../modal_screens/CustomerInfoModalScreen").then((m) => ({ default: m.CustomerInfoScreenModalComponent }))
+);
 import styles from "./Info_NewWorkorder.module.css";
 
 export function NewWorkorderComponent({}) {
@@ -447,14 +449,16 @@ export function NewWorkorderComponent({}) {
                   />
                 )}
                 Component={() => (
-                  <CustomerInfoScreenModalComponent
-                    incomingCustomer={sCustomerInfo}
-                    isNewCustomer={true}
-                    button1Text={"Create Customer"}
-                    button2Text={"Cancel"}
-                    handleButton1Press={handleCreateNewCustomerPressed}
-                    handleButton2Press={handleCancelCreateNewCustomerPress}
-                  />
+                  <Suspense fallback={null}>
+                    <CustomerInfoScreenModalComponent
+                      incomingCustomer={sCustomerInfo}
+                      isNewCustomer={true}
+                      button1Text={"Create Customer"}
+                      button2Text={"Cancel"}
+                      handleButton1Press={handleCreateNewCustomerPressed}
+                      handleButton2Press={handleCancelCreateNewCustomerPress}
+                    />
+                  </Suspense>
                 )}
               />
             ),

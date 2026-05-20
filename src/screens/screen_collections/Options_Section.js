@@ -39,7 +39,7 @@ const PayrollModal = lazy(() =>
     default: m.PayrollModal,
   }))
 );
-import { getWeekStart, formatTimeShort, getStoreHoursForDayIndex } from "../screen_components/modal_screens/ScheduleModal";
+import { getWeekStart, formatTimeShort, getStoreHoursForDayIndex } from "../screen_components/modal_screens/scheduleUtils";
 import { preloadItemsEmailView } from "./Items_Section";
 import dayjs from "dayjs";
 

@@ -59,7 +59,9 @@ import {
   broadcastClear,
   TRANSLATE_MSG_TYPES,
 } from "../../broadcastChannel";
-import { DevNotesModal } from "../screen_components/modal_screens/DevNotesModal";
+const DevNotesModal = lazy(() =>
+  import("../screen_components/modal_screens/DevNotesModal").then((m) => ({ default: m.DevNotesModal }))
+);
 
 export const Items_Section = React.memo(({}) => {
   // setters ///////////////////////////////////////////////////////////////////
@@ -126,10 +128,14 @@ export const Items_Section = React.memo(({}) => {
         visible={sShowTranslateModal}
         onClose={() => _sSetShowTranslateModal(false)}
       />
-      <DevNotesModal
-        visible={sShowDevNotes}
-        onClose={() => _sSetShowDevNotes(false)}
-      />
+      {sShowDevNotes && (
+        <Suspense fallback={null}>
+          <DevNotesModal
+            visible={sShowDevNotes}
+            onClose={() => _sSetShowDevNotes(false)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 });

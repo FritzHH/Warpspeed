@@ -3,8 +3,12 @@ import { useState, useRef, lazy, Suspense } from "react";
 import { SmallLoadingIndicator, Button } from "../dom_components";
 import { C, ICONS } from "../styles";
 import { executeTicketSearch, executeLiveSearch } from "./ticketSearch";
-import { ClosedWorkorderModal } from "../screens/screen_components/modal_screens/ClosedWorkorderModal";
-import { TransactionModal } from "../screens/screen_components/modal_screens/TransactionModal";
+const ClosedWorkorderModal = lazy(() =>
+  import("../screens/screen_components/modal_screens/ClosedWorkorderModal").then((m) => ({ default: m.ClosedWorkorderModal }))
+);
+const TransactionModal = lazy(() =>
+  import("../screens/screen_components/modal_screens/TransactionModal").then((m) => ({ default: m.TransactionModal }))
+);
 const FullSaleModal = lazy(() =>
   import("../dom_components/FullSaleModal/FullSaleModal").then((m) => ({ default: m.FullSaleModal }))
 );
@@ -156,15 +160,23 @@ export function TicketSearchInput({}) {
           </div>
         )}
       </div>
-      <ClosedWorkorderModal
-        workorder={sClosedWorkorder}
-        onClose={() => _sSetClosedWorkorder(null)}
-      />
-      <TransactionModal
-        transaction={sTransaction}
-        onClose={() => _sSetTransaction(null)}
-        onRefund={handleTransactionRefund}
-      />
+      {!!sClosedWorkorder && (
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <ClosedWorkorderModal
+            workorder={sClosedWorkorder}
+            onClose={() => _sSetClosedWorkorder(null)}
+          />
+        </Suspense>
+      )}
+      {!!sTransaction && (
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <TransactionModal
+            transaction={sTransaction}
+            onClose={() => _sSetTransaction(null)}
+            onRefund={handleTransactionRefund}
+          />
+        </Suspense>
+      )}
       {!!sSale && (
         <Suspense fallback={<SmallLoadingIndicator />}>
           <FullSaleModal

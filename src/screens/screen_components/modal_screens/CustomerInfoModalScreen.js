@@ -62,14 +62,18 @@ import {
   readTransactions,
 } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { sendCreditReceipt } from "./newCheckoutModalScreen/newCheckoutUtils";
-import { ClosedWorkorderModal } from "./ClosedWorkorderModal";
+const ClosedWorkorderModal = lazy(() =>
+  import("./ClosedWorkorderModal").then((m) => ({ default: m.ClosedWorkorderModal }))
+);
 const DepositRefundModal = lazy(() =>
   import("./newCheckoutModalScreen/DepositRefundModal").then((m) => ({ default: m.DepositRefundModal }))
 );
 const FullSaleModal = lazy(() =>
   import("../../../dom_components/FullSaleModal/FullSaleModal").then((m) => ({ default: m.FullSaleModal }))
 );
-import { GoogleMapsModal } from "./GoogleMapsModal";
+const GoogleMapsModal = lazy(() =>
+  import("./GoogleMapsModal").then((m) => ({ default: m.GoogleMapsModal }))
+);
 import styles from "./CustomerInfoModalScreen.module.css";
 
 const INPUT_BASE_STYLE = {
@@ -862,32 +866,36 @@ export const CustomerInfoScreenModalComponent = ({
           />
         </Suspense>
       )}
-      <ClosedWorkorderModal
-        workorder={sClosedWorkorder}
-        onClose={() => _sSetClosedWorkorder(null)}
-        onGoToWorkorder={(wo) => {
-          const store = useOpenWorkordersStore.getState();
-          const lockedID = store.lockedWorkorderID;
-          if (lockedID && lockedID !== wo.id) {
-            store.setLockedWorkorderID(null);
-            store.removeWorkorder(lockedID, false);
-          }
-          store.setOpenWorkorderID(wo.id);
-          useTabNamesStore.getState().setItems({
-            infoTabName: TAB_NAMES.infoTab.workorder,
-            itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-            optionsTabName: TAB_NAMES.optionsTab.inventory,
-          });
-          useWorkorderPreviewStore.getState().setPreviewObj(null);
-          if (wo.customerID) {
-            dbGetCustomer(wo.customerID).then((customer) => {
-              if (customer) useCurrentCustomerStore.getState().setCustomer(customer, false);
-            });
-          }
-          _sSetClosedWorkorder(null);
-          if (handleButton2Press) handleButton2Press();
-        }}
-      />
+      {!!sClosedWorkorder && (
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <ClosedWorkorderModal
+            workorder={sClosedWorkorder}
+            onClose={() => _sSetClosedWorkorder(null)}
+            onGoToWorkorder={(wo) => {
+              const store = useOpenWorkordersStore.getState();
+              const lockedID = store.lockedWorkorderID;
+              if (lockedID && lockedID !== wo.id) {
+                store.setLockedWorkorderID(null);
+                store.removeWorkorder(lockedID, false);
+              }
+              store.setOpenWorkorderID(wo.id);
+              useTabNamesStore.getState().setItems({
+                infoTabName: TAB_NAMES.infoTab.workorder,
+                itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+                optionsTabName: TAB_NAMES.optionsTab.inventory,
+              });
+              useWorkorderPreviewStore.getState().setPreviewObj(null);
+              if (wo.customerID) {
+                dbGetCustomer(wo.customerID).then((customer) => {
+                  if (customer) useCurrentCustomerStore.getState().setCustomer(customer, false);
+                });
+              }
+              _sSetClosedWorkorder(null);
+              if (handleButton2Press) handleButton2Press();
+            }}
+          />
+        </Suspense>
+      )}
       <CreditEditModal
         credit={sEditingCredit}
         customer={sCustomerInfo}
@@ -933,16 +941,20 @@ export const CustomerInfoScreenModalComponent = ({
           />
         </Suspense>
       )}
-      <GoogleMapsModal
-        visible={sShowMapsModal}
-        onClose={() => _sSetShowMapsModal(false)}
-        startAddress={(() => {
-          const si = useSettingsStore.getState().getSettings()?.storeInfo;
-          if (!si) return "";
-          return [si.street, si.unit, si.city, si.state, si.zip].filter(Boolean).join(", ");
-        })()}
-        endAddress={[sCustomerInfo.streetAddress, sCustomerInfo.unit, sCustomerInfo.city, sCustomerInfo.state, sCustomerInfo.zip].filter(Boolean).join(", ")}
-      />
+      {sShowMapsModal && (
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <GoogleMapsModal
+            visible={sShowMapsModal}
+            onClose={() => _sSetShowMapsModal(false)}
+            startAddress={(() => {
+              const si = useSettingsStore.getState().getSettings()?.storeInfo;
+              if (!si) return "";
+              return [si.street, si.unit, si.city, si.state, si.zip].filter(Boolean).join(", ");
+            })()}
+            endAddress={[sCustomerInfo.streetAddress, sCustomerInfo.unit, sCustomerInfo.city, sCustomerInfo.state, sCustomerInfo.zip].filter(Boolean).join(", ")}
+          />
+        </Suspense>
+      )}
     </div>
   );
 };

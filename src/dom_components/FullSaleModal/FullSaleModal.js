@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, lazy, Suspense } from "react";
 import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
 import { Button } from "../Button/Button";
 import { SmallLoadingIndicator } from "../LoadingIndicator/LoadingIndicator";
@@ -13,7 +13,9 @@ import {
   readTransactions,
   newCheckoutFetchWorkordersForSale,
 } from "../../screens/screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
-import { ClosedWorkorderModal } from "../../screens/screen_components/modal_screens/ClosedWorkorderModal";
+const ClosedWorkorderModal = lazy(() =>
+  import("../../screens/screen_components/modal_screens/ClosedWorkorderModal").then((m) => ({ default: m.ClosedWorkorderModal }))
+);
 import styles from "./FullSaleModal.module.css";
 
 // ─── Helper components ──────────────────────────────────
@@ -179,10 +181,12 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
   // ── Workorder drill-down (still RN-web) ──
   if (sSelectedWorkorder) {
     return (
-      <ClosedWorkorderModal
-        workorder={sSelectedWorkorder}
-        onClose={() => _sSetSelectedWorkorder(null)}
-      />
+      <Suspense fallback={<SmallLoadingIndicator />}>
+        <ClosedWorkorderModal
+          workorder={sSelectedWorkorder}
+          onClose={() => _sSetSelectedWorkorder(null)}
+        />
+      </Suspense>
     );
   }
 

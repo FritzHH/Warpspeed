@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { capitalizeFirstLetterOfString, formatCurrencyDisp, formatMillisForDisplay, formatPhoneForDisplay, resolveStatus, calculateRunningTotals, formatWorkorderNumber } from "../../../utils";
 import {
   SmallLoadingIndicator,
@@ -15,7 +15,9 @@ import {
 } from "../../../stores";
 import { TAB_NAMES } from "../../../data";
 import { C } from "../../../styles";
-import { ClosedWorkorderModal } from "../modal_screens/ClosedWorkorderModal";
+const ClosedWorkorderModal = lazy(() =>
+  import("../modal_screens/ClosedWorkorderModal").then((m) => ({ default: m.ClosedWorkorderModal }))
+);
 import styles from "./Items_WorkorderSearchList.module.css";
 
 export function Items_WorkorderSearchList({}) {
@@ -190,10 +192,14 @@ export function Items_WorkorderSearchList({}) {
           })
         )}
       </div>
-      <ClosedWorkorderModal
-        workorder={sClosedWorkorder}
-        onClose={() => _sSetClosedWorkorder(null)}
-      />
+      {!!sClosedWorkorder && (
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <ClosedWorkorderModal
+            workorder={sClosedWorkorder}
+            onClose={() => _sSetClosedWorkorder(null)}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

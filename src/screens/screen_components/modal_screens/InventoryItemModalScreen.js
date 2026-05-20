@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import { useState, useRef } from "react";
+import { useState, useRef, lazy, Suspense } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import debounce from "lodash/debounce";
 import {
@@ -26,7 +26,9 @@ import {
   dbSavePrintObj,
 } from "../../../db_calls_wrapper";
 import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
-import { QuickButtonPickerModal } from "./QuickButtonPickerModal";
+const QuickButtonPickerModal = lazy(() =>
+  import("./QuickButtonPickerModal").then((m) => ({ default: m.QuickButtonPickerModal }))
+);
 
 const CATEGORIES = ["Item", "Labor"];
 
@@ -672,13 +674,17 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
       >
         {modalContent}
       </Dialog>
-      <QuickButtonPickerModal
-        visible={sShowQBPicker}
-        itemID={sItem.id}
-        quickButtons={quickButtons}
-        onToggle={handleToggleInButton}
-        onClose={() => _setShowQBPicker(false)}
-      />
+      {sShowQBPicker && (
+        <Suspense fallback={null}>
+          <QuickButtonPickerModal
+            visible={sShowQBPicker}
+            itemID={sItem.id}
+            quickButtons={quickButtons}
+            onToggle={handleToggleInButton}
+            onClose={() => _setShowQBPicker(false)}
+          />
+        </Suspense>
+      )}
     </>
   );
 };

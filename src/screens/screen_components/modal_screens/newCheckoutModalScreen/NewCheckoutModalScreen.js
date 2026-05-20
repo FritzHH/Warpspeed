@@ -67,7 +67,9 @@ import { SaleTotals, PaymentStatus, CashChangeNeeded } from "./SaleTotals";
 import { PaymentsList } from "./PaymentsList";
 import { InventorySearch } from "./InventorySearch";
 import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "../../../../broadcastChannel";
-import { InventoryItemModalScreen } from "../InventoryItemModalScreen";
+const InventoryItemModalScreen = lazy(() =>
+  import("../InventoryItemModalScreen").then((m) => ({ default: m.InventoryItemModalScreen }))
+);
 
 const WorkorderCombiner = lazy(() =>
   import("./WorkorderCombiner").then((m) => ({ default: m.WorkorderCombiner }))
@@ -2167,12 +2169,14 @@ export function NewCheckoutModalScreen() {
           )}
           <ReceiptSentOverlay visible={!!sReceiptSentOverlay} sentSMS={sReceiptSentOverlay?.sentSMS} sentEmail={sReceiptSentOverlay?.sentEmail} onDone={() => _setReceiptSentOverlay(null)} />
           {sNewItemModal && (
-            <InventoryItemModalScreen
-              key={sNewItemModal.id}
-              item={sNewItemModal}
-              isNew={true}
-              handleExit={() => _setNewItemModal(null)}
-            />
+            <Suspense fallback={<LoadingIndicator />}>
+              <InventoryItemModalScreen
+                key={sNewItemModal.id}
+                item={sNewItemModal}
+                isNew={true}
+                handleExit={() => _setNewItemModal(null)}
+              />
+            </Suspense>
           )}
         </div>
     </Dialog>

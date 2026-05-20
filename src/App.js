@@ -26,7 +26,11 @@ const BikeStandScreen = lazy(() =>
     default: m.BikeStandScreen,
   }))
 );
-import { PhoneScreen } from "./screens/phone/PhoneScreen";
+const PhoneScreen = lazy(() =>
+  import("./screens/phone/PhoneScreen").then((m) => ({
+    default: m.PhoneScreen,
+  }))
+);
 import { HomeScreen } from "./screens/HomeScreen";
 const DatabaseViewerScreen = lazy(() =>
   import("./screens/DatabaseViewerScreen").then((m) => ({
@@ -388,7 +392,9 @@ function App() {
           path={ROUTES.phone}
           element={
             <ProtectedRoute user={user}>
-              <PhoneScreenWrapper />
+              <Suspense fallback={<LoadingIndicator />}>
+                <PhoneScreenWrapper />
+              </Suspense>
             </ProtectedRoute>
           }
         />

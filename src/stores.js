@@ -509,7 +509,6 @@ export const useAlertScreenStore = create((set, get) => ({
   setIcon2Size: (icon2Size) => {
     set(() => ({ icon2Size }));
   },
-  setShowAlert: (showAlert) => set({ showAlert }),
 
   resetAll: () => {
     set(() => ({
@@ -547,10 +546,6 @@ export const useDatabaseBatchStore = create((set, get) => ({
 
   setLastBatchMillis: (lastBatchMillis) => set({ lastBatchMillis }),
   setLastWriteMillis: (lastWriteMillis) => set({ lastWriteMillis }),
-  setLastWriteMillis: () => {
-    let lastWriteMillis = new Date().getTime();
-    set({ lastWriteMillis });
-  },
   resetLastWriteMillis: () =>
     set({ lastWriteMillis: 9999999999999999999999999 }),
 }));

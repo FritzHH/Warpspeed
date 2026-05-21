@@ -93,6 +93,7 @@ export const Button = forwardRef(function Button(
   // When innerClassName is supplied, defer all padding to that CSS class so it
   // isn't overridden by inline style defaults.
   const hasInnerClass = !!innerClassName;
+  const resolvedBackground = gradient || (icon && !displayText ? undefined : getBackgroundColor());
   const innerStyle = {
     alignItems: "center",
     justifyContent: "center",
@@ -107,10 +108,11 @@ export const Button = forwardRef(function Button(
     ...shadowStyle,
     ...buttonStyle,
     ...(WIDTH != null ? { width: WIDTH } : {}),
-    background: gradient || undefined,
-    backgroundColor: gradient ? undefined : (icon && !displayText ? undefined : getBackgroundColor()),
     opacity: enabled ? (buttonStyle.opacity ?? 1) : 0.2,
   };
+  delete innerStyle.backgroundColor;
+  if (resolvedBackground !== undefined) innerStyle.background = resolvedBackground;
+  else delete innerStyle.background;
 
   // Remove RNW-only props from inline style
   delete innerStyle.paddingHorizontal;

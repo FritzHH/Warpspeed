@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import { createPortal } from "react-dom";
-import { capitalizeFirstLetterOfString, calculateRunningTotals, dim, findTemplateByType, formatDateTimeForReceipt, formatPhoneWithDashes, formatStoreHours, log, printBuilder } from "../../../utils";
+import { capitalizeFirstLetterOfString, calculateRunningTotals, dim, findTemplateByType, formatDateTimeForReceipt, formatPhoneWithDashes, formatStoreHours, getWorkorderPaymentState, log, printBuilder } from "../../../utils";
 import {
   DropdownMenu as DropdownMenuDom,
   Image as ImageDom,
@@ -570,6 +570,14 @@ export function MessagesComponent({}) {
 
       const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
       let receiptData = printBuilder.workorder(zWorkorderObj, zCustomer, settings?.salesTaxPercent, _ctx);
+      let activeSale = zWorkorderObj.activeSaleID
+        ? useActiveSalesStore.getState().getActiveSale(zWorkorderObj.activeSaleID)
+        : null;
+      let paymentState = getWorkorderPaymentState(zWorkorderObj, activeSale, settings);
+      if (paymentState.netPaid > 0) {
+        receiptData.amountPaid = paymentState.netPaid;
+        receiptData.finalTotal = Math.max(0, (receiptData.finalTotal || 0) - paymentState.netPaid);
+      }
       let storagePath = `${tenantID}/${storeID}/workorder-tickets/${zWorkorderObj.id}.pdf`;
       let messageID = crypto.randomUUID();
       let canRespondBool = canRespondVal ? true : null;
@@ -640,16 +648,11 @@ export function MessagesComponent({}) {
       return;
     }
     useLoginStore.getState().requireLogin(async () => {
-      let amountDue = 0;
       let activeSale = zWorkorderObj.activeSaleID
         ? useActiveSalesStore.getState().getActiveSale(zWorkorderObj.activeSaleID)
         : null;
-      if (activeSale) {
-        amountDue = (activeSale.total || 0) - (activeSale.amountCaptured || 0);
-      } else {
-        let totals = calculateRunningTotals(zWorkorderObj, zSettings?.salesTaxPercent, [], false, !!zWorkorderObj.taxFree);
-        amountDue = totals.finalTotal;
-      }
+      let paymentState = getWorkorderPaymentState(zWorkorderObj, activeSale, zSettings);
+      let amountDue = paymentState.remainingForThisWO;
       let displayAmount = "$" + (amountDue / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
       let customerObj = useCurrentCustomerStore.getState().getCustomer();

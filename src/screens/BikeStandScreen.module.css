@@ -388,7 +388,7 @@
 }
 
 .nwmTapToClose {
-  padding: 12px 0;
+  padding: 24px 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -397,7 +397,7 @@
 }
 
 .nwmTapToCloseText {
-  font-size: 26px;
+  font-size: 52px;
   font-style: italic;
 }
 
@@ -440,6 +440,7 @@
   font-weight: 600;
   color: var(--text-on-accent);
   flex-shrink: 0;
+  height: 56px;
 }
 
 .nwmKeypadWrap {
@@ -1521,7 +1522,7 @@
 .bmSuggestionDismiss {
   position: absolute;
   inset: 0;
-  z-index: 998;
+  z-index: 1;
 }
 
 .bmFieldLabel {

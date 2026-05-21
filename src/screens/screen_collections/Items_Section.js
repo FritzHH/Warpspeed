@@ -80,7 +80,7 @@ export const Items_Section = React.memo(({}) => {
     switch (zItemsTabName) {
       case TAB_NAMES.itemsTab.changeLog:
         return (
-          <Suspense fallback={<LoadingIndicator />}>
+          <Suspense fallback={null}>
             <Items_ChangeLog />
           </Suspense>
         );
@@ -88,7 +88,7 @@ export const Items_Section = React.memo(({}) => {
         return <CustomerSearchListComponent />;
       case TAB_NAMES.itemsTab.dashboard:
         return (
-          <Suspense fallback={<LoadingIndicator />}>
+          <Suspense fallback={null}>
             <Items_Dashboard />
           </Suspense>
         );
@@ -101,7 +101,7 @@ export const Items_Section = React.memo(({}) => {
       case TAB_NAMES.itemsTab.emailView:
         if (zOptionsTabName === TAB_NAMES.optionsTab.email)
           return (
-            <Suspense fallback={<LoadingIndicator />}>
+            <Suspense fallback={null}>
               <Items_EmailView />
             </Suspense>
           );

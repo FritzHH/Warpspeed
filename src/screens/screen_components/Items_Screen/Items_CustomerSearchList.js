@@ -23,35 +23,43 @@ import styles from "./Items_CustomerSearchList.module.css";
 export function CustomerSearchListComponent({}) {
   // store getters //////////////////////////////////////////////////////////////////////
   const zSearchResults = useCustomerSearchStore((state) => state.searchResults);
+  const zSearchResultTimestamps = useCustomerSearchStore((state) => state.searchResultTimestamps);
   const zSearchQuery = useCustomerSearchStore((state) => state.searchQuery);
   const zSearchType = useCustomerSearchStore((state) => state.searchType);
   const zIsSearching = useCustomerSearchStore((state) => state.isSearching);
 
   const filteredResults = useMemo(() => {
-    if (!zSearchQuery) return zSearchResults;
+    const twoHoursMs = 2 * 60 * 60 * 1000;
+    const cutoff = Date.now() - twoHoursMs;
+    const freshResults = zSearchResults.filter((c) => {
+      const ts = zSearchResultTimestamps?.[c.id];
+      return typeof ts === "number" && ts >= cutoff;
+    });
+
+    if (!zSearchQuery) return freshResults;
 
     if (zSearchType === "phone") {
       const digits = zSearchQuery.replace(/\D/g, "");
-      if (!digits) return zSearchResults;
-      return zSearchResults.filter((c) => {
+      if (!digits) return freshResults;
+      return freshResults.filter((c) => {
         const cellDigits = (c.customerCell || "").replace(/\D/g, "");
         const landDigits = (c.customerLandline || c.land || "").replace(/\D/g, "");
         return cellDigits.includes(digits) || landDigits.includes(digits);
       });
     } else if (zSearchType === "email") {
       const emailQ = zSearchQuery.toLowerCase();
-      return zSearchResults.filter((c) =>
+      return freshResults.filter((c) =>
         (c.email || "").toLowerCase().includes(emailQ)
       );
     } else {
       const words = zSearchQuery.toLowerCase().split(/\s+/).filter(Boolean);
-      return zSearchResults.filter((c) => {
+      return freshResults.filter((c) => {
         const first = (c.first || "").toLowerCase();
         const last = (c.last || "").toLowerCase();
         return words.every((w) => first.includes(w) || last.includes(w));
       });
     }
-  }, [zSearchResults, zSearchQuery, zSearchType]);
+  }, [zSearchResults, zSearchResultTimestamps, zSearchQuery, zSearchType]);
   ////////////////////////////////////////////////////////////////////////////////////////
   const [sCustomerInfo, _setCustomerInfo] = useState();
   const [sSelectedCustomer, _setSelectedCustomer] = useState(null);

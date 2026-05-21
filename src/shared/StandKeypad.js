@@ -38,7 +38,7 @@ function KeyButton({ keyLabel, displayLabel, onClick, style, mountTime }) {
   return (
     <div
       onClick={() => { if (_touchFired) { _touchFired = false; return; } if (Date.now() - mountTime < 500) return; onClick(keyLabel); }}
-      onTouchStart={(e) => { _touchFired = true; e.currentTarget.style.backgroundColor = C.surfaceAlt; onClick(keyLabel); }}
+      onTouchStart={(e) => { e.preventDefault(); _touchFired = true; e.currentTarget.style.backgroundColor = C.surfaceAlt; onClick(keyLabel); }}
       onTouchEnd={(e) => { e.currentTarget.style.backgroundColor = C.listItemWhite; }}
       onMouseDown={(e) => { e.currentTarget.style.backgroundColor = C.surfaceAlt; }}
       onMouseUp={(e) => { e.currentTarget.style.backgroundColor = C.listItemWhite; }}
@@ -69,7 +69,7 @@ export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, 
             {ri === PHONE_KEYS.length - 1 && toggleLabel && onToggle && (
               <div
                 onClick={() => { if (_touchFired) { _touchFired = false; return; } onToggle(); }}
-                onTouchStart={() => { _touchFired = true; onToggle(); }}
+                onTouchStart={(e) => { e.preventDefault(); _touchFired = true; onToggle(); }}
                 style={{ ...KEY_STYLE, width: 102 + pAdj * 2, height: 84 + pAdj * 2, fontSize: 20 + fAdj, backgroundColor: C.blue, color: "white", borderColor: C.blue }}
               >
                 {toggleLabel}
@@ -102,7 +102,7 @@ export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, 
         {toggleLabel && onToggle && (
           <div
             onClick={() => { if (_touchFired) { _touchFired = false; return; } onToggle(); }}
-            onTouchStart={() => { _touchFired = true; onToggle(); }}
+            onTouchStart={(e) => { e.preventDefault(); _touchFired = true; onToggle(); }}
             style={{ ...KEY_STYLE, flex: 1.3, height: 78 + pAdj * 2, fontSize: 20 + fAdj, backgroundColor: C.blue, color: "white", borderColor: C.blue }}
           >
             {toggleLabel}

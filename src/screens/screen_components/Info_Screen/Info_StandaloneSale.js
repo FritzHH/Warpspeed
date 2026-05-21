@@ -71,7 +71,7 @@ export const StandaloneSaleComponent = ({}) => {
       <TicketSearchInput />
 
       <div className={styles.titleBlock}>
-        <span className={styles.titleText} style={{ color: C.textDisabled }}>SALE</span>
+        <span className={styles.titleText} style={{ color: C.textDisabled, opacity: 0.38 }}>SALE</span>
         <Button
           text={`Active Sales (${standaloneSales.length})`}
           enabled={standaloneSales.length > 0}

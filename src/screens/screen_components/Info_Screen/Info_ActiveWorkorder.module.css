@@ -67,13 +67,16 @@
 }
 
 .depositChip {
-  padding: 1px 5px;
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 5px;
   border-radius: 4px;
 }
 
 .depositChipText {
   font-size: 10px;
   font-weight: 600;
+  line-height: 1;
 }
 
 .depositAmount {

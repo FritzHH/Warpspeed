@@ -15,6 +15,7 @@ import {
   DropdownMenu,
   Image,
   LoginModal,
+  TextInput,
   Tooltip,
 } from "../../../dom_components";
 import { C, ICONS } from "../../../styles";
@@ -319,12 +320,13 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
               onChange={(e) => handleMinutesChange(e.target.value)}
             />
           ) : opts.multiline ? (
-            <textarea
+            <TextInput
+              multiline
+              debounceMs={0}
               className={styles.fieldTextarea}
               style={textareaInline}
-              rows={10}
               value={String(sItem[fieldName] || "")}
-              onChange={(e) => handleFieldChange(fieldName, e.target.value)}
+              onChangeText={(v) => handleFieldChange(fieldName, v)}
             />
           ) : (
             <input

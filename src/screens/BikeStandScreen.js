@@ -38,6 +38,7 @@ import {
   CheckBox,
   StatusPickerModal,
   DropdownMenu,
+  AlertBox,
 } from "../dom_components";
 import {
   dbListenToSettings,
@@ -54,6 +55,7 @@ import {
 import { WorkorderMediaModal } from "./screen_components/modal_screens/WorkorderMediaModal";
 import { InventorySearchModal } from "./screen_components/modal_screens/InventorySearchModal";
 import { StandKeypad } from "../shared/StandKeypad";
+import { useMountClickGuard } from "../shared/useMountClickGuard";
 import { MILLIS_IN_DAY, DISCOUNT_TYPES, FACE_DESCRIPTOR_CONFIDENCE_DISTANCE, build_db_path } from "../constants";
 import { openCacheDB, clearStaleCache, loadModelCached } from "../faceDetection";
 import warningIcon from "../assets/webp/warning.webp";
@@ -106,6 +108,7 @@ export function BikeStandScreen() {
   const zWorkorders = useOpenWorkordersStore((state) => state.workorders);
   const zSendStatuses = useOpenWorkordersStore((state) => state._sendStatuses);
   const zInventory = useInventoryStore((state) => state.inventoryArr);
+  const zShowAlert = useAlertScreenStore((state) => state.showAlert);
 
   const [sSelectedWorkorderID, _setSelectedWorkorderID] = useState(null);
   const [sPendingCustomer, _setPendingCustomer] = useState(null); // null | customer object | "standalone"
@@ -724,6 +727,7 @@ export function BikeStandScreen() {
   function saveBrandToAllBrands(brand) {
     if (!brand || !brand.trim()) return;
     const trimmed = brand.trim();
+    if (trimmed.length < 3) return;
     const existing = zSettings.allBrands || [];
     if (existing.some((b) => b.toLowerCase() === trimmed.toLowerCase())) return;
     const updated = [...existing, trimmed].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
@@ -733,6 +737,7 @@ export function BikeStandScreen() {
   function saveDescToAllDescriptions(desc) {
     if (!desc || !desc.trim()) return;
     const trimmed = desc.trim();
+    if (trimmed.length < 3) return;
     const existing = zSettings.allDescriptions || [];
     if (existing.some((d) => d.toLowerCase() === trimmed.toLowerCase())) return;
     const updated = [...existing, trimmed].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
@@ -1220,6 +1225,7 @@ export function BikeStandScreen() {
 
   return (
     <div id="stand-inactivity-root" style={{ display: "flex", flexDirection: "column", height: "100vh", maxHeight: "100vh", overflow: "hidden", backgroundColor: C.backgroundWhite, position: "relative" }}>
+      <AlertBox showAlert={zShowAlert} />
       {/* Phone search modal (portal) */}
       {sShowPhoneSearch && (
         <PhoneSearchModal
@@ -1283,21 +1289,49 @@ export function BikeStandScreen() {
                   itemHeight={69}
                   itemTextStyle={{ fontSize: 23 }}
                 />
+                <div style={{ display: "flex", flexDirection: "row", gap: 15 }}>
                 <StandTouch
                   className={styles.bmCancelBtn}
-                  style={{ backgroundColor: C.orange }}
+                  style={{ backgroundColor: C.green }}
+                  touchStart={false}
                   onPress={() => {
-                    let woID = sSelectedWorkorderID;
+                    saveDetailOnLeave(sDetailField);
                     _setShowBikeInfoModal(false);
                     _setDetailField(null);
-                    _setSelectedWorkorderID(null);
-                    _setPendingCustomer(null);
-                    if (woID) useOpenWorkordersStore.getState().removeWorkorder(woID, true);
                   }}
                 >
                   <Image icon={ICONS.close1} size={24} />
-                  <span className={styles.bmCancelText} style={{ color: C.textWhite }}>Cancel</span>
+                  <span className={styles.bmCancelText} style={{ color: C.textWhite }}>Close</span>
                 </StandTouch>
+                <StandTouch
+                  className={styles.bmCancelBtn}
+                  style={{ backgroundColor: C.orange }}
+                  touchStart={false}
+                  onPress={() => {
+                    let woID = sSelectedWorkorderID;
+                    if (!woID) return;
+                    useAlertScreenStore.getState().setValues({
+                      title: "Delete Workorder?",
+                      message: "This will permanently delete the workorder. This cannot be undone.",
+                      btn1Text: "Delete",
+                      btn2Text: "Cancel",
+                      handleBtn1Press: () => {
+                        useAlertScreenStore.getState().setShowAlert(false);
+                        _setShowBikeInfoModal(false);
+                        _setDetailField(null);
+                        _setSelectedWorkorderID(null);
+                        _setPendingCustomer(null);
+                        useOpenWorkordersStore.getState().removeWorkorder(woID, true);
+                      },
+                      handleBtn2Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                      canExitOnOuterClick: true,
+                    });
+                  }}
+                >
+                  <Image icon={ICONS.trash} size={24} />
+                  <span className={styles.bmCancelText} style={{ color: C.textWhite }}>Delete WO</span>
+                </StandTouch>
+                </div>
               </div>
 
               {/* Fields */}
@@ -1758,8 +1792,8 @@ export function BikeStandScreen() {
                       style={{ backgroundColor: hasBrand ? C.green : C.surfaceAlt }}
                       onPress={() => { if (!hasBrand) return; saveDetailOnLeave(sDetailField); _setShowBikeInfoModal(false); _setDetailField(null); }}
                     >
-                      <Image icon={ICONS.add} size={36} />
-                      <span className={styles.bmAddItemsText} style={{ color: hasBrand ? C.textWhite : C.textMuted }}>Add Items</span>
+                      <Image icon={ICONS.gears1} size={36} />
+                      <span className={styles.bmAddItemsText} style={{ color: hasBrand ? C.textWhite : C.textMuted }}>Back to Workorder</span>
                     </StandTouch>
                   </div>
                 );
@@ -3960,6 +3994,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
   const [sCreateForm, _setCreateForm] = useState({ first: "", last: "", phone: "", email: "" });
   const [sActiveField, _setActiveField] = useState("first");
   const searchTimerRef = useRef(null);
+  const mountGuard = useMountClickGuard(350);
 
   // Debounced search
   function handleSearchTextChange(newText) {
@@ -4089,7 +4124,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
 
   return (
     <StandTouch touchStart={false} onPress={onClose}>
-      <div onClick={onClose} className={styles.nwmBackdrop} style={{ zIndex: Z.modal }}>
+      <div onClick={onClose} onClickCapture={mountGuard} onTouchStartCapture={mountGuard} className={styles.nwmBackdrop} style={{ zIndex: Z.modal }}>
         <div onClick={(e) => e.stopPropagation()} className={styles.nwmDialog}>
           {/* Header */}
           {sMode === "create" ? (
@@ -4737,6 +4772,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
   const [sShowMediaModal, _setShowMediaModal] = useState(null);
   const waitDaysTimerRef = useRef(null);
   const uploadInputRef = useRef(null);
+  const mountGuard = useMountClickGuard(350);
 
   useEffect(() => {
     if (!zWorkorder?.partOrderEstimateMillis || !zWorkorder?.partOrderedMillis) {
@@ -4844,7 +4880,13 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
   };
 
   return (
-    <div className={styles.swdContainer}>
+    <div
+      className={styles.swdContainer}
+      onClickCapture={mountGuard}
+      onMouseDownCapture={mountGuard}
+      onPointerDownCapture={mountGuard}
+      onTouchStartCapture={mountGuard}
+    >
       {/* Top bar: customer info + back button */}
       <div className={styles.swdTopBar} style={{ borderBottomColor: C.borderSubtle }}>
         <StandTouch onPress={onShowCustomerModal} style={{ flex: 1, display: "flex", minWidth: 0 }}>

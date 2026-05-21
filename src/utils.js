@@ -8,6 +8,7 @@ import {
   RECEIPT_TYPES,
   SALE_PROTO,
   SETTINGS_OBJ,
+  SMS_PROTO,
   WORKORDER_ITEM_PROTO,
   WORKORDER_PROTO,
 } from "./data";
@@ -15,7 +16,7 @@ import { generate } from "random-words";
 import cloneDeep from "lodash/cloneDeep";
 import dayjs from "dayjs";
 import { C } from "./styles";
-import { useAlertScreenStore, useLoginStore, useOpenWorkordersStore, useSettingsStore } from "./stores";
+import { useAlertScreenStore, useCustMessagesStore, useLoginStore, useOpenWorkordersStore, useSettingsStore } from "./stores";
 import { DISCOUNT_TYPES, MILLIS_IN_MINUTE } from "./constants";
 import * as _shared from "./shared/printBuilder";
 
@@ -167,6 +168,70 @@ export function calculateRunningTotals(
   };
   // clog(obj);
   return obj;
+}
+
+// Single source of truth for "what does this customer owe right now" on a workorder.
+// Pure: takes workorder + activeSale + settings, returns every facet callers need.
+// Rule: for combined sales (multi-WO), stored activeSale.total is authoritative
+// (locks the agreed total). For single-WO sales, live line recompute wins so
+// line edits update the balance immediately.
+export function getWorkorderPaymentState(workorder, activeSale, settings) {
+  if (!workorder) {
+    return {
+      lineItemTotal: 0,
+      storedSaleTotal: 0,
+      effectiveTotal: 0,
+      paid: 0,
+      refunded: 0,
+      netPaid: 0,
+      balance: 0,
+      woCount: 1,
+      remainingForThisWO: 0,
+      hasPayments: false,
+    };
+  }
+
+  let taxFree = !!workorder.taxFree;
+  let salesTaxPercent = settings?.salesTaxPercent || 0;
+  let liveTotals = calculateRunningTotals(workorder, salesTaxPercent, [], false, taxFree);
+  let lineItemTotal = liveTotals.finalTotal;
+
+  if (!activeSale) {
+    return {
+      lineItemTotal,
+      storedSaleTotal: 0,
+      effectiveTotal: lineItemTotal,
+      paid: 0,
+      refunded: 0,
+      netPaid: 0,
+      balance: lineItemTotal,
+      woCount: 1,
+      remainingForThisWO: lineItemTotal,
+      hasPayments: false,
+    };
+  }
+
+  let storedSaleTotal = activeSale.total || 0;
+  let paid = activeSale.amountCaptured || 0;
+  let refunded = activeSale.amountRefunded || 0;
+  let netPaid = paid - refunded;
+  let woCount = activeSale.workorderIDs?.length || 1;
+  let effectiveTotal = woCount > 1 ? storedSaleTotal : lineItemTotal;
+  let balance = Math.max(0, effectiveTotal - netPaid);
+  let remainingForThisWO = woCount > 1 ? Math.round(balance / woCount) : balance;
+
+  return {
+    lineItemTotal,
+    storedSaleTotal,
+    effectiveTotal,
+    paid,
+    refunded,
+    netPaid,
+    balance,
+    woCount,
+    remainingForThisWO,
+    hasPayments: netPaid > 0,
+  };
 }
 
 export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
@@ -1200,17 +1265,22 @@ export function normalizeBarcode(input) {
     console.log("[normalizeBarcode] invalid length (" + len + ") — input: " + input);
     return null;
   }
+  // For UPC-A (11 or 12 digits), promote to EAN-13 frame ("0" + UPC) first,
+  // then compute/validate the check digit against the EAN-13 parity. The check
+  // digit algorithm depends on absolute position within the 13-digit frame —
+  // running it on the bare 11/12-digit string uses the wrong parity and
+  // rejects valid UPC-A codes.
   if (len === 11) {
-    let check = calculateCheckDigit(stripped);
-    let upc12 = stripped + check;
-    return "0" + upc12;
+    let check = calculateCheckDigit("0" + stripped);
+    return "0" + stripped + check;
   }
   if (len === 12) {
-    if (!isValidCheckDigit(stripped)) {
+    const ean13 = "0" + stripped;
+    if (!isValidCheckDigit(ean13)) {
       console.log("[normalizeBarcode] invalid check digit — input: " + input);
       return null;
     }
-    return "0" + stripped;
+    return ean13;
   }
   // len === 13
   if (!isValidCheckDigit(stripped)) {
@@ -2305,12 +2375,47 @@ function removePendingAutoText(id) {
 async function executeAutoText(msg) {
   try {
     if (msg.smsMessage && msg.customerCell) {
-      await dbSendSMS({
+      // Reuse a pre-assigned ID when present so the optimistic placeholder
+      // and the eventual Firestore-listener message share the same id and
+      // mergeMessages can swap one for the other.
+      const smsID = msg.smsMessageID || crypto.randomUUID();
+
+      // Optimistic UI: drop a "sending" placeholder into the currently-loaded
+      // conversation if the user is viewing this customer's thread.
+      const msgStore = useCustMessagesStore.getState();
+      const showPlaceholder = msgStore.getMessagesPhone() === msg.customerCell;
+      if (showPlaceholder) {
+        const currentUser = useLoginStore.getState().getCurrentUser();
+        msgStore.setOutgoingMessage({
+          ...SMS_PROTO,
+          id: smsID,
+          message: msg.smsMessage,
+          phoneNumber: msg.customerCell,
+          customerID: msg.customerID || "",
+          type: "outgoing",
+          millis: Date.now(),
+          status: "sending",
+          senderUserObj: currentUser || "",
+          sentByUser: currentUser?.id || "",
+        });
+      }
+
+      const result = await dbSendSMS({
         message: msg.smsMessage,
         phoneNumber: msg.customerCell,
         customerID: msg.customerID || "",
-        id: crypto.randomUUID(),
+        id: smsID,
       });
+
+      if (showPlaceholder) {
+        if (result?.success) {
+          useCustMessagesStore.getState().updateMessageStatus(smsID, "sent", "");
+        } else {
+          useCustMessagesStore
+            .getState()
+            .updateMessageStatus(smsID, "failed", result?.error || "Failed to send");
+        }
+      }
     }
     if (msg.emailSubject && msg.emailBody && msg.customerEmail) {
       await dbSendEmail(msg.customerEmail, msg.emailSubject, msg.emailBody);

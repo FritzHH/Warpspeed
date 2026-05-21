@@ -740,13 +740,13 @@ function mapWorkorders(
     const workorderLines = woItems.map(function (wi) {
       const item = itemMap[wi.itemID] || null;
 
-      const rawUpc = item ? (item.upc || "") : "";
-      const rawEan = item ? (item.ean || "") : "";
-      const normUpc = normalizeBarcode(rawUpc);
-      const normEan = normalizeBarcode(rawEan);
-      const isNativeEan = normEan && !normEan.startsWith("0");
-      const primaryBarcode = (isNativeEan ? normEan : null) || normUpc || generateEAN13Barcode();
-      const barcodes = [normEan, normUpc].filter(function (c) { return c && c !== primaryBarcode; });
+      const rawUpc = item ? (item.upc || "").trim() : "";
+      const rawEan = item ? (item.ean || "").trim() : "";
+      const primaryBarcode = rawUpc || rawEan || "";
+      const barcodes = [];
+      for (const code of [rawUpc, rawEan]) {
+        if (code && code !== primaryBarcode && barcodes.indexOf(code) === -1) barcodes.push(code);
+      }
 
       const inventoryItem = {
         id: item ? item.itemID : crypto.randomUUID(),
@@ -1163,13 +1163,14 @@ function buildStandaloneWorkorders(sales, salesLinesCSVText, itemsCSVText, custo
     var workorderLines = saleLines.map(function (sl) {
       var item = sl.itemID ? itemMap[sl.itemID] : null;
 
-      var rawUpc = item ? (item.upc || "") : "";
-      var rawEan = item ? (item.ean || "") : "";
-      var normUpc = normalizeBarcode(rawUpc);
-      var normEan = normalizeBarcode(rawEan);
-      var isNativeEan = normEan && !normEan.startsWith("0");
-      var primaryBarcode = (isNativeEan ? normEan : null) || normUpc || generateEAN13Barcode();
-      var barcodes = [normEan, normUpc].filter(function (c) { return c && c !== primaryBarcode; });
+      var rawUpc = item ? (item.upc || "").trim() : "";
+      var rawEan = item ? (item.ean || "").trim() : "";
+      var primaryBarcode = rawUpc || rawEan || "";
+      var barcodes = [];
+      for (var bIdx = 0; bIdx < 2; bIdx++) {
+        var code = bIdx === 0 ? rawUpc : rawEan;
+        if (code && code !== primaryBarcode && barcodes.indexOf(code) === -1) barcodes.push(code);
+      }
 
       var priceCents = dollarsToCents(sl.unitPrice);
 
@@ -1274,16 +1275,17 @@ function mapInventory(itemsCSVText) {
   for (const item of activeItems) {
     const isLabor = (item.description || "").toLowerCase().includes("labor");
 
+    // Store raw codes verbatim — what LS has is what's printed on the shelf label.
     const rawUpc = (item.upc || "").trim();
     const rawEan = (item.ean || "").trim();
-    const normUpc = normalizeBarcode(rawUpc);
-    const normEan = normalizeBarcode(rawEan);
-    const isNativeEan = normEan && !normEan.startsWith("0");
-    const primaryBarcode = (isNativeEan ? normEan : null) || normUpc || generateEAN13Barcode();
-    const barcodes = [normEan, normUpc].filter(function (c) { return c && c !== primaryBarcode; });
+    const primaryBarcode = rawUpc || rawEan || "";
+    const barcodes = [];
+    for (const code of [rawUpc, rawEan]) {
+      if (code && code !== primaryBarcode && barcodes.indexOf(code) === -1) barcodes.push(code);
+    }
 
     items.push({
-      id: generateEAN13Barcode(),
+      id: primaryBarcode || generateEAN13Barcode(),
       formalName: (item.description || "").trim(),
       informalName: "",
       brand: (item.brand || "").trim(),

@@ -53,6 +53,7 @@ export function WorkordersComponent({}) {
     _setSearchTerm(val);
     let q = val.trim();
     if (!q) return;
+    if (q.length < 3) return;
     let workorders = zOpenWorkorders.filter((wo) => !!wo.customerID);
     let scored = workorders.map((wo) => ({ wo, score: scoreWorkorder(wo, q) }));
     let matches = scored.filter((s) => s.score > 0);

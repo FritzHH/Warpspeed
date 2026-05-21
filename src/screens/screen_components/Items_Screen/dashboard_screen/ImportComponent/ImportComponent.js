@@ -8,6 +8,7 @@ import {
   useMigrationStore,
   useAlertScreenStore,
   useOpenWorkordersStore,
+  useInventoryStore,
 } from "../../../../../stores";
 import { Image } from "../../../../../dom_components";
 import { C, ICONS } from "../../../../../styles";
@@ -40,9 +41,15 @@ import {
   mapPunchHistory,
   parseCSV,
 } from "../../../../../lightspeed_import";
+import { disableListener } from "../../../../../listenerManager";
 
 let _lsConnectionCache = null;
 let _lsCsvData = null;
+
+// Wide-net labor detection. Better to over-match labor than under-match —
+// labor is tax-free, so false-positives cost nothing while false-negatives
+// charge tax on something that should be exempt.
+const LABOR_WORDS = /\b(labor|install|installation|replace|repair|tune|tuneup|service|adjust|diagnostic|cleaning|assembly|bleed|overhaul|true|truing|build|swap|mount|fit|fitting|setup|set-up|removal|remove|inspection|inspect|charge)\b/i;
 
 const ImportComponent = () => {
   const [sLsConnected, _setLsConnected] = useState(_lsConnectionCache?.connected || false);
@@ -56,6 +63,8 @@ const ImportComponent = () => {
 
   const lsConnectionPollRef = useRef(null);
   const lsConnectionTimeoutRef = useRef(null);
+  const inventoryCsvFileInputRef = useRef(null);
+  const inventoryUploadCsvFileInputRef = useRef(null);
 
   function stopLsConnectionPoll() {
     if (lsConnectionPollRef.current) {
@@ -440,6 +449,183 @@ const ImportComponent = () => {
     _setLookupLoading(false);
   }
 
+  function parseInventoryCSVRows(rows) {
+    const toBool = (v) => v === true || v === "true" || v === "TRUE" || v === "1";
+    const toNum = (v) => {
+      if (v === null || v === undefined || v === "") return 0;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+    return rows.map((r) => ({
+      id: (r.id || "").trim(),
+      formalName: r.formalName || "",
+      informalName: r.informalName || "",
+      brand: r.brand || "",
+      category: r.category || "Item",
+      price: toNum(r.price),
+      salePrice: toNum(r.salePrice),
+      cost: toNum(r.cost),
+      primaryBarcode: (r.primaryBarcode || "").trim(),
+      barcodes: r.barcodes ? r.barcodes.split("|").filter(Boolean) : [],
+      minutes: toNum(r.minutes),
+      customPart: toBool(r.customPart),
+      customLabor: toBool(r.customLabor),
+      receiptNoteRequired: toBool(r.receiptNoteRequired),
+    }));
+  }
+
+  function handleUploadInventoryFromCSVClick() {
+    if (inventoryUploadCsvFileInputRef.current) inventoryUploadCsvFileInputRef.current.click();
+  }
+
+  async function handleInventoryUploadCSVFileChosen(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (!window.confirm(
+      "Upload \"" + file.name + "\" to Firestore inventory collection?\n\n" +
+      "This will OVERWRITE inventory items in the live database (matched by id).\n" +
+      "Quick-button references are preserved as long as ids are unchanged.\n\n" +
+      "Click OK to proceed."
+    )) {
+      return;
+    }
+
+    _setLookupLoading(true);
+    _setLsResult("");
+    try {
+      console.log("[Upload Inventory CSV] reading file:", file.name);
+      const text = await file.text();
+      const rows = parseCSV(text);
+      console.log("[Upload Inventory CSV] parsed rows:", rows.length);
+      if (!rows.length) {
+        _setLsResult("CSV had no rows.");
+        return;
+      }
+      const items = parseInventoryCSVRows(rows).filter((it) => it.id);
+      const skipped = rows.length - items.length;
+      if (skipped > 0) console.warn("[Upload Inventory CSV] skipped " + skipped + " rows without id");
+      console.log("[Upload Inventory CSV] writing " + items.length + " items to Firestore...");
+      _setLsResult("Uploading " + items.length + " items to Firestore...");
+
+      await dbBatchWrite(items, "inventory", (done, total) => {
+        console.log("[Upload Inventory CSV] " + done + "/" + total + " written");
+        _setLsResult("Uploading " + done + "/" + total + "...");
+      });
+
+      console.log("[Upload Inventory CSV] complete");
+      _setLsResult("Uploaded " + items.length + " inventory items to Firestore.");
+      alert("Uploaded " + items.length + " inventory items to Firestore.");
+    } catch (err) {
+      console.error("[Upload Inventory CSV] Error:", err);
+      _setLsResult("Upload error: " + err.message);
+      alert("Upload error: " + err.message);
+    } finally {
+      _setLookupLoading(false);
+    }
+  }
+
+  function handleLoadInventoryFromCSVClick() {
+    console.log("[Load Inventory CSV] button clicked, opening file picker...");
+    if (inventoryCsvFileInputRef.current) inventoryCsvFileInputRef.current.click();
+    else console.warn("[Load Inventory CSV] file input ref is null");
+  }
+
+  async function handleInventoryCSVFileChosen(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!file) {
+      console.log("[Load Inventory CSV] no file selected (dialog cancelled)");
+      return;
+    }
+    console.log("[Load Inventory CSV] file chosen:", file.name, file.size, "bytes");
+    try {
+      _setLsResult("Loading " + file.name + "...");
+      // Stop the live Firestore inventory listener so it doesn't overwrite the local data
+      console.log("[Load Inventory CSV] disabling inventory listener...");
+      disableListener("inventory");
+
+      console.log("[Load Inventory CSV] reading file text...");
+      const text = await file.text();
+      console.log("[Load Inventory CSV] file text length:", text.length);
+
+      console.log("[Load Inventory CSV] parsing CSV...");
+      const rows = parseCSV(text);
+      console.log("[Load Inventory CSV] parsed rows:", rows.length);
+      if (rows.length) console.log("[Load Inventory CSV] first row:", rows[0]);
+      if (!rows.length) {
+        _setLsResult("CSV had no rows.");
+        console.warn("[Load Inventory CSV] CSV had no rows");
+        return;
+      }
+      const items = parseInventoryCSVRows(rows);
+      console.log("[Load Inventory CSV] mapped items:", items.length);
+      if (items.length) console.log("[Load Inventory CSV] sample mapped item:", items[0]);
+      console.log("[Load Inventory CSV] writing to useInventoryStore...");
+      useInventoryStore.getState().setItems(items);
+      console.log("[Load Inventory CSV] done. inventoryArr length now:",
+        useInventoryStore.getState().getInventoryArr().length);
+      _setLsResult(
+        "Loaded " + items.length + " items into Zustand (local only). " +
+        "Inventory listener disabled — refresh page to restore live sync."
+      );
+      alert("Loaded " + items.length + " items into local store. Inventory listener disabled. Refresh to restore.");
+    } catch (err) {
+      console.error("[Load Inventory CSV] Error:", err);
+      _setLsResult("Load error: " + err.message);
+      alert("Load error: " + err.message);
+    }
+  }
+
+  function handleDownloadInventoryCSV() {
+    try {
+      const inv = useInventoryStore.getState().getInventoryArr() || [];
+      if (!inv.length) {
+        _setLsResult("No inventory in store to download.");
+        return;
+      }
+      const cols = [
+        "id",
+        "formalName",
+        "informalName",
+        "brand",
+        "category",
+        "price",
+        "salePrice",
+        "cost",
+        "primaryBarcode",
+        "barcodes",
+        "minutes",
+        "customPart",
+        "customLabor",
+        "receiptNoteRequired",
+      ];
+      const esc = (v) => {
+        if (v === null || v === undefined) return "";
+        const s = Array.isArray(v) ? v.join("|") : String(v);
+        return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+      };
+      const lines = [cols.join(",")];
+      for (const item of inv) lines.push(cols.map((c) => esc(item[c])).join(","));
+      const csv = lines.join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
+      a.download = "inventory_" + stamp + ".csv";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      _setLsResult("Downloaded " + inv.length + " inventory items.");
+    } catch (e) {
+      console.error("[Inventory CSV Download] Error:", e);
+      _setLsResult("Download error: " + e.message);
+    }
+  }
+
   async function handleInventoryImport() {
     _setLookupLoading(true);
     _setLsResult("");
@@ -454,28 +640,24 @@ const ImportComponent = () => {
 
       const toImport = [];
       const skipped = [];
-      let invalidCheckDigits = 0;
+      let missingCodes = 0;
       for (const item of activeItems) {
         const desc = item["Description"] || "";
         if (desc.includes("Discontinued")) continue;
-        const descLower = desc.toLowerCase();
-        const isLabor = descLower.includes("labor") || descLower.includes("install");
+        const isLabor = LABOR_WORDS.test(desc);
         const rawUpc = (item["UPC"] || "").trim();
         const rawEan = (item["EAN"] || "").trim();
-        const systemId = (item["System ID"] || "").trim();
-        const normEan = normalizeBarcode(rawEan);
-        const normUpc = normalizeBarcode(rawUpc);
-        if (rawEan && !normEan) invalidCheckDigits++;
-        if (rawUpc && !normUpc) invalidCheckDigits++;
-        // Primary: native EAN-13 (non-leading-0) > padded UPC-A > random
-        const isNativeEan = normEan && !normEan.startsWith("0");
-        const primaryBarcode = (isNativeEan ? normEan : null) || normUpc || generateEAN13Barcode();
-        // Collect all unique normalized barcodes (excluding primary)
+        // Store raw codes verbatim — what LS has is what's on the shelf label.
+        // No normalization, no check-digit validation, no fabricated fallback.
+        const primaryBarcode = rawUpc || rawEan || "";
         const barcodes = [];
-        for (const code of [normEan, normUpc]) {
+        for (const code of [rawUpc, rawEan]) {
           if (code && code !== primaryBarcode && !barcodes.includes(code)) barcodes.push(code);
         }
-        const id = primaryBarcode;
+        if (!primaryBarcode) missingCodes++;
+        // Use barcode as id when present; otherwise generate a stable UUID-style id
+        // so the item is still uniquely addressable without claiming a fake barcode.
+        const id = primaryBarcode || generateEAN13Barcode();
         const isTube = desc.includes("TUBE ");
         const tubeCost = dollarsToCents(stripDollar(item["Default Cost"]));
         const price = isTube ? (tubeCost > 600 ? 1878 : 939) : dollarsToCents(stripDollar(item["Price"]));
@@ -513,7 +695,7 @@ const ImportComponent = () => {
         if (aGroup !== bGroup) return aGroup - bGroup;
         return a.formalName.localeCompare(b.formalName);
       });
-      console.log("[Inventory Import] " + toImport.length + " items to import, " + skipped.length + " skipped (no price), " + invalidCheckDigits + " invalid check digits.");
+      console.log("[Inventory Import] " + toImport.length + " items to import, " + skipped.length + " skipped (no price), " + missingCodes + " items with no UPC/EAN in source.");
 
       await dbBatchWrite(toImport, "inventory", (done, total) => {
         console.log("[Inventory Import] inventory: " + done + "/" + total + " written.");
@@ -1872,6 +2054,76 @@ const ImportComponent = () => {
           </span>
           <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
             All items from Lightspeed CSV
+          </span>
+        </button>
+        {/* --- Download Inventory CSV --- */}
+        <button
+          type="button"
+          onClick={handleDownloadInventoryCSV}
+          className={styles.cardButton}
+          style={{
+            borderColor: C.blue,
+            backgroundColor: C.listItemWhite,
+            marginBottom: 20,
+          }}
+        >
+          <span className={styles.cardButtonTitle} style={{ color: C.blue }}>
+            Download Inventory CSV
+          </span>
+          <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
+            Export current inventory store to CSV
+          </span>
+        </button>
+        {/* --- Load Inventory CSV → Zustand (local only) --- */}
+        <input
+          ref={inventoryCsvFileInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: "none" }}
+          onChange={handleInventoryCSVFileChosen}
+        />
+        <button
+          type="button"
+          onClick={handleLoadInventoryFromCSVClick}
+          className={styles.cardButton}
+          style={{
+            borderColor: C.orange,
+            backgroundColor: C.listItemWhite,
+            marginBottom: 20,
+          }}
+        >
+          <span className={styles.cardButtonTitle} style={{ color: C.orange }}>
+            Load Inventory CSV → Zustand (local only)
+          </span>
+          <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
+            Disables inventory listener, no DB writes. Refresh to restore.
+          </span>
+        </button>
+        {/* --- Upload Inventory CSV → Firestore --- */}
+        <input
+          ref={inventoryUploadCsvFileInputRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: "none" }}
+          onChange={handleInventoryUploadCSVFileChosen}
+        />
+        <button
+          type="button"
+          onClick={handleUploadInventoryFromCSVClick}
+          disabled={sLookupLoading}
+          className={styles.cardButton}
+          style={{
+            borderColor: C.red,
+            backgroundColor: sLookupLoading ? C.surfaceAlt : C.listItemWhite,
+            opacity: sLookupLoading ? 0.5 : 1,
+            marginBottom: 20,
+          }}
+        >
+          <span className={styles.cardButtonTitle} style={{ color: C.red }}>
+            {sLookupLoading ? "Uploading..." : "Upload Inventory CSV → Firestore"}
+          </span>
+          <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
+            Overwrite live inventory by id. Quick buttons preserved.
           </span>
         </button>
         {/* --- Clear DB --- */}

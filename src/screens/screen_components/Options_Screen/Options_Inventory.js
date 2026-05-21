@@ -1031,7 +1031,7 @@ export function InventoryComponent({}) {
           }
           _setSearchTerm("");
           _setSearchResults([]);
-        }, searchTerm.length === 13 ? 100 : 1500);
+        }, searchTerm.length === 13 ? 100 : 200);
         return;
       }
       _setSearchResults(results);
@@ -1683,7 +1683,8 @@ export function InventoryComponent({}) {
             </div>
           ) : (
             <div className={styles.resultsList}>
-              {sSearchResults.slice(0, 50).map((item, index) => {
+              {sSearchResults.slice(0, 50).map((cached, index) => {
+                const item = zInventoryArr.find((i) => i.id === cached.id) || cached;
                 const activeBtn = sSelectedButtonID
                   ? (zQuickItemButtons || []).find((b) => b.id === sSelectedButtonID)
                   : null;
@@ -1700,6 +1701,12 @@ export function InventoryComponent({}) {
                     )}
                     <div
                       className={`${styles.resultsRow} ${index % 2 === 0 ? styles.resultsRowEven : styles.resultsRowOdd}`}
+                      style={{
+                        borderLeftColor:
+                          item.category === "Labor"
+                            ? lightenRGBByPercent(C.orange, 15)
+                            : lightenRGBByPercent(C.green, 15),
+                      }}
                     >
                       {!!zOpenWorkorderID && (
                         <div className={styles.infoBtn}>

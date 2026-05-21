@@ -11,9 +11,11 @@ export const SHADOW_RADIUS_NOTHING = {
   shadowColor: "transparent",
 };
 
+const DARK_TEXT = "rgb(20, 20, 20)";
+
 export const COLORS = [
   {
-    textColor: "black",
+    textColor: DARK_TEXT,
 
     backgroundColor: "whitesmoke",
     label: "White",
@@ -25,7 +27,7 @@ export const COLORS = [
     label: "Blue",
   },
   {
-    textColor: "black",
+    textColor: DARK_TEXT,
 
     backgroundColor: "lightblue",
     label: "Light-blue",
@@ -51,7 +53,7 @@ export const COLORS = [
     label: "Black",
   },
   {
-    textColor: "black",
+    textColor: DARK_TEXT,
 
     backgroundColor: "yellow",
     label: "Yellow",
@@ -75,19 +77,19 @@ export const COLORS = [
     label: "Brown",
   },
   {
-    textColor: "black",
+    textColor: DARK_TEXT,
 
     backgroundColor: "rgb(192,192,192)",
     label: "Silver",
   },
   {
-    textColor: "black",
+    textColor: DARK_TEXT,
 
     backgroundColor: "tan",
     label: "Tan",
   },
   {
-    textColor: "black",
+    textColor: DARK_TEXT,
 
     backgroundColor: "beige",
     label: "Beige",
@@ -95,18 +97,19 @@ export const COLORS = [
   {
     textColor: "white",
 
+
+    backgroundColor: "purple",
+    label: "Purple",
+  },
+  {
+    textColor: "white",
+
     backgroundColor: "darkgray",
     label: "Gray",
   },
-  {
-    textColor: "black",
 
-
-    backgroundColor: "lightgray",
-    label: "Light-gray",
-  },
   {
-    textColor: "black",
+    textColor: DARK_TEXT,
 
     backgroundColor: "pink",
     label: "Pink",
@@ -127,7 +130,7 @@ export const NONREMOVABLE_STATUSES = [
 
   {
     id: "work_in_progress",
-    textColor: "black",
+    textColor: DARK_TEXT,
     backgroundColor: "rgb(192,192,192)",
     label: "Work in Progress",
     removable: false,
@@ -979,6 +982,7 @@ export const SETTINGS_OBJ = {
   waitTimeBlurbWithoutEstimate: "We do not currently have an estimate. We will call/text/email when service is complete!",
   bikeDescriptions: ["Hybrid", "E-Bike", "Cruiser", "Road Bike"],
   partSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
+  allPartSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   smsConversationLockTimeout: 2, //days
   activeLoginTimeoutSeconds: 7,
   userInactivityTimeout: 120,

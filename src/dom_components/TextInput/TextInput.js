@@ -35,6 +35,7 @@ export const TextInput = forwardRef(function TextInput(
 ) {
   const [localValue, setLocalValue] = useState(value || "");
   const debounceRef = useRef(null);
+  const latestValueRef = useRef(value || "");
   const internalRef = useRef(null);
   const inputRef = externalInputRef || ref || internalRef;
 
@@ -45,6 +46,7 @@ export const TextInput = forwardRef(function TextInput(
   // Sync local state when value prop changes externally
   useEffect(() => {
     setLocalValue(value || "");
+    latestValueRef.current = value || "";
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
       debounceRef.current = null;
@@ -95,6 +97,7 @@ export const TextInput = forwardRef(function TextInput(
       val = val.replace(/(^|[.!?]\s+|\n[-*]+\s*)([a-z])/g, (_, sep, char) => sep + char.toUpperCase());
     }
     setLocalValue(val);
+    latestValueRef.current = val;
 
     if (multiline && e.target) {
       adjustHeight(e.target);
@@ -165,7 +168,14 @@ export const TextInput = forwardRef(function TextInput(
         aria-required={required || undefined}
         data-testid={testId}
         onFocus={onFocus}
-        onBlur={onBlur}
+        onBlur={(e) => {
+          if (debounceRef.current) {
+            clearTimeout(debounceRef.current);
+            debounceRef.current = null;
+            if (onChangeText) onChangeText(latestValueRef.current);
+          }
+          if (onBlur) onBlur(e);
+        }}
         {...props}
       />
       {error && errorMessage && (

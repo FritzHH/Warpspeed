@@ -98,6 +98,10 @@ function addTotals(doc, y, data, leftX, rightX, L) {
   if (!L) L = DEFAULT_SALE_LABELS;
   y = addTotalRow(doc, y, L.subtotal, data.runningSubtotal || data.subtotal || 0, leftX, rightX, false);
 
+  if ((data.amountPaid || 0) > 0) {
+    y = addTotalRow(doc, y, L.amountPaid, -(data.amountPaid || 0), leftX, rightX, false);
+  }
+
   if ((data.runningDiscount || data.discount || 0) > 0) {
     y = addTotalRow(doc, y, L.discount, -(data.runningDiscount || data.discount || 0), leftX, rightX, false);
   }

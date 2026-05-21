@@ -242,6 +242,32 @@ export const ActiveWorkorderComponent = ({}) => {
     commitOrUpdateActiveItem(updated);
   }
 
+  function handleDeleteActiveOrderedItem() {
+    useLoginStore.getState().requireLogin(() => {
+      const woID = zOpenWorkorder?.id;
+      if (!woID || !sActiveOrderedItem) return;
+      const current = zOpenWorkorder?.orderedItems || [];
+      const updated = current.filter((o) => o.id !== sActiveOrderedItem.id);
+      useOpenWorkordersStore.getState().setField("orderedItems", updated, woID);
+      if (updated.length === 0) {
+        _sSetActiveOrderedItem(null);
+        _sSetActiveOrderedIndex(-1);
+        hasCommittedRef.current = false;
+        _setWaitDays(0);
+        return;
+      }
+      const nextIndex = Math.min(sActiveOrderedIndex, updated.length - 1);
+      const nextItem = cloneDeep(updated[nextIndex]);
+      _sSetActiveOrderedItem(nextItem);
+      _sSetActiveOrderedIndex(nextIndex);
+      hasCommittedRef.current = true;
+      const days = nextItem.partOrderEstimateMillis && nextItem.partOrderedMillis
+        ? Math.max(0, Math.round((nextItem.partOrderEstimateMillis - nextItem.partOrderedMillis) / MILLIS_IN_DAY))
+        : 0;
+      _setWaitDays(days);
+    });
+  }
+
   function handleNavigateRight() {
     const items = zOpenWorkorder?.orderedItems || [];
     if (items.length === 0) return;
@@ -344,6 +370,7 @@ export const ActiveWorkorderComponent = ({}) => {
   function saveBrandToAllBrands(brand) {
     if (!brand || !brand.trim()) return;
     const trimmed = brand.trim();
+    if (trimmed.length < 3) return;
     const existing = zSettings.allBrands || [];
     if (existing.some((b) => b.toLowerCase() === trimmed.toLowerCase())) return;
     const updated = [...existing, trimmed].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
@@ -365,10 +392,31 @@ export const ActiveWorkorderComponent = ({}) => {
   function saveDescToAllDescriptions(desc) {
     if (!desc || !desc.trim()) return;
     const trimmed = desc.trim();
+    if (trimmed.length < 3) return;
     const existing = zSettings.allDescriptions || [];
     if (existing.some((d) => d.toLowerCase() === trimmed.toLowerCase())) return;
     const updated = [...existing, trimmed].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
     useSettingsStore.getState().setField("allDescriptions", updated);
+  }
+
+  // Part source autocomplete
+  const [sPartSourceFocused, _setPartSourceFocused] = useState(false);
+  const partSourceWrapperRef = useRef(null);
+
+  const partSourceSuggestions = sPartSourceFocused && sActiveOrderedItem?.partSource?.trim()
+    ? (zSettings.allPartSources || []).filter(
+        (s) => s.toLowerCase().startsWith(sActiveOrderedItem.partSource.trim().toLowerCase()) && s.toLowerCase() !== sActiveOrderedItem.partSource.trim().toLowerCase()
+      ).slice(0, 8)
+    : [];
+
+  function savePartSourceToAllPartSources(src) {
+    if (!src || !src.trim()) return;
+    const trimmed = src.trim();
+    if (trimmed.length < 3) return;
+    const existing = zSettings.allPartSources || [];
+    if (existing.some((s) => s.toLowerCase() === trimmed.toLowerCase())) return;
+    const updated = [...existing, trimmed].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+    useSettingsStore.getState().setField("allPartSources", updated);
   }
 
   // Color autocomplete
@@ -1667,30 +1715,89 @@ export const ActiveWorkorderComponent = ({}) => {
                       boxSizing: "border-box",
                     }}
                   >
-                    <TextInput_
-                      value={capitalizeFirstLetterOfString(sActiveOrderedItem?.partSource || "")}
-                      placeholder={"Item sources"}
-                      placeholderTextColor={C.textDisabled}
-                      editable={!isDonePaid && hasActiveItem}
-                      capitalize={true}
-                      style={{
-                        width: "50%",
-                        borderWidth: 1,
-                        borderColor: sActiveOrderedItem?.partSource ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
-                        color: C.text,
-                        paddingVertical: 2,
-                        paddingHorizontal: 4,
-                        fontSize: 15,
-                        outlineStyle: "none",
-                        borderRadius: 5,
-                        fontWeight: sActiveOrderedItem?.partSource ? "500" : null,
-                        backgroundColor: C.backgroundWhite,
-                      }}
-                      onFocus={() => useLoginStore.getState().requireLogin(() => {})}
-                      onChangeText={(val) => {
-                        updateActiveItemField("partSource", val);
-                      }}
-                    />
+                    <div ref={partSourceWrapperRef} style={{ position: "relative", width: "50%", flexShrink: 0, zIndex: 5 }}>
+                      <TextInput_
+                        value={capitalizeFirstLetterOfString(sActiveOrderedItem?.partSource || "")}
+                        placeholder={"Item sources"}
+                        placeholderTextColor={C.textDisabled}
+                        editable={!isDonePaid && hasActiveItem}
+                        capitalize={true}
+                        style={{
+                          width: "100%",
+                          borderWidth: 1,
+                          borderColor: sActiveOrderedItem?.partSource ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
+                          color: C.text,
+                          paddingVertical: 2,
+                          paddingHorizontal: 4,
+                          fontSize: 15,
+                          outlineStyle: "none",
+                          borderRadius: 5,
+                          fontWeight: sActiveOrderedItem?.partSource ? "500" : null,
+                          backgroundColor: C.backgroundWhite,
+                        }}
+                        onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setPartSourceFocused(true); }}
+                        onBlur={() => {
+                          setTimeout(() => {
+                            _setPartSourceFocused(false);
+                            savePartSourceToAllPartSources(sActiveOrderedItem?.partSource);
+                          }, 150);
+                        }}
+                        onChangeText={(val) => {
+                          updateActiveItemField("partSource", val);
+                        }}
+                      />
+                      {partSourceSuggestions.length > 0 && (
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "100%",
+                            left: 0,
+                            right: 0,
+                            backgroundColor: C.listItemWhite,
+                            borderWidth: 1,
+                            borderStyle: "solid",
+                            borderColor: C.buttonLightGreenOutline,
+                            borderRadius: 5,
+                            maxHeight: 200,
+                            overflow: "auto",
+                            zIndex: 999,
+                            boxSizing: "border-box",
+                          }}
+                        >
+                          {partSourceSuggestions.map((item) => (
+                            <div
+                              key={item}
+                              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = C.surfaceAlt; }}
+                              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = "transparent"; }}
+                              style={{ display: "flex", flexDirection: "row", alignItems: "center", padding: "6px 8px" }}
+                            >
+                              <button
+                                type="button"
+                                onMouseDown={(e) => { e.preventDefault(); }}
+                                onClick={() => {
+                                  updateActiveItemField("partSource", item);
+                                  _setPartSourceFocused(false);
+                                }}
+                                style={{ flex: 1, cursor: "pointer", background: "none", border: "none", padding: 0, textAlign: "left", font: "inherit" }}
+                              >
+                                <span style={{ fontSize: 14, color: C.text }}>{item}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onMouseDown={(e) => { e.preventDefault(); }}
+                                onClick={() => {
+                                  const updated = (zSettings.allPartSources || []).filter((s) => s !== item);
+                                  useSettingsStore.getState().setField("allPartSources", updated);
+                                }}
+                                style={{ paddingLeft: 8, cursor: "pointer", background: "none", border: "none", font: "inherit" }}
+                              >
+                                <span style={{ fontSize: 12, color: C.textMuted }}>✕</span>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                     <div
                       style={{
                         width: "50%",
@@ -1713,6 +1820,7 @@ export const ActiveWorkorderComponent = ({}) => {
                           enabled={!isDonePaid && hasActiveItem}
                           onSelect={(item) => {
                             updateActiveItemField("partSource", item);
+                            savePartSourceToAllPartSources(item);
                           }}
                           modalCoordX={20}
                           buttonStyle={{ paddingHorizontal: 40 }}
@@ -1896,6 +2004,10 @@ export const ActiveWorkorderComponent = ({}) => {
                   const leftTooltip = canGoLeft
                     ? `Previous item (${sActiveOrderedIndex} of ${items.length})`
                     : "Already at first item";
+                  const canDelete = hasActiveItem && !isDonePaid;
+                  const deleteTooltip = isDonePaid
+                    ? "Workorder is done & paid"
+                    : hasActiveItem ? "Delete ordered item" : "No item to delete";
                   return (
                     <div style={{ width: "13%", flexShrink: 0, display: "flex", flexDirection: "column", paddingLeft: 5, borderLeftWidth: 1, borderLeftStyle: "solid", borderLeftColor: C.borderSubtle, boxSizing: "border-box" }}>
                       {/* Plus button */}
@@ -1908,20 +2020,28 @@ export const ActiveWorkorderComponent = ({}) => {
                       </div>
                       {/* Caret navigation */}
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
-                        <div style={{ opacity: canGoRight ? 1 : 0.2 }}>
+                        {canGoRight && (
                           <Tooltip text={rightTooltip} position="left">
-                            <button type="button" disabled={!canGoRight} onClick={handleNavigateRight} style={{ background: "none", border: "none", padding: 0, cursor: canGoRight ? "pointer" : "default" }}>
+                            <button type="button" onClick={handleNavigateRight} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
                               <Image_ icon={ICONS.caretRight} size={22} />
                             </button>
                           </Tooltip>
-                        </div>
-                        <div style={{ opacity: canGoLeft ? 1 : 0.2 }}>
+                        )}
+                        {canGoLeft && (
                           <Tooltip text={leftTooltip} position="left">
-                            <button type="button" disabled={!canGoLeft} onClick={handleNavigateLeft} style={{ background: "none", border: "none", padding: 0, cursor: canGoLeft ? "pointer" : "default" }}>
+                            <button type="button" onClick={handleNavigateLeft} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
                               <Image_ icon={ICONS.caretLeft} size={22} />
                             </button>
                           </Tooltip>
-                        </div>
+                        )}
+                      </div>
+                      {/* Delete button */}
+                      <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", opacity: canDelete ? 1 : 0.2 }}>
+                        <Tooltip text={deleteTooltip} position="left">
+                          <button type="button" disabled={!canDelete} onClick={handleDeleteActiveOrderedItem} style={{ background: "none", border: "none", padding: 0, cursor: canDelete ? "pointer" : "default", lineHeight: 1 }}>
+                            <Image_ icon={ICONS.redx} size={14} />
+                          </button>
+                        </Tooltip>
                       </div>
                     </div>
                   );

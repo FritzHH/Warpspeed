@@ -223,10 +223,15 @@ export const useInvModalStore = create((set, get) => ({
 export const useCustomerSearchStore = create((set, get) => ({
   selectedItem: null,
   searchResults: [],
+  // Map of customer id -> millis when they last appeared in a search result.
+  // Kept in a side-map so the customer objects themselves stay clean (they
+  // flow through to dbSaveCustomer on selection).
+  searchResultTimestamps: {},
   searchQuery: "",
   searchType: "phone", // "phone" | "name" | "email"
   isSearching: false,
   getSearchResults: () => get().searchResults,
+  getSearchResultTimestamps: () => get().searchResultTimestamps,
   getSelectedItem: () => get().selectedItem,
   getSearchQuery: () => get().searchQuery,
   getSearchType: () => get().searchType,
@@ -236,17 +241,27 @@ export const useCustomerSearchStore = create((set, get) => ({
     set({
       selectedItem: item,
     }),
-  setSearchResults: (searchResults) => set({ searchResults }),
+  setSearchResults: (searchResults) => {
+    const now = Date.now();
+    const next = {};
+    searchResults.forEach((r) => {
+      if (r?.id) next[r.id] = now;
+    });
+    set({ searchResults, searchResultTimestamps: next });
+  },
   setSearchQuery: (searchQuery, searchType) => set({ searchQuery, searchType }),
   addToSearchResults: (searchResults) => {
     let storeSearchResults = get().searchResults;
+    const timestamps = { ...get().searchResultTimestamps };
+    const now = Date.now();
     searchResults.forEach((searchResult) => {
+      if (searchResult?.id) timestamps[searchResult.id] = now;
       if (arrHasItem(storeSearchResults, searchResult)) return;
       storeSearchResults = [...storeSearchResults, searchResult];
     });
-    set({ searchResults: storeSearchResults });
+    set({ searchResults: storeSearchResults, searchResultTimestamps: timestamps });
   },
-  reset: () => set({ searchResults: [], selectedItem: null, searchQuery: "", searchType: "phone", isSearching: false }),
+  reset: () => set({ searchResults: [], searchResultTimestamps: {}, selectedItem: null, searchQuery: "", searchType: "phone", isSearching: false }),
 }));
 
 export const useRecentCustomersStore = create(

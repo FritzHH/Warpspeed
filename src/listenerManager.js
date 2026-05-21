@@ -102,4 +102,8 @@ function teardownAll() {
   Object.keys(listeners).forEach((name) => listeners[name].teardown());
 }
 
-export { register, reconnectAll, teardownAll };
+function disableListener(name) {
+  if (listeners[name]) listeners[name].teardown();
+}
+
+export { register, reconnectAll, teardownAll, disableListener };

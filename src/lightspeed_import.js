@@ -481,13 +481,14 @@ export function mapWorkorders(
     const workorderLines = woItems.map(wi => {
       const item = itemMap[wi.itemID] || null;
 
-      const rawUpc = item ? (item.upc || "") : "";
-      const rawEan = item ? (item.ean || "") : "";
-      const normUpc = normalizeBarcode(rawUpc);
-      const normEan = normalizeBarcode(rawEan);
-      const isNativeEan = normEan && !normEan.startsWith("0");
-      const primaryBarcode = (isNativeEan ? normEan : null) || normUpc || generateEAN13Barcode();
-      const barcodes = [normEan, normUpc].filter(c => c && c !== primaryBarcode);
+      const rawUpc = item ? (item.upc || "").trim() : "";
+      const rawEan = item ? (item.ean || "").trim() : "";
+      // Store raw codes verbatim — what LS has is what's on the shelf label.
+      const primaryBarcode = rawUpc || rawEan || "";
+      const barcodes = [];
+      for (const code of [rawUpc, rawEan]) {
+        if (code && code !== primaryBarcode && barcodes.indexOf(code) === -1) barcodes.push(code);
+      }
       const inventoryItem = {
         id: item ? item.itemID : crypto.randomUUID(),
         formalName: item ? (item.description || "Unknown Item") : "Unknown Item",

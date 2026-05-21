@@ -66,13 +66,13 @@ export const Options_Section = React.memo(({}) => {
         return <InventoryComponent />;
       case TAB_NAMES.optionsTab.messages:
         return (
-          <Suspense fallback={<LoadingIndicator />}>
+          <Suspense fallback={null}>
             <MessagesComponent />
           </Suspense>
         );
       case TAB_NAMES.optionsTab.email:
         return (
-          <Suspense fallback={<LoadingIndicator />}>
+          <Suspense fallback={null}>
             <EmailOptionsPanel />
           </Suspense>
         );

@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import { applyDiscountToWorkorderItem, calculateRunningTotals, deepEqual, formatCurrencyDisp, lightenRGBByPercent, log, replaceOrAddToArr, resolveStatus, showAlert } from "../../../utils";
+import { applyDiscountToWorkorderItem, calculateRunningTotals, deepEqual, formatCurrencyDisp, getWorkorderPaymentState, lightenRGBByPercent, log, replaceOrAddToArr, resolveStatus, showAlert } from "../../../utils";
 import { DISCOUNT_TYPES } from "../../../constants";
 import {
   Button,
@@ -509,7 +509,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     return (
       <div className={styles.container} style={previewBgStyle}>
         <div className={styles.emptyTextWrap}>
-          <div className={styles.emptyText} style={{ color: C.textDisabled }}>
+          <div className={styles.emptyText} style={{ color: C.textDisabled, opacity: 0.38 }}>
             {zOpenWorkorder.customerID ? "Empty\nWorkorder" : "Empty\nSale"}
           </div>
         </div>
@@ -585,13 +585,9 @@ export const Items_WorkorderItemsTab = ({}) => {
     _setNoteHelperDropdown((prev) => prev ? { ...prev, workorderLine: updatedLine } : null);
   }
 
-  const activeSaleForFooter = zOpenWorkorder?.activeSaleID ? zActiveSales.find((s) => s.id === zOpenWorkorder.activeSaleID) : null;
-  const paidForFooter = activeSaleForFooter ? (activeSaleForFooter.amountCaptured || 0) - (activeSaleForFooter.amountRefunded || 0) : 0;
-  const hasPaymentsForFooter = paidForFooter > 0;
-  const woCountForFooter = activeSaleForFooter?.workorderIDs?.length || 1;
-  const currentTotalForFooter = woCountForFooter > 1 ? (activeSaleForFooter?.total || sTotals.finalTotal) : sTotals.finalTotal;
-  const saleBalanceForFooter = Math.max(0, currentTotalForFooter - paidForFooter);
-  const remainingForFooter = hasPaymentsForFooter ? Math.round(saleBalanceForFooter / woCountForFooter) : 0;
+  const footerPaymentState = getWorkorderPaymentState(zOpenWorkorder, activeSale, { salesTaxPercent: zSalesTaxPercent });
+  const hasPaymentsForFooter = footerPaymentState.hasPayments;
+  const remainingForFooter = hasPaymentsForFooter ? footerPaymentState.remainingForThisWO : 0;
 
   return (
     <div className={styles.container} style={previewBgStyle}>

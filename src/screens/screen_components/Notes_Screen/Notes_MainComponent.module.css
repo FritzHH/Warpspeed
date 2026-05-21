@@ -187,6 +187,12 @@
   padding-left: 2px;
 }
 
+.noteMonthYear {
+  font-size: 10px;
+  font-style: italic;
+  padding-left: 2px;
+}
+
 .noteTextBox {
   flex: 1 1 0;
   padding: 2px;

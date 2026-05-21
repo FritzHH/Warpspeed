@@ -67,6 +67,14 @@ export function Notes_MainComponent() {
     return `${days[d.getDay()]} ${hours}:${mins} ${ap}`;
   }
 
+  function formatNoteMonthYear(millis) {
+    if (!millis) return "";
+    const d = new Date(millis);
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const yy = d.getFullYear().toString().slice(-2);
+    return `${months[d.getMonth()]} ${d.getDate()}, '${yy}`;
+  }
+
   function outsideClicked(option) {
     useLoginStore.getState().requireLogin(() => {
       let notesArr;
@@ -218,6 +226,17 @@ export function Notes_MainComponent() {
                     <span className={styles.noteDate} style={{ color: C.textMuted }}>
                       {formatNoteDateShort(item.createdAt)}
                     </span>
+                    {(() => {
+                      if (!item.createdAt) return null;
+                      const d = new Date(item.createdAt);
+                      const now = new Date();
+                      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) return null;
+                      return (
+                        <span className={styles.noteMonthYear} style={{ color: C.textMuted }}>
+                          {formatNoteMonthYear(item.createdAt)}
+                        </span>
+                      );
+                    })()}
                   </div>
                   {isEditing ? (
                     <TextInput
@@ -301,6 +320,17 @@ export function Notes_MainComponent() {
                     <span className={styles.noteDate} style={{ color: C.textMuted }}>
                       {formatNoteDateShort(item.createdAt)}
                     </span>
+                    {(() => {
+                      if (!item.createdAt) return null;
+                      const d = new Date(item.createdAt);
+                      const now = new Date();
+                      if (d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()) return null;
+                      return (
+                        <span className={styles.noteMonthYear} style={{ color: C.textMuted }}>
+                          {formatNoteMonthYear(item.createdAt)}
+                        </span>
+                      );
+                    })()}
                   </div>
                   {isEditing ? (
                     <TextInput

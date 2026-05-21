@@ -867,6 +867,11 @@ export const CustomerInfoScreenModalComponent = ({
           <ClosedWorkorderModal
             workorder={sClosedWorkorder}
             onClose={() => _sSetClosedWorkorder(null)}
+            onRefund={(saleID) => {
+              _sSetClosedWorkorder(null);
+              if (handleButton2Press) handleButton2Press();
+              useCheckoutStore.getState().setPendingRefundSaleID(saleID);
+            }}
             onGoToWorkorder={(wo) => {
               const store = useOpenWorkordersStore.getState();
               const lockedID = store.lockedWorkorderID;

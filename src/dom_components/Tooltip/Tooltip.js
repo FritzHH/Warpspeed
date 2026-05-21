@@ -137,6 +137,20 @@ export const Tooltip = ({
     };
   }, [visible, hideTooltip]);
 
+  // Hide on any pointerdown anywhere while visible. Capture-phase so it fires
+  // before any element's stopPropagation can intercept (e.g., DropdownMenu
+  // triggers, modal close buttons). Suppress further focus-driven re-shows
+  // until the pointer leaves and re-enters the trigger.
+  useEffect(() => {
+    if (!visible) return;
+    const onGlobalDown = () => {
+      suppressShowRef.current = true;
+      hideTooltip();
+    };
+    document.addEventListener("pointerdown", onGlobalDown, true);
+    return () => document.removeEventListener("pointerdown", onGlobalDown, true);
+  }, [visible, hideTooltip]);
+
   if (!text || disabled) {
     return (
       <span

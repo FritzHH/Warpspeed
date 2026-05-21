@@ -216,7 +216,7 @@ const ChangeLogEntry = ({ entry, index }) => {
 
 // ─── Main Modal ─────────────────────────────────────────────────
 
-export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) => {
+export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRefund }) => {
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
   const taxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
 
@@ -710,6 +710,10 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder }) =>
         <FullSaleModal
           item={{ saleID: sSaleForModal.id }}
           onClose={() => _sSetSaleForModal(null)}
+          onRefund={onRefund ? (saleID) => {
+            _sSetSaleForModal(null);
+            onRefund(saleID);
+          } : undefined}
         />
       </Suspense>
     )}

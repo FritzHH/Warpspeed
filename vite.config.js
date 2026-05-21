@@ -1,5 +1,5 @@
 import { defineConfig } from 'vite';
-import react from '@vitejs/plugin-react';
+import react from '@vitejs/plugin-react-swc';
 import { nodePolyfills } from 'vite-plugin-node-polyfills';
 import { viteCommonjs } from '@originjs/vite-plugin-commonjs';
 import fs from 'fs';
@@ -49,14 +49,7 @@ export default defineConfig(async () => {
   const { visualizer } = await import('rollup-plugin-visualizer');
   return {
   plugins: [
-    react({
-      babel: {
-        plugins: [
-          ['@babel/plugin-proposal-class-properties', { loose: true }],
-          '@babel/plugin-transform-flow-strip-types',
-        ],
-      },
-    }),
+    react(),
     viteCommonjs(),
     migrationDataPlugin(),
     nodePolyfills({
@@ -85,11 +78,6 @@ export default defineConfig(async () => {
   define: {
     __DEV__: JSON.stringify(process.env.NODE_ENV !== 'production'),
     global: 'globalThis',
-  },
-  esbuild: {
-    loader: 'jsx',
-    include: /src\/.*\.jsx?$/,
-    exclude: [],
   },
   optimizeDeps: {
     esbuildOptions: {

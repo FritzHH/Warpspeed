@@ -3,6 +3,66 @@ import { createPortal } from "react-dom";
 import { C } from "../../styles";
 import styles from "./Tooltip.module.css";
 
+const GAP = 6;
+const VIEWPORT_PAD = 8;
+
+// Compute top/left for a given side. r = trigger rect, b = bubble rect.
+function positionForSide(side, r, b, offsetX, offsetY) {
+  switch (side) {
+    case "top":
+      return {
+        top: r.top - b.height - GAP + offsetY,
+        left: r.left + r.width / 2 - b.width / 2 + offsetX,
+      };
+    case "bottom":
+      return {
+        top: r.bottom + GAP - offsetY,
+        left: r.left + r.width / 2 - b.width / 2 + offsetX,
+      };
+    case "left":
+      return {
+        top: r.top + r.height / 2 - b.height / 2 + offsetY,
+        left: r.left - b.width - GAP + offsetX,
+      };
+    case "right":
+    default:
+      return {
+        top: r.top + r.height / 2 - b.height / 2 + offsetY,
+        left: r.right + GAP + offsetX,
+      };
+  }
+}
+
+function fitsViewport(pos, b) {
+  return (
+    pos.left >= VIEWPORT_PAD &&
+    pos.top >= VIEWPORT_PAD &&
+    pos.left + b.width <= window.innerWidth - VIEWPORT_PAD &&
+    pos.top + b.height <= window.innerHeight - VIEWPORT_PAD
+  );
+}
+
+const OPPOSITE = { top: "bottom", bottom: "top", left: "right", right: "left" };
+
+// Try preferred side; if it overflows, try opposite, then perpendiculars.
+// Fall back to preferred with clamping if nothing fits.
+function pickPosition(preferred, r, b, offsetX, offsetY) {
+  const tried = new Set();
+  const order = [preferred, OPPOSITE[preferred], "top", "bottom", "left", "right"];
+  for (const side of order) {
+    if (tried.has(side)) continue;
+    tried.add(side);
+    const pos = positionForSide(side, r, b, offsetX, offsetY);
+    if (fitsViewport(pos, b)) return { ...pos, ready: true };
+  }
+  const fallback = positionForSide(preferred, r, b, offsetX, offsetY);
+  return {
+    top: Math.max(VIEWPORT_PAD, Math.min(fallback.top, window.innerHeight - b.height - VIEWPORT_PAD)),
+    left: Math.max(VIEWPORT_PAD, Math.min(fallback.left, window.innerWidth - b.width - VIEWPORT_PAD)),
+    ready: true,
+  };
+}
+
 export const Tooltip = ({
   text,
   children,
@@ -21,11 +81,16 @@ export const Tooltip = ({
   const wrapRef = useRef(null);
   const bubbleRef = useRef(null);
   const showTimerRef = useRef(null);
+  // Set on click; suppresses focus-driven show until pointer leaves and re-enters.
+  // Without this, clicking a tooltipped button hides the tooltip on pointerdown
+  // but the click's focus transfer re-fires onFocus → tooltip reappears.
+  const suppressShowRef = useRef(false);
   const [visible, setVisible] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, ready: false });
 
   const showTooltip = useCallback(() => {
     if (!text || disabled) return;
+    if (suppressShowRef.current) return;
     clearTimeout(showTimerRef.current);
     showTimerRef.current = setTimeout(() => setVisible(true), delayDuration);
   }, [text, disabled, delayDuration]);
@@ -36,8 +101,20 @@ export const Tooltip = ({
     setPos((p) => (p.ready ? { top: 0, left: 0, ready: false } : p));
   }, []);
 
+  const handlePointerDown = useCallback(() => {
+    suppressShowRef.current = true;
+    hideTooltip();
+  }, [hideTooltip]);
+
+  const handlePointerLeave = useCallback(() => {
+    suppressShowRef.current = false;
+    hideTooltip();
+  }, [hideTooltip]);
+
   useEffect(() => () => clearTimeout(showTimerRef.current), []);
 
+  // Measure trigger + bubble and position with collision detection (try
+  // preferred side, then opposite, then perpendiculars, fall back to clamped).
   useEffect(() => {
     if (!visible) return;
     const el = wrapRef.current?.firstElementChild;
@@ -45,27 +122,20 @@ export const Tooltip = ({
     if (!el || !bubble) return;
     const r = el.getBoundingClientRect();
     const b = bubble.getBoundingClientRect();
-    const gap = 6;
-    let top = 0;
-    let left = 0;
-    if (position === "top") {
-      top = r.top - b.height - gap + offsetY;
-      left = r.left + r.width / 2 - b.width / 2 + offsetX;
-    } else if (position === "bottom") {
-      top = r.bottom + gap - offsetY;
-      left = r.left + r.width / 2 - b.width / 2 + offsetX;
-    } else if (position === "left") {
-      top = r.top + r.height / 2 - b.height / 2 + offsetY;
-      left = r.left - b.width - gap + offsetX;
-    } else {
-      top = r.top + r.height / 2 - b.height / 2 + offsetY;
-      left = r.right + gap + offsetX;
-    }
-    const pad = 10;
-    left = Math.max(pad, Math.min(left, window.innerWidth - b.width - pad));
-    top = Math.max(pad, Math.min(top, window.innerHeight - b.height - pad));
-    setPos({ top, left, ready: true });
+    setPos(pickPosition(position, r, b, offsetX, offsetY));
   }, [visible, position, offsetX, offsetY, text]);
+
+  // Close on scroll or resize while visible — coordinates would otherwise stale.
+  useEffect(() => {
+    if (!visible) return;
+    const onMove = () => hideTooltip();
+    window.addEventListener("scroll", onMove, true);
+    window.addEventListener("resize", onMove);
+    return () => {
+      window.removeEventListener("scroll", onMove, true);
+      window.removeEventListener("resize", onMove);
+    };
+  }, [visible, hideTooltip]);
 
   if (!text || disabled) {
     return (
@@ -89,7 +159,8 @@ export const Tooltip = ({
       <span
         ref={wrapRef}
         onPointerEnter={showTooltip}
-        onPointerLeave={hideTooltip}
+        onPointerLeave={handlePointerLeave}
+        onPointerDown={handlePointerDown}
         onFocus={showTooltip}
         onBlur={hideTooltip}
         style={{ display: "contents", ...style }}
@@ -102,13 +173,11 @@ export const Tooltip = ({
           <div
             ref={bubbleRef}
             className={styles.bubble}
+            role="tooltip"
             style={{
-              position: "fixed",
               top: pos.top,
               left: pos.left,
               backgroundColor: bgColor,
-              zIndex: "var(--z-tooltip)",
-              pointerEvents: "none",
               opacity: pos.ready ? 1 : 0,
             }}
           >

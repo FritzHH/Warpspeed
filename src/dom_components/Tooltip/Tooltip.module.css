@@ -1,9 +1,7 @@
-.content {
+.bubble {
+  position: fixed;
   z-index: var(--z-tooltip);
   pointer-events: none;
-}
-
-.bubble {
   border-radius: 6px;
   padding: 7px 9px;
   display: inline-flex;

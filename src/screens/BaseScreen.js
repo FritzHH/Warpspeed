@@ -112,6 +112,48 @@ export function BaseScreen() {
     return () => clearInterval(id);
   }, []);
 
+  // Preload lazy chunks after first paint so subsequent navigations are
+  // instant. Bundle savings from code-splitting are preserved (these still
+  // ship as separate chunks, just fetched in the background after initial
+  // render). Sandbox prospects feel zero flash on tab clicks.
+  useEffect(() => {
+    const idle =
+      window.requestIdleCallback ||
+      ((cb) => setTimeout(cb, 200));
+    idle(() => {
+      // Items tab content
+      import("./screen_components/Items_Screen/Items_Dashboard");
+      import("./screen_components/Items_Screen/Items_ChangeLog");
+      import("./screen_components/Items_Screen/Items_EmailView");
+      // Options tab content
+      import("./screen_components/Options_Screen/Options_Messages");
+      import("./screen_components/Options_Screen/Options_Email");
+      import("./screen_components/Options_Screen/MediaLightbox");
+      // Workorder / sale modals
+      import("./screen_components/modal_screens/newCheckoutModalScreen/NewRefundModalScreen");
+      import("../dom_components/FullSaleModal/FullSaleModal");
+      import("./screen_components/modal_screens/ClosedWorkorderModal");
+      import("./screen_components/modal_screens/TransactionModal");
+      import("./screen_components/modal_screens/CustomerInfoModalScreen");
+      import("./screen_components/modal_screens/WorkorderMediaModal");
+      import("./screen_components/modal_screens/newCheckoutModalScreen/DepositRefundModal");
+      import("./screen_components/modal_screens/newCheckoutModalScreen/WorkorderCombiner");
+      import("./screen_components/modal_screens/newCheckoutModalScreen/SendReceiptModal");
+      import("./screen_components/modal_screens/GoogleMapsModal");
+      // Dashboard / admin modals
+      import("./screen_components/modal_screens/PayrollModal");
+      import("./screen_components/modal_screens/DevNotesModal");
+      import("./screen_components/modal_screens/UserClockHistoryModalScreen");
+      import("./screen_components/modal_screens/SalesReports");
+      import("./screen_components/modal_screens/ScheduleModal");
+      // Inventory modals
+      import("./screen_components/modal_screens/InventoryItemModalScreen");
+      import("./screen_components/modal_screens/CustomItemModal");
+      import("./screen_components/modal_screens/ColorPickerModal");
+      import("./screen_components/modal_screens/QuickButtonPickerModal");
+    });
+  }, []);
+
   // display window status — "closed" until display broadcasts otherwise
   const [sDisplayStatus, _setDisplayStatus] = useState(DISPLAY_STATUS.CLOSED);
   const [sDisplayLoading, _setDisplayLoading] = useState(

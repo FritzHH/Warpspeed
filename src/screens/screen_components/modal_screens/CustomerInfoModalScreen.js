@@ -589,14 +589,14 @@ export const CustomerInfoScreenModalComponent = ({
             onChangeText={(val) => saveField("unit", val)}
             placeholder="Unit"
             className={styles.input}
-            style={{ ...INPUT_BASE_STYLE, marginTop: 0, width: "20%", height: 40, flexShrink: 0 }}
+            style={{ ...INPUT_BASE_STYLE, marginTop: 0, width: "20%", height: "100%" }}
             value={sCustomerInfo.unit}
           />
           <TextInput
             onChangeText={(val) => saveField("city", capitalizeFirstLetterOfString(val))}
             placeholder="City"
             className={styles.input}
-            style={{ ...INPUT_BASE_STYLE, marginTop: 0, width: "70%", height: 40, flexShrink: 0 }}
+            style={{ ...INPUT_BASE_STYLE, marginTop: 0, width: "70%", height: "100%" }}
             value={capitalizeFirstLetterOfString(sCustomerInfo.city)}
             capitalize={true}
           />
@@ -617,7 +617,7 @@ export const CustomerInfoScreenModalComponent = ({
             }}
             placeholder="Zip code"
             className={styles.input}
-            style={{ ...INPUT_BASE_STYLE, marginTop: 0, height: 40, flex: 1 }}
+            style={{ ...INPUT_BASE_STYLE, marginTop: 0, flex: 1, height: "100%" }}
             value={sCustomerInfo.zip}
           />
           {!!sCustomerInfo.streetAddress && !!sCustomerInfo.city && !!sCustomerInfo.state && (
@@ -630,7 +630,7 @@ export const CustomerInfoScreenModalComponent = ({
               buttonStyle={{
                 paddingTop: 2,
                 paddingBottom: 2,
-                height: 40,
+                height: 20,
                 borderRadius: 7,
                 marginLeft: 10,
                 justifyContent: "center",
@@ -681,7 +681,6 @@ export const CustomerInfoScreenModalComponent = ({
               fullWidth
               colorGradientArr={COLOR_GRADIENTS.yellow}
               buttonStyle={{
-                marginTop: 20,
                 height: 40,
                 borderWidth: 1,
                 borderColor: C.borderSubtle,
@@ -693,26 +692,21 @@ export const CustomerInfoScreenModalComponent = ({
             />
           )}
           {!isNewCustomer && (
-            <Tooltip text="Deposits, gift cards and credits" position="top">
-              <div style={{ marginTop: 20 }}>
-                <Button
-                  onPress={() => _sSetShowDepositModal(true)}
-                  fullWidth
-                  colorGradientArr={COLOR_GRADIENTS.green}
-                  icon={ICONS.greenDollar}
-                  buttonStyle={{ height: 36 }}
-                  iconSize={16}
-                  textStyle={{ color: C.textWhite, fontSize: 13 }}
-                  text={"Add Money"}
-                />
-              </div>
+            <Tooltip text="Deposits, gift cards and credits" position="top" darkMode style={{ width: "100%" }}>
+              <Button
+                onPress={() => _sSetShowDepositModal(true)}
+                fullWidth
+                colorGradientArr={COLOR_GRADIENTS.green}
+                icon={ICONS.greenDollar}
+                buttonStyle={{ height: 36 }}
+                iconSize={16}
+                textStyle={{ color: C.textWhite, fontSize: 13 }}
+                text={"Add Money"}
+              />
             </Tooltip>
           )}
-        </div>
-
-        {!!button2Text && (
-          <Tooltip text="All edits auto-saved" position="top">
-            <div style={{ marginTop: 20, marginBottom: 10 }}>
+          {!!button2Text && (
+            <Tooltip text="All edits auto-saved" position="top" darkMode style={{ width: "100%" }}>
               <Button
                 icon={ICONS.close1}
                 fullWidth
@@ -723,9 +717,9 @@ export const CustomerInfoScreenModalComponent = ({
                 textStyle={{ marginLeft: 15, color: C.textWhite }}
                 text={button2Text}
               />
-            </div>
-          </Tooltip>
-        )}
+            </Tooltip>
+          )}
+        </div>
       </div>
 
       {!isNewCustomer && (

@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { C } from "../../styles";
+import { claimModalZ, releaseModalZ } from "./modalStack";
 import styles from "./Dialog.module.css";
 
 export const Dialog = ({
@@ -18,6 +19,11 @@ export const Dialog = ({
   "aria-describedby": ariaDescribedBy,
 }) => {
   const [fadedIn, setFadedIn] = useState(false);
+  const zRef = useRef(0);
+
+  if (visible && zRef.current === 0) {
+    zRef.current = claimModalZ();
+  }
 
   useEffect(() => {
     if (visible) {
@@ -26,6 +32,16 @@ export const Dialog = ({
       setFadedIn(false);
     }
   }, [visible]);
+
+  useEffect(() => () => {
+    if (zRef.current !== 0) {
+      releaseModalZ(zRef.current);
+      zRef.current = 0;
+    }
+  }, []);
+
+  const overlayZ = zRef.current || 9000;
+  const contentZ = overlayZ + 1;
 
   return (
     <DialogPrimitive.Root
@@ -41,6 +57,7 @@ export const Dialog = ({
             style={{
               backgroundColor: overlayColor,
               opacity: fadedIn ? 1 : 0,
+              zIndex: overlayZ,
             }}
           />
         </DialogPrimitive.Overlay>
@@ -58,6 +75,7 @@ export const Dialog = ({
             className={styles.content}
             style={{
               opacity: fadedIn ? 1 : 0,
+              zIndex: contentZ,
               ...contentStyle,
             }}
           >

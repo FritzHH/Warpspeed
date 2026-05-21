@@ -119,6 +119,10 @@ export function BaseScreen() {
   );
   const [sDisplayFullscreen, _setDisplayFullscreen] = useState(false);
   const [sDisplayHeartbeatAlive, _setDisplayHeartbeatAlive] = useState(false);
+  // Holds the popup window object returned by window.open so the yellow
+  // banner can synchronously focus + requestFullscreen on the popup from
+  // inside a main-window click handler (gesture activation propagates).
+  const _displayPopupRef = useRef(null);
 
   // Poll display heartbeat from localStorage
   useEffect(() => {
@@ -127,6 +131,9 @@ export function BaseScreen() {
       if (!raw) {
         _setDisplayFullscreen(false);
         _setDisplayHeartbeatAlive(false);
+        if (_displayPopupRef.current && _displayPopupRef.current.closed) {
+          _displayPopupRef.current = null;
+        }
         return;
       }
       try {
@@ -134,6 +141,9 @@ export function BaseScreen() {
         let stale = Date.now() - hb.timestamp > 10000;
         _setDisplayFullscreen(!stale && hb.fullscreen === true);
         _setDisplayHeartbeatAlive(!stale && hb.open === true);
+        if (_displayPopupRef.current && _displayPopupRef.current.closed) {
+          _displayPopupRef.current = null;
+        }
       } catch (e) {
         _setDisplayFullscreen(false);
         _setDisplayHeartbeatAlive(false);
@@ -148,26 +158,81 @@ export function BaseScreen() {
     _setDisplayLoading(true);
     let storeName = useSettingsStore.getState().getSettings()?.storeInfo?.displayName || "";
     let title = storeName ? `${storeName} Checkout Display` : "Checkout Display";
-    let screenDetails = null;
+
+    // Zero-touch fullscreen on secondary monitor via Window Management API.
+    // Permission is granted per-origin and remembered by the browser. On any
+    // failure (no API, permission denied, single screen, throws) we fall
+    // through to the default window.open path — existing behavior preserved.
+    // Multi-monitor (3+) fallback: pick first non-primary; tenant-setting
+    // for preferred display deferred to a future pass.
     let secondScreen = null;
     if (window.getScreenDetails) {
       try {
-        screenDetails = await window.getScreenDetails();
-        let currentScreen = screenDetails.currentScreen;
-        secondScreen = screenDetails.screens.find((s) => s.label !== currentScreen.label);
-      } catch (e) { }
+        let canQuery = true;
+        if (navigator.permissions && navigator.permissions.query) {
+          try {
+            let status = await navigator.permissions.query({ name: "window-management" });
+            canQuery = status.state === "granted" || status.state === "prompt";
+          } catch (e) {
+            // older Chrome may not know the name; let getScreenDetails decide
+          }
+        }
+        if (canQuery) {
+          let screenDetails = await window.getScreenDetails();
+          let currentScreen = screenDetails.currentScreen;
+          let nonPrimary = screenDetails.screens.filter(
+            (s) => !s.isPrimary && s.label !== currentScreen.label
+          );
+          if (nonPrimary.length > 1) {
+            clog("[CustomerDisplay] multi-monitor: chose", nonPrimary[0].label);
+          }
+          secondScreen = nonPrimary[0] || null;
+        }
+      } catch (e) {
+        // permission denied / API unavailable — fall through to default
+      }
     }
     let features = secondScreen
-      ? `popup,left=${secondScreen.left},top=${secondScreen.top},width=${secondScreen.width},height=${secondScreen.height}`
+      ? `popup,left=${secondScreen.availLeft},top=${secondScreen.availTop},width=${secondScreen.availWidth},height=${secondScreen.availHeight}`
       : "popup,width=1024,height=768";
     let win = window.open(ROUTES.display, "customerDisplay", features);
     if (win) {
+      _displayPopupRef.current = win;
       win.focus();
       win.addEventListener("load", () => { win.document.title = title; });
       return true;
     } else {
       _setDisplayLoading(false);
       return false;
+    }
+  }
+
+  // Yellow-banner click: synchronously focus the popup and request
+  // fullscreen. requestFullscreen MUST run inside the gesture handler
+  // (no awaits before it) so user-activation propagates to the popup.
+  function handleYellowBannerClick() {
+    clog("[display] banner click fired");
+    let popup = _displayPopupRef.current;
+    if (!popup) {
+      clog("[display] popup ref is null — auto-open never stored it, or it was cleared");
+      return;
+    }
+    if (popup.closed) {
+      clog("[display] popup ref present but .closed === true");
+      return;
+    }
+    clog("[display] popup ref valid, calling focus + requestFullscreen");
+    try {
+      popup.focus();
+      let result = popup.document.documentElement.requestFullscreen();
+      if (result && result.then) {
+        result.then(
+          () => clog("[display] requestFullscreen resolved successfully"),
+          (err) => clog("[display] requestFullscreen REJECTED:", err && err.message)
+        );
+      }
+    } catch (e) {
+      clog("[display] sync throw from cross-window access:", e && e.message);
     }
   }
 
@@ -251,6 +316,7 @@ export function BaseScreen() {
       }
       // Auto-reopen on close if secondary display is configured
       if (msg.status === DISPLAY_STATUS.CLOSED && hasSecondary && !popupBlocked) {
+        _displayPopupRef.current = null;
         openDisplayWindow().then((success) => {
           if (!success) popupBlocked = true;
         });
@@ -582,9 +648,15 @@ export function BaseScreen() {
             </div>
           )}
         {!sDisplayFullscreen && sDisplayStatus !== DISPLAY_STATUS.CLOSED && sDisplayStatus !== DISPLAY_STATUS.HIDDEN && (
-          <div className={`${styles.banner} ${styles.bannerPulse}`} style={{ backgroundColor: "yellow" }}>
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={handleYellowBannerClick}
+            className={`${styles.banner} ${styles.bannerPulse} ${styles.bannerClickable}`}
+            style={{ backgroundColor: "yellow" }}
+          >
             <span className={styles.bannerBtnText} style={{ color: "red" }}>
-              Double-click anywhere in the secondary display to go Full Screen!
+              Click anywhere on the secondary display to go full-screen!
             </span>
           </div>
         )}

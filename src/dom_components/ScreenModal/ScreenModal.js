@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { Button } from "../Button/Button";
 import { SHADOW_NONE } from "../shadows";
 import { C, Z } from "../../styles";
+import { claimModalZ, releaseModalZ } from "../Dialog/modalStack";
 import styles from "./ScreenModal.module.css";
 
 export const ScreenModal = ({
@@ -35,8 +36,13 @@ export const ScreenModal = ({
 }) => {
   const [sInternalModalShow, _setInternalModalShow] = useState(false);
   const [sFadedIn, _setFadedIn] = useState(false);
+  const zRef = useRef(0);
 
   const isVisible = handleModalActionInternally ? sInternalModalShow : modalVisible;
+
+  if (isVisible && showOuterModal && zRef.current === 0) {
+    zRef.current = claimModalZ();
+  }
 
   useEffect(() => {
     if (isVisible) {
@@ -45,6 +51,16 @@ export const ScreenModal = ({
       _setFadedIn(false);
     }
   }, [isVisible]);
+
+  useEffect(() => () => {
+    if (zRef.current !== 0) {
+      releaseModalZ(zRef.current);
+      zRef.current = 0;
+    }
+  }, []);
+
+  const overlayZ = zRef.current || 9000;
+  const contentZ = overlayZ + 1;
 
   let resolvedShadow = shadowStyle;
   if (!showShadow) resolvedShadow = SHADOW_NONE;
@@ -96,6 +112,7 @@ export const ScreenModal = ({
                 style={{
                   backgroundColor: outerModalStyle?.backgroundColor || C.surfaceOverlay,
                   opacity: sFadedIn ? 1 : 0,
+                  zIndex: overlayZ,
                   transition: "opacity 150ms ease-in",
                 }}
               />
@@ -105,6 +122,7 @@ export const ScreenModal = ({
                 className={styles.contentWrapper}
                 style={{
                   opacity: sFadedIn ? 1 : 0,
+                  zIndex: contentZ,
                   transition: "opacity 150ms ease-in",
                   ...outerModalStyle,
                 }}

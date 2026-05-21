@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 5000;
+  z-index: var(--z-alert);
   background-color: var(--surface-overlay);
   display: flex;
   align-items: center;
@@ -17,7 +17,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 5001;
+  z-index: calc(var(--z-alert) + 1);
   border-radius: 15px;
   display: flex;
   flex-direction: column;

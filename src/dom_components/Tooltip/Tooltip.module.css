@@ -1,18 +1,18 @@
-.trigger {
-  display: contents;
-}
-
 .content {
-  z-index: 3000;
+  z-index: var(--z-tooltip);
   pointer-events: none;
 }
 
 .bubble {
   border-radius: 6px;
-  padding: 5px 9px;
+  padding: 7px 9px;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
 }
 
 .text {
   font-size: 12px;
   white-space: pre;
+  line-height: 1;
 }

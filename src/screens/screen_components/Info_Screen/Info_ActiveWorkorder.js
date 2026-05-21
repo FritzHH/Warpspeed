@@ -724,11 +724,8 @@ export const ActiveWorkorderComponent = ({}) => {
           <div
             style={{
               marginTop: 10,
-              borderColor: C.borderSubtle,
               padding: "8px 8px",
               backgroundColor: C.surfaceAlt,
-              borderWidth: 1,
-              borderStyle: "solid",
               borderRadius: 5,
               zIndex: 10,
               overflow: "visible",

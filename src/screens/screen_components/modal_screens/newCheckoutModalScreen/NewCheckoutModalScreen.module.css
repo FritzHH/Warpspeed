@@ -462,12 +462,14 @@
 }
 
 .paymentsContainer {
+  width: 100%;
   display: flex;
   flex-direction: column;
   flex-shrink: 1;
 }
 
 .paymentsScroll {
+  width: 100%;
   display: flex;
   flex-direction: column;
   flex-shrink: 1;

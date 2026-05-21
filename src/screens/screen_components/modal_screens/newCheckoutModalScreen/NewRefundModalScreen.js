@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   Dialog,
   LoadingIndicator,
+  ReceiptSentOverlay,
 } from "../../../../dom_components";
 import { C, Fonts, ICONS } from "../../../../styles";
 import styles from "./NewRefundModalScreen.module.css";
@@ -79,6 +80,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
   const [sShowSendReceiptModal, _sSetShowSendReceiptModal] = useState(false);
   const [sReceiptLanguage, _setReceiptLanguage] = useState("english");
   const [sShowPopConfirm, _setShowPopConfirm] = useState(false);
+  const [sReceiptSentOverlay, _setReceiptSentOverlay] = useState(null);
 
   // ─── Derived Values ───────────────────────────────────────
   let refundLimits = calculateRefundLimits(sOriginalSale, { cardFeeRefund: zCardFeeRefund }, sTransactions);
@@ -730,6 +732,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     const canEmail = customerForReceipt.email && emailContent.trim();
     if (canSMS || canEmail) {
       sendRefundReceipt(refundReceipt, customerForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null);
+      _setReceiptSentOverlay({ sentSMS: !!canSMS, sentEmail: !!canEmail });
     }
 
     // Check if fully refunded
@@ -783,6 +786,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       let canEmail = customerForReceipt.email && emailContent.trim();
       if (canSMS || canEmail) {
         sendRefundReceipt(sLastRefundReceipt, customerForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null);
+        _setReceiptSentOverlay({ sentSMS: !!canSMS, sentEmail: !!canEmail });
       }
     } else {
       _sSetShowSendReceiptModal(true);
@@ -811,6 +815,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     let canEmail = email && emailContent.trim();
     if (canSMS || canEmail) {
       await sendRefundReceipt(sLastRefundReceipt, customerForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null);
+      _setReceiptSentOverlay({ sentSMS: !!canSMS, sentEmail: !!canEmail });
     }
   }
 
@@ -837,6 +842,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     _sSetShowSendReceiptModal(false);
     _setReceiptLanguage("english");
     _setShowPopConfirm(false);
+    _setReceiptSentOverlay(null);
     _setIsActiveSale(false);
     _setLoading(false);
     _setLoadMessage("");
@@ -1150,9 +1156,11 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     </TouchableOpacity>
                   </Tooltip>
                 ) : (
-                  <div className={styles.footerIconDisabled}>
-                    <Image icon={ICONS.print} size={35} />
-                  </div>
+                  <Tooltip text="Reprint receipt (available after refund)" position="top">
+                    <div className={styles.footerIconDisabled}>
+                      <Image icon={ICONS.print} size={35} />
+                    </div>
+                  </Tooltip>
                 )}
                 {sRefundComplete ? (
                   <Tooltip text="Send receipt" position="top">
@@ -1164,9 +1172,11 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     </TouchableOpacity>
                   </Tooltip>
                 ) : (
-                  <div className={styles.footerIconDisabled}>
-                    <Image icon={ICONS.paperPlane} size={35} />
-                  </div>
+                  <Tooltip text="Send receipt (available after refund)" position="top">
+                    <div className={styles.footerIconDisabled}>
+                      <Image icon={ICONS.paperPlane} size={35} />
+                    </div>
+                  </Tooltip>
                 )}
                 <Tooltip text="Pop register" position="top">
                   <TouchableOpacity
@@ -1248,6 +1258,13 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
             </div>
           </div>
         )}
+
+        <ReceiptSentOverlay
+          visible={!!sReceiptSentOverlay}
+          sentSMS={sReceiptSentOverlay?.sentSMS}
+          sentEmail={sReceiptSentOverlay?.sentEmail}
+          onDone={() => _setReceiptSentOverlay(null)}
+        />
       </div>
     </Dialog>
   );

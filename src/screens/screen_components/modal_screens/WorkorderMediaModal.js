@@ -33,6 +33,7 @@ export const WorkorderMediaModal = ({
     useOpenWorkordersStore(
       (s) => s.workorders.find((w) => w.id === workorderID)?.media
     ) || [];
+  const sUploadProgress = useUploadProgressStore((s) => s.progress);
 
   const [sUploading, _setUploading] = useState(false);
   const [sUploadMsg, _setUploadMsg] = useState("");
@@ -355,6 +356,36 @@ export const WorkorderMediaModal = ({
             </button>
           </div>
         </div>
+
+        {/* Upload progress banner */}
+        {sUploadProgress && !sUploadProgress.done && (
+          <div className={styles.progressBanner} style={{ backgroundColor: C.surfaceAlt, borderBottomColor: C.borderSubtle }}>
+            <div className={styles.progressRow}>
+              <div className={styles.spinner} style={{ borderColor: C.borderSubtle, borderTopColor: C.orange }} />
+              <span className={styles.progressText} style={{ color: C.text }}>
+                Uploading {sUploadProgress.completed + (sUploadProgress.failed || 0) + 1} of {sUploadProgress.total}...
+              </span>
+            </div>
+            <div className={styles.progressTrack} style={{ backgroundColor: C.backgroundWhite }}>
+              <div
+                className={styles.progressFill}
+                style={{
+                  width: `${((sUploadProgress.completed + (sUploadProgress.failed || 0)) / sUploadProgress.total) * 100}%`,
+                  backgroundColor: C.orange,
+                }}
+              />
+            </div>
+          </div>
+        )}
+        {sUploadProgress && sUploadProgress.done && (
+          <div className={styles.progressBanner} style={{ backgroundColor: C.surfaceAlt, borderBottomColor: C.borderSubtle }}>
+            <span className={styles.progressText} style={{ color: sUploadProgress.failed > 0 ? C.red : C.green }}>
+              {sUploadProgress.failed > 0
+                ? `Uploaded ${sUploadProgress.completed} of ${sUploadProgress.total} — ${sUploadProgress.failed} failed`
+                : `Uploaded ${sUploadProgress.completed} of ${sUploadProgress.total}`}
+            </span>
+          </div>
+        )}
 
         {/* Hidden file input */}
         <input

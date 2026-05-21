@@ -121,6 +121,7 @@
 }
 
 .midScroll {
+  width: 100%;
   flex: 1 1 0;
   overflow-y: auto;
   min-height: 0;

@@ -139,6 +139,7 @@ export function BikeStandScreen() {
   const [sShowBikeDetails, _setShowBikeDetails] = useState(false);
   const [sDetailField, _setDetailField] = useState(null); // null | "brand" | "description" | "color1" | "color2" | "waitDays"
   const [sDetailForm, _setDetailForm] = useState({ brand: "", description: "", color1: "", color2: "", waitDays: "" });
+  const [sSuggestionsHidden, _setSuggestionsHidden] = useState(false);
   const detailDebounceRef = useRef(null);
   const detailBackspaced = useRef(false);
   const waitDaysDebounceRef = useRef(null);
@@ -740,29 +741,31 @@ export function BikeStandScreen() {
 
   const allColorLabels = COLORS.map((c) => c.label);
 
-  const brandSuggestions = sDetailField === "brand" && sDetailForm.brand?.trim()
+  const brandSuggestions = !sSuggestionsHidden && sDetailField === "brand" && sDetailForm.brand?.trim()
     ? (zSettings.allBrands || []).filter(
         (b) => b.toLowerCase().startsWith(sDetailForm.brand.trim().toLowerCase()) && b.toLowerCase() !== sDetailForm.brand.trim().toLowerCase()
       ).slice(0, 8)
     : [];
 
-  const descSuggestions = sDetailField === "description" && sDetailForm.description?.trim()
+  const descSuggestions = !sSuggestionsHidden && sDetailField === "description" && sDetailForm.description?.trim()
     ? (zSettings.allDescriptions || []).filter(
         (d) => d.toLowerCase().startsWith(sDetailForm.description.trim().toLowerCase()) && d.toLowerCase() !== sDetailForm.description.trim().toLowerCase()
       ).slice(0, 8)
     : [];
 
-  const color1Suggestions = sDetailField === "color1" && sDetailForm.color1?.trim()
+  const color1Suggestions = !sSuggestionsHidden && sDetailField === "color1" && sDetailForm.color1?.trim()
     ? allColorLabels.filter(
         (c) => c.toLowerCase().startsWith(sDetailForm.color1.trim().toLowerCase()) && c.toLowerCase() !== sDetailForm.color1.trim().toLowerCase()
       ).slice(0, 8)
     : [];
 
-  const color2Suggestions = sDetailField === "color2" && sDetailForm.color2?.trim()
+  const color2Suggestions = !sSuggestionsHidden && sDetailField === "color2" && sDetailForm.color2?.trim()
     ? allColorLabels.filter(
         (c) => c.toLowerCase().startsWith(sDetailForm.color2.trim().toLowerCase()) && c.toLowerCase() !== sDetailForm.color2.trim().toLowerCase()
       ).slice(0, 8)
     : [];
+
+  const anySuggestionsVisible = brandSuggestions.length > 0 || descSuggestions.length > 0 || color1Suggestions.length > 0 || color2Suggestions.length > 0;
 
   // Bike detail keypad helpers
   const DETAIL_FIELDS = ["brand", "description", "color1", "color2", "waitDays"];
@@ -786,6 +789,7 @@ export function BikeStandScreen() {
     });
     _setDetailField(fieldName);
     _setDetailKeypadOverride(null);
+    _setSuggestionsHidden(false);
   }
 
   function handleDetailNext() {
@@ -820,6 +824,7 @@ export function BikeStandScreen() {
 
   function handleDetailKeyPress(key) {
     if (!sDetailField) return;
+    _setSuggestionsHidden(false);
     let val = sDetailForm[sDetailField] || "";
     let isBackspace = key === "\u232B" || key === "CLR";
     if (key === "CLR") {
@@ -1297,6 +1302,13 @@ export function BikeStandScreen() {
 
               {/* Fields */}
               <div className={styles.bmScroll}>
+                {anySuggestionsVisible && (
+                  <div
+                    className={styles.bmSuggestionDismiss}
+                    onTouchStartCapture={(e) => { e.preventDefault(); e.stopPropagation(); _standTouchFired = true; _setSuggestionsHidden(true); }}
+                    onClickCapture={(e) => { if (_standTouchFired) { _standTouchFired = false; e.stopPropagation(); return; } _setSuggestionsHidden(true); }}
+                  />
+                )}
                 {/* Brand row */}
                 <div className={styles.bmFieldLabel} style={{ color: C.textMuted }}>Brand</div>
                 <div className={styles.bmFieldRow} style={{ zIndex: 12 }}>
@@ -1717,20 +1729,21 @@ export function BikeStandScreen() {
                   ) : null;
                 })()}
 
-                {/* On-screen keypad for detail fields */}
+              </div>
+
+              {/* Keypad — always docked above the footer */}
+              <div className={styles.bmKeypadWrap}>
+                <StandKeypad
+                  mode={modalKeypadMode}
+                  onKeyPress={handleDetailKeyPress}
+                  toggleLabel={modalKeypadMode === "phone" ? "ABC" : "123"}
+                  onToggle={() => _setDetailKeypadOverride(modalKeypadMode === "phone" ? "alpha" : "phone")}
+                />
                 {sDetailField !== null && (
-                  <div className={styles.bmKeypadWrap}>
-                    <StandKeypad
-                      mode={modalKeypadMode}
-                      onKeyPress={handleDetailKeyPress}
-                      toggleLabel={modalKeypadMode === "phone" ? "ABC" : "123"}
-                      onToggle={() => _setDetailKeypadOverride(modalKeypadMode === "phone" ? "alpha" : "phone")}
-                    />
-                    <div className={styles.bmKeypadCloseRow}>
-                      <StandTouch className={styles.bmKeypadCloseBtn} onPress={() => { saveDetailOnLeave(sDetailField); _setDetailField(null); }}>
-                        <Image icon={ICONS.close1} size={36} />
-                      </StandTouch>
-                    </div>
+                  <div className={styles.bmKeypadCloseRow}>
+                    <StandTouch className={styles.bmKeypadCloseBtn} onPress={() => { saveDetailOnLeave(sDetailField); _setDetailField(null); }}>
+                      <Image icon={ICONS.close1} size={36} />
+                    </StandTouch>
                   </div>
                 )}
               </div>
@@ -2432,6 +2445,7 @@ export function BikeStandScreen() {
                 <div className={styles.standNavItem}>
                   <Button
                     onPress={() => _setShowInventoryModal(true)}
+                    fullWidth
                     colorGradientArr={COLOR_GRADIENTS.purple}
                     buttonStyle={{
                       borderWidth: 1,
@@ -2461,6 +2475,7 @@ export function BikeStandScreen() {
                     <div key={item.id} className={styles.standNavItem}>
                       <Button
                         onPress={() => handleNavButtonPress(item)}
+                        fullWidth
                         colorGradientArr={isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "item" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
                         buttonStyle={{
                           borderWidth: 1,

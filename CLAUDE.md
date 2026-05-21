@@ -1,5 +1,24 @@
 # CLAUDE.md
 
+## CRITICAL: Question = information only. Do NOT edit.
+
+**If the user's prompt ends with `?`, or is phrased as a question ("can you...", "is X...", "how does...", "what's...", "should I...", "does this...", "where is..."), DO NOT edit files, run mutating commands, or take any action that changes project state.**
+
+Answer with text only — explanations, code references, or descriptions. Even prompts that look like requests but are phrased as questions ("can you fix this?") are information-only until the user follows up with an explicit instruction.
+
+Editing in response to a question wastes the user's time and breaks trust. A PreToolUse hook also enforces this rule and will block `Edit` / `Write` / `NotebookEdit` calls when the last user message ended with `?`.
+
+**Examples of prompts that look like requests but are NOT:**
+- "Can you fix this bug?" → diagnose and propose; do not edit
+- "Is this the right place for X?" → answer; do not edit
+- "Should I refactor this?" → recommend; do not refactor
+- "How does this function handle Y?" → explain; do not modify
+- "What if we changed X?" → discuss the tradeoff; do not change
+
+If the user wants you to act, they'll follow up with a statement ("ok, fix it" / "go ahead" / "do it"). Wait for that.
+
+---
+
 ## Development Commands
 
 ```bash
@@ -18,8 +37,6 @@ firebase deploy --only functions:functionName1,functions:functionName2
 ---
 
 # Agent behavior
-
-**Question mark = information only.** If the prompt ends with `?`, answer with explanations or code references only — no edits, refactors, or commands that alter the project. No exceptions unless otherwise stated.
 
 Before acting on any request:
 
@@ -73,6 +90,39 @@ Inner modal card sizing by class:
 **Do not use** `vw`/`vh`/`vmin`/`vmax`, `rem`/`em`, or media queries — the JS-measured root binds the layout to the viewport; these are redundant.
 
 If unsure which approach a new layout calls for, default to percentages and ask. Silent use of flex sizing where percentages were intended produces layouts that behave differently across screens and are hard to debug later.
+
+### Layout debugging — fix the parent, not the leaf
+
+When an element looks the wrong size, the fix is almost never on that element. Its size is determined by:
+- Its declared dimensions
+- Its parent's `display`, `align-items`, `justify-content`, and `flex` properties
+- The parent's own dimensions
+
+**Diagnostic order, top-down:**
+1. Identify the element that looks wrong (the symptom).
+2. Walk UP the tree. Find the nearest ancestor that *controls* the dimension you're trying to fix.
+3. Read that ancestor's CSS Module class. Understand what its `display`, `flex-direction`, `align-items`, and explicit dimensions are doing.
+4. Make the fix THERE. Set the parent's dimension explicitly, then let children fill `100%`.
+
+**The pattern:** container declares the dimension (e.g., row `height: 40px`); children fill it (`height: 100%`).
+
+**Anti-pattern:** children declare absolute dimensions while the container has `align-items: center` and no declared height. Result: container collapses to children's content-height, children compete, layout breaks.
+
+**Red flags — you're leaf-hacking, stop:**
+- You've made more than one edit to the same child element trying to fix a sizing issue
+- You're theorizing about CSS spec behavior to explain why a leaf doesn't size correctly
+- You haven't read the parent component's CSS Module yet
+
+If any of those apply, walk up the tree and start over. The problem is in a container above the one you're editing.
+
+### Wrapper components — must be layout-transparent
+
+Components that wrap children (`Tooltip`, `Portal`, route guards, etc.) MUST NOT insert DOM elements that interrupt the layout chain. Specifically:
+
+- Do not wrap children in a `<div>` or `<span>` that has its own `display`, `width`, `height`, or `flex` properties.
+- If the wrapper component uses Radix `Trigger`, `Slot`, or similar primitive that supports `asChild`, use it correctly: pass `{children}` as the direct argument, not wrapped in your own element.
+- If style/aria props need to flow through to the wrapped child, use `React.cloneElement` to merge them onto the child — never via an intermediate wrapper element.
+- If you find yourself debugging child sizing inside a wrapper component, suspect the wrapper FIRST. Read the wrapper's render output and check whether it inserts a DOM element with its own layout behavior.
 
 ---
 

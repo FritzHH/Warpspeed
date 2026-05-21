@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import React, { useEffect, useImperativeHandle, useRef, useState, lazy, Suspense } from "react";
+import React, { useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, lazy, Suspense } from "react";
 import { WORKORDER_ITEM_PROTO, INVENTORY_ITEM_PROTO, QUICK_BUTTON_ITEM_PROTO, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../data";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 
@@ -36,6 +36,49 @@ function getQuickButtonFontSize(text, baseFontSize) {
   let len = (text || "").length;
   if (len <= 15) return baseFontSize;
   return Math.max(7, Math.round(baseFontSize - (len - 15) * 0.5));
+}
+
+const QB_BREAK_CHARS_RE = /[ &/\\]/;
+
+function splitQuickButtonLabel(text) {
+  const mid = text.length / 2;
+  let breakIdx = -1;
+  let bestDist = Infinity;
+  for (let i = 0; i < text.length; i++) {
+    if (QB_BREAK_CHARS_RE.test(text[i])) {
+      const d = Math.abs(i - mid);
+      if (d < bestDist) { bestDist = d; breakIdx = i; }
+    }
+  }
+  if (breakIdx === -1) return null;
+  return text.slice(0, breakIdx).trim() + "\n" + text.slice(breakIdx + 1).trim();
+}
+
+function RootButtonLabel({ text, fontSize, styles }) {
+  const spanRef = useRef(null);
+  const [label, setLabel] = useState(text);
+
+  useLayoutEffect(() => {
+    const el = spanRef.current;
+    if (!el) return;
+    // Measure the original text forced to one line; if it overflows the
+    // span's actual rendered width, swap in a hard-broken version.
+    setLabel(text);
+    const prevWhiteSpace = el.style.whiteSpace;
+    el.style.whiteSpace = "nowrap";
+    const overflows = el.scrollWidth > el.clientWidth + 0.5;
+    el.style.whiteSpace = prevWhiteSpace;
+    if (overflows) {
+      const split = splitQuickButtonLabel(text);
+      if (split) setLabel(split);
+    }
+  }, [text, fontSize]);
+
+  return (
+    <span ref={spanRef} className={styles.rootBtnText} style={{ fontSize }}>
+      {label}
+    </span>
+  );
 }
 
 /** Normalize legacy string IDs to QUICK_BUTTON_ITEM_PROTO objects */
@@ -891,6 +934,7 @@ export function InventoryComponent({}) {
   const [sCurrentParentID, _setCurrentParentID] = useState(null);
   const [sMenuPath, _setMenuPath] = useState([]);
   const [sSelectedButtonID, _setSelectedButtonID] = useState(null);
+  const leftColRef = useRef(null);
   const [sCustomItemModal, _setCustomItemModal] = useState(null); // { type, anchorX, anchorY } | null
   const [sForceEditMode, _setForceEditMode] = useState(false);
   const [sCanvasEditMode, _setCanvasEditMode] = useState(false);
@@ -913,6 +957,20 @@ export function InventoryComponent({}) {
   useEffect(() => {
     const timer = setTimeout(() => setIsReady(true), 50);
     return () => clearTimeout(timer);
+  }, []);
+
+  // Re-measure all root-button labels when the column resizes
+  // (RootButtonLabel handles its own measurement on mount; this forces
+  // a re-mount on width change by keying the column with its width)
+  const [sLeftColWidth, _setLeftColWidth] = useState(0);
+  useLayoutEffect(() => {
+    const el = leftColRef.current;
+    if (!el) return;
+    const update = () => _setLeftColWidth(el.clientWidth);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
   }, []);
 
   // Auto-fire "common" button on mount once data is loaded
@@ -1477,7 +1535,7 @@ export function InventoryComponent({}) {
       )}
       <div className={styles.body}>
         {/** Left column - ALWAYS shows root-level buttons */}
-        <div className={styles.leftCol}>
+        <div className={styles.leftCol} ref={leftColRef} key={sLeftColWidth}>
           {zQuickItemButtons
             ?.filter((b) => !b.parentID)
             .map((item) => {
@@ -1510,12 +1568,11 @@ export function InventoryComponent({}) {
                     _setCanvasEditMode(true);
                   }}
                 >
-                  <span
-                    className={styles.rootBtnText}
-                    style={{ fontSize: getQuickButtonFontSize(item.name, 14) }}
-                  >
-                    {item.name.toUpperCase()}
-                  </span>
+                  <RootButtonLabel
+                    text={item.name.toUpperCase()}
+                    fontSize={getQuickButtonFontSize(item.name, 14)}
+                    styles={styles}
+                  />
                 </button>
               );
             })}

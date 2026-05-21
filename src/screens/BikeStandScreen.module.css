@@ -1511,10 +1511,17 @@
 }
 
 .bmScroll {
+  position: relative;
   flex: 1;
   padding: 16px 20px 0 20px;
   overflow-y: auto;
   overflow-x: visible;
+}
+
+.bmSuggestionDismiss {
+  position: absolute;
+  inset: 0;
+  z-index: 998;
 }
 
 .bmFieldLabel {
@@ -1627,8 +1634,8 @@
 }
 
 .bmKeypadWrap {
-  margin-top: 8px;
-  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
 }
 
 .bmKeypadCloseRow {

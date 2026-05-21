@@ -52,7 +52,7 @@ export function WorkordersComponent({}) {
   function handleSearchChange(val) {
     _setSearchTerm(val);
     let q = val.trim();
-    if (q.length < 5) return;
+    if (!q) return;
     let workorders = zOpenWorkorders.filter((wo) => !!wo.customerID);
     let scored = workorders.map((wo) => ({ wo, score: scoreWorkorder(wo, q) }));
     let matches = scored.filter((s) => s.score > 0);
@@ -73,7 +73,7 @@ export function WorkordersComponent({}) {
     openedFlashTimerRef.current = setTimeout(() => {
       _setOpenedFlash("");
       openedFlashTimerRef.current = null;
-    }, 1200);
+    }, 1700);
   }
 
   const searchInputRef = useRef(null);

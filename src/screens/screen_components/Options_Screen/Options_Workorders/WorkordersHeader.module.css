@@ -87,7 +87,7 @@
   border-radius: 12px;
   pointer-events: none;
   white-space: nowrap;
-  animation: openedPillFade 1200ms ease-out forwards;
+  animation: openedPillFade 1700ms ease-out forwards;
 }
 
 @keyframes openedPillFade {

@@ -16,7 +16,6 @@
   border: 2px solid;
   box-shadow: 0 2px 4px var(--shadow-color-default);
   padding: 10px;
-  overflow-y: auto;
 }
 
 .header {
@@ -25,13 +24,42 @@
   border-bottom: 1px solid;
 }
 
+.itemNameRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
 .itemName {
   font-weight: 700;
-  display: block;
-  margin-bottom: 6px;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.viewItemBtn {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid;
+  background-color: var(--surface-base);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 120ms ease, opacity 80ms ease;
+}
+
+.viewItemBtn:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.viewItemBtn:active {
+  background-color: rgba(0, 0, 0, 0.1);
+  opacity: 0.7;
 }
 
 .targetRow {
@@ -58,6 +86,16 @@
 
 .targetBtn:hover {
   opacity: 0.7;
+}
+
+.swapContainer {
+  display: grid;
+}
+
+.swapLayer {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
 }
 
 .columnsContainer {

@@ -325,11 +325,11 @@ function calculateWaitEstimateLabel(workorder, settings) {
   return shortDay2 + ", " + month2 + " " + day2 + dateSuffix(day2);
 }
 
-var DAY_LABELS_SHORT = ["Sun", "Mon", "Tues", "Wed", "Thurs", "Fri", "Sat"];
+var DAY_LABELS_FULL = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 
 // Annotate any "today"/"tomorrow"/"yesterday" in a wait-estimate label with the
-// actual short day name in parens (e.g. "Tomorrow" -> "Tomorrow (Fri)",
-// "First half today" -> "First half today (Thurs)", "Overdue yesterday" -> "Overdue yesterday (Wed)").
+// actual day name in parens (e.g. "Tomorrow" -> "Tomorrow (Friday)",
+// "First half today" -> "First half today (Thursday)", "Overdue yesterday" -> "Overdue yesterday (Wednesday)").
 // Leaves labels that already name a day or full date untouched.
 function annotateRelativeDayLabel(label) {
   if (!label) return label;
@@ -339,7 +339,7 @@ function annotateRelativeDayLabel(label) {
   var offset = word === "today" ? 0 : word === "tomorrow" ? 1 : -1;
   var d = new Date();
   d.setDate(d.getDate() + offset);
-  var dayName = DAY_LABELS_SHORT[d.getDay()];
+  var dayName = DAY_LABELS_FULL[d.getDay()];
   if (label.indexOf("(" + dayName + ")") !== -1) return label;
   return label + " (" + dayName + ")";
 }

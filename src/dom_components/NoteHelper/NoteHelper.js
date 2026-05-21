@@ -1,4 +1,4 @@
-import React, { forwardRef, useState, useEffect, useRef, useCallback } from "react";
+import React, { forwardRef, useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { C, Fonts } from "../../styles";
 import { lightenRGBByPercent } from "../../utils";
@@ -18,6 +18,7 @@ export const NoteHelper = forwardRef(function NoteHelper(
     centered = false,
     fontSizeAdj = 0,
     chipPaddingVertAdj = 0,
+    onViewItem,
     className = "",
     "data-testid": testId,
   },
@@ -25,8 +26,21 @@ export const NoteHelper = forwardRef(function NoteHelper(
 ) {
   const [sTarget, _sSetTarget] = useState(noteHelpersTarget);
   const [sClickedMap, _sSetClickedMap] = useState({});
+  const [sMeasuredHeight, _setMeasuredHeight] = useState(0);
   const openTimeRef = useRef(0);
   const prevVisibleRef = useRef(visible);
+  const dropdownRef = useRef(null);
+
+  useLayoutEffect(() => {
+    if (visible && dropdownRef.current) {
+      const h = dropdownRef.current.offsetHeight;
+      if (h > 0 && h !== sMeasuredHeight) _setMeasuredHeight(h);
+    }
+  });
+
+  useEffect(() => {
+    if (!visible) _setMeasuredHeight(0);
+  }, [visible]);
 
   if (visible && !prevVisibleRef.current) {
     openTimeRef.current = Date.now();
@@ -50,12 +64,13 @@ export const NoteHelper = forwardRef(function NoteHelper(
     return item.buttonLabel || "";
   }, []);
 
-  const isChipActive = useCallback((catId, item) => {
+  const isChipActive = useCallback((catId, item, targetOverride) => {
+    const target = targetOverride || sTarget;
     const insertText = getInsertText(item);
-    const notes = workorderLine[sTarget] || "";
+    const notes = workorderLine[target] || "";
     const parts = notes.split(", ").map((s) => s.trim()).filter(Boolean);
     if (!parts.includes(insertText)) return false;
-    const trackedCat = sClickedMap[sTarget + "|" + insertText];
+    const trackedCat = sClickedMap[target + "|" + insertText];
     if (trackedCat !== undefined) return trackedCat === catId;
     return true;
   }, [workorderLine, sTarget, sClickedMap, getInsertText]);
@@ -79,7 +94,6 @@ export const NoteHelper = forwardRef(function NoteHelper(
 
   if (!visible) return null;
 
-  const filteredHelpers = noteHelpers.filter((cat) => cat[sTarget] === true);
   const dropdownWidth = 580;
   const margin = 10;
   const vw = typeof window !== "undefined" ? window.innerWidth : 1200;
@@ -89,11 +103,14 @@ export const NoteHelper = forwardRef(function NoteHelper(
   let left = centered ? (vw - dropdownWidth) / 2 : clickX + 8;
   if (left + dropdownWidth > vw - margin) left = vw - dropdownWidth - margin;
   if (left < margin) left = margin;
+  const bottomMargin = 20;
+  const modalHeight = sMeasuredHeight || 600;
   let top = clickY + 5;
-  if (top + 400 > vh - margin) top = vh - 400 - margin;
+  if (top + modalHeight > vh - bottomMargin) top = vh - modalHeight - bottomMargin;
   if (top < margin) top = margin;
+  const positionStyle = { top, left, width: dropdownWidth, visibility: sMeasuredHeight ? "visible" : "hidden" };
 
-  const renderCategory = (category, chipIdx) => {
+  const renderCategory = (category, targetForRender) => {
     return (
       <div key={category.id} className={styles.category}>
         <span
@@ -104,13 +121,13 @@ export const NoteHelper = forwardRef(function NoteHelper(
         </span>
         <div className={styles.chipGrid}>
           {(category.items || []).map((item, i) => {
-            const active = isChipActive(category.id, item);
+            const active = isChipActive(category.id, item, targetForRender);
             const label = getDisplayLabel(item);
             return (
               <button
                 key={(item.id || label) + i}
                 className={styles.chip}
-                onClick={() => toggleChip(item, null, category.id)}
+                onClick={() => toggleChip(item, targetForRender, category.id)}
                 style={{
                   backgroundColor: active ? lightenRGBByPercent(C.red, 70) : C.buttonLightGreenOutline,
                   paddingTop: 5 + chipPaddingVertAdj,
@@ -128,6 +145,21 @@ export const NoteHelper = forwardRef(function NoteHelper(
     );
   };
 
+  const renderColumns = (targetForRender) => {
+    const helpers = noteHelpers.filter((cat) => cat[targetForRender] === true);
+    return (
+      <div className={styles.columnsContainer}>
+        <div className={styles.column}>
+          {helpers.filter((_, i) => i % 2 === 0).map((cat) => renderCategory(cat, targetForRender))}
+        </div>
+        <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
+        <div className={styles.column} style={{ paddingLeft: 14 }}>
+          {helpers.filter((_, i) => i % 2 === 1).map((cat) => renderCategory(cat, targetForRender))}
+        </div>
+      </div>
+    );
+  };
+
   return ReactDOM.createPortal(
     <div
       ref={ref}
@@ -136,15 +168,28 @@ export const NoteHelper = forwardRef(function NoteHelper(
       data-testid={testId}
     >
       <div
+        ref={dropdownRef}
         className={styles.dropdown}
-        style={{ top, left, width: dropdownWidth, maxHeight: vh - top - margin, borderColor: C.buttonLightGreenOutline }}
+        style={{ ...positionStyle, borderColor: C.buttonLightGreenOutline }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Item header */}
         <div className={styles.header} style={{ borderBottomColor: C.buttonLightGreenOutline }}>
-          <span className={styles.itemName} style={{ fontSize: 13 + fontSizeAdj, color: C.text }}>
-            {workorderLine.inventoryItem?.informalName || workorderLine.inventoryItem?.formalName || "Item"}
-          </span>
+          <div className={styles.itemNameRow}>
+            <span className={styles.itemName} style={{ fontSize: 13 + fontSizeAdj, color: C.text }}>
+              {workorderLine.inventoryItem?.formalName || workorderLine.inventoryItem?.informalName || "Item"}
+            </span>
+            {onViewItem && (
+              <button
+                type="button"
+                className={styles.viewItemBtn}
+                onClick={() => onViewItem(workorderLine.inventoryItem)}
+                style={{ borderColor: C.buttonLightGreenOutline, color: C.text }}
+              >
+                View Inventory Item
+              </button>
+            )}
+          </div>
           <div className={styles.targetRow}>
             <span className={styles.addingTo} style={{ color: C.textMuted }}>Adding to:</span>
             <button
@@ -168,14 +213,28 @@ export const NoteHelper = forwardRef(function NoteHelper(
           </div>
         </div>
 
-        {/* Two-column layout */}
-        <div className={styles.columnsContainer}>
-          <div className={styles.column}>
-            {filteredHelpers.filter((_, i) => i % 2 === 0).map(renderCategory)}
+        {/* Both targets rendered stacked in a single grid cell so the
+            container always sizes to the max of intake/receipt heights. */}
+        <div className={styles.swapContainer}>
+          <div
+            className={styles.swapLayer}
+            style={{
+              visibility: sTarget === "intakeNotes" ? "visible" : "hidden",
+              pointerEvents: sTarget === "intakeNotes" ? "auto" : "none",
+            }}
+            aria-hidden={sTarget !== "intakeNotes"}
+          >
+            {renderColumns("intakeNotes")}
           </div>
-          <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
-          <div className={styles.column} style={{ paddingLeft: 14 }}>
-            {filteredHelpers.filter((_, i) => i % 2 === 1).map(renderCategory)}
+          <div
+            className={styles.swapLayer}
+            style={{
+              visibility: sTarget === "receiptNotes" ? "visible" : "hidden",
+              pointerEvents: sTarget === "receiptNotes" ? "auto" : "none",
+            }}
+            aria-hidden={sTarget !== "receiptNotes"}
+          >
+            {renderColumns("receiptNotes")}
           </div>
         </div>
 

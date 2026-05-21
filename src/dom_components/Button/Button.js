@@ -22,6 +22,7 @@ export const Button = forwardRef(function Button(
       textColor: "",
     },
     shadow = false,
+    liftOnHover,
     allCaps = false,
     fullWidth = false,
     colorGradientArr = [],
@@ -43,6 +44,8 @@ export const Button = forwardRef(function Button(
   const longPressTimer = useRef(null);
   const displayText = allCaps && text ? text.toUpperCase() : text;
   const shadowStyle = shadow ? SHADOW_PROTO : SHADOW_NONE;
+  const isIconOnly = !!icon && !displayText;
+  const effectiveLift = liftOnHover === undefined ? isIconOnly : liftOnHover;
 
   const HEIGHT = buttonStyle.height;
   const WIDTH = buttonStyle.width != null ? buttonStyle.width : (fullWidth ? "100%" : undefined);
@@ -67,7 +70,7 @@ export const Button = forwardRef(function Button(
   }
 
   function getOpacity() {
-    if (sMouseOver && enabled) {
+    if (sMouseOver && enabled && !effectiveLift) {
       return mouseOverOptions.opacity;
     } else if (!enabled) {
       return null;
@@ -150,7 +153,7 @@ export const Button = forwardRef(function Button(
     >
       <div
         ref={ref}
-        className={`${styles.touchable} ${!enabled ? styles.disabled : ""} ${className}`}
+        className={`${styles.touchable} ${!enabled ? styles.disabled : ""} ${effectiveLift ? styles.lift : ""} ${effectiveLift && isIconOnly ? styles.liftIconOnly : ""} ${className}`}
         style={{
           opacity: getOpacity(),
           cursor: !enabled ? "default" : "pointer",
@@ -209,7 +212,7 @@ export const Button = forwardRef(function Button(
                 height: iconSize,
                 marginRight: displayText ? 10 : 0,
                 objectFit: "contain",
-                opacity: sMouseOver ? mouseOverOptions.opacity : (buttonStyle.opacity ?? undefined),
+                opacity: (sMouseOver && !effectiveLift) ? mouseOverOptions.opacity : (buttonStyle.opacity ?? undefined),
                 ...iconStyle,
               }}
             />

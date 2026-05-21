@@ -41,6 +41,13 @@
   border-style: solid;
   border-radius: 15px;
   box-sizing: border-box;
+  transition: opacity 100ms ease, box-shadow 120ms ease, transform 100ms ease;
+}
+
+.rowHovered {
+  opacity: 0.85;
+  box-shadow: 0 2px 8px var(--shadow-color-default);
+  transform: translateY(-1px);
 }
 
 .rowReplaceMode {
@@ -102,24 +109,12 @@
   width: 100%;
 }
 
-.pencilButton {
-  background: none;
-  border: none;
-  padding: 0;
-  margin-right: 4px;
+.nameRowClickable,
+.nameRowClickable .nameTapArea,
+.nameRowClickable .itemName,
+.nameRowClickable .placeholderText,
+.nameRowClickable .placeholderPill {
   cursor: pointer;
-  display: flex;
-  align-items: center;
-}
-
-.pencilButton:disabled {
-  cursor: default;
-}
-
-.pencilIcon {
-  width: 15px;
-  height: 15px;
-  opacity: 0.5;
 }
 
 .nameTapArea {
@@ -136,10 +131,6 @@
 
 .nameTapAreaEditable {
   cursor: pointer;
-}
-
-.nameTapAreaEditable:active {
-  opacity: 0.6;
 }
 
 .customBadge {

@@ -10,6 +10,23 @@
   background-color: var(--surface-overlay);
 }
 
+.anchoredWrap {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+}
+
+.anchoredWrap > .backdropClickCatcher {
+  pointer-events: auto;
+}
+
+.anchoredWrap > .modal {
+  pointer-events: auto;
+}
+
 .backdropClickCatcher {
   position: absolute;
   top: 0;

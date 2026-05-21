@@ -1,8 +1,8 @@
 /* eslint-disable */
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { createPortal } from "react-dom";
 import { C, COLOR_GRADIENTS, ICONS, Z } from "../../../styles";
 import { Button } from "../../../dom_components";
+import { claimModalZ, releaseModalZ } from "../../../dom_components/Dialog/modalStack";
 
 import { useLayoutStore } from "../../../stores";
 import { GOOGLE_MAPS_API_KEY } from "../../../private_user_constants";
@@ -42,6 +42,25 @@ export const GoogleMapsModal = ({
   const mapContainerRef = useRef(null);
   const mapRef = useRef(null);
   const directionsRendererRef = useRef(null);
+  const zRef = useRef(0);
+
+  if (visible && zRef.current === 0) {
+    zRef.current = claimModalZ();
+  }
+
+  useEffect(() => {
+    if (!visible && zRef.current !== 0) {
+      releaseModalZ(zRef.current);
+      zRef.current = 0;
+    }
+  }, [visible]);
+
+  useEffect(() => () => {
+    if (zRef.current !== 0) {
+      releaseModalZ(zRef.current);
+      zRef.current = 0;
+    }
+  }, []);
 
   const [sLoading, _setLoading] = useState(true);
   const [sError, _setError] = useState("");
@@ -160,16 +179,19 @@ export const GoogleMapsModal = ({
 
   if (!visible) return null;
 
-  return createPortal(
+  const overlayZ = zRef.current || Z.modal;
+  const contentZ = overlayZ + 1;
+
+  return (
     <div
       className={styles.overlay}
       onClick={onClose}
-      style={{ zIndex: Z.modal }}
+      style={{ zIndex: overlayZ }}
     >
       <div
         className={styles.innerWrap}
         onClick={(e) => e.stopPropagation()}
-        style={{ width: isTablet ? "95%" : "70%" }}
+        style={{ width: isTablet ? "95%" : "70%", zIndex: contentZ }}
       >
         <div
           className={styles.modal}
@@ -259,7 +281,6 @@ export const GoogleMapsModal = ({
           </div>
         </div>
       </div>
-    </div>,
-    document.body
+    </div>
   );
 };

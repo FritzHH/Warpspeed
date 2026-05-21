@@ -181,6 +181,8 @@ export function MessagesComponent({}) {
   const [sHubHoverPhone, _setHubHoverPhone] = useState("");
   const hoverTimerRef = useRef(null);
   const [sHubVisibleCount, _setHubVisibleCount] = useState(35);
+  const [sHubSearch, _setHubSearch] = useState("");
+  const hubSearchInputRef = useRef(null);
   const hubLoadObserverRef = useRef(null);
   const hubSentinelRef = useCallback((node) => {
     if (hubLoadObserverRef.current) {
@@ -1070,11 +1072,85 @@ export function MessagesComponent({}) {
   // Whether the compose area should show
   const hasActivePhone = sCustomPhoneMode ? sCustomPhone.length === 10 : !!zCustomer?.customerCell;
 
+  // Search-bar filtering for hub thread list (matches by first, last, phone cell, phone landline)
+  const hubSearchIsPhone = !/[a-zA-Z]/.test(sHubSearch);
+  const hubSearchDisplayValue = hubSearchIsPhone && sHubSearch ? formatPhoneWithDashes(sHubSearch) : sHubSearch;
+  const filteredHubThreads = React.useMemo(() => {
+    let raw = sHubSearch.trim();
+    if (!raw) return zSmsThreads;
+    let hasLetters = /[a-zA-Z]/.test(raw);
+    let digitsOnly = raw.replace(/\D/g, "");
+    let landlineByCell = null;
+    if (!hasLetters && digitsOnly) {
+      landlineByCell = {};
+      for (let wo of zAllWorkorders) {
+        if (wo.customerCell && wo.customerLandline) {
+          if (!landlineByCell[wo.customerCell]) landlineByCell[wo.customerCell] = new Set();
+          landlineByCell[wo.customerCell].add(wo.customerLandline.replace(/\D/g, ""));
+        }
+      }
+    }
+    return zSmsThreads.filter((t) => {
+      if (hasLetters) {
+        let q = raw.toLowerCase();
+        let first = (t.customerFirst || "").toLowerCase();
+        let last = (t.customerLast || "").toLowerCase();
+        if (!first && !last) {
+          let wo = zAllWorkorders.find((w) => w.customerCell === t.phone);
+          if (wo) {
+            first = (wo.customerFirst || "").toLowerCase();
+            last = (wo.customerLast || "").toLowerCase();
+          }
+        }
+        let full = (first + " " + last).trim();
+        return first.startsWith(q) || last.startsWith(q) || full.includes(q);
+      }
+      if (digitsOnly) {
+        if (t.phone && t.phone.replace(/\D/g, "").includes(digitsOnly)) return true;
+        let landlines = landlineByCell ? landlineByCell[t.phone] : null;
+        if (landlines) {
+          for (let ll of landlines) if (ll.includes(digitsOnly)) return true;
+        }
+        return false;
+      }
+      return true;
+    });
+  }, [zSmsThreads, sHubSearch, zAllWorkorders]);
+
   // Hub mode: 2-panel layout for all message threads
   const showHub = sHubMode || !hasCustomer;
   if (showHub) {
     return (
-      <div className={hubStyles.hubLayoutRoot}>
+      <div className={hubStyles.hubOuterRoot}>
+        <div className={hubStyles.hubSearchHeader}>
+          <button
+            type="button"
+            className={hubStyles.hubSearchResetBtn}
+            onClick={() => {
+              _setHubSearch("");
+              hubSearchInputRef.current?.focus();
+            }}
+            disabled={!sHubSearch}
+          >
+            <img src={ICONS.reset1} alt="" className={hubStyles.hubSearchResetIcon} />
+          </button>
+          <input
+            ref={hubSearchInputRef}
+            type="text"
+            className={hubStyles.hubSearchInput}
+            placeholder="Search by name or phone"
+            value={hubSearchDisplayValue}
+            onChange={(e) => {
+              let val = e.target.value;
+              if (/[a-zA-Z]/.test(val)) {
+                _setHubSearch(val);
+              } else {
+                _setHubSearch(val.replace(/\D/g, "").slice(0, 10));
+              }
+            }}
+          />
+        </div>
+        <div className={hubStyles.hubLayoutRoot}>
         {/* Left panel: thread list */}
         {sHubSidebarCollapsed ? (
           <div className={hubStyles.hubSidebarCollapsed}>
@@ -1112,9 +1188,13 @@ export function MessagesComponent({}) {
               <div className={hubStyles.hubEmpty}>
                 <span className={hubStyles.hubEmptyText} style={{ color: C.textDisabled }}>No conversations yet</span>
               </div>
+            ) : filteredHubThreads.length < 1 ? (
+              <div className={hubStyles.hubEmpty}>
+                <span className={hubStyles.hubEmptyText} style={{ color: C.textDisabled }}>No matching conversations</span>
+              </div>
             ) : (
               <div className={hubStyles.threadList}>
-                {zSmsThreads.slice(0, sHubVisibleCount).map((item) => {
+                {filteredHubThreads.slice(0, sHubVisibleCount).map((item) => {
                   let activeWO = zAllWorkorders.find(wo => wo.customerCell === item.phone);
                   let isUnread = item.lastType === "incoming" && sHubSelectedPhone !== item.phone && (!sReadThreadPhones[item.phone] || sReadThreadPhones[item.phone] < item.lastMillis);
                   return (
@@ -1131,7 +1211,7 @@ export function MessagesComponent({}) {
                     />
                   );
                 })}
-                {sHubVisibleCount < zSmsThreads.length && (
+                {sHubVisibleCount < filteredHubThreads.length && (
                   <>
                     <div className={hubStyles.loadingMore}>Loading more…</div>
                     <div ref={hubSentinelRef} className={hubStyles.sentinel} />
@@ -1196,6 +1276,7 @@ export function MessagesComponent({}) {
             )}
           </div>
         )}
+        </div>
       </div>
     );
   }

@@ -126,7 +126,7 @@
 .zipMapsRow {
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: stretch;
   height: 30px;
   margin-top: 15px;
   flex-shrink: 0;

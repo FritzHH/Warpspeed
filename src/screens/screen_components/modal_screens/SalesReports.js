@@ -4,11 +4,12 @@ import {
   Button,
   Dialog,
   LoadingIndicator,
-  DateTimePicker,
 } from "../../../dom_components";
 import { C, COLOR_GRADIENTS } from "../../../styles";
 import { getPreviousMondayDayJS, capitalizeFirstLetterOfString, formatCurrencyDisp, formatMillisForDisplay, lightenRGBByPercent } from "../../../utils";
 import dayjs from "dayjs";
+import { DayPicker } from "react-day-picker";
+import "react-day-picker/style.css";
 import {
   queryCompletedSalesReport,
   queryActiveSalesForReport,
@@ -359,6 +360,15 @@ export const SalesReportsModal = ({ handleExit }) => {
     },
   };
 
+  let dayPickerWrapperStyle = {
+    color: "white",
+    "--rdp-accent-color": C.blue,
+    "--rdp-accent-background-color": lightenRGBByPercent(C.blue, 60),
+    "--rdp-today-color": C.red,
+    "--rdp-day-height": "32px",
+    "--rdp-day-width": "32px",
+  };
+
   function renderGroupHeader(group) {
     let isDeposit = group.transactions.some((tx) => tx.isDepositSale);
     let label = isDeposit ? "Deposit" : "Sale";
@@ -558,16 +568,22 @@ export const SalesReportsModal = ({ handleExit }) => {
               <span className={styles.calendarHeader} style={{ color: C.orange }}>
                 Begin Date
               </span>
-              <DateTimePicker
-                key={"begin-" + sCalKey}
-                modifiersStyles={calendarModifiersStyles}
-                range={{ startDate: displayStart, endDate: displayEnd }}
-                handleDateRangeChange={({ startDate, endDate }) => {
-                  _setActiveShortcut(null);
-                  if (startDate) _setPendingStart(dayjs(startDate));
-                  if (endDate) _setPendingEnd(dayjs(endDate));
-                }}
-              />
+              <div style={dayPickerWrapperStyle}>
+                <DayPicker
+                  key={"begin-" + sCalKey}
+                  mode="range"
+                  modifiersStyles={calendarModifiersStyles}
+                  selected={{
+                    from: displayStart ? new Date(displayStart) : undefined,
+                    to: displayEnd ? new Date(displayEnd) : undefined,
+                  }}
+                  onSelect={(r) => {
+                    _setActiveShortcut(null);
+                    if (r?.from) _setPendingStart(dayjs(r.from));
+                    if (r?.to || r?.from) _setPendingEnd(dayjs(r?.to || r?.from));
+                  }}
+                />
+              </div>
             </div>
 
             {/* Date Range Summary */}
@@ -636,21 +652,27 @@ export const SalesReportsModal = ({ handleExit }) => {
                       </button>
                     </div>
                   ) : (
-                    <DateTimePicker
-                      key={"end-" + sCalKey + "-" + sEndCalMonth + "-" + sEndCalYear}
-                      modifiersStyles={calendarModifiersStyles}
-                      range={{ startDate: displayStart, endDate: displayEnd }}
-                      month={new Date(sEndCalYear, sEndCalMonth, 1)}
-                      onMonthChange={(d) => {
-                        _setEndCalMonth(d.getMonth());
-                        _setEndCalYear(d.getFullYear());
-                      }}
-                      handleDateRangeChange={({ startDate, endDate }) => {
-                        _setActiveShortcut(null);
-                        if (startDate) _setPendingStart(dayjs(startDate));
-                        if (endDate) _setPendingEnd(dayjs(endDate));
-                      }}
-                    />
+                    <div style={dayPickerWrapperStyle}>
+                      <DayPicker
+                        key={"end-" + sCalKey + "-" + sEndCalMonth + "-" + sEndCalYear}
+                        mode="range"
+                        modifiersStyles={calendarModifiersStyles}
+                        selected={{
+                          from: displayStart ? new Date(displayStart) : undefined,
+                          to: displayEnd ? new Date(displayEnd) : undefined,
+                        }}
+                        month={new Date(sEndCalYear, sEndCalMonth, 1)}
+                        onMonthChange={(d) => {
+                          _setEndCalMonth(d.getMonth());
+                          _setEndCalYear(d.getFullYear());
+                        }}
+                        onSelect={(r) => {
+                          _setActiveShortcut(null);
+                          if (r?.from) _setPendingStart(dayjs(r.from));
+                          if (r?.to || r?.from) _setPendingEnd(dayjs(r?.to || r?.from));
+                        }}
+                      />
+                    </div>
                   )}
                 </div>
               );

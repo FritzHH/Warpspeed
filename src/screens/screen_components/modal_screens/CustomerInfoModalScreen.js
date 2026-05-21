@@ -630,7 +630,7 @@ export const CustomerInfoScreenModalComponent = ({
               buttonStyle={{
                 paddingTop: 2,
                 paddingBottom: 2,
-                height: 20,
+                height: "100%",
                 borderRadius: 7,
                 marginLeft: 10,
                 justifyContent: "center",

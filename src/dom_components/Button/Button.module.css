@@ -11,6 +11,37 @@
   outline-offset: 2px;
 }
 
+.lift {
+  transition: transform 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+}
+
+.lift:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px var(--shadow-color-default);
+}
+
+.lift:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 3px var(--shadow-color-default);
+}
+
+.liftIconOnly:hover {
+  box-shadow: none;
+  filter: drop-shadow(0 3px 3px var(--shadow-color-default));
+}
+
+.liftIconOnly:active {
+  box-shadow: none;
+  filter: drop-shadow(0 1px 1px var(--shadow-color-default));
+}
+
+.disabled.lift:hover,
+.disabled.lift:active {
+  transform: none;
+  box-shadow: none;
+  filter: none;
+}
+
 .inner {
   display: flex;
   align-items: center;

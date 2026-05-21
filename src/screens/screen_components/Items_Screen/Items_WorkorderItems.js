@@ -38,6 +38,9 @@ import { broadcastClear } from "../../../broadcastChannel";
 const CustomItemModal = lazy(() =>
   import("../modal_screens/CustomItemModal").then((m) => ({ default: m.CustomItemModal }))
 );
+const InventoryItemModalScreen = lazy(() =>
+  import("../modal_screens/InventoryItemModalScreen").then((m) => ({ default: m.InventoryItemModalScreen }))
+);
 import { calculateSaleTotals } from "../modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { deleteActiveSale, writeActiveSale } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import styles from "./Items_WorkorderItems.module.css";
@@ -111,6 +114,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     useState(false);
 
   const [sEditingCustomLine, _setEditingCustomLine] = useState(null);
+  const [sEditingInventoryItem, _setEditingInventoryItem] = useState(null);
   const zCasting = useOpenWorkordersStore((s) => s.castingToDisplay);
 
   // Note Helper dropdown state (lifted to parent so only one Modal exists)
@@ -761,6 +765,16 @@ export const Items_WorkorderItemsTab = ({}) => {
           />
         </Tooltip>
       </div>
+      {sEditingInventoryItem && (
+        <Suspense fallback={null}>
+          <InventoryItemModalScreen
+            key={sEditingInventoryItem.id}
+            item={sEditingInventoryItem}
+            isNew={false}
+            handleExit={() => _setEditingInventoryItem(null)}
+          />
+        </Suspense>
+      )}
       {sEditingCustomLine && (
         <Suspense fallback={null}>
           <CustomItemModal
@@ -782,6 +796,13 @@ export const Items_WorkorderItemsTab = ({}) => {
         anchorX={sNoteHelperDropdown?.anchorX || 0}
         anchorY={sNoteHelperDropdown?.anchorY || 0}
         noteHelpers={zNoteHelpers || []}
+        onViewItem={(invItem) => {
+          if (!invItem) return;
+          const freshInv = useInventoryStore.getState().inventoryArr.find(
+            (o) => o.id === invItem.id
+          );
+          _setEditingInventoryItem(freshInv || invItem);
+        }}
       />
     </div>
   );
@@ -807,6 +828,8 @@ export const LineItemComponent = ({
 }) => {
   const isCustom = inventoryItem.customPart || inventoryItem.customLabor;
   const isPlaceholder = ((inventoryItem.formalName || "") + " " + (inventoryItem.informalName || "")).toLowerCase().includes("placeholder");
+  const nameRowClickable = !isLocked && !isPlaceholder;
+  const [sNameHovered, _setNameHovered] = useState(false);
   const zPlaceholderReplaceLineID = useOpenWorkordersStore((s) => s.placeholderReplaceLineID);
   const isInReplaceMode = isPlaceholder && zPlaceholderReplaceLineID === workorderLine.id;
   const effectiveQty = localQty !== undefined ? localQty : workorderLine.qty;
@@ -851,7 +874,11 @@ export const LineItemComponent = ({
         </div>
       )}
       <div
-        className={cx(lineStyles.row, isInReplaceMode && lineStyles.rowReplaceMode)}
+        className={cx(
+          lineStyles.row,
+          isInReplaceMode && lineStyles.rowReplaceMode,
+          sNameHovered && nameRowClickable && lineStyles.rowHovered
+        )}
         style={{
           backgroundColor: rowBg,
           borderColor: rowBorderColor,
@@ -883,29 +910,23 @@ export const LineItemComponent = ({
 
                 return (
                   <>
-                    <div className={lineStyles.nameRow}>
-                      <Tooltip text="Notes" position="top">
-                        <button
-                          type="button"
-                          className={lineStyles.pencilButton}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            useLoginStore.getState().requireLogin(() => {
-                              onOpenNoteHelper?.(workorderLine, e.pageX || 0, e.pageY || 0);
-                            });
-                          }}
-                        >
-                          <img src={ICONS.editPencil} alt="" className={lineStyles.pencilIcon} />
-                        </button>
-                      </Tooltip>
-                      <div
-                        className={cx(lineStyles.nameTapArea, isCustom && !isLocked && lineStyles.nameTapAreaEditable)}
-                        onClick={(e) => {
-                          if (!isCustom || isLocked) return;
-                          e.stopPropagation();
-                          onEditCustomItem?.(workorderLine, e.pageX || 0, e.pageY || 0);
-                        }}
-                      >
+                    <div
+                      className={cx(lineStyles.nameRow, nameRowClickable && lineStyles.nameRowClickable)}
+                      onMouseEnter={() => nameRowClickable && _setNameHovered(true)}
+                      onMouseLeave={() => _setNameHovered(false)}
+                      onClick={(e) => {
+                        if (!nameRowClickable) return;
+                        e.stopPropagation();
+                        useLoginStore.getState().requireLogin(() => {
+                          if (isCustom) {
+                            onEditCustomItem?.(workorderLine, e.pageX || 0, e.pageY || 0);
+                          } else {
+                            onOpenNoteHelper?.(workorderLine, e.pageX || 0, e.pageY || 0);
+                          }
+                        });
+                      }}
+                    >
+                      <div className={lineStyles.nameTapArea}>
                         {(inventoryItem.customPart || inventoryItem.customLabor) && (
                           <Tooltip text={inventoryItem.customPart ? "Edit item" : "Edit labor charge"} position="top">
                             <div

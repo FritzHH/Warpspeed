@@ -110,6 +110,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
               multiline={true}
               numberOfLines={3}
               style={{
+                width: "100%",
                 borderColor: C.buttonLightGreenOutline,
                 borderRadius: 10,
                 borderWidth: 2,
@@ -120,6 +121,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
                 paddingRight: 10,
                 fontSize: 14,
                 color: C.text,
+                boxSizing: "border-box",
               }}
             />
           </div>

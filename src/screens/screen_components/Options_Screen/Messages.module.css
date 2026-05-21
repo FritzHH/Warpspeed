@@ -210,6 +210,27 @@
   justify-content: center;
 }
 
+.emojiButton {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  margin-right: 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+}
+
+.emojiButton:hover {
+  background-color: var(--surface-overlay-light);
+}
+
 .footerRow > *,
 .footerGroup > * {
   flex: 0 0 auto !important;
@@ -1088,6 +1109,70 @@
 .hubSidebarHeaderTitle {
   font-size: 16px;
   font-weight: 700;
+}
+
+.hubOuterRoot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.hubSearchHeader {
+  width: 100%;
+  height: 5%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.hubSearchResetBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 4px;
+  margin-right: 15px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.hubSearchResetBtn:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.hubSearchResetBtn:not(:disabled):hover {
+  background: var(--surface-overlay-light);
+}
+
+.hubSearchResetIcon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: block;
+}
+
+.hubSearchInput {
+  flex: 1;
+  min-width: 0;
+  font-size: 18px;
+  color: var(--text-default);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  outline: none;
+  padding: 0;
+}
+
+.hubSearchInput::placeholder {
+  color: var(--border-subtle);
 }
 
 .hubEmpty {

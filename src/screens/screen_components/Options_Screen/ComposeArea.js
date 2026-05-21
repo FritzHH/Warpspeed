@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import React from "react";
+import React, { useRef, useState } from "react";
 import {
   DropdownMenu as DropdownMenuDom,
   Image as ImageDom,
@@ -9,6 +9,7 @@ import {
 } from "../../../dom_components";
 import { C, ICONS } from "../../../styles";
 import { ReplyOptionsBar } from "./ReplyOptionsBar";
+import { EmojiPickerModal } from "../Items_Screen/dashboard_screen/TextTemplates/EmojiPickerModal";
 import s from "./Messages.module.css";
 
 const TRANSLATION_LANGUAGES = [
@@ -61,6 +62,48 @@ export function ComposeArea({
   let rootClass = s.composeRoot + (mode === "hub" ? " " + s["composeRoot--hub"] : "");
   let showTranslate = fromLang && toLang && fromLang !== toLang && value && value.trim();
 
+  const internalInputRef = useRef(null);
+  const inputRef = textInputRef || internalInputRef;
+  const emojiBtnRef = useRef(null);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [emojiAnchorRect, setEmojiAnchorRect] = useState(null);
+  const emojiCursorRef = useRef(null);
+
+  function captureCursor() {
+    const el = inputRef.current;
+    if (el && typeof el.selectionStart === "number") {
+      emojiCursorRef.current = el.selectionStart;
+    } else {
+      emojiCursorRef.current = (value || "").length;
+    }
+  }
+
+  function openEmojiPicker() {
+    const btn = emojiBtnRef.current;
+    if (btn) setEmojiAnchorRect(btn.getBoundingClientRect());
+    setShowEmojiPicker(true);
+  }
+
+  function handleEmojiSelect(emojiChar) {
+    const inserted = emojiChar + " ";
+    const pos = emojiCursorRef.current ?? (value || "").length;
+    const before = (value || "").slice(0, pos);
+    const after = (value || "").slice(pos);
+    const next = before + inserted + after;
+    onChange(next);
+    setShowEmojiPicker(false);
+    const newPos = pos + inserted.length;
+    setTimeout(() => {
+      const el = inputRef.current;
+      if (!el) return;
+      try {
+        el.focus();
+        el.setSelectionRange(newPos, newPos);
+        if (onSelect) onSelect({ target: el });
+      } catch (e) {}
+    }, 0);
+  }
+
   return (
     <div className={rootClass}>
       {showTranslate ? (
@@ -93,7 +136,7 @@ export function ComposeArea({
 
       <div className={s.inputRow} style={{ borderColor: C.surfaceOverlayLight }}>
         <TextInputDom
-          ref={textInputRef}
+          ref={inputRef}
           value={value}
           onChangeText={onChange}
           debounceMs={0}
@@ -106,6 +149,16 @@ export function ComposeArea({
           className={s.inputField}
           style={{ color: C.text }}
         />
+        <button
+          ref={emojiBtnRef}
+          type="button"
+          className={s.emojiButton}
+          onMouseDown={(e) => { e.preventDefault(); captureCursor(); }}
+          onClick={openEmojiPicker}
+          aria-label="Insert emoji"
+        >
+          {"\uD83D\uDE0A"}
+        </button>
         <div className={s.sendColumn}>
           <TouchableOpacityDom
             onPress={() => { if (!sendDisabled) onSend(); }}
@@ -116,6 +169,14 @@ export function ComposeArea({
           </TouchableOpacityDom>
         </div>
       </div>
+
+      {showEmojiPicker ? (
+        <EmojiPickerModal
+          onSelectEmoji={handleEmojiSelect}
+          onClose={() => setShowEmojiPicker(false)}
+          anchorRect={emojiAnchorRect}
+        />
+      ) : null}
 
       <div className={s.footerRow}>
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>

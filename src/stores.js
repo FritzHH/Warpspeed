@@ -972,11 +972,7 @@ export const useCustMessagesStore = create((set, get) => ({
   _threadsUnsub: null,
   getSmsThreads: () => get().smsThreads,
   setSmsThreads: (smsThreads) => set({ smsThreads }),
-  setThreadsUnsub: (unsub) => {
-    let prev = get()._threadsUnsub;
-    if (prev) prev();
-    set({ _threadsUnsub: unsub });
-  },
+  setThreadsUnsub: (unsub) => set({ _threadsUnsub: unsub }),
 
   // In-memory hub conversation cache (backed by IndexedDB, NOT localStorage)
   hubConversationCache: {},
@@ -1581,19 +1577,14 @@ export const useWorkorderPreviewStore = create((set, get) => ({
 export const useSettingsStore = create(
   persist(
     (set, get) => ({
-      // settingsObj: null,
       settings: null,
 
-      // getSettingsObj: () => get().settingsObj,
       getSettings: () => get().settings,
 
       setSettings: (settings, batch = true, sendToDB = true) => {
-        // clog(settingsObj);
-        // set({ settingsObj: settings });
         set({ settings });
 
         if (sendToDB) {
-          // log("savingsetting");
           dbSaveSettings(settings);
         }
       },
@@ -1828,18 +1819,10 @@ export const useEmailStore = create(
   setSyncError: (syncError) => set({ syncError }),
 
   _emailsUnsub: null,
-  setEmailsUnsub: (unsub) => {
-    let prev = get()._emailsUnsub;
-    if (prev) prev();
-    set({ _emailsUnsub: unsub });
-  },
+  setEmailsUnsub: (unsub) => set({ _emailsUnsub: unsub }),
 
   _authUnsub: null,
-  setAuthUnsub: (unsub) => {
-    let prev = get()._authUnsub;
-    if (prev) prev();
-    set({ _authUnsub: unsub });
-  },
+  setAuthUnsub: (unsub) => set({ _authUnsub: unsub }),
 
   getTotalUnreadCount: () => {
     const auth = get().emailAuth;

@@ -3,7 +3,10 @@
 
 import { initializeApp } from "firebase/app";
 import {
-  getFirestore,
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
+  setLogLevel,
   doc,
   setDoc,
   getDoc,
@@ -57,7 +60,18 @@ import { log } from "./utils";
 import { firebaseApp } from "./init";
 
 // Initialize services using the existing Firebase app
-export const DB = getFirestore(firebaseApp);
+export const DB = initializeFirestore(firebaseApp, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+  }),
+  experimentalAutoDetectLongPolling: true,
+});
+
+// Verbose Firestore SDK logging in dev — reveals cache hits vs network reads.
+// Remove or set to "error" if console noise becomes annoying.
+if (import.meta.env.DEV) {
+  setLogLevel("error");
+}
 export const RDB = getDatabase(firebaseApp);
 export const AUTH = initializeAuth(firebaseApp, { persistence: browserLocalPersistence });
 export const STORAGE = getStorage(firebaseApp);
@@ -271,10 +285,16 @@ export function firestoreSubscribe(path, callback) {
   const unsubscribe = onSnapshot(
     docRef,
     (docSnap) => {
+      const meta = {
+        fromCache: docSnap.metadata.fromCache,
+        hasPendingWrites: docSnap.metadata.hasPendingWrites,
+        changes: 1,
+        total: docSnap.exists() ? 1 : 0,
+      };
       if (docSnap.exists()) {
-        callback(docSnap.data());
+        callback(docSnap.data(), null, meta);
       } else {
-        callback(null); // Document doesn't exist
+        callback(null, null, meta); // Document doesn't exist
       }
     },
     (error) => {
@@ -303,7 +323,13 @@ export function firestoreSubscribeCollection(path, callback) {
       querySnapshot.forEach((doc) => {
         documents.push({ id: doc.id, ...doc.data() });
       });
-      callback(documents);
+      const meta = {
+        fromCache: querySnapshot.metadata.fromCache,
+        hasPendingWrites: querySnapshot.metadata.hasPendingWrites,
+        changes: querySnapshot.docChanges().length,
+        total: querySnapshot.size,
+      };
+      callback(documents, null, meta);
     },
     (error) => {
       console.error("Firestore collection subscription error:", error);

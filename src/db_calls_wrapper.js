@@ -58,6 +58,36 @@ import {
 } from "firebase/auth";
 import { collection, doc, query, orderBy, where, onSnapshot, deleteField } from "firebase/firestore";
 
+// Listener diagnostics — track attach/detach and emit metadata.
+// The active-listener counter catches duplicate-subscription bugs:
+// if you ever see `active=2` or more for the same listener name, a
+// useEffect or similar lifecycle hook isn't cleaning up its previous
+// subscription before creating a new one.
+const __listenerCounts = {};
+
+function __logListenerAttach(name) {
+  __listenerCounts[name] = (__listenerCounts[name] || 0) + 1;
+  console.log(`[${name}] ATTACHED (active=${__listenerCounts[name]})`);
+  if (__listenerCounts[name] > 1) {
+    console.warn(`[${name}] ⚠️ ${__listenerCounts[name]} active subscriptions — possible duplicate listener bug`);
+  }
+}
+
+function __logListenerDetach(name) {
+  __listenerCounts[name] = Math.max(0, (__listenerCounts[name] || 0) - 1);
+  console.log(`[${name}] DETACHED (active=${__listenerCounts[name]})`);
+}
+
+function __logListenerEmit(name, meta) {
+  if (!meta) {
+    console.log(`[${name}] EMIT`);
+    return;
+  }
+  console.log(
+    `[${name}] EMIT changes=${meta.changes} fromCache=${meta.fromCache} total=${meta.total}`
+  );
+}
+
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
@@ -2201,6 +2231,7 @@ export async function dbSearchCustomersByName(name) {
  * @returns {Function} Unsubscribe function to stop listening
  */
 export function dbListenToOpenWorkorders(onSnapshot, onError) {
+  const name = "workorders";
   try {
     const { tenantID, storeID } = getTenantAndStore();
 
@@ -2221,21 +2252,26 @@ export function dbListenToOpenWorkorders(onSnapshot, onError) {
     // Build collection path: tenants/{tenantID}/stores/{storeID}/open-workorders
     const collectionPath = buildOpenWorkordersCollectionPath(tenantID, storeID);
 
+    __logListenerAttach(name);
     // Subscribe to collection changes
     const unsubscribe = firestoreSubscribeCollection(
       collectionPath,
-      (workordersData, error) => {
+      (workordersData, error, meta) => {
         if (error) {
           log("Workorder listener error", { tenantID, storeID, error });
           if (onError) onError(error);
           return;
         }
 
+        __logListenerEmit(name, meta);
         onSnapshot(workordersData);
       }
     );
 
-    return unsubscribe;
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
   } catch (error) {
     log("Error setting up workorder listener:", error);
     if (onError) onError(error);
@@ -2244,6 +2280,7 @@ export function dbListenToOpenWorkorders(onSnapshot, onError) {
 }
 
 export function dbListenToActiveSales(onSnapshot, onError) {
+  const name = "activeSales";
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID) {
@@ -2255,18 +2292,23 @@ export function dbListenToActiveSales(onSnapshot, onError) {
       return null;
     }
     const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.ACTIVE_SALES}`;
+    __logListenerAttach(name);
     const unsubscribe = firestoreSubscribeCollection(
       collectionPath,
-      (salesData, error) => {
+      (salesData, error, meta) => {
         if (error) {
           log("Active sales listener error", { tenantID, storeID, error });
           if (onError) onError(error);
           return;
         }
+        __logListenerEmit(name, meta);
         onSnapshot(salesData);
       }
     );
-    return unsubscribe;
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
   } catch (error) {
     log("Error setting up active sales listener:", error);
     if (onError) onError(error);
@@ -2281,14 +2323,20 @@ export function dbListenToActiveSales(onSnapshot, onError) {
  * @returns {Function} unsubscribe function
  */
 export function dbListenToSingleWorkorder(workorderID, callback) {
+  const name = `singleWorkorder:${workorderID}`;
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID || !workorderID) return null;
     const path = buildOpenWorkordersCollectionPath(tenantID, storeID) + "/" + workorderID;
-    const unsubscribe = firestoreSubscribe(path, (data) => {
+    __logListenerAttach(name);
+    const unsubscribe = firestoreSubscribe(path, (data, error, meta) => {
+      __logListenerEmit(name, meta);
       callback(data ? { ...data, id: workorderID } : null);
     });
-    return unsubscribe;
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
   } catch (error) {
     log("Error setting up single workorder listener:", error);
     return null;
@@ -2301,6 +2349,7 @@ export function dbListenToSingleWorkorder(workorderID, callback) {
  * @returns {Function} Unsubscribe function to stop listening
  */
 export function dbListenToSettings(onChange, onError) {
+  const name = "settings";
   try {
     const { tenantID, storeID } = getTenantAndStore();
 
@@ -2321,18 +2370,23 @@ export function dbListenToSettings(onChange, onError) {
     // Build path: tenants/{tenantID}/stores/{storeID}/settings/settings
     const path = buildSettingsPath(tenantID, storeID);
 
+    __logListenerAttach(name);
     // Subscribe to document changes
-    const unsubscribe = firestoreSubscribe(path, (settingsData, error) => {
+    const unsubscribe = firestoreSubscribe(path, (settingsData, error, meta) => {
       if (error) {
         log("Settings listener error", { tenantID, storeID, error });
         if (onError) onError(error);
         return;
       }
 
+      __logListenerEmit(name, meta);
       onChange(settingsData, tenantID, storeID);
     });
 
-    return unsubscribe;
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
   } catch (error) {
     log("Error setting up settings listener:", error);
     if (onError) onError(error);
@@ -2346,6 +2400,7 @@ export function dbListenToSettings(onChange, onError) {
  * @returns {Function} Unsubscribe function to stop listening
  */
 export function dbListenToCurrentPunchClock(onChange, onError) {
+  const name = "punchClock";
   try {
     const { tenantID, storeID } = getTenantAndStore();
 
@@ -2366,18 +2421,23 @@ export function dbListenToCurrentPunchClock(onChange, onError) {
     // Build path: tenants/{tenantID}/stores/{storeID}/punch_clock/current
     const path = buildCurrentPunchClockPath(tenantID, storeID);
 
+    __logListenerAttach(name);
     // Subscribe to document changes
-    const unsubscribe = firestoreSubscribe(path, (punchClockData, error) => {
+    const unsubscribe = firestoreSubscribe(path, (punchClockData, error, meta) => {
       if (error) {
         log("Current punch clock listener error", { tenantID, storeID, error });
         if (onError) onError(error);
         return;
       }
       if (!punchClockData) punchClockData = {};
+      __logListenerEmit(name, meta);
       onChange(punchClockData);
     });
 
-    return unsubscribe;
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
   } catch (error) {
     log("Error setting up current punch clock listener:", error);
     if (onError) onError(error);
@@ -2391,6 +2451,7 @@ export function dbListenToCurrentPunchClock(onChange, onError) {
  * @returns {Function} Unsubscribe function to stop listening
  */
 export function dbListenToInventory(onSnapshot, onError) {
+  const name = "inventory";
   try {
     const { tenantID, storeID } = getTenantAndStore();
 
@@ -2411,21 +2472,26 @@ export function dbListenToInventory(onSnapshot, onError) {
     // Build collection path: tenants/{tenantID}/stores/{storeID}/inventory
     const collectionPath = buildInventoryCollectionPath(tenantID, storeID);
 
+    __logListenerAttach(name);
     // Subscribe to collection changes
     const unsubscribe = firestoreSubscribeCollection(
       collectionPath,
-      (inventoryData, error) => {
+      (inventoryData, error, meta) => {
         if (error) {
           log("Inventory listener error", { tenantID, storeID, error });
           if (onError) onError(error);
           return;
         }
 
+        __logListenerEmit(name, meta);
         onSnapshot(inventoryData);
       }
     );
 
-    return unsubscribe;
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
   } catch (error) {
     log("Error setting up inventory listener:", error);
     if (onError) onError(error);
@@ -2434,11 +2500,20 @@ export function dbListenToInventory(onSnapshot, onError) {
 }
 
 export function dbListenToDevLogs(docName, callback) {
+  const name = `devLogs:${docName}`;
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID) return null;
     const path = `tenants/${tenantID}/stores/${storeID}/dev-logs/${docName}`;
-    return firestoreSubscribe(path, callback);
+    __logListenerAttach(name);
+    const unsubscribe = firestoreSubscribe(path, (data, error, meta) => {
+      __logListenerEmit(name, meta);
+      callback(data, error);
+    });
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
   } catch (error) {
     log("Error setting up dev log listener:", error);
     return null;
@@ -2511,10 +2586,14 @@ export function dbListenToPaymentReaderUpdates(
       paymentIntentID
     );
 
+    const updatesName = `paymentReaderUpdates:${readerID}:${paymentIntentID}`;
+    const completionsName = `paymentReaderCompletions:${readerID}:${paymentIntentID}`;
+
+    __logListenerAttach(updatesName);
     // Subscribe to updates
     const unsubscribeUpdates = firestoreSubscribe(
       updatesPath,
-      (updateData, error) => {
+      (updateData, error, meta) => {
         if (error) {
           log("Payment reader updates listener error", {
             tenantID,
@@ -2526,14 +2605,16 @@ export function dbListenToPaymentReaderUpdates(
           return;
         }
 
+        __logListenerEmit(updatesName, meta);
         onUpdate(updateData);
       }
     );
 
+    __logListenerAttach(completionsName);
     // Subscribe to completions
     const unsubscribeCompletions = firestoreSubscribe(
       completionsPath,
-      (completionData, error) => {
+      (completionData, error, meta) => {
         if (error) {
           log("Payment reader completions listener error", {
             tenantID,
@@ -2545,17 +2626,27 @@ export function dbListenToPaymentReaderUpdates(
           return;
         }
 
+        __logListenerEmit(completionsName, meta);
         onCompletion(completionData);
       }
     );
 
+    const unsubscribeUpdatesWrapped = () => {
+      __logListenerDetach(updatesName);
+      unsubscribeUpdates();
+    };
+    const unsubscribeCompletionsWrapped = () => {
+      __logListenerDetach(completionsName);
+      unsubscribeCompletions();
+    };
+
     // Return object with both unsubscribe functions
     return {
-      unsubscribeUpdates,
-      unsubscribeCompletions,
+      unsubscribeUpdates: unsubscribeUpdatesWrapped,
+      unsubscribeCompletions: unsubscribeCompletionsWrapped,
       unsubscribe: () => {
-        unsubscribeUpdates();
-        unsubscribeCompletions();
+        unsubscribeUpdatesWrapped();
+        unsubscribeCompletionsWrapped();
       },
     };
   } catch (error) {
@@ -3171,13 +3262,20 @@ export async function dbGetAllMessageThreads() {
  * @returns {Function} unsubscribe function
  */
 export function dbListenToActiveMessageThreads(callback, onError) {
+  const name = "messageThreads";
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID) return null;
     const smsRef = collection(DB, "tenants", tenantID, "stores", storeID, "sms-messages");
+    __logListenerAttach(name);
     const unsub = onSnapshot(
       smsRef,
       (snapshot) => {
+        __logListenerEmit(name, {
+          fromCache: snapshot.metadata.fromCache,
+          changes: snapshot.docChanges().length,
+          total: snapshot.size,
+        });
         const changes = [];
         snapshot.docChanges().forEach((change) => {
           changes.push({ type: change.type, phone: change.doc.id, ...change.doc.data() });
@@ -3189,7 +3287,10 @@ export function dbListenToActiveMessageThreads(callback, onError) {
         if (onError) onError(error);
       }
     );
-    return unsub;
+    return () => {
+      __logListenerDetach(name);
+      unsub();
+    };
   } catch (error) {
     log("Error setting up active threads listener", { error });
     if (onError) onError(error);
@@ -3348,12 +3449,13 @@ export async function dbGetCustomerMessages(
 }
 
 export function dbListenToCustomerMessages(customerPhone, callback) {
+  const cleanPhone = (customerPhone || "").replace(/\D/g, "");
+  const name = `customerMessages:${cleanPhone}`;
   try {
     if (!customerPhone || typeof customerPhone !== "string") {
       log("Error: customerPhone is required for dbListenToCustomerMessages");
       return null;
     }
-    const cleanPhone = customerPhone.replace(/\D/g, "");
     if (cleanPhone.length !== 10) {
       log("Error: phone must be 10 digits for dbListenToCustomerMessages");
       return null;
@@ -3365,9 +3467,15 @@ export function dbListenToCustomerMessages(customerPhone, callback) {
     }
     const messagesRef = collection(DB, "tenants", tenantID, "stores", storeID, "sms-messages", cleanPhone, "messages");
     const messagesQuery = query(messagesRef, orderBy("millis", "asc"));
+    __logListenerAttach(name);
     const unsubscribe = onSnapshot(
       messagesQuery,
       (querySnapshot) => {
+        __logListenerEmit(name, {
+          fromCache: querySnapshot.metadata.fromCache,
+          changes: querySnapshot.docChanges().length,
+          total: querySnapshot.size,
+        });
         const messages = [];
         querySnapshot.forEach((doc) => {
           const data = doc.data();
@@ -3402,7 +3510,10 @@ export function dbListenToCustomerMessages(customerPhone, callback) {
         callback([]);
       }
     );
-    return unsubscribe;
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
   } catch (error) {
     log("Error setting up customer messages listener:", error);
     return null;
@@ -3410,17 +3521,24 @@ export function dbListenToCustomerMessages(customerPhone, callback) {
 }
 
 export function dbListenToNewMessages(customerPhone, afterMillis, callback) {
+  const cleanPhone = (customerPhone || "").replace(/\D/g, "");
+  const name = `newMessages:${cleanPhone}`;
   try {
     if (!customerPhone || typeof customerPhone !== "string") return null;
-    const cleanPhone = customerPhone.replace(/\D/g, "");
     if (cleanPhone.length !== 10) return null;
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID) return null;
     const messagesRef = collection(DB, "tenants", tenantID, "stores", storeID, "sms-messages", cleanPhone, "messages");
     const messagesQuery = query(messagesRef, orderBy("millis", "asc"), where("millis", ">", afterMillis));
+    __logListenerAttach(name);
     const unsubscribe = onSnapshot(
       messagesQuery,
       (querySnapshot) => {
+        __logListenerEmit(name, {
+          fromCache: querySnapshot.metadata.fromCache,
+          changes: querySnapshot.docChanges().length,
+          total: querySnapshot.size,
+        });
         const messages = [];
         querySnapshot.forEach((doc) => {
           const data = doc.data();
@@ -3454,7 +3572,10 @@ export function dbListenToNewMessages(customerPhone, afterMillis, callback) {
         log("New messages listener error", { phone: cleanPhone, error });
       }
     );
-    return unsubscribe;
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
   } catch (error) {
     log("Error setting up new messages listener:", error);
     return null;
@@ -3665,6 +3786,7 @@ function buildEmailAuthCollectionPath(tenantID, storeID) {
 }
 
 export function dbListenToEmails(onSnapshot, onError) {
+  const name = "emails";
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID) {
@@ -3676,15 +3798,20 @@ export function dbListenToEmails(onSnapshot, onError) {
       return null;
     }
     const collectionPath = buildEmailsCollectionPath(tenantID, storeID);
-    const unsubscribe = firestoreSubscribeCollection(collectionPath, (data, error) => {
+    __logListenerAttach(name);
+    const unsubscribe = firestoreSubscribeCollection(collectionPath, (data, error, meta) => {
       if (error) {
         log("Email listener error", { tenantID, storeID, error });
         if (onError) onError(error);
         return;
       }
+      __logListenerEmit(name, meta);
       onSnapshot(data);
     });
-    return unsubscribe;
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
   } catch (error) {
     log("Error setting up email listener:", error);
     if (onError) onError(error);
@@ -3693,6 +3820,7 @@ export function dbListenToEmails(onSnapshot, onError) {
 }
 
 export function dbListenToEmailAuth(onSnapshot, onError) {
+  const name = "emailAuth";
   try {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID) {
@@ -3704,15 +3832,20 @@ export function dbListenToEmailAuth(onSnapshot, onError) {
       return null;
     }
     const collectionPath = buildEmailAuthCollectionPath(tenantID, storeID);
-    const unsubscribe = firestoreSubscribeCollection(collectionPath, (data, error) => {
+    __logListenerAttach(name);
+    const unsubscribe = firestoreSubscribeCollection(collectionPath, (data, error, meta) => {
       if (error) {
         log("Email auth listener error", { tenantID, storeID, error });
         if (onError) onError(error);
         return;
       }
+      __logListenerEmit(name, meta);
       onSnapshot(data);
     });
-    return unsubscribe;
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
   } catch (error) {
     log("Error setting up email auth listener:", error);
     if (onError) onError(error);
@@ -3796,6 +3929,7 @@ function getEmailStoreState() {
 // ============================================================================
 
 export function dbListenToSubscription(onChange, onError) {
+  const name = "subscription";
   try {
     const { tenantID } = getTenantAndStore();
     if (!tenantID) {
@@ -3807,15 +3941,20 @@ export function dbListenToSubscription(onChange, onError) {
       return null;
     }
     const path = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.SUBSCRIPTION}/${DB_NODES.FIRESTORE.SUBSCRIPTION}`;
-    const unsubscribe = firestoreSubscribe(path, (data, error) => {
+    __logListenerAttach(name);
+    const unsubscribe = firestoreSubscribe(path, (data, error, meta) => {
       if (error) {
         log("Subscription listener error", { tenantID, error });
         if (onError) onError(error);
         return;
       }
+      __logListenerEmit(name, meta);
       onChange(data);
     });
-    return unsubscribe;
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
   } catch (error) {
     log("Error setting up subscription listener:", error);
     if (onError) onError(error);

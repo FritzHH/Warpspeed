@@ -70,14 +70,26 @@ const storage = getStorage(firebaseApp);
 // Connect to local emulators when running in dev mode with the emulator flag set.
 // Production builds (yarn build) never enter this branch because import.meta.env.DEV
 // is false. The flag is set by the `yarn start:emulator` script via cross-env.
-if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true") {
+const USING_EMULATORS =
+  import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true";
+
+if (USING_EMULATORS) {
   connectFirestoreEmulator(DB, "localhost", 8080);
   connectDatabaseEmulator(RDB, "localhost", 9000);
   connectAuthEmulator(AUTH, "http://localhost:9099", { disableWarnings: true });
   connectStorageEmulator(STORAGE, "localhost", 9199);
   connectFunctionsEmulator(FUNCTIONS, "localhost", 5001);
-  console.warn(
-    "[warpspeed] Connected to Firebase LOCAL EMULATORS — no production data in use"
+  console.log(
+    "%c[warpspeed] 🔧 EMULATOR MODE — connected to local Firebase emulators (no production data)",
+    "background:#d97706;color:white;font-weight:bold;padding:4px 8px;border-radius:4px;",
+  );
+  console.log(
+    "[warpspeed] Emulator ports → Firestore:8080  RTDB:9000  Auth:9099  Storage:9199  Functions:5001  UI:http://localhost:4000",
+  );
+} else {
+  console.log(
+    "%c[warpspeed] ☁️  PRODUCTION FIREBASE — connected to real project (reads are billed)",
+    "background:#0369a1;color:white;font-weight:bold;padding:4px 8px;border-radius:4px;",
   );
 }
 

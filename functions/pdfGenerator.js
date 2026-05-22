@@ -424,6 +424,28 @@ function generateRefundReceiptPDF(data) {
   doc.text(typeLabel + " REFUND", leftX, y);
   y += 14;
 
+  if ((data.refundType || "").toLowerCase() === "card") {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    let cardName = data.cardIssuer && data.cardIssuer !== "Unknown" ? data.cardIssuer : (data.cardType || "Card");
+    let last4 = data.cardLast4 || "";
+    if (cardName || last4) {
+      doc.text(cardName + (last4 ? "  \u2022\u2022\u2022\u2022 " + last4 : ""), leftX, y);
+      y += 11;
+    }
+    if (data.cardExpMonth && data.cardExpYear) {
+      let mm = String(data.cardExpMonth).padStart(2, "0");
+      let yy = String(data.cardExpYear).slice(-2);
+      doc.text("Exp: " + mm + "/" + yy, leftX, y);
+      y += 11;
+    }
+    if (data.cardRefundID) {
+      doc.text("Ref ID: " + data.cardRefundID, leftX, y);
+      y += 11;
+    }
+    y += 2;
+  }
+
   if (data.workorderLines && data.workorderLines.length > 0) {
     y = addLineItems(doc, data.workorderLines, y, leftX, rightX, margin, false, DEFAULT_SALE_LABELS);
     y = addDivider(doc, y, leftX, rightX);
@@ -437,14 +459,30 @@ function generateRefundReceiptPDF(data) {
   doc.text("Refund Amount: $" + formatCents(data.refundAmount || data.total || 0), leftX, y);
   y += 16;
 
-  if (data.refundNotes) {
+  let reasonText = "";
+  let reasonInitials = "";
+  if (data.refundNotes && typeof data.refundNotes === "object") {
+    reasonText = data.refundNotes.reason || "";
+    reasonInitials = data.refundNotes.userInitials || "";
+  } else if (typeof data.refundNotes === "string") {
+    reasonText = data.refundNotes;
+  }
+  if (reasonText) {
     doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("Reason:", leftX, y);
+    y += 11;
     doc.setFont("helvetica", "normal");
-    let noteLines = doc.splitTextToSize("Notes: " + data.refundNotes, contentWidth);
+    let noteLines = doc.splitTextToSize(reasonText, contentWidth);
     noteLines.forEach(function (nl) {
       doc.text(nl, leftX, y);
       y += 10;
     });
+    if (reasonInitials) {
+      doc.setFont("helvetica", "italic");
+      doc.text("- " + reasonInitials, leftX, y);
+      y += 10;
+    }
     y += 4;
   }
 
@@ -716,16 +754,8 @@ function generateWorkorderTicketPDF(data) {
     doc.text("Colors: " + colors, leftX, y);
     y += 12;
   }
-  if (isIntake && data.waitTime) {
-    doc.text("Estimate: " + data.waitTime, leftX, y);
-    y += 12;
-  }
-  if (isIntake && data.waitTimeEstimateLabel) {
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text(data.waitTimeEstimateLabel, leftX, y);
-    doc.setTextColor(0);
-    doc.setFontSize(9);
+  if (isIntake && (data.waitTimeEstimateLabel || data.waitTime)) {
+    doc.text("Estimate: " + (data.waitTimeEstimateLabel || data.waitTime), leftX, y);
     y += 12;
   }
 

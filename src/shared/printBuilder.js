@@ -371,7 +371,7 @@ function createPrintBase(workorder, customer, salesTaxPercent, context) {
   r.barcode = r.id;
   r.shopName = _settings.storeInfo?.displayName || SHOP_NAME;
   r.waitTime = workorder.waitTime?.label;
-  r.waitTimeEstimateLabel = calculateWaitEstimateLabel(workorder, _settings) || "";
+  r.waitTimeEstimateLabel = annotateRelativeDayLabel(calculateWaitEstimateLabel(workorder, _settings) || "");
   if (workorder.partOrderEstimateMillis) {
     var d = new Date(Number(workorder.partOrderEstimateMillis));
     r.partEstimatedDelivery = getWordDayOfWeek(workorder.partOrderEstimateMillis, true) + ", " + getWordMonth(workorder.partOrderEstimateMillis) + " " + d.getDate();
@@ -409,7 +409,6 @@ var printBuilder = {
   workorder: function (workorder, customer, salesTaxPercent, context) {
     var receipt = createPrintBase(workorder, customer, salesTaxPercent, context);
     receipt.receiptType = RECEIPT_TYPES.workorder;
-    receipt.waitTimeEstimateLabel = annotateRelativeDayLabel(receipt.waitTimeEstimateLabel);
     return receipt;
   },
   intake: function (workorder, customer, salesTaxPercent, context) {
@@ -471,6 +470,21 @@ var printBuilder = {
     receipt.originalSaleID = sale?.id || "";
     receipt.originalSaleTotal = sale?.total || 0;
     receipt.cardRefundID = refund.stripeRefundID || "";
+
+    // Card details — sourced from the parent transaction
+    if ((refund.method || "") === "card") {
+      var _txns = _ctx.transactions || [];
+      var _parentTxn = _ctx.parentTransaction
+        || _txns.find(function (t) { return t && t.id === refund.transactionID; })
+        || null;
+      if (_parentTxn) {
+        receipt.cardType = _parentTxn.cardType || "";
+        receipt.cardIssuer = _parentTxn.cardIssuer || "";
+        receipt.cardLast4 = _parentTxn.last4 || "";
+        receipt.cardExpMonth = _parentTxn.expMonth || "";
+        receipt.cardExpYear = _parentTxn.expYear || "";
+      }
+    }
 
     receipt.previousRefunds = (_ctx.previousRefunds || []).map(function (pr) {
       var prNotes = pr.notes;

@@ -1,6 +1,7 @@
 /* eslint-disable */
 import { useEffect, useInsertionEffect, useRef } from "react";
 import { getNewCollectionRef, dbSendSMS, dbSendEmail } from "./db_calls_wrapper";
+import { translateText } from "./db_calls";
 import {
   CONTACT_RESTRICTIONS,
   CUSTOMER_PROTO,
@@ -2352,6 +2353,31 @@ export function resolveTemplateStandalone(templateStr, workorder, customer, sett
 
 const PENDING_AUTO_TEXT_KEY = "warpspeed_pending_auto_texts";
 
+const AUTO_TEXT_LANG_NAME_TO_CODE = {
+  English: "en",
+  Spanish: "es",
+  French: "fr",
+  German: "de",
+  Creole: "ht",
+  Arabic: "ar",
+};
+
+async function translateAutoTextIfNeeded(text, languageName) {
+  if (!text || !languageName) return text;
+  let code = AUTO_TEXT_LANG_NAME_TO_CODE[languageName];
+  if (!code || code === "en") return text;
+  try {
+    let result = await translateText({ text, targetLanguage: code, sourceLanguage: "en" });
+    let translated = result?.data?.data?.translatedText;
+    if (typeof translated === "string" && translated) return translated;
+    if (Array.isArray(translated) && translated[0]) return translated[0];
+    return text;
+  } catch (e) {
+    console.log("Auto-text translation failed, sending original:", e);
+    return text;
+  }
+}
+
 function persistPendingAutoText(msg) {
   try {
     let arr = JSON.parse(localStorage.getItem(PENDING_AUTO_TEXT_KEY) || "[]");
@@ -2375,6 +2401,8 @@ function removePendingAutoText(id) {
 async function executeAutoText(msg) {
   try {
     if (msg.smsMessage && msg.customerCell) {
+      const finalSmsMessage = await translateAutoTextIfNeeded(msg.smsMessage, msg.customerLanguage);
+
       // Reuse a pre-assigned ID when present so the optimistic placeholder
       // and the eventual Firestore-listener message share the same id and
       // mergeMessages can swap one for the other.
@@ -2389,7 +2417,7 @@ async function executeAutoText(msg) {
         msgStore.setOutgoingMessage({
           ...SMS_PROTO,
           id: smsID,
-          message: msg.smsMessage,
+          message: finalSmsMessage,
           phoneNumber: msg.customerCell,
           customerID: msg.customerID || "",
           type: "outgoing",
@@ -2401,7 +2429,7 @@ async function executeAutoText(msg) {
       }
 
       const result = await dbSendSMS({
-        message: msg.smsMessage,
+        message: finalSmsMessage,
         phoneNumber: msg.customerCell,
         customerID: msg.customerID || "",
         id: smsID,
@@ -2477,6 +2505,7 @@ export function scheduleAutoText(rule, workorder, settings) {
     customerCell: cell,
     customerEmail: email,
     customerID: workorder?.customerID || "",
+    customerLanguage: workorder?.customerLanguage || "",
     smsMessage,
     emailSubject,
     emailBody,

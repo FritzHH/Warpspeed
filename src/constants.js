@@ -221,6 +221,7 @@ export const DB_NODES = {
     PAYMENT_PROCESSING: "payment-processing",
     COMPLETED_WORKORDERS: "completed-workorders",
     COMPLETED_SALES: "completed-sales",
+    DELETED_WORKORDERS: "deleted-workorders",
     ACTIVE_SALES: "active-sales",
     TRANSACTIONS: "transactions",
     ARCHIVE_LOGS: "archive-logs",

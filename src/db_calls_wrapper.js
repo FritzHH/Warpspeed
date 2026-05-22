@@ -127,6 +127,14 @@ function buildCompletedWorkorderPath(tenantID, storeID, workorderID) {
   return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.COMPLETED_WORKORDERS}/${workorderID}`;
 }
 
+function buildDeletedWorkorderPath(tenantID, storeID, workorderID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.DELETED_WORKORDERS}/${workorderID}`;
+}
+
+function buildDeletedWorkordersCollectionPath(tenantID, storeID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.DELETED_WORKORDERS}`;
+}
+
 function buildCompletedSalePath(tenantID, storeID, saleID) {
   return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.COMPLETED_SALES}/${saleID}`;
 }
@@ -1647,6 +1655,147 @@ export async function dbDeleteWorkorder(workorderID) {
       tenantID: null,
       storeID: null,
     };
+  }
+}
+
+export async function dbSoftDeleteWorkorder(workorderID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !workorderID) {
+      return { success: false, error: "Validation Error", message: "tenantID, storeID, and workorderID are required" };
+    }
+
+    const openPath = buildWorkorderPath(tenantID, storeID, workorderID);
+    const workorder = await firestoreRead(openPath);
+    if (!workorder) {
+      log(`dbSoftDeleteWorkorder: workorder ${workorderID} not found at ${openPath}`);
+      return { success: false, error: "Not Found", message: "Workorder not found" };
+    }
+
+    const currentUser = useLoginStore.getState().getCurrentUser?.() || useLoginStore.getState().currentUser || null;
+    const userID = currentUser?.id || "";
+    const userName = [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(" ").trim() || currentUser?.email || "";
+    const deletedDoc = {
+      ...workorder,
+      _deletedAt: Date.now(),
+      _deletedBy: userName || userID,
+      _deletedByUserID: userID,
+      _deletedActiveSaleID: workorder.activeSaleID || "",
+      _deletedCustomerID: workorder.customerID || "",
+    };
+
+    const deletedPath = buildDeletedWorkorderPath(tenantID, storeID, workorderID);
+    const writeResult = await firestoreWrite(deletedPath, deletedDoc);
+    if (!writeResult || writeResult.success === false) {
+      return { success: false, error: "Write Failed", message: writeResult?.error || "Failed to write soft-delete record" };
+    }
+    await firestoreDelete(openPath);
+
+    return { success: true, workorderID, tenantID, storeID };
+  } catch (error) {
+    log("Error in dbSoftDeleteWorkorder:", error);
+    return { success: false, error: "Database Error", message: "An error occurred while soft-deleting the workorder" };
+  }
+}
+
+export async function dbRehydrateWorkorder(workorderID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !workorderID) {
+      return { success: false, error: "Validation Error", message: "tenantID, storeID, and workorderID are required" };
+    }
+
+    const deletedPath = buildDeletedWorkorderPath(tenantID, storeID, workorderID);
+    const deletedDoc = await firestoreRead(deletedPath);
+    if (!deletedDoc) {
+      return { success: false, error: "Not Found", message: "Deleted workorder not found (may have been purged)" };
+    }
+
+    const { _deletedAt, _deletedBy, _deletedActiveSaleID, _deletedCustomerID, ...restored } = deletedDoc;
+    // Clear sale linkage on restore — captured money/credits/deposits stayed with the sale, not the WO.
+    restored.activeSaleID = "";
+    restored.saleID = "";
+
+    const openPath = buildWorkorderPath(tenantID, storeID, workorderID);
+    await firestoreWrite(openPath, restored);
+    await firestoreDelete(deletedPath);
+
+    // Re-link to customer.workorders array if customerID present
+    if (restored.customerID) {
+      try {
+        const customer = await dbGetCustomer(restored.customerID);
+        if (customer && !(customer.workorders || []).includes(workorderID)) {
+          const updated = { ...customer, workorders: [...(customer.workorders || []), workorderID] };
+          await dbSaveCustomer(updated);
+        }
+      } catch (linkErr) {
+        log("Warning: failed to re-link rehydrated workorder to customer:", linkErr);
+      }
+    }
+
+    log(`Rehydrated workorder ${workorderID}`);
+    return { success: true, workorderID, workorder: restored };
+  } catch (error) {
+    log("Error in dbRehydrateWorkorder:", error);
+    return { success: false, error: "Database Error", message: "An error occurred while rehydrating the workorder" };
+  }
+}
+
+export async function dbListDeletedWorkorders(sinceMillis = 0) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      return { success: false, error: "Validation Error", message: "tenantID and storeID are required", workorders: [] };
+    }
+
+    const collectionPath = buildDeletedWorkordersCollectionPath(tenantID, storeID);
+    // No where/orderBy — orderBy would exclude docs missing `_deletedAt`, and the
+    // collection is small (nightly cleanup). Filter + sort in JS.
+    const results = await firestoreQuery(collectionPath, [], {});
+    const filtered = (results || []).filter((wo) => !sinceMillis || (wo._deletedAt || 0) >= sinceMillis);
+    filtered.sort((a, b) => (b._deletedAt || 0) - (a._deletedAt || 0));
+    return { success: true, workorders: filtered };
+  } catch (error) {
+    log("Error in dbListDeletedWorkorders:", error);
+    return { success: false, error: "Database Error", message: "An error occurred while listing deleted workorders", workorders: [] };
+  }
+}
+
+export async function dbListCompletedSalesSince(sinceMillis) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      return { success: false, error: "Validation Error", sales: [] };
+    }
+    const path = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.COMPLETED_SALES}`;
+    const results = await firestoreQuery(
+      path,
+      [{ field: "millis", operator: ">=", value: sinceMillis }],
+      { orderBy: { field: "millis", direction: "desc" }, limit: 500 }
+    );
+    return { success: true, sales: results || [] };
+  } catch (error) {
+    log("Error in dbListCompletedSalesSince:", error);
+    return { success: false, error: "Database Error", sales: [] };
+  }
+}
+
+export async function dbListCompletedWorkordersSince(sinceMillis) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      return { success: false, error: "Validation Error", workorders: [] };
+    }
+    const path = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.COMPLETED_WORKORDERS}`;
+    const results = await firestoreQuery(
+      path,
+      [{ field: "endedOnMillis", operator: ">=", value: sinceMillis }],
+      { orderBy: { field: "endedOnMillis", direction: "desc" }, limit: 500 }
+    );
+    return { success: true, workorders: results || [] };
+  } catch (error) {
+    log("Error in dbListCompletedWorkordersSince:", error);
+    return { success: false, error: "Database Error", workorders: [] };
   }
 }
 
@@ -3600,10 +3749,10 @@ export async function dbGmailSendEmail(emailData) {
   });
 }
 
-export async function dbGmailModifyLabels(messageIds, addLabelIds, removeLabelIds) {
+export async function dbGmailModifyLabels(messageIds, addLabelIds, removeLabelIds, accountKeyOverride) {
   const { tenantID, storeID } = getTenantAndStore();
   if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
-  const accountKey = getEmailStoreState().activeAccountKey;
+  const accountKey = accountKeyOverride || getEmailStoreState().activeAccountKey;
   return gmailModifyLabels({ tenantID, storeID, accountKey, messageIds, addLabelIds, removeLabelIds });
 }
 

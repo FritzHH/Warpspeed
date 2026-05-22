@@ -25,6 +25,8 @@ export const AlertBox = ({ showAlert }) => {
   const zIcon3Size = useAlertScreenStore((state) => state.icon3Size);
   const zAlertBoxStyle = useAlertScreenStore((state) => state.alertBoxStyle);
   const zUseCancelButton = useAlertScreenStore((state) => state.useCancelButton);
+  const zAutoDismiss = useAlertScreenStore((state) => state.autoDismiss);
+  const zAutoDismissMs = useAlertScreenStore((state) => state.autoDismissMs);
 
   const [fadedIn, setFadedIn] = useState(false);
 
@@ -36,7 +38,17 @@ export const AlertBox = ({ showAlert }) => {
     }
   }, [showAlert]);
 
-  const showCancel = zUseCancelButton || (!zButton2Handler && !zButton3Handler);
+  useEffect(() => {
+    if (!showAlert || !zAutoDismiss) return;
+    const ms = zAutoDismissMs > 0 ? zAutoDismissMs : 4000;
+    const t = setTimeout(() => {
+      useAlertScreenStore.getState().setShowAlert(false);
+      setTimeout(() => useAlertScreenStore.getState().resetAll(), 100);
+    }, ms);
+    return () => clearTimeout(t);
+  }, [showAlert, zAutoDismiss, zAutoDismissMs]);
+
+  const showCancel = !zAutoDismiss && (zUseCancelButton || (!zButton2Handler && !zButton3Handler));
 
   function dismissAlert() {
     useAlertScreenStore.getState().setShowAlert(false);
@@ -98,6 +110,7 @@ export const AlertBox = ({ showAlert }) => {
               )}
             </div>
 
+            {!zAutoDismiss && (
             <div className={styles.buttonRow}>
               <AlertDialogPrimitive.Action asChild>
                 <Button
@@ -137,6 +150,7 @@ export const AlertBox = ({ showAlert }) => {
                 </AlertDialogPrimitive.Action>
               )}
             </div>
+            )}
 
             {showCancel && (
               <div className={styles.cancelWrapper}>

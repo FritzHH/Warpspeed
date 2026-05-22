@@ -254,6 +254,8 @@ export function NewCheckoutModalScreen() {
   const [sRefundPayment, _setRefundPayment] = useState(null);
   const [sSplitDepositPayment, _setSplitDepositPayment] = useState(null);
   const [sExpandedCreditIds, _setExpandedCreditIds] = useState([]);
+  const [sDepositInputDisp, _setDepositInputDisp] = useState("");
+  const [sDepositInputCents, _setDepositInputCents] = useState(0);
   const [sShowSendReceiptModal, _sSetShowSendReceiptModal] = useState(false);
   const [sReceiptSentOverlay, _setReceiptSentOverlay] = useState(null);
   const [sTransactions, _setTransactions] = useState([]);   // real payments (cash/card)
@@ -681,14 +683,18 @@ export function NewCheckoutModalScreen() {
   }
 
   // ─── Deposit / Credit Application ───────────────────────
-  function handleApplyDeposit(deposit) {
-    dlog(DCAT.BUTTON, "handleApplyDeposit", "CheckoutModal", { depositID: deposit?.id, amountCents: deposit?.amountCents, type: deposit?._type, saleID: sSale?.id });
+  function handleApplyDeposit(deposit, requestedAmountCents) {
+    dlog(DCAT.BUTTON, "handleApplyDeposit", "CheckoutModal", { depositID: deposit?.id, amountCents: deposit?.amountCents, type: deposit?._type, requestedAmountCents, saleID: sSale?.id });
     if (!sSale || sSale.paymentComplete) return;
     let amountNeeded = (sSale.total || 0) - (sSale.amountCaptured || 0);
     if (amountNeeded <= 0) return;
 
     let isCredit = deposit._type === "credit";
-    let appliedAmount = Math.min(deposit.amountCents, amountNeeded);
+    let maxApplicable = Math.min(deposit.amountCents, amountNeeded);
+    let appliedAmount = requestedAmountCents > 0
+      ? Math.min(requestedAmountCents, maxApplicable)
+      : maxApplicable;
+    if (appliedAmount <= 0) return;
 
     // Create a credit entry (not a transaction)
     let credit = {
@@ -1906,16 +1912,58 @@ export function NewCheckoutModalScreen() {
                       let badgeColor = isGiftCard ? C.orange : isCredit ? C.blue : C.green;
                       let noteText = item.note || item.text || "";
                       let isExpanded = sExpandedCreditIds.includes(item.id);
+                      let amountNeeded = Math.max(0, (sSale?.total || 0) - (sSale?.amountCaptured || 0));
+                      let smartAmount = Math.min(item.amountCents, amountNeeded);
+                      let hasTyped = sDepositInputCents > 0;
+                      let buttonAmount = hasTyped ? sDepositInputCents : smartAmount;
+                      let buttonLabel = hasTyped ? "Apply" : "Apply $" + formatCurrencyDisp(smartAmount);
+                      function toggleExpand() {
+                        if (isExpanded) {
+                          _setExpandedCreditIds([]);
+                        } else {
+                          _setExpandedCreditIds([item.id]);
+                        }
+                        _setDepositInputDisp("");
+                        _setDepositInputCents(0);
+                      }
+                      function handleAmountChange(val) {
+                        let result = usdTypeMask(val, { withDollar: false });
+                        if (result.cents === 0) {
+                          _setDepositInputDisp("");
+                          _setDepositInputCents(0);
+                          return;
+                        }
+                        let maxApplicable = Math.min(item.amountCents, amountNeeded);
+                        if (result.cents > maxApplicable) {
+                          _setDepositInputDisp(formatCurrencyDisp(maxApplicable));
+                          _setDepositInputCents(maxApplicable);
+                          return;
+                        }
+                        _setDepositInputDisp(result.display);
+                        _setDepositInputCents(result.cents);
+                      }
+                      function handleApplyClick() {
+                        if (buttonAmount <= 0) return;
+                        handleApplyDeposit(item, buttonAmount);
+                        _setExpandedCreditIds([]);
+                        _setDepositInputDisp("");
+                        _setDepositInputCents(0);
+                      }
                       return (
                         <div key={item.id} className={styles.depositRow}>
-                          <div className={styles.depositRowInner}>
-                            <CheckBox
-                              text=""
-                              isChecked={false}
-                              onCheck={() => handleApplyDeposit(item)}
-                              buttonStyle={{ marginRight: 6 }}
-                              iconSize={20}
-                            />
+                          <div
+                            className={styles.depositRowInner}
+                            onClick={toggleExpand}
+                            role="button"
+                            tabIndex={0}
+                            style={{ cursor: "pointer" }}
+                          >
+                            <span
+                              className={styles.depositExpandChevron}
+                              style={{ color: C.textMuted }}
+                            >
+                              {isExpanded ? "▾" : "▸"}
+                            </span>
                             <div
                               className={styles.depositTypeBadge}
                               style={{ backgroundColor: lightenRGBByPercent(badgeColor, 70) }}
@@ -1932,31 +1980,47 @@ export function NewCheckoutModalScreen() {
                                 {"$" + formatCurrencyDisp(item.reservedCents) + "/$" + formatCurrencyDisp(item.amountCents + item.reservedCents) + (item.amountCents <= 0 ? " Used" : " In use")}
                               </span>
                             )}
-                            {!isCredit && !isGiftCard && !!noteText && (
-                              <span className={styles.depositNoteInList} style={{ color: C.textMuted }}>
-                                {noteText}
-                              </span>
-                            )}
-                            {isCredit && !!noteText && (
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  _setExpandedCreditIds(isExpanded
-                                    ? sExpandedCreditIds.filter((id) => id !== item.id)
-                                    : [...sExpandedCreditIds, item.id]
-                                  );
-                                }}
-                                className={styles.depositReasonToggle}
-                                style={{ color: C.blue }}
-                              >
-                                {"Reason " + (isExpanded ? "▾" : "▸")}
-                              </button>
-                            )}
                           </div>
-                          {isCredit && isExpanded && !!noteText && (
-                            <span className={styles.depositReasonExpanded} style={{ color: C.textMuted }}>
-                              {noteText}
-                            </span>
+                          {isExpanded && (
+                            <div className={styles.depositExpandPanel}>
+                              {!!noteText && (
+                                <span className={styles.depositReasonExpanded} style={{ color: C.textMuted }}>
+                                  <span style={{ color: "var(--text-disabled)" }}>{"Reason: "}</span>
+                                  {noteText}
+                                </span>
+                              )}
+                              <div className={styles.depositApplyRow}>
+                                <div
+                                  className={styles.depositAmountInputWrap}
+                                  style={{ borderColor: C.borderDefault }}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <span className={styles.depositAmountInputLabel} style={{ color: C.textMuted }}>
+                                    Custom amount
+                                  </span>
+                                  <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    className={styles.depositAmountInput}
+                                    placeholder="0.00"
+                                    value={sDepositInputDisp}
+                                    onChange={(e) => handleAmountChange(e.target.value)}
+                                    onClick={(e) => e.stopPropagation()}
+                                    autoFocus
+                                    style={{ color: C.text }}
+                                  />
+                                </div>
+                                <button
+                                  type="button"
+                                  className={styles.depositApplyButton}
+                                  onClick={(e) => { e.stopPropagation(); handleApplyClick(); }}
+                                  disabled={buttonAmount <= 0}
+                                  style={{ backgroundColor: buttonAmount > 0 ? C.green : C.borderDefault, color: C.surfaceBase }}
+                                >
+                                  {buttonLabel}
+                                </button>
+                              </div>
+                            </div>
                           )}
                         </div>
                       );

@@ -646,12 +646,12 @@ export const CardReaderPayment = memo(function CardReaderPayment({
         </div>
         <div className={styles.actionCenter}>
           <Button
-            text="START CARD SALE"
+            text="START SALE"
             onPress={startPayment}
             enabled={!startDisabled}
             colorGradientArr={COLOR_GRADIENTS.green}
             textStyle={{ color: C.textWhite, fontSize: 16, fontWeight: 600 }}
-            buttonStyle={{ paddingVertical: 10, cursor: startDisabled ? "default" : "inherit", borderRadius: 5 }}
+            buttonStyle={{ paddingVertical: 10, paddingLeft: 25, paddingRight: 25, cursor: startDisabled ? "default" : "inherit", borderRadius: 5 }}
           />
         </div>
         <div className={styles.actionRight}>

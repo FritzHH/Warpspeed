@@ -56,6 +56,7 @@ const PayrollModal = lazy(() =>
 const ScheduleModal = lazy(() =>
   import("../../modal_screens/ScheduleModal").then((m) => ({ default: m.ScheduleModal }))
 );
+import { TodaysHistoryComponent } from "./TodaysHistoryComponent";
 import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection, dbSaveInventoryItem, dbGmailDisconnect, dbGmailInitiateAuth } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses, mapEmployees, mapPunchHistory, parseCSV } from "../../../../lightspeed_import";
 import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead, firestoreQuery, firestoreDelete, firestoreWrite, firestoreBatchWrite } from "../../../../db_calls";
@@ -83,6 +84,7 @@ const TAB_NAMES = {
   storeInfo: "Store Info",
   quickItems: "Quick Buttons",
   sales: "Sales History",
+  todaysHistory: "Today's History",
   payroll: "Payroll",
   schedule: "Schedule",
   ordering: "Ordering",
@@ -227,6 +229,21 @@ export function Dashboard_Admin({}) {
               }}
               text={TAB_NAMES.sales}
               icon={ICONS.dollarYellow}
+              iconSize={25}
+            />
+            <VerticalSpacer />
+            {/****************** today's history tab *****************************/}
+            <MenuListLabelComponent
+              selected={sExpand === TAB_NAMES.todaysHistory}
+              handleExpandPress={() =>
+                _setExpand(sExpand === TAB_NAMES.todaysHistory ? null : TAB_NAMES.todaysHistory)
+              }
+              style={{
+                fontWeight: sExpand === TAB_NAMES.todaysHistory ? 500 : null,
+                color: sExpand === TAB_NAMES.todaysHistory ? C.green : C.textSecondary,
+              }}
+              text={TAB_NAMES.todaysHistory}
+              icon={ICONS.clock}
               iconSize={25}
             />
             <VerticalSpacer />
@@ -537,6 +554,7 @@ export function Dashboard_Admin({}) {
               handleSettingsFieldChange={handleSettingsFieldChange}
             />
           )}
+          {sExpand === TAB_NAMES.todaysHistory && <TodaysHistoryComponent />}
           {sExpand === TAB_NAMES.import && <ImportComponent />}
           {sExpand === TAB_NAMES.backup && <BackupRecoveryComponent />}
         </div>}

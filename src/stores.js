@@ -26,6 +26,7 @@ import { calculateRunningTotals } from "./utils";
 
 import {
   dbDeleteWorkorder,
+  dbSoftDeleteWorkorder,
   dbGetCompletedSale,
   dbGetCompletedWorkorder,
   dbGetWorkorder,
@@ -417,6 +418,8 @@ export const useAlertScreenStore = create((set, get) => ({
   pauseOnBaseComponent: false,
   useCancelButton: false,
   fullScreen: true,
+  autoDismiss: false,
+  autoDismissMs: 4000,
 
   getPauseOnBaseComponent: () => get().pauseOnBaseComponent,
   getMessage: () => get().message,
@@ -460,6 +463,8 @@ export const useAlertScreenStore = create((set, get) => ({
     pauseOnBaseComponent = false,
     useCancelButton,
     fullScreen = false,
+    autoDismiss = false,
+    autoDismissMs = 4000,
   }) => {
     set(() => ({
       title,
@@ -483,6 +488,8 @@ export const useAlertScreenStore = create((set, get) => ({
       pauseOnBaseComponent,
       useCancelButton,
       fullScreen,
+      autoDismiss,
+      autoDismissMs,
     }));
   },
   setMessage: (message) => {
@@ -548,6 +555,8 @@ export const useAlertScreenStore = create((set, get) => ({
       pauseOnBaseComponent: false,
       useCancelButton: false,
       fullScreen: true,
+      autoDismiss: false,
+      autoDismissMs: 4000,
     }));
   },
 }));
@@ -1527,7 +1536,7 @@ export const useOpenWorkordersStore = create(
         }
 
         if (saveToDB) {
-          dbDeleteWorkorder(workorderID);
+          dbSoftDeleteWorkorder(workorderID);
 
           // Remove workorder ID from customer's workorders array
           if (workorder?.customerID) {

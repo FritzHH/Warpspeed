@@ -685,7 +685,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
         if (!currentRefundIDs.has(r.id)) previousRefunds.push(r);
       }
     }
-    let _ctx = { currentUser, settings, previousRefunds };
+    let _ctx = { currentUser, settings, previousRefunds, transactions: updatedTxns };
     let refundReceipt = printBuilder.refund(
       primaryRefund,
       sale,

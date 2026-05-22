@@ -36,29 +36,39 @@ export function CustomerSearchListComponent({}) {
       return typeof ts === "number" && ts >= cutoff;
     });
 
-    if (!zSearchQuery) return freshResults;
-
-    if (zSearchType === "phone") {
+    let results;
+    if (!zSearchQuery) {
+      results = freshResults;
+    } else if (zSearchType === "phone") {
       const digits = zSearchQuery.replace(/\D/g, "");
-      if (!digits) return freshResults;
-      return freshResults.filter((c) => {
-        const cellDigits = (c.customerCell || "").replace(/\D/g, "");
-        const landDigits = (c.customerLandline || c.land || "").replace(/\D/g, "");
-        return cellDigits.includes(digits) || landDigits.includes(digits);
-      });
+      if (!digits) {
+        results = freshResults;
+      } else {
+        results = freshResults.filter((c) => {
+          const cellDigits = (c.customerCell || "").replace(/\D/g, "");
+          const landDigits = (c.customerLandline || c.land || "").replace(/\D/g, "");
+          return cellDigits.includes(digits) || landDigits.includes(digits);
+        });
+      }
     } else if (zSearchType === "email") {
       const emailQ = zSearchQuery.toLowerCase();
-      return freshResults.filter((c) =>
+      results = freshResults.filter((c) =>
         (c.email || "").toLowerCase().includes(emailQ)
       );
     } else {
       const words = zSearchQuery.toLowerCase().split(/\s+/).filter(Boolean);
-      return freshResults.filter((c) => {
+      results = freshResults.filter((c) => {
         const first = (c.first || "").toLowerCase();
         const last = (c.last || "").toLowerCase();
         return words.every((w) => first.includes(w) || last.includes(w));
       });
     }
+
+    return [...results].sort((a, b) => {
+      const firstCmp = (a.first || "").toLowerCase().localeCompare((b.first || "").toLowerCase());
+      if (firstCmp !== 0) return firstCmp;
+      return (a.last || "").toLowerCase().localeCompare((b.last || "").toLowerCase());
+    });
   }, [zSearchResults, zSearchResultTimestamps, zSearchQuery, zSearchType]);
   ////////////////////////////////////////////////////////////////////////////////////////
   const [sCustomerInfo, _setCustomerInfo] = useState();
@@ -191,15 +201,6 @@ export function CustomerSearchListComponent({}) {
               backgroundColor: C.backgroundWhite,
             }}
           >
-            <div className={styles.actionPopupHeader}>
-              <button
-                type="button"
-                className={styles.closeButton}
-                onClick={() => _setSelectedCustomer(null)}
-              >
-                <Image icon={ICONS.close1} className={styles.closeIcon} />
-              </button>
-            </div>
             <div className={styles.actionPopupBody}>
               <Button
                 text="New Workorder"

@@ -1,10 +1,12 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { calculateRunningTotals, capitalizeFirstLetterOfString, formatCurrencyDisp, formatMillisForDisplay, formatPhoneWithDashes, lightenRGBByPercent, resolveStatus, formatWorkorderNumber, localStorageWrapper } from "../../../utils";
+import { calculateRunningTotals, capitalizeFirstLetterOfString, formatCurrencyDisp, formatMillisForDisplay, formatPhoneWithDashes, lightenRGBByPercent, resolveStatus, formatWorkorderNumber, localStorageWrapper, findTemplateByType, log } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
-import { useSettingsStore, useLoginStore } from "../../../stores";
-import { Button, Dialog, SHADOW_PROTO, SmallLoadingIndicator } from "../../../dom_components";
-import { dbGetCompletedSale, dbSavePrintObj } from "../../../db_calls_wrapper";
+import { useSettingsStore, useLoginStore, useAlertScreenStore, useOpenWorkordersStore } from "../../../stores";
+import { Button, Dialog, DropdownMenu, SHADOW_PROTO, SmallLoadingIndicator } from "../../../dom_components";
+import { dbGetCompletedSale, dbSavePrintObj, dbSendReceipt } from "../../../db_calls_wrapper";
+import { build_db_path } from "../../../constants";
 import { printBuilder } from "../../../utils";
+import { saveIntakeReceiptPDF } from "../../../shared/intakeReceiptPdf";
 import { readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 const FullSaleModal = lazy(() =>
   import("../../../dom_components/FullSaleModal/FullSaleModal").then((m) => ({ default: m.FullSaleModal }))
@@ -290,6 +292,137 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
     dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
   }
 
+  function handleDownloadEstimate() {
+    const _settings = useSettingsStore.getState().getSettings();
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    const receiptData = printBuilder.intake(workorder, _getCustomerFromWorkorder(), _settings?.salesTaxPercent, _ctx);
+    saveIntakeReceiptPDF(receiptData);
+  }
+
+  function handleDownloadFinalized() {
+    const _settings = useSettingsStore.getState().getSettings();
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    const receiptData = printBuilder.workorder(workorder, _getCustomerFromWorkorder(), _settings?.salesTaxPercent, _ctx);
+    saveIntakeReceiptPDF(receiptData);
+  }
+
+  function _sendReceiptForType(receiptType) {
+    const _settings = useSettingsStore.getState().getSettings();
+    const customer = _getCustomerFromWorkorder();
+
+    const smsTemplate = findTemplateByType(_settings?.smsTemplates || _settings?.textTemplates, "intakeReceipt");
+    const emailTemplate = findTemplateByType(_settings?.emailTemplates, "intakeReceipt");
+
+    const shouldSMS = !!customer.customerCell;
+    const shouldEmail = !!customer.email;
+
+    const smsContent = smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "";
+    const emailContent = emailTemplate?.message || emailTemplate?.content || emailTemplate?.body || "";
+
+    const emptyParts = [];
+    if (shouldSMS && !smsContent.trim()) emptyParts.push("SMS");
+    if (shouldEmail && !emailContent.trim()) emptyParts.push("email");
+    if (emptyParts.length > 0) {
+      useAlertScreenStore.getState().setValues({
+        title: "Empty Template",
+        message: "The intake receipt " + emptyParts.join(" and ") + " template is empty. Fill in the template content in Dashboard > " + (emptyParts.includes("SMS") ? "Text Templates" : "Email Templates") + ".",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+    }
+
+    const canSMS = shouldSMS && smsContent.trim();
+    const canEmail = shouldEmail && emailContent.trim();
+    if (!canSMS && !canEmail) {
+      useAlertScreenStore.getState().setValues({
+        title: "No Contact Info",
+        message: "This customer has no phone or email on file.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+
+    const sendingMessage = (
+      <>
+        {canSMS && !!customer.customerCell && (
+          <span style={{ display: "block" }}>
+            <span style={{ color: C.blue, fontWeight: 600 }}>TEXT</span>
+            {" sending to " + formatPhoneWithDashes(customer.customerCell)}
+          </span>
+        )}
+        {canEmail && !!customer.email && (
+          <span style={{ display: "block" }}>
+            <span style={{ color: C.green, fontWeight: 600 }}>EMAIL</span>
+            {" sending to " + customer.email}
+          </span>
+        )}
+      </>
+    );
+    useAlertScreenStore.getState().setValues({ title: "Sending", message: sendingMessage, canExitOnOuterClick: true, autoDismiss: true, autoDismissMs: 1300 });
+
+    const { tenantID, storeID } = _settings;
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    const receiptData = receiptType === "intake"
+      ? printBuilder.intake(workorder, customer, _settings?.salesTaxPercent, _ctx)
+      : printBuilder.workorder(workorder, customer, _settings?.salesTaxPercent, _ctx);
+    const storagePath = build_db_path.cloudStorage.intakeReceiptPDF(workorder.id, tenantID, storeID);
+
+    const woID = workorder.id;
+    useOpenWorkordersStore.getState().setSendStatus?.(woID, "sent");
+
+    dbSendReceipt({
+      receiptType,
+      receiptData,
+      storagePath,
+      sendSMS: !!(canSMS && customer.customerCell),
+      sendEmail: !!(canEmail && customer.email),
+      customerEmail: customer.email || "",
+      customerCell: customer.customerCell || "",
+      customerID: workorder.customerID || "",
+      templateVars: {
+        firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
+        storeName: _settings?.storeInfo?.displayName || "our store",
+        brand: workorder.brand || "",
+        description: workorder.description || "",
+      },
+      smsMessageID: crypto.randomUUID(),
+      updateWorkorderField: { workorderID: woID, field: "intakeReceiptURL" },
+    }).then((result) => {
+      if (result?.data?.receiptURL) {
+        useOpenWorkordersStore.getState().setField?.("intakeReceiptURL", result.data.receiptURL, woID);
+      }
+    }).catch((e) => {
+      log("sendReceipt (" + receiptType + ") error:", e?.message || String(e));
+      useOpenWorkordersStore.getState().setSendStatus?.(woID, "failed");
+    });
+  }
+
+  function handleSendEstimate() { _sendReceiptForType("intake"); }
+  function handleSendFinalized() { _sendReceiptForType("workorder"); }
+
+  const pdfMenuItems = isClosed
+    ? [
+        { id: "downloadFinalized", label: "Download Finalized Ticket" },
+        { id: "sendFinalized", label: "Send Finalized Ticket" },
+      ]
+    : [
+        { id: "downloadEstimate", label: "Download Estimate" },
+        { id: "downloadFinalized", label: "Download Finalized Ticket" },
+        { id: "sendEstimate", label: "Send Estimate" },
+        { id: "sendFinalized", label: "Send Finalized Ticket" },
+      ];
+
+  function handlePdfMenuSelect(item) {
+    if (!item) return;
+    if (item.id === "downloadEstimate") handleDownloadEstimate();
+    else if (item.id === "downloadFinalized") handleDownloadFinalized();
+    else if (item.id === "sendEstimate") handleSendEstimate();
+    else if (item.id === "sendFinalized") handleSendFinalized();
+  }
+
   return (
   <>
     <Dialog visible={true} onClose={onClose} overlayColor={C.surfaceOverlayHeavy}>
@@ -303,12 +436,6 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
         {/* ── Header ── */}
         <div className={styles.header} style={{ backgroundColor: C.backgroundWhite }}>
           <div className={styles.headerLeft}>
-            <span
-              className={styles.statusBadge}
-              style={{ backgroundColor: rs.backgroundColor, color: rs.textColor }}
-            >
-              {rs.label}
-            </span>
             {!!workorder.workorderNumber && (
               <span className={styles.woNumber} style={{ color: C.text }}>
                 {"#" + formatWorkorderNumber(workorder.workorderNumber)}
@@ -349,6 +476,18 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
               buttonStyle={{ paddingHorizontal: 14, height: 32, marginRight: 8, outlineStyle: "none" }}
               textStyle={{ fontSize: 12, color: C.text }}
             />
+            <div style={{ marginRight: 8 }}>
+              <DropdownMenu
+                buttonText="PDF Options"
+                dataArr={pdfMenuItems}
+                onSelect={handlePdfMenuSelect}
+                buttonStyle={{ paddingHorizontal: 14, height: 32 }}
+                buttonTextStyle={{ fontSize: 12, color: C.text }}
+                itemStyle={{ paddingVertical: 8, paddingHorizontal: 12 }}
+                itemTextStyle={{ fontSize: 12 }}
+                itemTextAlign="left"
+              />
+            </div>
             <Button
               text="Close"
               colorGradientArr={COLOR_GRADIENTS.red}

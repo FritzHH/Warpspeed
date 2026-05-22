@@ -7,7 +7,6 @@ import {
   GradientView,
   LineActionsDropdown,
   NoteHelper,
-  StaleBanner,
   TextInput,
   Tooltip,
 } from "../../../dom_components";
@@ -35,6 +34,7 @@ import {
   broadcastFullWorkorderToDisplay,
 } from "../../../stores";
 import { broadcastClear } from "../../../broadcastChannel";
+import { getWorkorderDeleteGuard } from "../../../shared/workorderDeleteGuard";
 const CustomItemModal = lazy(() =>
   import("../modal_screens/CustomItemModal").then((m) => ({ default: m.CustomItemModal }))
 );
@@ -81,7 +81,6 @@ export const Items_WorkorderItemsTab = ({}) => {
   const zDiscounts = useSettingsStore((state) => state.settings?.discounts, deepEqual);
   const zStatuses = useSettingsStore((state) => state.settings?.statuses, deepEqual);
 
-  const zWorkordersLoaded = useOpenWorkordersStore((state) => state.workordersLoaded);
   const zActiveSales = useActiveSalesStore((state) => state.activeSales);
 
   const isDonePaid = resolveStatus(zOpenWorkorder?.status, zStatuses)?.label?.toLowerCase() === "done & paid";
@@ -99,6 +98,8 @@ export const Items_WorkorderItemsTab = ({}) => {
   const depositOnlyTotal = (activeSale?.depositsApplied || []).reduce((sum, d) => sum + (d.amount || 0), 0);
   const hasActiveSale = !!activeSale && ((activeSale.amountCaptured || 0) - depositOnlyTotal) > 0;
   const hasAppliedCredits = (activeSale?.creditsApplied || []).some(c => (c.amount || 0) > 0);
+  const deleteGuard = getWorkorderDeleteGuard(zOpenWorkorder, activeSale);
+  const deleteTooltipText = deleteGuard.canDelete ? "Delete workorder" : (deleteGuard.reason + " - cannot delete workorder");
 
   ///////////////////////////////////////////////////////////////////////////
   const [sTotalDiscount, _setTotalDiscount] = useState("");
@@ -445,6 +446,7 @@ export const Items_WorkorderItemsTab = ({}) => {
 
     showAlert({
       title: "Confirm Delete Workorder",
+      message: "Recoverable from the deleted-workorders list until tonight's cleanup.",
       btn1Icon: ICONS.trash,
       handleBtn1Press: deleteFun,
     });
@@ -524,13 +526,13 @@ export const Items_WorkorderItemsTab = ({}) => {
             borderColor: C.buttonLightGreenOutline,
           }}
         >
-          <Tooltip text={(hasActiveSale || hasAppliedCredits) ? "Sale in progress, cannot delete workorder" : "Delete workorder"} position="top" alert={hasActiveSale || hasAppliedCredits}>
+          <Tooltip text={deleteTooltipText} position="top" alert={!deleteGuard.canDelete}>
             <Button
               icon={ICONS.trash}
               iconSize={22}
-              enabled={!(hasActiveSale || hasAppliedCredits)}
+              enabled={deleteGuard.canDelete}
               onPress={handleDeleteWorkorder}
-              buttonStyle={{ opacity: (hasActiveSale || hasAppliedCredits) ? 0.3 : 1 }}
+              buttonStyle={{ opacity: deleteGuard.canDelete ? 1 : 0.3 }}
             />
           </Tooltip>
           <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
@@ -601,13 +603,6 @@ export const Items_WorkorderItemsTab = ({}) => {
         </div>
       )}
 
-      {!zWorkordersLoaded && zOpenWorkorder && (
-        <StaleBanner
-          text="Waiting on workorder refresh...."
-          style={{ marginLeft: 8, marginRight: 8, marginTop: 3 }}
-        />
-      )}
-
       {hasActiveSale && (activeSale?.workorderIDs?.length || 0) > 1 && (
         <div className={styles.combinedSaleBanner}>
           <span className={styles.combinedSaleText}>
@@ -666,13 +661,13 @@ export const Items_WorkorderItemsTab = ({}) => {
           borderColor: C.buttonLightGreenOutline,
         }}
       >
-        <Tooltip text={(hasActiveSale || hasAppliedCredits) ? "Sale in progress, cannot delete workorder" : "Delete workorder"} position="top" alert={hasActiveSale || hasAppliedCredits}>
+        <Tooltip text={isLocked ? "Delete workorder" : deleteTooltipText} position="top" alert={!isLocked && !deleteGuard.canDelete}>
           <Button
             icon={ICONS.trash}
             iconSize={22}
-            enabled={!isLocked && !(hasActiveSale || hasAppliedCredits)}
+            enabled={!isLocked && deleteGuard.canDelete}
             onPress={handleDeleteWorkorder}
-            buttonStyle={{ opacity: (isLocked || hasActiveSale || hasAppliedCredits) ? 0.3 : 1 }}
+            buttonStyle={{ opacity: (isLocked || !deleteGuard.canDelete) ? 0.3 : 1 }}
           />
         </Tooltip>
         <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />

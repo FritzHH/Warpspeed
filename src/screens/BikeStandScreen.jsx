@@ -13,7 +13,9 @@ import {
   useUploadProgressStore,
   useLoginStore,
   useAlertScreenStore,
+  useActiveSalesStore,
 } from "../stores";
+import { getWorkorderDeleteGuard } from "../shared/workorderDeleteGuard";
 import { resolveStatus, formatCurrencyDisp, lightenRGBByPercent, capitalizeFirstLetterOfString, applyDiscountToWorkorderItem, calculateRunningTotals, deepEqual, removeDashesFromPhone, formatPhoneWithDashes, checkInputForNumbersOnly, calculateWaitEstimateLabel, formatMillisForDisplay, compressImage, createNewWorkorder, scheduleAutoText, usdTypeMask, generateEAN13Barcode, log, printBuilder, localStorageWrapper, replaceOrAddToArr, findTemplateByType } from "../utils";
 import {
   WORKORDER_ITEM_PROTO,
@@ -109,6 +111,7 @@ export function BikeStandScreen() {
   const zSendStatuses = useOpenWorkordersStore((state) => state._sendStatuses);
   const zInventory = useInventoryStore((state) => state.inventoryArr);
   const zShowAlert = useAlertScreenStore((state) => state.showAlert);
+  const zActiveSales = useActiveSalesStore((state) => state.activeSales);
 
   const [sSelectedWorkorderID, _setSelectedWorkorderID] = useState(null);
   const [sPendingCustomer, _setPendingCustomer] = useState(null); // null | customer object | "standalone"
@@ -316,6 +319,10 @@ export function BikeStandScreen() {
 
   let selectedWorkorder = (zWorkorders || []).find((o) => o.id === sSelectedWorkorderID);
   let hasWorkorderReady = !!selectedWorkorder || sPendingCustomer !== null;
+  const selectedActiveSale = selectedWorkorder?.activeSaleID
+    ? (zActiveSales || []).find((s) => s.id === selectedWorkorder.activeSaleID)
+    : null;
+  const selectedDeleteGuard = getWorkorderDeleteGuard(selectedWorkorder, selectedActiveSale);
 
   // Auto-fire "common" button on mount once data is loaded
   const hasAutoFiredRef = useRef(false);
@@ -968,11 +975,23 @@ export function BikeStandScreen() {
     let canEmail = shouldEmail && emailContent.trim();
     if (!canSMS && !canEmail) return;
 
-    let results = [];
-    if (canSMS && customer.customerCell) results.push("SMS sending to " + customer.customerCell);
-    if (canEmail && customer.email) results.push("Email sending to " + customer.email);
-    useAlertScreenStore.getState().setValues({ title: "Sending", message: results.join("\n"), canExitOnOuterClick: true });
-    setTimeout(() => useAlertScreenStore.getState().setShowAlert(false), 1300);
+    let sendingMessage = (
+      <>
+        {canSMS && !!customer.customerCell && (
+          <span style={{ display: "block" }}>
+            <span style={{ color: C.blue, fontWeight: 600 }}>TEXT</span>
+            {" sending to " + formatPhoneWithDashes(customer.customerCell)}
+          </span>
+        )}
+        {canEmail && !!customer.email && (
+          <span style={{ display: "block" }}>
+            <span style={{ color: C.green, fontWeight: 600 }}>EMAIL</span>
+            {" sending to " + customer.email}
+          </span>
+        )}
+      </>
+    );
+    useAlertScreenStore.getState().setValues({ title: "Sending", message: sendingMessage, canExitOnOuterClick: true, autoDismiss: true, autoDismissMs: 1300 });
 
     let { tenantID, storeID } = _settings;
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
@@ -1027,11 +1046,23 @@ export function BikeStandScreen() {
     let canEmail = shouldEmail && emailContent.trim();
     if (!canSMS && !canEmail) return;
 
-    let results = [];
-    if (canSMS && customer.customerCell) results.push("SMS sending to " + customer.customerCell);
-    if (canEmail && customer.email) results.push("Email sending to " + customer.email);
-    useAlertScreenStore.getState().setValues({ title: "Sending", message: results.join("\n"), canExitOnOuterClick: true });
-    setTimeout(() => useAlertScreenStore.getState().setShowAlert(false), 1300);
+    let sendingMessage = (
+      <>
+        {canSMS && !!customer.customerCell && (
+          <span style={{ display: "block" }}>
+            <span style={{ color: C.blue, fontWeight: 600 }}>TEXT</span>
+            {" sending to " + formatPhoneWithDashes(customer.customerCell)}
+          </span>
+        )}
+        {canEmail && !!customer.email && (
+          <span style={{ display: "block" }}>
+            <span style={{ color: C.green, fontWeight: 600 }}>EMAIL</span>
+            {" sending to " + customer.email}
+          </span>
+        )}
+      </>
+    );
+    useAlertScreenStore.getState().setValues({ title: "Sending", message: sendingMessage, canExitOnOuterClick: true, autoDismiss: true, autoDismissMs: 1300 });
 
     let { tenantID, storeID } = _settings;
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
@@ -1305,14 +1336,24 @@ export function BikeStandScreen() {
                 </StandTouch>
                 <StandTouch
                   className={styles.bmCancelBtn}
-                  style={{ backgroundColor: C.orange }}
+                  style={{ backgroundColor: C.orange, opacity: selectedDeleteGuard.canDelete ? 1 : 0.3, cursor: selectedDeleteGuard.canDelete ? "pointer" : "not-allowed" }}
                   touchStart={false}
                   onPress={() => {
                     let woID = sSelectedWorkorderID;
                     if (!woID) return;
+                    if (!selectedDeleteGuard.canDelete) {
+                      useAlertScreenStore.getState().setValues({
+                        title: "Cannot Delete Workorder",
+                        message: selectedDeleteGuard.reason + " — remove it before deleting this workorder.",
+                        btn1Text: "OK",
+                        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+                        canExitOnOuterClick: true,
+                      });
+                      return;
+                    }
                     useAlertScreenStore.getState().setValues({
                       title: "Delete Workorder?",
-                      message: "This will permanently delete the workorder. This cannot be undone.",
+                      message: "Recoverable from the deleted-workorders list until tonight's cleanup.",
                       btn1Text: "Delete",
                       btn2Text: "Cancel",
                       handleBtn1Press: () => {

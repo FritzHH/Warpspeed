@@ -12,6 +12,66 @@
   box-sizing: border-box;
 }
 
+.searchHeader {
+  width: 100%;
+  height: 5%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-start;
+  padding-left: 4px;
+  padding-right: 4px;
+}
+
+.searchIconBtn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.searchIconBtn:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.searchIconBtn:not(:disabled):hover {
+  background: var(--surface-overlay-light);
+}
+
+.searchResetBtn {
+  margin-right: 15px;
+}
+
+.searchIcon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  display: block;
+}
+
+.searchInput {
+  flex: 1;
+  min-width: 0;
+  font-size: 18px;
+  color: var(--text-default);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  outline: none;
+  padding: 0;
+}
+
+.searchInput::placeholder {
+  color: var(--border-subtle);
+}
+
 .accountRow {
   width: 100%;
   flex-shrink: 0;
@@ -126,6 +186,28 @@
   line-height: 1;
 }
 
+.searchResultsContainer {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.acctBadgeChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 800;
+  margin-right: 8px;
+  flex-shrink: 0;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  line-height: 1.2;
+}
+
 .emailRow {
   width: 100%;
   flex-shrink: 0;
@@ -212,6 +294,25 @@
   padding: 1px 5px;
   margin-left: 6px;
   flex-shrink: 0;
+}
+
+.fwdChip {
+  display: inline-flex;
+  align-items: center;
+  background: var(--surface-overlay-light);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  padding: 1px 6px;
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
+  max-width: 50%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
 }
 
 .msgCountChipText {

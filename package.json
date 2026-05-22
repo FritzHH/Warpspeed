@@ -25,6 +25,7 @@
     "face-api.js": "^0.22.2",
     "firebase": "^11.6.1",
     "fs": "^0.0.1-security",
+    "jspdf": "^4.2.1",
     "lodash": "^4.17.21",
     "random-words": "^2.0.1",
     "react": "^19.1.0",

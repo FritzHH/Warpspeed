@@ -1,0 +1,288 @@
+import { jsPDF } from "jspdf";
+
+const cap = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "";
+
+function formatWorkorderNumber(woNum) {
+  if (!woNum || typeof woNum !== "string") return woNum || "";
+  if (woNum.startsWith("W") && !woNum.startsWith("WO") && woNum.length >= 10) {
+    return "W-" + woNum.slice(1, 6) + "-" + woNum.slice(6);
+  }
+  if (woNum.startsWith("WO") && woNum.length >= 7) {
+    return woNum.slice(0, 2) + "-" + woNum.slice(2, 6) + "-" + woNum.slice(6);
+  }
+  return woNum;
+}
+
+function formatCents(cents) {
+  let val = Number(cents) || 0;
+  return (val / 100).toFixed(2);
+}
+
+function checkPageBreak(doc, y, needed, margin) {
+  let pageHeight = doc.internal.pageSize.getHeight();
+  if (y + needed > pageHeight - margin) {
+    doc.addPage();
+    return margin;
+  }
+  return y;
+}
+
+function addDivider(doc, y, x1, x2) {
+  doc.setDrawColor(180);
+  doc.setLineWidth(0.3);
+  doc.line(x1, y, x2, y);
+  return y + 10;
+}
+
+function addShopHeader(doc, y, data, centerX) {
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text(data.shopName || "Bonita Bikes LLC", centerX, y, { align: "center" });
+  y += 16;
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  let contactLines = (data.shopContactBlurb || "").split("\n").map((s) => s.trim()).filter(Boolean);
+  contactLines.forEach((line) => {
+    doc.text(line, centerX, y, { align: "center" });
+    y += 10;
+  });
+
+  return y + 4;
+}
+
+function addTotalRow(doc, y, label, value, leftX, rightX, bold) {
+  doc.setFontSize(9);
+  doc.setFont("helvetica", bold ? "bold" : "normal");
+  doc.text(label, leftX, y);
+  doc.text("$" + formatCents(value), rightX, y, { align: "right" });
+  return y + 13;
+}
+
+function addTotals(doc, y, data, leftX, rightX) {
+  y = addTotalRow(doc, y, "Subtotal", data.runningSubtotal || data.subtotal || 0, leftX, rightX, false);
+
+  if ((data.amountPaid || 0) > 0) {
+    y = addTotalRow(doc, y, "Amount Paid", -(data.amountPaid || 0), leftX, rightX, false);
+  }
+
+  if ((data.runningDiscount || data.discount || 0) > 0) {
+    y = addTotalRow(doc, y, "Discount", -(data.runningDiscount || data.discount || 0), leftX, rightX, false);
+  }
+
+  y = addTotalRow(doc, y, "Sales Tax", data.runningTax || data.tax || 0, leftX, rightX, false);
+
+  if ((data.cardFee || 0) > 0) {
+    let label = "Card Fee" + (data.cardFeePercent ? " (" + data.cardFeePercent + "%)" : "");
+    y = addTotalRow(doc, y, label, data.cardFee, leftX, rightX, false);
+  }
+
+  y += 2;
+  y = addTotalRow(doc, y, "TOTAL", data.finalTotal || data.total || 0, leftX, rightX, true);
+  return y;
+}
+
+function addLineItems(doc, lines, y, leftX, rightX, margin, includeReceiptNotes) {
+  let contentWidth = rightX - leftX;
+  let qtyX = rightX - 90;
+  let priceX = rightX - 45;
+  let nameMaxWidth = qtyX - leftX - 8;
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.text("Item", leftX, y);
+  doc.text("Qty", qtyX, y, { align: "right" });
+  doc.text("Price", priceX, y, { align: "right" });
+  doc.text("Total", rightX, y, { align: "right" });
+  y += 4;
+  doc.setDrawColor(180);
+  doc.line(leftX, y, rightX, y);
+  y += 10;
+
+  doc.setFont("helvetica", "normal");
+  (lines || []).forEach((line) => {
+    y = checkPageBreak(doc, y, 30, margin);
+
+    let name = line.itemName || "Item";
+    doc.setFontSize(9);
+    let nameLines = doc.splitTextToSize(name, nameMaxWidth);
+    nameLines.forEach((nl, i) => {
+      doc.text(nl, leftX, y + (i * 11));
+    });
+    let nameHeight = nameLines.length * 11;
+
+    doc.setFontSize(8);
+    let qty = String(line.qty || 1);
+    let unitPrice = formatCents(line.price || 0);
+    let lineTotal = formatCents(line.finalPrice || 0);
+    doc.text(qty, qtyX, y, { align: "right" });
+    doc.text("$" + unitPrice, priceX, y, { align: "right" });
+    doc.text("$" + lineTotal, rightX, y, { align: "right" });
+
+    y += Math.max(nameHeight, 12);
+
+    if (line.discountName && (line.discountSavings || 0) > 0) {
+      doc.setFontSize(7);
+      doc.setTextColor(100, 100, 100);
+      doc.text("  Discount: " + line.discountName + " (-$" + formatCents(line.discountSavings) + ")", leftX, y);
+      doc.setTextColor(0);
+      y += 10;
+    }
+
+    if (includeReceiptNotes && line.receiptNotes) {
+      doc.setFontSize(7);
+      doc.setTextColor(80, 80, 80);
+      let noteLines = doc.splitTextToSize("Note: " + line.receiptNotes, contentWidth - 10);
+      noteLines.forEach((nl) => {
+        y = checkPageBreak(doc, y, 10, margin);
+        doc.text(nl, leftX + 4, y);
+        y += 9;
+      });
+      doc.setTextColor(0);
+      y += 2;
+    }
+
+    y += 4;
+  });
+
+  return y;
+}
+
+export function buildIntakeReceiptPDF(data) {
+  let pageWidth = 340;
+  let margin = 14;
+  let leftX = margin;
+  let rightX = pageWidth - margin;
+  let centerX = pageWidth / 2;
+  let contentWidth = rightX - leftX;
+
+  let doc = new jsPDF({ unit: "pt", format: [pageWidth, 900] });
+  let y = margin + 10;
+
+  y = addShopHeader(doc, y, data, centerX);
+
+  if (data.barcode) {
+    doc.setFontSize(7);
+    doc.setFont("helvetica", "normal");
+    doc.text(data.barcode, centerX, y, { align: "center" });
+    y += 10;
+  }
+
+  y = addDivider(doc, y, leftX, rightX);
+
+  y += 10;
+  doc.setFontSize(13);
+  doc.setFont("helvetica", "bold");
+  let isIntake = data.receiptType !== "Workorder";
+  let ticketTitle = isIntake ? "INTAKE/ESTIMATE TICKET" : "FINALIZED WORKORDER TICKET";
+  doc.text(ticketTitle, centerX, y, { align: "center" });
+  y += 18;
+
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  if (data.workorderNumber) { doc.text("WO #: " + formatWorkorderNumber(data.workorderNumber), leftX, y); y += 12; }
+  if (data.startedOnMillis) { doc.text("Date: " + new Date(Number(data.startedOnMillis)).toLocaleDateString(), leftX, y); y += 12; }
+  if (data.status) { doc.text("Status: " + data.status, leftX, y); y += 12; }
+  if (data.startedBy) { doc.text("By: " + data.startedBy, leftX, y); y += 12; }
+
+  y += 4;
+
+  let custName = [cap(data.first), cap(data.last)].filter(Boolean).join(" ");
+  if (custName) {
+    doc.setFont("helvetica", "bold");
+    doc.text("Customer: ", leftX, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(custName, leftX + 55, y);
+    y += 12;
+  }
+  if (data.customerContact) {
+    doc.text("Contact: " + data.customerContact, leftX, y);
+    y += 12;
+  }
+
+  y += 4;
+
+  let bikeInfo = [data.brand, data.description].filter(Boolean).join(" ");
+  if (bikeInfo) {
+    doc.setFont("helvetica", "bold");
+    doc.text("Bike: ", leftX, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(bikeInfo, leftX + 28, y);
+    y += 12;
+  }
+  if (data.description) {
+    doc.text("Description: " + data.description, leftX, y);
+    y += 12;
+  }
+  let colors = [data.color1, data.color2].filter(Boolean).join(", ");
+  if (colors) {
+    doc.text("Colors: " + colors, leftX, y);
+    y += 12;
+  }
+  if (isIntake && (data.waitTimeEstimateLabel || data.waitTime)) {
+    doc.text("Estimate: " + (data.waitTimeEstimateLabel || data.waitTime), leftX, y);
+    y += 12;
+  }
+
+  y += 4;
+  y = addDivider(doc, y, leftX, rightX);
+
+  y = addLineItems(doc, data.workorderLines, y, leftX, rightX, margin, true);
+  y = addDivider(doc, y, leftX, rightX);
+
+  y = addTotals(doc, y, data, leftX, rightX);
+
+  y += 6;
+  y = addDivider(doc, y, leftX, rightX);
+
+  let customerNotes = data.customerNotes;
+  if (customerNotes && customerNotes.length > 0) {
+    y = checkPageBreak(doc, y, 30, margin);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Notes", leftX, y);
+    y += 14;
+
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    customerNotes.forEach((note) => {
+      y = checkPageBreak(doc, y, 15, margin);
+      let noteText = typeof note === "string" ? note : note.value || note.text || note.note || "";
+      if (noteText) {
+        let noteLines = doc.splitTextToSize("• " + noteText, contentWidth - 10);
+        noteLines.forEach((nl) => {
+          doc.text(nl, leftX + 4, y);
+          y += 10;
+        });
+        y += 4;
+      }
+    });
+    y += 4;
+    y = addDivider(doc, y, leftX, rightX);
+  }
+
+  if (isIntake && data.intakeBlurb) {
+    y = checkPageBreak(doc, y, 40, margin);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(100, 100, 100);
+    let blurbLines = doc.splitTextToSize(data.intakeBlurb, contentWidth);
+    blurbLines.forEach((line) => {
+      doc.text(line, centerX, y, { align: "center" });
+      y += 9;
+    });
+    doc.setTextColor(0);
+    y += 8;
+  }
+
+  return doc;
+}
+
+export function saveIntakeReceiptPDF(data, filename) {
+  let doc = buildIntakeReceiptPDF(data);
+  let isIntake = data.receiptType !== "Workorder";
+  let prefix = isIntake ? "intake-" : "workorder-";
+  let name = filename || (prefix + (data.workorderNumber || data.barcode || Date.now()) + ".pdf");
+  doc.save(name);
+  return doc;
+}

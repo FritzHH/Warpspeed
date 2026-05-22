@@ -5167,6 +5167,32 @@ async function cleanupActiveSales(db, tenantID, storeID) {
   return { success: true, salesDeleted, standaloneWosDeleted, customerWosCleaned };
 }
 
+async function cleanupDeletedWorkorders(db, tenantID, storeID) {
+  const basePath = `tenants/${tenantID}/stores/${storeID}`;
+  let deleted = 0;
+
+  try {
+    const snap = await db.collection(`${basePath}/deleted-workorders`).get();
+    if (snap.empty) return { success: true, deleted: 0 };
+
+    const BATCH_LIMIT = 400;
+    const docs = snap.docs;
+    for (let i = 0; i < docs.length; i += BATCH_LIMIT) {
+      const chunk = docs.slice(i, i + BATCH_LIMIT);
+      const batch = db.batch();
+      for (const d of chunk) batch.delete(d.ref);
+      await batch.commit();
+      deleted += chunk.length;
+    }
+
+    log("cleanupDeletedWorkorders: Purged " + deleted + " from " + tenantID + "/" + storeID);
+    return { success: true, deleted };
+  } catch (err) {
+    log("cleanupDeletedWorkorders: Error for " + tenantID + "/" + storeID, err.message);
+    return { success: false, error: err.message, deleted };
+  }
+}
+
 async function cleanupSmsCanRespond(db, tenantID, storeID) {
   const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
   const cutoffMillis = Date.now() - THREE_DAYS_MS;
@@ -5413,6 +5439,7 @@ exports.nightlyArchiveAndCleanup = onSchedule(
           const mediaResults = await cleanupOldMedia(db, bucket, tenantID, storeID);
           const activeSaleResults = await cleanupActiveSales(db, tenantID, storeID);
           const smsCleanupResults = await cleanupSmsCanRespond(db, tenantID, storeID);
+          const deletedWorkorderResults = await cleanupDeletedWorkorders(db, tenantID, storeID);
 
           // Write audit log
           const now = Date.now();
@@ -5432,6 +5459,7 @@ exports.nightlyArchiveAndCleanup = onSchedule(
               mediaCleanup: mediaResults,
               activeSaleCleanup: activeSaleResults,
               smsCleanup: smsCleanupResults,
+              deletedWorkorderCleanup: deletedWorkorderResults,
             });
 
           log("nightlyArchive: Completed " + tenantID + "/" + storeID, {
@@ -5439,6 +5467,7 @@ exports.nightlyArchiveAndCleanup = onSchedule(
             mediaCleanup: mediaResults,
             activeSaleCleanup: activeSaleResults,
             smsCleanup: smsCleanupResults,
+            deletedWorkorderCleanup: deletedWorkorderResults,
           });
         } catch (err) {
           log(
@@ -7130,6 +7159,7 @@ async function getGmailAccessToken(db, tenantID, storeID, accountKey) {
 function parseGmailMessage(msg) {
   const headers = msg.payload?.headers || [];
   const getHeader = (name) => headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || "";
+  const getAllHeaders = (name) => headers.filter((h) => h.name.toLowerCase() === name.toLowerCase()).map((h) => h.value);
 
   const fromRaw = getHeader("From");
   const fromMatch = fromRaw.match(/^"?([^"<]*)"?\s*<?([^>]*)>?$/);
@@ -7202,6 +7232,10 @@ function parseGmailMessage(msg) {
     messageIdHeader: getHeader("Message-ID") || getHeader("Message-Id"),
     inReplyTo: getHeader("In-Reply-To"),
     references: getHeader("References"),
+    deliveredTo: getAllHeaders("Delivered-To"),
+    xForwardedFor: getHeader("X-Forwarded-For"),
+    xForwardedTo: getHeader("X-Forwarded-To"),
+    resentFrom: getHeader("Resent-From"),
   };
 }
 

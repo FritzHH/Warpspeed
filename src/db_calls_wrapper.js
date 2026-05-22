@@ -58,35 +58,9 @@ import {
 } from "firebase/auth";
 import { collection, doc, query, orderBy, where, onSnapshot, deleteField } from "firebase/firestore";
 
-// Listener diagnostics — track attach/detach and emit metadata.
-// The active-listener counter catches duplicate-subscription bugs:
-// if you ever see `active=2` or more for the same listener name, a
-// useEffect or similar lifecycle hook isn't cleaning up its previous
-// subscription before creating a new one.
-const __listenerCounts = {};
-
-function __logListenerAttach(name) {
-  __listenerCounts[name] = (__listenerCounts[name] || 0) + 1;
-  console.log(`[${name}] ATTACHED (active=${__listenerCounts[name]})`);
-  if (__listenerCounts[name] > 1) {
-    console.warn(`[${name}] ⚠️ ${__listenerCounts[name]} active subscriptions — possible duplicate listener bug`);
-  }
-}
-
-function __logListenerDetach(name) {
-  __listenerCounts[name] = Math.max(0, (__listenerCounts[name] || 0) - 1);
-  console.log(`[${name}] DETACHED (active=${__listenerCounts[name]})`);
-}
-
-function __logListenerEmit(name, meta) {
-  if (!meta) {
-    console.log(`[${name}] EMIT`);
-    return;
-  }
-  console.log(
-    `[${name}] EMIT changes=${meta.changes} fromCache=${meta.fromCache} total=${meta.total}`
-  );
-}
+function __logListenerAttach() {}
+function __logListenerDetach() {}
+function __logListenerEmit() {}
 
 // ============================================================================
 // UTILITY FUNCTIONS

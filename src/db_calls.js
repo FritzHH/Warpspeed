@@ -6,7 +6,6 @@ import {
   initializeFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
-  setLogLevel,
   doc,
   setDoc,
   getDoc,
@@ -67,11 +66,6 @@ export const DB = initializeFirestore(firebaseApp, {
   experimentalAutoDetectLongPolling: true,
 });
 
-// Verbose Firestore SDK logging in dev — reveals cache hits vs network reads.
-// Remove or set to "error" if console noise becomes annoying.
-if (import.meta.env.DEV) {
-  setLogLevel("error");
-}
 export const RDB = getDatabase(firebaseApp);
 export const AUTH = initializeAuth(firebaseApp, { persistence: browserLocalPersistence });
 export const STORAGE = getStorage(firebaseApp);

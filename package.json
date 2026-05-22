@@ -50,7 +50,10 @@
   },
   "scripts": {
     "emulator": "firebase emulators:start --only functions",
+    "emulators": "firebase emulators:start --import=./.emulator-data --export-on-exit",
+    "emulators:fresh": "firebase emulators:start",
     "start": "vite",
+    "start:emulator": "cross-env VITE_USE_EMULATORS=true vite",
     "prebuild": "node scripts/update-version.js",
     "build": "vite build",
     "preview": "vite preview",
@@ -85,6 +88,7 @@
     "@originjs/vite-plugin-commonjs": "^1.0.3",
     "@vitejs/plugin-react": "^4.7.0",
     "@vitejs/plugin-react-swc": "^4.3.1",
+    "cross-env": "^10.1.0",
     "electron-builder": "^26.0.12",
     "rollup-plugin-visualizer": "^7.0.1",
     "source-map-explorer": "^2.5.3",

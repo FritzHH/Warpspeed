@@ -119,6 +119,7 @@ export const TextInput = forwardRef(function TextInput(
   };
 
   const isDisabled = disabled || !editable;
+  const isReadOnly = !disabled && !editable;
   const inputId = id || (label ? `input-${label.replace(/\s+/g, "-").toLowerCase()}` : undefined);
 
   const computedStyle = {
@@ -135,7 +136,8 @@ export const TextInput = forwardRef(function TextInput(
   const classNames = [
     styles.input,
     multiline ? styles.multiline : "",
-    isDisabled ? styles.disabled : "",
+    disabled ? styles.disabled : "",
+    isReadOnly ? styles.readOnly : "",
     error ? styles.error : "",
     className,
   ]
@@ -161,7 +163,8 @@ export const TextInput = forwardRef(function TextInput(
         onChange={handleChange}
         placeholder={placeholder}
         autoFocus={autoFocus}
-        disabled={isDisabled}
+        disabled={disabled}
+        readOnly={isReadOnly}
         rows={multiline ? (numberOfLines || 1) : undefined}
         aria-label={ariaLabel || label}
         aria-invalid={!!error || undefined}

@@ -272,12 +272,16 @@ export const useRecentCustomersStore = create(
       getRecentCustomers: () => get().recentCustomers,
       addRecentCustomer: (customer) => {
         if (!customer?.id) return;
-        let recent = get().recentCustomers.filter((c) => c.id !== customer.id);
+        const cutoff = Date.now() - 2 * 60 * 60 * 1000;
+        let recent = get()
+          .recentCustomers.filter((c) => c.id !== customer.id)
+          .filter((c) => (c.addedAt || 0) > cutoff);
         let slim = {
           id: customer.id,
           first: customer.first || "",
           last: customer.last || "",
           customerCell: customer.customerCell || "",
+          addedAt: Date.now(),
         };
         recent = [slim, ...recent].slice(0, 10);
         set({ recentCustomers: recent });

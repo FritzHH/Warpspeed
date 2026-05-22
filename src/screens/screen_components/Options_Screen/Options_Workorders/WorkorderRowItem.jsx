@@ -20,7 +20,7 @@ import WaitTimeIndicator from "./WaitTimeIndicator";
 import styles from "./WorkorderRowItem.module.css";
 
 const WorkorderRowItem = React.memo(function WorkorderRowItem({
-  workorder, isSelected, isPreviewed, paidAmount, isLinkedSale, onSelect, onHoverEnter, onHoverExit
+  workorder, isSelected, isPreviewed, paidAmount, isLinkedSale, daysSinceLastText, onSelect, onHoverEnter, onHoverExit
 }) {
   const rs = resolveStatus(workorder.status, useSettingsStore.getState().settings?.statuses);
   const isFinished = isFinishedStatus(workorder);
@@ -288,7 +288,7 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
           onMouseOver={() => onHoverEnter(workorder)}
           onMouseLeave={() => onHoverExit()}
         >
-          <WaitTimeIndicator workorder={workorder} />
+          <WaitTimeIndicator workorder={workorder} daysSinceLastText={daysSinceLastText} />
         </div>
       </div>
   );
@@ -298,6 +298,7 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
   if (prev.isPreviewed !== next.isPreviewed) return false;
   if (prev.paidAmount !== next.paidAmount) return false;
   if (prev.isLinkedSale !== next.isLinkedSale) return false;
+  if (prev.daysSinceLastText !== next.daysSinceLastText) return false;
   return true;
 });
 

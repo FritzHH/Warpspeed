@@ -67,13 +67,129 @@ import styles from "./BikeStandScreen.module.css";
 const DROPDOWN_SELECTED_OPACITY = 0.3;
 
 let _standTouchFired = false;
-const StandTouch = forwardRef(function StandTouch({ onPress, children, style, className, touchStart = true }, ref) {
-  if (!touchStart) return <div ref={ref} onClick={() => onPress?.()} style={style} className={className}>{children}</div>;
+let _lastStandTouchTime = 0;
+const STAND_TOUCH_GHOST_WINDOW = 700;
+const LONG_PRESS_MOVE_THRESHOLD = 8;
+const StandTouch = forwardRef(function StandTouch({ onPress, onLongPress, delayLongPress = 500, children, style, className, touchStart = true }, ref) {
+  const longPressTimerRef = useRef(null);
+  const longPressFiredRef = useRef(false);
+  const pointerStartRef = useRef({ x: 0, y: 0 });
+
+  function clearLongPressTimer() {
+    if (longPressTimerRef.current) {
+      clearTimeout(longPressTimerRef.current);
+      longPressTimerRef.current = null;
+    }
+  }
+
+  function handlePointerDown(e) {
+    if (!onLongPress) return;
+    longPressFiredRef.current = false;
+    pointerStartRef.current = { x: e.clientX, y: e.clientY };
+    clearLongPressTimer();
+    longPressTimerRef.current = setTimeout(() => {
+      longPressFiredRef.current = true;
+      onLongPress();
+    }, delayLongPress);
+  }
+
+  function handlePointerMove(e) {
+    if (!longPressTimerRef.current) return;
+    const dx = e.clientX - pointerStartRef.current.x;
+    const dy = e.clientY - pointerStartRef.current.y;
+    if (dx * dx + dy * dy > LONG_PRESS_MOVE_THRESHOLD * LONG_PRESS_MOVE_THRESHOLD) {
+      clearLongPressTimer();
+    }
+  }
+
+  function handlePointerEnd() {
+    clearLongPressTimer();
+  }
+
+  const contextMenuHandler = (e) => { e.preventDefault(); e.stopPropagation(); return false; };
+
+  const internalRef = useRef(null);
+  const setRefs = (node) => {
+    internalRef.current = node;
+    if (typeof ref === "function") ref(node);
+    else if (ref) ref.current = node;
+  };
+
+  useEffect(() => {
+    const node = internalRef.current;
+    if (!node) return;
+    const handler = (e) => { e.preventDefault(); e.stopPropagation(); return false; };
+    node.addEventListener("contextmenu", handler, { capture: true });
+    return () => node.removeEventListener("contextmenu", handler, { capture: true });
+  }, []);
+
+  if (!touchStart) {
+    return (
+      <div
+        ref={setRefs}
+        onClick={(e) => {
+          if (Date.now() - _lastStandTouchTime < STAND_TOUCH_GHOST_WINDOW) {
+            e.stopPropagation();
+            return;
+          }
+          if (longPressFiredRef.current) { longPressFiredRef.current = false; return; }
+          onPress?.();
+        }}
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerLeave={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
+        onContextMenu={contextMenuHandler}
+        style={style}
+        className={className}
+      >
+        {children}
+      </div>
+    );
+  }
   return (
     <div
-      ref={ref}
-      onTouchStartCapture={(e) => { e.preventDefault(); e.stopPropagation(); _standTouchFired = true; onPress?.(); }}
+      ref={setRefs}
+      onTouchStartCapture={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        _standTouchFired = true;
+        _lastStandTouchTime = Date.now();
+        if (onLongPress) {
+          longPressFiredRef.current = false;
+          const t = e.touches[0];
+          pointerStartRef.current = { x: t?.clientX || 0, y: t?.clientY || 0 };
+          clearLongPressTimer();
+          longPressTimerRef.current = setTimeout(() => {
+            longPressFiredRef.current = true;
+            onLongPress();
+          }, delayLongPress);
+        } else {
+          onPress?.();
+        }
+      }}
+      onTouchMove={(e) => {
+        if (!longPressTimerRef.current) return;
+        const t = e.touches[0];
+        if (!t) return;
+        const dx = t.clientX - pointerStartRef.current.x;
+        const dy = t.clientY - pointerStartRef.current.y;
+        if (dx * dx + dy * dy > LONG_PRESS_MOVE_THRESHOLD * LONG_PRESS_MOVE_THRESHOLD) {
+          clearLongPressTimer();
+        }
+      }}
+      onTouchEnd={() => {
+        if (onLongPress) {
+          const longFired = longPressFiredRef.current;
+          clearLongPressTimer();
+          longPressFiredRef.current = false;
+          if (!longFired) onPress?.();
+        }
+      }}
+      onTouchCancel={() => { clearLongPressTimer(); longPressFiredRef.current = false; }}
       onClickCapture={(e) => { if (_standTouchFired) { _standTouchFired = false; e.stopPropagation(); } }}
+      onContextMenu={contextMenuHandler}
       style={style}
       className={className}
     >
@@ -753,13 +869,13 @@ export function BikeStandScreen() {
 
   const allColorLabels = COLORS.map((c) => c.label);
 
-  const brandSuggestions = !sSuggestionsHidden && sDetailField === "brand" && sDetailForm.brand?.trim()
+  const brandSuggestions = !sSuggestionsHidden && sDetailField === "brand" && sDetailForm.brand?.trim().length >= 2
     ? (zSettings.allBrands || []).filter(
         (b) => b.toLowerCase().startsWith(sDetailForm.brand.trim().toLowerCase()) && b.toLowerCase() !== sDetailForm.brand.trim().toLowerCase()
       ).slice(0, 8)
     : [];
 
-  const descSuggestions = !sSuggestionsHidden && sDetailField === "description" && sDetailForm.description?.trim()
+  const descSuggestions = !sSuggestionsHidden && sDetailField === "description" && sDetailForm.description?.trim().length >= 2
     ? (zSettings.allDescriptions || []).filter(
         (d) => d.toLowerCase().startsWith(sDetailForm.description.trim().toLowerCase()) && d.toLowerCase() !== sDetailForm.description.trim().toLowerCase()
       ).slice(0, 8)

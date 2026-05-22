@@ -5483,90 +5483,6 @@ exports.nightlyArchiveAndCleanup = onSchedule(
 );
 
 /**
- * Hourly scheduled backup — runs at the top of every hour.
- * Archives all ARCHIVE_COLLECTIONS to timestamped Cloud Storage JSON files.
- * Auto-deletes backups older than 7 days.
- * Temporary: remove once bugs are ironed out.
- */
-exports.hourlyBackup = onSchedule(
-  {
-    schedule: "0 * * * *",
-    timeZone: "America/New_York",
-    secrets: [firebaseServiceAccountKey],
-    timeoutSeconds: 540,
-    memory: "1GiB",
-  },
-  async (event) => {
-    log("hourlyBackup: Starting hourly backup run");
-
-    const db = await getDB(firebaseServiceAccountKey);
-    const bucket = admin
-      .storage()
-      .bucket(STORAGE_BUCKET);
-
-    const now = new Date();
-    const timestamp = now.toISOString().replace(/[:.]/g, "-");
-    const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
-
-    let tenantsSnapshot;
-    try {
-      tenantsSnapshot = await db.collection("tenants").get();
-    } catch (err) {
-      log("hourlyBackup: Failed to enumerate tenants", err.message);
-      return;
-    }
-
-    if (tenantsSnapshot.empty) {
-      log("hourlyBackup: No tenants found, exiting");
-      return;
-    }
-
-    for (const tenantDoc of tenantsSnapshot.docs) {
-      const tenantID = tenantDoc.id;
-      let storesSnapshot;
-
-      try {
-        storesSnapshot = await db
-          .collection("tenants")
-          .doc(tenantID)
-          .collection("stores")
-          .get();
-      } catch (err) {
-        log("hourlyBackup: Error fetching stores for tenant " + tenantID, err.message);
-        continue;
-      }
-
-      for (const storeDoc of storesSnapshot.docs) {
-        const storeID = storeDoc.id;
-
-        await archiveTenantStore(db, bucket, tenantID, storeID, timestamp, "hourly");
-
-        // Cleanup: delete hourly backups older than 7 days
-        try {
-          for (const collectionName of ARCHIVE_COLLECTIONS) {
-            const prefix = `${tenantID}/${storeID}/archives/hourly/${collectionName}/`;
-            const [files] = await bucket.getFiles({ prefix });
-
-            for (const file of files) {
-              const meta = file.metadata;
-              const archivedAt = meta?.metadata?.archivedAt;
-              if (archivedAt && Date.now() - new Date(archivedAt).getTime() > SEVEN_DAYS_MS) {
-                await file.delete();
-                log("hourlyBackup: Deleted old backup", file.name);
-              }
-            }
-          }
-        } catch (err) {
-          log("hourlyBackup: Error cleaning old backups for " + tenantID + "/" + storeID, err.message);
-        }
-      }
-    }
-
-    log("hourlyBackup: Hourly backup run complete");
-  }
-);
-
-/**
  * Manual trigger for the nightly archive process.
  * Runs the same archive + cleanup as the scheduled function.
  */
@@ -6037,11 +5953,11 @@ async function completeSaleServerSide({
       wo.changeLog = [...(wo.changeLog || []), ...entries];
       wo.status = "finished_and_paid";
 
-      await db.collection("tenants").doc(tenantID)
-        .collection("stores").doc(storeID)
-        .collection("completed-workorders").doc(woID)
-        .set(wo);
-      await woRef.delete();
+      // Link-to-pay completions leave the workorder in the open list with status "finished_and_paid".
+      // The product hasn't been picked up yet — staff archives it via the "Save & Archive Workorder" button
+      // on the closed-workorder modal once the customer collects it. This mirrors the "Keep Ticket Open"
+      // outcome of the in-store checkout pickup-decision modal.
+      await woRef.set(wo);
     }
   }
 
@@ -6078,15 +5994,16 @@ async function completeSaleServerSide({
   }
 
   // ── Save sales index ──
+  // Workorder stays in open-workorders after link-to-pay completion (not archived to completed-workorders).
   let allLines = [];
   let primaryWO = null;
   for (const woID of workorderIDs) {
-    const completedSnap = await db.collection("tenants").doc(tenantID)
+    const woSnap = await db.collection("tenants").doc(tenantID)
       .collection("stores").doc(storeID)
-      .collection("completed-workorders").doc(woID)
+      .collection("open-workorders").doc(woID)
       .get();
-    if (completedSnap.exists) {
-      const wo = completedSnap.data();
+    if (woSnap.exists) {
+      const wo = woSnap.data();
       if (!primaryWO) primaryWO = wo;
       allLines = [...allLines, ...(wo.workorderLines || [])];
     }
@@ -6339,7 +6256,7 @@ exports.createTextToPayInvoice = onCall(
     requireCallableAuth(request);
 
     try {
-      const { workorderID, channel, tenantID, storeID, phone: directPhone, email: directEmail } = request.data;
+      const { workorderID, channel, tenantID, storeID, phone: directPhone, email: directEmail, amountCents: requestedAmountCents } = request.data;
 
       // ── Validate input ──
       if (!workorderID || typeof workorderID !== "string") {
@@ -6350,6 +6267,11 @@ exports.createTextToPayInvoice = onCall(
       }
       if (!tenantID || !storeID) {
         throw new HttpsError("invalid-argument", "tenantID and storeID are required");
+      }
+      if (requestedAmountCents !== undefined && requestedAmountCents !== null) {
+        if (!Number.isInteger(requestedAmountCents) || requestedAmountCents <= 0) {
+          throw new HttpsError("invalid-argument", "amountCents must be a positive integer");
+        }
       }
 
       requireTenantMatch(request, tenantID, storeID);
@@ -6409,7 +6331,7 @@ exports.createTextToPayInvoice = onCall(
 
       // ── Calculate totals ──
       const totals = calculateWorkorderTotal(workorder, settings);
-      let amountToCharge = totals.total - (workorder.amountPaid || 0);
+      let remainingAmount = totals.total - (workorder.amountPaid || 0);
 
       // If active sale exists, calculate remaining from the sale's captured amount
       let existingSaleID = null;
@@ -6421,14 +6343,23 @@ exports.createTextToPayInvoice = onCall(
           .get();
         if (existingSaleSnap.exists) {
           const existingSale = existingSaleSnap.data();
-          amountToCharge = (existingSale.total || 0) - (existingSale.amountCaptured || 0);
+          remainingAmount = (existingSale.total || 0) - (existingSale.amountCaptured || 0);
           existingSaleID = workorder.activeSaleID;
         }
       }
 
-      if (amountToCharge <= 0) {
+      if (remainingAmount <= 0) {
         throw new HttpsError("failed-precondition", "Workorder balance is already paid");
       }
+
+      let amountToCharge = remainingAmount;
+      if (requestedAmountCents !== undefined && requestedAmountCents !== null) {
+        if (requestedAmountCents > remainingAmount) {
+          throw new HttpsError("failed-precondition", "Requested amount exceeds remaining balance");
+        }
+        amountToCharge = requestedAmountCents;
+      }
+
       if (amountToCharge < 50) {
         throw new HttpsError("failed-precondition", "Amount must be at least $0.50 for card payment");
       }
@@ -8039,48 +7970,194 @@ exports.gmailRenewWatch = onSchedule(
     timeoutSeconds: 120,
   },
   async () => {
-    const db = await getDB(firebaseServiceAccountKey);
-    const tenantsSnap = await db.collection("tenants").get();
+    log("[gmailRenewWatch] === START ===", { now: Date.now(), nowIso: new Date().toISOString() });
+    let stats = {
+      tenants: 0, stores: 0, accounts: 0,
+      skippedNotConnected: 0, skippedFresh: 0,
+      attempted: 0, renewed: 0, watchFetchFailed: 0, exceptions: 0,
+    };
 
-    for (const tenantDoc of tenantsSnap.docs) {
-      const storesSnap = await tenantDoc.ref.collection("stores").get();
-      for (const storeDoc of storesSnap.docs) {
-        const authSnap = await storeDoc.ref.collection("email-auth").get();
-        for (const authDoc of authSnap.docs) {
-          const data = authDoc.data();
-          if (data.status !== "connected") continue;
-          const twoDaysFromNow = Date.now() + 2 * 24 * 60 * 60 * 1000;
-          if (data.watchExpiration && data.watchExpiration > twoDaysFromNow) continue;
+    try {
+      const db = await getDB(firebaseServiceAccountKey);
+      log("[gmailRenewWatch] db ready, querying tenants…");
+      const tenantsSnap = await db.collection("tenants").get();
+      log("[gmailRenewWatch] tenants found:", tenantsSnap.size);
 
-          try {
-            const accessToken = await getGmailAccessToken(
-              db, tenantDoc.id, storeDoc.id, authDoc.id
-            );
-            const watchRes = await fetch(`${GMAIL_API_BASE}/watch`, {
-              method: "POST",
-              headers: {
-                Authorization: `Bearer ${accessToken}`,
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify({
-                topicName: `projects/${PROJECT_ID}/topics/gmail-push-notifications`,
-                labelIds: ["INBOX"],
-              }),
-            });
-            if (watchRes.ok) {
-              const watchData = await watchRes.json();
-              await authDoc.ref.update({
-                watchExpiration: parseInt(watchData.expiration) || 0,
-                historyId: watchData.historyId || data.historyId,
-              });
-              log("Renewed watch for", data.email);
+      for (const tenantDoc of tenantsSnap.docs) {
+        stats.tenants++;
+        const storesSnap = await tenantDoc.ref.collection("stores").get();
+        log(`[gmailRenewWatch] tenant=${tenantDoc.id} stores=${storesSnap.size}`);
+
+        for (const storeDoc of storesSnap.docs) {
+          stats.stores++;
+          const authSnap = await storeDoc.ref.collection("email-auth").get();
+          log(`[gmailRenewWatch]   store=${storeDoc.id} email-auth docs=${authSnap.size}`);
+
+          for (const authDoc of authSnap.docs) {
+            stats.accounts++;
+            const data = authDoc.data();
+            const ctx = {
+              tenant: tenantDoc.id,
+              store: storeDoc.id,
+              account: authDoc.id,
+              email: data.email,
+              status: data.status,
+              watchExpiration: data.watchExpiration,
+              watchExpirationIso: data.watchExpiration ? new Date(data.watchExpiration).toISOString() : null,
+              historyId: data.historyId,
+              lastSyncedAt: data.lastSyncedAt,
+              lastSyncedAtIso: data.lastSyncedAt ? new Date(data.lastSyncedAt).toISOString() : null,
+            };
+            log("[gmailRenewWatch]     evaluating account:", ctx);
+
+            if (data.status !== "connected") {
+              stats.skippedNotConnected++;
+              log(`[gmailRenewWatch]     SKIP (status !== "connected"): status=${data.status}`);
+              continue;
             }
-          } catch (e) {
-            log("Watch renewal error for", data.email, e);
+
+            const twoDaysFromNow = Date.now() + 2 * 24 * 60 * 60 * 1000;
+            if (data.watchExpiration && data.watchExpiration > twoDaysFromNow) {
+              stats.skippedFresh++;
+              const daysLeft = ((data.watchExpiration - Date.now()) / (24 * 60 * 60 * 1000)).toFixed(2);
+              log(`[gmailRenewWatch]     SKIP (fresh): ${daysLeft} days until expiry`);
+              continue;
+            }
+
+            stats.attempted++;
+            log("[gmailRenewWatch]     ATTEMPTING renewal for", data.email);
+
+            try {
+              const accessToken = await getGmailAccessToken(
+                db, tenantDoc.id, storeDoc.id, authDoc.id
+              );
+              log("[gmailRenewWatch]     got access token, calling Gmail watch…");
+
+              const watchRes = await fetch(`${GMAIL_API_BASE}/watch`, {
+                method: "POST",
+                headers: {
+                  Authorization: `Bearer ${accessToken}`,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  topicName: `projects/${PROJECT_ID}/topics/gmail-push-notifications`,
+                  labelIds: ["INBOX"],
+                }),
+              });
+
+              if (watchRes.ok) {
+                const watchData = await watchRes.json();
+                await authDoc.ref.update({
+                  watchExpiration: parseInt(watchData.expiration) || 0,
+                  historyId: watchData.historyId || data.historyId,
+                });
+                stats.renewed++;
+                log("[gmailRenewWatch]     ✅ RENEWED:", {
+                  email: data.email,
+                  expiration: watchData.expiration,
+                  expirationIso: watchData.expiration ? new Date(parseInt(watchData.expiration)).toISOString() : null,
+                  historyId: watchData.historyId,
+                });
+              } else {
+                stats.watchFetchFailed++;
+                const errBody = await watchRes.text();
+                log("[gmailRenewWatch]     ❌ watch fetch FAILED:", {
+                  email: data.email,
+                  status: watchRes.status,
+                  statusText: watchRes.statusText,
+                  body: errBody.substring(0, 500),
+                });
+              }
+            } catch (e) {
+              stats.exceptions++;
+              log("[gmailRenewWatch]     ❌ EXCEPTION for", data.email, {
+                message: e.message,
+                code: e.code,
+                stack: e.stack?.substring(0, 1000),
+              });
+            }
           }
         }
       }
+    } catch (outerErr) {
+      log("[gmailRenewWatch] ❌ OUTER EXCEPTION:", {
+        message: outerErr.message,
+        code: outerErr.code,
+        stack: outerErr.stack?.substring(0, 1000),
+      });
     }
+
+    log("[gmailRenewWatch] === END ===", stats);
+  }
+);
+
+exports.gmailReconnectWatch = onCall(
+  {
+    secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey],
+    timeoutSeconds: 300,
+    memory: "512MiB",
+  },
+  async (request) => {
+    const { tenantID, storeID, accountKey } = request.data;
+    if (!tenantID || !storeID || !accountKey) {
+      throw new HttpsError("invalid-argument", "tenantID, storeID, accountKey required");
+    }
+
+    log("[gmailReconnectWatch] start", { tenantID, storeID, accountKey });
+
+    const db = await getDB(firebaseServiceAccountKey);
+    const accessToken = await getGmailAccessToken(db, tenantID, storeID, accountKey);
+    const authRef = db
+      .collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("email-auth").doc(accountKey);
+
+    const watchRes = await fetch(`${GMAIL_API_BASE}/watch`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        topicName: `projects/${PROJECT_ID}/topics/gmail-push-notifications`,
+        labelIds: ["INBOX"],
+      }),
+    });
+
+    if (!watchRes.ok) {
+      const errText = await watchRes.text();
+      log("[gmailReconnectWatch] watch failed", {
+        status: watchRes.status, body: errText.substring(0, 500),
+      });
+      throw new HttpsError("internal", "Watch setup failed: " + errText);
+    }
+
+    const watchData = await watchRes.json();
+    await authRef.update({
+      watchExpiration: parseInt(watchData.expiration) || 0,
+      historyId: watchData.historyId,
+    });
+    log("[gmailReconnectWatch] watch re-established", {
+      expiration: watchData.expiration, historyId: watchData.historyId,
+    });
+
+    const emailsCollection = db
+      .collection("tenants").doc(tenantID)
+      .collection("stores").doc(storeID)
+      .collection("emails");
+
+    const fullResult = await syncFull(
+      db, accessToken, tenantID, storeID, accountKey, emailsCollection, authRef
+    );
+    log("[gmailReconnectWatch] backfill complete", fullResult);
+
+    return {
+      success: true,
+      expiration: watchData.expiration,
+      historyId: watchData.historyId,
+      synced: fullResult.synced,
+      unreadCount: fullResult.unreadCount,
+    };
   }
 );
 

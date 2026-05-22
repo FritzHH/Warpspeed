@@ -1,10 +1,12 @@
 /* eslint-disable */
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Image as ImageDom, TouchableOpacity as TouchableOpacityDom } from "../../../dom_components";
 import { C, ICONS } from "../../../styles";
 import { useLoginStore } from "../../../stores";
 import s from "./Messages.module.css";
+
+const AUTO_SEND_SECONDS = 10;
 
 // Module-level auto-send timer
 let _autoSendTimer = null;
@@ -17,7 +19,7 @@ export function scheduleAutoSend(thunk) {
     if (_autoSendThunk) _autoSendThunk();
     _autoSendThunk = null;
     _autoSendTimer = null;
-  }, 10000);
+  }, AUTO_SEND_SECONDS * 1000);
 }
 
 export function clearAutoSend() {
@@ -60,7 +62,18 @@ function ForwardCheckboxRow({ checked, disabled, onToggle, label }) {
  * Orange reply options bar that appears after pressing send.
  * Shows: auto-send countdown, can reply yes/no, forward replies checkbox.
  */
-export function ReplyOptionsBar({ visible, forwardReplies, hasActivePhone, onSelectCanRespond, onToggleForward, audioMode, audioUploading, onSendAudio, onDeleteAudio }) {
+export function ReplyOptionsBar({ visible, forwardReplies, hasActivePhone, onSelectCanRespond, onToggleForward, onCancel, audioMode, audioUploading, onSendAudio, onDeleteAudio }) {
+  const [secondsLeft, setSecondsLeft] = useState(AUTO_SEND_SECONDS);
+
+  useEffect(() => {
+    if (!visible || audioMode) { setSecondsLeft(AUTO_SEND_SECONDS); return; }
+    setSecondsLeft(AUTO_SEND_SECONDS);
+    let interval = setInterval(() => {
+      setSecondsLeft((prev) => (prev <= 1 ? 0 : prev - 1));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [visible, audioMode]);
+
   if (!visible) return null;
 
   if (audioMode) {
@@ -104,7 +117,14 @@ export function ReplyOptionsBar({ visible, forwardReplies, hasActivePhone, onSel
 
   return (
     <div className={s.replyOptionsBar}>
-      <span className={s.replyOptionsCountdown}>Auto-sending in 10 seconds</span>
+      <div className={s.replyOptionsHeaderRow}>
+        <span className={s.replyOptionsCountdown}>{`Auto-sending in ${secondsLeft} second${secondsLeft === 1 ? "" : "s"}`}</span>
+        {onCancel && (
+          <button type="button" className={s.replyOptionsCancelBtn} onClick={onCancel}>
+            Cancel
+          </button>
+        )}
+      </div>
       <div className={s.replyOptionsCanReplyRow}>
         <span className={s.replyOptionsCanReplyLabel}>Can reply?</span>
         <TouchableOpacityDom

@@ -49,6 +49,7 @@ export function ComposeArea({
   onDeleteAudio,
   forwardReplies,
   onToggleForward,
+  onCancelReply,
   hasActivePhone,
   fromLang,
   onFromLang,
@@ -132,6 +133,7 @@ export function ComposeArea({
         onSendAudio={onSendAudio}
         onDeleteAudio={onDeleteAudio}
         onToggleForward={onToggleForward}
+        onCancel={onCancelReply}
       />
 
       <div className={s.inputRow} style={{ borderColor: C.surfaceOverlayLight }}>

@@ -32,3 +32,13 @@ src/assets/import_data/
 # Claude Terminal / Claude Code local tool state
 .claude-terminal
 .claude/scheduled_tasks.lock
+
+# Firebase emulator suite
+.emulator-data/
+firebase-debug.log
+firestore-debug.log
+database-debug.log
+ui-debug.log
+storage-debug.log
+auth-debug.log
+pubsub-debug.log

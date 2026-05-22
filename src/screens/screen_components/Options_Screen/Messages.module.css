@@ -318,7 +318,7 @@
 .replyOptionsBar {
   width: 100%;
   margin-bottom: 4px;
-  background-color: var(--warning);
+  border: 2px solid var(--warning);
   padding: 10px;
   border-radius: 6px;
   box-sizing: border-box;
@@ -357,6 +357,30 @@
 
 .replyOptionsCountdown {
   color: var(--text-secondary);
+}
+
+.replyOptionsHeaderRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.replyOptionsCancelBtn {
+  padding: 4px 12px;
+  background-color: transparent;
+  border: 1px solid var(--danger);
+  border-radius: 4px;
+  color: var(--danger);
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.replyOptionsCancelBtn:hover {
+  background-color: var(--danger);
+  color: var(--text-on-accent);
 }
 
 .replyOptionsCanReplyRow {

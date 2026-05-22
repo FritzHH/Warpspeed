@@ -345,11 +345,10 @@ export const ActiveWorkorderComponent = ({}) => {
     _setWaitDays(newDays);
     clearTimeout(waitDaysTimerRef.current);
     waitDaysTimerRef.current = setTimeout(() => {
-      const now = Date.now();
+      const anchor = sActiveOrderedItem.partOrderedMillis || Date.now();
       const updated = {
         ...sActiveOrderedItem,
-        partOrderedMillis: now,
-        partOrderEstimateMillis: now + (newDays * MILLIS_IN_DAY),
+        partOrderEstimateMillis: anchor + (newDays * MILLIS_IN_DAY),
       };
       _sSetActiveOrderedItem(updated);
       commitOrUpdateActiveItem(updated);
@@ -361,7 +360,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const brandWrapperRef = useRef(null);
   const brandBackspaced = useRef(false);
 
-  const brandSuggestions = sBrandFocused && zOpenWorkorder?.brand?.trim()
+  const brandSuggestions = sBrandFocused && zOpenWorkorder?.brand?.trim().length >= 2
     ? (zSettings.allBrands || []).filter(
         (b) => b.toLowerCase().startsWith(zOpenWorkorder.brand.trim().toLowerCase()) && b.toLowerCase() !== zOpenWorkorder.brand.trim().toLowerCase()
       ).slice(0, 8)
@@ -383,7 +382,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const color1InputRef = useRef(null);
   const descBackspaced = useRef(false);
 
-  const descSuggestions = sDescFocused && zOpenWorkorder?.description?.trim()
+  const descSuggestions = sDescFocused && zOpenWorkorder?.description?.trim().length >= 2
     ? (zSettings.allDescriptions || []).filter(
         (d) => d.toLowerCase().startsWith(zOpenWorkorder.description.trim().toLowerCase()) && d.toLowerCase() !== zOpenWorkorder.description.trim().toLowerCase()
       ).slice(0, 8)
@@ -1903,21 +1902,60 @@ export const ActiveWorkorderComponent = ({}) => {
                         {formatMillisForDisplay(sActiveOrderedItem.partOrderEstimateMillis)}
                       </span>
                     )}
-                    <button
-                      type="button"
-                      disabled={isDonePaid || !hasActiveItem}
-                      onClick={() => {
-                        const newVal = !sActiveOrderedItem?.partToBeOrdered;
-                        updateActiveItemField("partToBeOrdered", newVal);
-                        useOpenWorkordersStore.getState().setField("status", newVal ? "is_order_part_for_customer" : "part_ordered", zOpenWorkorder.id);
-                      }}
-                      style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: (isDonePaid || !hasActiveItem) ? 'default' : 'pointer' }}
-                    >
-                      <span style={{ display: 'flex', width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderStyle: 'solid', borderColor: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green, justifyContent: 'center', alignItems: 'center', marginRight: 4, boxSizing: 'border-box' }}>
-                        <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 3, backgroundColor: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green }} />
-                      </span>
-                      <span style={{ fontSize: 11, fontWeight: '600', color: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green }}>{sActiveOrderedItem?.partToBeOrdered ? "Not ordered" : "Ordered"}</span>
-                    </button>
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                      <button
+                        type="button"
+                        disabled={isDonePaid || !hasActiveItem}
+                        onClick={() => {
+                          const currentlyOrdered = !sActiveOrderedItem?.partToBeOrdered;
+                          const applyToggle = () => {
+                            const newVal = !sActiveOrderedItem?.partToBeOrdered;
+                            const updated = { ...sActiveOrderedItem, partToBeOrdered: newVal };
+                            if (!newVal) {
+                              const now = Date.now();
+                              updated.partOrderedMillis = now;
+                              updated.partOrderEstimateMillis = now + (sWaitDays * MILLIS_IN_DAY);
+                            } else {
+                              updated.partOrderedMillis = "";
+                            }
+                            _sSetActiveOrderedItem(updated);
+                            commitOrUpdateActiveItem(updated);
+                            useOpenWorkordersStore.getState().setField("status", newVal ? "is_order_part_for_customer" : "part_ordered", zOpenWorkorder.id);
+                          };
+                          if (currentlyOrdered) {
+                            useAlertScreenStore.getState().setValues({
+                              showAlert: true,
+                              title: "Reset Order Date?",
+                              message: "Continuing will clear the ordered-on date for this item. Are you sure?",
+                              btn1Text: "Continue",
+                              btn2Text: "Cancel",
+                              handleBtn1Press: () => {
+                                useAlertScreenStore.getState().setValues({ showAlert: false });
+                                applyToggle();
+                              },
+                              handleBtn2Press: () => useAlertScreenStore.getState().setValues({ showAlert: false }),
+                            });
+                          } else {
+                            applyToggle();
+                          }
+                        }}
+                        style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: (isDonePaid || !hasActiveItem) ? 'default' : 'pointer' }}
+                      >
+                        <span style={{ display: 'flex', width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderStyle: 'solid', borderColor: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green, justifyContent: 'center', alignItems: 'center', marginRight: 4, boxSizing: 'border-box' }}>
+                          <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 3, backgroundColor: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green }} />
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: '600', color: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green }}>{sActiveOrderedItem?.partToBeOrdered ? "Not ordered" : "Ordered"}</span>
+                      </button>
+                      {!sActiveOrderedItem?.partToBeOrdered && sActiveOrderedItem?.partOrderedMillis ? (
+                        <span style={{ marginTop: 2, fontSize: 9, fontStyle: 'italic', color: C.textMuted, whiteSpace: 'nowrap' }}>
+                          {(() => {
+                            const d = new Date(sActiveOrderedItem.partOrderedMillis);
+                            const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+                            return `${months[d.getMonth()]} ${d.getDate()}, '${String(d.getFullYear()).slice(-2)}`;
+                          })()}
+                        </span>
+                      ) : null}
+                    </div>
                   </div>
 
                   <div style={{ width: '100%', display: 'flex', flexDirection: 'row', alignItems: 'stretch', marginTop: 8, height: 22 }}>
@@ -1943,7 +1981,7 @@ export const ActiveWorkorderComponent = ({}) => {
                           <button
                             type="button"
                             title="Press to open, right-click to copy"
-                            onClick={() => window.open(openUrl, "_blank")}
+                            onClick={() => window.open(openUrl, "_blank", "noopener,noreferrer")}
                             onContextMenu={copyOnRightClick}
                             style={{ height: '100%', boxSizing: 'border-box', marginLeft: 5, backgroundColor: C.buttonLightGreen, borderColor: C.buttonLightGreenOutline, borderWidth: 1, borderStyle: 'solid', borderRadius: 5, paddingTop: 0, paddingBottom: 0, paddingLeft: 8, paddingRight: 8, fontSize: 12, color: C.textMuted, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
                           >
@@ -1972,16 +2010,9 @@ export const ActiveWorkorderComponent = ({}) => {
                       handleOuterClick={() => _sSetShowTracker(false)}
                       Component={() => (
                         <div style={{ width: "80vw", height: "85vh", backgroundColor: C.backgroundWhite, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                          <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: "10px 15px", backgroundColor: C.green, boxSizing: "border-box" }}>
-                            <span style={{ fontSize: 16, fontWeight: "600", color: "white" }}>Package Tracking</span>
-                            <span style={{ fontSize: 13, color: "rgba(255,255,255,0.85)", flex: 1, marginLeft: 10, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sActiveOrderedItem.trackingNumber.trim()}</span>
-                            <button type="button" onClick={() => _sSetShowTracker(false)} style={{ width: 30, height: 30, borderRadius: 15, display: "flex", justifyContent: "center", alignItems: "center", background: "none", border: "none", cursor: "pointer", padding: 0 }}>
-                              <span style={{ fontSize: 18, fontWeight: "700", color: "white" }}>✕</span>
-                            </button>
-                          </div>
                           <div style={{ flex: 1, padding: 10 }}>
                             <iframe
-                              src={"https://parcelsapp.com/en/tracking/" + sActiveOrderedItem.trackingNumber.trim()}
+                              src={"https://www.17track.net/en/track?nums=" + encodeURIComponent(sActiveOrderedItem.trackingNumber.trim())}
                               style={{ width: "100%", height: "100%", border: "none", borderRadius: 6 }}
                               title="Package Tracking"
                             />

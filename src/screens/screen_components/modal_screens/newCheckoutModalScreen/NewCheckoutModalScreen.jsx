@@ -257,6 +257,10 @@ export function NewCheckoutModalScreen() {
   const [sDepositInputDisp, _setDepositInputDisp] = useState("");
   const [sDepositInputCents, _setDepositInputCents] = useState(0);
   const [sShowSendReceiptModal, _sSetShowSendReceiptModal] = useState(false);
+  const [sShowPickupModal, _setShowPickupModal] = useState(false);
+  const [sPickupKeepOpenExpanded, _setPickupKeepOpenExpanded] = useState(false);
+  const [sPickupKeepOpenReason, _setPickupKeepOpenReason] = useState("");
+  const [sPickupCountdown, _setPickupCountdown] = useState(10);
   const [sReceiptSentOverlay, _setReceiptSentOverlay] = useState(null);
   const [sTransactions, _setTransactions] = useState([]);   // real payments (cash/card)
   const [sCredits, _setCredits] = useState([]);              // applied credits/deposits/gift cards
@@ -280,11 +284,26 @@ export function NewCheckoutModalScreen() {
     return (t.amountCaptured || 0) > refunded;
   }) || sCredits.length > 0;
 
+  // Auto-close after sale completion (only when pickup-decision modal is NOT awaiting input — e.g., deposit/gift-card sales).
   useEffect(() => {
     if (!saleComplete) return;
+    if (sShowPickupModal) return;
     let timer = setTimeout(() => closeModal(), 15000);
     return () => clearTimeout(timer);
-  }, [saleComplete]);
+  }, [saleComplete, sShowPickupModal]);
+
+  // Pickup-decision modal: 10-second countdown that auto-fires Complete & Close at zero.
+  // Pauses (cancels) the moment the user clicks "Keep Ticket Open" (expanded = true).
+  useEffect(() => {
+    if (!sShowPickupModal) return;
+    if (sPickupKeepOpenExpanded) return;
+    if (sPickupCountdown <= 0) {
+      handlePickupCompleteAndClose();
+      return;
+    }
+    let t = setTimeout(() => _setPickupCountdown((n) => n - 1), 1000);
+    return () => clearTimeout(t);
+  }, [sShowPickupModal, sPickupKeepOpenExpanded, sPickupCountdown]);
 
   // ─── Initialization ──────────────────────────────────────
   useEffect(() => {
@@ -949,8 +968,9 @@ export function NewCheckoutModalScreen() {
     _setSale(sale);
     broadcastSaleToDisplay(sale, sCombinedWorkorders, custFirst, custLast, custLanguage);
 
-    // Persist immediately (skip if complete — handleSaleComplete handles deletion)
-    if (!sale.paymentComplete) persistSale(sale, newTransactions, sCredits);
+    // Persist immediately on every capture so the txn is durable before any modal/UI step.
+    // For completing payments, handleSaleComplete will write the completed-sale doc and delete the active-sale doc.
+    persistSale(sale, newTransactions, sCredits);
   }
 
   // Update workorders to track that a sale is in progress
@@ -1097,41 +1117,40 @@ export function NewCheckoutModalScreen() {
       handleDepositSaleComplete(sale, localTxns, localCreds);
       return;
     }
-    // Mark all combined workorders as complete
+    // Mark all combined workorders as paid IN-PLACE (still in open list).
+    // Archival (newCheckoutCompleteWorkorder + removeWorkorder) is deferred to the pickup modal selection.
+    // If the user steps away / crashes mid-modal, the WO stays in the open list with Finished & Paid status — safe default.
     let settings = useSettingsStore.getState().getSettings();
     let statuses = settings?.statuses || [];
     let user = useLoginStore.getState().currentUser?.first || "System";
     let timestamp = Date.now();
 
     for (let wo of sCombinedWorkorders) {
-      let woToComplete = cloneDeep(wo);
+      let woUpdated = cloneDeep(wo);
       let oldStatusLabel = resolveStatus(wo.status, statuses)?.label || wo.status || "";
       let newStatusLabel = resolveStatus("finished_and_paid", statuses)?.label || "Finished & Paid";
 
-      woToComplete.paymentComplete = true;
-      woToComplete.paidOnMillis = Date.now();
-      woToComplete.activeSaleID = "";
-      woToComplete.saleID = sale.id;
-      woToComplete.status = "finished_and_paid";
+      woUpdated.paymentComplete = true;
+      woUpdated.paidOnMillis = Date.now();
+      woUpdated.activeSaleID = "";
+      woUpdated.saleID = sale.id;
+      woUpdated.status = "finished_and_paid";
 
       let entries = [];
       if (wo.status !== "finished_and_paid") {
         entries.push({ timestamp, user, field: "status", action: "changed", from: oldStatusLabel, to: newStatusLabel });
       }
       entries.push({ timestamp, user, field: "payment", action: "completed", from: "", to: "Sale completed — " + formatCurrencyDisp(sale.total, true) });
-      woToComplete.changeLog = [...(woToComplete.changeLog || []), ...entries];
-      woToComplete.endedOnMillis = Date.now();
+      woUpdated.changeLog = [...(woUpdated.changeLog || []), ...entries];
+      woUpdated.endedOnMillis = Date.now();
 
-      await newCheckoutCompleteWorkorder(woToComplete);
-      useOpenWorkordersStore.getState().removeWorkorder(woToComplete, false); // remove from local store, don't send DB delete (already archived)
+      useOpenWorkordersStore.getState().setWorkorder(woUpdated, true);
     }
-    useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.customer);
-    useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.workorders);
 
-    // Write all transaction docs + completed sale
+    // Transactions were already persisted on capture (persistSale). Just write the completed-sale and delete the active-sale.
     let saleToPersist = prepareSaleForPersist(sale, localTxns, localCreds);
     delete saleToPersist.pendingTransactionIDs;
-    await Promise.all([writeAllTransactions(localTxns), writeCompletedSale(saleToPersist)]);
+    await writeCompletedSale(saleToPersist);
     await deleteActiveSale(sale.id);
 
     // Add sale ID to customer and persist deposit removal
@@ -1231,6 +1250,84 @@ export function NewCheckoutModalScreen() {
     if (canSMS || canEmail) {
       sendSaleReceipt(sale, customerForReceipt, woForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, translatedReceipt, translatedPdfLabels, langCode, localTxns, localCreds);
     }
+
+    // Reset the customer-facing display before showing the pickup-decision modal —
+    // sale is done, no reason to keep the checkout on the customer screen.
+    broadcastClear();
+
+    // Ask the user: archive the workorder, or keep it open for pickup.
+    _setPickupKeepOpenExpanded(false);
+    _setPickupKeepOpenReason("");
+    _setPickupCountdown(10);
+    _setShowPickupModal(true);
+  }
+
+  // ─── Pickup-Decision Modal Handlers ───────────────────────
+  // Called when user picks "Complete & Close" — archive each WO and close the checkout modal.
+  async function handlePickupCompleteAndClose() {
+    dlog(DCAT.BUTTON, "pickup_completeAndClose", "CheckoutModal", { saleID: sSale?.id, workorderCount: sCombinedWorkorders?.length });
+    _setShowPickupModal(false);
+    // Pull fresh copies from the open-workorders store (handleSaleComplete already wrote the paid-state to them).
+    let woStore = useOpenWorkordersStore.getState();
+    for (let wo of sCombinedWorkorders) {
+      let current = woStore.workorders.find((w) => w.id === wo.id);
+      let woToArchive = cloneDeep(current || wo);
+      await newCheckoutCompleteWorkorder(woToArchive);
+      woStore.removeWorkorder(woToArchive, false);
+    }
+    useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.customer);
+    useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.workorders);
+    // For standalone sales, also clear the open-workorder pointer + customer (mirrors closeModal's standalone branch).
+    if (isStandalone) {
+      let oldWoId = woStore.openWorkorderID;
+      if (oldWoId) woStore.removeWorkorder(oldWoId, false);
+      woStore.setOpenWorkorderID(null);
+      useCurrentCustomerStore.getState().setCustomer({ ...CUSTOMER_PROTO }, false);
+      useTabNamesStore.getState().setItems({
+        infoTabName: TAB_NAMES.infoTab.customer,
+        itemsTabName: TAB_NAMES.itemsTab.empty,
+        optionsTabName: TAB_NAMES.optionsTab.workorders,
+      });
+    }
+    resetAndClose();
+  }
+
+  // Called when user picks "Keep Ticket Open" — expand the modal to collect a required reason.
+  function handlePickupKeepOpen() {
+    dlog(DCAT.BUTTON, "pickup_keepOpen", "CheckoutModal", { saleID: sSale?.id, workorderCount: sCombinedWorkorders?.length });
+    _setPickupKeepOpenExpanded(true);
+  }
+
+  // Called when user clicks "Save & Close" after entering the keep-alive reason.
+  // Writes the reason into each combined workorder's internalNotes (matches the Notes-tab add pattern), then closes.
+  function handlePickupSaveKeepOpenReason() {
+    let reason = sPickupKeepOpenReason.trim();
+    if (reason.length < 7) return;
+    dlog(DCAT.BUTTON, "pickup_saveKeepOpenReason", "CheckoutModal", { saleID: sSale?.id, workorderCount: sCombinedWorkorders?.length, reasonLength: reason.length });
+    let currentUser = useLoginStore.getState().currentUser;
+    let userName = "(" + (currentUser?.first || "") + " " + ((currentUser?.last || "")[0] || "") + ")  ";
+    let woStore = useOpenWorkordersStore.getState();
+    for (let wo of sCombinedWorkorders) {
+      let current = woStore.workorders.find((w) => w.id === wo.id);
+      if (!current) continue;
+      let updated = cloneDeep(current);
+      let notes = [...(updated.internalNotes || [])];
+      notes.unshift({
+        id: crypto.randomUUID(),
+        name: userName,
+        userID: currentUser?.id || "",
+        value: reason,
+        createdAt: Date.now(),
+      });
+      updated.internalNotes = notes;
+      woStore.setWorkorder(updated, true);
+    }
+    _setShowPickupModal(false);
+    _setPickupKeepOpenExpanded(false);
+    _setPickupKeepOpenReason("");
+    useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.customer);
+    useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.workorders);
+    resetAndClose();
   }
 
   function handleCashChange(change) {
@@ -2241,6 +2338,75 @@ export function NewCheckoutModalScreen() {
                 handleExit={() => _setNewItemModal(null)}
               />
             </Suspense>
+          )}
+          {sShowPickupModal && (
+            <div className={styles.pickupOverlay}>
+              <div className={styles.pickupBox} style={{ backgroundColor: C.backgroundWhite, borderColor: C.buttonLightGreenOutline }}>
+                <span className={styles.pickupTitle} style={{ color: C.text }}>Payment Complete</span>
+                <span className={styles.pickupSubtitle} style={{ color: C.textMuted }}>
+                  Close out this ticket, or keep it open for pickup?
+                </span>
+                <button
+                  type="button"
+                  className={styles.pickupPrimaryBtn}
+                  style={{ backgroundColor: C.green, color: C.textWhite }}
+                  onClick={handlePickupCompleteAndClose}
+                  disabled={sPickupKeepOpenExpanded}
+                >
+                  Complete & Close
+                  {!sPickupKeepOpenExpanded && (
+                    <span
+                      className={styles.pickupCountdown}
+                      style={{ color: sPickupCountdown <= 3 ? C.red : C.textWhite }}
+                    >
+                      {sPickupCountdown}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  className={styles.pickupSecondaryBtn}
+                  style={{ borderColor: C.borderDefault, color: C.text, backgroundColor: C.backgroundWhite }}
+                  onClick={handlePickupKeepOpen}
+                  disabled={sPickupKeepOpenExpanded}
+                >
+                  Keep Ticket Open
+                </button>
+                {sPickupKeepOpenExpanded && (
+                  <>
+                    <textarea
+                      className={styles.pickupReasonInput}
+                      style={{ borderColor: C.borderDefault, color: C.text, backgroundColor: C.backgroundWhite }}
+                      placeholder="Enter keep alive reason  REQUIRED"
+                      value={sPickupKeepOpenReason}
+                      onChange={(e) => {
+                        let v = e.target.value;
+                        if (v.length > 0) v = v.charAt(0).toUpperCase() + v.slice(1);
+                        _setPickupKeepOpenReason(v);
+                      }}
+                      autoCapitalize="sentences"
+                      rows={3}
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      className={styles.pickupPrimaryBtn}
+                      style={{
+                        backgroundColor: sPickupKeepOpenReason.trim().length >= 7 ? C.green : C.textDisabled,
+                        color: C.textWhite,
+                        cursor: sPickupKeepOpenReason.trim().length >= 7 ? "pointer" : "not-allowed",
+                        marginTop: 12,
+                        marginBottom: 0,
+                      }}
+                      onClick={handlePickupSaveKeepOpenReason}
+                      disabled={sPickupKeepOpenReason.trim().length < 7}
+                    >
+                      Save & Close
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
           )}
         </div>
     </Dialog>

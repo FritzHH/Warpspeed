@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import { calculateRunningTotals, capitalizeFirstLetterOfString, formatCurrencyDisp, formatMillisForDisplay, formatPhoneWithDashes, lightenRGBByPercent, resolveStatus, formatWorkorderNumber, localStorageWrapper, findTemplateByType, log } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useSettingsStore, useLoginStore, useAlertScreenStore, useOpenWorkordersStore } from "../../../stores";
-import { Button, Dialog, DropdownMenu, SHADOW_PROTO, SmallLoadingIndicator } from "../../../dom_components";
+import { Button, Dialog, DropdownMenu, SHADOW_PROTO, SmallLoadingIndicator, Tooltip } from "../../../dom_components";
 import { dbGetCompletedSale, dbSavePrintObj, dbSendReceipt } from "../../../db_calls_wrapper";
 import { build_db_path } from "../../../constants";
 import { printBuilder } from "../../../utils";
@@ -218,9 +218,10 @@ const ChangeLogEntry = ({ entry, index }) => {
 
 // ─── Main Modal ─────────────────────────────────────────────────
 
-export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRefund }) => {
+export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRefund, onArchive }) => {
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
   const taxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
+  const sIsInOpenList = useOpenWorkordersStore((s) => !!s.workorders.find((w) => w.id === workorder?.id));
 
   const [sSales, _sSetSales] = useState([]);
   const [sTransactionsMap, _sSetTransactionsMap] = useState({});
@@ -527,6 +528,17 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
               buttonStyle={{ paddingHorizontal: 16, height: 32, marginRight: 8 }}
               textStyle={{ color: C.textWhite, fontSize: 12 }}
             />
+          )}
+          {onArchive && sIsInOpenList && (
+            <Tooltip text="Move workorder out of open list" position="bottom">
+              <Button
+                text="Save & Archive Workorder"
+                colorGradientArr={COLOR_GRADIENTS.green}
+                onPress={() => onArchive(workorder)}
+                buttonStyle={{ paddingHorizontal: 16, height: 32, marginRight: 8 }}
+                textStyle={{ color: C.textWhite, fontSize: 12 }}
+              />
+            </Tooltip>
           )}
           {sSales.length > 0 && (
             <button

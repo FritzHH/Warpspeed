@@ -10,6 +10,7 @@ import {
   dbListDeletedWorkorders,
   dbRehydrateWorkorder,
 } from "../../../../db_calls_wrapper";
+import { queryTransactionsByDateRange } from "../../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import styles from "./TodaysHistoryComponent.module.css";
 
 const FullSaleModal = lazy(() =>
@@ -100,33 +101,29 @@ function getWorkorderPhone(wo) {
   return "";
 }
 
-function getSalePaymentMethods(sale) {
+function formatPaymentMethod(transactionIDs, txnsById) {
+  if (!Array.isArray(transactionIDs) || transactionIDs.length === 0) return "—";
   const methods = new Set();
-  (sale.transactions || []).forEach((t) => {
-    if (t && t.type) methods.add(t.type);
-  });
-  (sale.depositsApplied || []).forEach((d) => {
-    methods.add(d.depositType === "giftcard" ? "gift card" : "deposit");
-  });
-  if ((sale.creditsApplied || []).some((c) => (c.amount || 0) > 0)) methods.add("credit");
-  return Array.from(methods).join(", ") || "—";
-}
-
-function getCustomerLabel(obj) {
-  if (!obj) return "—";
-  if (obj.customerName) return obj.customerName;
-  if (obj.customer) {
-    const first = obj.customer.firstName || "";
-    const last = obj.customer.lastName || "";
-    if (first || last) return `${first} ${last}`.trim();
+  for (const id of transactionIDs) {
+    const txn = txnsById?.[id];
+    const m = (txn?.method || "").toLowerCase();
+    if (m) methods.add(m);
   }
-  if (!obj.customerID) return "Standalone Sale";
-  return `Customer ${obj.customerID.slice(0, 8)}`;
+  if (methods.size === 0) return "—";
+  if (methods.size === 1) {
+    const only = [...methods][0];
+    return only.charAt(0).toUpperCase() + only.slice(1);
+  }
+  return [...methods].map((m) => m.charAt(0).toUpperCase() + m.slice(1)).join(" + ");
 }
 
 export const TodaysHistoryComponent = () => {
   const zSalesTaxPercent = useSettingsStore((state) => state.settings?.salesTaxPercent) || 0;
   const [sEvents, _setEvents] = useState([]);
+  const [sFilter, _setFilter] = useState("all");
+  const [sTxnsById, _setTxnsById] = useState({});
+  const [sSalesById, _setSalesById] = useState({});
+  const [sWosById, _setWosById] = useState({});
   const [sLoading, _setLoading] = useState(true);
   const [sSaleModalItem, _setSaleModalItem] = useState(null);
   const [sWorkorderModalItem, _setWorkorderModalItem] = useState(null);
@@ -137,22 +134,38 @@ export const TodaysHistoryComponent = () => {
     _setLoading(true);
     const since = startOfTodayEasternMillis();
     try {
-      const [salesRes, wosRes, deletedRes] = await Promise.all([
+      const [salesRes, wosRes, deletedRes, txns] = await Promise.all([
         dbListCompletedSalesSince(since),
         dbListCompletedWorkordersSince(since),
         dbListDeletedWorkorders(since),
+        queryTransactionsByDateRange(since, Date.now()),
       ]);
 
-      const saleEvents = (salesRes?.sales || []).map((sale) => ({
-        type: "sale",
-        millis: sale.millis || 0,
-        data: sale,
-      }));
-      const woEvents = (wosRes?.workorders || []).map((wo) => ({
-        type: "completed",
-        millis: wo.endedOnMillis || wo.paidOnMillis || 0,
-        data: wo,
-      }));
+      const txnsById = {};
+      for (const t of txns || []) { if (t?.id) txnsById[t.id] = t; }
+      const salesById = {};
+      for (const s of salesRes?.sales || []) { if (s?.id) salesById[s.id] = s; }
+      const wosById = {};
+      for (const w of wosRes?.workorders || []) { if (w?.id) wosById[w.id] = w; }
+
+      // Only standalone sales (no customerID) — sales tied to a customer
+      // already surface via their corresponding completed-workorder card.
+      const saleEvents = (salesRes?.sales || [])
+        .filter((sale) => !sale.customerID)
+        .map((sale) => ({
+          type: "sale",
+          millis: sale.millis || 0,
+          data: sale,
+        }));
+      // Skip standalone workorders (no customerID) — their Sale Completed card
+      // already represents the transaction.
+      const woEvents = (wosRes?.workorders || [])
+        .filter((wo) => !!wo.customerID)
+        .map((wo) => ({
+          type: "completed",
+          millis: wo.endedOnMillis || wo.paidOnMillis || 0,
+          data: wo,
+        }));
       const deletedEvents = (deletedRes?.workorders || []).map((wo) => ({
         type: "deleted",
         millis: wo._deletedAt || 0,
@@ -162,9 +175,15 @@ export const TodaysHistoryComponent = () => {
       const all = [...saleEvents, ...woEvents, ...deletedEvents]
         .sort((a, b) => b.millis - a.millis);
       _setEvents(all);
+      _setTxnsById(txnsById);
+      _setSalesById(salesById);
+      _setWosById(wosById);
     } catch (err) {
       console.error("TodaysHistoryComponent: load failed", err);
       _setEvents([]);
+      _setTxnsById({});
+      _setSalesById({});
+      _setWosById({});
     }
     _setLoading(false);
   }, []);
@@ -184,10 +203,28 @@ export const TodaysHistoryComponent = () => {
     }
   }
 
+  const FILTERS = [
+    { id: "all", label: "All" },
+    { id: "sale", label: "Sales" },
+    { id: "completed", label: "Workorders" },
+    { id: "deleted", label: "Deleted Workorders" },
+  ];
+  const filteredEvents = sFilter === "all" ? sEvents : sEvents.filter((e) => e.type === sFilter);
+
   return (
     <div className={styles.root}>
       <div className={styles.toolbar}>
-        <div className={styles.subtitle}>(since midnight Eastern)</div>
+        <div className={styles.chipRow}>
+          {FILTERS.map((f) => (
+            <div
+              key={f.id}
+              className={`${styles.chip} ${sFilter === f.id ? styles.chipActive : ""}`}
+              onClick={() => _setFilter(f.id)}
+            >
+              {f.label}
+            </div>
+          ))}
+        </div>
         <div className={styles.toolbarSpacer} />
         <div className={styles.refreshBtn} onClick={loadData}>Refresh</div>
       </div>
@@ -195,14 +232,17 @@ export const TodaysHistoryComponent = () => {
       <div className={styles.list}>
         {sLoading ? (
           <div className={styles.loadingState}>Loading…</div>
-        ) : sEvents.length === 0 ? (
+        ) : filteredEvents.length === 0 ? (
           <div className={styles.emptyState}>No events today yet.</div>
         ) : (
-          sEvents.map((event, idx) => (
+          filteredEvents.map((event, idx) => (
             <EventCard
               key={event.type + "-" + (event.data.id || idx)}
               event={event}
               salesTaxPercent={zSalesTaxPercent}
+              txnsById={sTxnsById}
+              salesById={sSalesById}
+              wosById={sWosById}
               onOpenSale={() => _setSaleModalItem({ saleID: event.data.id, source: "completed" })}
               onOpenWorkorder={() => _setWorkorderModalItem(event.data)}
               onRestore={() => _setRestoreCandidate(event.data)}
@@ -243,37 +283,36 @@ export const TodaysHistoryComponent = () => {
   );
 };
 
-const EventCard = ({ event, salesTaxPercent, onOpenSale, onOpenWorkorder, onRestore }) => {
+const EventCard = ({ event, salesTaxPercent, txnsById, salesById, wosById, onOpenSale, onOpenWorkorder, onRestore }) => {
   if (event.type === "sale") {
     const sale = event.data;
+    const backingWo = wosById?.[sale.workorderIDs?.[0]] || null;
+    const totals = getWorkorderTotals(backingWo, salesTaxPercent);
+    const payment = formatPaymentMethod(sale.transactionIDs, txnsById);
     return (
       <div className={`${styles.eventCard} ${styles.eventCardSale}`}>
         <div className={styles.cardTopRow}>
           <div className={styles.cardTypeLabel}>Sale Completed</div>
           <div className={styles.cardTime}>{formatEasternTime(event.millis)}</div>
           <div className={styles.cardSpacer} />
-          <div className={`${styles.cardAction} ${styles.cardActionPrimary}`} onClick={onOpenSale}>View Sale</div>
+          <div className={`${styles.cardAction} ${styles.cardActionSale}`} onClick={onOpenSale}>View Sale</div>
         </div>
         <div className={styles.cardBody}>
           <div className={styles.cardRow}>
             <span className={styles.cardLabel}>Sale ID:</span>
             <span className={styles.cardValue}>{sale.id || "—"}</span>
-            <span className={styles.cardLabel}>Customer:</span>
-            <span className={styles.cardValue}>{sale.customerID ? getCustomerLabel(sale) : "Standalone Sale"}</span>
+            <span className={styles.cardLabel}>Payment:</span>
+            <span className={styles.cardValue}>{payment}</span>
           </div>
           <div className={styles.cardRow}>
             <span className={styles.cardLabel}>Cashier:</span>
             <span className={styles.cardValue}>{sale.createdBy || "—"}</span>
-            <span className={styles.cardLabel}>Payment:</span>
-            <span className={styles.cardValue}>{getSalePaymentMethods(sale)}</span>
           </div>
           <div className={styles.cardRow}>
-            <span className={styles.cardLabel}>Subtotal:</span>
-            <span className={styles.cardValue}>${formatCurrencyDisp(sale.subtotal || 0)}</span>
-            <span className={styles.cardLabel}>Tax:</span>
-            <span className={styles.cardValue}>${formatCurrencyDisp(sale.salesTax || 0)}</span>
+            <span className={styles.cardLabel}>Items:</span>
+            <span className={styles.cardValue}>{totals.itemCount}</span>
             <span className={styles.cardLabel}>Total:</span>
-            <span className={styles.cardTotal}>${formatCurrencyDisp((sale.amountCaptured || 0) - (sale.amountRefunded || 0))}</span>
+            <span className={styles.cardTotal}>${formatCurrencyDisp(totals.finalTotal)}</span>
           </div>
         </div>
       </div>
@@ -288,20 +327,22 @@ const EventCard = ({ event, salesTaxPercent, onOpenSale, onOpenWorkorder, onRest
     const phone = getWorkorderPhone(wo);
     const email = wo.customerEmail || "";
     const isStandalone = !wo.customerID;
+    const backingSale = salesById?.[wo.saleID || wo.activeSaleID] || null;
+    const payment = formatPaymentMethod(backingSale?.transactionIDs, txnsById);
     return (
       <div className={`${styles.eventCard} ${styles.eventCardCompleted}`}>
         <div className={styles.cardTopRow}>
           <div className={styles.cardTypeLabel}>Workorder Completed</div>
           <div className={styles.cardTime}>{formatEasternTime(event.millis)}</div>
           <div className={styles.cardSpacer} />
-          <div className={`${styles.cardAction} ${styles.cardActionPrimary}`} onClick={onOpenWorkorder}>View Workorder</div>
+          <div className={`${styles.cardAction} ${styles.cardActionCompleted}`} onClick={onOpenWorkorder}>View Workorder</div>
         </div>
         <div className={styles.cardBody}>
           <div className={styles.cardRow}>
             <span className={styles.cardLabel}>Workorder ID:</span>
             <span className={styles.cardValue}>{wo.id || "—"}</span>
-            <span className={styles.cardLabel}>Status:</span>
-            <span className={styles.cardValue}>{formatStatus(wo.status)}</span>
+            <span className={styles.cardLabel}>Payment:</span>
+            <span className={styles.cardValue}>{payment}</span>
           </div>
           {isStandalone ? (
             <div className={styles.cardRow}>
@@ -352,7 +393,7 @@ const EventCard = ({ event, salesTaxPercent, onOpenSale, onOpenWorkorder, onRest
           <div className={styles.cardTypeLabel}>Workorder Deleted</div>
           <div className={styles.cardTime}>{formatEasternTime(event.millis)}</div>
           <div className={styles.cardSpacer} />
-          <div className={`${styles.cardAction} ${styles.cardActionPrimary}`} onClick={onRestore}>Restore</div>
+          <div className={`${styles.cardAction} ${styles.cardActionDeleted}`} onClick={onRestore}>Restore</div>
         </div>
         <div className={styles.cardBody}>
           <div className={styles.cardRow}>

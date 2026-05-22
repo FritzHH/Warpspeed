@@ -22,6 +22,11 @@
   cursor: not-allowed;
 }
 
+.readOnly {
+  cursor: inherit;
+  pointer-events: none;
+}
+
 .error {
   border-color: var(--danger);
 }

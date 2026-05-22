@@ -1,8 +1,10 @@
 /* eslint-disable */
 
 import { createPortal } from "react-dom";
-import { capitalizeFirstLetterOfString, calculateRunningTotals, dim, findTemplateByType, formatDateTimeForReceipt, formatPhoneWithDashes, formatStoreHours, getWorkorderPaymentState, log, printBuilder } from "../../../utils";
+import { capitalizeFirstLetterOfString, calculateRunningTotals, dim, findTemplateByType, formatCurrencyDisp, formatDateTimeForReceipt, formatPhoneWithDashes, formatStoreHours, getWorkorderPaymentState, log, printBuilder, usdTypeMask } from "../../../utils";
 import {
+  Button as ButtonDom,
+  Dialog as DialogDom,
   DropdownMenu as DropdownMenuDom,
   Image as ImageDom,
   TextInput as TextInputDom,
@@ -140,6 +142,10 @@ export function MessagesComponent({}) {
   const [sAudioUrl, _setAudioUrl] = useState("");
   const [sHasMicrophone, _setHasMicrophone] = useState(false);
   const [sAudioUploading, _setAudioUploading] = useState(false);
+  const [sPayLinkModal, _setPayLinkModal] = useState(null);
+  const [sPayLinkAmountDisp, _setPayLinkAmountDisp] = useState("");
+  const [sPayLinkAmountCents, _setPayLinkAmountCents] = useState(0);
+  const [sPayLinkError, _setPayLinkError] = useState("");
   const textInputRef = useRef("");
   const messageListRef = useRef(null);
   const debounceTimerRef = useRef(null);
@@ -389,78 +395,76 @@ export function MessagesComponent({}) {
     if ((!text || !text.trim()) && !imageUrl) return;
     let sendPhone = sCustomPhoneMode ? sCustomPhone : zCustomer.customerCell;
     if (!sendPhone || sendPhone.length !== 10) return;
-    useLoginStore.getState().requireLogin(async () => {
-      let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
-      let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-      let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
-      userOverrodeForwardRef.current = false;
-      userOverrodeCanRespondRef.current = false;
+    let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+    let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
+    let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+    userOverrodeForwardRef.current = false;
+    userOverrodeCanRespondRef.current = false;
 
-      let isTranslated = !!(translatedText && sFromLang && sToLang && sFromLang !== sToLang);
-      let sendText = isTranslated ? translatedText : text;
-      let originalText = isTranslated ? text : "";
-      let translatedFromLang = isTranslated ? sFromLang : "";
+    let isTranslated = !!(translatedText && sFromLang && sToLang && sFromLang !== sToLang);
+    let sendText = isTranslated ? translatedText : text;
+    let originalText = isTranslated ? text : "";
+    let translatedFromLang = isTranslated ? sFromLang : "";
 
-      _setNewMessage("");
-      _setShowReplyModal(false);
-      clearTranslation();
+    _setNewMessage("");
+    _setShowReplyModal(false);
+    clearTranslation();
 
-      let chunks = splitIntoChunks(sendText || "");
-      let anyFailed = false;
-      let lastError = "";
+    let chunks = splitIntoChunks(sendText || "");
+    let anyFailed = false;
+    let lastError = "";
 
-      for (let i = 0; i < chunks.length; i++) {
-        let isLastChunk = i === chunks.length - 1;
-        let msg = { ...SMS_PROTO };
-        msg.message = chunks[i];
-        if (i === 0 && originalText) { msg.originalMessage = originalText; msg.translatedFrom = translatedFromLang; msg.translatedTo = isTranslated ? sToLang : ""; }
-        msg.imageUrl = i === 0 ? imageUrl : "";
-        msg.phoneNumber = sendPhone;
-        msg.canRespond = isLastChunk && useCanRespond ? true : null;
-        msg.millis = new Date().getTime() + i;
-        msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
-        if (!sCustomPhoneMode && zCustomer.first) msg.customerFirst = zCustomer.first;
-        if (!sCustomPhoneMode && zCustomer.last) msg.customerLast = zCustomer.last;
-        if (sCustomPhoneMode) {
-          let matchedWO = zAllWorkorders.find(wo => wo.customerCell === sendPhone);
-          if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
-        }
-        msg.id = crypto.randomUUID();
-        msg.type = "outgoing";
-        msg.senderUserObj = zCurrentUserObj;
-        msg.sentByUser = zCurrentUserObj.id;
-        if (isLastChunk && forwardTo) msg.forwardTo = forwardTo;
-        if (sCustomPhoneMode) {
-          _setCustomPhoneMessages(prev => [...prev, { ...msg, status: "sending" }]);
-        }
-        let result = await smsService.send(msg);
-        if (sCustomPhoneMode) {
-          _setCustomPhoneMessages(prev => prev.map(m =>
-            m.id === msg.id
-              ? { ...m, status: result.success ? "sent" : "failed", errorMessage: result.success ? "" : (result.error || "") }
-              : m
-          ));
-        }
-        if (!result.success) { anyFailed = true; lastError = result.error || ""; break; }
+    for (let i = 0; i < chunks.length; i++) {
+      let isLastChunk = i === chunks.length - 1;
+      let msg = { ...SMS_PROTO };
+      msg.message = chunks[i];
+      if (i === 0 && originalText) { msg.originalMessage = originalText; msg.translatedFrom = translatedFromLang; msg.translatedTo = isTranslated ? sToLang : ""; }
+      msg.imageUrl = i === 0 ? imageUrl : "";
+      msg.phoneNumber = sendPhone;
+      msg.canRespond = isLastChunk && useCanRespond ? true : null;
+      msg.millis = new Date().getTime() + i;
+      msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
+      if (!sCustomPhoneMode && zCustomer.first) msg.customerFirst = zCustomer.first;
+      if (!sCustomPhoneMode && zCustomer.last) msg.customerLast = zCustomer.last;
+      if (sCustomPhoneMode) {
+        let matchedWO = zAllWorkorders.find(wo => wo.customerCell === sendPhone);
+        if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
       }
+      msg.id = crypto.randomUUID();
+      msg.type = "outgoing";
+      msg.senderUserObj = zCurrentUserObj;
+      msg.sentByUser = zCurrentUserObj.id;
+      if (isLastChunk && forwardTo) msg.forwardTo = forwardTo;
+      if (sCustomPhoneMode) {
+        _setCustomPhoneMessages(prev => [...prev, { ...msg, status: "sending" }]);
+      }
+      let result = await smsService.send(msg);
+      if (sCustomPhoneMode) {
+        _setCustomPhoneMessages(prev => prev.map(m =>
+          m.id === msg.id
+            ? { ...m, status: result.success ? "sent" : "failed", errorMessage: result.success ? "" : (result.error || "") }
+            : m
+        ));
+      }
+      if (!result.success) { anyFailed = true; lastError = result.error || ""; break; }
+    }
 
-      if (!anyFailed && !sCustomPhoneMode) {
-        let allWOs = useOpenWorkordersStore.getState().workorders;
-        allWOs.filter((wo) => wo.customerID === zCustomer.id).forEach((wo) => {
-          useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", zCurrentUserObj.id, wo.id);
-        });
-      }
-      if (anyFailed) {
-        useAlertScreenStore.getState().setValues({
-          title: "Message Failed",
-          message: lastError || "Failed to send message",
-          btn1Text: "OK",
-          handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-          showAlert: true,
-          canExitOnOuterClick: true,
-        });
-      }
-    });
+    if (!anyFailed && !sCustomPhoneMode) {
+      let allWOs = useOpenWorkordersStore.getState().workorders;
+      allWOs.filter((wo) => wo.customerID === zCustomer.id).forEach((wo) => {
+        useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", zCurrentUserObj.id, wo.id);
+      });
+    }
+    if (anyFailed) {
+      useAlertScreenStore.getState().setValues({
+        title: "Message Failed",
+        message: lastError || "Failed to send message",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+    }
   }
   function resolveTemplate(templateMessage) {
     if (!templateMessage) return "";
@@ -506,121 +510,117 @@ export function MessagesComponent({}) {
   }
   function handleSendWorkorderTicket(canRespondVal, forwardOverride) {
     if (!zWorkorderObj || !zCustomer?.customerCell) return;
-    useLoginStore.getState().requireLogin(() => {
-      let settings = zSettings;
-      let { tenantID, storeID } = useSettingsStore.getState().getSettings();
+    let settings = zSettings;
+    let { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
-      let smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "intakeReceipt");
-      if (!(smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "").trim()) return;
+    let smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "intakeReceipt");
+    if (!(smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "").trim()) return;
 
-      const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-      let receiptData = printBuilder.intake(zWorkorderObj, zCustomer, settings?.salesTaxPercent, _ctx);
-      let storagePath = build_db_path.cloudStorage.intakeReceiptPDF(zWorkorderObj.id, tenantID, storeID);
-      let messageID = crypto.randomUUID();
-      let canRespondBool = canRespondVal ? true : null;
-      let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+    let receiptData = printBuilder.intake(zWorkorderObj, zCustomer, settings?.salesTaxPercent, _ctx);
+    let storagePath = build_db_path.cloudStorage.intakeReceiptPDF(zWorkorderObj.id, tenantID, storeID);
+    let messageID = crypto.randomUUID();
+    let canRespondBool = canRespondVal ? true : null;
+    let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
 
-      useCustMessagesStore.getState().setOutgoingMessage({
-        ...SMS_PROTO,
-        id: messageID,
-        message: "Sending intake ticket...",
-        phoneNumber: zCustomer.customerCell,
-        customerID: zWorkorderObj?.customerID || "",
-        type: "outgoing",
-        millis: Date.now(),
-        status: "sending",
-        senderUserObj: useLoginStore.getState().getCurrentUser(),
-        sentByUser: useLoginStore.getState().getCurrentUser()?.id || "",
-      });
+    useCustMessagesStore.getState().setOutgoingMessage({
+      ...SMS_PROTO,
+      id: messageID,
+      message: "Sending intake ticket...",
+      phoneNumber: zCustomer.customerCell,
+      customerID: zWorkorderObj?.customerID || "",
+      type: "outgoing",
+      millis: Date.now(),
+      status: "sending",
+      senderUserObj: useLoginStore.getState().getCurrentUser(),
+      sentByUser: useLoginStore.getState().getCurrentUser()?.id || "",
+    });
 
-      dbSendReceipt({
-        receiptType: "intake",
-        receiptData,
-        storagePath,
-        sendSMS: true,
-        sendEmail: false,
-        customerEmail: "",
-        customerCell: zCustomer.customerCell,
-        customerID: zWorkorderObj?.customerID || "",
-        templateVars: {
-          firstName: capitalizeFirstLetterOfString((zCustomer?.first || "Customer").trim()),
-          storeName: settings?.storeInfo?.displayName || "our store",
-          brand: zWorkorderObj?.brand || "",
-          description: zWorkorderObj?.description || "",
-        },
-        smsMessageID: messageID,
-        canRespond: canRespondBool,
-        forwardTo,
-        updateWorkorderField: { workorderID: zWorkorderObj.id, field: "intakeReceiptURL" },
-      }).then((result) => {
-        if (result?.data?.receiptURL) {
-          useOpenWorkordersStore.getState().setField("intakeReceiptURL", result.data.receiptURL, zWorkorderObj.id);
-        }
-        useCustMessagesStore.getState().updateMessageStatus(messageID, "sent", "");
-      }).catch(() => {
-        useCustMessagesStore.getState().updateMessageStatus(messageID, "failed", "Failed to send");
-      });
+    dbSendReceipt({
+      receiptType: "intake",
+      receiptData,
+      storagePath,
+      sendSMS: true,
+      sendEmail: false,
+      customerEmail: "",
+      customerCell: zCustomer.customerCell,
+      customerID: zWorkorderObj?.customerID || "",
+      templateVars: {
+        firstName: capitalizeFirstLetterOfString((zCustomer?.first || "Customer").trim()),
+        storeName: settings?.storeInfo?.displayName || "our store",
+        brand: zWorkorderObj?.brand || "",
+        description: zWorkorderObj?.description || "",
+      },
+      smsMessageID: messageID,
+      canRespond: canRespondBool,
+      forwardTo,
+      updateWorkorderField: { workorderID: zWorkorderObj.id, field: "intakeReceiptURL" },
+    }).then((result) => {
+      if (result?.data?.receiptURL) {
+        useOpenWorkordersStore.getState().setField("intakeReceiptURL", result.data.receiptURL, zWorkorderObj.id);
+      }
+      useCustMessagesStore.getState().updateMessageStatus(messageID, "sent", "");
+    }).catch(() => {
+      useCustMessagesStore.getState().updateMessageStatus(messageID, "failed", "Failed to send");
     });
   }
 
   function handleSendFinalizedTicket(canRespondVal, forwardOverride) {
     if (!zWorkorderObj || !zCustomer?.customerCell) return;
     if (!zWorkorderObj.workorderLines || zWorkorderObj.workorderLines.length === 0) return;
-    useLoginStore.getState().requireLogin(async () => {
-      let settings = zSettings;
-      let { tenantID, storeID } = useSettingsStore.getState().getSettings();
+    let settings = zSettings;
+    let { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
-      const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-      let receiptData = printBuilder.workorder(zWorkorderObj, zCustomer, settings?.salesTaxPercent, _ctx);
-      let activeSale = zWorkorderObj.activeSaleID
-        ? useActiveSalesStore.getState().getActiveSale(zWorkorderObj.activeSaleID)
-        : null;
-      let paymentState = getWorkorderPaymentState(zWorkorderObj, activeSale, settings);
-      if (paymentState.netPaid > 0) {
-        receiptData.amountPaid = paymentState.netPaid;
-        receiptData.finalTotal = Math.max(0, (receiptData.finalTotal || 0) - paymentState.netPaid);
-      }
-      let storagePath = `${tenantID}/${storeID}/workorder-tickets/${zWorkorderObj.id}.pdf`;
-      let messageID = crypto.randomUUID();
-      let canRespondBool = canRespondVal ? true : null;
-      let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
+    let receiptData = printBuilder.workorder(zWorkorderObj, zCustomer, settings?.salesTaxPercent, _ctx);
+    let activeSale = zWorkorderObj.activeSaleID
+      ? useActiveSalesStore.getState().getActiveSale(zWorkorderObj.activeSaleID)
+      : null;
+    let paymentState = getWorkorderPaymentState(zWorkorderObj, activeSale, settings);
+    if (paymentState.netPaid > 0) {
+      receiptData.amountPaid = paymentState.netPaid;
+      receiptData.finalTotal = Math.max(0, (receiptData.finalTotal || 0) - paymentState.netPaid);
+    }
+    let storagePath = `${tenantID}/${storeID}/workorder-tickets/${zWorkorderObj.id}.pdf`;
+    let messageID = crypto.randomUUID();
+    let canRespondBool = canRespondVal ? true : null;
+    let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
 
-      useCustMessagesStore.getState().setOutgoingMessage({
-        ...SMS_PROTO,
-        id: messageID,
-        message: "Sending finalized ticket...",
-        phoneNumber: zCustomer.customerCell,
-        customerID: zWorkorderObj?.customerID || "",
-        type: "outgoing",
-        millis: Date.now(),
-        status: "sending",
-        senderUserObj: useLoginStore.getState().getCurrentUser(),
-        sentByUser: useLoginStore.getState().getCurrentUser()?.id || "",
-      });
+    useCustMessagesStore.getState().setOutgoingMessage({
+      ...SMS_PROTO,
+      id: messageID,
+      message: "Sending finalized ticket...",
+      phoneNumber: zCustomer.customerCell,
+      customerID: zWorkorderObj?.customerID || "",
+      type: "outgoing",
+      millis: Date.now(),
+      status: "sending",
+      senderUserObj: useLoginStore.getState().getCurrentUser(),
+      sentByUser: useLoginStore.getState().getCurrentUser()?.id || "",
+    });
 
-      dbSendReceipt({
-        receiptType: "workorder",
-        receiptData,
-        storagePath,
-        sendSMS: true,
-        sendEmail: false,
-        customerEmail: "",
-        customerCell: zCustomer.customerCell,
-        customerID: zWorkorderObj?.customerID || "",
-        templateVars: {
-          firstName: capitalizeFirstLetterOfString((zCustomer?.first || "Customer").trim()),
-          storeName: settings?.storeInfo?.displayName || "our store",
-          brand: zWorkorderObj?.brand || "",
-          description: zWorkorderObj?.description || "",
-        },
-        smsMessageID: messageID,
-        canRespond: canRespondBool,
-        forwardTo,
-      }).then(() => {
-        useCustMessagesStore.getState().updateMessageStatus(messageID, "sent", "");
-      }).catch(() => {
-        useCustMessagesStore.getState().updateMessageStatus(messageID, "failed", "Failed to send");
-      });
+    dbSendReceipt({
+      receiptType: "workorder",
+      receiptData,
+      storagePath,
+      sendSMS: true,
+      sendEmail: false,
+      customerEmail: "",
+      customerCell: zCustomer.customerCell,
+      customerID: zWorkorderObj?.customerID || "",
+      templateVars: {
+        firstName: capitalizeFirstLetterOfString((zCustomer?.first || "Customer").trim()),
+        storeName: settings?.storeInfo?.displayName || "our store",
+        brand: zWorkorderObj?.brand || "",
+        description: zWorkorderObj?.description || "",
+      },
+      smsMessageID: messageID,
+      canRespond: canRespondBool,
+      forwardTo,
+    }).then(() => {
+      useCustMessagesStore.getState().updateMessageStatus(messageID, "sent", "");
+    }).catch(() => {
+      useCustMessagesStore.getState().updateMessageStatus(messageID, "failed", "Failed to send");
     });
   }
 
@@ -649,161 +649,200 @@ export function MessagesComponent({}) {
       });
       return;
     }
-    useLoginStore.getState().requireLogin(async () => {
-      let activeSale = zWorkorderObj.activeSaleID
-        ? useActiveSalesStore.getState().getActiveSale(zWorkorderObj.activeSaleID)
-        : null;
-      let paymentState = getWorkorderPaymentState(zWorkorderObj, activeSale, zSettings);
-      let amountDue = paymentState.remainingForThisWO;
-      let displayAmount = "$" + (amountDue / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    let activeSale = zWorkorderObj.activeSaleID
+      ? useActiveSalesStore.getState().getActiveSale(zWorkorderObj.activeSaleID)
+      : null;
+    let paymentState = getWorkorderPaymentState(zWorkorderObj, activeSale, zSettings);
+    let amountDue = paymentState.remainingForThisWO;
 
-      let customerObj = useCurrentCustomerStore.getState().getCustomer();
-      let custEmail = customerObj?.email || "";
-      let hasPhone = sendPhone.length === 10;
-      let hasEmail = custEmail && custEmail.includes("@");
-      let channel = hasPhone && hasEmail ? "both" : (hasPhone ? "sms" : "email");
+    let customerObj = useCurrentCustomerStore.getState().getCustomer();
+    let custEmail = customerObj?.email || "";
+    let hasPhone = sendPhone.length === 10;
+    let hasEmail = custEmail && custEmail.includes("@");
+    let channel = hasPhone && hasEmail ? "both" : (hasPhone ? "sms" : "email");
 
-      let sendTo = [];
-      if (hasPhone) sendTo.push(formatPhoneWithDashes(sendPhone));
-      if (hasEmail) sendTo.push(custEmail);
-      let recipientName = zCustomer?.first || "customer";
+    let sendTo = [];
+    if (hasPhone) sendTo.push(formatPhoneWithDashes(sendPhone));
+    if (hasEmail) sendTo.push(custEmail);
+    let recipientName = zCustomer?.first || "customer";
 
-      useAlertScreenStore.getState().setValues({
-        title: "Send Payment Link",
-        message: "Send a payment link for " + displayAmount + " to " + recipientName + " at " + sendTo.join(" & ") + "?",
-        btn1Text: "Send",
-        btn2Text: "Cancel",
-        handleBtn1Press: () => {
-          useAlertScreenStore.getState().resetAll();
-          let opts = {};
-          if (!zWorkorderObj.customerID) opts.phone = sendPhone;
-          if (hasEmail && !zWorkorderObj.customerID) opts.email = custEmail;
-
-          let messageID = crypto.randomUUID();
-          useCustMessagesStore.getState().setOutgoingMessage({
-            ...SMS_PROTO,
-            id: messageID,
-            message: "Sending payment link for " + displayAmount + "...",
-            phoneNumber: sendPhone,
-            customerID: zWorkorderObj?.customerID || "",
-            type: "outgoing",
-            millis: Date.now(),
-            status: "sending",
-            senderUserObj: useLoginStore.getState().getCurrentUser(),
-            sentByUser: useLoginStore.getState().getCurrentUser()?.id || "",
-          });
-
-          dbCreateTextToPayInvoice(zWorkorderObj.id, channel, opts).then((result) => {
-            if (result && result.success) {
-              useCustMessagesStore.getState().updateMessageStatus(messageID, "sent", "");
-            } else {
-              useCustMessagesStore.getState().updateMessageStatus(messageID, "failed", result?.error || "Failed to send payment link");
-            }
-          }).catch(() => {
-            useCustMessagesStore.getState().updateMessageStatus(messageID, "failed", "Failed to send payment link");
-          });
-        },
-        handleBtn2Press: () => useAlertScreenStore.getState().resetAll(),
-        showAlert: true,
-        canExitOnOuterClick: true,
-      });
+    _setPayLinkAmountCents(amountDue);
+    _setPayLinkAmountDisp(formatCurrencyDisp(amountDue));
+    _setPayLinkError("");
+    _setPayLinkModal({
+      remainingCents: amountDue,
+      channel,
+      sendTo,
+      recipientName,
+      sendPhone,
+      hasEmail,
+      custEmail,
     });
+  }
+
+  function _closePayLinkModal() {
+    _setPayLinkModal(null);
+    _setPayLinkAmountCents(0);
+    _setPayLinkAmountDisp("");
+    _setPayLinkError("");
+  }
+
+  function _handlePayLinkAmountChange(val) {
+    let result = usdTypeMask(val, { withDollar: false });
+    let max = sPayLinkModal?.remainingCents || 0;
+    if (result.cents > max) {
+      _setPayLinkAmountDisp(formatCurrencyDisp(max));
+      _setPayLinkAmountCents(max);
+    } else {
+      _setPayLinkAmountDisp(result.display);
+      _setPayLinkAmountCents(result.cents);
+    }
+    if (sPayLinkError) _setPayLinkError("");
+  }
+
+  function _handleSendPayLink() {
+    if (!sPayLinkModal) return;
+    let amountCents = sPayLinkAmountCents;
+    let remaining = sPayLinkModal.remainingCents;
+    if (amountCents < 50) {
+      _setPayLinkError("Amount must be at least $0.50");
+      return;
+    }
+    if (amountCents > remaining) {
+      _setPayLinkError("Amount exceeds balance due");
+      return;
+    }
+
+    let { channel, sendPhone, hasEmail, custEmail } = sPayLinkModal;
+    let displayAmount = "$" + formatCurrencyDisp(amountCents);
+
+    let opts = { amountCents };
+    if (!zWorkorderObj.customerID) opts.phone = sendPhone;
+    if (hasEmail && !zWorkorderObj.customerID) opts.email = custEmail;
+
+    let messageID = crypto.randomUUID();
+    useCustMessagesStore.getState().setOutgoingMessage({
+      ...SMS_PROTO,
+      id: messageID,
+      message: "Sending payment link for " + displayAmount + "...",
+      phoneNumber: sendPhone,
+      customerID: zWorkorderObj?.customerID || "",
+      type: "outgoing",
+      millis: Date.now(),
+      status: "sending",
+      senderUserObj: useLoginStore.getState().getCurrentUser(),
+      sentByUser: useLoginStore.getState().getCurrentUser()?.id || "",
+    });
+
+    dbCreateTextToPayInvoice(zWorkorderObj.id, channel, opts).then((result) => {
+      if (result && result.success) {
+        useCustMessagesStore.getState().updateMessageStatus(messageID, "sent", "");
+      } else {
+        useCustMessagesStore.getState().updateMessageStatus(messageID, "failed", result?.error || "Failed to send payment link");
+      }
+    }).catch(() => {
+      useCustMessagesStore.getState().updateMessageStatus(messageID, "failed", "Failed to send payment link");
+    });
+
+    _closePayLinkModal();
   }
   function handleMediaPicked(mediaItem) {
     _setShowMediaPicker(false);
     if (!mediaItem || !mediaItem.url) return;
-    pendingMediaRef.current = [mediaItem];
-    pendingActionRef.current = "media";
-    _setShowReplyModal(true);
-    scheduleAutoSend(() => {
-      _setShowReplyModal(false);
-      sendMediaMessage(sCanRespond);
-      pendingActionRef.current = null;
-      pendingMediaRef.current = null;
+    useLoginStore.getState().requireLogin(() => {
+      pendingMediaRef.current = [mediaItem];
+      pendingActionRef.current = "media";
+      _setShowReplyModal(true);
+      scheduleAutoSend(() => {
+        _setShowReplyModal(false);
+        sendMediaMessage(sCanRespond);
+        pendingActionRef.current = null;
+        pendingMediaRef.current = null;
+      });
     });
   }
   function handleMediaMultiSelect(mediaItems) {
     _setShowMediaPicker(false);
     if (!mediaItems || !mediaItems.length) return;
-    pendingMediaRef.current = mediaItems;
-    pendingActionRef.current = "media";
-    _setShowReplyModal(true);
-    scheduleAutoSend(() => {
-      _setShowReplyModal(false);
-      sendMediaMessage(sCanRespond);
-      pendingActionRef.current = null;
-      pendingMediaRef.current = null;
+    useLoginStore.getState().requireLogin(() => {
+      pendingMediaRef.current = mediaItems;
+      pendingActionRef.current = "media";
+      _setShowReplyModal(true);
+      scheduleAutoSend(() => {
+        _setShowReplyModal(false);
+        sendMediaMessage(sCanRespond);
+        pendingActionRef.current = null;
+        pendingMediaRef.current = null;
+      });
     });
   }
-  function sendMediaMessage(canRespondVal, forwardOverride) {
+  async function sendMediaMessage(canRespondVal, forwardOverride) {
     let mediaItems = pendingMediaRef.current;
     if (!mediaItems || !mediaItems.length) return;
     let sendPhone = sCustomPhoneMode ? sCustomPhone : zCustomer.customerCell;
     if (!sendPhone || sendPhone.length !== 10) return;
-    useLoginStore.getState().requireLogin(async () => {
-      let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
-      let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-      let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
-      userOverrodeForwardRef.current = false;
-      userOverrodeCanRespondRef.current = false;
-      _setShowReplyModal(false);
-      let storeName = zSettings?.storeInfo?.displayName || "Our store";
-      let hasImages = mediaItems.some((m) => m.type === "image");
-      let hasVideos = mediaItems.some((m) => m.type === "video");
-      let imageCount = mediaItems.filter((m) => m.type === "image").length;
-      let videoCount = mediaItems.filter((m) => m.type === "video").length;
-      let parts = [];
-      if (hasImages) parts.push(imageCount === 1 ? "a photo" : imageCount + " photos");
-      if (hasVideos) parts.push(videoCount === 1 ? "a video" : videoCount + " videos");
-      let mediaText = storeName + " has sent you " + parts.join(" and ");
-      let msg = { ...SMS_PROTO };
-      msg.message = mediaText;
-      msg.mediaUrls = mediaItems.map((m) => ({ url: m.url, thumbnailUrl: m.thumbnailUrl || "", contentType: m.type === "video" ? "video/mp4" : "image/jpeg" }));
-      msg.phoneNumber = sendPhone;
-      msg.canRespond = useCanRespond ? true : null;
-      msg.millis = new Date().getTime();
-      msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
-      if (!sCustomPhoneMode && zCustomer.first) msg.customerFirst = zCustomer.first;
-      if (!sCustomPhoneMode && zCustomer.last) msg.customerLast = zCustomer.last;
-      if (sCustomPhoneMode) {
-        let matchedWO = zAllWorkorders.find(wo => wo.customerCell === sendPhone);
-        if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
-      }
-      msg.id = crypto.randomUUID();
-      msg.type = "outgoing";
-      msg.senderUserObj = zCurrentUserObj;
-      msg.sentByUser = zCurrentUserObj.id;
-      if (forwardTo) msg.forwardTo = forwardTo;
-      if (sCustomPhoneMode) {
-        _setCustomPhoneMessages(prev => [...prev, { ...msg, status: "sending" }]);
-      }
-      let result = await smsService.send(msg);
-      if (sCustomPhoneMode) {
-        _setCustomPhoneMessages(prev => prev.map(m =>
-          m.id === msg.id
-            ? { ...m, status: result.success ? "sent" : "failed", errorMessage: result.success ? "" : (result.error || "") }
-            : m
-        ));
-      }
-      if (result.success && !sCustomPhoneMode) {
-        let allWOs = useOpenWorkordersStore.getState().workorders;
-        allWOs.filter((wo) => wo.customerID === zCustomer.id).forEach((wo) => {
-          useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", zCurrentUserObj.id, wo.id);
-        });
-      }
-      if (!result.success) {
-        useAlertScreenStore.getState().setValues({
-          title: "Message Failed",
-          message: result.error || "Failed to send media",
-          btn1Text: "OK",
-          handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-          showAlert: true,
-          canExitOnOuterClick: true,
-        });
-      }
-      pendingMediaRef.current = null;
-      pendingActionRef.current = null;
-    });
+    let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+    let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
+    let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+    userOverrodeForwardRef.current = false;
+    userOverrodeCanRespondRef.current = false;
+    _setShowReplyModal(false);
+    let storeName = zSettings?.storeInfo?.displayName || "Our store";
+    let hasImages = mediaItems.some((m) => m.type === "image");
+    let hasVideos = mediaItems.some((m) => m.type === "video");
+    let imageCount = mediaItems.filter((m) => m.type === "image").length;
+    let videoCount = mediaItems.filter((m) => m.type === "video").length;
+    let parts = [];
+    if (hasImages) parts.push(imageCount === 1 ? "a photo" : imageCount + " photos");
+    if (hasVideos) parts.push(videoCount === 1 ? "a video" : videoCount + " videos");
+    let mediaText = storeName + " has sent you " + parts.join(" and ");
+    let msg = { ...SMS_PROTO };
+    msg.message = mediaText;
+    msg.mediaUrls = mediaItems.map((m) => ({ url: m.url, thumbnailUrl: m.thumbnailUrl || "", contentType: m.type === "video" ? "video/mp4" : "image/jpeg" }));
+    msg.phoneNumber = sendPhone;
+    msg.canRespond = useCanRespond ? true : null;
+    msg.millis = new Date().getTime();
+    msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
+    if (!sCustomPhoneMode && zCustomer.first) msg.customerFirst = zCustomer.first;
+    if (!sCustomPhoneMode && zCustomer.last) msg.customerLast = zCustomer.last;
+    if (sCustomPhoneMode) {
+      let matchedWO = zAllWorkorders.find(wo => wo.customerCell === sendPhone);
+      if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
+    }
+    msg.id = crypto.randomUUID();
+    msg.type = "outgoing";
+    msg.senderUserObj = zCurrentUserObj;
+    msg.sentByUser = zCurrentUserObj.id;
+    if (forwardTo) msg.forwardTo = forwardTo;
+    if (sCustomPhoneMode) {
+      _setCustomPhoneMessages(prev => [...prev, { ...msg, status: "sending" }]);
+    }
+    let result = await smsService.send(msg);
+    if (sCustomPhoneMode) {
+      _setCustomPhoneMessages(prev => prev.map(m =>
+        m.id === msg.id
+          ? { ...m, status: result.success ? "sent" : "failed", errorMessage: result.success ? "" : (result.error || "") }
+          : m
+      ));
+    }
+    if (result.success && !sCustomPhoneMode) {
+      let allWOs = useOpenWorkordersStore.getState().workorders;
+      allWOs.filter((wo) => wo.customerID === zCustomer.id).forEach((wo) => {
+        useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", zCurrentUserObj.id, wo.id);
+      });
+    }
+    if (!result.success) {
+      useAlertScreenStore.getState().setValues({
+        title: "Message Failed",
+        message: result.error || "Failed to send media",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+    }
+    pendingMediaRef.current = null;
+    pendingActionRef.current = null;
   }
   ///////////////////////////////////////////////////////////////
   /////////////////////////////////////////////////////////////////
@@ -967,16 +1006,17 @@ export function MessagesComponent({}) {
   async function handleToggleForwardResponses() {
     let phone = sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell;
     if (!phone || phone.length !== 10) return;
-    let currentUser = useLoginStore.getState().getCurrentUser();
-    if (!currentUser?.id) return;
-    let thread = zSmsThreads.find(t => t.phone === phone);
-    let isCurrentlyForwarding = !!(thread?.forwardTo?.[currentUser.id]);
-    if (!isCurrentlyForwarding && !sCanRespond) {
-      userOverrodeCanRespondRef.current = true;
-      _setCanRespond(true);
-      await dbUpdateMessageCanRespond(phone, null, true);
-    }
-    await dbToggleSMSForwarding(phone, currentUser.id, !isCurrentlyForwarding, currentUser.phone, currentUser.first);
+    useLoginStore.getState().requireLogin(async () => {
+      let currentUser = useLoginStore.getState().getCurrentUser();
+      let thread = zSmsThreads.find(t => t.phone === phone);
+      let isCurrentlyForwarding = !!(thread?.forwardTo?.[currentUser.id]);
+      if (!isCurrentlyForwarding && !sCanRespond) {
+        userOverrodeCanRespondRef.current = true;
+        _setCanRespond(true);
+        await dbUpdateMessageCanRespond(phone, null, true);
+      }
+      await dbToggleSMSForwarding(phone, currentUser.id, !isCurrentlyForwarding, currentUser.phone, currentUser.first);
+    });
   }
 
   async function handleStartRecording() {
@@ -1035,34 +1075,32 @@ export function MessagesComponent({}) {
       let storagePath = `${tenantID}/${storeID}/sms-audio/${timestamp}_${crypto.randomUUID()}.webm`;
       let result = await uploadFileToStorage(sAudioBlob, storagePath, { contentType: "audio/webm" });
       if (!result.success) { log("Audio upload failed:", result.error); _setAudioUploading(false); return; }
-      useLoginStore.getState().requireLogin(async () => {
-        let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
-        let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-        let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
-        let msg = { ...SMS_PROTO };
-        msg.message = storeName + " has sent you an audio message";
-        msg.mediaUrls = [{ url: result.downloadURL, contentType: "audio/webm" }];
-        msg.phoneNumber = sendPhone;
-        msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
-        if (!sCustomPhoneMode && zCustomer.first) msg.customerFirst = zCustomer.first;
-        if (!sCustomPhoneMode && zCustomer.last) msg.customerLast = zCustomer.last;
-        msg.canRespond = useCanRespond ? true : null;
-        msg.millis = Date.now();
-        msg.id = crypto.randomUUID();
-        msg.type = "outgoing";
-        msg.senderUserObj = zCurrentUserObj;
-        msg.sentByUser = zCurrentUserObj.id;
-        if (forwardTo) msg.forwardTo = forwardTo;
-        let sendResult = await smsService.send(msg);
-        if (sendResult.success && !sCustomPhoneMode) {
-          let allWOs = useOpenWorkordersStore.getState().workorders;
-          allWOs.filter((wo) => wo.customerID === zCustomer.id).forEach((wo) => {
-            useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", zCurrentUserObj.id, wo.id);
-          });
-        }
-        handleDeleteAudio();
-        _setAudioUploading(false);
-      });
+      let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+      let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
+      let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+      let msg = { ...SMS_PROTO };
+      msg.message = storeName + " has sent you an audio message";
+      msg.mediaUrls = [{ url: result.downloadURL, contentType: "audio/webm" }];
+      msg.phoneNumber = sendPhone;
+      msg.customerID = sCustomPhoneMode ? "" : zCustomer.id;
+      if (!sCustomPhoneMode && zCustomer.first) msg.customerFirst = zCustomer.first;
+      if (!sCustomPhoneMode && zCustomer.last) msg.customerLast = zCustomer.last;
+      msg.canRespond = useCanRespond ? true : null;
+      msg.millis = Date.now();
+      msg.id = crypto.randomUUID();
+      msg.type = "outgoing";
+      msg.senderUserObj = zCurrentUserObj;
+      msg.sentByUser = zCurrentUserObj.id;
+      if (forwardTo) msg.forwardTo = forwardTo;
+      let sendResult = await smsService.send(msg);
+      if (sendResult.success && !sCustomPhoneMode) {
+        let allWOs = useOpenWorkordersStore.getState().workorders;
+        allWOs.filter((wo) => wo.customerID === zCustomer.id).forEach((wo) => {
+          useOpenWorkordersStore.getState().setField("lastSMSSenderUserID", zCurrentUserObj.id, wo.id);
+        });
+      }
+      handleDeleteAudio();
+      _setAudioUploading(false);
     } catch (err) {
       log("Audio send error:", err);
       _setAudioUploading(false);
@@ -1397,16 +1435,18 @@ export function MessagesComponent({}) {
           value={sNewMessage}
           onChange={handleMessageChange}
           onSend={() => {
-            if (isUnmodifiedTemplateRef.current) {
-              sendMessage(sNewMessage, "", false, false);
-              isUnmodifiedTemplateRef.current = false;
-            } else {
-              _setShowReplyModal(true);
-              scheduleAutoSend(() => {
-                _setShowReplyModal(false);
-                sendMessage(sNewMessage, "", sCanRespond);
-              });
-            }
+            useLoginStore.getState().requireLogin(() => {
+              if (isUnmodifiedTemplateRef.current) {
+                sendMessage(sNewMessage, "", false, false);
+                isUnmodifiedTemplateRef.current = false;
+              } else {
+                _setShowReplyModal(true);
+                scheduleAutoSend(() => {
+                  _setShowReplyModal(false);
+                  sendMessage(sNewMessage, "", sCanRespond);
+                });
+              }
+            });
           }}
           sendDisabled={!sNewMessage.trim() || (sFromLang !== sToLang && sTranslateLoading)}
           textInputRef={textInputRef}
@@ -1425,10 +1465,16 @@ export function MessagesComponent({}) {
             else if (pendingActionRef.current === "audio") { handleSendAudio(canRespond); }
             else { sendMessage(sNewMessage, "", canRespond); }
           }}
-          onSendAudio={() => handleSendAudio(sCanRespond)}
+          onSendAudio={() => useLoginStore.getState().requireLogin(() => handleSendAudio(sCanRespond))}
           onDeleteAudio={handleDeleteAudio}
           forwardReplies={sForwardReplies}
           onToggleForward={handleToggleForwardReplies}
+          onCancelReply={() => {
+            clearAutoSend();
+            _setShowReplyModal(false);
+            pendingActionRef.current = null;
+            pendingMediaRef.current = null;
+          }}
           hasActivePhone={hasActivePhone}
           fromLang={sFromLang}
           onFromLang={(code) => {
@@ -1493,10 +1539,12 @@ export function MessagesComponent({}) {
                     return items;
                   })()}
                   onSelect={(item) => {
-                    if (item.key === "workorder") { pendingActionRef.current = "intake"; _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); handleSendWorkorderTicket(sCanRespond); pendingActionRef.current = null; }); }
-                    else if (item.key === "finalized") { pendingActionRef.current = "finalized"; _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); handleSendFinalizedTicket(sCanRespond); pendingActionRef.current = null; }); }
-                    else if (item.key === "payment") handleSendSMSPayment();
-                    else if (item.key === "media") _setShowMediaPicker(true);
+                    if (item.key === "media") { _setShowMediaPicker(true); return; }
+                    useLoginStore.getState().requireLogin(() => {
+                      if (item.key === "workorder") { pendingActionRef.current = "intake"; _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); handleSendWorkorderTicket(sCanRespond); pendingActionRef.current = null; }); }
+                      else if (item.key === "finalized") { pendingActionRef.current = "finalized"; _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); handleSendFinalizedTicket(sCanRespond); pendingActionRef.current = null; }); }
+                      else if (item.key === "payment") handleSendSMSPayment();
+                    });
                   }}
                   buttonIcon={ICONS.paperPlane}
                   buttonIconSize={35}
@@ -1541,6 +1589,106 @@ export function MessagesComponent({}) {
           onSendMedia={handleMediaMultiSelect}
         />
       )}
+      <DialogDom
+        visible={!!sPayLinkModal}
+        onClose={_closePayLinkModal}
+        title="Send Payment Link"
+        aria-label="Send Payment Link"
+      >
+        {sPayLinkModal && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              padding: 24,
+              backgroundColor: C.surfaceBase,
+              borderRadius: 8,
+              minWidth: 360,
+              gap: 16,
+            }}
+          >
+            <span style={{ fontSize: 18, fontWeight: 600, color: C.text }}>
+              Send Payment Link
+            </span>
+            <span style={{ fontSize: 13, color: C.textMuted }}>
+              {"To " + sPayLinkModal.recipientName + " at " + sPayLinkModal.sendTo.join(" & ")}
+            </span>
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "10px 12px",
+                borderRadius: 6,
+                backgroundColor: C.listItemWhite,
+                border: "1px solid " + C.borderSubtle,
+              }}
+            >
+              <span style={{ fontSize: 13, color: C.textMuted }}>Balance</span>
+              <span style={{ fontSize: 14, fontWeight: 600, color: C.text }}>
+                {"$" + formatCurrencyDisp(sPayLinkModal.remainingCents)}
+              </span>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <span style={{ fontSize: 12, color: C.textMuted }}>Amount to charge</span>
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "row",
+                  alignItems: "center",
+                  border: "1px solid " + C.buttonLightGreenOutline,
+                  borderRadius: 6,
+                  backgroundColor: C.listItemWhite,
+                  padding: "8px 12px",
+                }}
+              >
+                <span style={{ fontSize: 18, color: C.textMuted, marginRight: 6 }}>$</span>
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={sPayLinkAmountDisp}
+                  onChange={(e) => _handlePayLinkAmountChange(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  autoFocus
+                  style={{
+                    flex: 1,
+                    border: "none",
+                    outline: "none",
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: C.text,
+                    backgroundColor: "transparent",
+                  }}
+                />
+              </div>
+            </div>
+
+            {sPayLinkError ? (
+              <span style={{ fontSize: 12, color: C.lightred }}>{sPayLinkError}</span>
+            ) : null}
+
+            <div style={{ display: "flex", flexDirection: "row", gap: 12, marginTop: 8 }}>
+              <ButtonDom
+                text="Cancel"
+                onPress={_closePayLinkModal}
+                buttonStyle={{ flex: 1, backgroundColor: C.buttonLightGray, borderRadius: 6 }}
+                textStyle={{ color: C.text }}
+              />
+              <ButtonDom
+                text="Send"
+                onPress={_handleSendPayLink}
+                enabled={sPayLinkAmountCents >= 50 && sPayLinkAmountCents <= sPayLinkModal.remainingCents}
+                colorGradientArr={COLOR_GRADIENTS.green}
+                buttonStyle={{ flex: 1, borderRadius: 6 }}
+                textStyle={{ color: C.textWhite }}
+              />
+            </div>
+          </div>
+        )}
+      </DialogDom>
     </div>
   );
 }
@@ -1837,11 +1985,13 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
 
   function handleSend() {
     if (!sNewMessage.trim() || !phone || phone.length !== 10) return;
-    pendingSendTextRef.current = sNewMessage;
-    _setShowReplyModal(true);
-    scheduleAutoSend(() => {
-      _setShowReplyModal(false);
-      doSend(pendingSendTextRef.current, sCanRespond);
+    useLoginStore.getState().requireLogin(() => {
+      pendingSendTextRef.current = sNewMessage;
+      _setShowReplyModal(true);
+      scheduleAutoSend(() => {
+        _setShowReplyModal(false);
+        doSend(pendingSendTextRef.current, sCanRespond);
+      });
     });
   }
 
@@ -1855,40 +2005,38 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
 
     _setNewMessage("");
     clearTranslation();
-    useLoginStore.getState().requireLogin(async () => {
-      let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
-      let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
-      let msg = { ...SMS_PROTO };
-      msg.message = sendText;
-      if (originalText) { msg.originalMessage = originalText; msg.translatedFrom = translatedFromLang; msg.translatedTo = isTranslated ? sToLang : ""; }
-      msg.phoneNumber = phone;
-      msg.canRespond = canRespondVal ? true : null;
-      msg.millis = Date.now();
-      msg.id = crypto.randomUUID();
-      msg.type = "outgoing";
-      msg.senderUserObj = zCurrentUserObj;
-      msg.sentByUser = zCurrentUserObj.id;
-      if (forwardTo) msg.forwardTo = forwardTo;
-      let matchedWO = useOpenWorkordersStore.getState().workorders.find(wo => wo.customerCell === phone);
-      if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
-      let optimistic = { ...msg, status: "sending" };
-      let addedMessages = [...sMessagesRef.current, optimistic];
-      sMessagesRef.current = addedMessages;
-      _setMessages(addedMessages);
-      updateCache(addedMessages, noMoreRef.current);
-      let result = await smsService.send(msg);
-      let updatedMessages = sMessagesRef.current.map(m => m.id === msg.id ? { ...m, status: result.success ? "sent" : "failed" } : m);
-      sMessagesRef.current = updatedMessages;
-      _setMessages(updatedMessages);
-      updateCache(updatedMessages, noMoreRef.current);
-      if (!result.success) {
-        useAlertScreenStore.getState().setValues({
-          title: "Message Failed", message: result.error || "Failed to send message",
-          btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-          showAlert: true, canExitOnOuterClick: true,
-        });
-      }
-    });
+    let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+    let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+    let msg = { ...SMS_PROTO };
+    msg.message = sendText;
+    if (originalText) { msg.originalMessage = originalText; msg.translatedFrom = translatedFromLang; msg.translatedTo = isTranslated ? sToLang : ""; }
+    msg.phoneNumber = phone;
+    msg.canRespond = canRespondVal ? true : null;
+    msg.millis = Date.now();
+    msg.id = crypto.randomUUID();
+    msg.type = "outgoing";
+    msg.senderUserObj = zCurrentUserObj;
+    msg.sentByUser = zCurrentUserObj.id;
+    if (forwardTo) msg.forwardTo = forwardTo;
+    let matchedWO = useOpenWorkordersStore.getState().workorders.find(wo => wo.customerCell === phone);
+    if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
+    let optimistic = { ...msg, status: "sending" };
+    let addedMessages = [...sMessagesRef.current, optimistic];
+    sMessagesRef.current = addedMessages;
+    _setMessages(addedMessages);
+    updateCache(addedMessages, noMoreRef.current);
+    let result = await smsService.send(msg);
+    let updatedMessages = sMessagesRef.current.map(m => m.id === msg.id ? { ...m, status: result.success ? "sent" : "failed" } : m);
+    sMessagesRef.current = updatedMessages;
+    _setMessages(updatedMessages);
+    updateCache(updatedMessages, noMoreRef.current);
+    if (!result.success) {
+      useAlertScreenStore.getState().setValues({
+        title: "Message Failed", message: result.error || "Failed to send message",
+        btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true, canExitOnOuterClick: true,
+      });
+    }
   }
 
   function handleToggleForwardReplies() {
@@ -1943,22 +2091,23 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
 
   async function handleHubToggleForward() {
     if (!phone || phone.length !== 10) return;
-    let currentUser = useLoginStore.getState().getCurrentUser();
-    if (!currentUser?.id) return;
-    let isCurrentlyForwarding = !!(thread?.forwardTo?.[currentUser.id]);
-    if (!isCurrentlyForwarding && !sCanRespond) {
-      _setCanRespond(true);
-      let outgoing = sMessages.filter(m => m.type === "outgoing");
-      let last = [...outgoing].sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
-      if (last?.id) {
-        await dbUpdateMessageCanRespond(phone, last.id, true);
-        let updated = sMessages.map(m => m.id === last.id ? { ...m, canRespond: true } : m);
-        sMessagesRef.current = updated;
-        _setMessages(updated);
-        updateCache(updated, noMoreRef.current);
+    useLoginStore.getState().requireLogin(async () => {
+      let currentUser = useLoginStore.getState().getCurrentUser();
+      let isCurrentlyForwarding = !!(thread?.forwardTo?.[currentUser.id]);
+      if (!isCurrentlyForwarding && !sCanRespond) {
+        _setCanRespond(true);
+        let outgoing = sMessages.filter(m => m.type === "outgoing");
+        let last = [...outgoing].sort((a, b) => (b.millis || 0) - (a.millis || 0))[0];
+        if (last?.id) {
+          await dbUpdateMessageCanRespond(phone, last.id, true);
+          let updated = sMessages.map(m => m.id === last.id ? { ...m, canRespond: true } : m);
+          sMessagesRef.current = updated;
+          _setMessages(updated);
+          updateCache(updated, noMoreRef.current);
+        }
       }
-    }
-    await dbToggleSMSForwarding(phone, currentUser.id, !isCurrentlyForwarding, currentUser.phone, currentUser.first);
+      await dbToggleSMSForwarding(phone, currentUser.id, !isCurrentlyForwarding, currentUser.phone, currentUser.first);
+    });
   }
 
   async function handleStartRecording() {
@@ -2015,43 +2164,41 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
       let storagePath = `${tenantID}/${storeID}/sms-audio/${timestamp}_${crypto.randomUUID()}.webm`;
       let result = await uploadFileToStorage(sAudioBlob, storagePath, { contentType: "audio/webm" });
       if (!result.success) { log("Audio upload failed:", result.error); _setAudioUploading(false); return; }
-      useLoginStore.getState().requireLogin(async () => {
-        let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
-        let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-        let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
-        let msg = { ...SMS_PROTO };
-        msg.message = storeName + " has sent you an audio message";
-        msg.mediaUrls = [{ url: result.downloadURL, contentType: "audio/webm" }];
-        msg.phoneNumber = phone;
-        msg.canRespond = useCanRespond ? true : null;
-        msg.millis = Date.now();
-        msg.id = crypto.randomUUID();
-        msg.type = "outgoing";
-        msg.senderUserObj = zCurrentUserObj;
-        msg.sentByUser = zCurrentUserObj.id;
-        if (forwardTo) msg.forwardTo = forwardTo;
-        let matchedWO = useOpenWorkordersStore.getState().workorders.find(wo => wo.customerCell === phone);
-        if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
-        let optimistic = { ...msg, status: "sending" };
-        let addedMessages = [...sMessagesRef.current, optimistic];
-        sMessagesRef.current = addedMessages;
-        _setMessages(addedMessages);
-        updateCache(addedMessages, noMoreRef.current);
-        let sendResult = await smsService.send(msg);
-        let updatedMessages = sMessagesRef.current.map(m => m.id === msg.id ? { ...m, status: sendResult.success ? "sent" : "failed" } : m);
-        sMessagesRef.current = updatedMessages;
-        _setMessages(updatedMessages);
-        updateCache(updatedMessages, noMoreRef.current);
-        if (!sendResult.success) {
-          useAlertScreenStore.getState().setValues({
-            title: "Message Failed", message: sendResult.error || "Failed to send message",
-            btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-            showAlert: true, canExitOnOuterClick: true,
-          });
-        }
-        handleDeleteAudio();
-        _setAudioUploading(false);
-      });
+      let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+      let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
+      let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+      let msg = { ...SMS_PROTO };
+      msg.message = storeName + " has sent you an audio message";
+      msg.mediaUrls = [{ url: result.downloadURL, contentType: "audio/webm" }];
+      msg.phoneNumber = phone;
+      msg.canRespond = useCanRespond ? true : null;
+      msg.millis = Date.now();
+      msg.id = crypto.randomUUID();
+      msg.type = "outgoing";
+      msg.senderUserObj = zCurrentUserObj;
+      msg.sentByUser = zCurrentUserObj.id;
+      if (forwardTo) msg.forwardTo = forwardTo;
+      let matchedWO = useOpenWorkordersStore.getState().workorders.find(wo => wo.customerCell === phone);
+      if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
+      let optimistic = { ...msg, status: "sending" };
+      let addedMessages = [...sMessagesRef.current, optimistic];
+      sMessagesRef.current = addedMessages;
+      _setMessages(addedMessages);
+      updateCache(addedMessages, noMoreRef.current);
+      let sendResult = await smsService.send(msg);
+      let updatedMessages = sMessagesRef.current.map(m => m.id === msg.id ? { ...m, status: sendResult.success ? "sent" : "failed" } : m);
+      sMessagesRef.current = updatedMessages;
+      _setMessages(updatedMessages);
+      updateCache(updatedMessages, noMoreRef.current);
+      if (!sendResult.success) {
+        useAlertScreenStore.getState().setValues({
+          title: "Message Failed", message: sendResult.error || "Failed to send message",
+          btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+          showAlert: true, canExitOnOuterClick: true,
+        });
+      }
+      handleDeleteAudio();
+      _setAudioUploading(false);
     } catch (err) {
       log("Audio send error:", err);
       _setAudioUploading(false);
@@ -2090,48 +2237,45 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
       }
       if (hubFileInputRef.current) hubFileInputRef.current.value = "";
       if (!mediaItems.length) { _setHubMediaUploading(false); return; }
-      // Build and send media message using same pattern as customer messages sendMediaMessage
-      useLoginStore.getState().requireLogin(async () => {
-        let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
-        let hasImages = mediaItems.some(m => m.type === "image");
-        let hasVideos = mediaItems.some(m => m.type === "video");
-        let imageCount = mediaItems.filter(m => m.type === "image").length;
-        let videoCount = mediaItems.filter(m => m.type === "video").length;
-        let parts = [];
-        if (hasImages) parts.push(imageCount === 1 ? "a photo" : imageCount + " photos");
-        if (hasVideos) parts.push(videoCount === 1 ? "a video" : videoCount + " videos");
-        let mediaText = storeName + " has sent you " + parts.join(" and ");
-        let msg = { ...SMS_PROTO };
-        msg.message = mediaText;
-        msg.mediaUrls = mediaItems.map(m => ({ url: m.url, thumbnailUrl: m.thumbnailUrl || "", contentType: m.contentType }));
-        msg.phoneNumber = phone;
-        msg.canRespond = sCanRespond ? true : null;
-        msg.millis = Date.now();
-        msg.id = crypto.randomUUID();
-        msg.type = "outgoing";
-        msg.senderUserObj = zCurrentUserObj;
-        msg.sentByUser = zCurrentUserObj.id;
-        let matchedWO = useOpenWorkordersStore.getState().workorders.find(wo => wo.customerCell === phone);
-        if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
-        let optimistic = { ...msg, status: "sending" };
-        let addedMessages = [...sMessagesRef.current, optimistic];
-        sMessagesRef.current = addedMessages;
-        _setMessages(addedMessages);
-        updateCache(addedMessages, noMoreRef.current);
-        _setHubMediaUploading(false);
-        let result = await smsService.send(msg);
-        let updatedMessages = sMessagesRef.current.map(m => m.id === msg.id ? { ...m, status: result.success ? "sent" : "failed" } : m);
-        sMessagesRef.current = updatedMessages;
-        _setMessages(updatedMessages);
-        updateCache(updatedMessages, noMoreRef.current);
-        if (!result.success) {
-          useAlertScreenStore.getState().setValues({
-            title: "Message Failed", message: result.error || "Failed to send media",
-            btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-            showAlert: true, canExitOnOuterClick: true,
-          });
-        }
-      });
+      let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
+      let hasImages = mediaItems.some(m => m.type === "image");
+      let hasVideos = mediaItems.some(m => m.type === "video");
+      let imageCount = mediaItems.filter(m => m.type === "image").length;
+      let videoCount = mediaItems.filter(m => m.type === "video").length;
+      let parts = [];
+      if (hasImages) parts.push(imageCount === 1 ? "a photo" : imageCount + " photos");
+      if (hasVideos) parts.push(videoCount === 1 ? "a video" : videoCount + " videos");
+      let mediaText = storeName + " has sent you " + parts.join(" and ");
+      let msg = { ...SMS_PROTO };
+      msg.message = mediaText;
+      msg.mediaUrls = mediaItems.map(m => ({ url: m.url, thumbnailUrl: m.thumbnailUrl || "", contentType: m.contentType }));
+      msg.phoneNumber = phone;
+      msg.canRespond = sCanRespond ? true : null;
+      msg.millis = Date.now();
+      msg.id = crypto.randomUUID();
+      msg.type = "outgoing";
+      msg.senderUserObj = zCurrentUserObj;
+      msg.sentByUser = zCurrentUserObj.id;
+      let matchedWO = useOpenWorkordersStore.getState().workorders.find(wo => wo.customerCell === phone);
+      if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
+      let optimistic = { ...msg, status: "sending" };
+      let addedMessages = [...sMessagesRef.current, optimistic];
+      sMessagesRef.current = addedMessages;
+      _setMessages(addedMessages);
+      updateCache(addedMessages, noMoreRef.current);
+      _setHubMediaUploading(false);
+      let result = await smsService.send(msg);
+      let updatedMessages = sMessagesRef.current.map(m => m.id === msg.id ? { ...m, status: result.success ? "sent" : "failed" } : m);
+      sMessagesRef.current = updatedMessages;
+      _setMessages(updatedMessages);
+      updateCache(updatedMessages, noMoreRef.current);
+      if (!result.success) {
+        useAlertScreenStore.getState().setValues({
+          title: "Message Failed", message: result.error || "Failed to send media",
+          btn1Text: "OK", handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+          showAlert: true, canExitOnOuterClick: true,
+        });
+      }
     } catch (err) {
       log("Hub media upload error:", err);
       _setHubMediaUploading(false);
@@ -2272,10 +2416,15 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
             if (pendingActionRef.current === "audio") { handleSendAudio(canRespond); }
             else { doSend(pendingSendTextRef.current, canRespond); }
           }}
-          onSendAudio={() => handleSendAudio(sCanRespond)}
+          onSendAudio={() => useLoginStore.getState().requireLogin(() => handleSendAudio(sCanRespond))}
           onDeleteAudio={handleDeleteAudio}
           forwardReplies={sForwardReplies}
           onToggleForward={handleToggleForwardReplies}
+          onCancelReply={() => {
+            clearAutoSend();
+            _setShowReplyModal(false);
+            pendingActionRef.current = null;
+          }}
           hasActivePhone={!!phone && phone.length === 10}
           fromLang={sFromLang}
           onFromLang={(code) => {
@@ -2304,7 +2453,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
               {matchingWorkorders.length < 1 && (
                 <TooltipDom text={sHubMediaUploading ? "Uploading..." : "Send photo/video"} position="top">
                   <TouchableOpacityDom
-                    onPress={() => !sHubMediaUploading && hubFileInputRef.current?.click()}
+                    onPress={() => !sHubMediaUploading && useLoginStore.getState().requireLogin(() => hubFileInputRef.current?.click())}
                     className={hubStyles.iconBtn}
                     style={{ opacity: sHubMediaUploading ? 0.4 : 1 }}
                   >
@@ -2318,7 +2467,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
               {onSendPaymentLink && (
                 <TooltipDom text="Send Payment Link" position="top" hideOnPress>
                   <TouchableOpacityDom
-                    onPress={() => onSendPaymentLink(phone)}
+                    onPress={() => useLoginStore.getState().requireLogin(() => onSendPaymentLink(phone))}
                     className={hubStyles.iconBtn}
                   >
                     <ImageDom icon={ICONS.paperPlane} size={35} />

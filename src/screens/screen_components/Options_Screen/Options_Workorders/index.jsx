@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { ICONS } from "../../../../styles";
 import { TAB_NAMES } from "../../../../data";
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, lazy, Suspense } from "react";
 import {
   useCurrentCustomerStore,
   useLoginStore,
@@ -13,10 +13,14 @@ import {
   useCustMessagesStore,
 } from "../../../../stores";
 import { dbGetCustomer, dbGetCustomerMessages, dbListenToNewMessages } from "../../../../db_calls_wrapper";
-import { scoreWorkorder, sortWorkorders } from "./utils";
+import { newCheckoutCompleteWorkorder } from "../../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { scoreWorkorder, sortWorkorders, isFinishedStatus, NUM_MILLIS_IN_DAY } from "./utils";
 import WorkorderRowItem from "./WorkorderRowItem";
 import EmptyState from "./EmptyState";
 import styles from "./WorkordersHeader.module.css";
+const ClosedWorkorderModal = lazy(() =>
+  import("../../modal_screens/ClosedWorkorderModal").then((m) => ({ default: m.ClosedWorkorderModal }))
+);
 
 export function WorkordersComponent({}) {
   const zOpenWorkorders = useOpenWorkordersStore((state) => state.workorders);
@@ -25,8 +29,19 @@ export function WorkordersComponent({}) {
   const zPreviewID = useOpenWorkordersStore((state) => state.workorderPreviewID);
   const zActiveSales = useActiveSalesStore((state) => state.activeSales);
   const zCurrentUser = useLoginStore((state) => state.currentUser);
+  const zSmsThreads = useCustMessagesStore((state) => state.smsThreads);
+
+  const lastOutgoingByPhone = useMemo(() => {
+    const map = {};
+    for (const t of zSmsThreads) {
+      const ms = t.lastOutgoingMillis || (t.lastType === "outgoing" ? t.lastMillis : 0);
+      if (ms) map[t.phone] = ms;
+    }
+    return map;
+  }, [zSmsThreads]);
   const [sSearchTerm, _setSearchTerm] = useState("");
   const [sOpenedFlash, _setOpenedFlash] = useState("");
+  const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
   const openedFlashTimerRef = useRef(null);
 
   const hasRehydratedMsgsRef = useRef(false);
@@ -187,6 +202,12 @@ export function WorkordersComponent({}) {
   }
 
   function workorderSelected(obj) {
+    // Finished & Paid workorders kept in the open list (pickup-pending) open in the
+    // read-only closed-workorder modal instead of the live editing flow.
+    if (obj.status === "finished_and_paid") {
+      _sSetClosedWorkorder(obj);
+      return;
+    }
     preHoverItemsTabRef.current = null;
     if (enterTimerRef.current) { clearTimeout(enterTimerRef.current); enterTimerRef.current = null; }
     if (exitTimerRef.current) { clearTimeout(exitTimerRef.current); exitTimerRef.current = null; }
@@ -268,6 +289,19 @@ export function WorkordersComponent({}) {
           sortedData.map((workorder) => {
             let sale = workorder.activeSaleID ? zActiveSales.find((s) => s.id === workorder.activeSaleID) : null;
             let paidAmount = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
+            let daysSinceLastText = null;
+            if (isFinishedStatus(workorder)) {
+              const phoneKey = (workorder.customerCell || "").replace(/\D/g, "");
+              const lastOut = phoneKey ? lastOutgoingByPhone[phoneKey] : 0;
+              if (lastOut) {
+                const startOfToday = new Date();
+                startOfToday.setHours(0, 0, 0, 0);
+                const startOfLast = new Date(lastOut);
+                startOfLast.setHours(0, 0, 0, 0);
+                daysSinceLastText = Math.round((startOfToday.getTime() - startOfLast.getTime()) / NUM_MILLIS_IN_DAY);
+                if (daysSinceLastText < 0) daysSinceLastText = 0;
+              }
+            }
             return (
               <WorkorderRowItem
                 key={workorder.id}
@@ -276,6 +310,7 @@ export function WorkordersComponent({}) {
                 isPreviewed={workorder.id === zPreviewID}
                 paidAmount={paidAmount}
                 isLinkedSale={!!workorder.activeSaleID && linkedSaleIDs.has(workorder.activeSaleID)}
+                daysSinceLastText={daysSinceLastText}
                 onSelect={workorderSelected}
                 onHoverEnter={onMouseEnter}
                 onHoverExit={onMouseExit}
@@ -284,6 +319,19 @@ export function WorkordersComponent({}) {
           })
         )}
       </div>
+      {sClosedWorkorder && (
+        <Suspense fallback={null}>
+          <ClosedWorkorderModal
+            workorder={sClosedWorkorder}
+            onClose={() => _sSetClosedWorkorder(null)}
+            onArchive={async (wo) => {
+              await newCheckoutCompleteWorkorder(wo);
+              useOpenWorkordersStore.getState().removeWorkorder(wo, false);
+              _sSetClosedWorkorder(null);
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

@@ -1,13 +1,56 @@
 /* eslint-disable */
 import React from "react";
-import { capitalizeFirstLetterOfString } from "../../../../utils";
+import { capitalizeFirstLetterOfString, lightenRGBByPercent } from "../../../../utils";
 import { C, ICONS } from "../../../../styles";
-import { computeWaitInfo, formatPickupDeliveryTime, MONTH_LABELS_SHORT, DAY_LABELS_SHORT } from "./utils";
+import { computeWaitInfo, formatPickupDeliveryTime, isFinishedStatus, MONTH_LABELS_SHORT, DAY_LABELS_SHORT, NUM_MILLIS_IN_DAY } from "./utils";
 import styles from "./WaitTimeIndicator.module.css";
 
-const WaitTimeIndicator = React.memo(function WaitTimeIndicator({ workorder }) {
+const WaitTimeIndicator = React.memo(function WaitTimeIndicator({ workorder, daysSinceLastText }) {
   const isPickupDelivery = workorder.status === "pickup" || workorder.status === "delivery";
   const pd = workorder.pickupDelivery;
+
+  if (isFinishedStatus(workorder)) {
+    const showPill = daysSinceLastText != null && daysSinceLastText >= 3;
+    let daysInShop = 0;
+    if (workorder.startedOnMillis) {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const startOfStart = new Date(workorder.startedOnMillis);
+      startOfStart.setHours(0, 0, 0, 0);
+      daysInShop = Math.round((startOfToday.getTime() - startOfStart.getTime()) / NUM_MILLIS_IN_DAY);
+    }
+    const showInShop = daysInShop >= 10;
+
+    let pillBg = null;
+    if (showPill) {
+      if (daysSinceLastText <= 3) pillBg = lightenRGBByPercent(C.green, 65);
+      else if (daysSinceLastText <= 5) pillBg = lightenRGBByPercent(C.orange, 55);
+      else pillBg = lightenRGBByPercent(C.lightred, 35);
+    }
+
+    return (
+      <div
+        className={styles.container}
+        style={{
+          backgroundColor: C.buttonLightGreen,
+          borderColor: C.buttonLightGreenOutline,
+          justifyContent: "center",
+          paddingRight: 0,
+          flexDirection: "column",
+        }}
+      >
+        {showPill && (
+          <div className={styles.daysPill} style={{ backgroundColor: pillBg }}>
+            <img src={ICONS.cellPhone} alt="" className={styles.daysPillIcon} />
+            <span className={styles.daysPillText} style={{ color: C.text }}>{daysSinceLastText} days</span>
+          </div>
+        )}
+        {showInShop && (
+          <span className={styles.inShopText}>{daysInShop} days in shop</span>
+        )}
+      </div>
+    );
+  }
 
   if (isPickupDelivery) {
     const hasDate = pd?.month && pd?.day;
@@ -55,9 +98,7 @@ const WaitTimeIndicator = React.memo(function WaitTimeIndicator({ workorder }) {
                 </span>
               )}
             </>
-          ) : (
-            <img src={ICONS.questionMark} className={styles.questionIcon} alt="" />
-          )}
+          ) : null}
         </div>
       </div>
     );

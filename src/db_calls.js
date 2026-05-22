@@ -20,6 +20,7 @@ import {
   writeBatch as firestoreWriteBatch,
   getCountFromServer,
   deleteField,
+  connectFirestoreEmulator,
 } from "firebase/firestore";
 import {
   getDatabase,
@@ -30,6 +31,7 @@ import {
   remove,
   onValue,
   off,
+  connectDatabaseEmulator,
 } from "firebase/database";
 import {
   initializeAuth,
@@ -38,6 +40,7 @@ import {
   signOut,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  connectAuthEmulator,
 } from "firebase/auth";
 import {
   getStorage,
@@ -47,8 +50,9 @@ import {
   getDownloadURL,
   deleteObject,
   listAll,
+  connectStorageEmulator,
 } from "firebase/storage";
-import { getFunctions, httpsCallable } from "firebase/functions";
+import { getFunctions, httpsCallable, connectFunctionsEmulator } from "firebase/functions";
 import { log } from "./utils";
 import { firebaseApp } from "./init";
 
@@ -62,6 +66,20 @@ export const FUNCTIONS = getFunctions(firebaseApp, "us-central1");
 const functions = FUNCTIONS;
 // Initialize Firebase Storage
 const storage = getStorage(firebaseApp);
+
+// Connect to local emulators when running in dev mode with the emulator flag set.
+// Production builds (yarn build) never enter this branch because import.meta.env.DEV
+// is false. The flag is set by the `yarn start:emulator` script via cross-env.
+if (import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true") {
+  connectFirestoreEmulator(DB, "localhost", 8080);
+  connectDatabaseEmulator(RDB, "localhost", 9000);
+  connectAuthEmulator(AUTH, "http://localhost:9099", { disableWarnings: true });
+  connectStorageEmulator(STORAGE, "localhost", 9199);
+  connectFunctionsEmulator(FUNCTIONS, "localhost", 5001);
+  console.warn(
+    "[warpspeed] Connected to Firebase LOCAL EMULATORS — no production data in use"
+  );
+}
 
 // ============================================================================
 // FIRESTORE OPERATIONS (Dumb functions - no business logic)
@@ -618,6 +636,7 @@ const gmailSendEmailCallable = httpsCallable(functions, "gmailSendEmail");
 const gmailModifyLabelsCallable = httpsCallable(functions, "gmailModifyLabels");
 const gmailGetAttachmentCallable = httpsCallable(functions, "gmailGetAttachment");
 const gmailDisconnectCallable = httpsCallable(functions, "gmailDisconnect");
+const gmailReconnectWatchCallable = httpsCallable(functions, "gmailReconnectWatch");
 
 
 export const processServerDrivenStripePaymentCallable = httpsCallable(
@@ -899,6 +918,15 @@ export function gmailSyncEmails(data) {
     .catch((error) => {
       log("Error syncing Gmail emails", error);
       return { success: false, error: error.message || "Failed to sync emails" };
+    });
+}
+
+export function gmailReconnectWatch(data) {
+  return gmailReconnectWatchCallable(data)
+    .then((result) => ({ success: true, data: result.data }))
+    .catch((error) => {
+      log("Error reconnecting Gmail watch", error);
+      return { success: false, error: error.message || "Failed to reconnect watch" };
     });
 }
 

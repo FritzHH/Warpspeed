@@ -20,8 +20,14 @@ const CustomerInfoScreenModalComponent = lazy(() =>
 );
 import styles from "./Items_RecentCustomers.module.css";
 
+const RECENT_CUSTOMER_WINDOW_MS = 2 * 60 * 60 * 1000;
+
 export function RecentCustomersComponent() {
-  const zRecentCustomers = useRecentCustomersStore((s) => s.recentCustomers);
+  const zRecentCustomersRaw = useRecentCustomersStore((s) => s.recentCustomers);
+  const zRecentCustomers = useMemo(() => {
+    const cutoff = Date.now() - RECENT_CUSTOMER_WINDOW_MS;
+    return zRecentCustomersRaw.filter((c) => (c.addedAt || 0) > cutoff);
+  }, [zRecentCustomersRaw]);
   const [sCustomerInfo, _setCustomerInfo] = useState(null);
   const [sSelectedCustomer, _setSelectedCustomer] = useState(null);
   const [sModalY, _setModalY] = useState(0);

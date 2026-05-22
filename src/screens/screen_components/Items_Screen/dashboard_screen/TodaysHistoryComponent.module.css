@@ -151,6 +151,24 @@
   border-color: var(--accent);
 }
 
+.cardActionSale {
+  background-color: var(--success, #4caf50);
+  color: var(--text-on-accent);
+  border-color: var(--success, #4caf50);
+}
+
+.cardActionCompleted {
+  background-color: var(--info, #2196f3);
+  color: var(--text-on-accent);
+  border-color: var(--info, #2196f3);
+}
+
+.cardActionDeleted {
+  background-color: var(--danger, #e57373);
+  color: var(--text-on-accent);
+  border-color: var(--danger, #e57373);
+}
+
 .cardBody {
   display: flex;
   flex-direction: column;

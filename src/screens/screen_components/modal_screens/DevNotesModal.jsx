@@ -170,6 +170,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
                       numberOfLines={3}
                       autoFocus={true}
                       style={{
+                        width: "100%",
                         borderColor: C.buttonLightGreenOutline,
                         borderRadius: 8,
                         borderWidth: 2,
@@ -181,6 +182,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
                         fontSize: 14,
                         color: C.text,
                         marginBottom: 8,
+                        boxSizing: "border-box",
                       }}
                     />
                     <div className={styles.editActions}>

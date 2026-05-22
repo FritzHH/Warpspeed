@@ -127,6 +127,34 @@
   color: var(--text-on-accent);
 }
 
+.reconnectBtn {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6px 14px;
+  margin-right: 8px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: opacity 120ms ease;
+}
+
+.reconnectBtn:hover:not(:disabled) {
+  opacity: 0.85;
+}
+
+.reconnectBtn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.reconnectBtnText {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--text-on-accent);
+}
+
 .divider {
   width: 100%;
   height: 1px;
@@ -296,23 +324,14 @@
   flex-shrink: 0;
 }
 
-.fwdChip {
-  display: inline-flex;
-  align-items: center;
-  background: var(--surface-overlay-light);
-  color: var(--text-secondary);
-  border-radius: 8px;
-  padding: 1px 6px;
-  margin-left: 6px;
-  font-size: 10px;
+.fwdInline {
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.2px;
+  color: var(--info);
+  margin-right: 8px;
   flex-shrink: 0;
-  max-width: 50%;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  line-height: 1.4;
+  line-height: 1.2;
 }
 
 .msgCountChipText {

@@ -179,6 +179,17 @@ export const NONREMOVABLE_STATUSES = [
     hidden: false,
   },
   {
+    id: "finished_and_paid",
+    textColor: "white",
+    backgroundColor: "green",
+    label: "Finished & Paid",
+    removable: false,
+    requireWaitTime: false,
+    hidden: false
+
+
+  },
+  {
     id: "part_ordered",
     textColor: "white",
     backgroundColor: "orange",
@@ -199,16 +210,7 @@ export const NONREMOVABLE_STATUSES = [
     systemOwned: true,
     hidden: false,
   },
-  // {
-  //   id: "finished_paid_",
-  //   label: "Finished & Paid",
-  //   textColor: "white",
-  //   backgroundColor: "green",
-  //   removable: false,
-  //   requireWaitTime: false,
-  //   systemOwned: true,
-  //   hidden: false,
-  // },
+
 ];
 
 export const CONTACT_RESTRICTIONS = {

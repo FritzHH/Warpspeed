@@ -294,6 +294,26 @@ function App() {
 
   return (
     <TooltipPrimitive.Provider delayDuration={400} skipDelayDuration={300}>
+    {import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true" && (
+      <div
+        style={{
+          position: "fixed",
+          bottom: 8,
+          left: 8,
+          padding: "4px 8px",
+          backgroundColor: "#d97706",
+          color: "white",
+          fontSize: 11,
+          fontWeight: "bold",
+          borderRadius: 4,
+          zIndex: 999999,
+          pointerEvents: "none",
+          letterSpacing: 0.5,
+        }}
+      >
+        EMULATOR
+      </div>
+    )}
     <BrowserRouter>
       <Routes>
         {/* Public route - Login */}

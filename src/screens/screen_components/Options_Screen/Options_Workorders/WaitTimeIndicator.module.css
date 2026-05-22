@@ -41,3 +41,32 @@
   width: 20px;
   height: 20px;
 }
+
+.daysPill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  min-width: 28px;
+}
+
+.daysPillIcon {
+  width: 17px;
+  height: 17px;
+  object-fit: contain;
+}
+
+.daysPillText {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.inShopText {
+  font-size: 10px;
+  font-style: italic;
+  color: gray;
+  margin-top: 2px;
+}

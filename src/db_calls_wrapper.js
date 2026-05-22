@@ -47,6 +47,7 @@ import {
   gmailModifyLabels,
   gmailGetAttachment,
   gmailDisconnect,
+  gmailReconnectWatch,
 } from "./db_calls";
 import { removeUnusedFields, createNewWorkorder, buildWorkorderNumberFromId } from "./utils";
 import { useSettingsStore, useLoginStore, useOpenWorkordersStore, clearPersistedStores } from "./stores";
@@ -3574,12 +3575,13 @@ export async function dbSendReceipt(params) {
   }
 }
 
-export async function dbCreateTextToPayInvoice(workorderID, channel = "sms", { phone, email } = {}) {
+export async function dbCreateTextToPayInvoice(workorderID, channel = "sms", { phone, email, amountCents } = {}) {
   const { tenantID, storeID } = getTenantAndStore();
   try {
     const payload = { workorderID, channel, tenantID, storeID };
     if (phone) payload.phone = phone;
     if (email) payload.email = email;
+    if (amountCents !== undefined && amountCents !== null) payload.amountCents = amountCents;
     const result = await createTextToPayInvoiceCallable(payload);
     return result.data;
   } catch (error) {
@@ -3733,6 +3735,20 @@ export async function dbGmailSyncEmails(accountKey, fullSync = false) {
   }
   const result = await gmailSyncEmails({ tenantID, storeID, accountKey, fullSync });
   log("dbGmailSyncEmails result", JSON.stringify(result));
+  return result;
+}
+
+export async function dbGmailReconnectWatch(accountKey) {
+  const { tenantID, storeID } = getTenantAndStore();
+  log("dbGmailReconnectWatch called", { tenantID, storeID, accountKey });
+  if (!tenantID || !storeID) {
+    return { success: false, error: "Missing tenant/store" };
+  }
+  if (!accountKey) {
+    return { success: false, error: "accountKey required" };
+  }
+  const result = await gmailReconnectWatch({ tenantID, storeID, accountKey });
+  log("dbGmailReconnectWatch result", JSON.stringify(result));
   return result;
 }
 

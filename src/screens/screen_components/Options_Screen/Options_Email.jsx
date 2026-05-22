@@ -6,7 +6,7 @@ import { Tooltip } from "../../../dom_components";
 import { TabMenuButton } from "../../../dom_components/TabMenuButton/TabMenuButton";
 import { useEmailStore, useLoginStore, useSettingsStore, useTabNamesStore } from "../../../stores";
 import { TAB_NAMES } from "../../../data";
-import { dbGmailDisconnect, dbGmailModifyLabels } from "../../../db_calls_wrapper";
+import { dbGmailDisconnect, dbGmailModifyLabels, dbGmailReconnectWatch } from "../../../db_calls_wrapper";
 import { buildSignOffHtml } from "../Items_Screen/emailSignOff";
 import { log, lightenRGBByPercent } from "../../../utils";
 import dayjs from "dayjs";
@@ -65,6 +65,7 @@ export const EmailOptionsPanel = React.memo(() => {
   const zSettings = useSettingsStore((state) => state.settings);
 
   const currentUser = useLoginStore((state) => state.currentUser);
+  const zCurrentUserLevel = useLoginStore((state) => state.currentUser?.permissions?.level || 0);
   const userInboxes = currentUser?.emailInboxes || [];
   const allEmailAccounts = zSettings?.emailAccounts || [];
   const emailAccounts = allEmailAccounts.filter((a) => userInboxes.includes(a.accountKey));
@@ -80,6 +81,7 @@ export const EmailOptionsPanel = React.memo(() => {
 
   const [sHoveredThreadId, _sSetHoveredThreadId] = useState(null);
   const [sSearchTerm, _sSetSearchTerm] = useState("");
+  const [sReconnecting, _sSetReconnecting] = useState(false);
 
   const isSearchActive = sSearchTerm.trim().length >= SEARCH_MIN_CHARS;
 
@@ -260,6 +262,29 @@ export const EmailOptionsPanel = React.memo(() => {
     useEmailStore.getState().setActiveAccountKey(accountKey);
   }
 
+  async function handleReconnect() {
+    if (sReconnecting) return;
+    if (!zActiveAccountKey) {
+      window.alert("No active inbox selected.");
+      return;
+    }
+    _sSetReconnecting(true);
+    try {
+      const result = await dbGmailReconnectWatch(zActiveAccountKey);
+      if (result?.success) {
+        const synced = result?.data?.synced ?? 0;
+        window.alert(`Reconnected. Backfilled ${synced} message${synced === 1 ? "" : "s"}.`);
+      } else {
+        window.alert(`Reconnect failed: ${result?.error || "Unknown error"}`);
+      }
+    } catch (e) {
+      log("Reconnect error", e);
+      window.alert(`Reconnect failed: ${e?.message || e}`);
+    } finally {
+      _sSetReconnecting(false);
+    }
+  }
+
   const renderEmailItem = useCallback((item) => {
     const isSelected = item.threadId === zSelectedThreadId
       && (!isSearchActive || item.accountKey === zActiveAccountKey);
@@ -273,6 +298,7 @@ export const EmailOptionsPanel = React.memo(() => {
     const isHovered = sHoveredThreadId === hoverKey;
     const badge = isSearchActive ? accountBadgeMap[item.accountKey] : null;
     const forwardedFrom = detectForwardedFrom(item, accountEmailMap[item.accountKey]);
+    const forwardedLocal = forwardedFrom ? `${forwardedFrom.split("@")[0]}@` : "";
     return (
       <div
         key={rowKey}
@@ -298,6 +324,11 @@ export const EmailOptionsPanel = React.memo(() => {
                 {badge.label}
               </span>
             )}
+            {forwardedFrom && (
+              <Tooltip text={`Forwarded from ${forwardedFrom}`} position="right">
+                <span className={styles.fwdInline}>{forwardedLocal}</span>
+              </Tooltip>
+            )}
             <span
               className={`${styles.emailRowFrom} ${item.isUnread ? styles.emailRowFromUnread : ""}`}
               style={{ color: C.text }}
@@ -320,11 +351,6 @@ export const EmailOptionsPanel = React.memo(() => {
               <span className={styles.msgCountChip}>
                 <span className={styles.msgCountChipText}>{item.messageCount}</span>
               </span>
-            )}
-            {forwardedFrom && (
-              <Tooltip text={`Forwarded from ${forwardedFrom}`} position="left">
-                <span className={styles.fwdChip}>Fwd: {forwardedFrom}</span>
-              </Tooltip>
             )}
           </div>
           <span className={styles.emailRowSnippet}>{item.snippet || ""}</span>
@@ -440,6 +466,21 @@ export const EmailOptionsPanel = React.memo(() => {
           })}
         </div>
         <div className={styles.actionGroup}>
+          {zCurrentUserLevel >= 4 && (
+            <Tooltip text="Re-establish Gmail watch and backfill missed messages" position="left">
+              <button
+                type="button"
+                className={styles.reconnectBtn}
+                onClick={handleReconnect}
+                disabled={sReconnecting}
+                style={{ background: C.orange }}
+              >
+                <span className={styles.reconnectBtnText}>
+                  {sReconnecting ? "Reconnecting…" : "Reconnect"}
+                </span>
+              </button>
+            </Tooltip>
+          )}
           <button
             type="button"
             className={styles.composeBtn}

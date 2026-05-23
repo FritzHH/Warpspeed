@@ -10,6 +10,7 @@ import {
   dbListenToOpenWorkorders,
   dbListenToInventory,
   dbListenToCurrentPunchClock,
+  dbListenToInAppMessages,
   dbListenToSettings,
 } from "../../db_calls_wrapper";
 import { authSignOut } from "../../db_calls";
@@ -57,7 +58,15 @@ export function PhoneScreen() {
       useInventoryStore.getState().setItems(data);
     });
     const unsubPunch = dbListenToCurrentPunchClock((data) => {
-      useLoginStore.getState().setPunchClock(data);
+      let notes = data?.notes || {};
+      let clean = { ...data };
+      delete clean.notes;
+      useLoginStore.getState().setPunchClock(clean);
+      useLoginStore.getState().setManagerNotes(notes);
+    });
+    const unsubMessages = dbListenToInAppMessages((data) => {
+      let msgs = data?.messages || {};
+      useLoginStore.getState().setInAppMessages(msgs);
     });
     const unsubSettings = dbListenToSettings((data) => {
       useSettingsStore.getState().setSettings(data, false, false);
@@ -66,6 +75,7 @@ export function PhoneScreen() {
       if (typeof unsub === "function") unsub();
       if (typeof unsubInv === "function") unsubInv();
       if (typeof unsubPunch === "function") unsubPunch();
+      if (typeof unsubMessages === "function") unsubMessages();
       if (typeof unsubSettings === "function") unsubSettings();
     };
   }, []);

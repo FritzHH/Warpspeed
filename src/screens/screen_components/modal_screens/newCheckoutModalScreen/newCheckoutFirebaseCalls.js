@@ -583,16 +583,12 @@ export async function newCheckoutProcessStripeRefund(amount, paymentIntentID, tr
 }
 
 export async function newCheckoutGetStripeReaders() {
-  dlog(DCAT.STRIPE_REQ, "getStripeReaders", "FirebaseCalls", {});
   try {
     const callables = await getCallables();
     const result = await callables.getReaders({});
-    // log("newCheckout readers fetched:", result.data);
-    dlog(DCAT.STRIPE_RES, "getStripeReaders", "FirebaseCalls", { readerCount: result.data?.readers?.length });
     return result.data;
   } catch (error) {
     log("newCheckoutGetStripeReaders error:", error);
-    dlog(DCAT.STRIPE_ERR, "getStripeReaders", "FirebaseCalls", { message: error?.message, code: error?.code });
     throw error;
   }
 }

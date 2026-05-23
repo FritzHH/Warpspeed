@@ -50,7 +50,8 @@ import { smsService } from "../../../data_service_modules";
 import {
   scheduleAutoSend,
   clearAutoSend,
-  buildForwardToPayload,
+  buildForwardToArray,
+  initialSelectedForwardIDs,
 } from "../Options_Screen/ReplyOptionsBar";
 import {
   IncomingMessageComponent,
@@ -1308,7 +1309,7 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
   const [sLoading, _sSetLoading] = useState(true);
   const [sSending, _sSending] = useState(false);
   const [sShowReplyModal, _sSetShowReplyModal] = useState(false);
-  const [sForwardReplies, _sSetForwardReplies] = useState(false);
+  const [sSelectedForwardIDs, _sSetSelectedForwardIDs] = useState(() => initialSelectedForwardIDs(null));
   const zSmsThreads = useCustMessagesStore((state) => state.getSmsThreads());
   let thread = zSmsThreads.find((t) => t.phone === customerPhone);
   const [sCanRespond, _sSetCanRespond] = useState(
@@ -1388,14 +1389,14 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     });
   }
 
-  async function sendMessage(canRespondVal, forwardOverride) {
+  async function sendMessage(canRespondVal, forwardToArrayOrNull) {
     let text = sNewMessage.trim();
     if (!text || !customerPhone || customerPhone.length !== 10) return;
     _sSetNewMessage("");
     _sSending(true);
     let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
     let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-    let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+    let forwardTo = Array.isArray(forwardToArrayOrNull) ? forwardToArrayOrNull : null;
     let msg = { ...SMS_PROTO };
     msg.message = text;
     msg.phoneNumber = customerPhone;
@@ -1408,7 +1409,7 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     msg.type = "outgoing";
     msg.senderUserObj = zCurrentUserObj;
     msg.sentByUser = zCurrentUserObj.id;
-    if (forwardTo) msg.forwardTo = forwardTo;
+    if (Array.isArray(forwardTo)) msg.forwardTo = forwardTo;
     _sSetMessages((prev) => [...prev, { ...msg, status: "sending" }]);
     let result = await smsService.send(msg);
     _sSending(false);
@@ -1438,7 +1439,8 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     await dbUpdateMessageCanRespond(customerPhone, null, newCanRespond);
     if (!newCanRespond) {
       let user = useLoginStore.getState().getCurrentUser();
-      if (user?.id && thread?.forwardTo?.[user.id]) {
+      let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
+      if (user?.id && arr.some((f) => f.userID === user.id)) {
         await dbToggleSMSForwarding(customerPhone, user.id, false, user.phone, user.first);
       }
     }
@@ -1448,7 +1450,8 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     if (!customerPhone || customerPhone.length !== 10) return;
     let user = useLoginStore.getState().getCurrentUser();
     if (!user?.id) return;
-    let isCurrentlyForwarding = !!(thread?.forwardTo?.[user.id]);
+    let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
+    let isCurrentlyForwarding = arr.some((f) => f.userID === user.id);
     if (!isCurrentlyForwarding && !sCanRespond) {
       _sSetCanRespond(true);
       await dbUpdateMessageCanRespond(customerPhone, null, true);
@@ -1462,28 +1465,14 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     );
   }
 
-  function handleToggleForwardReplies() {
-    let user = useLoginStore.getState().getCurrentUser();
-    if (!user?.id) return;
-    if (!user?.phone) {
-      useAlertScreenStore.getState().setValues({
-        title: "No Phone Number",
-        message: "Your account needs a personal phone number to enable SMS forwarding. Ask an admin to add one.",
-        btn1Text: "OK",
-        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-        showAlert: true,
-        canExitOnOuterClick: true,
-      });
-      return;
-    }
-    let newVal = !sForwardReplies;
-    _sSetForwardReplies(newVal);
-    if (newVal) {
-      clearAutoSend();
-      _sSetCanRespond(true);
-      _sSetShowReplyModal(false);
-      sendMessage(true, true);
-    }
+  function handleFire() {
+    if (!sSelectedForwardIDs?.length) return;
+    const users = useSettingsStore.getState().getSettings()?.users || [];
+    const forwardToArray = buildForwardToArray(sSelectedForwardIDs, users);
+    clearAutoSend();
+    _sSetCanRespond(true);
+    _sSetShowReplyModal(false);
+    sendMessage(true, forwardToArray);
   }
 
   return (
@@ -1551,7 +1540,6 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
         sendDisabled={sSending || !sNewMessage.trim()}
         placeholder="Type a message..."
         showReplyOptions={sShowReplyModal}
-        forwardReplies={sForwardReplies}
         hasActivePhone={hasActivePhone}
         onSelectCanRespond={(canRespond) => {
           clearAutoSend();
@@ -1559,7 +1547,9 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
           _sSetShowReplyModal(false);
           sendMessage(canRespond);
         }}
-        onToggleForward={handleToggleForwardReplies}
+        selectedForwardIDs={sSelectedForwardIDs}
+        onChangeSelectedForwardIDs={_sSetSelectedForwardIDs}
+        onFire={handleFire}
       />
     </div>
   );

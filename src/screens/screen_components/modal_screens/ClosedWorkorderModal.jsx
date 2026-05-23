@@ -383,6 +383,8 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
       customerEmail: customer.email || "",
       customerCell: customer.customerCell || "",
       customerID: workorder.customerID || "",
+      workorderID: woID,
+      saleID: workorder?.activeSaleID || "",
       templateVars: {
         firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
         storeName: _settings?.storeInfo?.displayName || "our store",

@@ -629,6 +629,7 @@ export const ActiveWorkorderComponent = ({}) => {
       customerEmail: customer.email || "",
       customerCell: customer.customerCell || "",
       customerID: workorder?.customerID || "",
+      workorderID: workorder?.id || "",
       templateVars: {
         firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
         storeName: settings?.storeInfo?.displayName || "our store",

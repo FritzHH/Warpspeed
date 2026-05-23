@@ -207,142 +207,104 @@
   flex-shrink: 0;
 }
 
-.ucAddUserWrap {
+.ucPickerRow {
   width: 100%;
   display: flex;
-  align-items: flex-start;
-}
-
-.ucUserList {
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.ucUserListItem {
-  height: 5px;
-  flex-shrink: 0;
-}
-
-.ucUserRow {
-  display: flex;
   flex-direction: row;
-  border: 1px solid var(--uc-row-border);
-  border-radius: 5px;
-  padding: 3px 10px 3px 3px;
-  box-sizing: border-box;
-}
-
-.ucUserLeftCol {
-  width: 16%;
-  margin-right: 5px;
-  flex-shrink: 0;
-}
-
-.ucUserRightCol {
-  width: 84%;
-  margin-top: 2px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.ucIconCell {
-  height: 25px;
-  display: flex;
-  justify-content: center;
   align-items: center;
-}
-
-.ucActionCell {
-  height: 25px;
-  display: flex;
-  justify-content: center;
-  margin-top: 7px;
-}
-
-.ucRowSpacer {
-  margin-top: 7px;
-}
-
-.ucNameRow {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.ucNameInput {
-  width: 49%;
-  height: 25px;
-  font-size: 14px;
-  border-width: 1px;
-  border-style: solid;
-  padding: 1px 5px;
-  outline: none;
-  box-sizing: border-box;
+  gap: 8px;
+  margin-bottom: 12px;
   flex-shrink: 0;
 }
 
-.ucContactRow {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  width: 100%;
-  margin-top: 7px;
-}
-
-.ucPhoneInput {
-  width: 120px;
-  height: 25px;
-  font-size: 14px;
-  border-width: 1px;
-  border-style: solid;
-  padding: 1px 5px;
-  outline: none;
-  box-sizing: border-box;
-  flex-shrink: 0;
-}
-
-.ucEmailInput {
+.ucPickerDropdownWrap {
   flex: 1;
-  margin-left: 5px;
-  height: 25px;
+  min-width: 0;
+}
+
+.ucEditorEmpty {
+  width: 100%;
+  padding: 24px 0;
+  display: flex;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.ucEditor {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 8px;
+  padding: 12px;
+  background-color: rgba(0, 0, 0, 0.025);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.ucEditorSection {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px;
+  border: 1px solid #3b82f6;
+  border-radius: 6px;
+  background-color: #ffffff;
+  box-shadow: 0 1px 2px rgba(59, 130, 246, 0.15);
+  flex-shrink: 0;
+}
+
+.ucEditorSectionTitle {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.ucEditorRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.ucEditorInput {
+  flex: 1;
+  min-width: 120px;
+  height: 28px;
   font-size: 14px;
   border-width: 1px;
   border-style: solid;
-  padding: 1px 5px;
-  background-color: transparent;
+  padding: 2px 5px;
   outline: none;
   box-sizing: border-box;
+  background-color: transparent;
 }
 
-.ucCredsRow {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-around;
-  align-items: center;
-  width: 100%;
-  margin-top: 7px;
-}
-
-.ucCredBox {
-  width: 22%;
+.ucCredField {
+  flex: 1;
+  min-width: 140px;
   display: flex;
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  height: 25px;
+  height: 28px;
   border-width: 1px;
   border-style: solid;
+  padding: 0 6px;
   box-sizing: border-box;
-  flex-shrink: 0;
 }
 
 .ucCredInput {
-  width: 80%;
+  flex: 1;
   font-size: 14px;
   padding: 1px 5px;
   outline: none;
@@ -351,16 +313,18 @@
   box-sizing: border-box;
 }
 
-.ucCredPlaceholder {
-  width: 15px;
-  flex-shrink: 0;
-}
-
-.ucRoleWrap {
-  width: 40%;
+.ucRoleBadgeWrap {
   display: flex;
   align-items: center;
-  justify-content: center;
+}
+
+.ucActionsBar {
+  width: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
 }
 
 .ucChipRow {

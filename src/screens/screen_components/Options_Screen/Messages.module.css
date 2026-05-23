@@ -488,6 +488,149 @@
   margin-left: 8px;
 }
 
+.replyOptionsForwardSection {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.replyOptionsForwardSection .replyOptionsForwardRow {
+  margin-top: 0;
+}
+
+.replyOptionsFireBtn {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 18px;
+  background-color: var(--accent);
+  border: none;
+  border-radius: 5px;
+  color: var(--text-on-accent);
+  font-weight: 600;
+  font-size: 15px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.replyOptionsFireBtn:hover {
+  filter: brightness(1.05);
+}
+
+.replyOptionsFireBtn--disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  filter: none;
+}
+
+.forwardUsersDropdownRoot {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.forwardUsersDropdownLeadLabel {
+  font-size: 11px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.forwardUsersDropdownBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background-color: transparent;
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  width: auto;
+  max-width: 100%;
+}
+
+.forwardUsersDropdownBtn:hover {
+  background-color: var(--surface-overlay-light);
+}
+
+.forwardUsersDropdownCaret {
+  font-size: 10px;
+  color: var(--text-secondary);
+}
+
+.forwardUsersDropdownPanel {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 0;
+  min-width: 180px;
+  max-height: 240px;
+  overflow-y: auto;
+  background-color: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.15));
+  z-index: 50;
+  padding: 4px 0;
+}
+
+.forwardUsersDropdownItem {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 8px 12px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.forwardUsersDropdownItem:hover {
+  background-color: var(--surface-overlay-light);
+}
+
+.forwardUsersDropdownCheckbox {
+  width: 18px;
+  height: 18px;
+  border-radius: 3px;
+  border: 2px solid var(--border-subtle);
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.forwardUsersDropdownCheckbox--checked {
+  background-color: var(--accent);
+  border-color: var(--accent);
+}
+
+.forwardUsersDropdownCheckmark {
+  color: var(--text-on-accent);
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.forwardUsersDropdownLabel {
+  margin-left: 8px;
+  font-size: 14px;
+  color: var(--text-strong);
+}
+
+.forwardUsersDropdownEmpty {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
 /* ============================================================
    Message Bubbles — incoming + outgoing
    ============================================================ */

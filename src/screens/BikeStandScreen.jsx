@@ -1126,6 +1126,7 @@ export function BikeStandScreen() {
       customerEmail: customer.email || "",
       customerCell: customer.customerCell || "",
       customerID: selectedWorkorder.customerID || "",
+      workorderID: woID,
       templateVars: {
         firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
         storeName: _settings?.storeInfo?.displayName || "our store",
@@ -1197,6 +1198,8 @@ export function BikeStandScreen() {
       customerEmail: customer.email || "",
       customerCell: customer.customerCell || "",
       customerID: selectedWorkorder.customerID || "",
+      workorderID: woID,
+      saleID: selectedWorkorder?.activeSaleID || "",
       templateVars: {
         firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
         storeName: _settings?.storeInfo?.displayName || "our store",
@@ -2007,7 +2010,12 @@ export function BikeStandScreen() {
             _setShowWorkorderList(false);
           }}
           onClose={() => _setShowWorkorderList(false)}
-          onNewWorkorder={() => { _setShowWorkorderList(false); handleNewWorkorderPress(); }}
+          onNewWorkorder={() => {
+            _setShowWorkorderList(false);
+            _setSelectedWorkorderID(null);
+            _setPendingCustomer(null);
+            _setShowNewWorkorderModal(true);
+          }}
           activeWorkorderID={sSelectedWorkorderID}
         />
       )}
@@ -3931,6 +3939,7 @@ const WorkorderListModal = ({ onSelect, onClose, onNewWorkorder, activeWorkorder
   const zStatuses = useSettingsStore((s) => s.settings?.statuses);
   const [sSearch, _setSearch] = useState("");
   const _swipeRef = useRef(null);
+  const mountGuard = useMountClickGuard(350);
 
   let filtered = (zWorkorders || []).filter((wo) => !!wo.customerID);
   if (sSearch.trim()) {
@@ -3947,6 +3956,10 @@ const WorkorderListModal = ({ onSelect, onClose, onNewWorkorder, activeWorkorder
       <div
         className={styles.wlmDialog}
         onClick={(e) => e.stopPropagation()}
+        onClickCapture={mountGuard}
+        onMouseDownCapture={mountGuard}
+        onPointerDownCapture={mountGuard}
+        onTouchStartCapture={mountGuard}
       >
         {/* Header — title, search, new workorder */}
         <div className={styles.wlmHeader} style={{ borderBottomColor: C.borderSubtle }}>
@@ -4016,6 +4029,7 @@ const WorkorderListModal = ({ onSelect, onClose, onNewWorkorder, activeWorkorder
               return (
                 <StandTouch
                   key={workorder.id}
+                  touchStart={false}
                   className={styles.wlmItem}
                   style={{
                     borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,

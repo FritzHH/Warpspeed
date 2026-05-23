@@ -47,8 +47,9 @@ export function ComposeArea({
   onSelectCanRespond,
   onSendAudio,
   onDeleteAudio,
-  forwardReplies,
-  onToggleForward,
+  selectedForwardIDs,
+  onChangeSelectedForwardIDs,
+  onFire,
   onCancelReply,
   hasActivePhone,
   fromLang,
@@ -124,15 +125,16 @@ export function ComposeArea({
       ) : null}
 
       <ReplyOptionsBar
-        visible={showReplyOptions}
-        forwardReplies={forwardReplies}
+        visible={!!showReplyOptions}
         hasActivePhone={hasActivePhone}
         audioMode={audioMode}
         audioUploading={audioUploading}
         onSelectCanRespond={onSelectCanRespond}
         onSendAudio={onSendAudio}
         onDeleteAudio={onDeleteAudio}
-        onToggleForward={onToggleForward}
+        selectedForwardIDs={selectedForwardIDs}
+        onChangeSelectedForwardIDs={onChangeSelectedForwardIDs}
+        onFire={onFire}
         onCancel={onCancelReply}
       />
 
@@ -151,16 +153,6 @@ export function ComposeArea({
           className={s.inputField}
           style={{ color: C.text }}
         />
-        <button
-          ref={emojiBtnRef}
-          type="button"
-          className={s.emojiButton}
-          onMouseDown={(e) => { e.preventDefault(); captureCursor(); }}
-          onClick={openEmojiPicker}
-          aria-label="Insert emoji"
-        >
-          {"\uD83D\uDE0A"}
-        </button>
         <div className={s.sendColumn}>
           <TouchableOpacityDom
             onPress={() => { if (!sendDisabled) onSend(); }}
@@ -200,6 +192,16 @@ export function ComposeArea({
         </div>
         {centerSlot}
         <div className={`${s.footerGroup} ${s.footerIconGroup}`}>
+          <button
+            ref={emojiBtnRef}
+            type="button"
+            className={s.emojiButton}
+            onMouseDown={(e) => { e.preventDefault(); captureCursor(); }}
+            onClick={openEmojiPicker}
+            aria-label="Insert emoji"
+          >
+            {"\uD83D\uDE0A"}
+          </button>
           {rightSlot}
         </div>
       </div>

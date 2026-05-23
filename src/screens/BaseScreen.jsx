@@ -42,6 +42,9 @@ const NewRefundModalScreen = lazy(() =>
 const FullSaleModal = lazy(() =>
   import("../dom_components/FullSaleModal/FullSaleModal").then((m) => ({ default: m.FullSaleModal }))
 );
+const UserMessagesModalForLogin = lazy(() =>
+  import("./screen_components/modal_screens/UserMessagesModal").then((m) => ({ default: m.UserMessagesModal }))
+);
 import { isSaleID, isLightspeedID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { decodeLightspeedBarcode, lightenRGBByPercent } from "../utils";
 import { newCheckoutGetStripeReaders, readActiveSale, recoverPendingActiveSales } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
@@ -49,6 +52,7 @@ import {
   dbListenToSettings,
   dbListenToOpenWorkorders,
   dbListenToCurrentPunchClock,
+  dbListenToInAppMessages,
   dbListenToInventory,
   dbListenToActiveSales,
   dbGetCompletedSale,
@@ -89,6 +93,8 @@ export function BaseScreen() {
     (state) => state.settings?.useFacialRecognition !== false
   );
   const zShowAlert = useAlertScreenStore((state) => state.showAlert);
+  const zLoginMessagesShowForUserID = useLoginStore((state) => state.loginMessagesShowForUserID);
+  const zLoginMessagesShowTab = useLoginStore((state) => state.loginMessagesShowTab);
   const zListenerStatuses = useListenerStatusStore((state) => state.statuses);
   const zEverConnected = useListenerStatusStore((state) => state.everConnected);
   const zReconnectingNames = [];
@@ -465,7 +471,19 @@ export function BaseScreen() {
 
     register("punch-clock", (onConnected, onError) => {
       return dbListenToCurrentPunchClock((data) => {
-        useLoginStore.getState().setPunchClock(data);
+        let notes = data?.notes || {};
+        let clean = { ...data };
+        delete clean.notes;
+        useLoginStore.getState().setPunchClock(clean);
+        useLoginStore.getState().setManagerNotes(notes);
+        onConnected();
+      }, onError);
+    });
+
+    register("in-app-messages", (onConnected, onError) => {
+      return dbListenToInAppMessages((data) => {
+        let msgs = data?.messages || {};
+        useLoginStore.getState().setInAppMessages(msgs);
         onConnected();
       }, onError);
     });
@@ -490,7 +508,8 @@ export function BaseScreen() {
 
     const emailTeardown = register("emails", (onConnected, onError) => {
       return dbListenToEmails((data) => {
-        useEmailStore.getState().setEmails(data);
+        const reconciled = useEmailStore.getState().reconcilePendingLabelMods(data);
+        useEmailStore.getState().setEmails(reconciled);
         onConnected();
       }, onError);
     });
@@ -658,6 +677,14 @@ export function BaseScreen() {
         </Suspense>
       )}
       <AlertBox showAlert={zShowAlert} />
+      {zLoginMessagesShowForUserID && (
+        <Suspense fallback={null}>
+          <UserMessagesModalForLogin
+            handleExit={() => useLoginStore.getState().consumeLoginMessagesOnDismiss()}
+            defaultTab={zLoginMessagesShowTab || "inbox"}
+          />
+        </Suspense>
+      )}
       <div
         className={styles.leftCol}
         style={{ backgroundColor: C.backgroundWhite }}

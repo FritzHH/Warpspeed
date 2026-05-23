@@ -1,0 +1,540 @@
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--surface-overlay);
+  z-index: var(--z-modal);
+}
+
+.card {
+  width: 720px;
+  max-width: 92%;
+  height: 80vh;
+  max-height: 720px;
+  background-color: var(--surface-base);
+  border-radius: 12px;
+  border: 2px solid var(--border-default);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  gap: 10px;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 700;
+  flex: 1;
+  text-align: center;
+}
+
+.suppressGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.suppressLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+}
+
+.suppressSelect {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-base);
+  cursor: pointer;
+}
+
+.readByText {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+  align-self: flex-end;
+  margin-top: 2px;
+}
+
+.closeBtn {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  line-height: 0;
+}
+
+.closeIcon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+}
+
+.tabsRow {
+  display: flex;
+  flex-direction: row;
+  border-bottom: 1px solid var(--border-default);
+  margin-bottom: 14px;
+  gap: 4px;
+}
+
+.tabBtn {
+  flex: 1;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  padding: 10px 0;
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+}
+
+.tabBtnActive {
+  border-bottom-color: var(--accent);
+}
+
+.unreadBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background-color: var(--danger);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+  margin-left: 6px;
+  vertical-align: middle;
+  box-sizing: border-box;
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.composeForm {
+  display: flex;
+  flex-direction: column;
+}
+
+.inboxScroll {
+  display: flex;
+  flex-direction: column;
+}
+
+.formLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.recipientList {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  max-height: 180px;
+  overflow-y: auto;
+  margin-bottom: 14px;
+}
+
+.recipientRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: pointer;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  font-family: inherit;
+  text-align: left;
+}
+
+.recipientRow:last-child {
+  border-bottom: none;
+}
+
+.recipientName {
+  flex: 1;
+  font-size: 13px;
+}
+
+.workorderSelect {
+  width: 100%;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-base);
+  margin-bottom: 14px;
+}
+
+.workorderTriggerRow {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.workorderTriggerBtn {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-base);
+  font-family: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workorderTriggerBtn:hover {
+  border-color: var(--accent);
+}
+
+.workorderClearBtn {
+  flex-shrink: 0;
+  width: 32px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-base);
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.workorderClearBtn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.pickerOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--surface-overlay);
+  z-index: var(--z-modal-content);
+}
+
+.pickerCard {
+  width: 640px;
+  max-width: 92%;
+  max-height: calc(100vh - 40px);
+  background-color: var(--surface-base);
+  border-radius: 12px;
+  border: 2px solid var(--border-default);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.pickerHeader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  flex-shrink: 0;
+}
+
+.pickerTitle {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.pickerList {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  display: flex;
+  flex-direction: column;
+}
+
+.workorderRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 10px;
+  border: none;
+  border-bottom: 1px solid var(--border-subtle);
+  border-left: 3px solid transparent;
+  background: transparent;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.workorderRow:last-child {
+  border-bottom: none;
+}
+
+.workorderRow:hover {
+  background-color: var(--surface-alt);
+}
+
+.workorderRowSelected {
+  background-color: var(--surface-accent-muted);
+  border-left-color: var(--accent);
+}
+
+.workorderName {
+  font-size: 13px;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workorderStatusPill {
+  display: flex;
+  flex-direction: row;
+  padding: 1px 11px;
+  align-items: center;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  flex-shrink: 0;
+}
+
+.workorderStatusLabel {
+  font-size: 11px;
+  font-weight: normal;
+}
+
+.messageTextarea {
+  width: 100%;
+  min-height: 100px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-base);
+  box-sizing: border-box;
+  margin-bottom: 12px;
+}
+
+.sendRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+
+.sendStatus {
+  font-size: 12px;
+  font-style: italic;
+}
+
+.sendBtn {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  padding: 8px 18px;
+  border-radius: 5px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sendBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.threadCard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  gap: 8px;
+}
+
+.messageRow {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background-color: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  gap: 6px;
+}
+
+.messageRowUnread {
+  border-color: var(--border-default);
+  background-color: var(--surface-accent-muted);
+}
+
+.messageMeta {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.messageAuthor {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.messageTime {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.messageBody {
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.recipients {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.workorderChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-default);
+  background-color: var(--surface-alt);
+  color: var(--text-default);
+  cursor: pointer;
+  align-self: flex-start;
+  font-family: inherit;
+}
+
+.workorderChip:hover {
+  border-color: var(--accent);
+}
+
+.messageActions {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.actionBtn {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+
+.actionBtnRead {
+  border: 1px solid var(--accent);
+  color: var(--accent);
+}
+
+.actionBtnDelete {
+  border: 1px solid var(--danger);
+  color: var(--danger);
+}
+
+.replyRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.replyInput {
+  flex: 1;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 6px 8px;
+  border-radius: 5px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-base);
+}
+
+.replyBtn {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.replyBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.emptyMessage {
+  font-size: 13px;
+  color: var(--text-muted);
+  font-style: italic;
+  text-align: center;
+  margin-top: 40px;
+}

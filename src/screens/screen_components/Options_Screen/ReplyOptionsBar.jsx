@@ -1,9 +1,9 @@
 /* eslint-disable */
 
-import React, { useEffect, useState } from "react";
-import { Image as ImageDom, TouchableOpacity as TouchableOpacityDom } from "../../../dom_components";
+import React, { useEffect, useRef, useState } from "react";
+import { Image as ImageDom, TouchableOpacity as TouchableOpacityDom, Tooltip } from "../../../dom_components";
 import { C, ICONS } from "../../../styles";
-import { useLoginStore } from "../../../stores";
+import { useLoginStore, useSettingsStore } from "../../../stores";
 import s from "./Messages.module.css";
 
 const AUTO_SEND_SECONDS = 10;
@@ -29,40 +29,144 @@ export function clearAutoSend() {
 }
 
 /**
- * Builds the forwardTo payload for outgoing messages.
- * @param {boolean|undefined} forwardOverride - explicit override
- * @param {boolean} forwardReplies - current forward replies state
- * @returns {object|null}
+ * Builds the forwardTo payload array for outgoing messages.
+ * Resolves selected user IDs against the users list, returning
+ * [{ userID, phone, first }, ...] for users that have a phone number.
  */
-export function buildForwardToPayload(forwardOverride, forwardReplies) {
-  const currentUser = useLoginStore.getState().getCurrentUser();
-  if (!currentUser?.id) return null;
-  let shouldForward = forwardOverride !== undefined ? forwardOverride : forwardReplies;
-  if (shouldForward) {
-    if (!currentUser.phone) return null;
-    return { userID: currentUser.id, phone: currentUser.phone, first: currentUser.first || "", enable: true };
-  }
-  return { userID: currentUser.id, enable: false };
+export function buildForwardToArray(selectedForwardIDs, users) {
+  if (!selectedForwardIDs?.length || !users?.length) return [];
+  return selectedForwardIDs
+    .map((id) => {
+      let u = users.find((u) => u.id === id);
+      if (!u || !u.phone) return null;
+      return { userID: u.id, phone: u.phone, first: u.first || "" };
+    })
+    .filter(Boolean);
 }
 
-function ForwardCheckboxRow({ checked, disabled, onToggle, label }) {
-  let rowClass = s.replyOptionsForwardRow + (disabled ? " " + s["replyOptionsForwardRow--disabled"] : "");
-  let boxClass = s.replyOptionsForwardCheckbox + (checked ? " " + s["replyOptionsForwardCheckbox--checked"] : "");
+/**
+ * Initial selection for the forward-users dropdown.
+ * Prefers existing thread.forwardTo array; falls back to [currentUser.id].
+ */
+export function initialSelectedForwardIDs(thread) {
+  let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : null;
+  if (arr && arr.length > 0) return arr.map((f) => f.userID).filter(Boolean);
+  let currentUser = useLoginStore.getState().getCurrentUser();
+  return currentUser?.id ? [currentUser.id] : [];
+}
+
+function ForwardUsersDropdown({ selectedForwardIDs, onChangeSelectedForwardIDs }) {
+  const users = useSettingsStore((state) => state.settings?.users) || [];
+  const visibleUsers = users.filter((u) => u.hidden !== true);
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function handleDocClick(e) {
+      if (rootRef.current && !rootRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleDocClick);
+    return () => document.removeEventListener("mousedown", handleDocClick);
+  }, [open]);
+
+  function toggle(id) {
+    let prev = Array.isArray(selectedForwardIDs) ? selectedForwardIDs : [];
+    let next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+    onChangeSelectedForwardIDs(next);
+  }
+
+  let selectedCount = selectedForwardIDs?.length || 0;
+  let currentUserID = useLoginStore.getState().getCurrentUser()?.id;
+  let buttonLabel;
+  if (selectedCount === 0) {
+    buttonLabel = "No one";
+  } else {
+    let names = selectedForwardIDs
+      .map((id) => {
+        if (id === currentUserID) return "You";
+        let u = users.find((x) => x.id === id);
+        if (!u) return null;
+        return (u.first || "") + (u.last ? " " + u.last.charAt(0) + "." : "");
+      })
+      .filter(Boolean);
+    buttonLabel = names.join(", ");
+  }
+
   return (
-    <div className={rowClass} onClick={disabled ? undefined : onToggle}>
-      <div className={boxClass}>
-        {checked && <span className={s.replyOptionsForwardCheckmark}>✓</span>}
-      </div>
-      <span className={s.replyOptionsForwardLabel}>{label}</span>
+    <div className={s.forwardUsersDropdownRoot} ref={rootRef}>
+      <span className={s.forwardUsersDropdownLeadLabel}>Forward to</span>
+      <button
+        type="button"
+        className={s.forwardUsersDropdownBtn}
+        onClick={() => setOpen((v) => !v)}
+      >
+        {buttonLabel}
+        <span className={s.forwardUsersDropdownCaret}>{open ? "▴" : "▾"}</span>
+      </button>
+      {open && (
+        <div className={s.forwardUsersDropdownPanel}>
+          {visibleUsers.length === 0 ? (
+            <div className={s.forwardUsersDropdownEmpty}>No users</div>
+          ) : (
+            visibleUsers.map((u) => {
+              let label = (u.first || "") + (u.last ? " " + u.last.charAt(0) + "." : "");
+              let isChecked = !!(selectedForwardIDs && selectedForwardIDs.includes(u.id));
+              let boxClass = s.forwardUsersDropdownCheckbox + (isChecked ? " " + s["forwardUsersDropdownCheckbox--checked"] : "");
+              return (
+                <div
+                  key={u.id}
+                  className={s.forwardUsersDropdownItem}
+                  onClick={() => toggle(u.id)}
+                >
+                  <div className={boxClass}>
+                    {isChecked && <span className={s.forwardUsersDropdownCheckmark}>✓</span>}
+                  </div>
+                  <span className={s.forwardUsersDropdownLabel}>{label || "Unnamed"}</span>
+                </div>
+              );
+            })
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+function FireButton({ disabled, onFire }) {
+  let cls = s.replyOptionsFireBtn + (disabled ? " " + s["replyOptionsFireBtn--disabled"] : "");
+  return (
+    <Tooltip text="Allow responses and forward" position="top">
+      <button
+        type="button"
+        className={cls}
+        onClick={disabled ? undefined : onFire}
+        disabled={!!disabled}
+      >
+        <ImageDom icon={ICONS.forwardGreen} size={20} style={{ marginRight: 6 }} />
+        Forward
+      </button>
+    </Tooltip>
   );
 }
 
 /**
  * Orange reply options bar that appears after pressing send.
- * Shows: auto-send countdown, can reply yes/no, forward replies checkbox.
+ * Shows: auto-send countdown, can reply yes/no, fire button + forward-users dropdown.
  */
-export function ReplyOptionsBar({ visible, forwardReplies, hasActivePhone, onSelectCanRespond, onToggleForward, onCancel, audioMode, audioUploading, onSendAudio, onDeleteAudio }) {
+export function ReplyOptionsBar({
+  visible,
+  hasActivePhone,
+  onSelectCanRespond,
+  onCancel,
+  audioMode,
+  audioUploading,
+  onSendAudio,
+  onDeleteAudio,
+  selectedForwardIDs,
+  onChangeSelectedForwardIDs,
+  onFire,
+}) {
   const [secondsLeft, setSecondsLeft] = useState(AUTO_SEND_SECONDS);
 
   useEffect(() => {
@@ -75,6 +179,8 @@ export function ReplyOptionsBar({ visible, forwardReplies, hasActivePhone, onSel
   }, [visible, audioMode]);
 
   if (!visible) return null;
+
+  let fireDisabled = !hasActivePhone || !(selectedForwardIDs?.length > 0);
 
   if (audioMode) {
     let sendBtnClass = s.replyOptionsAudioSendBtn + (audioUploading ? " " + s["replyOptionsAudioSendBtn--uploading"] : "");
@@ -104,11 +210,9 @@ export function ReplyOptionsBar({ visible, forwardReplies, hasActivePhone, onSel
               Delete
             </button>
           </div>
-          <ForwardCheckboxRow
-            checked={forwardReplies}
-            disabled={!hasActivePhone}
-            onToggle={onToggleForward}
-            label="Forward replies to me"
+          <ForwardUsersDropdown
+            selectedForwardIDs={selectedForwardIDs}
+            onChangeSelectedForwardIDs={onChangeSelectedForwardIDs}
           />
         </div>
       </div>
@@ -118,7 +222,7 @@ export function ReplyOptionsBar({ visible, forwardReplies, hasActivePhone, onSel
   return (
     <div className={s.replyOptionsBar}>
       <div className={s.replyOptionsHeaderRow}>
-        <span className={s.replyOptionsCountdown}>{`Auto-sending in ${secondsLeft} second${secondsLeft === 1 ? "" : "s"}`}</span>
+        <span className={s.replyOptionsCountdown}>{`Auto-sending (no replies) in ${secondsLeft} seconds`}</span>
         {onCancel && (
           <button type="button" className={s.replyOptionsCancelBtn} onClick={onCancel}>
             Cancel
@@ -127,27 +231,32 @@ export function ReplyOptionsBar({ visible, forwardReplies, hasActivePhone, onSel
       </div>
       <div className={s.replyOptionsCanReplyRow}>
         <span className={s.replyOptionsCanReplyLabel}>Can reply?</span>
-        <TouchableOpacityDom
-          onPress={() => onSelectCanRespond(true)}
-          className={`${s.replyOptionsYesNoBtn} ${s.replyOptionsYesBtn}`}
-          hoverOpacity={0.5}
-        >
-          <ImageDom icon={ICONS.check} size={50} />
-        </TouchableOpacityDom>
-        <TouchableOpacityDom
-          onPress={() => onSelectCanRespond(false)}
-          className={s.replyOptionsYesNoBtn}
-          hoverOpacity={0.5}
-        >
-          <ImageDom icon={ICONS.redx} size={50} />
-        </TouchableOpacityDom>
+        <Tooltip text="Allow replies (no forwarding)" position="top">
+          <TouchableOpacityDom
+            onPress={() => onSelectCanRespond(true)}
+            className={`${s.replyOptionsYesNoBtn} ${s.replyOptionsYesBtn}`}
+            hoverOpacity={0.5}
+          >
+            <ImageDom icon={ICONS.check} size={50} />
+          </TouchableOpacityDom>
+        </Tooltip>
+        <Tooltip text="Nope" position="top">
+          <TouchableOpacityDom
+            onPress={() => onSelectCanRespond(false)}
+            className={s.replyOptionsYesNoBtn}
+            hoverOpacity={0.5}
+          >
+            <ImageDom icon={ICONS.redx} size={50} />
+          </TouchableOpacityDom>
+        </Tooltip>
       </div>
-      <ForwardCheckboxRow
-        checked={forwardReplies}
-        disabled={!hasActivePhone}
-        onToggle={onToggleForward}
-        label="Forward replies"
-      />
+      <div className={s.replyOptionsForwardSection}>
+        <ForwardUsersDropdown
+          selectedForwardIDs={selectedForwardIDs}
+          onChangeSelectedForwardIDs={onChangeSelectedForwardIDs}
+        />
+        <FireButton disabled={fireDisabled} onFire={onFire} />
+      </div>
     </div>
   );
 }

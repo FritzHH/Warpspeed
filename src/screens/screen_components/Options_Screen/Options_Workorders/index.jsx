@@ -39,6 +39,27 @@ export function WorkordersComponent({}) {
     }
     return map;
   }, [zSmsThreads]);
+
+  const lastOutgoingSenderByPhone = useMemo(() => {
+    const map = {};
+    for (const t of zSmsThreads) {
+      if (t.lastOutgoingSenderID) map[t.phone] = t.lastOutgoingSenderID;
+    }
+    return map;
+  }, [zSmsThreads]);
+
+  const zSettingsUsers = useSettingsStore((state) => state.settings?.users);
+  const lastOutgoingSenderNameByPhone = useMemo(() => {
+    const users = zSettingsUsers || [];
+    const map = {};
+    for (const t of zSmsThreads) {
+      if (!t.lastOutgoingSenderID) continue;
+      const u = users.find((x) => x.id === t.lastOutgoingSenderID);
+      if (!u) continue;
+      map[t.phone] = (u.first || "") + (u.last ? " " + u.last.charAt(0) + "." : "");
+    }
+    return map;
+  }, [zSmsThreads, zSettingsUsers]);
   const [sSearchTerm, _setSearchTerm] = useState("");
   const [sOpenedFlash, _setOpenedFlash] = useState("");
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
@@ -63,6 +84,22 @@ export function WorkordersComponent({}) {
       if (saleIDCounts[wo.activeSaleID] > 1) linkedSaleIDs.add(wo.activeSaleID);
     }
   }
+
+  const customerBadgeMap = useMemo(() => {
+    const byCustomer = {};
+    for (const wo of zOpenWorkorders) {
+      if (!wo.customerID) continue;
+      (byCustomer[wo.customerID] = byCustomer[wo.customerID] || []).push(wo);
+    }
+    const map = {};
+    for (const cid in byCustomer) {
+      const list = byCustomer[cid];
+      if (list.length < 2) continue;
+      list.sort((a, b) => (a.startedOnMillis || 0) - (b.startedOnMillis || 0));
+      list.forEach((wo, i) => { map[wo.id] = `${i + 1}/${list.length}`; });
+    }
+    return map;
+  }, [zOpenWorkorders]);
 
   function handleSearchChange(val) {
     _setSearchTerm(val);
@@ -225,6 +262,9 @@ export function WorkordersComponent({}) {
       itemsTabName: TAB_NAMES.itemsTab.workorderItems,
     });
     useTabNamesStore.getState().setMessagesHubMode(false);
+    if (obj.hasNewSMS) {
+      useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.messages);
+    }
     useWorkorderPreviewStore.getState().setPreviewObj(null);
     if (obj.customerID) {
       dbGetCustomer(obj.customerID).then((customer) => {
@@ -245,10 +285,26 @@ export function WorkordersComponent({}) {
 
   const sortedData = useMemo(() => {
     const customerWorkorders = zOpenWorkorders.filter((wo) => !!wo.customerID);
-    if (sSearchTerm.trim()) return filterAndRankWorkorders(customerWorkorders);
-    const statuses = useSettingsStore.getState().settings?.statuses || [];
-    return sortWorkorders(customerWorkorders, statuses, zCurrentUser);
-  }, [zOpenWorkorders, sSearchTerm, zCurrentUser]);
+    let baseSorted;
+    if (sSearchTerm.trim()) {
+      baseSorted = filterAndRankWorkorders(customerWorkorders);
+    } else {
+      const statuses = useSettingsStore.getState().settings?.statuses || [];
+      baseSorted = sortWorkorders(customerWorkorders, statuses, zCurrentUser);
+    }
+    const myID = zCurrentUser?.id;
+    if (!myID) return baseSorted;
+    const bubbled = [];
+    const rest = [];
+    for (const wo of baseSorted) {
+      if (wo.hasNewSMS && lastOutgoingSenderByPhone[wo.customerCell] === myID) {
+        bubbled.push(wo);
+      } else {
+        rest.push(wo);
+      }
+    }
+    return bubbled.concat(rest);
+  }, [zOpenWorkorders, sSearchTerm, zCurrentUser, lastOutgoingSenderByPhone]);
 
   return (
     <div className={styles.container}>
@@ -309,8 +365,10 @@ export function WorkordersComponent({}) {
                 isSelected={workorder.id === zOpenWorkorderID}
                 isPreviewed={workorder.id === zPreviewID}
                 paidAmount={paidAmount}
+                customerBadge={customerBadgeMap[workorder.id] || null}
                 isLinkedSale={!!workorder.activeSaleID && linkedSaleIDs.has(workorder.activeSaleID)}
                 daysSinceLastText={daysSinceLastText}
+                lastOutgoingSenderName={lastOutgoingSenderNameByPhone[(workorder.customerCell || "").replace(/\D/g, "")] || ""}
                 onSelect={workorderSelected}
                 onHoverEnter={onMouseEnter}
                 onHoverExit={onMouseExit}

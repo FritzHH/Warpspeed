@@ -57,8 +57,9 @@ function collectTranslatableText(receipt) {
  * @param {string} [targetLanguage="es"] - ISO language code
  * @returns {Promise<{ translatedReceipt: object, pdfLabels: object }>}
  */
-export async function translateSalesReceipt(receiptObj, targetLanguage) {
+export async function translateSalesReceipt(receiptObj, targetLanguage, opts) {
   if (!targetLanguage) targetLanguage = "es";
+  if (!opts) opts = {};
 
   // 1. Collect dynamic text from the receipt
   var dynamicEntries = collectTranslatableText(receiptObj);
@@ -89,6 +90,9 @@ export async function translateSalesReceipt(receiptObj, targetLanguage) {
   var result = await translateText({
     text: uniqueStrings,
     targetLanguage: targetLanguage,
+    workorderID: opts.workorderID || "",
+    saleID: opts.saleID || "",
+    customerID: opts.customerID || "",
   });
 
   if (!result?.success || !result?.data?.data?.translatedText) {

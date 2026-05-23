@@ -43,6 +43,8 @@
   font-weight: 600;
   color: white;
   flex-shrink: 0;
+  width: 56px;
+  text-align: center;
 }
 
 .modalRow {

@@ -2362,12 +2362,18 @@ const AUTO_TEXT_LANG_NAME_TO_CODE = {
   Arabic: "ar",
 };
 
-async function translateAutoTextIfNeeded(text, languageName) {
+async function translateAutoTextIfNeeded(text, languageName, ctx) {
   if (!text || !languageName) return text;
   let code = AUTO_TEXT_LANG_NAME_TO_CODE[languageName];
   if (!code || code === "en") return text;
   try {
-    let result = await translateText({ text, targetLanguage: code, sourceLanguage: "en" });
+    let result = await translateText({
+      text,
+      targetLanguage: code,
+      sourceLanguage: "en",
+      workorderID: ctx?.workorderID || "",
+      customerID: ctx?.customerID || "",
+    });
     let translated = result?.data?.data?.translatedText;
     if (typeof translated === "string" && translated) return translated;
     if (Array.isArray(translated) && translated[0]) return translated[0];
@@ -2401,7 +2407,10 @@ function removePendingAutoText(id) {
 async function executeAutoText(msg) {
   try {
     if (msg.smsMessage && msg.customerCell) {
-      const finalSmsMessage = await translateAutoTextIfNeeded(msg.smsMessage, msg.customerLanguage);
+      const finalSmsMessage = await translateAutoTextIfNeeded(msg.smsMessage, msg.customerLanguage, {
+        workorderID: msg.workorderID || "",
+        customerID: msg.customerID || "",
+      });
 
       // Reuse a pre-assigned ID when present so the optimistic placeholder
       // and the eventual Firestore-listener message share the same id and
@@ -2432,6 +2441,7 @@ async function executeAutoText(msg) {
         message: finalSmsMessage,
         phoneNumber: msg.customerCell,
         customerID: msg.customerID || "",
+        workorderID: msg.workorderID || "",
         id: smsID,
       });
 
@@ -2446,7 +2456,10 @@ async function executeAutoText(msg) {
       }
     }
     if (msg.emailSubject && msg.emailBody && msg.customerEmail) {
-      await dbSendEmail(msg.customerEmail, msg.emailSubject, msg.emailBody);
+      await dbSendEmail(msg.customerEmail, msg.emailSubject, msg.emailBody, undefined, {
+        workorderID: msg.workorderID || "",
+        customerID: msg.customerID || "",
+      });
     }
   } catch (e) {
     console.log("Error executing auto-text:", e);

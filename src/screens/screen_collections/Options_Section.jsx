@@ -39,6 +39,11 @@ const PayrollModal = lazy(() =>
     default: m.PayrollModal,
   }))
 );
+const UserMessagesModal = lazy(() =>
+  import("../screen_components/modal_screens/UserMessagesModal").then((m) => ({
+    default: m.UserMessagesModal,
+  }))
+);
 import { getWeekStart, formatTimeShort, getStoreHoursForDayIndex } from "../screen_components/modal_screens/scheduleUtils";
 import { preloadItemsEmailView } from "./Items_Section";
 import dayjs from "dayjs";
@@ -52,6 +57,7 @@ export const Options_Section = React.memo(({}) => {
   // local state
   const [sShowPayroll, _setShowPayroll] = useState(false);
   const [sShowUserClockModal, _setShowUserClockModal] = useState(false);
+  const [sShowUserMessages, _setShowUserMessages] = useState(false);
 
   //////////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////////
@@ -107,7 +113,16 @@ export const Options_Section = React.memo(({}) => {
             _setShowUserClockModal(false);
             _setShowPayroll(true);
           }}
+          handleOpenMessages={() => {
+            _setShowUserClockModal(false);
+            _setShowUserMessages(true);
+          }}
         />
+      )}
+      {sShowUserMessages && (
+        <Suspense fallback={null}>
+          <UserMessagesModal handleExit={() => _setShowUserMessages(false)} />
+        </Suspense>
       )}
     </div>
   );
@@ -123,6 +138,24 @@ export const TabBar = ({
   const zCameraError = useLoginStore((state) => state.cameraError);
   const zPrinters = useSettingsStore((state) => state.settings?.printers);
   const zUseFacialRecognition = useSettingsStore((state) => state.settings?.useFacialRecognition !== false);
+  const zInAppMessages = useLoginStore((state) => state.inAppMessages) || {};
+  const zManagerNotes = useLoginStore((state) => state.managerNotes) || {};
+
+  let userUnreadCount = 0;
+  let managerUnreadCount = 0;
+  if (zCurrentUser?.id) {
+    userUnreadCount = Object.values(zInAppMessages).filter((m) => {
+      if (!m) return false;
+      if (m.fromUserID === zCurrentUser.id) return false;
+      if (m.deletedBy?.[zCurrentUser.id]) return false;
+      if (!(m.toUserIDs || []).includes(zCurrentUser.id)) return false;
+      return !m.readBy?.[zCurrentUser.id];
+    }).length;
+    if ((zCurrentUser?.permissions?.level || 0) >= 3) {
+      managerUnreadCount = Object.values(zManagerNotes).filter((n) => n && !n.read).length;
+    }
+  }
+  let totalUnreadCount = userUnreadCount + managerUnreadCount;
   // local state /////////////////////////////////////////////////////////////////////////
   const [sIsOnline, _setIsOnline] = useState(true);
   const [sShowCameraPreview, _sSetShowCameraPreview] = useState(false);
@@ -181,6 +214,11 @@ export const TabBar = ({
                 (zCurrentUser?.last?.length >= 0 ? zCurrentUser.last[0] : "") +
                 "."}
             </span>
+            {totalUnreadCount > 0 && (
+              <span className={tabBarStyles.userUnreadBadge}>
+                {totalUnreadCount > 99 ? "99+" : totalUnreadCount}
+              </span>
+            )}
           </button>
         </div>
       </Tooltip>
@@ -428,11 +466,32 @@ function ScheduleWeekRow({ label, user, weekStart, schedules, storeHours, todayS
   );
 }
 
-const UserClockModal = ({ user, handleExit, handleViewHistory }) => {
+const UserClockModal = ({ user, handleExit, handleViewHistory, handleOpenMessages }) => {
   const zPunchClock = useLoginStore((state) => state.punchClock);
   const settings = useSettingsStore((state) => state.settings);
   const storeHours = settings?.storeHours;
   const schedules = settings?.schedules;
+  const zInAppMessages = useLoginStore((state) => state.inAppMessages) || {};
+  const [sNoteText, _setNoteText] = useState("");
+  const [sNoteSent, _setNoteSent] = useState(false);
+
+  let unreadMsgCount = Object.values(zInAppMessages).filter((m) => {
+    if (!m) return false;
+    if (m.fromUserID === user?.id) return false;
+    if (m.deletedBy?.[user?.id]) return false;
+    if (!(m.toUserIDs || []).includes(user?.id)) return false;
+    return !m.readBy?.[user?.id];
+  }).length;
+
+  function handleSendNote() {
+    let trimmed = (sNoteText || "").trim();
+    if (!trimmed) return;
+    let authorName = ((user?.first || "") + " " + (user?.last || "")).trim();
+    useLoginStore.getState().setAddManagerNote(user.id, trimmed, authorName, "punch_forgot");
+    _setNoteText("");
+    _setNoteSent(true);
+    setTimeout(() => _setNoteSent(false), 3000);
+  }
 
   let isClockedIn = zPunchClock[user?.id];
   let millis = new Date().getTime();
@@ -501,6 +560,21 @@ const UserClockModal = ({ user, handleExit, handleViewHistory }) => {
         onClick={handleExit}
       />
       <div className={styles.modalCard}>
+        {/* ─── top-right notes button row ─────────────────────── */}
+        <div className={styles.modalTopRow}>
+          <button
+            type="button"
+            className={styles.notesBtn}
+            onClick={handleOpenMessages}
+          >
+            APP MESSAGING
+            {unreadMsgCount > 0 && (
+              <span className={styles.notesBadge}>
+                {unreadMsgCount > 99 ? "99+" : unreadMsgCount}
+              </span>
+            )}
+          </button>
+        </div>
         {/* ─── title + clock status ───────────────────────────── */}
         <p className={styles.modalTitle}>PUNCH CLOCK</p>
         <p className={styles.modalClockMessage} style={{ color: C.textDisabled }}>
@@ -539,26 +613,80 @@ const UserClockModal = ({ user, handleExit, handleViewHistory }) => {
         </div>
 
         {/* ─── schedule: this week + next week ────────────────── */}
+        {(() => {
+          function userHasShifts(weekStart) {
+            let weekShifts = schedules?.[weekStart]?.shifts || {};
+            let prefix = `${user?.id}_`;
+            return Object.keys(weekShifts).some((k) => k.startsWith(prefix) && weekShifts[k]);
+          }
+          let showThis = userHasShifts(thisWeekStart);
+          let showNext = userHasShifts(nextWeekStart);
+          if (!showThis && !showNext) return null;
+          return (
+            <div
+              className={styles.scheduleWrap}
+              style={{ borderTopColor: C.borderSubtle }}
+            >
+              {showThis && (
+                <ScheduleWeekRow
+                  label="This Week"
+                  user={user}
+                  weekStart={thisWeekStart}
+                  schedules={schedules}
+                  storeHours={storeHours}
+                  todayStr={todayStr}
+                />
+              )}
+              {showNext && (
+                <ScheduleWeekRow
+                  label="Next Week"
+                  user={user}
+                  weekStart={nextWeekStart}
+                  schedules={schedules}
+                  storeHours={storeHours}
+                  todayStr={todayStr}
+                />
+              )}
+            </div>
+          );
+        })()}
+
+        {/* ─── note to manager ────────────────────────────────── */}
         <div
-          className={styles.scheduleWrap}
+          className={styles.noteWrap}
           style={{ borderTopColor: C.borderSubtle }}
         >
-          <ScheduleWeekRow
-            label="This Week"
-            user={user}
-            weekStart={thisWeekStart}
-            schedules={schedules}
-            storeHours={storeHours}
-            todayStr={todayStr}
+          <span className={styles.noteHeader} style={{ color: C.textMuted }}>
+            Note to Manager
+          </span>
+          <span className={styles.noteSubtitle} style={{ color: C.textMuted }}>
+            Forgot to punch in or out? Let your manager know.
+          </span>
+          <textarea
+            className={styles.noteTextarea}
+            value={sNoteText}
+            onChange={(e) => {
+              let val = e.target.value;
+              if (val.length > 0) val = val.charAt(0).toUpperCase() + val.slice(1);
+              _setNoteText(val);
+            }}
+            placeholder="e.g. Forgot to clock in at 8:00 AM today"
+            style={{ borderColor: C.borderSubtle, color: C.text, backgroundColor: C.surfaceBase }}
           />
-          <ScheduleWeekRow
-            label="Next Week"
-            user={user}
-            weekStart={nextWeekStart}
-            schedules={schedules}
-            storeHours={storeHours}
-            todayStr={todayStr}
-          />
+          <div className={styles.noteFooter}>
+            <span className={styles.noteConfirmation} style={{ color: sNoteSent ? C.green : "transparent" }}>
+              Sent to manager
+            </span>
+            <button
+              type="button"
+              className={styles.noteSendBtn}
+              disabled={!sNoteText.trim()}
+              onClick={handleSendNote}
+              style={{ borderColor: C.green, color: C.green }}
+            >
+              SEND
+            </button>
+          </div>
         </div>
       </div>
     </div>,

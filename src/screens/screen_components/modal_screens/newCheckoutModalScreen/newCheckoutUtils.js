@@ -431,6 +431,8 @@ export function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate
     customerEmail: customer?.email || "",
     customerCell: customer?.customerCell || "",
     customerID: customer?.id || "",
+    saleID: sale?.id || "",
+    workorderID: workorder?.id || "",
     templateVars: {
       firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
       storeName: settings?.storeInfo?.displayName || "our store",
@@ -443,7 +445,7 @@ export function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate
 
 // ─── Send Refund Receipt (SMS + Email) ────────────────────────
 
-export function sendRefundReceipt(refundReceiptData, customer, settings, smsTemplate, emailTemplate) {
+export function sendRefundReceipt(refundReceiptData, customer, settings, smsTemplate, emailTemplate, opts = {}) {
   dlog(DCAT.RECEIPT, "sendRefundReceipt_start", "CheckoutUtils", { hasCustomer: !!customer });
   if (!refundReceiptData || !settings) return;
   const { tenantID, storeID } = useSettingsStore.getState().getSettings();
@@ -458,6 +460,8 @@ export function sendRefundReceipt(refundReceiptData, customer, settings, smsTemp
     customerEmail: customer?.email || "",
     customerCell: customer?.customerCell || "",
     customerID: customer?.id || "",
+    saleID: opts?.saleID || "",
+    workorderID: opts?.workorderID || "",
     templateVars: {
       firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
       storeName: settings?.storeInfo?.displayName || "our store",

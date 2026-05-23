@@ -224,6 +224,7 @@ export const EmailOptionsPanel = React.memo(() => {
   }
 
   function optimisticLabelUpdate(messageIds, addLabelIds, removeLabelIds) {
+    useEmailStore.getState().addPendingLabelMods(messageIds, addLabelIds, removeLabelIds);
     const updated = zEmails.map((e) => {
       if (!messageIds.includes(e.id)) return e;
       let labels = [...(e.labelIds || [])];

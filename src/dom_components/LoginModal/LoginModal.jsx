@@ -2,7 +2,7 @@ import React, { forwardRef, useState, useRef, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { C, Fonts, ICONS } from "../../styles";
 import { deepEqual, localStorageWrapper } from "../../utils";
-import { PRIVILEDGE_LEVELS } from "../../data";
+import { permissionToLevel } from "../../data";
 import { useLoginStore, useSettingsStore, useAlertScreenStore } from "../../stores";
 import { LOCAL_DB_KEYS, PAUSE_USER_CLOCK_IN_CHECK_MILLIS } from "../../constants";
 import styles from "./LoginModal.module.css";
@@ -21,7 +21,13 @@ export const LoginModal = forwardRef(function LoginModal(
   const [sPin, _setPin] = useState("");
   const [sError, _setError] = useState("");
   const [sSuccess, _setSuccess] = useState(false);
+  const [sExpandedTo4, _setExpandedTo4] = useState(false);
   const pinInputRef = useRef(null);
+
+  const requiredLevel = permissionToLevel(zAdminPrivilege);
+  const adminEntryRequired = requiredLevel >= 4;
+  const effectivePinLength = (sExpandedTo4 || adminEntryRequired) ? 4 : zPinStrength;
+  const showLockToggle = zPinStrength < 4 && !adminEntryRequired;
 
   useEffect(() => {
     if (!modalVisible || sSuccess) return;
@@ -33,18 +39,7 @@ export const LoginModal = forwardRef(function LoginModal(
       let diff = (Date.now() - store.lastActionMillis) / 1000;
       if (diff > timeout) return;
       if (store.adminPrivilege) {
-        let perm = user.permissions?.name || user.permissions;
-        let level = store.adminPrivilege;
-        let hasAccess = false;
-        if (level === PRIVILEDGE_LEVELS.user) hasAccess = true;
-        if (level === PRIVILEDGE_LEVELS.superUser &&
-          (perm === PRIVILEDGE_LEVELS.superUser || perm === PRIVILEDGE_LEVELS.admin || perm === PRIVILEDGE_LEVELS.owner))
-          hasAccess = true;
-        if (level === PRIVILEDGE_LEVELS.admin &&
-          (perm === PRIVILEDGE_LEVELS.admin || perm === PRIVILEDGE_LEVELS.owner))
-          hasAccess = true;
-        if (level === PRIVILEDGE_LEVELS.owner && perm === PRIVILEDGE_LEVELS.owner)
-          hasAccess = true;
+        let hasAccess = permissionToLevel(user.permissions) >= permissionToLevel(store.adminPrivilege);
         if (!hasAccess) return;
       }
       clearInterval(interval);
@@ -69,24 +64,12 @@ export const LoginModal = forwardRef(function LoginModal(
     let userObj = zUsers?.find((u) => u.pin == input);
     if (!userObj) userObj = zUsers?.find((u) => u.alternatePin == input);
     if (!userObj) {
-      if (input.length >= zPinStrength) _setPin("");
+      if (input.length >= effectivePinLength) _setPin("");
       return;
     }
 
     if (zAdminPrivilege) {
-      let level = zAdminPrivilege;
-      let perm = userObj.permissions?.name || userObj.permissions;
-      let hasAccess = false;
-      if (level === PRIVILEDGE_LEVELS.user) hasAccess = true;
-      if (level === PRIVILEDGE_LEVELS.superUser &&
-        (perm === PRIVILEDGE_LEVELS.superUser || perm === PRIVILEDGE_LEVELS.admin || perm === PRIVILEDGE_LEVELS.owner))
-        hasAccess = true;
-      if (level === PRIVILEDGE_LEVELS.admin &&
-        (perm === PRIVILEDGE_LEVELS.admin || perm === PRIVILEDGE_LEVELS.owner))
-        hasAccess = true;
-      if (level === PRIVILEDGE_LEVELS.owner && perm === PRIVILEDGE_LEVELS.owner)
-        hasAccess = true;
-
+      let hasAccess = permissionToLevel(userObj.permissions) >= permissionToLevel(zAdminPrivilege);
       if (!hasAccess) {
         _setError("Insufficient permissions");
         return;
@@ -99,7 +82,30 @@ export const LoginModal = forwardRef(function LoginModal(
     _setError("");
     useLoginStore.getState().setShowLoginScreen(false);
     useLoginStore.getState().runPostLoginFunction();
+    runPostLoginChain(userObj);
+  }
+
+  function runPostLoginChain(userObj) {
+    let steps = [
+      (next) => maybeOpenMessagesModal(userObj, next),
+      (next) => maybePromptClockIn(userObj, next),
+    ];
+    let i = 0;
+    function runNext() {
+      if (i >= steps.length) return;
+      let step = steps[i++];
+      step(() => setTimeout(runNext, 150));
+    }
+    runNext();
+  }
+
+  function maybeOpenMessagesModal(userObj, next) {
+    useLoginStore.getState().triggerLoginMessagesAutoOpen(userObj, next);
+  }
+
+  function maybePromptClockIn(userObj, next) {
     promptClockInIfNeeded(userObj);
+    next();
   }
 
   function promptClockInIfNeeded(userObj) {
@@ -144,7 +150,7 @@ export const LoginModal = forwardRef(function LoginModal(
       data-testid={testId}
       role="dialog"
       aria-modal="true"
-      aria-label={zAdminPrivilege ? "Authorization Required" : "Login"}
+      aria-label={zAdminPrivilege ? "Admin Login" : "Login"}
     >
       <div
         className={styles.card}
@@ -160,8 +166,28 @@ export const LoginModal = forwardRef(function LoginModal(
             className={styles.title}
             style={{ color: sSuccess ? "white" : C.text }}
           >
-            {sSuccess ? "Welcome!" : zAdminPrivilege ? "Authorization Required" : "Login"}
+            {sSuccess ? "Welcome!" : zAdminPrivilege ? "Admin Login" : "Login"}
           </span>
+          {!sSuccess && showLockToggle && (
+            <button
+              type="button"
+              className={styles.lockToggle}
+              onClick={(e) => {
+                e.stopPropagation();
+                _setExpandedTo4((v) => !v);
+                _setPin("");
+                _setError("");
+                pinInputRef.current?.focus();
+              }}
+              aria-label={sExpandedTo4 ? "Use standard PIN length" : "Use 4-digit admin PIN"}
+            >
+              <img
+                src={resolveIcon(sExpandedTo4 ? ICONS.unblock : ICONS.blocked)}
+                alt=""
+                style={{ width: 22, height: 22 }}
+              />
+            </button>
+          )}
         </div>
 
         {/* Privilege badge */}
@@ -181,7 +207,7 @@ export const LoginModal = forwardRef(function LoginModal(
               className={styles.pinBoxes}
               onClick={() => pinInputRef.current?.focus()}
             >
-              {Array.from({ length: zPinStrength }).map((_, i) => {
+              {Array.from({ length: effectivePinLength }).map((_, i) => {
                 const isFilled = i < sPin.length;
                 const isCursor = i === sPin.length;
                 return (
@@ -206,10 +232,10 @@ export const LoginModal = forwardRef(function LoginModal(
                 autoFocus={true}
                 value={sPin}
                 onChange={(e) => {
-                  const clean = e.target.value.replace(/\D/g, "").slice(0, zPinStrength);
+                  const clean = e.target.value.replace(/\D/g, "").slice(0, effectivePinLength);
                   handlePinChange(clean);
                 }}
-                maxLength={zPinStrength}
+                maxLength={effectivePinLength}
                 className={styles.hiddenInput}
               />
             </div>

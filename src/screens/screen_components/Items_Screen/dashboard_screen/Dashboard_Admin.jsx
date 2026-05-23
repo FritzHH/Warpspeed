@@ -35,7 +35,7 @@ import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen
 import { C, COLOR_GRADIENTS, Fonts, ICONS, Z } from "../../../../styles";
 import defaultLogo from "../../../../resources/default_app_logo_large.png";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
-import { APP_USER, COLORS, INTAKE_QUICK_BUTTON_PROTO, NOTE_HELPER_PROTO, NOTE_HELPER_ITEM_PROTO, QUICK_CUSTOMER_NOTE_PROTO, QUICK_CUSTOMER_NOTE_ITEM_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT } from "../../../../data";
+import { APP_USER, COLORS, INTAKE_QUICK_BUTTON_PROTO, NOTE_HELPER_PROTO, NOTE_HELPER_ITEM_PROTO, QUICK_CUSTOMER_NOTE_PROTO, QUICK_CUSTOMER_NOTE_ITEM_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT, levelToPrivilegeName } from "../../../../data";
 import { useCallback } from "react";
 import { ColorWheel } from "../../../../ColorWheel";
 const UserClockHistoryModal = lazy(() =>
@@ -55,6 +55,11 @@ const PayrollModal = lazy(() =>
 );
 const ScheduleModal = lazy(() =>
   import("../../modal_screens/ScheduleModal").then((m) => ({ default: m.ScheduleModal }))
+);
+const AnalyticsModalScreen = lazy(() =>
+  import("../../modal_screens/AnalyticsModalScreen/AnalyticsModalScreen").then((m) => ({
+    default: m.AnalyticsModalScreen,
+  }))
 );
 import { TodaysHistoryComponent } from "./TodaysHistoryComponent";
 import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection, dbSaveInventoryItem, dbGmailDisconnect, dbGmailInitiateAuth } from "../../../../db_calls_wrapper";
@@ -93,6 +98,27 @@ const TAB_NAMES = {
   import: "Import",
   backup: "Backup & Recovery",
   labelDesigner: "Label Designer",
+  analytics: "Analytics",
+};
+
+const TAB_GATES = {
+  [TAB_NAMES.sales]: 1,
+  [TAB_NAMES.todaysHistory]: 1,
+  [TAB_NAMES.payments]: 1,
+  [TAB_NAMES.labelDesigner]: 2,
+  [TAB_NAMES.ordering]: 2,
+  [TAB_NAMES.quickItems]: 2,
+  [TAB_NAMES.payroll]: 3,
+  [TAB_NAMES.schedule]: 3,
+  [TAB_NAMES.statuses]: 3,
+  [TAB_NAMES.lists]: 3,
+  [TAB_NAMES.analytics]: 4,
+  [TAB_NAMES.users]: 4,
+  [TAB_NAMES.storeInfo]: 4,
+  [TAB_NAMES.textTemplates]: 4,
+  [TAB_NAMES.emailTemplates]: 4,
+  [TAB_NAMES.import]: 4,
+  [TAB_NAMES.backup]: 4,
 };
 
 export function Dashboard_Admin({}) {
@@ -100,18 +126,21 @@ export function Dashboard_Admin({}) {
   const zSettingsObj = useSettingsStore((state) => state.settings);
   const zLiveReaders = useStripePaymentStore((state) => state.readersArr) || [];
   const zCurrentUserLevel = useLoginStore((state) => state.currentUser?.permissions?.level || 0);
-  const sMenuLocked = zCurrentUserLevel < 4;
+  const guardedMenuPress = (action, level = 3) => () =>
+    useLoginStore.getState().execute(action, levelToPrivilegeName(level));
   // local state ///////////////////////////////////////////////////////////
   const [sFacialRecognitionModalUserObj, _setFacialRecognitionModalUserObj] =
     useState(false);
   const [sPunchClockUserObj, _setPunchClockUserObj] = useState(null);
   const [sShowSalesReportModal, _setShowSalesReportModal] = useState(false);
   const [sShowPayrollModal, _setShowPayrollModal] = useState(false);
+  const [sPayrollPreselectUserObj, _setPayrollPreselectUserObj] = useState(null);
   const [sShowScheduleModal, _setShowScheduleModal] = useState(false);
   const sExpand = useTabNamesStore((state) => state.getDashboardExpand());
   const _setExpand = useTabNamesStore((state) => state.setDashboardExpand);
   const [sStandEditButtonObj, _setStandEditButtonObj] = useState(null);
   const [sShowLabelDesigner, _setShowLabelDesigner] = useState(false);
+  const [sShowAnalyticsModal, _setShowAnalyticsModal] = useState(false);
 
   //////////////////////////////////////////////////////////////////////////
 
@@ -123,12 +152,15 @@ export function Dashboard_Admin({}) {
     } else {
       userArr = liveUsers.map((o) => {
         if (o.id === userObj.id) {
-          return { ...userObj, faceDescriptor: o.faceDescriptor };
+          return { ...userObj };
         }
         return o;
       });
     }
     useSettingsStore.getState().setField("users", userArr);
+    if (isNewUser) {
+      useLoginStore.getState().setSendWelcomeMessageToUser(userObj);
+    }
   }
 
   function handleRemoveUserPress(userObj) {
@@ -173,22 +205,33 @@ export function Dashboard_Admin({}) {
           />
         </Suspense>
       )}
-      {!!sShowSalesReportModal && (
+      {!!sShowSalesReportModal && zCurrentUserLevel >= TAB_GATES[TAB_NAMES.sales] && (
         <Suspense fallback={null}>
           <SalesReportsModal handleExit={() => _setShowSalesReportModal(false)} />
         </Suspense>
       )}
-      {!!sShowPayrollModal && (
+      {!!sShowPayrollModal && zCurrentUserLevel >= TAB_GATES[TAB_NAMES.payroll] && (
         <Suspense fallback={null}>
-          <PayrollModal handleExit={() => _setShowPayrollModal(false)} />
+          <PayrollModal
+            handleExit={() => {
+              _setShowPayrollModal(false);
+              _setPayrollPreselectUserObj(null);
+            }}
+            preselectedUser={sPayrollPreselectUserObj}
+          />
         </Suspense>
       )}
-      {!!sShowScheduleModal && (
+      {!!sShowScheduleModal && zCurrentUserLevel >= TAB_GATES[TAB_NAMES.schedule] && (
         <Suspense fallback={null}>
           <ScheduleModal handleExit={() => _setShowScheduleModal(false)} />
         </Suspense>
       )}
-      {!!sShowLabelDesigner && (
+      {!!sShowAnalyticsModal && zCurrentUserLevel >= TAB_GATES[TAB_NAMES.analytics] && (
+        <Suspense fallback={null}>
+          <AnalyticsModalScreen handleExit={() => _setShowAnalyticsModal(false)} />
+        </Suspense>
+      )}
+      {!!sShowLabelDesigner && zCurrentUserLevel >= TAB_GATES[TAB_NAMES.labelDesigner] && (
         <LabelDesignerModal
           handleExit={() => _setShowLabelDesigner(false)}
           handleSettingsFieldChange={handleSettingsFieldChange}
@@ -218,258 +261,60 @@ export function Dashboard_Admin({}) {
           }}
         >
           <div className={adminStyles.tabBarInner}>
-            {/************************* settings list names ****************** */}
-            {/****************** sales report modal *****************************/}
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.sales}
-              handleExpandPress={() => _setShowSalesReportModal(true)}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.sales ? 500 : null,
-                color: sExpand === TAB_NAMES.sales ? C.green : C.textSecondary,
-              }}
-              text={TAB_NAMES.sales}
-              icon={ICONS.dollarYellow}
-              iconSize={25}
-            />
-            <VerticalSpacer />
-            {/****************** today's history tab *****************************/}
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.todaysHistory}
-              handleExpandPress={() =>
-                _setExpand(sExpand === TAB_NAMES.todaysHistory ? null : TAB_NAMES.todaysHistory)
-              }
-              style={{
-                fontWeight: sExpand === TAB_NAMES.todaysHistory ? 500 : null,
-                color: sExpand === TAB_NAMES.todaysHistory ? C.green : C.textSecondary,
-              }}
-              text={TAB_NAMES.todaysHistory}
-              icon={ICONS.clock}
-              iconSize={25}
-            />
-            <VerticalSpacer />
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.payments}
-              handleExpandPress={() => {
-                let opening = sExpand !== TAB_NAMES.payments;
-                _setExpand(opening ? TAB_NAMES.payments : null);
-                if (opening) {
+            {(() => {
+              const menuItems = [
+                { key: "sales", label: TAB_NAMES.sales, icon: ICONS.dollarYellow, iconSize: 25, gate: TAB_GATES[TAB_NAMES.sales], onClick: () => _setShowSalesReportModal(true) },
+                { key: "labelDesigner", label: TAB_NAMES.labelDesigner, icon: ICONS.print, gate: TAB_GATES[TAB_NAMES.labelDesigner], onClick: () => _setShowLabelDesigner(true) },
+                { key: "payroll", label: TAB_NAMES.payroll, icon: ICONS.greenDollar, iconSize: 25, gate: TAB_GATES[TAB_NAMES.payroll], onClick: () => _setShowPayrollModal(true) },
+                { key: "schedule", label: TAB_NAMES.schedule, icon: ICONS.clock, iconSize: 22, gate: TAB_GATES[TAB_NAMES.schedule], onClick: () => _setShowScheduleModal(true) },
+                { key: "analytics", label: TAB_NAMES.analytics, icon: ICONS.greenDollar, iconSize: 25, gate: TAB_GATES[TAB_NAMES.analytics], onClick: () => _setShowAnalyticsModal(true) },
+                { key: "todaysHistory", label: TAB_NAMES.todaysHistory, icon: ICONS.clock, iconSize: 25, gate: TAB_GATES[TAB_NAMES.todaysHistory], tab: TAB_NAMES.todaysHistory },
+                { key: "payments", label: TAB_NAMES.payments, icon: ICONS.paymentProcessing, gate: TAB_GATES[TAB_NAMES.payments], tab: TAB_NAMES.payments, onOpen: () => {
                   newCheckoutGetStripeReaders().then((result) => {
                     let arr = result?.data?.data || [];
                     useStripePaymentStore.getState().setReadersArr(arr);
                   }).catch(() => { });
-                }
-              }}
-              text={TAB_NAMES.payments}
-              icon={ICONS.paymentProcessing}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.payments ? 500 : null,
-
-                color: sExpand === TAB_NAMES.payments ? C.green : C.textSecondary,
-              }}
-            />
-            <VerticalSpacer />
-            {/****************** ordering tab***********************************/}
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.ordering}
-              handleExpandPress={() =>
-                _setExpand(
-                  sExpand === TAB_NAMES.ordering ? null : TAB_NAMES.ordering
-                )
-              }
-              style={{
-                fontWeight: sExpand === TAB_NAMES.ordering ? 500 : null,
-                color: sExpand === TAB_NAMES.ordering ? C.green : C.textSecondary,
-              }}
-              text={TAB_NAMES.ordering}
-              icon={ICONS.ordering}
-            />
-            <VerticalSpacer />
-            {/****************** label designer *****************************/}
-            <MenuListLabelComponent
-              handleExpandPress={() => _setShowLabelDesigner(true)}
-              text={TAB_NAMES.labelDesigner}
-              icon={ICONS.print}
-            />
-            <VerticalSpacer />
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.users}
-              handleExpandPress={() =>
-                _setExpand(sExpand === TAB_NAMES.users ? null : TAB_NAMES.users)
-              }
-              text={TAB_NAMES.users}
-              icon={ICONS.userControl}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.users ? 500 : null,
-                color: sExpand === TAB_NAMES.users ? C.green : C.textSecondary,
-              }}
-              disabled={sMenuLocked}
-            />
-            <VerticalSpacer />
-            {/****************** payroll modal *****************************/}
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.payroll}
-              handleExpandPress={() => _setShowPayrollModal(true)}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.payroll ? 500 : null,
-                color: sExpand === TAB_NAMES.payroll ? C.green : C.textSecondary,
-              }}
-              text={TAB_NAMES.payroll}
-              icon={ICONS.greenDollar}
-              iconSize={25}
-              disabled={sMenuLocked}
-            />
-            <VerticalSpacer />
-            {/****************** schedule modal ****************************/}
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.schedule}
-              handleExpandPress={() => _setShowScheduleModal(true)}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.schedule ? 500 : null,
-                color: sExpand === TAB_NAMES.schedule ? C.green : C.textSecondary,
-              }}
-              text={TAB_NAMES.schedule}
-              icon={ICONS.clock}
-              iconSize={22}
-              disabled={sMenuLocked}
-            />
-            <VerticalSpacer />
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.quickItems}
-              handleExpandPress={() =>
-                _setExpand(
-                  sExpand === TAB_NAMES.quickItems ? null : TAB_NAMES.quickItems
-                )
-              }
-              text={TAB_NAMES.quickItems}
-              icon={ICONS.quickItemButton}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.quickItems ? 500 : null,
-                color: sExpand === TAB_NAMES.quickItems ? C.green : C.textSecondary,
-              }}
-              disabled={sMenuLocked}
-            />
-            <VerticalSpacer />
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.statuses}
-              handleExpandPress={() =>
-                _setExpand(
-                  sExpand === TAB_NAMES.statuses ? null : TAB_NAMES.statuses
-                )
-              }
-              text={TAB_NAMES.statuses}
-              icon={ICONS.workorderStatuses}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.statuses ? 500 : null,
-
-                color: sExpand === TAB_NAMES.statuses ? C.green : C.textSecondary,
-              }}
-              disabled={sMenuLocked}
-            />
-            <VerticalSpacer />
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.lists}
-              handleExpandPress={() =>
-                _setExpand(sExpand === TAB_NAMES.lists ? null : TAB_NAMES.lists)
-              }
-              icon={ICONS.listsAndOptions}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.lists ? 500 : null,
-
-                color: sExpand === TAB_NAMES.lists ? C.green : C.textSecondary,
-              }}
-              text={TAB_NAMES.lists}
-              disabled={sMenuLocked}
-            />
-            <VerticalSpacer />
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.storeInfo}
-              handleExpandPress={() =>
-                _setExpand(
-                  sExpand === TAB_NAMES.storeInfo ? null : TAB_NAMES.storeInfo
-                )
-              }
-              icon={ICONS.storeInfo}
-              style={{
-                fontWeight: sExpand === TAB_NAMES.storeInfo ? 500 : null,
-                color: sExpand === TAB_NAMES.storeInfo ? C.green : C.textSecondary,
-              }}
-              text={TAB_NAMES.storeInfo}
-              disabled={sMenuLocked}
-            />
-            <VerticalSpacer />
-            {/****************** text templates tab *****************************/}
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.textTemplates}
-              handleExpandPress={() =>
-                _setExpand(
-                  sExpand === TAB_NAMES.textTemplates
-                    ? null
-                    : TAB_NAMES.textTemplates
-                )
-              }
-              style={{
-                fontWeight: sExpand === TAB_NAMES.textTemplates ? 500 : null,
-                color:
-                  sExpand === TAB_NAMES.textTemplates ? C.green : C.textSecondary,
-              }}
-              text={TAB_NAMES.textTemplates}
-              icon={ICONS.notes}
-              disabled={sMenuLocked}
-            />
-            <VerticalSpacer />
-            {/****************** email templates tab *****************************/}
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.emailTemplates}
-              handleExpandPress={() =>
-                _setExpand(
-                  sExpand === TAB_NAMES.emailTemplates
-                    ? null
-                    : TAB_NAMES.emailTemplates
-                )
-              }
-              style={{
-                fontWeight: sExpand === TAB_NAMES.emailTemplates ? 500 : null,
-                color:
-                  sExpand === TAB_NAMES.emailTemplates ? C.green : C.textSecondary,
-              }}
-              text={TAB_NAMES.emailTemplates}
-              icon={ICONS.notes}
-              disabled={sMenuLocked}
-            />
-            <VerticalSpacer />
-            {/****************** import tab *****************************/}
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.import}
-              handleExpandPress={() =>
-                _setExpand(
-                  sExpand === TAB_NAMES.import ? null : TAB_NAMES.import
-                )
-              }
-              style={{
-                fontWeight: sExpand === TAB_NAMES.import ? 500 : null,
-                color: sExpand === TAB_NAMES.import ? C.green : C.textSecondary,
-              }}
-              text={TAB_NAMES.import}
-              icon={ICONS.importIcon}
-              disabled={sMenuLocked}
-            />
-            <VerticalSpacer />
-            {/****************** backup & recovery tab *****************************/}
-            <MenuListLabelComponent
-              selected={sExpand === TAB_NAMES.backup}
-              handleExpandPress={() =>
-                _setExpand(
-                  sExpand === TAB_NAMES.backup ? null : TAB_NAMES.backup
-                )
-              }
-              style={{
-                fontWeight: sExpand === TAB_NAMES.backup ? 500 : null,
-                color: sExpand === TAB_NAMES.backup ? C.green : C.textSecondary,
-              }}
-              text={TAB_NAMES.backup}
-              icon={ICONS.tools}
-              disabled={sMenuLocked}
-            />
+                } },
+                { key: "ordering", label: TAB_NAMES.ordering, icon: ICONS.ordering, gate: TAB_GATES[TAB_NAMES.ordering], tab: TAB_NAMES.ordering },
+                { key: "users", label: TAB_NAMES.users, icon: ICONS.userControl, gate: TAB_GATES[TAB_NAMES.users], tab: TAB_NAMES.users },
+                { key: "quickItems", label: TAB_NAMES.quickItems, icon: ICONS.quickItemButton, gate: TAB_GATES[TAB_NAMES.quickItems], tab: TAB_NAMES.quickItems },
+                { key: "statuses", label: TAB_NAMES.statuses, icon: ICONS.workorderStatuses, gate: TAB_GATES[TAB_NAMES.statuses], tab: TAB_NAMES.statuses },
+                { key: "lists", label: TAB_NAMES.lists, icon: ICONS.listsAndOptions, gate: TAB_GATES[TAB_NAMES.lists], tab: TAB_NAMES.lists },
+                { key: "storeInfo", label: TAB_NAMES.storeInfo, icon: ICONS.storeInfo, gate: TAB_GATES[TAB_NAMES.storeInfo], tab: TAB_NAMES.storeInfo },
+                { key: "textTemplates", label: TAB_NAMES.textTemplates, icon: ICONS.notes, gate: TAB_GATES[TAB_NAMES.textTemplates], tab: TAB_NAMES.textTemplates },
+                { key: "emailTemplates", label: TAB_NAMES.emailTemplates, icon: ICONS.notes, gate: TAB_GATES[TAB_NAMES.emailTemplates], tab: TAB_NAMES.emailTemplates },
+                { key: "import", label: TAB_NAMES.import, icon: ICONS.importIcon, gate: TAB_GATES[TAB_NAMES.import], tab: TAB_NAMES.import },
+                { key: "backup", label: TAB_NAMES.backup, icon: ICONS.tools, gate: TAB_GATES[TAB_NAMES.backup], tab: TAB_NAMES.backup },
+              ];
+              menuItems.sort((a, b) => (a.gate - b.gate) || a.label.localeCompare(b.label));
+              return menuItems.map((item) => {
+                const selected = item.tab ? sExpand === item.tab : false;
+                const action = item.tab
+                  ? () => {
+                      const opening = sExpand !== item.tab;
+                      _setExpand(opening ? item.tab : null);
+                      if (opening && item.onOpen) item.onOpen();
+                    }
+                  : item.onClick;
+                return (
+                  <React.Fragment key={item.key}>
+                    <MenuListLabelComponent
+                      selected={selected}
+                      handleExpandPress={guardedMenuPress(action, item.gate)}
+                      text={item.label}
+                      icon={item.icon}
+                      iconSize={item.iconSize}
+                      style={{
+                        fontWeight: selected ? 500 : null,
+                        color: selected ? C.green : C.textSecondary,
+                      }}
+                      locked={zCurrentUserLevel < item.gate}
+                    />
+                    <VerticalSpacer />
+                  </React.Fragment>
+                );
+              });
+            })()}
           </div>
         </div>
 
@@ -485,79 +330,89 @@ export function Dashboard_Admin({}) {
             />
           </div>
         )}
-        {!!sExpand && <div
-          className={adminStyles.dashboardPane}
-          style={{ "--pane-title-color": C.textSecondary }}
-        >
-          <span className={adminStyles.dashboardPaneTitle}>
-            {sExpand === TAB_NAMES.payments ? "CARD READERS / RECEIPT PRINTERS" : sExpand?.toUpperCase()}
-          </span>
-          {sExpand === TAB_NAMES.payments && (
-            <>
-              <PaymentProcessingComponent
-                zSettingsObj={zSettingsObj}
-                handleSettingsFieldChange={handleSettingsFieldChange}
-                liveReaders={zLiveReaders}
-              />
-              <PrintersComponent
-                zSettingsObj={zSettingsObj}
-                handleSettingsFieldChange={handleSettingsFieldChange}
-              />
-            </>
-          )}
-          {sExpand === TAB_NAMES.users && (
-            <AppUserListComponent
-              handleRemoveUserPress={handleRemoveUserPress}
-              handleDescriptorCapture={handleDescriptorCapture}
-              zSettingsObj={zSettingsObj}
-              commitUserInfoChange={commitUserInfoChange}
-              _setFacialRecognitionModalUserObj={
-                _setFacialRecognitionModalUserObj
-              }
-              _setPunchClockUserObj={_setPunchClockUserObj}
-              handleSettingsFieldChange={handleSettingsFieldChange}
-            />
-          )}
-          {sExpand === TAB_NAMES.statuses && (
-            <WorkorderStatusesComponent
-              zSettingsObj={zSettingsObj}
-              handleSettingsFieldChange={handleSettingsFieldChange}
-            />
-          )}
-          {sExpand === TAB_NAMES.lists && (
-            <ListOptionsComponent
-              zSettingsObj={zSettingsObj}
-              handleSettingsFieldChange={handleSettingsFieldChange}
-            />
-          )}
-          {sExpand === TAB_NAMES.storeInfo && (
-            <StoreInfoComponent
-              zSettingsObj={zSettingsObj}
-              handleSettingsFieldChange={handleSettingsFieldChange}
-            />
-          )}
-          {sExpand === TAB_NAMES.quickItems && (
-            <QuickItemButtonsComponent />
-          )}
-          {sExpand === TAB_NAMES.ordering && (
-            <OrderingComponent />
-          )}
-          {sExpand === TAB_NAMES.textTemplates && (
-            <TextTemplatesComponent
-              zSettingsObj={zSettingsObj}
-              handleSettingsFieldChange={handleSettingsFieldChange}
-            />
-          )}
-          {sExpand === TAB_NAMES.emailTemplates && (
-            <EmailOptionsComponent
-              zSettingsObj={zSettingsObj}
-              handleSettingsFieldChange={handleSettingsFieldChange}
-            />
-          )}
-          {sExpand === TAB_NAMES.todaysHistory && <TodaysHistoryComponent />}
-          {sExpand === TAB_NAMES.import && <ImportComponent />}
-          {sExpand === TAB_NAMES.backup && <BackupRecoveryComponent />}
-        </div>}
+        {!!sExpand && (() => {
+          const paneAuthorized = zCurrentUserLevel >= (TAB_GATES[sExpand] || 0);
+          return (
+            <div
+              className={adminStyles.dashboardPane}
+              style={{ "--pane-title-color": C.textSecondary }}
+            >
+              {paneAuthorized && (
+                <>
+                  <span className={adminStyles.dashboardPaneTitle}>
+                    {sExpand === TAB_NAMES.payments ? "CARD READERS / RECEIPT PRINTERS" : sExpand?.toUpperCase()}
+                  </span>
+                  {sExpand === TAB_NAMES.payments && (
+                    <>
+                      <PaymentProcessingComponent
+                        zSettingsObj={zSettingsObj}
+                        handleSettingsFieldChange={handleSettingsFieldChange}
+                        liveReaders={zLiveReaders}
+                        currentUserLevel={zCurrentUserLevel}
+                      />
+                      <PrintersComponent
+                        zSettingsObj={zSettingsObj}
+                        handleSettingsFieldChange={handleSettingsFieldChange}
+                        currentUserLevel={zCurrentUserLevel}
+                      />
+                    </>
+                  )}
+                  {sExpand === TAB_NAMES.users && (
+                    <AppUserListComponent
+                      handleRemoveUserPress={handleRemoveUserPress}
+                      zSettingsObj={zSettingsObj}
+                      commitUserInfoChange={commitUserInfoChange}
+                      handleSettingsFieldChange={handleSettingsFieldChange}
+                      onOpenPayrollForUser={(userObj) => {
+                        _setPayrollPreselectUserObj(userObj);
+                        _setShowPayrollModal(true);
+                      }}
+                    />
+                  )}
+                  {sExpand === TAB_NAMES.statuses && (
+                    <WorkorderStatusesComponent
+                      zSettingsObj={zSettingsObj}
+                      handleSettingsFieldChange={handleSettingsFieldChange}
+                    />
+                  )}
+                  {sExpand === TAB_NAMES.lists && (
+                    <ListOptionsComponent
+                      zSettingsObj={zSettingsObj}
+                      handleSettingsFieldChange={handleSettingsFieldChange}
+                    />
+                  )}
+                  {sExpand === TAB_NAMES.storeInfo && (
+                    <StoreInfoComponent
+                      zSettingsObj={zSettingsObj}
+                      handleSettingsFieldChange={handleSettingsFieldChange}
+                    />
+                  )}
+                  {sExpand === TAB_NAMES.quickItems && (
+                    <QuickItemButtonsComponent />
+                  )}
+                  {sExpand === TAB_NAMES.ordering && (
+                    <OrderingComponent />
+                  )}
+                  {sExpand === TAB_NAMES.textTemplates && (
+                    <TextTemplatesComponent
+                      zSettingsObj={zSettingsObj}
+                      handleSettingsFieldChange={handleSettingsFieldChange}
+                    />
+                  )}
+                  {sExpand === TAB_NAMES.emailTemplates && (
+                    <EmailOptionsComponent
+                      zSettingsObj={zSettingsObj}
+                      handleSettingsFieldChange={handleSettingsFieldChange}
+                    />
+                  )}
+                  {sExpand === TAB_NAMES.todaysHistory && <TodaysHistoryComponent />}
+                  {sExpand === TAB_NAMES.import && <ImportComponent />}
+                  {sExpand === TAB_NAMES.backup && <BackupRecoveryComponent />}
+                </>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -620,6 +475,7 @@ function MenuListLabelComponent({
   dropdownDataArr,
   onDropdownSelect,
   disabled,
+  locked,
 }) {
   const ICON_SIZE = 18;
   const rowClassName = selected
@@ -630,6 +486,8 @@ function MenuListLabelComponent({
       type="button"
       className={rowClassName}
       disabled={disabled}
+      aria-disabled={locked || undefined}
+      style={locked ? { opacity: 0.4 } : undefined}
       onClick={disabled ? undefined : handleExpandPress}
     >
       {!dropdownDataArr && (
@@ -745,33 +603,218 @@ function MoveArrows({ index, listLength, onMove }) {
 const AppUserListComponent = ({
   zSettingsObj,
   commitUserInfoChange,
-  handleDescriptorCapture,
-  _setFacialRecognitionModalUserObj,
-  _setPunchClockUserObj,
   handleRemoveUserPress,
   handleSettingsFieldChange,
+  onOpenPayrollForUser,
 }) => {
-  const [sEditUserIndex, _setEditUserIndex] = useState(null);
-  const [sShowPinIndex, _setShowPinIndex] = useState(false);
-  const [sShowWageIndex, _setShowWageIndex] = useState(false);
-  const [sNewUserObj, _setNewUserObj] = useState(null);
-  const [sExpand, _setExpand] = useState(false);
+  const [sSelectedUserId, _setSelectedUserId] = useState(null);
+  const [sDraftUser, _setDraftUser] = useState(null);
+  const [sOriginalUser, _setOriginalUser] = useState(null);
+  const [sIsNewUser, _setIsNewUser] = useState(false);
+  const [sIsDirty, _setIsDirty] = useState(false);
+  const [sShowPin, _setShowPin] = useState(false);
+  const [sShowWage, _setShowWage] = useState(false);
+  const [sPinError, _setPinError] = useState("");
+  const [sFaceModalDraftActive, _setFaceModalDraftActive] = useState(false);
   const [sLoginTimeout, _setLoginTimeout] = useState(zSettingsObj?.activeLoginTimeoutSeconds || "");
   const [sLockHours, _setLockHours] = useState(zSettingsObj?.idleLoginTimeoutHours ? String(Math.round(zSettingsObj.idleLoginTimeoutHours)) : "");
   const [sPinLength, _setPinLength] = useState(zSettingsObj?.userPinStrength || "");
-  const zPunchClock = useLoginStore((state) => state.punchClock);
+  const [sClockTick, _setClockTick] = useState(0);
   const zCurrentUserLevel = useLoginStore((state) => state.currentUser?.permissions?.level || 0);
+  const zPunchClock = useLoginStore((state) => state.punchClock);
   const canEditUsers = zCurrentUserLevel >= PERMISSION_LEVELS.superUser.level;
 
-  const userListItemRefs = useRef([]);
+  useEffect(() => {
+    const id = setInterval(() => _setClockTick((n) => n + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
+
+  function formatElapsedSince(startMillis) {
+    let diff = Date.now() - startMillis;
+    if (diff < 0) diff = 0;
+    let totalMin = Math.floor(diff / 60000);
+    let h = Math.floor(totalMin / 60);
+    let m = totalMin % 60;
+    if (h === 0) return m + "m";
+    return h + "h " + m + "m";
+  }
+
+  function handleTogglePunch(userObj) {
+    let isClockedIn = !!zPunchClock?.[userObj.id];
+    useLoginStore.getState().setCreateUserClock(userObj.id, new Date().getTime(), isClockedIn ? "out" : "in");
+  }
+
+  const ROLE_BADGE_COLORS = {
+    1: { bg: "#d4d4d4", fg: "#333333" }, // light gray (User)
+    2: { bg: "#6b6b6b", fg: "#ffffff" }, // dark gray (Editor)
+    3: { bg: "#2e8b57", fg: "#ffffff" }, // green (Admin)
+    4: { bg: "#7b4ea3", fg: "#ffffff" }, // purple (Super-User)
+    5: { bg: "#c0392b", fg: "#ffffff" }, // red (reserved)
+  };
+  function roleBadgeColors(level) {
+    return ROLE_BADGE_COLORS[level] || ROLE_BADGE_COLORS[1];
+  }
+
+  function selectUser(userId) {
+    let userObj = (zSettingsObj?.users || []).find((u) => u.id === userId);
+    if (!userObj) return;
+    _setSelectedUserId(userId);
+    _setDraftUser(cloneDeep(userObj));
+    _setOriginalUser(cloneDeep(userObj));
+    _setIsNewUser(false);
+    _setIsDirty(false);
+    _setShowPin(false);
+    _setShowWage(false);
+    _setPinError("");
+  }
+
+  function tryChangeSelection(action) {
+    if (sIsDirty) {
+      useAlertScreenStore.getState().setValues({
+        title: "UNSAVED CHANGES",
+        message: "Discard your unsaved changes?",
+        btn1Text: "DISCARD",
+        btn2Text: "KEEP EDITING",
+        handleBtn1Press: action,
+        handleBtn2Press: () => null,
+        showAlert: true,
+      });
+    } else {
+      action();
+    }
+  }
 
   function handleNewUserPress() {
-    let userObj = cloneDeep(APP_USER);
-    userObj.id = crypto.randomUUID();
-    let role = PERMISSION_LEVELS.user;
-    userObj.permissions = role;
-    commitUserInfoChange(userObj, true);
-    _setEditUserIndex(0);
+    tryChangeSelection(() => {
+      let userObj = cloneDeep(APP_USER);
+      userObj.id = crypto.randomUUID();
+      userObj.permissions = cloneDeep(PERMISSION_LEVELS.user);
+      _setSelectedUserId(userObj.id);
+      _setDraftUser(cloneDeep(userObj));
+      _setOriginalUser(cloneDeep(userObj));
+      _setIsNewUser(true);
+      _setIsDirty(false);
+      _setShowPin(false);
+      _setShowWage(false);
+      _setPinError("");
+    });
+  }
+
+  function handleSave() {
+    if (!sDraftUser) return;
+
+    const first = (sDraftUser.first || "").trim();
+    const last = (sDraftUser.last || "").trim();
+    const pin = (sDraftUser.pin || "").trim();
+    const isHighPriv = (sDraftUser.permissions?.level || 0) >= PERMISSION_LEVELS.superUser.level;
+    const configuredLen = Number(zSettingsObj?.userPinStrength) || 4;
+    const requiredPinLen = isHighPriv ? 4 : configuredLen;
+
+    let error = null;
+    if (!first) error = "First name is required";
+    else if (!last) error = "Last name is required";
+    else if (!pin) error = "PIN is required";
+    else if (pin.length !== requiredPinLen) {
+      error = "PIN must be exactly " + requiredPinLen + " digit" + (requiredPinLen === 1 ? "" : "s");
+    } else {
+      const liveUsers = useSettingsStore.getState().settings?.users || [];
+      const otherUsers = liveUsers.filter((u) => u.id !== sDraftUser.id);
+      for (const u of otherUsers) {
+        if (u.pin && u.pin === pin) { error = "PIN matches another user's PIN"; break; }
+        if (u.alternatePin && u.alternatePin === pin) { error = "PIN matches another user's alternate PIN"; break; }
+      }
+      if (!error && sDraftUser.alternatePin && sDraftUser.alternatePin === pin) {
+        error = "PIN cannot match this user's own alternate PIN";
+      }
+    }
+
+    if (error) {
+      useAlertScreenStore.getState().setValues({
+        title: "INVALID USER",
+        message: error,
+        btn1Text: "OK",
+        handleBtn1Press: () => null,
+        showAlert: true,
+      });
+      return;
+    }
+
+    commitUserInfoChange(sDraftUser, sIsNewUser);
+    _setOriginalUser(cloneDeep(sDraftUser));
+    _setIsNewUser(false);
+    _setIsDirty(false);
+    _setPinError("");
+  }
+
+  function handleCancel() {
+    if (sIsNewUser) {
+      _setSelectedUserId(null);
+      _setDraftUser(null);
+      _setOriginalUser(null);
+      _setIsNewUser(false);
+    } else {
+      _setDraftUser(cloneDeep(sOriginalUser));
+    }
+    _setIsDirty(false);
+    _setShowPin(false);
+    _setShowWage(false);
+    _setPinError("");
+  }
+
+  function handleDelete() {
+    if (!sDraftUser) return;
+
+    if (!sIsNewUser) {
+      const currentUserId = useLoginStore.getState().currentUser?.id;
+      if (sDraftUser.id === currentUserId) {
+        useAlertScreenStore.getState().setValues({
+          title: "CANNOT DELETE",
+          message: "You cannot delete the user you are currently logged in as.",
+          btn1Text: "OK",
+          handleBtn1Press: () => null,
+          showAlert: true,
+        });
+        return;
+      }
+      const liveUsers = useSettingsStore.getState().settings?.users || [];
+      const superUsers = liveUsers.filter((u) => (u.permissions?.level || 0) >= PERMISSION_LEVELS.superUser.level);
+      if (superUsers.length === 1 && superUsers[0].id === sDraftUser.id) {
+        useAlertScreenStore.getState().setValues({
+          title: "CANNOT DELETE",
+          message: "Cannot delete the only super-user. Promote another user to super-user first.",
+          btn1Text: "OK",
+          handleBtn1Press: () => null,
+          showAlert: true,
+        });
+        return;
+      }
+    }
+
+    useAlertScreenStore.getState().setValues({
+      title: "DELETE USER",
+      message: "Are you sure you want to delete " + capitalizeFirstLetterOfString(sDraftUser.first) + " " + capitalizeFirstLetterOfString(sDraftUser.last) + "?",
+      btn1Text: "DELETE",
+      btn2Text: "CANCEL",
+      handleBtn1Press: () => {
+        if (!sIsNewUser) handleRemoveUserPress(sDraftUser);
+        _setSelectedUserId(null);
+        _setDraftUser(null);
+        _setOriginalUser(null);
+        _setIsNewUser(false);
+        _setIsDirty(false);
+      },
+      handleBtn2Press: () => null,
+      showAlert: true,
+    });
+  }
+
+  function updateDraft(patch) {
+    _setDraftUser((prev) => (prev ? { ...prev, ...patch } : prev));
+    _setIsDirty(true);
+  }
+
+  function handleFaceCaptureToDraft(desc) {
+    updateDraft({ faceDescriptor: desc ? Array.from(desc) : "" });
   }
 
   const ucVars = {
@@ -780,8 +823,9 @@ const AppUserListComponent = ({
   };
 
   return (
+    <>
     <BoxContainerOuterComponent style={{}}>
-      {/* User Control: settings, facial recognition, user list */}
+      {/* User Control: settings, facial recognition */}
       <BoxContainerInnerComponent
         style={{
           backgroundColor: C.backgroundListWhite,
@@ -878,337 +922,542 @@ const AppUserListComponent = ({
             </div>
           </div>
         )}
-        <div className={adminStyles.ucDivider} style={{ backgroundColor: C.surfaceAlt }} />
-        <div className={adminStyles.ucAddUserWrap}>
-          <BoxButton1
-            iconSize={35}
-            icon={ICONS.add}
-            onPress={handleNewUserPress}
-            style={{}}
-          />
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+
+    {/* Clocked-in users list */}
+    <BoxContainerOuterComponent style={{ marginTop: 10 }}>
+      <BoxContainerInnerComponent
+        style={{
+          backgroundColor: C.backgroundListWhite,
+          borderWidth: 0,
+          alignItems: "stretch",
+          ...ucVars,
+        }}
+      >
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: C.textMuted, marginBottom: 10 }}>
+          Punch Clock
         </div>
-        <div className={adminStyles.ucUserList}>
-          {(() => {
-            let data = zSettingsObj
-              ? sNewUserObj
-                ? [sNewUserObj, ...zSettingsObj.users]
-                : zSettingsObj.users
-              : [];
-            return data.map((userObj, idx) => {
-              userObj = cloneDeep(userObj);
-              let editable = sEditUserIndex === idx;
-              let borderColor = editable ? C.buttonLightGreenOutline : "transparent";
-              return (
-                <React.Fragment key={userObj.id || idx}>
-                  {idx > 0 && <div className={adminStyles.ucUserListItem} />}
+        {(() => {
+          let visibleUsers = (zSettingsObj?.users || [])
+            .filter((u) => !u.hidden)
+            .sort((a, b) => {
+              let an = ((a.first || "") + " " + (a.last || "")).trim().toLowerCase();
+              let bn = ((b.first || "") + " " + (b.last || "")).trim().toLowerCase();
+              return an.localeCompare(bn);
+            });
+          if (visibleUsers.length === 0) {
+            return (
+              <div style={{ color: C.textMuted, fontSize: 13, padding: "8px 0" }}>
+                No users to display.
+              </div>
+            );
+          }
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, width: "100%" }}>
+              {visibleUsers.map((u) => {
+                let punch = zPunchClock?.[u.id];
+                let isClockedIn = !!punch;
+                let fullName = (capitalizeFirstLetterOfString(u.first || "") + " " + capitalizeFirstLetterOfString(u.last || "")).trim() || "(no name)";
+                let elapsedText = isClockedIn ? formatElapsedSince(punch.millis) : "";
+                return (
                   <div
-                    ref={(element) => (userListItemRefs.current[idx] = element)}
-                    className={adminStyles.ucUserRow}
+                    key={u.id}
                     style={{
-                      backgroundColor: C.listItemWhite,
-                      borderColor: C.buttonLightGreenOutline,
-                      opacity: !editable && sEditUserIndex ? 0.3 : 1,
+                      display: "flex",
+                      flexDirection: "row",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      padding: "6px 10px",
+                      borderRadius: 6,
+                      border: "1px solid " + C.surfaceAlt,
+                      backgroundColor: "transparent",
+                      gap: 10,
                     }}
                   >
-                    <div className={adminStyles.ucUserLeftCol}>
-                      {/* Row 1 - aligns with name row */}
-                      <div className={adminStyles.ucIconCell}>
-                        <DomTouchableOpacity
-                          onPress={() => {
-                            if (!canEditUsers) return;
-                            if (sEditUserIndex == null) {
-                              console.log(JSON.stringify(userObj, null, 2));
-                            }
-                            _setEditUserIndex(sEditUserIndex != null ? null : idx);
-                            _setShowPinIndex(null);
-                            _setShowWageIndex(null);
-                          }}
-                          style={{ opacity: canEditUsers ? 1 : 0.3 }}
-                        >
-                          <Image icon={editable ? ICONS.check1 : ICONS.editPencil} size={20} />
-                        </DomTouchableOpacity>
-                      </div>
-                      {/* Row 2 - Clock In/Out (aligns with phone/email row) */}
-                      <div className={adminStyles.ucActionCell}>
+                    <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: 4,
+                          backgroundColor: isClockedIn ? C.green : C.surfaceAlt,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <span style={{ color: C.text, fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {fullName}
+                      </span>
+                    </div>
+                    <span style={{ color: isClockedIn ? C.text : C.textMuted, fontSize: 12, minWidth: 60, textAlign: "right" }}>
+                      {isClockedIn ? elapsedText : "Clocked out"}
+                    </span>
+                    <DomTooltip text="Edit punch history" position="top">
+                      <DomTouchableOpacity
+                        onPress={() => onOpenPayrollForUser && onOpenPayrollForUser(u)}
+                        style={{
+                          padding: 5,
+                          borderRadius: 4,
+                          border: "1px solid " + C.surfaceAlt,
+                          backgroundColor: "transparent",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Image icon={ICONS.editPencil} size={14} />
+                      </DomTouchableOpacity>
+                    </DomTooltip>
+                    <DomButton
+                      text={isClockedIn ? "Clock Out" : "Clock In"}
+                      onPress={() => handleTogglePunch(u)}
+                      buttonStyle={{
+                        paddingLeft: 10,
+                        paddingRight: 10,
+                        paddingTop: 4,
+                        paddingBottom: 4,
+                        borderWidth: 1,
+                        borderStyle: "solid",
+                        borderColor: isClockedIn ? C.buttonLightGreenOutline : C.surfaceAlt,
+                        backgroundColor: isClockedIn ? C.buttonLightGreen : "transparent",
+                        borderRadius: 5,
+                        minWidth: 90,
+                      }}
+                      textStyle={{ fontSize: 12, color: C.text, fontWeight: 600 }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })()}
+      </BoxContainerInnerComponent>
+    </BoxContainerOuterComponent>
+
+    {/* User picker + editor */}
+    <BoxContainerOuterComponent style={{ marginTop: 10 }}>
+      <BoxContainerInnerComponent
+        style={{
+          backgroundColor: C.backgroundListWhite,
+          borderWidth: 0,
+          ...ucVars,
+        }}
+      >
+        {(() => {
+          let users = zSettingsObj?.users || [];
+          let sortedUsers = [...users].sort((a, b) => {
+            let an = ((a.first || "") + " " + (a.last || "")).trim().toLowerCase();
+            let bn = ((b.first || "") + " " + (b.last || "")).trim().toLowerCase();
+            return an.localeCompare(bn);
+          });
+          let pickerItems = sortedUsers.map((u) => {
+            let level = u.permissions?.level || 1;
+            let roleName = u.permissions?.name || "User";
+            let badge = roleBadgeColors(level);
+            let fullName = (capitalizeFirstLetterOfString(u.first || "") + " " + capitalizeFirstLetterOfString(u.last || "")).trim() || "(no name)";
+            return {
+              id: u.id,
+              value: u.id,
+              label: (
+                <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 8 }}>
+                  <span style={{ color: C.text, fontSize: 14 }}>{fullName}</span>
+                  <span
+                    style={{
+                      backgroundColor: badge.bg,
+                      color: badge.fg,
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: "2px 6px",
+                      borderRadius: 4,
+                    }}
+                  >
+                    {roleName}
+                  </span>
+                </div>
+              ),
+            };
+          });
+
+          let selectedRoleLevel = sDraftUser?.permissions?.level || 1;
+          let selectedRoleBadge = roleBadgeColors(selectedRoleLevel);
+          let pickerButtonText = (() => {
+            if (!sDraftUser) return "Select a user...";
+            let fn = capitalizeFirstLetterOfString(sDraftUser.first || "");
+            let ln = capitalizeFirstLetterOfString(sDraftUser.last || "");
+            let name = (fn + " " + ln).trim();
+            if (sIsNewUser && !name) return "New User";
+            return name || "(no name)";
+          })();
+
+          return (
+            <>
+              {/* Picker row: dropdown + New User button */}
+              <div className={adminStyles.ucPickerRow}>
+                <div className={adminStyles.ucPickerDropdownWrap}>
+                  <DomDropdownMenu
+                    enabled={canEditUsers}
+                    dataArr={pickerItems}
+                    onSelect={(item) => {
+                      if (!item || !item.value) return;
+                      if (item.value === sSelectedUserId && !sIsNewUser) return;
+                      tryChangeSelection(() => selectUser(item.value));
+                    }}
+                    buttonText={pickerButtonText}
+                    buttonStyle={{
+                      paddingLeft: 8,
+                      paddingRight: 8,
+                      paddingTop: 4,
+                      paddingBottom: 4,
+                      borderColor: C.buttonLightGreenOutline,
+                      borderStyle: "solid",
+                      borderWidth: 1,
+                      borderRadius: 5,
+                      height: 32,
+                      width: "100%",
+                      alignItems: "center",
+                      backgroundColor: C.buttonLightGreen,
+                    }}
+                    buttonTextStyle={{
+                      color: C.text,
+                      fontSize: 14,
+                      fontWeight: 600,
+                    }}
+                  />
+                </div>
+                <DomButton
+                  text="+ New User"
+                  onPress={() => {
+                    if (!canEditUsers) return;
+                    handleNewUserPress();
+                  }}
+                  buttonStyle={{
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                    borderColor: C.buttonLightGreenOutline,
+                    backgroundColor: C.buttonLightGreen,
+                    paddingTop: 4,
+                    paddingBottom: 4,
+                    paddingLeft: 10,
+                    paddingRight: 10,
+                    borderRadius: 5,
+                    opacity: canEditUsers ? 1 : 0.4,
+                  }}
+                  textStyle={{ fontSize: 13, color: C.text, fontWeight: 600 }}
+                />
+              </div>
+
+              {!sDraftUser && (
+                <div className={adminStyles.ucEditorEmpty}>
+                  <span style={{ color: C.textMuted, fontSize: 13 }}>
+                    Select a user above or create a new one.
+                  </span>
+                </div>
+              )}
+
+              {sDraftUser && (() => {
+                let editable = canEditUsers;
+                let borderColor = editable ? C.buttonLightGreenOutline : "transparent";
+                return (
+                  <div
+                    className={adminStyles.ucEditor}
+                    style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
+                  >
+                    {/* ACTIONS */}
+                    <div className={adminStyles.ucActionsBar}>
+                      {(() => {
+                        const canSave = sIsDirty && editable && !sPinError;
+                        return (
+                          <DomButton
+                            text="Save"
+                            onPress={() => canSave && handleSave()}
+                            buttonStyle={{
+                              borderWidth: 1,
+                              borderStyle: "solid",
+                              borderColor: canSave ? C.green : C.borderSubtle || C.buttonLightGreenOutline,
+                              backgroundColor: canSave ? C.green : C.surfaceAlt,
+                              paddingTop: 6,
+                              paddingBottom: 6,
+                              paddingLeft: 18,
+                              paddingRight: 18,
+                              borderRadius: 5,
+                              opacity: canSave ? 1 : 0.5,
+                              cursor: canSave ? "pointer" : "default",
+                            }}
+                            textStyle={{
+                              fontSize: 13,
+                              color: canSave ? C.textWhite : C.textMuted,
+                              fontWeight: 700,
+                            }}
+                          />
+                        );
+                      })()}
+                      <DomButton
+                        text={sIsNewUser ? "Discard" : "Cancel"}
+                        onPress={handleCancel}
+                        buttonStyle={{
+                          borderWidth: 1,
+                          borderStyle: "solid",
+                          borderColor: C.borderSubtle || C.buttonLightGreenOutline,
+                          backgroundColor: "transparent",
+                          paddingTop: 6,
+                          paddingBottom: 6,
+                          paddingLeft: 14,
+                          paddingRight: 14,
+                          borderRadius: 5,
+                        }}
+                        textStyle={{ fontSize: 13, color: C.text, fontWeight: 600 }}
+                      />
+                      <div style={{ flex: 1 }} />
+                      {!sIsNewUser && editable && (
                         <DomButton
-                          text={zPunchClock[userObj.id] ? "Clock Out" : "Clock In"}
-                          onPress={() => {
-                            let isClockedIn = !!zPunchClock[userObj.id];
-                            let option = isClockedIn ? "out" : "in";
-                            let name = capitalizeFirstLetterOfString(userObj.first) + " " + capitalizeFirstLetterOfString(userObj.last);
-                            useAlertScreenStore.getState().setValues({
-                              title: "PUNCH CLOCK",
-                              message: (option === "in" ? "Clock in " : "Clock out ") + name + "?",
-                              btn1Text: option === "in" ? "CLOCK IN" : "CLOCK OUT",
-                              btn2Text: "CANCEL",
-                              handleBtn1Press: () => {
-                                useLoginStore.getState().setCreateUserClock(userObj.id, new Date().getTime(), option);
-                                if (option === "out") {
-                                  useLoginStore.getState().setCurrentUser(null);
-                                }
-                              },
-                              handleBtn2Press: () => null,
-                              showAlert: true,
-                            });
-                          }}
+                          text="Delete"
+                          onPress={handleDelete}
                           buttonStyle={{
                             borderWidth: 1,
                             borderStyle: "solid",
-                            borderColor: zPunchClock[userObj.id] ? C.lightred : C.buttonLightGreenOutline,
-                            backgroundColor: zPunchClock[userObj.id] ? C.lightred : C.buttonLightGreen,
-                            paddingTop: 2,
-                            paddingBottom: 2,
-                            paddingLeft: 4,
-                            paddingRight: 4,
+                            borderColor: C.lightred,
+                            backgroundColor: "transparent",
+                            paddingTop: 6,
+                            paddingBottom: 6,
+                            paddingLeft: 14,
+                            paddingRight: 14,
                             borderRadius: 5,
-                            width: "100%",
                           }}
-                          mouseOverOptions={{ opacity: 0.7 }}
-                          textStyle={{ fontSize: 11, color: zPunchClock[userObj.id] ? C.textWhite : C.text, fontWeight: "600", width: '100%', textAlign: "center" }}
+                          textStyle={{ fontSize: 13, color: C.lightred, fontWeight: 600 }}
                         />
-                      </div>
-                      {/* Row 3 - Enroll (aligns with PIN/wage/role row) */}
-                      {zSettingsObj?.useFacialRecognition !== false && (
-                        <div className={adminStyles.ucActionCell}>
-                          <DomTooltip text="Click to enroll user, right-click to remove" position="right">
-                            <div
-                              className={adminStyles.ucEnrollBtn}
-                              style={{
-                                "--uc-enroll-border": C.buttonLightGreenOutline,
-                                "--uc-enroll-bg": C.buttonLightGreen,
-                                opacity: editable ? 1 : 0.5,
-                                cursor: editable ? "pointer" : "default",
-                              }}
-                              onClick={() => {
-                                if (!editable) return;
-                                _setFacialRecognitionModalUserObj(userObj);
-                              }}
-                              onContextMenu={(e) => {
-                                e.preventDefault();
-                                if (!editable) return;
-                                handleDescriptorCapture(userObj, "");
-                              }}
-                            >
-                              <Image icon={userObj.faceDescriptor ? ICONS.check1 : ICONS.redx} size={12} />
-                              <span className={adminStyles.ucEnrollText} style={{ color: C.text }}>Enroll</span>
-                            </div>
-                          </DomTooltip>
-                        </div>
                       )}
-                      {/* Row 4 - aligns with statuses row */}
-                      <div className={adminStyles.ucRowSpacer} />
                     </div>
-                    <div className={adminStyles.ucUserRightCol}>
-                      <div className={adminStyles.ucNameRow}>
+
+                    {/* IDENTITY */}
+                    <div className={adminStyles.ucEditorSection}>
+                      <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>Identity</div>
+                      <div className={adminStyles.ucEditorRow}>
                         <DomTextInput
-                          debounceMs={500}
-                          value={userObj.first}
+                          debounceMs={300}
+                          value={sDraftUser.first || ""}
                           placeholder="First name"
                           placeholderTextColor={"lightgray"}
                           editable={editable}
-                          style={{
-                            paddingLeft: 5,
-                            paddingRight: 5,
-                            paddingTop: 1,
-                            paddingBottom: 1,
-                            borderColor: borderColor,
-                            color: editable ? C.text : C.textMuted,
-                          }}
-                          className={adminStyles.ucNameInput}
-                          onChangeText={(value) => {
-                            userObj.first = value;
-                            commitUserInfoChange(userObj);
-                          }}
+                          style={{ paddingLeft: 5, paddingRight: 5, borderColor: borderColor, color: editable ? C.text : C.textMuted }}
+                          className={adminStyles.ucEditorInput}
+                          onChangeText={(value) => updateDraft({ first: value })}
                         />
                         <DomTextInput
-                          debounceMs={500}
-                          value={userObj.last}
-                          onChangeText={(value) => {
-                            userObj.last = value;
-                            commitUserInfoChange(userObj);
-                          }}
+                          debounceMs={300}
+                          value={sDraftUser.last || ""}
                           placeholder="Last name"
                           placeholderTextColor={"lightgray"}
                           editable={editable}
-                          style={{
-                            paddingLeft: 5,
-                            paddingRight: 5,
-                            borderColor: borderColor,
-                            color: editable ? C.text : C.textMuted,
-                          }}
-                          className={adminStyles.ucNameInput}
+                          style={{ paddingLeft: 5, paddingRight: 5, borderColor: borderColor, color: editable ? C.text : C.textMuted }}
+                          className={adminStyles.ucEditorInput}
+                          onChangeText={(value) => updateDraft({ last: value })}
                         />
                       </div>
-                      <div className={adminStyles.ucContactRow}>
+                      <div className={adminStyles.ucEditorRow}>
                         <DomTextInput
-                          debounceMs={500}
-                          value={formatPhoneWithDashes(userObj.phone)}
-                          onChangeText={(value) => {
-                            let val = removeDashesFromPhone(value);
-                            userObj.phone = val;
-                            commitUserInfoChange(userObj);
-                          }}
-                          placeholder="Phone num."
+                          debounceMs={300}
+                          value={formatPhoneWithDashes(sDraftUser.phone || "")}
+                          placeholder="Phone"
                           placeholderTextColor={"lightgray"}
                           editable={editable}
-                          style={{
-                            paddingLeft: 5,
-                            paddingRight: 5,
-                            paddingTop: 1,
-                            paddingBottom: 1,
-                            borderColor: borderColor,
-                            color: editable ? C.text : C.textMuted,
-                          }}
-                          className={adminStyles.ucPhoneInput}
+                          style={{ paddingLeft: 5, paddingRight: 5, borderColor: borderColor, color: editable ? C.text : C.textMuted }}
+                          className={adminStyles.ucEditorInput}
+                          onChangeText={(value) => updateDraft({ phone: removeDashesFromPhone(value) })}
                         />
                         <DomTextInput
-                          debounceMs={500}
-                          value={userObj.email || ""}
-                          onChangeText={(value) => {
-                            userObj.email = value;
-                            commitUserInfoChange(userObj);
-                          }}
+                          debounceMs={300}
+                          value={sDraftUser.email || ""}
                           placeholder="Email"
                           placeholderTextColor={"lightgray"}
                           editable={editable}
-                          style={{
-                            paddingLeft: 5,
-                            paddingRight: 5,
-                            paddingTop: 1,
-                            paddingBottom: 1,
-                            borderColor: borderColor,
-                            color: editable ? C.text : C.textMuted,
-                          }}
-                          className={adminStyles.ucEmailInput}
+                          style={{ paddingLeft: 5, paddingRight: 5, borderColor: borderColor, color: editable ? C.text : C.textMuted }}
+                          className={adminStyles.ucEditorInput}
+                          onChangeText={(value) => updateDraft({ email: value })}
                         />
                       </div>
-                      <div className={adminStyles.ucCredsRow}>
-                        <div className={adminStyles.ucCredBox} style={{ borderColor: borderColor }}>
-                          <DomTextInput
-                            debounceMs={500}
-                            caretHidden={sShowPinIndex != idx}
-                            focused={sShowPinIndex === idx}
-                            value={sShowPinIndex === idx ? userObj.pin : ""}
-                            onChangeText={(value) => {
-                              let otherPins = (zSettingsObj?.users || []).filter((u) => u.id !== userObj.id).map((u) => u.pin);
-                              if (value && otherPins.includes(value)) {
-                                value = value.slice(0, -1);
-                              }
-                              userObj.pin = value;
-                              commitUserInfoChange(userObj);
+                      <div className={adminStyles.ucEditorRow}>
+                        <DomTooltip text="Hides username from in-app lists" position="top">
+                          <CheckBox
+                            isChecked={!!sDraftUser.hidden}
+                            text="Hidden"
+                            textStyle={{ fontSize: 13, color: editable ? C.text : C.textMuted }}
+                            buttonStyle={{ backgroundColor: "transparent", paddingLeft: 0 }}
+                            onCheck={() => {
+                              if (!editable) return;
+                              updateDraft({ hidden: !sDraftUser.hidden });
                             }}
-                            placeholder={sShowPinIndex === idx ? "pin..." : "PIN"}
+                          />
+                        </DomTooltip>
+                      </div>
+                    </div>
+
+                    {/* CREDENTIALS / ROLE */}
+                    <div className={adminStyles.ucEditorSection}>
+                      <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>Credentials & Role</div>
+                      <div className={adminStyles.ucEditorRow}>
+                        <div className={adminStyles.ucCredField} style={{ borderColor: borderColor }}>
+                          {(() => {
+                            const isHighPriv = (sDraftUser.permissions?.level || 0) >= PERMISSION_LEVELS.superUser.level;
+                            const configuredLen = Number(zSettingsObj?.userPinStrength) || 4;
+                            const maxPinLen = isHighPriv ? 4 : configuredLen;
+                            return (
+                              <DomTextInput
+                                debounceMs={300}
+                                caretHidden={!sShowPin}
+                                focused={sShowPin}
+                                value={sShowPin ? (sDraftUser.pin || "") : ""}
+                                maxLength={maxPinLen}
+                                onChangeText={(value) => {
+                                  if (value && value.length > maxPinLen) value = value.slice(0, maxPinLen);
+                                  const otherUsers = (zSettingsObj?.users || []).filter((u) => u.id !== sDraftUser.id);
+                                  const conflictKeys = [];
+                                  for (const u of otherUsers) {
+                                    if (u.pin) conflictKeys.push(u.pin);
+                                    if (u.alternatePin) conflictKeys.push(u.alternatePin);
+                                  }
+                                  if (sDraftUser.alternatePin) conflictKeys.push(sDraftUser.alternatePin);
+                                  if (value && conflictKeys.includes(value)) {
+                                    _setPinError("PIN already in use");
+                                  } else {
+                                    _setPinError("");
+                                  }
+                                  updateDraft({ pin: value });
+                                }}
+                                placeholder={sShowPin ? "pin..." : "PIN (hidden)"}
+                                placeholderTextColor={"lightgray"}
+                                editable={editable}
+                                className={adminStyles.ucCredInput}
+                                style={{ color: editable ? C.text : C.textMuted }}
+                              />
+                            );
+                          })()}
+                          <DomTouchableOpacity onPress={() => editable && _setShowPin(!sShowPin)}>
+                            <Image icon={ICONS.editPencil} size={15} />
+                          </DomTouchableOpacity>
+                        </div>
+                        <div className={adminStyles.ucCredField} style={{ borderColor: borderColor }}>
+                          <DomTextInput
+                            debounceMs={300}
+                            caretHidden={!sShowWage}
+                            value={sShowWage ? (sDraftUser.hourlyWage || "") : ""}
+                            onChangeText={(value) => updateDraft({ hourlyWage: value })}
+                            placeholder={sShowWage ? "wage..." : "Wage (hidden)"}
                             placeholderTextColor={"lightgray"}
                             editable={editable}
                             className={adminStyles.ucCredInput}
                             style={{ color: editable ? C.text : C.textMuted }}
                           />
-                          {editable ? (
-                            <DomTouchableOpacity
-                              onPress={() =>
-                                _setShowPinIndex(sShowPinIndex != null ? null : idx)
-                              }
-                            >
-                              <Image icon={ICONS.editPencil} size={15} />
-                            </DomTouchableOpacity>
-                          ) : (
-                            <div className={adminStyles.ucCredPlaceholder} />
-                          )}
+                          <DomTouchableOpacity onPress={() => editable && _setShowWage(!sShowWage)}>
+                            <Image icon={ICONS.editPencil} size={15} />
+                          </DomTouchableOpacity>
                         </div>
-                        <div className={adminStyles.ucCredBox} style={{ borderColor: borderColor }}>
-                          <DomTextInput
-                            debounceMs={500}
-                            caretHidden={sShowWageIndex != idx}
-                            value={sShowWageIndex === idx ? userObj.hourlyWage : ""}
-                            onChangeText={(value) => {
-                              userObj.hourlyWage = value;
-                              commitUserInfoChange(userObj);
-                            }}
-                            placeholder={sShowWageIndex === idx ? "wage..." : "Wage"}
-                            placeholderTextColor={"lightgray"}
-                            editable={editable}
-                            className={adminStyles.ucCredInput}
-                            style={{ color: editable ? C.text : C.textMuted }}
-                          />
-                          {editable ? (
-                            <DomTouchableOpacity
-                              onPress={() =>
-                                _setShowWageIndex(sShowWageIndex != null ? null : idx)
-                              }
-                            >
-                              <Image icon={ICONS.editPencil} size={15} />
-                            </DomTouchableOpacity>
-                          ) : (
-                            <div className={adminStyles.ucCredPlaceholder} />
-                          )}
+                      </div>
+                      {!!sPinError && (
+                        <div className={adminStyles.ucEditorRow}>
+                          <span style={{ fontSize: 12, color: C.lightred, fontWeight: 600 }}>
+                            {sPinError}
+                          </span>
                         </div>
-                        <div className={adminStyles.ucRoleWrap}>
+                      )}
+                      <div className={adminStyles.ucEditorRow}>
+                        <div className={adminStyles.ucRoleBadgeWrap}>
                           <DomDropdownMenu
-                            enabled={editable}
-                            ref={userListItemRefs.current[idx]}
+                            enabled={editable && selectedRoleLevel < PERMISSION_LEVELS.owner.level}
                             dataArr={Object.values(PERMISSION_LEVELS).map((o) => o.name)}
                             onSelect={(item) => {
                               if (!editable) return;
-                              let perm = Object.values(PERMISSION_LEVELS).find(
-                                (o) => o.name === item
-                              );
-                              userObj.permissions = perm;
-                              commitUserInfoChange(userObj);
+                              if (selectedRoleLevel >= PERMISSION_LEVELS.owner.level) return;
+                              let perm = Object.values(PERMISSION_LEVELS).find((o) => o.name === item);
+                              if (!perm) return;
+                              let patch = { permissions: perm };
+                              if (perm.level >= PERMISSION_LEVELS.superUser.level && (sDraftUser.pin || "").length > 4) {
+                                patch.pin = (sDraftUser.pin || "").slice(0, 4);
+                              }
+                              updateDraft(patch);
                             }}
+                            buttonText={sDraftUser.permissions?.name || "User"}
                             buttonStyle={{
-                              paddingLeft: 5,
-                              paddingRight: 5,
-                              paddingTop: 2,
-                              paddingBottom: 2,
-                              borderColor: C.buttonLightGreenOutline,
+                              paddingLeft: 10,
+                              paddingRight: 10,
+                              paddingTop: 4,
+                              paddingBottom: 4,
+                              borderColor: selectedRoleBadge.bg,
                               borderStyle: "solid",
                               borderWidth: 1,
-                              outline: "none",
-                              borderRadius: 5,
-                              minWidth: 100,
-                              height: 25,
-                              alignItems: "flex-start",
-                              backgroundColor: editable ? C.buttonLightGreen : "transparent",
+                              borderRadius: 4,
+                              minWidth: 120,
+                              height: 28,
+                              alignItems: "center",
+                              backgroundColor: selectedRoleBadge.bg,
                             }}
-                            buttonText={userObj.permissions.name}
                             buttonTextStyle={{
-                              color: editable ? C.text : C.textMuted,
-                              fontSize: 14,
+                              color: selectedRoleBadge.fg,
+                              fontSize: 13,
+                              fontWeight: 700,
                             }}
                           />
                         </div>
-                        {editable && (
-                          <DomTouchableOpacity
-                            onPress={() => {
-                              useAlertScreenStore.getState().setValues({
-                                title: "DELETE USER",
-                                message: "Are you sure you want to delete " + capitalizeFirstLetterOfString(userObj.first) + " " + capitalizeFirstLetterOfString(userObj.last) + "?",
-                                btn1Text: "DELETE",
-                                btn2Text: "CANCEL",
-                                handleBtn1Press: () => {
-                                  handleRemoveUserPress(userObj);
-                                  _setEditUserIndex(null);
-                                },
-                                handleBtn2Press: () => null,
-                                showAlert: true,
-                              });
+                      </div>
+                    </div>
+
+                    {/* FACE ENROLLMENT */}
+                    {zSettingsObj?.useFacialRecognition !== false && (
+                      <div className={adminStyles.ucEditorSection}>
+                        <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>Face Enrollment</div>
+                        <div className={adminStyles.ucEditorRow}>
+                          <div
+                            className={adminStyles.ucEnrollBtn}
+                            style={{
+                              "--uc-enroll-border": C.buttonLightGreenOutline,
+                              "--uc-enroll-bg": C.buttonLightGreen,
+                              opacity: editable ? 1 : 0.5,
+                              cursor: editable ? "pointer" : "default",
+                              width: "auto",
+                              padding: "4px 10px",
+                            }}
+                            onClick={() => {
+                              if (!editable) return;
+                              _setFaceModalDraftActive(true);
                             }}
                           >
-                            <Image icon={ICONS.trash} size={18} />
-                          </DomTouchableOpacity>
-                        )}
+                            <Image icon={sDraftUser.faceDescriptor ? ICONS.check1 : ICONS.redx} size={14} />
+                            <span className={adminStyles.ucEnrollText} style={{ color: C.text }}>
+                              {sDraftUser.faceDescriptor ? "Re-enroll Face" : "Enroll Face"}
+                            </span>
+                          </div>
+                          {sDraftUser.faceDescriptor && editable && (
+                            <DomButton
+                              text="Remove Face"
+                              onPress={() => handleFaceCaptureToDraft("")}
+                              buttonStyle={{
+                                borderWidth: 1,
+                                borderStyle: "solid",
+                                borderColor: C.lightred,
+                                backgroundColor: C.lightred,
+                                paddingTop: 4,
+                                paddingBottom: 4,
+                                paddingLeft: 10,
+                                paddingRight: 10,
+                                borderRadius: 5,
+                              }}
+                              textStyle={{ fontSize: 11, color: C.textWhite, fontWeight: 600 }}
+                            />
+                          )}
+                        </div>
                       </div>
-                      {/* ROW 4: Statuses */}
+                    )}
+
+                    {/* STATUSES */}
+                    <div className={adminStyles.ucEditorSection}>
+                      <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>Connected Statuses</div>
                       <div className={adminStyles.ucChipRow}>
                         {editable && (
                           <DomStatusPickerModal
-                            statuses={zSettingsObj.statuses}
+                            statuses={zSettingsObj?.statuses || []}
                             onSelect={(item) => {
                               if (!item) return;
-                              let currentStatuses = userObj.statuses || [];
+                              let currentStatuses = sDraftUser.statuses || [];
                               if (currentStatuses.includes(item.id)) return;
-                              userObj.statuses = [...currentStatuses, item.id];
-                              commitUserInfoChange(userObj);
+                              updateDraft({ statuses: [...currentStatuses, item.id] });
                             }}
                             buttonText="+ Status"
                             modalCoordX={80}
@@ -1226,14 +1475,11 @@ const AppUserListComponent = ({
                               alignItems: "center",
                               backgroundColor: C.buttonLightGreen,
                             }}
-                            buttonTextStyle={{
-                              color: C.text,
-                              fontSize: 12,
-                            }}
+                            buttonTextStyle={{ color: C.text, fontSize: 12 }}
                           />
                         )}
-                        {(userObj.statuses || []).map((statusId) => {
-                          let status = zSettingsObj.statuses.find((s) => s.id === statusId);
+                        {(sDraftUser.statuses || []).map((statusId) => {
+                          let status = (zSettingsObj?.statuses || []).find((s) => s.id === statusId);
                           if (!status) return null;
                           return (
                             <div
@@ -1241,10 +1487,7 @@ const AppUserListComponent = ({
                               className={adminStyles.ucChip}
                               style={{ backgroundColor: editable ? status.backgroundColor : C.surfaceAlt }}
                             >
-                              <span
-                                className={adminStyles.ucChipLabel}
-                                style={{ color: editable ? status.textColor : C.textMuted }}
-                              >
+                              <span className={adminStyles.ucChipLabel} style={{ color: editable ? status.textColor : C.textMuted }}>
                                 {status.label}
                               </span>
                               {editable && (
@@ -1253,8 +1496,7 @@ const AppUserListComponent = ({
                                   className={adminStyles.ucChipRemove}
                                   style={{ color: status.textColor }}
                                   onClick={() => {
-                                    userObj.statuses = (userObj.statuses || []).filter((id) => id !== statusId);
-                                    commitUserInfoChange(userObj);
+                                    updateDraft({ statuses: (sDraftUser.statuses || []).filter((id) => id !== statusId) });
                                   }}
                                 >
                                   ×
@@ -1264,20 +1506,24 @@ const AppUserListComponent = ({
                           );
                         })}
                       </div>
+                    </div>
 
-                      {/* ROW 5: Email Inboxes */}
+                    {/* EMAIL INBOXES */}
+                    <div className={adminStyles.ucEditorSection}>
+                      <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>Visible Email Accounts</div>
                       <div className={adminStyles.ucChipRow}>
-                        {editable && (zSettingsObj?.emailAccounts || []).length > 0 && (
+                        {(() => {
+                          let availableInboxes = (zSettingsObj?.emailAccounts || [])
+                            .filter((a) => !(sDraftUser.emailInboxes || []).includes(a.accountKey));
+                          if (!editable || availableInboxes.length === 0) return null;
+                          return (
                           <DomDropdownMenu
-                            dataArr={(zSettingsObj.emailAccounts || [])
-                              .filter((a) => !(userObj.emailInboxes || []).includes(a.accountKey))
-                              .map((a) => ({ label: a.displayName, value: a.accountKey }))}
+                            dataArr={availableInboxes.map((a) => ({ label: a.displayName, value: a.accountKey }))}
                             onSelect={(item) => {
                               if (!item) return;
-                              let current = userObj.emailInboxes || [];
+                              let current = sDraftUser.emailInboxes || [];
                               if (current.includes(item.value)) return;
-                              userObj.emailInboxes = [...current, item.value];
-                              commitUserInfoChange(userObj);
+                              updateDraft({ emailInboxes: [...current, item.value] });
                             }}
                             buttonText="+ Inbox"
                             buttonStyle={{
@@ -1293,14 +1539,12 @@ const AppUserListComponent = ({
                               alignItems: "center",
                               backgroundColor: C.buttonLightGreen,
                             }}
-                            buttonTextStyle={{
-                              color: C.text,
-                              fontSize: 12,
-                            }}
+                            buttonTextStyle={{ color: C.text, fontSize: 12 }}
                           />
-                        )}
-                        {(userObj.emailInboxes || []).map((accountKey) => {
-                          let acct = (zSettingsObj.emailAccounts || []).find((a) => a.accountKey === accountKey);
+                          );
+                        })()}
+                        {(sDraftUser.emailInboxes || []).map((accountKey) => {
+                          let acct = (zSettingsObj?.emailAccounts || []).find((a) => a.accountKey === accountKey);
                           if (!acct) return null;
                           return (
                             <div
@@ -1308,10 +1552,7 @@ const AppUserListComponent = ({
                               className={adminStyles.ucChip}
                               style={{ backgroundColor: editable ? C.blue : C.surfaceAlt }}
                             >
-                              <span
-                                className={adminStyles.ucChipLabel}
-                                style={{ color: editable ? C.textWhite : C.textMuted }}
-                              >
+                              <span className={adminStyles.ucChipLabel} style={{ color: editable ? C.textWhite : C.textMuted }}>
                                 {acct.displayName}
                               </span>
                               {editable && (
@@ -1320,8 +1561,7 @@ const AppUserListComponent = ({
                                   className={adminStyles.ucChipRemove}
                                   style={{ color: C.textWhite }}
                                   onClick={() => {
-                                    userObj.emailInboxes = (userObj.emailInboxes || []).filter((k) => k !== accountKey);
-                                    commitUserInfoChange(userObj);
+                                    updateDraft({ emailInboxes: (sDraftUser.emailInboxes || []).filter((k) => k !== accountKey) });
                                   }}
                                 >
                                   ×
@@ -1332,14 +1572,24 @@ const AppUserListComponent = ({
                         })}
                       </div>
                     </div>
+
                   </div>
-                </React.Fragment>
-              );
-            });
-          })()}
-        </div>
+                );
+              })()}
+
+              {sFaceModalDraftActive && sDraftUser && (
+                <FaceEnrollModalScreen
+                  userObj={sDraftUser}
+                  handleDescriptorCapture={(_userObj, desc) => handleFaceCaptureToDraft(desc)}
+                  handleExitPress={() => _setFaceModalDraftActive(false)}
+                />
+              )}
+            </>
+          );
+        })()}
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
+    </>
   );
 };
 
@@ -1349,32 +1599,43 @@ const PaymentProcessingComponent = ({
   zSettingsObj,
   handleSettingsFieldChange,
   liveReaders: zLiveReaders = [],
+  currentUserLevel = 0,
 }) => {
-  // const [sExpand, _setExpand] = useState();
+  const canEdit = currentUserLevel >= 3;
 
   return (
     <BoxContainerOuterComponent>
       <BoxContainerInnerComponent>
-        <CheckBox
-          isChecked={zSettingsObj?.autoConnectToCardReader}
-          textStyle={{ fontSize: 15 }}
-          buttonStyle={{
-            backgroundColor: "transparent",
+        <div
+          style={{
+            width: "100%",
+            pointerEvents: canEdit ? "auto" : "none",
+            opacity: canEdit ? 1 : 0.4,
+            userSelect: canEdit ? "auto" : "none",
           }}
-          text={"Auto connect to card reader"}
-          onCheck={() =>
-            handleSettingsFieldChange(
-              "autoConnectToCardReader",
-              !zSettingsObj?.autoConnectToCardReader
-            )
-          }
-        />
-        {/**card reader list — auto-discovered from Stripe */}
-        <CardReaderManager
-          liveReaders={zLiveReaders}
-          savedReaders={zSettingsObj?.cardReaders || []}
-          onSaveReaders={(arr) => handleSettingsFieldChange("cardReaders", arr)}
-        />
+          aria-disabled={!canEdit}
+        >
+          <CheckBox
+            isChecked={zSettingsObj?.autoConnectToCardReader}
+            textStyle={{ fontSize: 15 }}
+            buttonStyle={{
+              backgroundColor: "transparent",
+            }}
+            text={"Auto connect to card reader"}
+            onCheck={() =>
+              handleSettingsFieldChange(
+                "autoConnectToCardReader",
+                !zSettingsObj?.autoConnectToCardReader
+              )
+            }
+          />
+          {/**card reader list — auto-discovered from Stripe */}
+          <CardReaderManager
+            liveReaders={zLiveReaders}
+            savedReaders={zSettingsObj?.cardReaders || []}
+            onSaveReaders={(arr) => handleSettingsFieldChange("cardReaders", arr)}
+          />
+        </div>
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );

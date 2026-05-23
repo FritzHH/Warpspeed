@@ -26,7 +26,8 @@ import {
   ReplyOptionsBar,
   scheduleAutoSend,
   clearAutoSend,
-  buildForwardToPayload,
+  buildForwardToArray,
+  initialSelectedForwardIDs,
 } from "../screen_components/Options_Screen/ReplyOptionsBar";
 import { WorkorderMediaModal } from "../screen_components/modal_screens/WorkorderMediaModal";
 import { SMS_PROTO } from "../../data";
@@ -49,6 +50,7 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
   const [sActionsOpen, _setActionsOpen] = useState(false);
   const [sShowMediaPicker, _setShowMediaPicker] = useState(false);
   const [sShowReplyModal, _setShowReplyModal] = useState(false);
+  const [sSelectedForwardIDs, _setSelectedForwardIDs] = useState(() => initialSelectedForwardIDs(null));
   const scrollRef = useRef(null);
   const inputRef = useRef(null);
   const pendingMediaRef = useRef(null);
@@ -113,8 +115,9 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
     msg.type = "outgoing";
     msg.senderUserObj = currentUser;
     msg.sentByUser = currentUser?.id;
-    const forwardTo = buildForwardToPayload(sNotifyMe);
-    if (forwardTo) msg.forwardTo = forwardTo;
+    if (sNotifyMe && currentUser?.id && currentUser?.phone) {
+      msg.forwardTo = [{ userID: currentUser.id, phone: currentUser.phone, first: currentUser.first || "" }];
+    }
     _setNewMessage("");
     if (inputRef.current) inputRef.current.style.height = "36px";
     const result = await smsService.send(msg);
@@ -174,13 +177,16 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
     });
   }
 
-  async function sendMediaMessage(canRespondVal, forwardOverride) {
+  async function sendMediaMessage(canRespondVal, forwardToArrayOrNull) {
     const mediaItems = pendingMediaRef.current;
     if (!mediaItems || !mediaItems.length) return;
     if (!customerPhone || customerPhone.replace(/\D/g, "").length !== 10) return;
     const currentUser = useLoginStore.getState().getCurrentUser();
     const useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-    const forwardTo = buildForwardToPayload(forwardOverride, sNotifyMe);
+    let forwardTo = Array.isArray(forwardToArrayOrNull) ? forwardToArrayOrNull : null;
+    if (!forwardTo && sNotifyMe && currentUser?.id && currentUser?.phone) {
+      forwardTo = [{ userID: currentUser.id, phone: currentUser.phone, first: currentUser.first || "" }];
+    }
     _setShowReplyModal(false);
     const zSettings = useSettingsStore.getState().getSettings();
     const storeName = zSettings?.storeInfo?.displayName || "Our store";
@@ -209,7 +215,7 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
     msg.type = "outgoing";
     msg.senderUserObj = currentUser;
     msg.sentByUser = currentUser?.id;
-    if (forwardTo) msg.forwardTo = forwardTo;
+    if (Array.isArray(forwardTo)) msg.forwardTo = forwardTo;
     const result = await smsService.send(msg);
     if (result.success) {
       const allWOs = useOpenWorkordersStore.getState().workorders;
@@ -466,7 +472,6 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
         </div>
         <ReplyOptionsBar
           visible={sShowReplyModal}
-          forwardReplies={sNotifyMe}
           hasActivePhone={!!useLoginStore.getState().getCurrentUser()?.phone}
           onSelectCanRespond={(canRespond) => {
             clearAutoSend();
@@ -476,7 +481,20 @@ export function MobileMessagesScreen({ workorderID, onBack }) {
               sendMediaMessage(canRespond);
             }
           }}
-          onToggleForward={handleToggleForward}
+          selectedForwardIDs={sSelectedForwardIDs}
+          onChangeSelectedForwardIDs={_setSelectedForwardIDs}
+          onFire={() => {
+            if (!sSelectedForwardIDs?.length) return;
+            const users = useSettingsStore.getState().getSettings()?.users || [];
+            const forwardToArray = buildForwardToArray(sSelectedForwardIDs, users);
+            clearAutoSend();
+            _setCanRespond(true);
+            _setShowReplyModal(false);
+            if (pendingActionRef.current === "media") {
+              sendMediaMessage(true, forwardToArray);
+              pendingActionRef.current = null;
+            }
+          }}
         />
         <div className={styles.inputRow}>
           <textarea

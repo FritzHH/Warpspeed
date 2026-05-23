@@ -50,9 +50,49 @@
   position: relative;
 }
 
+.modalTopRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+  width: 100%;
+  padding: 10px 14px 0 14px;
+  box-sizing: border-box;
+}
+
+.notesBtn {
+  position: relative;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 6px 14px;
+  border-radius: 5px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.notesBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 8px;
+  border-radius: 9px;
+  background-color: var(--danger);
+  color: var(--text-on-accent, #fff);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 .modalTitle {
   font-weight: 500;
-  margin-top: 25px;
+  margin-top: 5px;
   font-size: 25px;
   color: red;
   text-align: center;
@@ -86,6 +126,73 @@
   border-top: 1px solid;
   padding: 16px 20px;
   box-sizing: border-box;
+}
+
+.noteWrap {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  border-top: 1px solid;
+  padding: 14px 20px 18px 20px;
+  box-sizing: border-box;
+  gap: 6px;
+}
+
+.noteHeader {
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+
+.noteSubtitle {
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.noteTextarea {
+  width: 100%;
+  min-height: 60px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border-width: 1px;
+  border-style: solid;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.noteFooter {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  gap: 10px;
+}
+
+.noteSendBtn {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 5px;
+  border-width: 1px;
+  border-style: solid;
+  cursor: pointer;
+  background-color: transparent;
+}
+
+.noteSendBtn:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.noteConfirmation {
+  font-size: 12px;
+  font-style: italic;
 }
 
 /* ───── ScheduleWeekRow ───── */

@@ -57,6 +57,7 @@ import {
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from "firebase/functions";
 import { log } from "./utils";
 import { firebaseApp } from "./init";
+import { APP_BRAND } from "./private_user_constants";
 
 // Initialize services using the existing Firebase app
 export const DB = initializeFirestore(firebaseApp, {
@@ -88,15 +89,15 @@ if (USING_EMULATORS) {
   connectStorageEmulator(STORAGE, "localhost", 9199);
   connectFunctionsEmulator(FUNCTIONS, "localhost", 5001);
   console.log(
-    "%c[warpspeed] 🔧 EMULATOR MODE — connected to local Firebase emulators (no production data)",
+    `%c[${APP_BRAND}] 🔧 EMULATOR MODE — connected to local Firebase emulators (no production data)`,
     "background:#d97706;color:white;font-weight:bold;padding:4px 8px;border-radius:4px;",
   );
   console.log(
-    "[warpspeed] Emulator ports → Firestore:8080  RTDB:9000  Auth:9099  Storage:9199  Functions:5001  UI:http://localhost:4000",
+    `[${APP_BRAND}] Emulator ports → Firestore:8080  RTDB:9000  Auth:9099  Storage:9199  Functions:5001  UI:http://localhost:4000`,
   );
 } else {
   console.log(
-    "%c[warpspeed] ☁️  PRODUCTION FIREBASE — connected to real project (reads are billed)",
+    `%c[${APP_BRAND}] ☁️  PRODUCTION FIREBASE — connected to real project (reads are billed)`,
     "background:#0369a1;color:white;font-weight:bold;padding:4px 8px;border-radius:4px;",
   );
 }

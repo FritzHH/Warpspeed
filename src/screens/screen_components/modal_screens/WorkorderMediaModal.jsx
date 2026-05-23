@@ -157,7 +157,10 @@ export const WorkorderMediaModal = ({
       .join("");
     const htmlBody = `<p>${storeName} has sent you ${selectedItems.length} ${noun} for your viewing:</p>${linksHtml}`;
     const subject = `Media from ${storeName}`;
-    dbSendEmail(zWorkorder.customerEmail, subject, htmlBody);
+    dbSendEmail(zWorkorder.customerEmail, subject, htmlBody, undefined, {
+      workorderID: workorderID || "",
+      customerID: zWorkorder?.customerID || "",
+    });
   }
 
   function handleSendAll() {
@@ -196,7 +199,10 @@ export const WorkorderMediaModal = ({
         .join("");
       const htmlBody = `<p>${storeName} has sent you ${selectedItems.length} ${noun} for your viewing:</p>${linksHtml}`;
       const subject = `Media from ${storeName}`;
-      dbSendEmail(zWorkorder.customerEmail, subject, htmlBody);
+      dbSendEmail(zWorkorder.customerEmail, subject, htmlBody, undefined, {
+        workorderID: workorderID || "",
+        customerID: zWorkorder?.customerID || "",
+      });
     }
 
     if (willSendText) {

@@ -20,7 +20,7 @@ import WaitTimeIndicator from "./WaitTimeIndicator";
 import styles from "./WorkorderRowItem.module.css";
 
 const WorkorderRowItem = React.memo(function WorkorderRowItem({
-  workorder, isSelected, isPreviewed, paidAmount, isLinkedSale, daysSinceLastText, onSelect, onHoverEnter, onHoverExit
+  workorder, isSelected, isPreviewed, paidAmount, customerBadge, isLinkedSale, daysSinceLastText, lastOutgoingSenderName, onSelect, onHoverEnter, onHoverExit
 }) {
   const rs = resolveStatus(workorder.status, useSettingsStore.getState().settings?.statuses);
   const isFinished = isFinishedStatus(workorder);
@@ -54,16 +54,27 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
               : C.listItemWhite,
         }}
       >
+        {workorder.hasNewSMS && (
+          <div className={styles.smsBanner}>
+            {lastOutgoingSenderName && (
+              <span className={styles.smsBannerSender}>{lastOutgoingSenderName + ": "}</span>
+            )}
+            {"New message from " + capitalizeFirstLetterOfString(workorder.customerFirst)}
+          </div>
+        )}
+        <div className={styles.cardBody}>
         <div className={styles.mainContent}>
           <div className={styles.topRow}>
             <div className={styles.customerInfo}>
               <div className={styles.nameRow}>
-                {workorder.hasNewSMS && (
-                  <span className={styles.smsDot} style={{ backgroundColor: C.green }} />
-                )}
                 <span className={styles.customerName}>
                   {capitalizeFirstLetterOfString(workorder.customerFirst) + " " + capitalizeFirstLetterOfString(workorder.customerLast)}
                 </span>
+                {customerBadge && (
+                  <span className={styles.customerCountBadge}>
+                    {customerBadge}
+                  </span>
+                )}
                 {paidAmount > 0 && (
                   <span className={styles.paidLabel} style={{ color: C.green }}>
                     {"Paid $" + formatCurrencyDisp(paidAmount)}
@@ -290,6 +301,7 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
         >
           <WaitTimeIndicator workorder={workorder} daysSinceLastText={daysSinceLastText} />
         </div>
+        </div>
       </div>
   );
 }, (prev, next) => {
@@ -297,8 +309,10 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
   if (prev.isSelected !== next.isSelected) return false;
   if (prev.isPreviewed !== next.isPreviewed) return false;
   if (prev.paidAmount !== next.paidAmount) return false;
+  if (prev.customerBadge !== next.customerBadge) return false;
   if (prev.isLinkedSale !== next.isLinkedSale) return false;
   if (prev.daysSinceLastText !== next.daysSinceLastText) return false;
+  if (prev.lastOutgoingSenderName !== next.lastOutgoingSenderName) return false;
   return true;
 });
 

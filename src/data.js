@@ -302,9 +302,11 @@ export const APP_USER = {
   hourlyWage: "",
   preview: true,
   forwardSMS: false,
+  hidden: false,
   statuses: [/*status id's go in here*/],
   emailInboxes: [],
   pendingWorkorderIDs: [],
+  loginMessageSuppressUntil: 0,
 };
 
 export const TIME_PUNCH_PROTO = {
@@ -1462,3 +1464,27 @@ export const PRIVILEDGE_LEVELS = {
   owner: "Owner",
   user: "User",
 };
+
+export function permissionToLevel(perm) {
+  if (perm == null) return 0;
+  if (typeof perm === "number") return perm;
+  if (typeof perm === "object" && typeof perm.level === "number") return perm.level;
+  if (typeof perm === "string") {
+    switch (perm) {
+      case "Owner": return 5;
+      case "Super-User": return 4;
+      case "Admin": return 3;
+      case "Editor": return 2;
+      case "User": return 1;
+    }
+  }
+  return 0;
+}
+
+export function levelToPrivilegeName(level) {
+  if (level >= 5) return "Owner";
+  if (level >= 4) return "Super-User";
+  if (level >= 3) return "Admin";
+  if (level >= 2) return "Editor";
+  return "User";
+}

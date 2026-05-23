@@ -266,7 +266,7 @@ export const OutgoingMessageComponent = memo(({ msgObj, isLastOutgoing, thread, 
   let mediaOnly = hasMedia && !msgObj.message;
   let showStatusIcons = isLastOutgoing;
   let currentUserID = useLoginStore.getState().getCurrentUser()?.id;
-  let isForwarding = !!(currentUserID && thread?.forwardTo?.[currentUserID]);
+  let isForwarding = !!(currentUserID && Array.isArray(thread?.forwardTo) && thread.forwardTo.some((f) => f.userID === currentUserID));
   let isResponding = (thread?.canRespond !== undefined ? thread.canRespond : msgObj.canRespond);
 
   let outerClass = s.bubbleOuter + " " + s["bubbleOuter--outgoing"] + (mediaOnly ? " " + s["bubbleOuter--mediaOnly"] : "");

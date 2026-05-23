@@ -31,6 +31,11 @@ const {
   getTemplateType,
   getDefaultSMSMessage,
 } = require("./communicationUtils");
+const {
+  withFeatureTracking,
+  withFeatureTrackingHttp,
+  withFeatureTrackingSchedule,
+} = require("./usageTracking");
 
 // ═══════════════════════════════════════════════════════════════
 // PROJECT CONFIG
@@ -800,7 +805,7 @@ exports.sendSMSEnhanced = onCall(
       firebaseServiceAccountKey,
     ],
   },
-  async (request) => {
+  withFeatureTracking("sms.send", async (request, tracker) => {
     log("Incoming enhanced SMS callable request", request.data);
     requireCallableAuth(request);
 
@@ -822,6 +827,7 @@ exports.sendSMSEnhanced = onCall(
         fromNumber,
         customerFirst = "",
         customerLast = "",
+        senderID = "",
         originalMessage = "",
         translatedFrom = "",
         translatedTo = "",
@@ -920,6 +926,9 @@ exports.sendSMSEnhanced = onCall(
           ...(statusCallbackUrl ? { statusCallback: statusCallbackUrl } : {}),
         });
         log("SMS sent (1/" + imageMediaUrls.length + ")", { messageSid: twilioResponse.sid, status: twilioResponse.status });
+        tracker.bump("twilioSegments", Number(twilioResponse.numSegments) || 1);
+        tracker.bump("twilioMms");
+        tracker.setContext({ correlationID: twilioResponse.sid });
 
         // Remaining images: no text body, just the image
         for (let i = 1; i < imageMediaUrls.length; i++) {
@@ -930,6 +939,8 @@ exports.sendSMSEnhanced = onCall(
             mediaUrl: [imageMediaUrls[i]],
           });
           log("SMS sent (" + (i + 1) + "/" + imageMediaUrls.length + ")", { messageSid: extraResponse.sid, status: extraResponse.status });
+          tracker.bump("twilioSegments", Number(extraResponse.numSegments) || 1);
+          tracker.bump("twilioMms");
         }
       } else {
         // Single image, text-only, or video links only
@@ -941,6 +952,9 @@ exports.sendSMSEnhanced = onCall(
           ...(statusCallbackUrl ? { statusCallback: statusCallbackUrl } : {}),
         });
         log("SMS sent successfully", { messageSid: twilioResponse.sid, to: twilioResponse.to, status: twilioResponse.status });
+        tracker.bump("twilioSegments", Number(twilioResponse.numSegments) || 1);
+        if (imageMediaUrls.length > 0) tracker.bump("twilioMms");
+        tracker.setContext({ correlationID: twilioResponse.sid });
       }
 
       // Store message in Firestore if messageID provided
@@ -953,15 +967,12 @@ exports.sendSMSEnhanced = onCall(
 
           // Read forwardTo from the parent doc (canonical source of truth)
           const parentDoc = await conversationRef.get();
-          let currentForwardTo = parentDoc.exists ? (parentDoc.data().forwardTo || {}) : {};
+          tracker.bump("firestoreReads");
+          let currentForwardTo = parentDoc.exists ? (parentDoc.data().forwardTo || []) : [];
 
-          // Apply the change from this send
-          if (forwardToParam && forwardToParam.userID) {
-            if (forwardToParam.enable && forwardToParam.phone) {
-              currentForwardTo[forwardToParam.userID] = { phone: forwardToParam.phone, first: forwardToParam.first || "" };
-            } else if (!forwardToParam.enable) {
-              delete currentForwardTo[forwardToParam.userID];
-            }
+          // If caller passed an array, overwrite; otherwise leave as-is
+          if (Array.isArray(forwardToParam)) {
+            currentForwardTo = forwardToParam;
           }
 
           // Store outgoing message in sms-messages (no forwardTo on individual messages)
@@ -986,6 +997,7 @@ exports.sendSMSEnhanced = onCall(
             ...(translatedFrom ? { translatedFrom } : {}),
             ...(translatedTo ? { translatedTo } : {}),
           });
+          tracker.bump("firestoreWrites");
 
           // Update conversation root with denormalized thread metadata
           await conversationRef.set({
@@ -998,11 +1010,13 @@ exports.sendSMSEnhanced = onCall(
             lastOutgoingMessageID: messageID,
             lastOutgoingMessageStatus: twilioResponse.status || "queued",
             lastOutgoingMillis: Date.now(),
+            lastOutgoingSenderID: senderID || "",
             forwardTo: currentForwardTo,
             ...(translatedTo ? { translatedTo } : {}),
             ...(customerFirst ? { customerFirst } : {}),
             ...(customerLast ? { customerLast } : {}),
           }, { merge: true });
+          tracker.bump("firestoreWrites");
 
           log("Outgoing message stored", {
             messageID,
@@ -1102,7 +1116,7 @@ exports.sendSMSEnhanced = onCall(
 
       throw new HttpsError(httpsErrorCode, errorMessage);
     }
-  }
+  })
 );
 
 /**
@@ -1112,7 +1126,7 @@ exports.sendSMSEnhanced = onCall(
  */
 exports.smsStatusCallback = onRequest(
   { cors: true, secrets: [firebaseServiceAccountKey, twilioSecretKey] },
-  async (request, response) => {
+  withFeatureTrackingHttp("sms.status", async (request, response, tracker) => {
     try {
       if (!validateTwilioWebhook(request, twilioSecretKey.value(), "smsStatusCallback")) {
         log("smsStatusCallback: invalid Twilio signature");
@@ -1121,6 +1135,9 @@ exports.smsStatusCallback = onRequest(
 
       const { MessageSid, MessageStatus, ErrorCode } = request.body || {};
       const { tenantID, storeID, phone, messageID } = request.query || {};
+      tracker.setContext({ tenantID, storeID, correlationID: MessageSid });
+      if (MessageStatus) tracker.set("messageStatus", MessageStatus);
+      if (ErrorCode) tracker.set("twilioErrorCode", ErrorCode);
 
       if (!MessageStatus || !tenantID || !storeID || !phone || !messageID) {
         log("smsStatusCallback: missing params", { MessageSid, MessageStatus, tenantID, storeID, phone, messageID });
@@ -1139,6 +1156,7 @@ exports.smsStatusCallback = onRequest(
 
       // Read current status and skip if incoming is lower priority
       const doc = await messageRef.get();
+      tracker.bump("firestoreReads");
       if (doc.exists) {
         const currentStatus = doc.data().status || "";
         const currentPriority = STATUS_PRIORITY.indexOf(currentStatus);
@@ -1153,6 +1171,7 @@ exports.smsStatusCallback = onRequest(
       if (ErrorCode) updateData.errorCode = ErrorCode;
 
       await messageRef.update(updateData);
+      tracker.bump("firestoreWrites");
 
       // Also write delivery status to the parent thread doc so the client can display it in real-time
       const conversationRef = db
@@ -1160,6 +1179,7 @@ exports.smsStatusCallback = onRequest(
         .collection("stores").doc(storeID)
         .collection("sms-messages").doc(phone);
       const parentDoc = await conversationRef.get();
+      tracker.bump("firestoreReads");
       const parentData = parentDoc.exists ? parentDoc.data() : {};
       // Only update if this message is the current last outgoing, or no last outgoing is tracked yet
       if (!parentData.lastOutgoingMessageID || parentData.lastOutgoingMessageID === messageID) {
@@ -1167,6 +1187,7 @@ exports.smsStatusCallback = onRequest(
           lastOutgoingMessageID: messageID,
           lastOutgoingMessageStatus: MessageStatus,
         }, { merge: true });
+        tracker.bump("firestoreWrites");
       }
 
       log("smsStatusCallback: updated", { messageID, status: MessageStatus, ErrorCode: ErrorCode || null });
@@ -1174,7 +1195,7 @@ exports.smsStatusCallback = onRequest(
       log("smsStatusCallback error", error.message);
     }
     return response.status(200).send("OK");
-  }
+  })
 );
 
 /**
@@ -1201,8 +1222,11 @@ exports.incomingSMSEnhanced = onRequest(
       googleTranslateApiKey,
     ],
   },
-  async (request, response) => {
+  withFeatureTrackingHttp("sms.inbound", async (request, response, tracker) => {
     const requestStartTime = Date.now();
+    if (request.body && request.body.MessageSid) {
+      tracker.setContext({ correlationID: request.body.MessageSid });
+    }
 
     response.set("Access-Control-Allow-Origin", "*");
     response.set("Access-Control-Allow-Methods", "POST, OPTIONS");
@@ -1366,7 +1390,7 @@ exports.incomingSMSEnhanced = onRequest(
 
         if (parentData && parentData.lastOutgoingMessageID) {
           canRespond = parentData.canRespond !== undefined ? !!parentData.canRespond : true;
-          conversationData = { forwardTo: parentData.forwardTo || {}, translatedTo: parentData.translatedTo || "" };
+          conversationData = { forwardTo: Array.isArray(parentData.forwardTo) ? parentData.forwardTo : [], translatedTo: parentData.translatedTo || "" };
           const lastOutgoingMillis = parentData.lastOutgoingMillis || parentData.lastMillis || 0;
 
           // Apply timeout check
@@ -1557,10 +1581,9 @@ exports.incomingSMSEnhanced = onRequest(
           }
         }
 
-        // 7b: Forward SMS to all users in the forwardTo map
-        const forwardTo = conversationData.forwardTo || {};
-        const forwardEntries = Object.entries(forwardTo);
-        if (forwardEntries.length > 0) {
+        // 7b: Forward SMS to all users in the forwardTo array
+        const forwardTo = Array.isArray(conversationData.forwardTo) ? conversationData.forwardTo : [];
+        if (forwardTo.length > 0) {
           if (!twilioClient) {
             twilioClient = require("twilio")(
               twilioSecretAccountNumber.value(),
@@ -1593,17 +1616,17 @@ exports.incomingSMSEnhanced = onRequest(
           let _tnFwd = (storeSettings?.storeInfo?.textingNumber || "").replace(/\D/g, "");
           const fromNumber = twilioData.To || (_tnFwd.length === 10 ? `+1${_tnFwd}` : "");
           if (!fromNumber) { log("No from number for forwarding, skipping"); return; }
-          await Promise.all(forwardEntries.map(async ([userID, userData]) => {
+          await Promise.all(forwardTo.map(async (entry) => {
             try {
-              if (!userData.phone) return;
+              if (!entry || !entry.phone) return;
               await twilioClient.messages.create({
                 body: forwardBody,
-                to: `+1${userData.phone}`,
+                to: `+1${entry.phone}`,
                 from: fromNumber,
               });
-              log("Forwarded SMS to user", { userID, userName: userData.first });
+              log("Forwarded SMS to user", { userID: entry.userID, userName: entry.first });
             } catch (fwdError) {
-              log("Error forwarding SMS to user", { userID, error: fwdError.message });
+              log("Error forwarding SMS to user", { userID: entry?.userID, error: fwdError.message });
             }
           }));
         }
@@ -1660,7 +1683,7 @@ exports.incomingSMSEnhanced = onRequest(
         .status(200)
         .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
     }
-  }
+  })
 );
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -4240,7 +4263,7 @@ exports.sendEmailCallable = onCall(
   {
     secrets: [firebaseServiceAccountKey, gmailAppPassword],
   },
-  async (request) => {
+  withFeatureTracking("email.send", async (request, tracker) => {
     log("Incoming email callable request", request.data);
     requireCallableAuth(request);
 
@@ -4290,6 +4313,11 @@ exports.sendEmailCallable = onCall(
       }
 
       const info = await transporter.sendMail(mailOptions);
+      tracker.bump("nodemailerSends", 1);
+      tracker.bump("firestoreReads", 1);
+      tracker.set("emailBytes", (htmlBody || "").length);
+      tracker.set("attachmentCount", (attachments && attachments.length) || 0);
+      if (info && info.messageId) tracker.setContext({ correlationID: info.messageId });
 
       log("Email sent successfully", {
         messageId: info.messageId,
@@ -4315,7 +4343,7 @@ exports.sendEmailCallable = onCall(
         "Failed to send email: " + (error.message || "Unknown error")
       );
     }
-  }
+  })
 );
 
 // ============================================================================
@@ -4329,7 +4357,7 @@ exports.uploadPDFAndSendSMSCallable = onCall(
       firebaseServiceAccountKey,
     ],
   },
-  async (request) => {
+  withFeatureTracking("pdf.upload-sms", async (request, tracker) => {
     log("Incoming uploadPDFAndSendSMS request");
     requireCallableAuth(request);
 
@@ -4348,6 +4376,7 @@ exports.uploadPDFAndSendSMSCallable = onCall(
         canRespond,
         forwardTo: forwardToParam = null,
         fromNumber: fromNumberParam,
+        senderID = "",
       } = request.data;
 
       if (tenantID && storeID) requireTenantMatch(request, tenantID, storeID);
@@ -4388,12 +4417,15 @@ exports.uploadPDFAndSendSMSCallable = onCall(
       // Upload PDF to Cloud Storage
       const bucket = admin.storage().bucket(STORAGE_BUCKET);
       const file = bucket.file(storagePath);
-      await file.save(Buffer.from(base64, "base64"), {
+      const pdfBuffer = Buffer.from(base64, "base64");
+      await file.save(pdfBuffer, {
         contentType: "application/pdf",
         metadata: { contentType: "application/pdf" },
       });
       await file.makePublic();
       const pdfURL = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+      tracker.bump("storageBytesAdded", pdfBuffer.length);
+      tracker.set("pdfBytes", pdfBuffer.length);
 
       log("PDF uploaded to Cloud Storage", { storagePath, pdfURL });
 
@@ -4427,6 +4459,9 @@ exports.uploadPDFAndSendSMSCallable = onCall(
         to: twilioResponse.to,
         status: twilioResponse.status,
       });
+      tracker.setContext({ correlationID: twilioResponse.sid });
+      tracker.bump("twilioMms", 1);
+      tracker.bump("twilioSegments", Math.max(1, Math.ceil(finalMessage.length / 160)));
 
       // Store outgoing message in Firestore
       if (messageID) {
@@ -4438,15 +4473,11 @@ exports.uploadPDFAndSendSMSCallable = onCall(
 
           // Read forwardTo from the parent doc (canonical source of truth)
           const parentDoc = await conversationRef.get();
-          let currentForwardTo = parentDoc.exists ? (parentDoc.data().forwardTo || {}) : {};
+          let currentForwardTo = parentDoc.exists ? (parentDoc.data().forwardTo || []) : [];
 
-          // Apply the change from this send
-          if (forwardToParam && forwardToParam.userID) {
-            if (forwardToParam.enable && forwardToParam.phone) {
-              currentForwardTo[forwardToParam.userID] = { phone: forwardToParam.phone, first: forwardToParam.first || "" };
-            } else if (!forwardToParam.enable) {
-              delete currentForwardTo[forwardToParam.userID];
-            }
+          // If caller passed an array, overwrite; otherwise leave as-is
+          if (Array.isArray(forwardToParam)) {
+            currentForwardTo = forwardToParam;
           }
 
           const messageRef = conversationRef.collection("messages").doc(messageID);
@@ -4474,10 +4505,13 @@ exports.uploadPDFAndSendSMSCallable = onCall(
             lastOutgoingMessageID: messageID,
             lastOutgoingMessageStatus: twilioResponse.status || "queued",
             lastOutgoingMillis: Date.now(),
+            lastOutgoingSenderID: senderID || "",
             canRespond: canRespond || false,
             forwardTo: currentForwardTo,
             threadStatus: "open",
           }, { merge: true });
+          tracker.bump("firestoreReads", 1);
+          tracker.bump("firestoreWrites", 2);
         } catch (firestoreError) {
           log("Error storing outgoing message in Firestore", firestoreError.message);
         }
@@ -4497,7 +4531,7 @@ exports.uploadPDFAndSendSMSCallable = onCall(
       if (error instanceof HttpsError) throw error;
       throw new HttpsError("internal", "Failed to upload PDF and send SMS: " + (error.message || "Unknown error"));
     }
-  }
+  })
 );
 
 // ============================================================================
@@ -4512,7 +4546,7 @@ exports.generateReceiptPDFCallable = onCall(
       gmailAppPassword,
     ],
   },
-  async (request) => {
+  withFeatureTracking("pdf.receipt", async (request, tracker) => {
     log("Incoming generateReceiptPDF request");
     requireCallableAuth(request);
 
@@ -4569,10 +4603,14 @@ exports.generateReceiptPDFCallable = onCall(
         default:
           throw new HttpsError("invalid-argument", "Unknown receiptType: " + receiptType);
       }
+      tracker.set("pdfReceiptType", receiptType);
+      const pdfBuffer = Buffer.from(base64, "base64");
+      tracker.set("pdfBytes", pdfBuffer.length);
+      tracker.set("storageBytesAdded", pdfBuffer.length);
 
       const bucket = admin.storage().bucket(STORAGE_BUCKET);
       const file = bucket.file(storagePath);
-      await file.save(Buffer.from(base64, "base64"), {
+      await file.save(pdfBuffer, {
         contentType: "application/pdf",
         metadata: { contentType: "application/pdf" },
       });
@@ -4611,6 +4649,7 @@ exports.generateReceiptPDFCallable = onCall(
           const customerID = smsParams.customerID || "";
           const canRespond = smsParams.canRespond || null;
           const forwardToParam = smsParams.forwardTo || null;
+          const smsSenderID = smsParams.senderID || "";
 
           const pdfCallbackParams = messageID ? `?tenantID=${tenantID}&storeID=${storeID}&phone=${cleanPhoneNumber}&messageID=${messageID}` : "";
           const twilioResponse = await twilioClient.messages.create({
@@ -4619,6 +4658,8 @@ exports.generateReceiptPDFCallable = onCall(
             from: fromNumber,
             ...(messageID ? { statusCallback: `${FUNCTIONS_BASE_URL}/smsStatusCallback${pdfCallbackParams}` } : {}),
           });
+          tracker.bump("twilioSegments", Number(twilioResponse.numSegments) || 1);
+          tracker.bump("twilioReceiptSends");
 
           log("Receipt SMS sent", { messageSid: twilioResponse.sid, status: twilioResponse.status });
 
@@ -4630,14 +4671,10 @@ exports.generateReceiptPDFCallable = onCall(
                 .collection("sms-messages").doc(cleanPhoneNumber);
 
               const parentDoc = await conversationRef.get();
-              let currentForwardTo = parentDoc.exists ? (parentDoc.data().forwardTo || {}) : {};
+              let currentForwardTo = parentDoc.exists ? (parentDoc.data().forwardTo || []) : [];
 
-              if (forwardToParam && forwardToParam.userID) {
-                if (forwardToParam.enable && forwardToParam.phone) {
-                  currentForwardTo[forwardToParam.userID] = { phone: forwardToParam.phone, first: forwardToParam.first || "" };
-                } else if (!forwardToParam.enable) {
-                  delete currentForwardTo[forwardToParam.userID];
-                }
+              if (Array.isArray(forwardToParam)) {
+                currentForwardTo = forwardToParam;
               }
 
               const messageRef = conversationRef.collection("messages").doc(messageID);
@@ -4663,6 +4700,7 @@ exports.generateReceiptPDFCallable = onCall(
                 lastOutgoingMessageID: messageID,
                 lastOutgoingMessageStatus: twilioResponse.status || "queued",
                 lastOutgoingMillis: Date.now(),
+                lastOutgoingSenderID: smsSenderID,
                 canRespond: canRespond || false,
                 forwardTo: currentForwardTo,
                 threadStatus: "open",
@@ -4697,6 +4735,7 @@ exports.generateReceiptPDFCallable = onCall(
             subject: emailSubject,
             html: emailHtml,
           });
+          tracker.bump("gmailMessagesSent");
 
           log("Receipt email sent", { to: emailParams.to });
         } catch (emailError) {
@@ -4713,7 +4752,7 @@ exports.generateReceiptPDFCallable = onCall(
       if (error instanceof HttpsError) throw error;
       throw new HttpsError("internal", "Failed to generate receipt PDF: " + (error.message || "Unknown error"));
     }
-  }
+  })
 );
 
 // ============================================================================
@@ -4729,7 +4768,7 @@ exports.sendReceiptCallable = onCall(
       googleTranslateApiKey,
     ],
   },
-  async (request) => {
+  withFeatureTracking("receipt.send", async (request, tracker) => {
     log("Incoming sendReceipt request");
     requireCallableAuth(request);
 
@@ -4754,6 +4793,7 @@ exports.sendReceiptCallable = onCall(
         forwardTo: forwardToParam,
         langCode,
         updateWorkorderField,
+        senderID = "",
       } = request.data;
 
       if (tenantID && storeID) requireTenantMatch(request, tenantID, storeID);
@@ -4895,14 +4935,10 @@ exports.sendReceiptCallable = onCall(
                       .collection("sms-messages").doc(cleanPhoneNumber);
 
                     const parentDoc = await conversationRef.get();
-                    let currentForwardTo = parentDoc.exists ? (parentDoc.data().forwardTo || {}) : {};
+                    let currentForwardTo = parentDoc.exists ? (parentDoc.data().forwardTo || []) : [];
 
-                    if (forwardToParam && forwardToParam.userID) {
-                      if (forwardToParam.enable && forwardToParam.phone) {
-                        currentForwardTo[forwardToParam.userID] = { phone: forwardToParam.phone, first: forwardToParam.first || "" };
-                      } else if (!forwardToParam.enable) {
-                        delete currentForwardTo[forwardToParam.userID];
-                      }
+                    if (Array.isArray(forwardToParam)) {
+                      currentForwardTo = forwardToParam;
                     }
 
                     const messageRef = conversationRef.collection("messages").doc(messageID);
@@ -4928,6 +4964,7 @@ exports.sendReceiptCallable = onCall(
                       lastOutgoingMessageID: messageID,
                       lastOutgoingMessageStatus: twilioResponse.status || "queued",
                       lastOutgoingMillis: Date.now(),
+                      lastOutgoingSenderID: senderID || "",
                       canRespond: canRespond || false,
                       forwardTo: currentForwardTo,
                       threadStatus: "open",
@@ -5015,7 +5052,7 @@ exports.sendReceiptCallable = onCall(
       if (error instanceof HttpsError) throw error;
       throw new HttpsError("internal", "Failed to send receipt: " + (error.message || "Unknown error"));
     }
-  }
+  })
 );
 
 // ============================================================================
@@ -5025,7 +5062,7 @@ exports.translateTextCallable = onCall(
   {
     secrets: [googleTranslateApiKey],
   },
-  async (request) => {
+  withFeatureTracking("translate.text", async (request, tracker) => {
     log("Incoming translateText callable request", request.data);
     requireCallableAuth(request);
 
@@ -5078,6 +5115,15 @@ exports.translateTextCallable = onCall(
         sourceLanguage ||
         null;
 
+      const charsTranslated = isArray
+        ? text.reduce((acc, t) => acc + (t || "").length, 0)
+        : (text || "").length;
+      tracker.bump("translateApiCalls", 1);
+      tracker.bump("translateCharacters", charsTranslated);
+      tracker.set("targetLanguage", targetLanguage);
+      tracker.set("detectedSourceLanguage", detectedSourceLanguage);
+      tracker.set("inputItems", isArray ? text.length : 1);
+
       log("Translation successful", {
         targetLanguage,
         detectedSourceLanguage,
@@ -5101,7 +5147,7 @@ exports.translateTextCallable = onCall(
         "Failed to translate text: " + (error.message || "Unknown error")
       );
     }
-  }
+  })
 );
 
 // ============================================================================
@@ -7172,7 +7218,7 @@ function parseGmailMessage(msg) {
 
 exports.gmailInitiateAuth = onCall(
   { secrets: [gmailOAuthClientId, firebaseServiceAccountKey] },
-  async (request) => {
+  withFeatureTracking("gmail.auth.initiate", async (request, tracker) => {
     const { tenantID, storeID, accountKey } = request.data;
     if (!tenantID || !storeID || !accountKey) {
       throw new HttpsError("invalid-argument", "tenantID, storeID, accountKey required");
@@ -7190,13 +7236,14 @@ exports.gmailInitiateAuth = onCall(
       `&prompt=consent` +
       `&state=${state}`;
 
+    tracker.set("accountKey", accountKey);
     return { success: true, authUrl };
-  }
+  })
 );
 
 exports.gmailOAuthCallback = onRequest(
   { secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey], cors: true },
-  async (req, res) => {
+  withFeatureTrackingHttp("gmail.auth.callback", async (req, res, tracker) => {
     try {
       const { code, state } = req.query;
       if (!code || !state) {
@@ -7205,6 +7252,8 @@ exports.gmailOAuthCallback = onRequest(
       }
 
       const { tenantID, storeID, accountKey } = JSON.parse(Buffer.from(state, "base64url").toString());
+      tracker.setContext({ tenantID, storeID });
+      tracker.set("accountKey", accountKey);
       const redirectUri = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/gmailOAuthCallback`;
 
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -7304,12 +7353,12 @@ exports.gmailOAuthCallback = onRequest(
       log("gmailOAuthCallback error", error);
       res.status(500).send("OAuth callback failed: " + error.message);
     }
-  }
+  })
 );
 
 exports.gmailDisconnect = onCall(
   { secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey] },
-  async (request) => {
+  withFeatureTracking("gmail.disconnect", async (request, tracker) => {
     const { tenantID, storeID, accountKey } = request.data;
     if (!tenantID || !storeID || !accountKey) {
       throw new HttpsError("invalid-argument", "tenantID, storeID, accountKey required");
@@ -7322,6 +7371,7 @@ exports.gmailDisconnect = onCall(
       .collection("email-auth").doc(accountKey);
 
     const snap = await authRef.get();
+    tracker.bump("firestoreReads", 1);
     if (snap.exists) {
       const data = snap.data();
       if (data.accessToken) {
@@ -7337,12 +7387,15 @@ exports.gmailDisconnect = onCall(
       if (data.email) {
         const lookupRef = db.collection("email-lookup").doc(data.email.toLowerCase());
         await lookupRef.delete();
+        tracker.bump("firestoreWrites", 1);
       }
       await authRef.delete();
+      tracker.bump("firestoreWrites", 1);
     }
 
+    tracker.set("accountKey", accountKey);
     return { success: true };
-  }
+  })
 );
 
 exports.gmailSyncEmails = onCall(
@@ -7351,12 +7404,14 @@ exports.gmailSyncEmails = onCall(
     timeoutSeconds: 300,
     memory: "512MiB",
   },
-  async (request) => {
+  withFeatureTracking("gmail.sync", async (request, tracker) => {
     const { tenantID, storeID, accountKey, fullSync } = request.data;
     if (!tenantID || !storeID || !accountKey) {
       throw new HttpsError("invalid-argument", "tenantID, storeID, accountKey required");
     }
 
+    tracker.set("accountKey", accountKey);
+    tracker.set("syncType", fullSync ? "full" : "incremental");
     log("gmailSyncEmails called", { tenantID, storeID, accountKey, fullSync });
 
     const db = await getDB(firebaseServiceAccountKey);
@@ -7369,6 +7424,7 @@ exports.gmailSyncEmails = onCall(
       .collection("email-auth").doc(accountKey);
     const authSnap = await authRef.get();
     const authData = authSnap.data();
+    tracker.bump("firestoreReads", 1);
     log("gmailSyncEmails - authData:", JSON.stringify({ historyId: authData?.historyId, status: authData?.status, email: authData?.email }));
 
     const emailsCollection = db
@@ -7387,6 +7443,7 @@ exports.gmailSyncEmails = onCall(
           `${GMAIL_API_BASE}/messages?maxResults=50&labelIds=${label}`,
           { headers: { Authorization: `Bearer ${accessToken}` } }
         );
+        tracker.bump("gmailApiCalls", 1);
         if (listRes.ok) {
           const listData = await listRes.json();
           (listData.messages || []).forEach((m) => allMessageIds.add(m.id));
@@ -7408,16 +7465,20 @@ exports.gmailSyncEmails = onCall(
             return msgRes.json();
           })
         );
+        tracker.bump("gmailApiCalls", batch.length);
 
         const writeBatch = db.batch();
+        let batchWrites = 0;
         for (const msg of messages) {
           if (!msg) continue;
           const parsed = parseGmailMessage(msg);
           parsed.accountKey = accountKey;
           writeBatch.set(emailsCollection.doc(parsed.id), parsed, { merge: true });
           synced++;
+          batchWrites++;
         }
         await writeBatch.commit();
+        tracker.bump("firestoreWrites", batchWrites);
 
         if (i + BATCH_SIZE < messageIds.length) {
           await new Promise((r) => setTimeout(r, 100));
@@ -7427,8 +7488,10 @@ exports.gmailSyncEmails = onCall(
       const profileRes = await fetch(`${GMAIL_API_BASE}/profile`, {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
+      tracker.bump("gmailApiCalls", 1);
       const profile = await profileRes.json();
       await authRef.update({ historyId: profile.historyId || authData.historyId });
+      tracker.bump("firestoreWrites", 1);
     } else {
       let pageToken = "";
       let historyId = authData.historyId;
@@ -7439,6 +7502,7 @@ exports.gmailSyncEmails = onCall(
         const histRes = await fetch(url, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
+        tracker.bump("gmailApiCalls", 1);
 
         if (!histRes.ok) {
           const status = histRes.status;
@@ -7475,19 +7539,24 @@ exports.gmailSyncEmails = onCall(
             return msgRes.json();
           })
         );
+        tracker.bump("gmailApiCalls", batch.length);
 
         const writeBatch = db.batch();
+        let batchWrites = 0;
         for (const msg of messages) {
           if (!msg) continue;
           const parsed = parseGmailMessage(msg);
           parsed.accountKey = accountKey;
           writeBatch.set(emailsCollection.doc(parsed.id), parsed, { merge: true });
           synced++;
+          batchWrites++;
         }
         await writeBatch.commit();
+        tracker.bump("firestoreWrites", batchWrites);
       }
 
       await authRef.update({ historyId });
+      tracker.bump("firestoreWrites", 1);
     }
 
     const unreadSnap = await emailsCollection
@@ -7495,13 +7564,16 @@ exports.gmailSyncEmails = onCall(
       .where("isUnread", "==", true)
       .where("labelIds", "array-contains", "INBOX")
       .get();
+    tracker.bump("firestoreReads", unreadSnap.size || 1);
     await authRef.update({
       unreadCount: unreadSnap.size,
       lastSyncedAt: Date.now(),
     });
+    tracker.bump("firestoreWrites", 1);
+    tracker.set("messagesSynced", synced);
 
     return { success: true, synced, unreadCount: unreadSnap.size };
-  }
+  })
 );
 
 async function syncFull(db, accessToken, tenantID, storeID, accountKey, emailsCollection, authRef) {
@@ -7563,7 +7635,7 @@ async function syncFull(db, accessToken, tenantID, storeID, accountKey, emailsCo
 
 exports.gmailPushHandler = onRequest(
   { secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey] },
-  async (req, res) => {
+  withFeatureTrackingHttp("gmail.push.handler", async (req, res, tracker) => {
     try {
       log("gmailPushHandler called, body:", JSON.stringify(req.body || {}).substring(0, 500));
       const message = req.body?.message;
@@ -7581,9 +7653,11 @@ exports.gmailPushHandler = onRequest(
         res.status(200).send("No email");
         return;
       }
+      if (message.messageId) tracker.setContext({ correlationID: message.messageId });
 
       const db = await getDB(firebaseServiceAccountKey);
       const lookupSnap = await db.collection("email-lookup").doc(emailAddress).get();
+      tracker.bump("firestoreReads", 1);
       if (!lookupSnap.exists) {
         log("gmailPushHandler: no email-lookup doc for", emailAddress);
         res.status(200).send("Unknown email");
@@ -7592,6 +7666,8 @@ exports.gmailPushHandler = onRequest(
       log("gmailPushHandler: found lookup for", emailAddress, "->", JSON.stringify(lookupSnap.data()));
 
       const { tenantID, storeID, accountKey } = lookupSnap.data();
+      tracker.setContext({ tenantID, storeID });
+      tracker.set("accountKey", accountKey);
       const accessToken = await getGmailAccessToken(db, tenantID, storeID, accountKey);
       const authRef = db
         .collection("tenants").doc(tenantID)
@@ -7599,6 +7675,7 @@ exports.gmailPushHandler = onRequest(
         .collection("email-auth").doc(accountKey);
       const authSnap = await authRef.get();
       const authData = authSnap.data();
+      tracker.bump("firestoreReads", 1);
       const emailsCollection = db
         .collection("tenants").doc(tenantID)
         .collection("stores").doc(storeID)
@@ -7617,6 +7694,7 @@ exports.gmailPushHandler = onRequest(
         const histRes = await fetch(url, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
+        tracker.bump("gmailApiCalls", 1);
         if (!histRes.ok) break;
         const histData = await histRes.json();
         if (histData.history) {
@@ -7644,14 +7722,18 @@ exports.gmailPushHandler = onRequest(
             return msgRes.json();
           })
         );
+        tracker.bump("gmailApiCalls", batch.length);
         const writeBatch = db.batch();
+        let batchWrites = 0;
         for (const msg of messages) {
           if (!msg) continue;
           const parsed = parseGmailMessage(msg);
           parsed.accountKey = accountKey;
           writeBatch.set(emailsCollection.doc(parsed.id), parsed, { merge: true });
+          batchWrites++;
         }
         await writeBatch.commit();
+        tracker.bump("firestoreWrites", batchWrites);
       }
 
       const unreadSnap = await emailsCollection
@@ -7659,11 +7741,14 @@ exports.gmailPushHandler = onRequest(
         .where("isUnread", "==", true)
         .where("labelIds", "array-contains", "INBOX")
         .get();
+      tracker.bump("firestoreReads", unreadSnap.size || 1);
       await authRef.update({
         historyId,
         unreadCount: unreadSnap.size,
         lastSyncedAt: Date.now(),
       });
+      tracker.bump("firestoreWrites", 1);
+      tracker.set("messagesSynced", changedIds.length);
 
       log("gmailPushHandler success:", changedIds.length, "messages synced for", emailAddress);
       res.status(200).send("OK");
@@ -7671,7 +7756,7 @@ exports.gmailPushHandler = onRequest(
       log("gmailPushHandler error", error);
       res.status(200).send("Error handled");
     }
-  }
+  })
 );
 
 exports.gmailSendEmail = onCall(
@@ -7680,8 +7765,12 @@ exports.gmailSendEmail = onCall(
     timeoutSeconds: 60,
     memory: "256MiB",
   },
-  async (request) => {
+  withFeatureTracking("gmail.send", async (request, tracker) => {
     const { tenantID, storeID, accountKey, to, cc, bcc, subject, bodyHtml, bodyText, threadId, inReplyTo, references, attachments, videoStorageUrl } = request.data;
+    tracker.set("accountKey", accountKey);
+    tracker.set("recipientCount", (to?.length || 0) + (cc?.length || 0) + (bcc?.length || 0));
+    tracker.set("attachmentCount", attachments?.length || 0);
+    tracker.set("hasVideo", videoStorageUrl ? 1 : 0);
     if (!tenantID || !storeID || !accountKey) {
       throw new HttpsError("invalid-argument", "tenantID, storeID, accountKey required");
     }
@@ -7696,6 +7785,7 @@ exports.gmailSendEmail = onCall(
       .collection("stores").doc(storeID)
       .collection("email-auth").doc(accountKey);
     const authData = (await authRef.get()).data();
+    tracker.bump("firestoreReads", 1);
     const fromEmail = authData.email;
 
     let htmlContent = bodyHtml || "";
@@ -7768,6 +7858,9 @@ exports.gmailSendEmail = onCall(
       },
       body: JSON.stringify(sendBody),
     });
+    tracker.bump("gmailApiCalls", 1);
+    tracker.bump("gmailMessagesSent", 1);
+    tracker.bump("emailBytesSent", rawMessage.length);
 
     if (!sendRes.ok) {
       const errBody = await sendRes.text();
@@ -7776,11 +7869,13 @@ exports.gmailSendEmail = onCall(
     }
 
     const sentMsg = await sendRes.json();
+    tracker.setContext({ correlationID: sentMsg.id });
 
     const msgRes = await fetch(
       `${GMAIL_API_BASE}/messages/${sentMsg.id}?format=full`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
+    tracker.bump("gmailApiCalls", 1);
     if (msgRes.ok) {
       const fullMsg = await msgRes.json();
       const parsed = parseGmailMessage(fullMsg);
@@ -7790,19 +7885,23 @@ exports.gmailSendEmail = onCall(
         .collection("stores").doc(storeID)
         .collection("emails");
       await emailsCollection.doc(parsed.id).set(parsed, { merge: true });
+      tracker.bump("firestoreWrites", 1);
     }
 
     return { success: true, messageId: sentMsg.id, threadId: sentMsg.threadId };
-  }
+  })
 );
 
 exports.gmailModifyLabels = onCall(
   { secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey] },
-  async (request) => {
+  withFeatureTracking("gmail.modifyLabels", async (request, tracker) => {
     const { tenantID, storeID, accountKey, messageIds, addLabelIds, removeLabelIds } = request.data;
     if (!tenantID || !storeID || !accountKey || !messageIds?.length) {
       throw new HttpsError("invalid-argument", "Missing required fields");
     }
+
+    tracker.set("accountKey", accountKey);
+    tracker.set("messageCount", messageIds.length);
 
     const db = await getDB(firebaseServiceAccountKey);
     const accessToken = await getGmailAccessToken(db, tenantID, storeID, accountKey);
@@ -7819,6 +7918,7 @@ exports.gmailModifyLabels = onCall(
         removeLabelIds: removeLabelIds || [],
       }),
     });
+    tracker.bump("gmailApiCalls", 1);
 
     if (!modifyRes.ok) {
       const errBody = await modifyRes.text();
@@ -7832,9 +7932,11 @@ exports.gmailModifyLabels = onCall(
       .collection("emails");
 
     const writeBatch = db.batch();
+    let batchWrites = 0;
     for (const msgId of messageIds) {
       const docRef = emailsCollection.doc(msgId);
       const snap = await docRef.get();
+      tracker.bump("firestoreReads", 1);
       if (!snap.exists) continue;
       const data = snap.data();
       let labels = [...(data.labelIds || [])];
@@ -7848,31 +7950,38 @@ exports.gmailModifyLabels = onCall(
         labelIds: labels,
         isUnread: labels.includes("UNREAD"),
       });
+      batchWrites++;
     }
     await writeBatch.commit();
+    tracker.bump("firestoreWrites", batchWrites);
 
     const unreadSnap = await emailsCollection
       .where("accountKey", "==", accountKey)
       .where("isUnread", "==", true)
       .where("labelIds", "array-contains", "INBOX")
       .get();
+    tracker.bump("firestoreReads", unreadSnap.size || 1);
     const authRef = db
       .collection("tenants").doc(tenantID)
       .collection("stores").doc(storeID)
       .collection("email-auth").doc(accountKey);
     await authRef.update({ unreadCount: unreadSnap.size });
+    tracker.bump("firestoreWrites", 1);
 
     return { success: true, unreadCount: unreadSnap.size };
-  }
+  })
 );
 
 exports.gmailGetAttachment = onCall(
   { secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey] },
-  async (request) => {
+  withFeatureTracking("gmail.attachment.fetch", async (request, tracker) => {
     const { tenantID, storeID, accountKey, messageId, attachmentId, filename } = request.data;
     if (!tenantID || !storeID || !accountKey || !messageId || !attachmentId) {
       throw new HttpsError("invalid-argument", "Missing required fields");
     }
+
+    tracker.set("accountKey", accountKey);
+    tracker.setContext({ correlationID: messageId });
 
     const db = await getDB(firebaseServiceAccountKey);
     const accessToken = await getGmailAccessToken(db, tenantID, storeID, accountKey);
@@ -7881,6 +7990,7 @@ exports.gmailGetAttachment = onCall(
       `${GMAIL_API_BASE}/messages/${messageId}/attachments/${attachmentId}`,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
+    tracker.bump("gmailApiCalls", 1);
 
     if (!attRes.ok) {
       throw new HttpsError("internal", "Failed to get attachment");
@@ -7888,6 +7998,8 @@ exports.gmailGetAttachment = onCall(
 
     const attData = await attRes.json();
     const fileBuffer = Buffer.from(attData.data, "base64url");
+    tracker.bump("storageBytesAdded", fileBuffer.length);
+    tracker.set("attachmentBytes", fileBuffer.length);
 
     const bucket = admin.storage().bucket(STORAGE_BUCKET);
     const storagePath = `${tenantID}/${storeID}/email-attachments/${messageId}/${filename || "attachment"}`;
@@ -7907,25 +8019,28 @@ exports.gmailGetAttachment = onCall(
       .collection("stores").doc(storeID)
       .collection("emails");
     const emailDoc = await emailsCollection.doc(messageId).get();
+    tracker.bump("firestoreReads", 1);
     if (emailDoc.exists) {
       const emailData = emailDoc.data();
       const updatedAttachments = (emailData.attachments || []).map((att) =>
         att.attachmentId === attachmentId ? { ...att, storageUrl: downloadUrl } : att
       );
       await emailsCollection.doc(messageId).update({ attachments: updatedAttachments });
+      tracker.bump("firestoreWrites", 1);
     }
 
     return { success: true, downloadUrl };
-  }
+  })
 );
 
 exports.gmailSetupWatch = onCall(
   { secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey] },
-  async (request) => {
+  withFeatureTracking("gmail.watch.setup", async (request, tracker) => {
     const { tenantID, storeID, accountKey } = request.data;
     if (!tenantID || !storeID || !accountKey) {
       throw new HttpsError("invalid-argument", "tenantID, storeID, accountKey required");
     }
+    tracker.set("accountKey", accountKey);
 
     const db = await getDB(firebaseServiceAccountKey);
     const accessToken = await getGmailAccessToken(db, tenantID, storeID, accountKey);
@@ -7945,6 +8060,7 @@ exports.gmailSetupWatch = onCall(
         labelIds: ["INBOX"],
       }),
     });
+    tracker.bump("gmailApiCalls", 1);
 
     if (!watchRes.ok) {
       const errText = await watchRes.text();
@@ -7957,10 +8073,11 @@ exports.gmailSetupWatch = onCall(
       watchExpiration: parseInt(watchData.expiration) || 0,
       historyId: watchData.historyId,
     });
+    tracker.bump("firestoreWrites", 1);
     log("Watch set up for", accountKey, "expires", watchData.expiration);
 
     return { success: true, expiration: watchData.expiration };
-  }
+  })
 );
 
 exports.gmailRenewWatch = onSchedule(
@@ -7969,7 +8086,7 @@ exports.gmailRenewWatch = onSchedule(
     secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey],
     timeoutSeconds: 120,
   },
-  async () => {
+  withFeatureTrackingSchedule("gmail.watch.renew", async (event, tracker) => {
     log("[gmailRenewWatch] === START ===", { now: Date.now(), nowIso: new Date().toISOString() });
     let stats = {
       tenants: 0, stores: 0, accounts: 0,
@@ -8044,6 +8161,7 @@ exports.gmailRenewWatch = onSchedule(
                   labelIds: ["INBOX"],
                 }),
               });
+              tracker.bump("gmailApiCalls", 1);
 
               if (watchRes.ok) {
                 const watchData = await watchRes.json();
@@ -8051,6 +8169,7 @@ exports.gmailRenewWatch = onSchedule(
                   watchExpiration: parseInt(watchData.expiration) || 0,
                   historyId: watchData.historyId || data.historyId,
                 });
+                tracker.bump("firestoreWrites", 1);
                 stats.renewed++;
                 log("[gmailRenewWatch]     ✅ RENEWED:", {
                   email: data.email,
@@ -8087,8 +8206,11 @@ exports.gmailRenewWatch = onSchedule(
       });
     }
 
+    tracker.set("accountsScanned", stats.accounts);
+    tracker.set("watchesRenewed", stats.renewed);
+    tracker.set("watchFailures", stats.watchFetchFailed + stats.exceptions);
     log("[gmailRenewWatch] === END ===", stats);
-  }
+  })
 );
 
 exports.gmailReconnectWatch = onCall(
@@ -8097,11 +8219,12 @@ exports.gmailReconnectWatch = onCall(
     timeoutSeconds: 300,
     memory: "512MiB",
   },
-  async (request) => {
+  withFeatureTracking("gmail.watch.reconnect", async (request, tracker) => {
     const { tenantID, storeID, accountKey } = request.data;
     if (!tenantID || !storeID || !accountKey) {
       throw new HttpsError("invalid-argument", "tenantID, storeID, accountKey required");
     }
+    tracker.set("accountKey", accountKey);
 
     log("[gmailReconnectWatch] start", { tenantID, storeID, accountKey });
 
@@ -8123,6 +8246,7 @@ exports.gmailReconnectWatch = onCall(
         labelIds: ["INBOX"],
       }),
     });
+    tracker.bump("gmailApiCalls", 1);
 
     if (!watchRes.ok) {
       const errText = await watchRes.text();
@@ -8137,6 +8261,7 @@ exports.gmailReconnectWatch = onCall(
       watchExpiration: parseInt(watchData.expiration) || 0,
       historyId: watchData.historyId,
     });
+    tracker.bump("firestoreWrites", 1);
     log("[gmailReconnectWatch] watch re-established", {
       expiration: watchData.expiration, historyId: watchData.historyId,
     });
@@ -8149,6 +8274,7 @@ exports.gmailReconnectWatch = onCall(
     const fullResult = await syncFull(
       db, accessToken, tenantID, storeID, accountKey, emailsCollection, authRef
     );
+    tracker.set("backfillSynced", fullResult.synced);
     log("[gmailReconnectWatch] backfill complete", fullResult);
 
     return {
@@ -8158,6 +8284,14 @@ exports.gmailReconnectWatch = onCall(
       synced: fullResult.synced,
       unreadCount: fullResult.unreadCount,
     };
-  }
+  })
 );
+
+// ============================================================================
+// Usage / cost analytics — vendor totals pull + reconciliation
+// (definitions live in ./usageVendorTotals.js)
+// ============================================================================
+const _vendorTotals = require("./usageVendorTotals");
+exports.pullVendorTotals = _vendorTotals.pullVendorTotals;
+exports.reconcileUsageEvents = _vendorTotals.reconcileUsageEvents;
 

@@ -43,29 +43,22 @@ import {
 } from "../../../stores";
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
-import { dbSendReceipt, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond, dbToggleSMSForwarding, dbGetCustomer, dbSaveMessageTranslation } from "../../../db_calls_wrapper";
+import { dbSendReceipt, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond, dbToggleSMSForwarding, dbSetSMSForwardTo, dbGetCustomer, dbSaveMessageTranslation } from "../../../db_calls_wrapper";
 import { translateText } from "../../../db_calls";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
-import { scheduleAutoSend, clearAutoSend, buildForwardToPayload } from "./ReplyOptionsBar";
+import { scheduleAutoSend, clearAutoSend, buildForwardToArray, initialSelectedForwardIDs } from "./ReplyOptionsBar";
 import { ComposeArea } from "./ComposeArea";
 import { IncomingMessageComponent, OutgoingMessageComponent, MediaThumbnail } from "./MessageBubble";
 
 // Optimistic thread patch so bubble icons (block/forward) reflect send intent
 // immediately, instead of flickering once the Firestore listener round-trips
 // the server-side thread update.
-function applyOptimisticThreadPatch(phone, canRespondVal, forwardToPayload) {
+function applyOptimisticThreadPatch(phone, canRespondVal, forwardToArray) {
   if (!phone || phone.length !== 10) return;
   let patch = {};
   if (canRespondVal !== undefined) patch.canRespond = canRespondVal ? true : null;
-  if (forwardToPayload && forwardToPayload.userID) {
-    patch.forwardToDelta = {
-      userID: forwardToPayload.userID,
-      enable: !!forwardToPayload.enable,
-      phone: forwardToPayload.phone || "",
-      first: forwardToPayload.first || "",
-    };
-  }
-  if (patch.canRespond === undefined && !patch.forwardToDelta) return;
+  if (Array.isArray(forwardToArray)) patch.forwardToArray = forwardToArray;
+  if (patch.canRespond === undefined && !patch.forwardToArray) return;
   useCustMessagesStore.getState().patchSmsThread(phone, patch);
 }
 
@@ -132,13 +125,10 @@ export function MessagesComponent({}) {
   const zSmsThreads = useCustMessagesStore((state) => state.getSmsThreads());
   //////////////////////////////////////////////////////////////////////////
 
-  // Clear hasNewSMS flag when messages are viewed - only if current user sent the last message
+  // Clear hasNewSMS flag when messages are viewed
   useEffect(() => {
     if (zWorkorderObj?.hasNewSMS) {
-      let currentUser = useLoginStore.getState().getCurrentUser();
-      if (currentUser?.id && zWorkorderObj.lastSMSSenderUserID === currentUser.id) {
-        useOpenWorkordersStore.getState().setField("hasNewSMS", false, zWorkorderObj.id);
-      }
+      useOpenWorkordersStore.getState().setField("hasNewSMS", false, zWorkorderObj.id);
     }
     if (zWorkorderObj?.customerCell) {
       let thread = zSmsThreads.find(t => t.phone === zWorkorderObj.customerCell);
@@ -155,7 +145,7 @@ export function MessagesComponent({}) {
   const [sShowReplyModal, _setShowReplyModal] = useState(false);
   const [sCustomPhone, _setCustomPhone] = useState("");
   const [sCustomPhoneMessages, _setCustomPhoneMessages] = useState([]);
-  const [sForwardReplies, _setForwardReplies] = useState(false);
+  const [sSelectedForwardIDs, _setSelectedForwardIDs] = useState(() => initialSelectedForwardIDs(null));
   const [sAudioRecording, _setAudioRecording] = useState(false);
   const [sAudioBlob, _setAudioBlob] = useState(null);
   const [sAudioUrl, _setAudioUrl] = useState("");
@@ -360,38 +350,27 @@ export function MessagesComponent({}) {
     if (sFromLang && sToLang && sFromLang !== sToLang) debouncedTranslate(newMessage, sToLang);
   }
 
-  function handleToggleForwardReplies() {
-    const currentUser = useLoginStore.getState().getCurrentUser();
-    if (!currentUser?.id) return;
-    if (!currentUser?.phone) {
-      useAlertScreenStore.getState().setValues({
-        title: "No Phone Number",
-        message: "Your account needs a personal phone number to enable SMS forwarding. Ask an admin to add one.",
-        btn1Text: "OK",
-        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-        showAlert: true,
-        canExitOnOuterClick: true,
-      });
-      return;
-    }
+  function handleFire() {
+    if (!sSelectedForwardIDs?.length) return;
+    const users = useSettingsStore.getState().getSettings()?.users || [];
+    const forwardToArray = buildForwardToArray(sSelectedForwardIDs, users);
     userOverrodeForwardRef.current = true;
-    let newVal = !sForwardReplies;
-    _setForwardReplies(newVal);
-    if (newVal) {
-      clearAutoSend();
-      _setCanRespond(true);
-      _setShowReplyModal(false);
-      if (pendingActionRef.current === "intake") {
-        handleSendWorkorderTicket(true, true);
-        pendingActionRef.current = null;
-      } else if (pendingActionRef.current === "media") {
-        sendMediaMessage(true, true);
-      } else if (pendingActionRef.current === "audio") {
-        handleSendAudio(true, true);
-        pendingActionRef.current = null;
-      } else {
-        sendMessage(sNewMessage, "", true, true);
-      }
+    clearAutoSend();
+    _setCanRespond(true);
+    _setShowReplyModal(false);
+    if (pendingActionRef.current === "intake") {
+      handleSendWorkorderTicket(true, forwardToArray);
+      pendingActionRef.current = null;
+    } else if (pendingActionRef.current === "finalized") {
+      handleSendFinalizedTicket(true, forwardToArray);
+      pendingActionRef.current = null;
+    } else if (pendingActionRef.current === "media") {
+      sendMediaMessage(true, forwardToArray);
+    } else if (pendingActionRef.current === "audio") {
+      handleSendAudio(true, forwardToArray);
+      pendingActionRef.current = null;
+    } else {
+      sendMessage(sNewMessage, "", true, forwardToArray);
     }
   }
 
@@ -410,13 +389,13 @@ export function MessagesComponent({}) {
     return chunks;
   }
 
-  async function sendMessage(text, imageUrl = "", canRespondVal, forwardOverride) {
+  async function sendMessage(text, imageUrl = "", canRespondVal, forwardToArrayOrNull) {
     if ((!text || !text.trim()) && !imageUrl) return;
     let sendPhone = sCustomPhoneMode ? sCustomPhone : zCustomer.customerCell;
     if (!sendPhone || sendPhone.length !== 10) return;
     let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
     let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-    let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+    let forwardTo = Array.isArray(forwardToArrayOrNull) ? forwardToArrayOrNull : null;
     userOverrodeForwardRef.current = false;
     userOverrodeCanRespondRef.current = false;
     applyOptimisticThreadPatch(sendPhone, useCanRespond, forwardTo);
@@ -454,7 +433,7 @@ export function MessagesComponent({}) {
       msg.type = "outgoing";
       msg.senderUserObj = zCurrentUserObj;
       msg.sentByUser = zCurrentUserObj.id;
-      if (isLastChunk && forwardTo) msg.forwardTo = forwardTo;
+      if (isLastChunk && Array.isArray(forwardTo)) msg.forwardTo = forwardTo;
       if (sCustomPhoneMode) {
         _setCustomPhoneMessages(prev => [...prev, { ...msg, status: "sending" }]);
       }
@@ -528,7 +507,7 @@ export function MessagesComponent({}) {
       .replace(/\{storePhone\}/g, ((p) => p.length === 10 ? "(" + p.slice(0, 3) + ") " + p.slice(3, 6) + "-" + p.slice(6) : p)(zSettings?.storeInfo?.phone || ""))
       .replace(/\{supportEmail\}/g, zSettings?.storeInfo?.supportEmail || "");
   }
-  function handleSendWorkorderTicket(canRespondVal, forwardOverride) {
+  function handleSendWorkorderTicket(canRespondVal, forwardToArrayOrNull) {
     if (!zWorkorderObj || !zCustomer?.customerCell) return;
     let settings = zSettings;
     let { tenantID, storeID } = useSettingsStore.getState().getSettings();
@@ -541,7 +520,7 @@ export function MessagesComponent({}) {
     let storagePath = build_db_path.cloudStorage.intakeReceiptPDF(zWorkorderObj.id, tenantID, storeID);
     let messageID = crypto.randomUUID();
     let canRespondBool = canRespondVal ? true : null;
-    let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+    let forwardTo = Array.isArray(forwardToArrayOrNull) ? forwardToArrayOrNull : null;
     applyOptimisticThreadPatch(zCustomer.customerCell, !!canRespondVal, forwardTo);
 
     useCustMessagesStore.getState().setOutgoingMessage({
@@ -566,6 +545,7 @@ export function MessagesComponent({}) {
       customerEmail: "",
       customerCell: zCustomer.customerCell,
       customerID: zWorkorderObj?.customerID || "",
+      workorderID: zWorkorderObj?.id || "",
       templateVars: {
         firstName: capitalizeFirstLetterOfString((zCustomer?.first || "Customer").trim()),
         storeName: settings?.storeInfo?.displayName || "our store",
@@ -586,7 +566,7 @@ export function MessagesComponent({}) {
     });
   }
 
-  function handleSendFinalizedTicket(canRespondVal, forwardOverride) {
+  function handleSendFinalizedTicket(canRespondVal, forwardToArrayOrNull) {
     if (!zWorkorderObj || !zCustomer?.customerCell) return;
     if (!zWorkorderObj.workorderLines || zWorkorderObj.workorderLines.length === 0) return;
     let settings = zSettings;
@@ -605,7 +585,7 @@ export function MessagesComponent({}) {
     let storagePath = `${tenantID}/${storeID}/workorder-tickets/${zWorkorderObj.id}.pdf`;
     let messageID = crypto.randomUUID();
     let canRespondBool = canRespondVal ? true : null;
-    let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+    let forwardTo = Array.isArray(forwardToArrayOrNull) ? forwardToArrayOrNull : null;
     applyOptimisticThreadPatch(zCustomer.customerCell, !!canRespondVal, forwardTo);
 
     useCustMessagesStore.getState().setOutgoingMessage({
@@ -630,6 +610,8 @@ export function MessagesComponent({}) {
       customerEmail: "",
       customerCell: zCustomer.customerCell,
       customerID: zWorkorderObj?.customerID || "",
+      workorderID: zWorkorderObj?.id || "",
+      saleID: zWorkorderObj?.activeSaleID || "",
       templateVars: {
         firstName: capitalizeFirstLetterOfString((zCustomer?.first || "Customer").trim()),
         storeName: settings?.storeInfo?.displayName || "our store",
@@ -798,14 +780,14 @@ export function MessagesComponent({}) {
       });
     });
   }
-  async function sendMediaMessage(canRespondVal, forwardOverride) {
+  async function sendMediaMessage(canRespondVal, forwardToArrayOrNull) {
     let mediaItems = pendingMediaRef.current;
     if (!mediaItems || !mediaItems.length) return;
     let sendPhone = sCustomPhoneMode ? sCustomPhone : zCustomer.customerCell;
     if (!sendPhone || sendPhone.length !== 10) return;
     let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
     let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-    let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+    let forwardTo = Array.isArray(forwardToArrayOrNull) ? forwardToArrayOrNull : null;
     userOverrodeForwardRef.current = false;
     userOverrodeCanRespondRef.current = false;
     applyOptimisticThreadPatch(sendPhone, useCanRespond, forwardTo);
@@ -836,7 +818,7 @@ export function MessagesComponent({}) {
     msg.type = "outgoing";
     msg.senderUserObj = zCurrentUserObj;
     msg.sentByUser = zCurrentUserObj.id;
-    if (forwardTo) msg.forwardTo = forwardTo;
+    if (Array.isArray(forwardTo)) msg.forwardTo = forwardTo;
     if (sCustomPhoneMode) {
       _setCustomPhoneMessages(prev => [...prev, { ...msg, status: "sending" }]);
     }
@@ -893,7 +875,7 @@ export function MessagesComponent({}) {
     _setHubSelectedPhone("");
     _setHubNewPhone("");
     _setNewMessage("");
-    _setForwardReplies(false);
+    _setSelectedForwardIDs(initialSelectedForwardIDs(null));
     clearTranslation();
   }
 
@@ -902,7 +884,7 @@ export function MessagesComponent({}) {
     _setHubSelectedPhone("");
     _setHubNewPhone("");
     _setNewMessage("");
-    _setForwardReplies(false);
+    _setSelectedForwardIDs(initialSelectedForwardIDs(null));
     clearTranslation();
     hasInitialScrolledRef.current = false;
     lastMsgIdRef.current = null;
@@ -968,6 +950,12 @@ export function MessagesComponent({}) {
 
   function handleHubThreadClick(thread) {
     _setReadThreadPhones(prev => ({ ...prev, [thread.phone]: thread.lastMillis }));
+    let woStore = useOpenWorkordersStore.getState();
+    zAllWorkorders.forEach((wo) => {
+      if (wo.customerCell === thread.phone && wo.hasNewSMS) {
+        woStore.setField("hasNewSMS", false, wo.id);
+      }
+    });
     _setHubSelectedPhone(prev => {
       if (prev === thread.phone) {
         _setHubHoverPhone("");
@@ -995,7 +983,7 @@ export function MessagesComponent({}) {
     _setCustomPhoneMessages([]);
     _setCanRespond(true);
     _setNewMessage("");
-    _setForwardReplies(false);
+    _setSelectedForwardIDs(initialSelectedForwardIDs(null));
     clearTranslation();
   }
 
@@ -1004,7 +992,7 @@ export function MessagesComponent({}) {
     _setCustomPhone("");
     _setCustomPhoneMessages([]);
     _setNewMessage("");
-    _setForwardReplies(false);
+    _setSelectedForwardIDs(initialSelectedForwardIDs(null));
     clearTranslation();
   }
 
@@ -1019,7 +1007,8 @@ export function MessagesComponent({}) {
       let currentUser = useLoginStore.getState().getCurrentUser();
       if (currentUser?.id) {
         let thread = zSmsThreads.find(t => t.phone === phone);
-        if (thread?.forwardTo?.[currentUser.id]) {
+        let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
+        if (arr.some((f) => f.userID === currentUser.id)) {
           await dbToggleSMSForwarding(phone, currentUser.id, false, currentUser.phone, currentUser.first);
         }
       }
@@ -1032,7 +1021,30 @@ export function MessagesComponent({}) {
     useLoginStore.getState().requireLogin(async () => {
       let currentUser = useLoginStore.getState().getCurrentUser();
       let thread = zSmsThreads.find(t => t.phone === phone);
-      let isCurrentlyForwarding = !!(thread?.forwardTo?.[currentUser.id]);
+      let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
+      let isCurrentlyForwarding = arr.some((f) => f.userID === currentUser.id);
+      if (isCurrentlyForwarding && arr.length > 1) {
+        let alert = useAlertScreenStore.getState();
+        alert.setValues({
+          title: "Stop Forwarding",
+          message: arr.length + " users are receiving forwarded replies for this conversation. Stop forwarding for everyone, or just you?",
+          btn1Text: "Just Me",
+          btn2Text: "Everyone (" + arr.length + ")",
+          btn3Text: "Cancel",
+          handleBtn1Press: async () => {
+            useAlertScreenStore.getState().setShowAlert(false);
+            await dbToggleSMSForwarding(phone, currentUser.id, false, currentUser.phone, currentUser.first);
+          },
+          handleBtn2Press: async () => {
+            useAlertScreenStore.getState().setShowAlert(false);
+            await dbSetSMSForwardTo(phone, []);
+          },
+          handleBtn3Press: () => {
+            useAlertScreenStore.getState().setShowAlert(false);
+          },
+        });
+        return;
+      }
       if (!isCurrentlyForwarding && !sCanRespond) {
         userOverrodeCanRespondRef.current = true;
         _setCanRespond(true);
@@ -1083,7 +1095,7 @@ export function MessagesComponent({}) {
     clearAutoSend();
   }
 
-  async function handleSendAudio(canRespondVal, forwardOverride) {
+  async function handleSendAudio(canRespondVal, forwardToArrayOrNull) {
     if (!sAudioBlob) return;
     let sendPhone = sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell;
     if (!sendPhone || sendPhone.length !== 10) return;
@@ -1100,7 +1112,7 @@ export function MessagesComponent({}) {
       if (!result.success) { log("Audio upload failed:", result.error); _setAudioUploading(false); return; }
       let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
       let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-      let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+      let forwardTo = Array.isArray(forwardToArrayOrNull) ? forwardToArrayOrNull : null;
       applyOptimisticThreadPatch(sendPhone, useCanRespond, forwardTo);
       let msg = { ...SMS_PROTO };
       msg.message = storeName + " has sent you an audio message";
@@ -1115,7 +1127,7 @@ export function MessagesComponent({}) {
       msg.type = "outgoing";
       msg.senderUserObj = zCurrentUserObj;
       msg.sentByUser = zCurrentUserObj.id;
-      if (forwardTo) msg.forwardTo = forwardTo;
+      if (Array.isArray(forwardTo)) msg.forwardTo = forwardTo;
       let sendResult = await smsService.send(msg);
       if (sendResult.success && !sCustomPhoneMode) {
         let allWOs = useOpenWorkordersStore.getState().workorders;
@@ -1461,7 +1473,7 @@ export function MessagesComponent({}) {
           onSend={() => {
             useLoginStore.getState().requireLogin(() => {
               if (isUnmodifiedTemplateRef.current) {
-                sendMessage(sNewMessage, "", false, false);
+                sendMessage(sNewMessage, "", false, null);
                 isUnmodifiedTemplateRef.current = false;
               } else {
                 _setShowReplyModal(true);
@@ -1491,8 +1503,9 @@ export function MessagesComponent({}) {
           }}
           onSendAudio={() => useLoginStore.getState().requireLogin(() => handleSendAudio(sCanRespond))}
           onDeleteAudio={handleDeleteAudio}
-          forwardReplies={sForwardReplies}
-          onToggleForward={handleToggleForwardReplies}
+          selectedForwardIDs={sSelectedForwardIDs}
+          onChangeSelectedForwardIDs={_setSelectedForwardIDs}
+          onFire={handleFire}
           onCancelReply={() => {
             clearAutoSend();
             _setShowReplyModal(false);
@@ -1824,7 +1837,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     return (wo?.customerLanguage && LANG_NAME_TO_CODE[wo.customerLanguage]) || "en";
   });
   const [sShowReplyModal, _setShowReplyModal] = useState(false);
-  const [sForwardReplies, _setForwardReplies] = useState(false);
+  const [sSelectedForwardIDs, _setSelectedForwardIDs] = useState(() => initialSelectedForwardIDs(thread));
   const [sHubMediaUploading, _setHubMediaUploading] = useState(false);
   const [sAudioRecording, _setAudioRecording] = useState(false);
   const [sAudioBlob, _setAudioBlob] = useState(null);
@@ -1868,7 +1881,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     let cancelled = false;
     _setNewMessage("");
     _setShowReplyModal(false);
-    _setForwardReplies(false);
+    _setSelectedForwardIDs(initialSelectedForwardIDs(thread));
     _setLoadingMore(false);
     clearAutoSend();
     // Reset audio state on phone change
@@ -2019,7 +2032,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     });
   }
 
-  async function doSend(text, canRespondVal, forwardOverride) {
+  async function doSend(text, canRespondVal, forwardToArrayOrNull) {
     if (!text?.trim() || !phone || phone.length !== 10) return;
 
     let isTranslated = !!(translatedText && sFromLang && sToLang && sFromLang !== sToLang);
@@ -2030,7 +2043,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     _setNewMessage("");
     clearTranslation();
     let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
-    let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+    let forwardTo = Array.isArray(forwardToArrayOrNull) ? forwardToArrayOrNull : null;
     applyOptimisticThreadPatch(phone, !!canRespondVal, forwardTo);
     let msg = { ...SMS_PROTO };
     msg.message = sendText;
@@ -2042,7 +2055,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     msg.type = "outgoing";
     msg.senderUserObj = zCurrentUserObj;
     msg.sentByUser = zCurrentUserObj.id;
-    if (forwardTo) msg.forwardTo = forwardTo;
+    if (Array.isArray(forwardTo)) msg.forwardTo = forwardTo;
     let matchedWO = useOpenWorkordersStore.getState().workorders.find(wo => wo.customerCell === phone);
     if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
     let optimistic = { ...msg, status: "sending" };
@@ -2064,31 +2077,18 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     }
   }
 
-  function handleToggleForwardReplies() {
-    const currentUser = useLoginStore.getState().getCurrentUser();
-    if (!currentUser?.id) return;
-    if (!currentUser?.phone) {
-      useAlertScreenStore.getState().setValues({
-        title: "No Phone Number",
-        message: "Your account needs a personal phone number to enable SMS forwarding. Ask an admin to add one.",
-        btn1Text: "OK",
-        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
-        showAlert: true, canExitOnOuterClick: true,
-      });
-      return;
-    }
-    let newVal = !sForwardReplies;
-    _setForwardReplies(newVal);
-    if (newVal) {
-      clearAutoSend();
-      _setCanRespond(true);
-      _setShowReplyModal(false);
-      if (pendingActionRef.current === "audio") {
-        handleSendAudio(true, true);
-        pendingActionRef.current = null;
-      } else {
-        doSend(pendingSendTextRef.current, true, true);
-      }
+  function handleFire() {
+    if (!sSelectedForwardIDs?.length) return;
+    const users = useSettingsStore.getState().getSettings()?.users || [];
+    const forwardToArray = buildForwardToArray(sSelectedForwardIDs, users);
+    clearAutoSend();
+    _setCanRespond(true);
+    _setShowReplyModal(false);
+    if (pendingActionRef.current === "audio") {
+      handleSendAudio(true, forwardToArray);
+      pendingActionRef.current = null;
+    } else {
+      doSend(pendingSendTextRef.current, true, forwardToArray);
     }
   }
 
@@ -2108,7 +2108,8 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     updateCache(updated, noMoreRef.current);
     if (!newCanRespond) {
       let currentUser = useLoginStore.getState().getCurrentUser();
-      if (currentUser?.id && thread?.forwardTo?.[currentUser.id]) {
+      let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
+      if (currentUser?.id && arr.some((f) => f.userID === currentUser.id)) {
         await dbToggleSMSForwarding(phone, currentUser.id, false, currentUser.phone, currentUser.first);
       }
     }
@@ -2118,7 +2119,30 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     if (!phone || phone.length !== 10) return;
     useLoginStore.getState().requireLogin(async () => {
       let currentUser = useLoginStore.getState().getCurrentUser();
-      let isCurrentlyForwarding = !!(thread?.forwardTo?.[currentUser.id]);
+      let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
+      let isCurrentlyForwarding = arr.some((f) => f.userID === currentUser.id);
+      if (isCurrentlyForwarding && arr.length > 1) {
+        let alert = useAlertScreenStore.getState();
+        alert.setValues({
+          title: "Stop Forwarding",
+          message: arr.length + " users are receiving forwarded replies for this conversation. Stop forwarding for everyone, or just you?",
+          btn1Text: "Just Me",
+          btn2Text: "Everyone (" + arr.length + ")",
+          btn3Text: "Cancel",
+          handleBtn1Press: async () => {
+            useAlertScreenStore.getState().setShowAlert(false);
+            await dbToggleSMSForwarding(phone, currentUser.id, false, currentUser.phone, currentUser.first);
+          },
+          handleBtn2Press: async () => {
+            useAlertScreenStore.getState().setShowAlert(false);
+            await dbSetSMSForwardTo(phone, []);
+          },
+          handleBtn3Press: () => {
+            useAlertScreenStore.getState().setShowAlert(false);
+          },
+        });
+        return;
+      }
       if (!isCurrentlyForwarding && !sCanRespond) {
         _setCanRespond(true);
         let outgoing = sMessages.filter(m => m.type === "outgoing");
@@ -2176,7 +2200,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     clearAutoSend();
   }
 
-  async function handleSendAudio(canRespondVal, forwardOverride) {
+  async function handleSendAudio(canRespondVal, forwardToArrayOrNull) {
     if (!sAudioBlob || !phone || phone.length !== 10) return;
     _setAudioUploading(true);
     try {
@@ -2191,7 +2215,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
       if (!result.success) { log("Audio upload failed:", result.error); _setAudioUploading(false); return; }
       let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
       let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
-      let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+      let forwardTo = Array.isArray(forwardToArrayOrNull) ? forwardToArrayOrNull : null;
       applyOptimisticThreadPatch(phone, useCanRespond, forwardTo);
       let msg = { ...SMS_PROTO };
       msg.message = storeName + " has sent you an audio message";
@@ -2203,7 +2227,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
       msg.type = "outgoing";
       msg.senderUserObj = zCurrentUserObj;
       msg.sentByUser = zCurrentUserObj.id;
-      if (forwardTo) msg.forwardTo = forwardTo;
+      if (Array.isArray(forwardTo)) msg.forwardTo = forwardTo;
       let matchedWO = useOpenWorkordersStore.getState().workorders.find(wo => wo.customerCell === phone);
       if (matchedWO) { msg.customerFirst = matchedWO.customerFirst || ""; msg.customerLast = matchedWO.customerLast || ""; }
       let optimistic = { ...msg, status: "sending" };
@@ -2445,8 +2469,9 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
           }}
           onSendAudio={() => useLoginStore.getState().requireLogin(() => handleSendAudio(sCanRespond))}
           onDeleteAudio={handleDeleteAudio}
-          forwardReplies={sForwardReplies}
-          onToggleForward={handleToggleForwardReplies}
+          selectedForwardIDs={sSelectedForwardIDs}
+          onChangeSelectedForwardIDs={_setSelectedForwardIDs}
+          onFire={handleFire}
           onCancelReply={() => {
             clearAutoSend();
             _setShowReplyModal(false);

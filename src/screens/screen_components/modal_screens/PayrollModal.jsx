@@ -168,7 +168,7 @@ function pairPunches(filteredArr) {
   return { displayArr: arr, runningTotalMinutes };
 }
 
-export const PayrollModal = ({ handleExit, employeeUser }) => {
+export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
   const zDefaultPayrollTimeFrame = useSettingsStore((s) => s.settings?.defaultPayrollTimeFrame, deepEqual);
   const zStoreDisplayName = useSettingsStore((s) => s.settings?.storeInfo?.displayName);
   const zEmailTemplates = useSettingsStore((s) => s.settings?.emailTemplates, deepEqual);
@@ -180,11 +180,20 @@ export const PayrollModal = ({ handleExit, employeeUser }) => {
   let tf = zDefaultPayrollTimeFrame || { begin: "lastFriday", end: "thisThursday" };
   let defaultRange = getTimeFrameRange(tf);
 
-  const [sSelectedUser, _setSelectedUser] = useState(employeeUser || null);
+  const [sSelectedUser, _setSelectedUser] = useState(employeeUser || preselectedUser || null);
 
-  const [sStartDate, _setStartDate] = useState(employeeUser ? dayjs().startOf("day") : defaultRange.start);
-  const [sEndDate, _setEndDate] = useState(employeeUser ? dayjs().endOf("day") : defaultRange.end);
-  const [sActiveShortcut, _setActiveShortcut] = useState(employeeUser ? "Today" : "Pay Period");
+  const last2DaysStart = dayjs().subtract(1, "day").startOf("day");
+  const last2DaysEnd = dayjs().endOf("day");
+
+  const [sStartDate, _setStartDate] = useState(
+    employeeUser ? dayjs().startOf("day") : (preselectedUser ? last2DaysStart : defaultRange.start)
+  );
+  const [sEndDate, _setEndDate] = useState(
+    employeeUser ? dayjs().endOf("day") : (preselectedUser ? last2DaysEnd : defaultRange.end)
+  );
+  const [sActiveShortcut, _setActiveShortcut] = useState(
+    employeeUser ? "Today" : (preselectedUser ? null : "Pay Period")
+  );
 
   const [sFilteredArr, _setFilteredArr] = useState([]);
   const [sLoading, _setLoading] = useState(false);

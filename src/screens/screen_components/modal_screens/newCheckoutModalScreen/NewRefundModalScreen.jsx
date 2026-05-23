@@ -731,7 +731,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     const canSMS = customerForReceipt.customerCell && smsContent.trim();
     const canEmail = customerForReceipt.email && emailContent.trim();
     if (canSMS || canEmail) {
-      sendRefundReceipt(refundReceipt, customerForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null);
+      sendRefundReceipt(refundReceipt, customerForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, { saleID: sale?.id || "", workorderID: primaryWO?.id || "" });
       _setReceiptSentOverlay({ sentSMS: !!canSMS, sentEmail: !!canEmail });
     }
 
@@ -785,7 +785,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       let canSMS = customerForReceipt.customerCell && smsContent.trim();
       let canEmail = customerForReceipt.email && emailContent.trim();
       if (canSMS || canEmail) {
-        sendRefundReceipt(sLastRefundReceipt, customerForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null);
+        sendRefundReceipt(sLastRefundReceipt, customerForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, { saleID: sOriginalSale?.id || "", workorderID: primaryWO?.id || "" });
         _setReceiptSentOverlay({ sentSMS: !!canSMS, sentEmail: !!canEmail });
       }
     } else {
@@ -814,7 +814,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     let canSMS = phone && smsContent.trim();
     let canEmail = email && emailContent.trim();
     if (canSMS || canEmail) {
-      await sendRefundReceipt(sLastRefundReceipt, customerForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null);
+      await sendRefundReceipt(sLastRefundReceipt, customerForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, { saleID: sOriginalSale?.id || "", workorderID: primaryWO?.id || "" });
       _setReceiptSentOverlay({ sentSMS: !!canSMS, sentEmail: !!canEmail });
     }
   }

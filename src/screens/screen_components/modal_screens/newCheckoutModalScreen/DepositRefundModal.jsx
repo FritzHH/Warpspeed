@@ -175,6 +175,8 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
         customerEmail: customer?.email || "",
         customerCell: customer?.phone || customer?.customerCell || "",
         customerID: customer?.id || "",
+        saleID: sTransaction?.saleID || "",
+        workorderID: deposit?.workorderID || sTransaction?.workorderID || "",
         templateVars: {
           firstName: (customer?.first || "Customer").trim(),
           storeName: settings?.storeInfo?.displayName || "our store",

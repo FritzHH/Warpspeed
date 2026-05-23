@@ -1061,7 +1061,7 @@ export function NewCheckoutModalScreen() {
     let langCode = getTranslateCode(sReceiptLanguage);
     if (langCode) {
       try {
-        let translated = await translateSalesReceipt(saleReceipt, langCode);
+        let translated = await translateSalesReceipt(saleReceipt, langCode, { saleID: sale?.id || "", customerID: zCustomer?.id || "" });
         translatedReceipt = translated.translatedReceipt;
         translatedPdfLabels = translated.pdfLabels;
       } catch (e) {
@@ -1212,7 +1212,7 @@ export function NewCheckoutModalScreen() {
     let langCode = getTranslateCode(sReceiptLanguage);
     if (langCode) {
       try {
-        let translated = await translateSalesReceipt(saleReceipt, langCode);
+        let translated = await translateSalesReceipt(saleReceipt, langCode, { saleID: sale?.id || "", workorderID: primaryWO?.id || "", customerID: customerForReceipt?.id || "" });
         translatedReceipt = translated.translatedReceipt;
         translatedPdfLabels = translated.pdfLabels;
       } catch (e) {
@@ -1362,7 +1362,7 @@ export function NewCheckoutModalScreen() {
       let langCode = getTranslateCode(sReceiptLanguage);
       if (langCode) {
         try {
-          let translated = await translateSalesReceipt(saleReceipt, langCode);
+          let translated = await translateSalesReceipt(saleReceipt, langCode, { saleID: sSale?.id || "", workorderID: primaryWO?.id || "", customerID: customerForReceipt?.id || "" });
           translatedReceipt = translated.translatedReceipt;
           translatedPdfLabels = translated.pdfLabels;
         } catch (e) {
@@ -1572,7 +1572,7 @@ export function NewCheckoutModalScreen() {
     let langCode = getTranslateCode(sReceiptLanguage);
     if (langCode) {
       try {
-        let translated = await translateSalesReceipt(toPrint, langCode);
+        let translated = await translateSalesReceipt(toPrint, langCode, { saleID: sSale?.id || "", workorderID: primaryWO?.id || "", customerID: customer?.id || "" });
         toPrint = translated.translatedReceipt;
       } catch (e) {
         log("Receipt translation failed on reprint, using English:", e);

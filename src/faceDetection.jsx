@@ -346,12 +346,17 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
       const matchedUser = descriptor ? findMatchingUser(descriptor) : null;
 
       if (matchedUser) {
+        let prevUserId = useLoginStore.getState().currentUser?.id;
+        let isFreshLogin = prevUserId !== matchedUser.id;
         lastMatchRef.current = { userId: matchedUser.id, timestamp: Date.now() };
         useLoginStore.getState().setCurrentUser(matchedUser);
         useLoginStore.getState().setLastActionMillis();
         useLoginStore.getState().setCameraStatus("matched");
-        useLoginStore.getState().runPostLoginFunction();
-        checkClockIn(matchedUser);
+        if (isFreshLogin) {
+          useLoginStore.getState().runPostLoginFunction();
+          useLoginStore.getState().triggerLoginMessagesAutoOpen(matchedUser);
+          checkClockIn(matchedUser);
+        }
         recognitionStateRef.current = "keepalive";
         verifyAttemptsRef.current = 0;
       } else {

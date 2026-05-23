@@ -6,9 +6,9 @@ import { clearIdPool } from "./idPool";
 import {
   CUSTOMER_PROTO,
   INVENTORY_ITEM_PROTO,
-  PRIVILEDGE_LEVELS,
   TAB_NAMES,
   TIME_PUNCH_PROTO,
+  permissionToLevel,
 } from "./data";
 import {
   addOrRemoveFromArr,
@@ -30,7 +30,17 @@ import {
   dbGetCompletedSale,
   dbGetCompletedWorkorder,
   dbGetWorkorder,
-  dbSaveCurrentPunchClock,
+  dbSetUserPunchSlot,
+  dbClearUserPunchSlot,
+  dbAddManagerNote,
+  dbUpdateManagerNote,
+  dbResolveManagerNote,
+  dbAddInAppMessage,
+  dbMarkInAppMessageReadByUser,
+  dbMarkInAppMessageUnreadByUser,
+  dbDeleteInAppMessageForUser,
+  dbHardDeleteInAppMessage,
+  dbSetUserLoginMessageSuppress,
   dbSaveCustomer,
   dbSaveInventoryItem,
   dbSaveOpenWorkorder,
@@ -683,24 +693,251 @@ export const useLoginStore = create(
     punch.option = option;
     punch.millis = millis;
 
-    let punchClock = get().punchClock;
+    let punchClock = { ...get().punchClock };
 
     if (option === "in") {
       punchClock[userID] = punch;
+      set({ punchClock });
+      dbSetUserPunchSlot(userID, punch);
     } else {
       punchClock = removeFieldFromObj(punchClock, userID);
+      set({ punchClock });
+      dbClearUserPunchSlot(userID);
     }
 
-    set({
-      punchClock,
-    });
     let tenantID = useSettingsStore.getState().getSettings()?.tenantID;
     let storeID = useSettingsStore.getState().getSettings()?.storeID;
-    dbSaveCurrentPunchClock(punchClock, tenantID, storeID);
     dbSavePunchObject(punch, punch.id, tenantID, storeID);
   },
 
   setPunchClock: (punchClock) => set({ punchClock }),
+
+  managerNotes: {},
+  getManagerNotes: () => get().managerNotes,
+  setManagerNotes: (managerNotes) => set({ managerNotes }),
+  setAddManagerNote: (userID, message, authorName, type = "punch_forgot") => {
+    let note = {
+      id: crypto.randomUUID(),
+      userID,
+      authorName: authorName || "",
+      message: message || "",
+      createdMillis: Date.now(),
+      read: false,
+      readAt: null,
+      readByUserID: null,
+      type,
+    };
+    let next = { ...get().managerNotes, [note.id]: note };
+    set({ managerNotes: next });
+    dbAddManagerNote(note);
+    return note;
+  },
+  setMarkManagerNoteRead: (noteID, managerUserID) => {
+    let current = get().managerNotes[noteID];
+    if (!current) return;
+    let updated = {
+      ...current,
+      read: !current.read,
+      readAt: !current.read ? Date.now() : null,
+      readByUserID: !current.read ? (managerUserID || null) : null,
+    };
+    let next = { ...get().managerNotes, [noteID]: updated };
+    set({ managerNotes: next });
+    dbUpdateManagerNote(updated);
+  },
+  setResolveManagerNote: (noteID) => {
+    let next = { ...get().managerNotes };
+    delete next[noteID];
+    set({ managerNotes: next });
+    dbResolveManagerNote(noteID);
+  },
+
+  /////////////////////////////////////////////////////////////
+  // In-app messages (user-to-user, threaded)
+  /////////////////////////////////////////////////////////////
+  inAppMessages: {},
+  getInAppMessages: () => get().inAppMessages,
+  setInAppMessages: (inAppMessages) => set({ inAppMessages }),
+  setSendInAppMessage: ({ message, toUserIDs, workorderID = null, workorderCustomerName = null, workorderStatus = null, replyToID = null }) => {
+    let fromUser = get().currentUser;
+    if (!fromUser?.id) return null;
+    let fromAuthorName = ((fromUser.first || "") + " " + (fromUser.last || "")).trim();
+    let id = crypto.randomUUID();
+    let threadID = id;
+    if (replyToID) {
+      let parent = get().inAppMessages?.[replyToID];
+      if (parent) threadID = parent.threadID || parent.id;
+    }
+    let msg = {
+      id,
+      threadID,
+      replyToID,
+      fromUserID: fromUser.id,
+      fromAuthorName,
+      toUserIDs: Array.isArray(toUserIDs) ? toUserIDs : [],
+      message: message || "",
+      workorderID: workorderID || null,
+      workorderCustomerName: workorderCustomerName || null,
+      workorderStatus: workorderStatus || null,
+      createdMillis: Date.now(),
+      readBy: { [fromUser.id]: Date.now() },
+      deletedBy: {},
+    };
+    let next = { ...get().inAppMessages, [id]: msg };
+    set({ inAppMessages: next });
+    dbAddInAppMessage(msg);
+    return msg;
+  },
+  setMarkInAppMessageRead: (messageID) => {
+    let user = get().currentUser;
+    if (!user?.id) return;
+    let cur = get().inAppMessages?.[messageID];
+    if (!cur) return;
+    let updated = { ...cur, readBy: { ...(cur.readBy || {}), [user.id]: Date.now() } };
+    let next = { ...get().inAppMessages, [messageID]: updated };
+    set({ inAppMessages: next });
+    dbMarkInAppMessageReadByUser(messageID, user.id);
+  },
+  setMarkInAppMessageUnread: (messageID) => {
+    let user = get().currentUser;
+    if (!user?.id) return;
+    let cur = get().inAppMessages?.[messageID];
+    if (!cur) return;
+    let nextReadBy = { ...(cur.readBy || {}) };
+    delete nextReadBy[user.id];
+    let updated = { ...cur, readBy: nextReadBy };
+    let next = { ...get().inAppMessages, [messageID]: updated };
+    set({ inAppMessages: next });
+    dbMarkInAppMessageUnreadByUser(messageID, user.id);
+  },
+  setDeleteInAppMessageForCurrentUser: (messageID) => {
+    let user = get().currentUser;
+    if (!user?.id) return;
+    let cur = get().inAppMessages?.[messageID];
+    if (!cur) return;
+    let updated = { ...cur, deletedBy: { ...(cur.deletedBy || {}), [user.id]: true } };
+    let next = { ...get().inAppMessages, [messageID]: updated };
+    set({ inAppMessages: next });
+    dbDeleteInAppMessageForUser(messageID, user.id);
+  },
+  setHardDeleteInAppMessage: (messageID) => {
+    let cur = get().inAppMessages?.[messageID];
+    if (!cur) return;
+    let next = { ...get().inAppMessages };
+    delete next[messageID];
+    set({ inAppMessages: next });
+    dbHardDeleteInAppMessage(messageID);
+  },
+
+  // Login-time auto-open of the UserMessagesModal
+  loginMessagesShowForUserID: null,
+  loginMessagesShowTab: null,
+  loginMessagesOnDismiss: null,
+  getLoginMessagesShowForUserID: () => get().loginMessagesShowForUserID,
+  setLoginMessagesShowForUserID: (loginMessagesShowForUserID, tab = "inbox", onDismiss = null) =>
+    set({ loginMessagesShowForUserID, loginMessagesShowTab: tab, loginMessagesOnDismiss: onDismiss }),
+  consumeLoginMessagesOnDismiss: () => {
+    let cb = get().loginMessagesOnDismiss;
+    set({ loginMessagesShowForUserID: null, loginMessagesShowTab: null, loginMessagesOnDismiss: null });
+    if (typeof cb === "function") cb();
+  },
+  setSendWelcomeMessageToUser: (toUserObj) => {
+    if (!toUserObj?.id) return null;
+    let rawFirst = (toUserObj.first || "").trim();
+    let first = rawFirst ? rawFirst.charAt(0).toUpperCase() + rawFirst.slice(1).toLowerCase() : "there";
+    let level = toUserObj.permissions?.level || 0;
+    let isManager = level >= 3;
+    let lines = [
+      "Hello " + first + ", welcome to Cadence Point of Sale!",
+      "",
+      "Quick guide to your Messages tab (Options > User > APP MESSAGING):",
+      "",
+      "INBOX - Messages from your coworkers appear here. Anyone on the team can compose a message to one or more users. Replies stay together as a thread, so a back-and-forth conversation reads top to bottom.",
+      "",
+      "ATTACH A WORKORDER - When composing, you can attach an open workorder. The recipient sees a chip on the message and can click it to jump straight to that workorder.",
+    ];
+    if (isManager) {
+      lines.push(
+        "",
+        "MANAGER TAB - Because your account is set to manager (level 3+), you'll also see a Manager tab. Staff can send you notes from the punch-clock screen (for example, when they forget to clock in or out). Mark them read or remove them as you handle each one.",
+      );
+    }
+    lines.push(
+      "",
+      "SUPPRESS - The top-left of the Messages modal has a SUPPRESS dropdown. If you don't want the modal popping up at every login, set it for 30 minutes, 1 hour, up to 8 hours. After the time runs out, the modal will resume opening on login when you have unread items.",
+      "",
+      "AUTO-OPEN - When you log in" + (isManager ? " and have unread messages or manager notes" : " and have unread messages") + ", this modal opens automatically so nothing slips through.",
+      "",
+      "You can delete this welcome message any time using the DELETE button below it.",
+    );
+    let body = lines.join("\n");
+    let id = crypto.randomUUID();
+    let msg = {
+      id,
+      threadID: id,
+      replyToID: null,
+      fromUserID: "system",
+      fromAuthorName: "Cadence POS",
+      toUserIDs: [toUserObj.id],
+      message: body,
+      workorderID: null,
+      workorderCustomerName: null,
+      workorderStatus: null,
+      createdMillis: Date.now(),
+      readBy: {},
+      deletedBy: {},
+    };
+    let next = { ...get().inAppMessages, [id]: msg };
+    set({ inAppMessages: next });
+    dbAddInAppMessage(msg);
+    return msg;
+  },
+  triggerLoginMessagesAutoOpen: (userObj, onDismiss = null) => {
+    let userID = userObj?.id;
+    if (!userID) {
+      if (typeof onDismiss === "function") onDismiss();
+      return;
+    }
+    let suppressUntil = userObj?.loginMessageSuppressUntil || 0;
+    if (suppressUntil && Date.now() < suppressUntil) {
+      if (typeof onDismiss === "function") onDismiss();
+      return;
+    }
+    let level = userObj?.permissions?.level || 0;
+    let msgs = get().inAppMessages || {};
+    let unreadMessages = Object.values(msgs).filter((m) => {
+      if (!m) return false;
+      if (m.fromUserID === userID) return false;
+      if (m.deletedBy?.[userID]) return false;
+      if (!(m.toUserIDs || []).includes(userID)) return false;
+      return !m.readBy?.[userID];
+    });
+    let unreadManagerCount = 0;
+    if (level >= 3) {
+      let notes = get().managerNotes || {};
+      unreadManagerCount = Object.values(notes).filter((n) => n && !n.read).length;
+    }
+    if (unreadMessages.length === 0 && unreadManagerCount === 0) {
+      if (typeof onDismiss === "function") onDismiss();
+      return;
+    }
+    let tab = (level >= 3 && unreadManagerCount > 0) ? "manager" : "inbox";
+    set({
+      loginMessagesShowForUserID: userID,
+      loginMessagesShowTab: tab,
+      loginMessagesOnDismiss: onDismiss,
+    });
+  },
+  setSuppressLoginMessagesForUser: (userID, durationMillis) => {
+    if (!userID) return;
+    let untilMillis = durationMillis > 0 ? Date.now() + durationMillis : 0;
+    // Optimistically update local currentUser if it matches
+    let cur = get().currentUser;
+    if (cur?.id === userID) {
+      set({ currentUser: { ...cur, loginMessageSuppressUntil: untilMillis } });
+    }
+    dbSetUserLoginMessageSuppress(userID, untilMillis);
+  },
   setWebcamDetected: (webcamDetected) => set(() => ({ webcamDetected })),
   setCameraStatus: (cameraStatus) => set({ cameraStatus }),
   setCameraError: (cameraError) => set({ cameraError }),
@@ -780,17 +1017,7 @@ export const useLoginStore = create(
     let hasAccess = true;
 
     if (priviledgeLevel && userObj) {
-      let perm = userObj.permissions?.name || userObj.permissions;
-      hasAccess = false;
-      if (priviledgeLevel === PRIVILEDGE_LEVELS.user) hasAccess = true;
-      if (priviledgeLevel === PRIVILEDGE_LEVELS.superUser &&
-        (perm === PRIVILEDGE_LEVELS.superUser || perm === PRIVILEDGE_LEVELS.admin || perm === PRIVILEDGE_LEVELS.owner))
-        hasAccess = true;
-      if (priviledgeLevel === PRIVILEDGE_LEVELS.admin &&
-        (perm === PRIVILEDGE_LEVELS.admin || perm === PRIVILEDGE_LEVELS.owner))
-        hasAccess = true;
-      if (priviledgeLevel === PRIVILEDGE_LEVELS.owner && perm === PRIVILEDGE_LEVELS.owner)
-        hasAccess = true;
+      hasAccess = permissionToLevel(userObj.permissions) >= permissionToLevel(priviledgeLevel);
     }
 
     let timeout = useSettingsStore.getState().getSettings()?.activeLoginTimeoutSeconds || 60;
@@ -973,27 +1200,22 @@ export const useCustMessagesStore = create((set, get) => ({
   getSmsThreads: () => get().smsThreads,
   setSmsThreads: (smsThreads) => set({ smsThreads }),
   setThreadsUnsub: (unsub) => set({ _threadsUnsub: unsub }),
-  // Optimistic thread patch. patch: { canRespond?, forwardToDelta?: { userID, enable, phone?, first? } }
+  // Optimistic thread patch. patch: { canRespond?, forwardToArray?: [{ userID, phone, first }] }
   // Listener-driven thread updates will overwrite this on the next snapshot.
   patchSmsThread: (phone, patch) => {
     if (!phone) return;
     set((state) => {
       let threads = state.smsThreads;
       let idx = threads.findIndex((t) => t.phone === phone);
-      let current = idx >= 0 ? threads[idx] : { phone, forwardTo: {} };
+      let current = idx >= 0 ? threads[idx] : { phone, forwardTo: [] };
       let next = { ...current };
       if (patch.canRespond !== undefined) next.canRespond = patch.canRespond;
-      if (patch.forwardToDelta) {
-        let { userID, enable, phone: fwdPhone, first } = patch.forwardToDelta;
-        if (userID) {
-          let nextForwardTo = { ...(current.forwardTo || {}) };
-          if (enable) {
-            nextForwardTo[userID] = { phone: fwdPhone || "", first: first || "", enable: true };
-          } else {
-            delete nextForwardTo[userID];
-          }
-          next.forwardTo = nextForwardTo;
-        }
+      if (Array.isArray(patch.forwardToArray)) {
+        next.forwardTo = patch.forwardToArray.map((f) => ({
+          userID: f.userID,
+          phone: f.phone || "",
+          first: f.first || "",
+        }));
       }
       let updated = idx >= 0
         ? threads.map((t, i) => (i === idx ? next : t))
@@ -1723,6 +1945,75 @@ export const useEmailStore = create(
   emails: [],
   getEmails: () => get().emails,
   setEmails: (emails) => set({ emails }),
+
+  // Runtime-only map of in-flight optimistic label mutations, keyed by
+  // messageId: { add: string[], remove: string[], expiresAt: number }.
+  // Lets the Firestore listener re-apply pending changes on top of stale
+  // snapshots so optimistic updates don't get clobbered before the server
+  // catches up. Not persisted.
+  pendingLabelMods: {},
+  addPendingLabelMods: (messageIds, addLabelIds, removeLabelIds) => {
+    if (!messageIds || messageIds.length === 0) return;
+    const add = addLabelIds || [];
+    const remove = removeLabelIds || [];
+    const expiresAt = Date.now() + 15000;
+    set((state) => {
+      const next = { ...state.pendingLabelMods };
+      messageIds.forEach((id) => {
+        const prev = next[id] || { add: [], remove: [], expiresAt };
+        const mergedAdd = Array.from(new Set([
+          ...prev.add.filter((l) => !remove.includes(l)),
+          ...add,
+        ]));
+        const mergedRemove = Array.from(new Set([
+          ...prev.remove.filter((l) => !add.includes(l)),
+          ...remove,
+        ]));
+        next[id] = { add: mergedAdd, remove: mergedRemove, expiresAt };
+      });
+      return { pendingLabelMods: next };
+    });
+  },
+  reconcilePendingLabelMods: (incomingEmails) => {
+    const pending = get().pendingLabelMods;
+    const pendingIds = Object.keys(pending);
+    if (pendingIds.length === 0) return incomingEmails;
+    const now = Date.now();
+    const nextPending = {};
+    const reconciled = incomingEmails.map((email) => {
+      const mod = pending[email.id];
+      if (!mod) return email;
+      if (mod.expiresAt <= now) return email; // expired, drop
+      const labels = email.labelIds || [];
+      const satisfied =
+        mod.add.every((l) => labels.includes(l)) &&
+        mod.remove.every((l) => !labels.includes(l));
+      if (satisfied) return email; // server caught up, drop entry
+      nextPending[email.id] = mod;
+      let nextLabels = [...labels];
+      mod.remove.forEach((l) => {
+        nextLabels = nextLabels.filter((x) => x !== l);
+      });
+      mod.add.forEach((l) => {
+        if (!nextLabels.includes(l)) nextLabels.push(l);
+      });
+      return {
+        ...email,
+        labelIds: nextLabels,
+        isUnread: nextLabels.includes("UNREAD"),
+      };
+    });
+    // Carry forward any pending entries whose email wasn't in the snapshot
+    // yet (rare, but possible) — drop only ones we explicitly resolved.
+    const incomingIds = new Set(incomingEmails.map((e) => e.id));
+    pendingIds.forEach((id) => {
+      if (incomingIds.has(id)) return;
+      if (pending[id].expiresAt <= now) return;
+      nextPending[id] = pending[id];
+    });
+    set({ pendingLabelMods: nextPending });
+    return reconciled;
+  },
 
   getFilteredEmails: () => {
     const folder = get().activeFolder;

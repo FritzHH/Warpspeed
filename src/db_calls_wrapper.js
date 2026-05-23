@@ -182,6 +182,11 @@ function buildCurrentPunchClockPath(tenantID, storeID) {
   return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.PUNCH_CLOCK}/current`;
 }
 
+function buildCurrentMessagesPath(tenantID, storeID) {
+  // Format: tenants/{tenantID}/stores/{storeID}/messages/current
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.MESSAGES}/current`;
+}
+
 /**
  * Build Firestore path for printer document (ensures even number of segments)
  * @param {string} tenantID - Tenant ID
@@ -1203,6 +1208,264 @@ export async function dbDeletePunch(punchID) {
   } catch (error) {
     log("Error deleting punch:", error);
     return { success: false, error: "Database Error", message: error.message };
+  }
+}
+
+/**
+ * Set a single user's punch slot in punch_clock/current via field-level update.
+ * Safe against concurrent clock-ins from multiple terminals.
+ */
+export async function dbSetUserPunchSlot(userID, punchObj) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !userID || !punchObj) return { success: false };
+    const path = buildCurrentPunchClockPath(tenantID, storeID);
+    await firestoreUpdate(path, { [userID]: punchObj });
+    return { success: true };
+  } catch (error) {
+    log("Error in dbSetUserPunchSlot:", error);
+    if (error?.code === "not-found") {
+      try {
+        const { tenantID, storeID } = getTenantAndStore();
+        const path = buildCurrentPunchClockPath(tenantID, storeID);
+        await firestoreWrite(path, { [userID]: punchObj });
+        return { success: true };
+      } catch (e2) {
+        log("Error fallback dbSetUserPunchSlot create:", e2);
+        return { success: false, error: e2.message };
+      }
+    }
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Clear a single user's punch slot in punch_clock/current via deleteField().
+ */
+export async function dbClearUserPunchSlot(userID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !userID) return { success: false };
+    const path = buildCurrentPunchClockPath(tenantID, storeID);
+    await firestoreUpdate(path, { [userID]: deleteField() });
+    return { success: true };
+  } catch (error) {
+    log("Error in dbClearUserPunchSlot:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Add a manager note to punch_clock/current under notes.{noteID}.
+ * noteObj shape: { id, userID, authorName, message, createdMillis, resolved, type }
+ */
+export async function dbAddManagerNote(noteObj) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !noteObj?.id) return { success: false };
+    const path = buildCurrentPunchClockPath(tenantID, storeID);
+    await firestoreUpdate(path, { [`notes.${noteObj.id}`]: noteObj });
+    return { success: true };
+  } catch (error) {
+    log("Error in dbAddManagerNote:", error);
+    if (error?.code === "not-found") {
+      try {
+        const { tenantID, storeID } = getTenantAndStore();
+        const path = buildCurrentPunchClockPath(tenantID, storeID);
+        await firestoreWrite(path, { notes: { [noteObj.id]: noteObj } });
+        return { success: true };
+      } catch (e2) {
+        log("Error fallback dbAddManagerNote create:", e2);
+        return { success: false, error: e2.message };
+      }
+    }
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Update a manager note in punch_clock/current. Overwrites the note object at notes.{id}.
+ */
+export async function dbUpdateManagerNote(noteObj) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !noteObj?.id) return { success: false };
+    const path = buildCurrentPunchClockPath(tenantID, storeID);
+    await firestoreUpdate(path, { [`notes.${noteObj.id}`]: noteObj });
+    return { success: true };
+  } catch (error) {
+    log("Error in dbUpdateManagerNote:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Resolve (delete) a manager note in punch_clock/current.
+ */
+export async function dbResolveManagerNote(noteID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !noteID) return { success: false };
+    const path = buildCurrentPunchClockPath(tenantID, storeID);
+    await firestoreUpdate(path, { [`notes.${noteID}`]: deleteField() });
+    return { success: true };
+  } catch (error) {
+    log("Error in dbResolveManagerNote:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * In-app messaging: write a new message into messages/current at messages.{id}.
+ * Has not-found fallback to create the doc if missing.
+ */
+export async function dbAddInAppMessage(messageObj) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !messageObj?.id) return { success: false };
+    const path = buildCurrentMessagesPath(tenantID, storeID);
+    await firestoreUpdate(path, { [`messages.${messageObj.id}`]: messageObj });
+    return { success: true };
+  } catch (error) {
+    log("Error in dbAddInAppMessage:", error);
+    if (error?.code === "not-found") {
+      try {
+        const { tenantID, storeID } = getTenantAndStore();
+        const path = buildCurrentMessagesPath(tenantID, storeID);
+        await firestoreWrite(path, { messages: { [messageObj.id]: messageObj } });
+        return { success: true };
+      } catch (e2) {
+        log("Error fallback dbAddInAppMessage create:", e2);
+        return { success: false, error: e2.message };
+      }
+    }
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Mark an in-app message as read by a specific user.
+ * Sets messages.{id}.readBy.{userID} = millis.
+ */
+export async function dbMarkInAppMessageReadByUser(messageID, userID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !messageID || !userID) return { success: false };
+    const path = buildCurrentMessagesPath(tenantID, storeID);
+    await firestoreUpdate(path, { [`messages.${messageID}.readBy.${userID}`]: Date.now() });
+    return { success: true };
+  } catch (error) {
+    log("Error in dbMarkInAppMessageReadByUser:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Mark an in-app message as unread for a specific user (delete their readBy entry).
+ */
+export async function dbMarkInAppMessageUnreadByUser(messageID, userID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !messageID || !userID) return { success: false };
+    const path = buildCurrentMessagesPath(tenantID, storeID);
+    await firestoreUpdate(path, { [`messages.${messageID}.readBy.${userID}`]: deleteField() });
+    return { success: true };
+  } catch (error) {
+    log("Error in dbMarkInAppMessageUnreadByUser:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Hard delete: removes messages.{id} for everyone (sender-initiated delete).
+ */
+export async function dbHardDeleteInAppMessage(messageID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !messageID) return { success: false };
+    const path = buildCurrentMessagesPath(tenantID, storeID);
+    await firestoreUpdate(path, { [`messages.${messageID}`]: deleteField() });
+    return { success: true };
+  } catch (error) {
+    log("Error in dbHardDeleteInAppMessage:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Per-user delete: marks messages.{id}.deletedBy.{userID} = true.
+ * Other recipients still see the message.
+ */
+export async function dbDeleteInAppMessageForUser(messageID, userID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !messageID || !userID) return { success: false };
+    const path = buildCurrentMessagesPath(tenantID, storeID);
+    await firestoreUpdate(path, { [`messages.${messageID}.deletedBy.${userID}`]: true });
+    return { success: true };
+  } catch (error) {
+    log("Error in dbDeleteInAppMessageForUser:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Listen to changes in messages/current doc.
+ */
+export function dbListenToInAppMessages(onChange, onError) {
+  const name = "inAppMessages";
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: tenantID/storeID not configured for dbListenToInAppMessages");
+      return null;
+    }
+    if (!onChange || typeof onChange !== "function") {
+      log("Error: onChange callback required for dbListenToInAppMessages");
+      return null;
+    }
+    const path = buildCurrentMessagesPath(tenantID, storeID);
+    __logListenerAttach(name);
+    const unsubscribe = firestoreSubscribe(path, (data, error, meta) => {
+      if (error) {
+        log("In-app messages listener error", { tenantID, storeID, error });
+        if (onError) onError(error);
+        return;
+      }
+      if (!data) data = {};
+      __logListenerEmit(name, meta);
+      onChange(data);
+    });
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
+  } catch (error) {
+    log("Error setting up in-app messages listener:", error);
+    if (onError) onError(error);
+    return null;
+  }
+}
+
+/**
+ * Set loginMessageSuppressUntil (millis) on a user in settings.users.
+ * Read-modify-write the users array, then persist with field-level updateDoc.
+ */
+export async function dbSetUserLoginMessageSuppress(userID, untilMillis) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !userID) return { success: false };
+    const path = buildSettingsPath(tenantID, storeID);
+    const currentSettings = await firestoreRead(path);
+    if (!currentSettings) return { success: false, error: "Not Found" };
+    const updatedUsers = (currentSettings.users || []).map((u) =>
+      u?.id === userID ? { ...u, loginMessageSuppressUntil: untilMillis || 0 } : u
+    );
+    await firestoreUpdate(path, { users: updatedUsers });
+    return { success: true };
+  } catch (error) {
+    log("Error in dbSetUserLoginMessageSuppress:", error);
+    return { success: false, error: error.message };
   }
 }
 
@@ -3031,12 +3294,15 @@ export async function dbSendSMS(
       storeID: storeID,
       customerID: message.customerID || "",
       messageID: message.id || "",
+      workorderID: message.workorderID || "",
+      saleID: message.saleID || "",
       imageUrl: message.imageUrl || "",
       mediaUrls: message.mediaUrls || [],
       canRespond: message.canRespond || null,
       forwardTo: message.forwardTo || null,
       customerFirst: message.customerFirst || "",
       customerLast: message.customerLast || "",
+      senderID: message.senderUserObj?.id || "",
       ...(fromNumber ? { fromNumber } : {}),
       ...(message.originalMessage ? { originalMessage: message.originalMessage } : {}),
       ...(message.translatedFrom ? { translatedFrom: message.translatedFrom } : {}),
@@ -3079,6 +3345,25 @@ export async function dbSendSMS(
   }
 }
 
+export async function dbSetSMSForwardTo(phone, forwardToArray) {
+  try {
+    const cleanPhone = (phone || "").replace(/\D/g, "");
+    if (cleanPhone.length !== 10) return { success: false, error: "Invalid phone" };
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
+    const path = `tenants/${tenantID}/stores/${storeID}/sms-messages/${cleanPhone}`;
+    const clean = (Array.isArray(forwardToArray) ? forwardToArray : [])
+      .filter((f) => f && f.userID && f.phone)
+      .map((f) => ({ userID: f.userID, phone: f.phone, first: f.first || "" }));
+    await firestoreUpdate(path, { forwardTo: clean });
+    log("SMS forwardTo set", { phone: cleanPhone, count: clean.length });
+    return { success: true };
+  } catch (error) {
+    log("Error setting SMS forwardTo", { error: error.message, phone });
+    return { success: false, error: error.message };
+  }
+}
+
 export async function dbToggleSMSForwarding(phone, userID, enable, userPhone, userFirst) {
   try {
     const cleanPhone = (phone || "").replace(/\D/g, "");
@@ -3087,13 +3372,17 @@ export async function dbToggleSMSForwarding(phone, userID, enable, userPhone, us
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
     const path = `tenants/${tenantID}/stores/${storeID}/sms-messages/${cleanPhone}`;
-    const fieldKey = `forwardTo.${userID}`;
+    const data = await firestoreRead(path);
+    let current = Array.isArray(data?.forwardTo) ? data.forwardTo : [];
+    let next;
     if (enable) {
       if (!userPhone) return { success: false, error: "No user phone" };
-      await firestoreUpdate(path, { [fieldKey]: { phone: userPhone, first: userFirst || "" } });
+      next = current.filter((f) => f.userID !== userID);
+      next.push({ userID, phone: userPhone, first: userFirst || "" });
     } else {
-      await firestoreUpdate(path, { [fieldKey]: deleteField() });
+      next = current.filter((f) => f.userID !== userID);
     }
+    await firestoreUpdate(path, { forwardTo: next });
     log("SMS forwarding toggled", { phone: cleanPhone, userID, enable });
     return { success: true };
   } catch (error) {
@@ -3109,7 +3398,8 @@ export async function dbGetConversationForwardState(phone, userID) {
     const { tenantID, storeID } = getTenantAndStore();
     if (!tenantID || !storeID) return false;
     const data = await firestoreRead(`tenants/${tenantID}/stores/${storeID}/sms-messages/${cleanPhone}`);
-    return !!(data?.forwardTo?.[userID]);
+    let arr = Array.isArray(data?.forwardTo) ? data.forwardTo : [];
+    return arr.some((f) => f.userID === userID);
   } catch (error) {
     log("Error reading forward state", { error: error.message, phone });
     return false;
@@ -3149,7 +3439,7 @@ export async function dbSaveMessageTranslation(phone, messageId, translated) {
   }
 }
 
-export async function dbSendEmail(to, subject, htmlBody, attachments) {
+export async function dbSendEmail(to, subject, htmlBody, attachments, opts = {}) {
   const { tenantID, storeID } = getTenantAndStore();
 
   try {
@@ -3169,6 +3459,9 @@ export async function dbSendEmail(to, subject, htmlBody, attachments) {
       htmlBody,
       tenantID,
       storeID,
+      workorderID: opts?.workorderID || "",
+      saleID: opts?.saleID || "",
+      customerID: opts?.customerID || "",
     };
     if (attachments && Array.isArray(attachments) && attachments.length > 0) {
       emailData.attachments = attachments;
@@ -3627,7 +3920,7 @@ export async function dbDeleteWorkorderMedia(mediaItem) {
   }
 }
 
-export async function dbUploadPDFAndSendSMS({ base64, storagePath, message, phoneNumber, customerID, messageID, canRespond, forwardTo }) {
+export async function dbUploadPDFAndSendSMS({ base64, storagePath, message, phoneNumber, customerID, messageID, canRespond, forwardTo, workorderID, saleID }) {
   const { tenantID, storeID } = getTenantAndStore();
   try {
     let result = await uploadPDFAndSendSMS({
@@ -3641,6 +3934,8 @@ export async function dbUploadPDFAndSendSMS({ base64, storagePath, message, phon
       messageID,
       canRespond,
       forwardTo: forwardTo || null,
+      workorderID: workorderID || "",
+      saleID: saleID || "",
     });
     return result;
   } catch (error) {

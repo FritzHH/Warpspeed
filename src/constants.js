@@ -48,6 +48,11 @@ export const TAB_MENU_HEIGHT = 40;
 
 // objects & functions
 export const PERMISSION_LEVELS = {
+  owner: {
+    name: "Owner",
+    level: 5,
+    id: "ownr_lvl",
+  },
   superUser: {
     name: "Super-User",
     level: 4,
@@ -217,6 +222,7 @@ export const DB_NODES = {
     EMAIL_USERS: "email_users",
     PUNCHES: "punches",
     PUNCH_CLOCK: "punch_clock",
+    MESSAGES: "messages",
     PRINTERS: "printers",
     PAYMENT_PROCESSING: "payment-processing",
     COMPLETED_WORKORDERS: "completed-workorders",

@@ -44,3 +44,10 @@ pubsub-debug.log
 
 # Firebase CLI local cache (regenerated on deploy)
 .firebase/
+
+# Local SSL certs (yarn begin) — regenerate per machine
+*.pem
+
+# Dev scratch / scripts with embedded test credentials
+simulate_reader.bat
+TODO

@@ -973,6 +973,34 @@ export const useCustMessagesStore = create((set, get) => ({
   getSmsThreads: () => get().smsThreads,
   setSmsThreads: (smsThreads) => set({ smsThreads }),
   setThreadsUnsub: (unsub) => set({ _threadsUnsub: unsub }),
+  // Optimistic thread patch. patch: { canRespond?, forwardToDelta?: { userID, enable, phone?, first? } }
+  // Listener-driven thread updates will overwrite this on the next snapshot.
+  patchSmsThread: (phone, patch) => {
+    if (!phone) return;
+    set((state) => {
+      let threads = state.smsThreads;
+      let idx = threads.findIndex((t) => t.phone === phone);
+      let current = idx >= 0 ? threads[idx] : { phone, forwardTo: {} };
+      let next = { ...current };
+      if (patch.canRespond !== undefined) next.canRespond = patch.canRespond;
+      if (patch.forwardToDelta) {
+        let { userID, enable, phone: fwdPhone, first } = patch.forwardToDelta;
+        if (userID) {
+          let nextForwardTo = { ...(current.forwardTo || {}) };
+          if (enable) {
+            nextForwardTo[userID] = { phone: fwdPhone || "", first: first || "", enable: true };
+          } else {
+            delete nextForwardTo[userID];
+          }
+          next.forwardTo = nextForwardTo;
+        }
+      }
+      let updated = idx >= 0
+        ? threads.map((t, i) => (i === idx ? next : t))
+        : [...threads, next];
+      return { smsThreads: updated };
+    });
+  },
 
   // In-memory hub conversation cache (backed by IndexedDB, NOT localStorage)
   hubConversationCache: {},

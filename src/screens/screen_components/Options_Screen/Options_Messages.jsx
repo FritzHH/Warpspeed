@@ -50,6 +50,25 @@ import { scheduleAutoSend, clearAutoSend, buildForwardToPayload } from "./ReplyO
 import { ComposeArea } from "./ComposeArea";
 import { IncomingMessageComponent, OutgoingMessageComponent, MediaThumbnail } from "./MessageBubble";
 
+// Optimistic thread patch so bubble icons (block/forward) reflect send intent
+// immediately, instead of flickering once the Firestore listener round-trips
+// the server-side thread update.
+function applyOptimisticThreadPatch(phone, canRespondVal, forwardToPayload) {
+  if (!phone || phone.length !== 10) return;
+  let patch = {};
+  if (canRespondVal !== undefined) patch.canRespond = canRespondVal ? true : null;
+  if (forwardToPayload && forwardToPayload.userID) {
+    patch.forwardToDelta = {
+      userID: forwardToPayload.userID,
+      enable: !!forwardToPayload.enable,
+      phone: forwardToPayload.phone || "",
+      first: forwardToPayload.first || "",
+    };
+  }
+  if (patch.canRespond === undefined && !patch.forwardToDelta) return;
+  useCustMessagesStore.getState().patchSmsThread(phone, patch);
+}
+
 
 const TRANSLATION_LANGUAGES = [
   { label: "English", code: "en" },
@@ -400,6 +419,7 @@ export function MessagesComponent({}) {
     let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
     userOverrodeForwardRef.current = false;
     userOverrodeCanRespondRef.current = false;
+    applyOptimisticThreadPatch(sendPhone, useCanRespond, forwardTo);
 
     let isTranslated = !!(translatedText && sFromLang && sToLang && sFromLang !== sToLang);
     let sendText = isTranslated ? translatedText : text;
@@ -522,6 +542,7 @@ export function MessagesComponent({}) {
     let messageID = crypto.randomUUID();
     let canRespondBool = canRespondVal ? true : null;
     let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+    applyOptimisticThreadPatch(zCustomer.customerCell, !!canRespondVal, forwardTo);
 
     useCustMessagesStore.getState().setOutgoingMessage({
       ...SMS_PROTO,
@@ -585,6 +606,7 @@ export function MessagesComponent({}) {
     let messageID = crypto.randomUUID();
     let canRespondBool = canRespondVal ? true : null;
     let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+    applyOptimisticThreadPatch(zCustomer.customerCell, !!canRespondVal, forwardTo);
 
     useCustMessagesStore.getState().setOutgoingMessage({
       ...SMS_PROTO,
@@ -786,6 +808,7 @@ export function MessagesComponent({}) {
     let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
     userOverrodeForwardRef.current = false;
     userOverrodeCanRespondRef.current = false;
+    applyOptimisticThreadPatch(sendPhone, useCanRespond, forwardTo);
     _setShowReplyModal(false);
     let storeName = zSettings?.storeInfo?.displayName || "Our store";
     let hasImages = mediaItems.some((m) => m.type === "image");
@@ -1078,6 +1101,7 @@ export function MessagesComponent({}) {
       let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
       let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
       let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+      applyOptimisticThreadPatch(sendPhone, useCanRespond, forwardTo);
       let msg = { ...SMS_PROTO };
       msg.message = storeName + " has sent you an audio message";
       msg.mediaUrls = [{ url: result.downloadURL, contentType: "audio/webm" }];
@@ -2007,6 +2031,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     clearTranslation();
     let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
     let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+    applyOptimisticThreadPatch(phone, !!canRespondVal, forwardTo);
     let msg = { ...SMS_PROTO };
     msg.message = sendText;
     if (originalText) { msg.originalMessage = originalText; msg.translatedFrom = translatedFromLang; msg.translatedTo = isTranslated ? sToLang : ""; }
@@ -2167,6 +2192,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
       let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
       let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
       let forwardTo = buildForwardToPayload(forwardOverride, sForwardReplies);
+      applyOptimisticThreadPatch(phone, useCanRespond, forwardTo);
       let msg = { ...SMS_PROTO };
       msg.message = storeName + " has sent you an audio message";
       msg.mediaUrls = [{ url: result.downloadURL, contentType: "audio/webm" }];
@@ -2246,6 +2272,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
       if (hasImages) parts.push(imageCount === 1 ? "a photo" : imageCount + " photos");
       if (hasVideos) parts.push(videoCount === 1 ? "a video" : videoCount + " videos");
       let mediaText = storeName + " has sent you " + parts.join(" and ");
+      applyOptimisticThreadPatch(phone, sCanRespond, null);
       let msg = { ...SMS_PROTO };
       msg.message = mediaText;
       msg.mediaUrls = mediaItems.map(m => ({ url: m.url, thumbnailUrl: m.thumbnailUrl || "", contentType: m.contentType }));

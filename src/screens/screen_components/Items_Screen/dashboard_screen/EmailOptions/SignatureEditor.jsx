@@ -7,7 +7,7 @@ import {
 } from "../../../../../dom_components";
 import { C, ICONS } from "../../../../../styles";
 import { log } from "../../../../../utils";
-import { useAlertScreenStore, useSettingsStore } from "../../../../../stores";
+import { useAlertScreenStore, useLoginStore, useSettingsStore } from "../../../../../stores";
 import {
   FONT_FAMILIES,
   FONT_WEIGHTS,
@@ -47,6 +47,7 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
 
   const segmentsRef = useRef(sSegments);
   segmentsRef.current = sSegments;
+  const savedRangeRef = useRef(null);
 
   function saveSegments(newSegments) {
     _sSetSegments(newSegments);
@@ -211,8 +212,8 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
     return { start: Math.min(start, end), end: Math.max(start, end) };
   }
 
-  function applyStyleToSelection(styleField, styleValue) {
-    let range = getSelectionRange();
+  function applyStyleToSelection(styleField, styleValue, providedRange) {
+    let range = providedRange || getSelectionRange();
     if (!range) return false;
     let { start, end } = range;
     let segs = [...segmentsRef.current];
@@ -376,17 +377,31 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
   let fontWeightLabel = FONT_WEIGHTS.find((w) => w.value === sActiveFontWeight)?.label || "Regular";
   let hasSegmentText = sSegments.some((s) => s.text.length > 0);
 
+  let currentUser = useLoginStore((state) => state.currentUser);
+  let previewUserName = (() => {
+    let firstName = currentUser?.first || "";
+    let lastInitial = currentUser?.last ? currentUser.last.charAt(0) + "." : "";
+    return (firstName + " " + lastInitial).trim();
+  })();
+
   return (
     <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "flex-start" }}>
       {/* Font controls row */}
       <div style={{ display: "flex", flexDirection: "row", width: "100%", marginBottom: 10, alignItems: "center", gap: 10, flexWrap: "wrap", flexShrink: 0 }}>
 
         {/* Font Family */}
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
+        <div
+          style={{ display: "flex", flexDirection: "row", alignItems: "center" }}
+          onMouseDown={() => { savedRangeRef.current = getSelectionRange(); }}
+        >
           <span style={{ fontSize: 11, color: C.textMuted, fontWeight: "500", marginRight: 5 }}>{"Font"}</span>
           <DropdownMenu
             dataArr={FONT_FAMILIES.map((f) => ({ label: f, value: f }))}
-            onSelect={(item) => { if (!applyStyleToSelection("fontFamily", item.value)) _sSetActiveFontFamily(item.value); }}
+            onSelect={(item) => {
+              let applied = applyStyleToSelection("fontFamily", item.value, savedRangeRef.current);
+              savedRangeRef.current = null;
+              if (!applied) _sSetActiveFontFamily(item.value);
+            }}
             buttonText={sActiveFontFamily}
             matchValue={sActiveFontFamily}
             buttonStyle={{
@@ -425,11 +440,18 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
         </div>
 
         {/* Font Weight */}
-        <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
+        <div
+          style={{ display: "flex", flexDirection: "row", alignItems: "center" }}
+          onMouseDown={() => { savedRangeRef.current = getSelectionRange(); }}
+        >
           <span style={{ fontSize: 11, color: C.textMuted, fontWeight: "500", marginRight: 5 }}>{"Weight"}</span>
           <DropdownMenu
             dataArr={FONT_WEIGHTS.map((w) => ({ label: w.label, value: w.value }))}
-            onSelect={(item) => { if (!applyStyleToSelection("fontWeight", item.value)) _sSetActiveFontWeight(item.value); }}
+            onSelect={(item) => {
+              let applied = applyStyleToSelection("fontWeight", item.value, savedRangeRef.current);
+              savedRangeRef.current = null;
+              if (!applied) _sSetActiveFontWeight(item.value);
+            }}
             buttonText={fontWeightLabel}
             matchValue={sActiveFontWeight}
             buttonStyle={{
@@ -553,7 +575,7 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
           </Tooltip>
         )}
         {!!sigImageUrl && (
-          <Tooltip text="Insert logo variable at cursor position">
+          <Tooltip darkMode text={"Insert here to drop a {logo} placeholder at your\ncursor position in the signature.\n\nWhen an email is sent, {logo} is replaced with your\nuploaded signature image inline at that exact spot,\nso you can place the logo between text, beside a\nphone number, or anywhere else it fits in your\nsignature layout."}>
             <TouchableOpacity
               onPress={() => {
                 let cursorOffset = getCursorOffset();
@@ -563,10 +585,23 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
               }}
               style={{ paddingTop: 4, paddingBottom: 4, paddingLeft: 8, paddingRight: 8, borderRadius: 6, borderWidth: 1, borderStyle: "solid", borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
             >
-              <span style={{ fontSize: 11, color: C.text, fontWeight: "500" }}>{"{logo}"}</span>
+              <span style={{ fontSize: 11, color: C.green, fontWeight: "500" }}>{"{logo}"}</span>
             </TouchableOpacity>
           </Tooltip>
         )}
+        <Tooltip darkMode text={"Insert here to drop a {username} placeholder at your\ncursor position in the signature.\n\nWhen an email is sent, {username} is replaced with\nthe signed-in user's name (first name + last\ninitial, e.g. 'Fritz H.'), so the same signature\nworks for every user on this inbox without anyone\nediting it per-account."}>
+          <TouchableOpacity
+            onPress={() => {
+              let cursorOffset = getCursorOffset();
+              if (cursorOffset === null) cursorOffset = segmentsRef.current.reduce((s, seg) => s + seg.text.length, 0);
+              insertTextAt(cursorOffset, "{username}");
+              cursorPosRef.current = cursorOffset + 10;
+            }}
+            style={{ paddingTop: 4, paddingBottom: 4, paddingLeft: 8, paddingRight: 8, borderRadius: 6, borderWidth: 1, borderStyle: "solid", borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
+          >
+            <span style={{ fontSize: 11, color: C.green, fontWeight: "500" }}>{"{username}"}</span>
+          </TouchableOpacity>
+        </Tooltip>
       </div>
 
       {/* Image preview with scale controls */}
@@ -614,11 +649,12 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
           {hasSegmentText ? (
             <div style={{ whiteSpace: "pre-wrap" }}>
               {sSegments.map((seg, i) => {
-                let parts = seg.text.split("{logo}");
+                let displayText = seg.text.replace(/\{username\}/g, previewUserName);
+                let parts = displayText.split("{logo}");
                 if (parts.length === 1) {
                   return (
                     <span key={i} style={{ fontFamily: seg.fontFamily, fontSize: seg.fontSize, fontWeight: seg.fontWeight, fontStyle: seg.fontStyle || "normal", color: C.text }}>
-                      {seg.text}
+                      {displayText}
                     </span>
                   );
                 }

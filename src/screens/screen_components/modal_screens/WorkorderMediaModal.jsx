@@ -3,7 +3,7 @@ import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useZ } from "../../../hooks/useZ";
-import { Button, Image, Tooltip, CheckBox } from "../../../dom_components";
+import { Button, Image, Tooltip, CheckBox, ModalFooter, ModalFooterButton } from "../../../dom_components";
 import { log, compressImage } from "../../../utils";
 import {
   useOpenWorkordersStore,
@@ -354,14 +354,6 @@ export const WorkorderMediaModal = ({
                 UPLOAD
               </button>
             )}
-            <button
-              type="button"
-              className={styles.closeBtn}
-              style={{ color: C.lightText }}
-              onClick={onClose}
-            >
-              X
-            </button>
           </div>
         </div>
 
@@ -512,90 +504,68 @@ export const WorkorderMediaModal = ({
           </div>
         )}
 
-        {/* Footer */}
+        {/* Selection controls row */}
         {zMedia.length > 0 && (selectedCount > 0 || hasEmail || onSendMedia) && (
-          <div className={styles.footer} style={{ borderTopColor: C.borderSubtle }}>
-            <div className={styles.footerLeft}>
-              {selectedCount > 0 && (
-                <span className={styles.selectedCount} style={{ color: C.lightText }}>
-                  {selectedCount} selected
-                </span>
-              )}
-              {onSendMedia && hasCell && (
-                <CheckBox
-                  text="Text"
-                  isChecked={sSendText}
-                  onCheck={() => _setSendText(!sSendText)}
-                />
-              )}
-              {hasEmail && (
-                <CheckBox
-                  text="Email"
-                  isChecked={sSendEmail}
-                  onCheck={() => _setSendEmail(!sSendEmail)}
-                />
-              )}
-            </div>
-            <div className={styles.footerRight}>
-              {selectedCount > 0 && (
-                <Button
-                  text={sDeleting ? "Deleting..." : "Delete Media"}
-                  colorGradientArr={COLOR_GRADIENTS.red}
-                  icon={ICONS.trash}
-                  iconSize={14}
-                  onPress={handleDeleteSelected}
-                  enabled={!sDeleting && !sSending}
-                  buttonStyle={{
-                    paddingLeft: 20,
-                    paddingRight: 20,
-                    paddingTop: 10,
-                    paddingBottom: 10,
-                    borderRadius: 5,
-                    opacity: !sDeleting && !sSending ? 1 : 0.4,
-                  }}
-                  textStyle={{ fontSize: 14, fontWeight: "500" }}
-                />
-              )}
-              {onSendMedia ? (
-                <Button
-                  text="Send Media"
-                  colorGradientArr={COLOR_GRADIENTS.green}
-                  icon={ICONS.paperPlane}
-                  iconSize={16}
-                  onPress={handleSendAll}
-                  enabled={selectedCount > 0 && (sSendText || sSendEmail)}
-                  buttonStyle={{
-                    paddingLeft: 20,
-                    paddingRight: 20,
-                    paddingTop: 10,
-                    paddingBottom: 10,
-                    borderRadius: 5,
-                    opacity: selectedCount > 0 && (sSendText || sSendEmail) ? 1 : 0.4,
-                  }}
-                  textStyle={{ fontSize: 14, fontWeight: "500" }}
-                />
-              ) : hasEmail ? (
-                <Button
-                  text={sSending ? "Sending..." : "Email Media"}
-                  colorGradientArr={COLOR_GRADIENTS.green}
-                  icon={ICONS.paperPlane}
-                  iconSize={16}
-                  onPress={handleSendMedia}
-                  enabled={selectedCount > 0 && !sSending}
-                  buttonStyle={{
-                    paddingLeft: 20,
-                    paddingRight: 20,
-                    paddingTop: 10,
-                    paddingBottom: 10,
-                    borderRadius: 5,
-                    opacity: selectedCount > 0 && !sSending ? 1 : 0.4,
-                  }}
-                  textStyle={{ fontSize: 14, fontWeight: "500" }}
-                />
-              ) : null}
-            </div>
+          <div className={styles.selectionRow} style={{ borderTopColor: C.borderSubtle }}>
+            {selectedCount > 0 && (
+              <span className={styles.selectedCount} style={{ color: C.lightText }}>
+                {selectedCount} selected
+              </span>
+            )}
+            {onSendMedia && hasCell && (
+              <CheckBox
+                text="Text"
+                isChecked={sSendText}
+                onCheck={() => _setSendText(!sSendText)}
+              />
+            )}
+            {hasEmail && (
+              <CheckBox
+                text="Email"
+                isChecked={sSendEmail}
+                onCheck={() => _setSendEmail(!sSendEmail)}
+              />
+            )}
           </div>
         )}
+
+        <ModalFooter>
+          {selectedCount > 0 ? (
+            <ModalFooterButton
+              variant="danger"
+              icon={ICONS.trash}
+              iconSize={14}
+              disabled={sDeleting || sSending}
+              onClick={handleDeleteSelected}
+            >
+              {sDeleting ? "Deleting..." : "Delete Media"}
+            </ModalFooterButton>
+          ) : null}
+          {onSendMedia ? (
+            <ModalFooterButton
+              variant="accent"
+              icon={ICONS.paperPlane}
+              iconSize={16}
+              disabled={!(selectedCount > 0 && (sSendText || sSendEmail))}
+              onClick={handleSendAll}
+            >
+              Send Media
+            </ModalFooterButton>
+          ) : hasEmail ? (
+            <ModalFooterButton
+              variant="accent"
+              icon={ICONS.paperPlane}
+              iconSize={16}
+              disabled={!(selectedCount > 0 && !sSending)}
+              onClick={handleSendMedia}
+            >
+              {sSending ? "Sending..." : "Email Media"}
+            </ModalFooterButton>
+          ) : null}
+          <ModalFooterButton variant="danger" onClick={onClose}>
+            Close
+          </ModalFooterButton>
+        </ModalFooter>
       </div>
 
       {/* Upload compression confirmation overlay */}

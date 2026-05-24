@@ -11,6 +11,8 @@ import {
   Button,
   Dialog,
   TimePicker,
+  ModalFooter,
+  ModalFooterButton,
 } from "../../../dom_components";
 import { useSettingsStore, useAlertScreenStore } from "../../../stores";
 import { getWeekStart, getStoreHoursForDayIndex, parseTime, formatTimeShort } from "./scheduleUtils";
@@ -460,9 +462,6 @@ export function ScheduleModal({ handleExit }) {
               }}
               textStyle={{ color: "white", fontSize: 14, fontWeight: "700" }}
             />
-            <TouchableOpacity onPress={handleExit} style={{ width: 40, height: 40, justifyContent: "center", alignItems: "center", display: "flex" }}>
-              <Image icon={ICONS.close1} size={31} />
-            </TouchableOpacity>
           </div>
         </div>
 
@@ -581,6 +580,9 @@ export function ScheduleModal({ handleExit }) {
             />
           </div>
         </div>
+        <ModalFooter>
+          <ModalFooterButton onClick={handleExit}>Close</ModalFooterButton>
+        </ModalFooter>
       </div>
     </Dialog>
   );

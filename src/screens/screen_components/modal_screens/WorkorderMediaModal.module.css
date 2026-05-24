@@ -119,16 +119,6 @@
   font-weight: 700;
 }
 
-.closeBtn {
-  padding: 6px 12px;
-  border-radius: 6px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 600;
-}
-
 .scrollArea {
   flex: 1;
   overflow-y: auto;
@@ -319,30 +309,16 @@
   text-align: center;
 }
 
-.footer {
+.selectionRow {
   display: flex;
   flex-direction: row;
-  justify-content: space-between;
   align-items: center;
-  padding: 4px 12px 12px 12px;
+  gap: 10px;
+  padding: 6px 12px;
   border-top-width: 1px;
   border-top-style: solid;
   box-sizing: border-box;
   flex-shrink: 0;
-}
-
-.footerLeft {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-}
-
-.footerRight {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
 }
 
 .selectedCount {

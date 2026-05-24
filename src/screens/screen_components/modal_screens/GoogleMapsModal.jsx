@@ -1,7 +1,7 @@
 /* eslint-disable */
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
-import { Button } from "../../../dom_components";
+import { Button, ModalFooter, ModalFooterButton } from "../../../dom_components";
 import { useZ } from "../../../hooks/useZ";
 
 import { useLayoutStore } from "../../../stores";
@@ -209,21 +209,6 @@ export const GoogleMapsModal = ({
               )}
             </div>
 
-            <Button
-              text="Close"
-              icon={ICONS.redx}
-              iconSize={14}
-              onPress={onClose}
-              buttonStyle={{
-                backgroundColor: "transparent",
-                borderWidth: 1,
-                borderColor: C.borderSubtle,
-                borderRadius: 5,
-                paddingHorizontal: 12,
-                paddingVertical: 5,
-              }}
-              textStyle={{ color: C.text, fontSize: 13 }}
-            />
           </div>
 
           <div className={styles.mapContainer}>
@@ -258,6 +243,10 @@ export const GoogleMapsModal = ({
               </div>
             )}
           </div>
+
+          <ModalFooter>
+            <ModalFooterButton onClick={onClose}>Close</ModalFooterButton>
+          </ModalFooter>
         </div>
       </div>
     </div>

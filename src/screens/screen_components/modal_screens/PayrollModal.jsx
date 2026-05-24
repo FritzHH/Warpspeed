@@ -7,6 +7,8 @@ import {
   SmallLoadingIndicator,
   Dialog,
   TouchableOpacity,
+  ModalFooter,
+  ModalFooterButton,
 } from "../../../dom_components";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
@@ -639,6 +641,7 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
         >
           <DialogPrimitive.Title className={styles.srOnly}>Payroll</DialogPrimitive.Title>
           <div className={styles.card} style={cardThemeVars}>
+        <div className={styles.cardContent}>
         {/* ═══ LEFT RAIL ═══ */}
         <div className={styles.leftRail}>
           <div className={styles.leftRailTop}>
@@ -723,16 +726,6 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
             )}
           </div>
 
-          {/* Close Button */}
-          <div className={styles.leftRailBottom}>
-            <Button
-              text="CLOSE"
-              colorGradientArr={COLOR_GRADIENTS.red}
-              onPress={handleExit}
-              innerClassName={styles.btnClose}
-              textClassName={styles.btnTxt13}
-            />
-          </div>
         </div>
 
         {/* ═══ MIDDLE COLUMN ═══ */}
@@ -925,6 +918,13 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
             </div>
           </div>
         </div>
+        </div>
+
+        <ModalFooter>
+          <ModalFooterButton onClick={handleExit}>
+            Close
+          </ModalFooterButton>
+        </ModalFooter>
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

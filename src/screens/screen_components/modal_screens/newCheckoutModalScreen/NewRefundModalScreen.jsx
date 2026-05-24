@@ -10,6 +10,8 @@ import {
   Dialog,
   LoadingIndicator,
   ReceiptSentOverlay,
+  ModalFooter,
+  ModalFooterButton,
 } from "../../../../dom_components";
 import { C, Fonts, ICONS } from "../../../../styles";
 import styles from "./NewRefundModalScreen.module.css";
@@ -1186,14 +1188,6 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
                     <Image icon={ICONS.openCashRegister} size={30} />
                   </TouchableOpacity>
                 </Tooltip>
-                <Tooltip text="Close" position="top">
-                  <TouchableOpacity
-                    onPress={handleClose}
-                    style={{ alignItems: "center", justifyContent: "center", padding: 6 }}
-                  >
-                    <Image icon={ICONS.close1} size={35} />
-                  </TouchableOpacity>
-                </Tooltip>
               </div>
             </div>
 
@@ -1236,6 +1230,16 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
             </span>
           </div>
         )}
+
+        <ModalFooter>
+          <ModalFooterButton
+            variant="danger"
+            disabled={formLocked}
+            onClick={handleClose}
+          >
+            Close
+          </ModalFooterButton>
+        </ModalFooter>
 
         {/* ── Send Receipt Modal ───────────────────── */}
         {sShowSendReceiptModal && (

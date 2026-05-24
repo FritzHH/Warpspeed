@@ -7,6 +7,8 @@ import {
   Image,
   CheckBox,
   Dialog,
+  ModalFooter,
+  ModalFooterButton,
 } from "../../../dom_components";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../styles";
 import { lightenRGBByPercent, localStorageWrapper } from "../../../utils";
@@ -828,6 +830,7 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
         className={styles.modal}
         style={{ backgroundColor: C.backgroundWhite }}
       >
+        <div className={styles.modalBody}>
         {/* ─── Top Bar ─── */}
         <div className={styles.topBar}>
           <span
@@ -977,32 +980,24 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
           />
         </div>
 
-        {/* ─── Bottom Bar ─── */}
-        <div className={styles.bottomBar} style={{ borderTopColor: C.borderStrong }}>
-          <div className={styles.bottomBarInner}>
-            <div className={styles.bottomBarLeft}>
-              <Button
-                text="Test Print Label Design"
-                onPress={handleTestPrint}
-                colorGradientArr={COLOR_GRADIENTS.green}
-                buttonStyle={{ marginRight: 8, paddingLeft: 16, paddingRight: 16 }}
-                textStyle={{ fontSize: 12 }}
-                enabled={sFields.length > 0}
-              />
-              {sPrintSuccess && (
-                <span className={styles.printSuccessText} style={{ color: C.green }}>Sent to printer!</span>
-              )}
-            </div>
-
-            <Button
-              text="Exit"
-              onPress={handleExitPress}
-              colorGradientArr={COLOR_GRADIENTS.grey}
-              buttonStyle={{ paddingLeft: 16, paddingRight: 16 }}
-              textStyle={{ fontSize: 12 }}
-            />
-          </div>
         </div>
+        {sPrintSuccess && (
+          <div className={styles.printSuccessRow} style={{ borderTopColor: C.borderStrong }}>
+            <span className={styles.printSuccessText} style={{ color: C.green }}>Sent to printer!</span>
+          </div>
+        )}
+        <ModalFooter>
+          <ModalFooterButton
+            variant="accent"
+            disabled={sFields.length === 0}
+            onClick={handleTestPrint}
+          >
+            Test Print Label Design
+          </ModalFooterButton>
+          <ModalFooterButton variant="danger" onClick={handleExitPress}>
+            Exit
+          </ModalFooterButton>
+        </ModalFooter>
       </div>
     </Dialog>
   );

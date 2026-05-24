@@ -1,6 +1,6 @@
 import React from "react";
 import { Dialog } from "../Dialog/Dialog";
-import { Image } from "../Image/Image";
+import { ModalFooter, ModalFooterButton } from "../ModalFooter/ModalFooter";
 import styles from "./TestConfirmModal.module.css";
 
 export const TestConfirmModal = ({
@@ -9,23 +9,7 @@ export const TestConfirmModal = ({
   onConfirm,
   title = "Discard changes?",
   message = "Your unsaved changes will be lost. Continue?",
-  cancelBg,
-  cancelFg,
-  cancelIcon,
-  discardIcon,
-  confirmBg,
-  confirmFg,
-  confirmIcon,
 }) => {
-  const cancelStyle = {
-    ...(cancelBg && { backgroundColor: cancelBg }),
-    ...(cancelFg && { color: cancelFg }),
-  };
-  const confirmStyle = {
-    ...(confirmBg && { backgroundColor: confirmBg }),
-    ...(confirmFg && { color: confirmFg }),
-  };
-
   return (
     <Dialog
       visible={visible}
@@ -43,28 +27,13 @@ export const TestConfirmModal = ({
           <p className={styles.message}>{message}</p>
         </div>
 
-        <div className={styles.footer}>
-          <button
-            className={styles.actionBtn}
-            style={cancelStyle}
-            onClick={onClose}
-          >
-            {cancelIcon && <Image icon={cancelIcon} size={16} />}
-            <span>Cancel</span>
-          </button>
-          <button className={styles.actionBtn} onClick={onClose}>
-            {discardIcon && <Image icon={discardIcon} size={16} />}
-            <span>Discard</span>
-          </button>
-          <button
-            className={styles.actionBtn}
-            style={confirmStyle}
-            onClick={onConfirm}
-          >
-            {confirmIcon && <Image icon={confirmIcon} size={16} />}
-            <span>Confirm</span>
-          </button>
-        </div>
+        <ModalFooter size="small">
+          <ModalFooterButton onClick={onClose}>Cancel</ModalFooterButton>
+          <ModalFooterButton onClick={onClose}>Discard</ModalFooterButton>
+          <ModalFooterButton variant="primary" onClick={onConfirm}>
+            Confirm
+          </ModalFooterButton>
+        </ModalFooter>
       </div>
     </Dialog>
   );

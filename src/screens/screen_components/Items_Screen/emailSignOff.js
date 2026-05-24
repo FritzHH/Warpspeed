@@ -1,22 +1,21 @@
 import { useSettingsStore, useLoginStore } from "../../../stores";
 
+function escapeHtml(s) {
+  return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 export function buildSignOffHtml(activeAccountKey) {
   let zSettings = useSettingsStore.getState().settings;
   let activeAccount = zSettings?.emailAccounts?.find((a) => a.accountKey === activeAccountKey) || {};
-  let html = "";
-  if (activeAccount.appendUserName) {
-    let currentUser = useLoginStore.getState().getCurrentUser();
-    if (currentUser) {
-      let firstName = currentUser.first || "";
-      let lastInitial = currentUser.last ? currentUser.last.charAt(0) + "." : "";
-      let userName = (firstName + " " + lastInitial).trim();
-      if (userName) {
-        html += `<br/><br/><br/><p style="margin:0;">Thanks,<br/><br/>-${userName}</p>`;
-      }
-    }
-  }
+  let currentUser = useLoginStore.getState().getCurrentUser();
+  let firstName = currentUser?.first || "";
+  let lastInitial = currentUser?.last ? currentUser.last.charAt(0) + "." : "";
+  let userName = (firstName + " " + lastInitial).trim();
+  let userNameEscaped = escapeHtml(userName);
+
   let sig = activeAccount.signature || {};
   let hasSegments = sig?.segments?.length > 0 && sig.segments.some((s) => s.text);
+  let html = "";
   if (hasSegments || sig.imageUrl) {
     let scale = (sig.imageScale || 100) / 100;
     let logoImgTag = sig.imageUrl ? `<img src="${sig.imageUrl}" style="max-width:${Math.round(300 * scale)}px;max-height:${Math.round(300 * scale)}px;vertical-align:middle;" />` : "";
@@ -28,6 +27,7 @@ export function buildSignOffHtml(activeAccountKey) {
         if (!seg.text) continue;
         let escaped = seg.text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br/>");
         if (logoImgTag) escaped = escaped.replace(/\{logo\}/g, logoImgTag);
+        escaped = escaped.replace(/\{username\}/g, userNameEscaped);
         html += `<span style="font-family:${seg.fontFamily};font-size:${seg.fontSize}px;font-weight:${seg.fontWeight};font-style:${seg.fontStyle || "normal"};">${escaped}</span>`;
       }
       html += "</p>";

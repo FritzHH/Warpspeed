@@ -489,12 +489,12 @@
   font-weight: 600;
 }
 
-.modalFooter {
+.modalErrorRow {
   display: flex;
   flex-direction: row;
-  justify-content: flex-end;
   align-items: center;
-  padding: 10px 14px;
+  justify-content: center;
+  padding: 6px 14px;
   border-top-width: 1px;
   border-top-style: solid;
   flex-shrink: 0;
@@ -502,7 +502,6 @@
 
 .modalFooterError {
   font-size: 12px;
-  margin-right: 10px;
 }
 
 .spacer20 {

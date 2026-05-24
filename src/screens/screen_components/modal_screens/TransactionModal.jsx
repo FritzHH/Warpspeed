@@ -1,7 +1,7 @@
 /*eslint-disable*/
 import { formatCurrencyDisp, formatMillisForDisplay, lightenRGBByPercent, localStorageWrapper } from "../../../utils";
 import { C, ICONS, COLOR_GRADIENTS } from "../../../styles";
-import { Button, Dialog, SHADOW_PROTO } from "../../../dom_components";
+import { Button, Dialog, ModalFooter, ModalFooterButton, SHADOW_PROTO } from "../../../dom_components";
 import { useSettingsStore, useLoginStore } from "../../../stores";
 import { printBuilder, log } from "../../../utils";
 import { dbSavePrintObj } from "../../../db_calls_wrapper";
@@ -207,14 +207,6 @@ export const TransactionModal = ({ transaction, onClose, onRefund }) => {
               buttonStyle={{ paddingHorizontal: 14, height: 32, borderWidth: 1, borderColor: C.buttonLightGreenOutline }}
               textStyle={{ fontSize: 12, color: C.text }}
             />
-            <Button
-              text="Close"
-              icon={ICONS.close1}
-              iconSize={14}
-              onPress={handleClose}
-              buttonStyle={{ paddingHorizontal: 16, height: 32 }}
-              textStyle={{ color: C.textMuted, fontSize: 12 }}
-            />
           </div>
         </div>
 
@@ -331,6 +323,10 @@ export const TransactionModal = ({ transaction, onClose, onRefund }) => {
           {/* Bottom spacer */}
           <div className={styles.bottomSpacer} />
         </div>
+
+        <ModalFooter>
+          <ModalFooterButton onClick={handleClose}>Close</ModalFooterButton>
+        </ModalFooter>
       </div>
     </Dialog>
   );

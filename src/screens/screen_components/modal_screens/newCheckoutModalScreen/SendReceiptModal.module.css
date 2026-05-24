@@ -1,11 +1,17 @@
 .panel {
   display: flex;
   flex-direction: column;
-  align-items: center;
   border-radius: 15px;
-  padding: 25px 30px;
   width: 360px;
+  overflow: hidden;
   box-sizing: border-box;
+}
+
+.panelInner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 25px 30px;
 }
 
 .title {
@@ -68,12 +74,3 @@
   text-align: center;
 }
 
-.actions {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  width: 100%;
-  margin-top: 10px;
-  flex-shrink: 0;
-  box-sizing: border-box;
-}

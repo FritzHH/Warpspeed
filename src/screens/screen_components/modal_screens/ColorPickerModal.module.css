@@ -14,9 +14,16 @@
 .modal {
   background-color: var(--surface-raised);
   border-radius: 10px;
-  padding: 30px;
   border: 2px solid var(--border-default);
   display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.modalBody {
+  display: flex;
+  padding: 30px;
   box-sizing: border-box;
 }
 
@@ -141,10 +148,3 @@
   font-weight: 500;
 }
 
-.buttonsRow {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  margin-top: 25px;
-  gap: 15px;
-}

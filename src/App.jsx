@@ -249,7 +249,7 @@ function App() {
               ?.find((u) => u.id == "1234");
             if (devUser) {
               useLoginStore.getState().setCurrentUser(devUser);
-              useLoginStore.getState().setLastActionMillis();
+              useLoginStore.setState({ lastActionMillis: Infinity });
             }
           }
           setUser({

@@ -1,0 +1,72 @@
+/* Modal footer — full-width button row at modal bottom */
+.footer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  background-color: var(--gray-200);
+}
+
+.slot {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+}
+
+.slot + .slot {
+  border-left: 1px solid var(--border-default);
+}
+
+.btn {
+  flex: 1;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-on-accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.1s;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+}
+
+.btn:hover:not(:disabled) {
+  opacity: 0.75;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* Size variants */
+.sizeLarge {
+  height: 37px;
+}
+
+.sizeSmall {
+  height: 27px;
+  font-size: 12px;
+}
+
+/* Color variants */
+.variantDefault {
+  /* transparent — shows gray-200 footer bg */
+}
+
+.variantPrimary {
+  background-color: var(--orange-300);
+}
+
+.variantAccent {
+  background-color: var(--success);
+}
+
+.variantDanger {
+  background-color: var(--danger);
+}

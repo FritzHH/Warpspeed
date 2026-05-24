@@ -2,6 +2,7 @@ import React, { forwardRef, useState } from "react";
 import ReactDOM from "react-dom";
 import { C } from "../../styles";
 import { useZ } from "../../hooks/useZ";
+import { ModalFooter, ModalFooterButton } from "../ModalFooter/ModalFooter";
 import styles from "./WebPageModal.module.css";
 
 export const WebPageModal = forwardRef(function WebPageModal(
@@ -51,13 +52,6 @@ export const WebPageModal = forwardRef(function WebPageModal(
               {subtitle && (
                 <span className={styles.subtitle}>{subtitle}</span>
               )}
-              <button
-                className={styles.closeBtn}
-                onClick={() => _setVisible(false)}
-                aria-label="Close"
-              >
-                ✕
-              </button>
             </div>
             <div className={styles.body}>
               <iframe
@@ -66,6 +60,9 @@ export const WebPageModal = forwardRef(function WebPageModal(
                 title={title}
               />
             </div>
+            <ModalFooter>
+              <ModalFooterButton onClick={() => _setVisible(false)}>Close</ModalFooterButton>
+            </ModalFooter>
           </div>
         </div>,
         document.body

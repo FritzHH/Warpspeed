@@ -4,10 +4,18 @@
   background-color: var(--surface-base);
   border-radius: 12px;
   border: 2px solid var(--border-default);
-  padding: 20px;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
   box-sizing: border-box;
+}
+
+.cardInner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
 }
 
 .header {
@@ -21,20 +29,6 @@
 .title {
   font-size: 18px;
   font-weight: 700;
-}
-
-.closeBtn {
-  background: none;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  line-height: 0;
-}
-
-.closeIcon {
-  width: 18px;
-  height: 18px;
-  object-fit: contain;
 }
 
 .inputRow {

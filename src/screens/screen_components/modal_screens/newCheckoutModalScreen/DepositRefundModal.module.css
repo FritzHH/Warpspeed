@@ -73,13 +73,6 @@
   font-weight: 500;
 }
 
-.actionRow {
-  display: flex;
-  flex-direction: row;
-  gap: 12px;
-  margin-top: 18px;
-}
-
 .removedState {
   padding: 20px;
   display: flex;
@@ -282,13 +275,6 @@
 .successSub {
   font-size: 11px;
   margin-top: 4px;
-}
-
-.closeRow {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  margin-top: 15px;
 }
 
 .confirmOverlay {

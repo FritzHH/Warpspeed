@@ -1,30 +1,11 @@
 import React from "react";
 import { Dialog } from "../Dialog/Dialog";
 import { Image } from "../Image/Image";
+import { ModalFooter, ModalFooterButton } from "../ModalFooter/ModalFooter";
 import { ICONS } from "../../styles";
 import styles from "./TestLargeModal.module.css";
 
-export const TestLargeModal = ({
-  visible,
-  onClose,
-  onShowConfirm,
-  cancelBg,
-  cancelFg,
-  cancelIcon,
-  draftIcon,
-  primaryBg,
-  primaryFg,
-  primaryIcon,
-}) => {
-  const cancelStyle = {
-    ...(cancelBg && { backgroundColor: cancelBg }),
-    ...(cancelFg && { color: cancelFg }),
-  };
-  const primaryStyle = {
-    ...(primaryBg && { backgroundColor: primaryBg }),
-    ...(primaryFg && { color: primaryFg }),
-  };
-
+export const TestLargeModal = ({ visible, onClose, onShowConfirm }) => {
   return (
     <Dialog
       visible={visible}
@@ -57,28 +38,13 @@ export const TestLargeModal = ({
           </p>
         </div>
 
-        <div className={styles.footer}>
-          <button
-            className={styles.actionBtn}
-            style={cancelStyle}
-            onClick={onClose}
-          >
-            {cancelIcon && <Image icon={cancelIcon} size={16} />}
-            <span>Cancel</span>
-          </button>
-          <button className={styles.actionBtn} onClick={onClose}>
-            {draftIcon && <Image icon={draftIcon} size={16} />}
-            <span>Save Draft</span>
-          </button>
-          <button
-            className={styles.actionBtn}
-            style={primaryStyle}
-            onClick={onShowConfirm}
-          >
-            {primaryIcon && <Image icon={primaryIcon} size={16} />}
-            <span>Show Confirm</span>
-          </button>
-        </div>
+        <ModalFooter>
+          <ModalFooterButton onClick={onClose}>Cancel</ModalFooterButton>
+          <ModalFooterButton onClick={onClose}>Save Draft</ModalFooterButton>
+          <ModalFooterButton variant="primary" onClick={onShowConfirm}>
+            Show Confirm
+          </ModalFooterButton>
+        </ModalFooter>
       </div>
     </Dialog>
   );

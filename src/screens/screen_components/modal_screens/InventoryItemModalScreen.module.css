@@ -5,10 +5,19 @@
   height: 90vh;
   background-color: var(--surface-base);
   border-radius: 15px;
-  padding: 20px;
   box-shadow: 3px 3px 12px var(--shadow-color-default);
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.cardInner {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
   box-sizing: border-box;
 }
 
@@ -340,33 +349,3 @@
   margin-left: 6px;
 }
 
-/* Footer */
-.footer {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 10px;
-}
-
-.footerLeft {
-  display: flex;
-  align-items: center;
-}
-
-.footerRight {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-}
-
-.iconBtn {
-  background: none;
-  border: none;
-  padding: 6px;
-  border-radius: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-}

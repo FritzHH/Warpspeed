@@ -23,61 +23,6 @@
   overflow: hidden;
 }
 
-/* Footer — full-width button row at modal bottom */
-.footer {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: row;
-  align-items: stretch;
-  background-color: var(--gray-200);
-}
-
-.footerSlot {
-  flex: 1;
-  display: flex;
-  align-items: stretch;
-}
-
-.footerSlot + .footerSlot {
-  border-left: 1px solid var(--border-default);
-}
-
-.footerBtn {
-  flex: 1;
-  height: 37px;
-  padding: 0;
-  background: none;
-  border: none;
-  color: var(--text-on-accent);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.1s;
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-family: inherit;
-}
-
-.footerBtn:hover:not(:disabled) {
-  opacity: 0.75;
-}
-
-.footerBtn:disabled {
-  cursor: not-allowed;
-  opacity: 0.4;
-}
-
-.footerBtnPrimary {
-  background-color: var(--orange-300);
-}
-
-.footerBtnAccent {
-  background-color: var(--success);
-}
-
 /* Form column (15%) */
 .formCol {
   width: 15%;

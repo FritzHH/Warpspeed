@@ -949,13 +949,13 @@ export const useLoginStore = create(
   setModalVisible: (modalVisible) => set((state) => ({ modalVisible })),
   setLoginTimeout: (loginTimeout) => set((state) => ({ loginTimeout })),
 
-  setLastActionMillis: () => set({ lastActionMillis: new Date().getTime() }),
+  setLastActionMillis: () => set((state) => state.lastActionMillis === Infinity ? {} : { lastActionMillis: new Date().getTime() }),
   setShowLoginScreen: (showLoginScreen) => {
     if (showLoginScreen && import.meta.env.DEV) {
       const devUser = useSettingsStore.getState().getSettings()?.users
         ?.find((u) => u.id == "1234");
       if (devUser) {
-        set({ currentUser: devUser, lastActionMillis: Date.now(), showLoginScreen: false });
+        set({ currentUser: devUser, lastActionMillis: Infinity, showLoginScreen: false });
         return;
       }
     }

@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { useState, memo } from "react";
 import cloneDeep from "lodash/cloneDeep";
-import { Dialog, Button, SmallLoadingIndicator, CheckBox } from "../../../../dom_components";
+import { Dialog, Button, SmallLoadingIndicator, CheckBox, ModalFooter, ModalFooterButton } from "../../../../dom_components";
 import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
 import { useZ } from "../../../../hooks/useZ";
 import { useCurrentCustomerStore, useSettingsStore, useLoginStore } from "../../../../stores";
@@ -268,22 +268,6 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                     {"$" + formatCurrencyDisp(refundAmount) + " - " + formatMillisForDisplay(deposit?.millis)}
                   </span>
                 </div>
-                <div className={styles.actionRow}>
-                  <Button
-                    text={"Remove " + label}
-                    onPress={() => _setShowRemoveConfirm(true)}
-                    colorGradientArr={COLOR_GRADIENTS.red}
-                    textStyle={{ fontSize: 13, color: C.textWhite, fontWeight: Fonts.weight.textHeavy }}
-                    buttonStyle={{ height: 36, paddingHorizontal: 18, borderRadius: 6 }}
-                  />
-                  <Button
-                    text="Cancel"
-                    onPress={handleClose}
-                    colorGradientArr={COLOR_GRADIENTS.grey}
-                    textStyle={{ fontSize: 13, color: C.textWhite }}
-                    buttonStyle={{ height: 36, paddingHorizontal: 18, borderRadius: 6 }}
-                  />
-                </div>
               </div>
             )}
 
@@ -301,13 +285,6 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                     {"$" + formatCurrencyDisp(refundAmount) + " " + label.toLowerCase() + " has been removed"}
                   </span>
                 </div>
-                <Button
-                  text="Done"
-                  onPress={handleClose}
-                  colorGradientArr={COLOR_GRADIENTS.green}
-                  textStyle={{ fontSize: 13, color: C.textWhite }}
-                  buttonStyle={{ marginTop: 15, width: 120, height: 36, borderRadius: 6 }}
-                />
               </div>
             )}
 
@@ -464,25 +441,6 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                         </span>
                       </div>
                     )}
-
-                    <Button
-                      text={
-                        sProcessing
-                          ? "PROCESSING..."
-                          : `REFUND FULL ${isGiftCard ? "GIFT CARD" : "DEPOSIT"}${isImportedCard ? " (CASH)" : ""}`
-                      }
-                      onPress={() => _setShowConfirm(true)}
-                      enabled={!sProcessing}
-                      colorGradientArr={COLOR_GRADIENTS.yellow}
-                      textStyle={{ fontSize: 13, fontWeight: Fonts.weight.textHeavy }}
-                      buttonStyle={{
-                        paddingVertical: 8,
-                        borderRadius: 6,
-                        alignItems: "center",
-                        justifyContent: "center",
-                        opacity: sProcessing ? 0.4 : 1,
-                      }}
-                    />
                   </div>
                 )}
 
@@ -501,19 +459,36 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                   </div>
                 )}
 
-                {/* Close Button */}
-                <div className={styles.closeRow}>
-                  <Button
-                    text={sRefundComplete ? "Done" : "Cancel"}
-                    onPress={handleClose}
-                    colorGradientArr={sRefundComplete ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.red}
-                    textStyle={{ fontSize: 13, color: C.textWhite }}
-                    buttonStyle={{ width: 120, height: 36, borderRadius: 6 }}
-                    enabled={!sProcessing}
-                  />
-                </div>
               </div>
             )}
+
+            <ModalFooter>
+              {!sLoading && !sTransaction && sLoadMessage && !sRemoved ? (
+                <ModalFooterButton variant="danger" onClick={() => _setShowRemoveConfirm(true)}>
+                  {"Remove " + label}
+                </ModalFooterButton>
+              ) : null}
+              {!sLoading && sTransaction && !fullyRefunded && !sRefundComplete ? (
+                <ModalFooterButton
+                  variant="accent"
+                  disabled={sProcessing}
+                  onClick={() => _setShowConfirm(true)}
+                >
+                  {sProcessing
+                    ? "PROCESSING..."
+                    : `REFUND FULL ${isGiftCard ? "GIFT CARD" : "DEPOSIT"}${isImportedCard ? " (CASH)" : ""}`}
+                </ModalFooterButton>
+              ) : null}
+              {sRemoved || sRefundComplete ? (
+                <ModalFooterButton variant="accent" onClick={handleClose}>
+                  Done
+                </ModalFooterButton>
+              ) : (
+                <ModalFooterButton variant="danger" disabled={sProcessing} onClick={handleClose}>
+                  {sLoading ? "Close" : "Cancel"}
+                </ModalFooterButton>
+              )}
+            </ModalFooter>
           </div>
 
           {sShowConfirm && (

@@ -16,12 +16,20 @@
   max-width: 1000px;
   height: 88%;
   border-radius: 15px;
-  padding: 20px;
   display: flex;
   flex-direction: column;
   outline: none;
+  overflow: hidden;
   flex-shrink: 0;
   box-sizing: border-box;
+}
+
+.modalBody {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
 }
 
 /* ─── Top bar ──────────────────────────────────────────────────────── */
@@ -336,25 +344,15 @@
 }
 
 /* ─── Bottom bar ───────────────────────────────────────────────────── */
-.bottomBar {
-  margin-top: 12px;
+.printSuccessRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 14px;
   border-top-width: 1px;
   border-top-style: solid;
-  padding-top: 10px;
   flex-shrink: 0;
-}
-
-.bottomBarInner {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.bottomBarLeft {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
 }
 
 .printSuccessText {

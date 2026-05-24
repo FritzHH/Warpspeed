@@ -47,6 +47,14 @@
   border-radius: 15px;
   overflow: hidden;
   display: flex;
+  flex-direction: column;
+}
+
+.cardContent {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  display: flex;
   flex-direction: row;
 }
 
@@ -65,15 +73,6 @@
 .leftRailTop {
   width: 100%;
   flex-shrink: 0;
-}
-
-.leftRailBottom {
-  width: 100%;
-  flex-shrink: 0;
-  margin-top: auto;
-  padding-top: 8px;
-  display: flex;
-  justify-content: center;
 }
 
 .title {
@@ -584,10 +583,6 @@
 }
 
 /* ════════════ Button padding variants (pass via Button className) ════════════ */
-.btnClose {
-  padding: 8px 20px;
-}
-
 .btnGo {
   padding: 10px 40px;
 }

@@ -2,7 +2,7 @@ import { useState, useEffect, lazy, Suspense } from "react";
 import { calculateRunningTotals, capitalizeFirstLetterOfString, formatCurrencyDisp, formatMillisForDisplay, formatPhoneWithDashes, lightenRGBByPercent, resolveStatus, formatWorkorderNumber, localStorageWrapper, findTemplateByType, log } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useSettingsStore, useLoginStore, useAlertScreenStore, useOpenWorkordersStore } from "../../../stores";
-import { Button, Dialog, DropdownMenu, SHADOW_PROTO, SmallLoadingIndicator, Tooltip } from "../../../dom_components";
+import { Button, Dialog, DropdownMenu, ModalFooter, ModalFooterButton, SHADOW_PROTO, SmallLoadingIndicator, Tooltip } from "../../../dom_components";
 import { dbGetCompletedSale, dbSavePrintObj, dbSendReceipt } from "../../../db_calls_wrapper";
 import { build_db_path } from "../../../constants";
 import { printBuilder } from "../../../utils";
@@ -491,13 +491,6 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
                 itemTextAlign="left"
               />
             </div>
-            <Button
-              text="Close"
-              colorGradientArr={COLOR_GRADIENTS.red}
-              onPress={handleClose}
-              buttonStyle={{ paddingHorizontal: 16, height: 32 }}
-              textStyle={{ color: C.textWhite, fontSize: 12 }}
-            />
           </div>
         </div>
 
@@ -856,6 +849,10 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
             )}
           </div>
         </div>
+
+        <ModalFooter>
+          <ModalFooterButton onClick={handleClose}>Close</ModalFooterButton>
+        </ModalFooter>
       </div>
     </Dialog>
     {!!sSaleForModal && (

@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import cloneDeep from "lodash/cloneDeep";
-import { Dialog, TextInput, TouchableOpacity, Image, Button, Tooltip } from "../../../../../dom_components";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../../../styles";
+import { Dialog, TextInput, TouchableOpacity, Image, ModalFooter, ModalFooterButton } from "../../../../../dom_components";
+import { C, ICONS } from "../../../../../styles";
 
 import { NOTE_HELPER_ITEM_PROTO } from "../../../../../data";
 import styles from "./ListOptions.module.css";
@@ -238,36 +238,22 @@ export const NoteHelperEditorModal = ({
           </button>
         </div>
 
-        {/* Footer */}
-        <div
-          className={styles.modalFooter}
-          style={{ borderTopColor: C.buttonLightGreenOutline }}
-        >
-          {!nameValid && (
+        {/* Validation message */}
+        {!nameValid && (
+          <div className={styles.modalErrorRow} style={{ borderTopColor: C.buttonLightGreenOutline }}>
             <span className={styles.modalFooterError} style={{ color: C.lightred }}>
               Category name must be 3+ characters
             </span>
-          )}
-          <Button
-            text="Cancel"
-            colorGradientArr={COLOR_GRADIENTS.grey}
-            onPress={onClose}
-            buttonStyle={{
-              paddingHorizontal: 20,
-              paddingVertical: 7,
-              marginRight: 8,
-            }}
-            textStyle={{ fontSize: 13 }}
-          />
-          <Button
-            text="Save"
-            colorGradientArr={nameValid ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
-            onPress={handleSave}
-            enabled={nameValid}
-            buttonStyle={{ paddingHorizontal: 20, paddingVertical: 7 }}
-            textStyle={{ fontSize: 13 }}
-          />
-        </div>
+          </div>
+        )}
+        <ModalFooter>
+          <ModalFooterButton variant="danger" onClick={onClose}>
+            Cancel
+          </ModalFooterButton>
+          <ModalFooterButton variant="accent" disabled={!nameValid} onClick={handleSave}>
+            Save
+          </ModalFooterButton>
+        </ModalFooter>
       </div>
     </Dialog>
   );

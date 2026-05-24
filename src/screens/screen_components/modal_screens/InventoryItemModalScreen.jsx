@@ -17,6 +17,8 @@ import {
   LoginModal,
   TextInput,
   Tooltip,
+  ModalFooter,
+  ModalFooterButton,
 } from "../../../dom_components";
 import { C, ICONS } from "../../../styles";
 import styles from "./InventoryItemModalScreen.module.css";
@@ -365,6 +367,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
       <div className={styles.card}>
           {zShowLoginScreen && <LoginModal modalVisible={true} />}
 
+          <div className={styles.cardInner}>
           {/* HEADER */}
           <div className={styles.header}>
             <span className={styles.headerTitle} style={{ color: C.text }}>
@@ -634,36 +637,46 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
             />
 
           </div>
-          <div className={styles.footer}>
-            {!isNew ? (
-              <Tooltip text="Delete this item" position="top">
-                <button type="button" className={styles.iconBtn} onClick={handleDeleteItem}>
-                  <Image icon={ICONS.trash} size={40} />
-                </button>
-              </Tooltip>
-            ) : <div className={styles.footerLeft} />}
-            <div className={styles.footerRight}>
-              {isNew && !!sItem.formalName?.trim() && (
-                <Tooltip text="Save new item" position="top">
-                  <button type="button" className={styles.iconBtn} onClick={handleSaveNewItem}>
-                    <Image icon={ICONS.check1} size={36} />
-                  </button>
-                </Tooltip>
-              )}
-              {!isNew && sDirty && (
-                <Tooltip text="Save changes" position="top">
-                  <button type="button" className={styles.iconBtn} onClick={handleExit}>
-                    <Image icon={ICONS.check1} size={36} />
-                  </button>
-                </Tooltip>
-              )}
-              <Tooltip text="Close" position="top">
-                <button type="button" className={styles.iconBtn} onClick={handleExit}>
-                  <Image icon={ICONS.close1} size={36} />
-                </button>
-              </Tooltip>
-            </div>
           </div>
+
+          <ModalFooter>
+            {!isNew ? (
+              <ModalFooterButton
+                variant="danger"
+                icon={ICONS.trash}
+                iconSize={18}
+                tooltip="Delete this item"
+                onClick={handleDeleteItem}
+              >
+                Delete
+              </ModalFooterButton>
+            ) : null}
+            {isNew && !!sItem.formalName?.trim() ? (
+              <ModalFooterButton
+                variant="accent"
+                icon={ICONS.check1}
+                iconSize={18}
+                tooltip="Save new item"
+                onClick={handleSaveNewItem}
+              >
+                Save
+              </ModalFooterButton>
+            ) : null}
+            {!isNew && sDirty ? (
+              <ModalFooterButton
+                variant="accent"
+                icon={ICONS.check1}
+                iconSize={18}
+                tooltip="Save changes"
+                onClick={handleExit}
+              >
+                Save
+              </ModalFooterButton>
+            ) : null}
+            <ModalFooterButton onClick={handleExit}>
+              Close
+            </ModalFooterButton>
+          </ModalFooter>
       </div>
   );
 

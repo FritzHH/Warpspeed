@@ -3,6 +3,7 @@ import { C } from "../../styles";
 import { usdTypeMask } from "../../utils";
 import { CUSTOMER_DEPOST_TYPES } from "../../data";
 import { Dialog } from "../Dialog/Dialog";
+import { ModalFooter, ModalFooterButton } from "../ModalFooter/ModalFooter";
 import styles from "./DepositModal.module.css";
 
 export const DepositModal = function DepositModal({
@@ -65,6 +66,7 @@ export const DepositModal = function DepositModal({
       className={`${styles.card} ${className}`}
       data-testid={testId}
     >
+      <div className={styles.cardInner}>
       <span className={styles.title} style={{ color: C.text }}>
         Add Deposit / Credit / Gift Card
       </span>
@@ -153,13 +155,14 @@ export const DepositModal = function DepositModal({
         </div>
       )}
 
-      {/* Action buttons */}
-      <div className={styles.actions}>
-        <button className={styles.cancelBtn} onClick={resetAndClose}>
+      </div>
+      <ModalFooter>
+        <ModalFooterButton variant="danger" onClick={resetAndClose}>
           Cancel
-        </button>
-        <button
-          className={styles.confirmBtn}
+        </ModalFooterButton>
+        <ModalFooterButton
+          variant="accent"
+          disabled={!confirmReady}
           onClick={() => {
             if (isCredit) {
               if (!creditReady) return;
@@ -174,12 +177,10 @@ export const DepositModal = function DepositModal({
               resetAndClose();
             }
           }}
-          disabled={!confirmReady}
-          style={{ opacity: confirmReady ? 1 : 0.4 }}
         >
           {isCredit ? "Apply Credit" : "Pay Amount"}
-        </button>
-      </div>
+        </ModalFooterButton>
+      </ModalFooter>
     </div>
     </Dialog>
   );

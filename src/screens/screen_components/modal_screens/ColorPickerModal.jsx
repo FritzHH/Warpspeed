@@ -1,9 +1,8 @@
 /* eslint-disable */
 import React, { useState, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { COLOR_GRADIENTS } from "../../../styles";
 import { useZ } from "../../../hooks/useZ";
-import { Button } from "../../../dom_components";
+import { ModalFooter, ModalFooterButton } from "../../../dom_components";
 import { ColorWheel } from "../../../ColorWheel";
 import styles from "./ColorPickerModal.module.css";
 
@@ -56,9 +55,10 @@ export const ColorPickerModal = ({
         }}
       >
         <div
-          className={`${styles.modal} ${hasSchemes ? styles.modalWithSchemes : styles.modalNoSchemes}`}
+          className={styles.modal}
           style={{ maxWidth: modalMaxWidth }}
         >
+          <div className={`${styles.modalBody} ${hasSchemes ? styles.modalWithSchemes : styles.modalNoSchemes}`}>
           {/* Color schemes sidebar */}
           {hasSchemes && (
             <>
@@ -123,22 +123,22 @@ export const ColorPickerModal = ({
               </div>
             </div>
 
-            <div className={styles.buttonsRow}>
-              <Button
-                text={saveButtonText || "Save Changes"}
-                colorGradientArr={COLOR_GRADIENTS.green}
-                onPress={() => {
-                  onSave(sBgColor, sTextColor);
-                  onClose();
-                }}
-              />
-              <Button
-                text={exitButtonText || "Exit (discard any changes)"}
-                colorGradientArr={COLOR_GRADIENTS.grey}
-                onPress={onClose}
-              />
-            </div>
           </div>
+          </div>
+          <ModalFooter>
+            <ModalFooterButton variant="danger" onClick={onClose}>
+              {exitButtonText || "Exit (discard any changes)"}
+            </ModalFooterButton>
+            <ModalFooterButton
+              variant="accent"
+              onClick={() => {
+                onSave(sBgColor, sTextColor);
+                onClose();
+              }}
+            >
+              {saveButtonText || "Save Changes"}
+            </ModalFooterButton>
+          </ModalFooter>
         </div>
       </div>
     </div>,

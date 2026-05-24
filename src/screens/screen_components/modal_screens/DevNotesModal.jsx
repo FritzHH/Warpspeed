@@ -1,7 +1,7 @@
 /* eslint-disable */
 import React, { useState, useEffect } from "react";
 import { C, ICONS, COLOR_GRADIENTS } from "../../../styles";
-import { Button, TextInput, Dialog } from "../../../dom_components";
+import { Button, TextInput, Dialog, ModalFooter, ModalFooterButton } from "../../../dom_components";
 import { useLoginStore, useSettingsStore } from "../../../stores";
 import { PRIVILEDGE_LEVELS } from "../../../data";
 import { formatMillisForDisplay } from "../../../utils";
@@ -86,14 +86,12 @@ export const DevNotesModal = ({ visible, onClose }) => {
   return (
     <Dialog visible={visible} onClose={onClose} title="Dev Notes" aria-label="Dev Notes">
       <div className={styles.card}>
+        <div className={styles.cardInner}>
         {/* Header */}
         <div className={styles.header}>
           <span className={styles.title} style={{ color: C.text }}>
             Dev Notes
           </span>
-          <button className={styles.closeBtn} onClick={onClose} aria-label="Close">
-            <img src={ICONS.close1} alt="" className={styles.closeIcon} />
-          </button>
         </div>
 
         {/* Input area */}
@@ -245,6 +243,10 @@ export const DevNotesModal = ({ visible, onClose }) => {
             );
           })}
         </div>
+        </div>
+        <ModalFooter>
+          <ModalFooterButton onClick={onClose}>Close</ModalFooterButton>
+        </ModalFooter>
       </div>
     </Dialog>
   );

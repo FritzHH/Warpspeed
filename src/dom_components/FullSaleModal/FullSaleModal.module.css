@@ -365,18 +365,6 @@
   margin-top: 2px;
 }
 
-/* ── Footer ── */
-.footer {
-  display: flex;
-  flex-direction: row;
-  justify-content: flex-end;
-  align-items: center;
-  padding: 10px 20px;
-  border-top: 1px solid var(--border-subtle);
-  background-color: var(--header-bg);
-  flex-shrink: 0;
-}
-
 /* ── Workorder card ── */
 .workorderBtn {
   width: 100%;

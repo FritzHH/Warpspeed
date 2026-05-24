@@ -4,6 +4,7 @@ import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
 import { Button } from "../Button/Button";
 import { SmallLoadingIndicator } from "../LoadingIndicator/LoadingIndicator";
 import { Dialog } from "../Dialog/Dialog";
+import { ModalFooter, ModalFooterButton } from "../ModalFooter/ModalFooter";
 import { useSettingsStore, useCheckoutStore, useLoginStore } from "../../stores";
 import { formatCurrencyDisp, formatMillisForDisplay, capitalizeFirstLetterOfString, formatPhoneWithDashes, lightenRGBByPercent, calculateRunningTotals, resolveStatus, log, printBuilder, localStorageWrapper } from "../../utils";
 import { dbSavePrintObj } from "../../db_calls_wrapper";
@@ -489,17 +490,9 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
             </div>
           </div>
 
-          {/* ── Footer ── */}
-          <div className={styles.footer}>
-            <Button
-              text="Close"
-              icon={ICONS.close1}
-              iconSize={14}
-              onPress={onClose}
-              buttonStyle={{ paddingHorizontal: 16, height: 34 }}
-              textStyle={{ color: C.textMuted, fontSize: 13 }}
-            />
-          </div>
+          <ModalFooter>
+            <ModalFooterButton onClick={onClose}>Close</ModalFooterButton>
+          </ModalFooter>
         </div>
       </Dialog>
 

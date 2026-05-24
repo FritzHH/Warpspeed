@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   Button,
-  CheckBox,
   Image,
   TextInput,
   TouchableOpacity,
@@ -32,7 +31,6 @@ export const EmailInboxes = ({ zSettingsObj, handleSettingsFieldChange }) => {
       accountKey: generate36CharUUID(),
       email: sEmail.trim().toLowerCase(),
       displayName: sDisplayName.trim(),
-      appendUserName: false,
       signature: { segments: [], imageUrl: "", fontFamily: "Arial", fontSize: 14, fontWeight: "400" },
     };
     let updated = [...emailAccounts, newAccount];
@@ -197,18 +195,6 @@ export const EmailInboxes = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   >
                     {acct.email}
                   </span>
-                  <CheckBox
-                    isChecked={!!acct.appendUserName}
-                    text="Append user name"
-                    onCheck={() => {
-                      let updated = emailAccounts.map((a) =>
-                        a.accountKey === acct.accountKey ? { ...a, appendUserName: !a.appendUserName } : a
-                      );
-                      handleSettingsFieldChange("emailAccounts", updated);
-                    }}
-                    buttonStyle={{ marginTop: 4 }}
-                    textStyle={{ fontSize: 11, color: C.textMuted }}
-                  />
                 </div>
                 <div className={styles.inboxRowActions}>
                   {isConnected && (

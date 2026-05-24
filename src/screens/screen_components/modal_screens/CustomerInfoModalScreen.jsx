@@ -29,6 +29,8 @@ import {
   DepositsList,
   DropdownMenu,
   Image,
+  ModalFooter,
+  ModalFooterButton,
   SmallLoadingIndicator,
   TextInput,
   Tooltip,
@@ -787,46 +789,31 @@ export const CustomerInfoScreenModalComponent = ({
       )}
       </div>
 
-      <div className={styles.footer}>
-        <div className={styles.footerSlot}>
-          <Tooltip text="All edits auto-saved" position="top" darkMode>
-            <button
-              type="button"
-              className={styles.footerBtn}
-              onClick={onClose}
-            >
-              <span>{dismissText}</span>
-            </button>
-          </Tooltip>
-        </div>
+      <ModalFooter>
+        <ModalFooterButton tooltip="All edits auto-saved" onClick={onClose}>
+          {dismissText}
+        </ModalFooterButton>
         {!!primaryHandler && (
-          <div className={styles.footerSlot}>
-            <button
-              type="button"
-              className={`${styles.footerBtn} ${primaryEnabled ? styles.footerBtnPrimary : ""}`}
-              disabled={!primaryEnabled}
-              onClick={() => primaryHandler(sCustomerInfo)}
-            >
-              <Image icon={ICONS.gears1} size={16} />
-              <span>{primaryText}</span>
-            </button>
-          </div>
+          <ModalFooterButton
+            variant="primary"
+            icon={ICONS.gears1}
+            disabled={!primaryEnabled}
+            onClick={() => primaryHandler(sCustomerInfo)}
+          >
+            {primaryText}
+          </ModalFooterButton>
         )}
         {!isNewCustomer && (
-          <div className={styles.footerSlot}>
-            <Tooltip text="Deposits, gift cards and credits" position="top" darkMode>
-              <button
-                type="button"
-                className={`${styles.footerBtn} ${styles.footerBtnAccent}`}
-                onClick={() => _sSetShowDepositModal(true)}
-              >
-                <Image icon={ICONS.greenDollar} size={16} />
-                <span>Add Money</span>
-              </button>
-            </Tooltip>
-          </div>
+          <ModalFooterButton
+            variant="accent"
+            icon={ICONS.greenDollar}
+            tooltip="Deposits, gift cards and credits"
+            onClick={() => _sSetShowDepositModal(true)}
+          >
+            Add Money
+          </ModalFooterButton>
         )}
-      </div>
+      </ModalFooter>
 
       <DepositModal
         visible={sShowDepositModal}

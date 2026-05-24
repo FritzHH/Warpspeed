@@ -5,6 +5,8 @@ import {
   DropdownMenu,
   Image,
   ScreenModal,
+  ModalFooter,
+  ModalFooterButton,
 } from "../../../dom_components";
 import { C, COLOR_GRADIENTS, ICONS, SHADOW_RADIUS_PROTO } from "../../../styles";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -307,6 +309,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
         style={{ "--card-bg": C.backgroundWhite }}
         onClick={(e) => e.stopPropagation()}
       >
+        <div className={styles.modalCardBody}>
         <div className={styles.leftCol}>
           {!!zCurrentUserObj?.permissions?.level >= 3 && (
             <div className={styles.topRow}>
@@ -636,6 +639,10 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
             </div>
           )}
         </div>
+        </div>
+        <ModalFooter>
+          <ModalFooterButton onClick={handleExit}>Close</ModalFooterButton>
+        </ModalFooter>
       </div>
     );
   }, [

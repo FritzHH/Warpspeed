@@ -8,6 +8,8 @@ import {
   Dialog,
   Image,
   LoadingIndicator,
+  ModalFooter,
+  ModalFooterButton,
   ReceiptSentOverlay,
   StaleBanner,
   TextInput,
@@ -2228,15 +2230,6 @@ export function NewCheckoutModalScreen() {
                     </Tooltip>
                   );
                 })()}
-                <Tooltip text={hasRealPayments && !saleComplete ? "Close with partial payment" : saleComplete ? "Close" : isStandalone ? "Cancel sale" : "Close checkout"} position="top">
-                  <button
-                    type="button"
-                    onClick={hasRealPayments && !saleComplete ? handlePartialPayment : closeModal}
-                    className={styles.iconButton}
-                  >
-                    <Image icon={ICONS.close1} size={35} />
-                  </button>
-                </Tooltip>
                 <Tooltip text="Pop register" position="top">
                   <button type="button" onClick={handlePopRegister} className={styles.iconButton}>
                     <Image icon={ICONS.openCashRegister} size={35} />
@@ -2286,6 +2279,22 @@ export function NewCheckoutModalScreen() {
               </>
             )}
           </div>
+
+          <ModalFooter>
+            <ModalFooterButton
+              variant="danger"
+              disabled={cardIsProcessing}
+              onClick={hasRealPayments && !saleComplete ? handlePartialPayment : closeModal}
+            >
+              {hasRealPayments && !saleComplete
+                ? "Close with Partial Payment"
+                : saleComplete
+                  ? "Close"
+                  : isStandalone
+                    ? "Cancel Sale"
+                    : "Close"}
+            </ModalFooterButton>
+          </ModalFooter>
 
           {/* Tax-Free Confirmation Overlay (inline to avoid z-index issues with global AlertBox_) */}
           {sShowTaxFreeConfirm && (

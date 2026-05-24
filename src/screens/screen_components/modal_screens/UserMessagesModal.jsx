@@ -13,7 +13,7 @@ import { selectOpenWorkorderByID } from "../../../shared/selectOpenWorkorder";
 import { sortWorkorders } from "../Options_Screen/Options_Workorders/utils";
 import styles from "./UserMessagesModal.module.css";
 import { useZ } from "../../../hooks/useZ";
-import { Tooltip, DropdownMenu } from "../../../dom_components";
+import { Tooltip, DropdownMenu, ModalFooter, ModalFooterButton } from "../../../dom_components";
 import { dbSetUserPersonalNotes, dbSendSMS, dbSendEmail } from "../../../db_calls_wrapper";
 
 const SUPPRESS_OPTIONS = [
@@ -548,6 +548,7 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
       {ReactDOM.createPortal(
     <div className={styles.overlay} style={{ zIndex: zMain }} onClick={handleExit}>
       <div className={styles.card} onClick={(e) => e.stopPropagation()}>
+        <div className={styles.cardInner}>
         <div className={styles.header}>
           <div className={styles.suppressGroup}>
             <span className={styles.suppressLabel} style={{ color: C.textMuted }}>
@@ -574,14 +575,7 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
           <span className={styles.title} style={{ color: C.text }}>
             Messages
           </span>
-          <button
-            type="button"
-            className={styles.closeBtn}
-            onClick={handleExit}
-            aria-label="Close"
-          >
-            <img src={ICONS.close1} alt="" className={styles.closeIcon} />
-          </button>
+          <span className={styles.headerSpacer} aria-hidden="true" />
         </div>
 
         <div className={styles.tabsRow}>
@@ -998,6 +992,10 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
             </div>
           )}
         </div>
+        </div>
+        <ModalFooter>
+          <ModalFooterButton onClick={handleExit}>Close</ModalFooterButton>
+        </ModalFooter>
       </div>
     </div>,
     document.body
@@ -1012,18 +1010,11 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
           }}
         >
           <div className={styles.pickerCard} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.pickerInner}>
             <div className={styles.pickerHeader}>
               <span className={styles.pickerTitle} style={{ color: C.text }}>
                 Attach Workorder
               </span>
-              <button
-                type="button"
-                className={styles.closeBtn}
-                onClick={() => _setShowWorkorderPicker(false)}
-                aria-label="Close"
-              >
-                <img src={ICONS.close1} alt="" className={styles.closeIcon} />
-              </button>
             </div>
             <div className={styles.pickerList}>
               <button
@@ -1077,6 +1068,10 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
                 );
               })}
             </div>
+            </div>
+            <ModalFooter>
+              <ModalFooterButton onClick={() => _setShowWorkorderPicker(false)}>Close</ModalFooterButton>
+            </ModalFooter>
           </div>
         </div>,
         document.body

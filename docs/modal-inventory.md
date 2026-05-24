@@ -93,4 +93,21 @@ Inventory of all modal components in the Warpspeed app, generated as a starting 
 
 - **Already have a clear footer:** DepositModal, FullSaleModal, ColorPickerModal, SendReceiptModal, CustomerQuickNoteEditorModal, NoteHelperEditorModal
 - **Header buttons only, no footer:** ClosedWorkorderModal, WebPageModal, LoginModal, GoogleMapsModal, DevNotesModal
-- **Scattered / no clear pattern:** most checkout sub-modals, NewCheckoutModalScreen, NewRefundModalScreen, CustomItemModal, InventoryItemModalScreen, LabelDesigner, Payroll, Schedule, UserMessages, WorkorderMedia, phone/WorkorderDetailModal
+- **Scattered / no clear pattern:** most checkout sub-modals, CustomItemModal, LabelDesigner, Schedule, UserMessages, phone/WorkorderDetailModal
+
+## ModalFooter Migration Status
+
+Reusable primitive: `src/dom_components/ModalFooter/` exports `<ModalFooter>` + `<ModalFooterButton>`.
+Variants: `default` (gray), `primary`, `accent` (green), `danger` (red).
+
+**Migrated:**
+- DepositModal, FullSaleModal, LoginModal, WebPageModal (primitives — close-only + 2-button batch)
+- ColorPickerModal, CustomerInfoModalScreen, CustomItemModal, DevNotesModal, GoogleMapsModal, ScheduleModal, TransactionModal, ClosedWorkorderModal, CustomerQuickNoteEditorModal, NoteHelperEditorModal, UserClockHistoryModalScreen (2-button batch)
+- WorkorderMediaModal — multi-button (Delete / Send Media / Close)
+- DepositRefundModal — multi-state (Remove / Refund / Done / Cancel collapsed into single state-aware ModalFooter)
+- PayrollModal — Close-only at card bottom; in-card right-column SAVE/EMAIL kept in place per design (3-column layout preserved via `.cardContent` wrapper)
+- InventoryItemModalScreen — Delete / Save (new) / Save (dirty) / Close
+- NewRefundModalScreen — Close at card bottom; in-column toolbar (Reprint / Send / Pop Register / language picker) kept in place
+- NewCheckoutModalScreen — Close / Close with Partial Payment / Cancel Sale (dynamic) at card bottom; in-column toolbar (Reprint / Send / Pop Register / Tax-Free / language picker) kept in place
+
+**Pattern for complex 3-column modals (Payroll, NewRefund, NewCheckout):** Extract the modal-wide Close action to a card-bottom `<ModalFooter>` while leaving in-column toolbars (post-action receipt operations, language picker, etc.) where they live. Card root becomes `flex-direction: column; overflow: hidden;` with the 3-column content as its first flex child.

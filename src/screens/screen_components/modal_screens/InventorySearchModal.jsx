@@ -3,7 +3,7 @@ import { useState, useRef } from "react";
 import { C } from "../../../styles";
 import { useZ } from "../../../hooks/useZ";
 import { formatCurrencyDisp } from "../../../utils";
-import { CheckBox, Pressable, Button } from "../../../dom_components";
+import { CheckBox, Pressable, ModalFooter, ModalFooterButton } from "../../../dom_components";
 import { workerSearchInventory } from "../../../inventorySearchManager";
 import { StandKeypad } from "../../../shared/StandKeypad";
 import styles from "./InventorySearchModal.module.css";
@@ -162,23 +162,18 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
           )}
         </div>
 
-        {/* Add checked button */}
-        {checkedCount > 0 && (
-          <div className={styles.addBtnWrap} style={{ borderTopColor: C.borderSubtle }}>
-            <Button
-              onPress={handleAddChecked}
-              text={`Add ${checkedCount} Item${checkedCount > 1 ? "s" : ""}`}
-              buttonStyle={{
-                width: "100%",
-                paddingTop: 24,
-                paddingBottom: 24,
-                borderRadius: 8,
-                backgroundColor: C.green,
-              }}
-              textStyle={{ fontSize: 24, fontWeight: "600", color: "white" }}
-            />
-          </div>
-        )}
+        <ModalFooter>
+          <ModalFooterButton
+            variant="accent"
+            disabled={checkedCount === 0}
+            onClick={handleAddChecked}
+          >
+            {checkedCount > 0 ? `Add ${checkedCount} Item${checkedCount > 1 ? "s" : ""}` : "Add Items"}
+          </ModalFooterButton>
+          <ModalFooterButton variant="danger" onClick={onClose}>
+            Close
+          </ModalFooterButton>
+        </ModalFooter>
       </div>
     </div>
   );

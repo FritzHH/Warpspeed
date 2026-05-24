@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { useState } from "react";
-import { Button, Dialog, TextInput } from "../../../../dom_components";
-import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
+import { Dialog, TextInput, ModalFooter, ModalFooterButton } from "../../../../dom_components";
+import { C, Fonts } from "../../../../styles";
 import { formatPhoneWithDashes, removeDashesFromPhone } from "../../../../utils";
 import { dlog, DCAT } from "./checkoutDebugLog";
 import styles from "./SendReceiptModal.module.css";
@@ -84,6 +84,7 @@ export function SendReceiptModal({ visible, onSend, onClose }) {
       aria-label="Send Receipt"
     >
       <div className={styles.panel} style={{ backgroundColor: C.backgroundWhite }}>
+        <div className={styles.panelInner}>
         <span
           className={styles.title}
           style={{ color: C.textMuted, fontWeight: Fonts.weight.textHeavy }}
@@ -131,24 +132,23 @@ export function SendReceiptModal({ visible, onSend, onClose }) {
           </div>
         )}
 
-        <div className={styles.actions}>
-          <Button
-            text="CANCEL"
-            onPress={() => { dlog(DCAT.BUTTON, "cancel", "SendReceiptModal", {}); onClose(); }}
-            enabled={!formLocked}
-            colorGradientArr={COLOR_GRADIENTS.grey}
-            textStyle={{ color: C.textWhite, fontSize: 14 }}
-            buttonStyle={{ paddingLeft: 20, paddingRight: 20 }}
-          />
-          <Button
-            text={sSending ? "SENDING..." : "SEND"}
-            onPress={handleSend}
-            enabled={!formLocked}
-            colorGradientArr={COLOR_GRADIENTS.green}
-            textStyle={{ color: C.textWhite, fontSize: 14 }}
-            buttonStyle={{ paddingLeft: 20, paddingRight: 20 }}
-          />
         </div>
+        <ModalFooter>
+          <ModalFooterButton
+            variant="danger"
+            disabled={formLocked}
+            onClick={() => { dlog(DCAT.BUTTON, "cancel", "SendReceiptModal", {}); onClose(); }}
+          >
+            CANCEL
+          </ModalFooterButton>
+          <ModalFooterButton
+            variant="accent"
+            disabled={formLocked}
+            onClick={handleSend}
+          >
+            {sSending ? "SENDING..." : "SEND"}
+          </ModalFooterButton>
+        </ModalFooter>
       </div>
     </Dialog>
   );

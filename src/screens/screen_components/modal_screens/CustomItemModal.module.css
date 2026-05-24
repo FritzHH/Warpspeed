@@ -16,8 +16,16 @@
   background-color: var(--surface-raised);
   border-radius: 10px;
   border: 2px solid var(--border-default);
-  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   box-sizing: border-box;
+}
+
+.modalBody {
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
 }
 
 .header {
@@ -32,20 +40,6 @@
   font-size: 18px;
   font-weight: 600;
   color: var(--text-default);
-}
-
-.closeBtn {
-  background-color: transparent;
-  padding: 0;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.closeBtn:hover {
-  opacity: 0.7;
 }
 
 .fieldLabel {
@@ -174,14 +168,6 @@
 .discountPreviewBadge {
   font-size: 12px;
   color: var(--danger-muted);
-}
-
-.actionsRow {
-  display: flex;
-  flex-direction: row;
-  justify-content: flex-end;
-  margin-top: 20px;
-  gap: 10px;
 }
 
 .dropdownBackdrop {

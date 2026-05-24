@@ -1,9 +1,9 @@
 /* eslint-disable */
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
+import { C, ICONS } from "../../../styles";
 import { useZ } from "../../../hooks/useZ";
-import { Button, TextInput, Image } from "../../../dom_components";
+import { TextInput, Image, ModalFooter, ModalFooterButton } from "../../../dom_components";
 import { usdTypeMask, applyDiscountToWorkorderItem, generateEAN13Barcode } from "../../../utils";
 import { INVENTORY_ITEM_PROTO, WORKORDER_ITEM_PROTO } from "../../../data";
 import { DISCOUNT_TYPES } from "../../../constants";
@@ -222,14 +222,12 @@ export const CustomItemModal = ({
         style={{ top, left }}
       >
         <div className={styles.modal}>
+          <div className={styles.modalBody}>
           {/* Header */}
           <div className={styles.header}>
             <span className={styles.headerTitle}>
               {isEditing ? "Edit" : "Add"} Custom {isLabor ? "Labor" : "Item"}
             </span>
-            <button type="button" className={styles.closeBtn} onClick={onClose}>
-              <Image icon={ICONS.redx} size={18} />
-            </button>
           </div>
 
           {/* Item Name */}
@@ -346,20 +344,15 @@ export const CustomItemModal = ({
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className={styles.actionsRow}>
-            <Button
-              text="Cancel"
-              onPress={onClose}
-              colorGradientArr={COLOR_GRADIENTS.grey}
-            />
-            <Button
-              text={isEditing ? "Save" : "Add"}
-              onPress={handleSave}
-              enabled={canSave}
-              colorGradientArr={canSave ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
-            />
           </div>
+          <ModalFooter>
+            <ModalFooterButton variant="danger" onClick={onClose}>
+              Cancel
+            </ModalFooterButton>
+            <ModalFooterButton variant="accent" disabled={!canSave} onClick={handleSave}>
+              {isEditing ? "Save" : "Add"}
+            </ModalFooterButton>
+          </ModalFooter>
         </div>
       </div>
       {sDiscountDropdownOpen && (() => {

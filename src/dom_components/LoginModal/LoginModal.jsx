@@ -6,6 +6,7 @@ import { deepEqual, localStorageWrapper } from "../../utils";
 import { permissionToLevel } from "../../data";
 import { useLoginStore, useSettingsStore, useAlertScreenStore } from "../../stores";
 import { LOCAL_DB_KEYS, PAUSE_USER_CLOCK_IN_CHECK_MILLIS } from "../../constants";
+import { ModalFooter, ModalFooterButton } from "../ModalFooter/ModalFooter";
 import styles from "./LoginModal.module.css";
 
 export const LoginModal = forwardRef(function LoginModal(
@@ -171,97 +172,109 @@ export const LoginModal = forwardRef(function LoginModal(
                 borderColor: sSuccess ? C.green : C.buttonLightGreenOutline,
               }}
             >
-        {/* Header */}
-        <div className={styles.header}>
-          <span
-            className={styles.title}
-            style={{ color: sSuccess ? "white" : C.text }}
-          >
-            {sSuccess ? "Welcome!" : zAdminPrivilege ? "Admin Login" : "Login"}
-          </span>
-          {!sSuccess && showLockToggle && (
-            <button
-              type="button"
-              className={styles.lockToggle}
-              onClick={(e) => {
-                e.stopPropagation();
-                _setExpandedTo4((v) => !v);
-                _setPin("");
-                _setError("");
-                pinInputRef.current?.focus();
-              }}
-              aria-label={sExpandedTo4 ? "Use standard PIN length" : "Use 4-digit admin PIN"}
-            >
-              <img
-                src={resolveIcon(sExpandedTo4 ? ICONS.unblock : ICONS.blocked)}
-                alt=""
-                style={{ width: 22, height: 22 }}
-              />
-            </button>
-          )}
-        </div>
-
-        {/* Privilege badge */}
-        {!!zAdminPrivilege && !sSuccess && (
-          <div className={styles.privilegeBadge} style={{ backgroundColor: C.surfaceAlt }}>
-            <span className={styles.privilegeText} style={{ color: C.textMuted }}>
-              Requires: <span style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}>{zAdminPrivilege}</span> or higher
-            </span>
-          </div>
-        )}
-
-        {/* PIN input */}
-        {!sSuccess && (
-          <div className={styles.pinSection}>
-            <span className={styles.pinLabel} style={{ color: C.textMuted }}>Enter PIN</span>
-            <div
-              className={styles.pinBoxes}
-              onClick={() => pinInputRef.current?.focus()}
-            >
-              {Array.from({ length: effectivePinLength }).map((_, i) => {
-                const isFilled = i < sPin.length;
-                const isCursor = i === sPin.length;
-                return (
-                  <div
-                    key={i}
-                    className={styles.pinBox}
-                    style={{
-                      borderColor: sError ? C.danger : isCursor ? C.dangerStrong : isFilled ? C.borderFocus : C.borderSubtle,
-                      backgroundColor: isCursor ? C.dangerStrong : isFilled ? C.surfaceBase : C.surfaceAlt,
-                      boxShadow: isCursor ? `0 0 10px ${C.dangerStrong}` : "none",
-                    }}
+              <div className={styles.body}>
+                {/* Header */}
+                <div className={styles.header}>
+                  <span
+                    className={styles.title}
+                    style={{ color: sSuccess ? "white" : C.text }}
                   >
-                    {isFilled && <div className={styles.pinDot} style={{ backgroundColor: C.text }} />}
-                  </div>
-                );
-              })}
-              <input
-                ref={pinInputRef}
-                type="text"
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                autoFocus={true}
-                value={sPin}
-                onChange={(e) => {
-                  const clean = e.target.value.replace(/\D/g, "").slice(0, effectivePinLength);
-                  handlePinChange(clean);
-                }}
-                maxLength={effectivePinLength}
-                className={styles.hiddenInput}
-              />
-            </div>
-            {!!sError && (
-              <span className={styles.errorText} style={{ color: C.red }}>{sError}</span>
-            )}
-          </div>
-        )}
+                    {sSuccess ? "Welcome!" : zAdminPrivilege ? "Admin Login" : "Login"}
+                  </span>
+                  {!sSuccess && showLockToggle && (
+                    <button
+                      type="button"
+                      className={styles.lockToggle}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        _setExpandedTo4((v) => !v);
+                        _setPin("");
+                        _setError("");
+                        pinInputRef.current?.focus();
+                      }}
+                      aria-label={sExpandedTo4 ? "Use standard PIN length" : "Use 4-digit admin PIN"}
+                    >
+                      <img
+                        src={resolveIcon(sExpandedTo4 ? ICONS.unblock : ICONS.blocked)}
+                        alt=""
+                        style={{ width: 22, height: 22 }}
+                      />
+                    </button>
+                  )}
+                </div>
 
-        {/* Success state */}
-        {sSuccess && (
-          <div className={styles.successIcon}>
-            <img src={resolveIcon(ICONS.check)} alt="" style={{ width: 30, height: 30, filter: "brightness(0) invert(1)" }} />
-          </div>
-        )}
+                {/* Privilege badge */}
+                {!!zAdminPrivilege && !sSuccess && (
+                  <div className={styles.privilegeBadge} style={{ backgroundColor: C.surfaceAlt }}>
+                    <span className={styles.privilegeText} style={{ color: C.textMuted }}>
+                      Requires: <span style={{ fontWeight: Fonts.weight.textHeavy, color: C.text }}>{zAdminPrivilege}</span> or higher
+                    </span>
+                  </div>
+                )}
+
+                {/* PIN input */}
+                {!sSuccess && (
+                  <div className={styles.pinSection}>
+                    <span className={styles.pinLabel} style={{ color: C.textMuted }}>Enter PIN</span>
+                    <div
+                      className={styles.pinBoxes}
+                      onClick={() => pinInputRef.current?.focus()}
+                    >
+                      {Array.from({ length: effectivePinLength }).map((_, i) => {
+                        const isFilled = i < sPin.length;
+                        const isCursor = i === sPin.length;
+                        return (
+                          <div
+                            key={i}
+                            className={styles.pinBox}
+                            style={{
+                              borderColor: sError ? C.danger : isCursor ? C.dangerStrong : isFilled ? C.borderFocus : C.borderSubtle,
+                              backgroundColor: isCursor ? C.dangerStrong : isFilled ? C.surfaceBase : C.surfaceAlt,
+                              boxShadow: isCursor ? `0 0 10px ${C.dangerStrong}` : "none",
+                            }}
+                          >
+                            {isFilled && <div className={styles.pinDot} style={{ backgroundColor: C.text }} />}
+                          </div>
+                        );
+                      })}
+                      <input
+                        ref={pinInputRef}
+                        type="text"
+                        inputMode="numeric"
+                        autoComplete="one-time-code"
+                        autoFocus={true}
+                        value={sPin}
+                        onChange={(e) => {
+                          const clean = e.target.value.replace(/\D/g, "").slice(0, effectivePinLength);
+                          handlePinChange(clean);
+                        }}
+                        maxLength={effectivePinLength}
+                        className={styles.hiddenInput}
+                      />
+                    </div>
+                    {!!sError && (
+                      <span className={styles.errorText} style={{ color: C.red }}>{sError}</span>
+                    )}
+                  </div>
+                )}
+
+                {/* Success state */}
+                {sSuccess && (
+                  <div className={styles.successIcon}>
+                    <img src={resolveIcon(ICONS.check)} alt="" style={{ width: 30, height: 30, filter: "brightness(0) invert(1)" }} />
+                  </div>
+                )}
+              </div>
+
+              {!sSuccess && (
+                <ModalFooter size="small">
+                  <ModalFooterButton
+                    onClick={(e) => { e.stopPropagation(); handleClose(); }}
+                  >
+                    Close
+                  </ModalFooterButton>
+                </ModalFooter>
+              )}
             </div>
           </div>
         </DialogPrimitive.Content>

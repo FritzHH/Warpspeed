@@ -872,7 +872,7 @@ export const LineItemComponent = ({
         className={cx(
           lineStyles.row,
           isInReplaceMode && lineStyles.rowReplaceMode,
-          sNameHovered && nameRowClickable && lineStyles.rowHovered
+          sNameHovered && lineStyles.rowHovered
         )}
         style={{
           backgroundColor: rowBg,
@@ -907,7 +907,7 @@ export const LineItemComponent = ({
                   <>
                     <div
                       className={cx(lineStyles.nameRow, nameRowClickable && lineStyles.nameRowClickable)}
-                      onMouseEnter={() => nameRowClickable && _setNameHovered(true)}
+                      onMouseEnter={() => _setNameHovered(true)}
                       onMouseLeave={() => _setNameHovered(false)}
                       onClick={(e) => {
                         if (!nameRowClickable) return;

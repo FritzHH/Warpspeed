@@ -1,5 +1,5 @@
 import React, { forwardRef, useState, useRef, useEffect } from "react";
-import ReactDOM from "react-dom";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { C, Fonts, ICONS } from "../../styles";
 import { useZ } from "../../hooks/useZ";
 import { deepEqual, localStorageWrapper } from "../../utils";
@@ -144,25 +144,33 @@ export const LoginModal = forwardRef(function LoginModal(
     return typeof src === "object" ? src.default || src : src;
   };
 
-  return ReactDOM.createPortal(
-    <div
-      ref={ref}
-      className={`${styles.backdrop} ${className}`}
-      style={{ zIndex: z }}
-      onClick={handleClose}
-      data-testid={testId}
-      role="dialog"
-      aria-modal="true"
-      aria-label={zAdminPrivilege ? "Admin Login" : "Login"}
-    >
-      <div
-        className={styles.card}
-        onClick={(e) => { e.stopPropagation(); pinInputRef.current?.focus(); }}
-        style={{
-          backgroundColor: sSuccess ? C.green : undefined,
-          borderColor: sSuccess ? C.green : C.buttonLightGreenOutline,
-        }}
-      >
+  return (
+    <DialogPrimitive.Root open={modalVisible} onOpenChange={(open) => { if (!open) handleClose(); }}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay asChild>
+          <div className={`${styles.backdrop} ${className}`} style={{ zIndex: z }} />
+        </DialogPrimitive.Overlay>
+        <DialogPrimitive.Content
+          asChild
+          onOpenAutoFocus={(e) => { e.preventDefault(); pinInputRef.current?.focus(); }}
+        >
+          <div
+            ref={ref}
+            className={styles.contentWrapper}
+            style={{ zIndex: z + 1 }}
+            data-testid={testId}
+          >
+            <DialogPrimitive.Title className={styles.srOnly}>
+              {zAdminPrivilege ? "Admin Login" : "Login"}
+            </DialogPrimitive.Title>
+            <div
+              className={styles.card}
+              onClick={(e) => { e.stopPropagation(); pinInputRef.current?.focus(); }}
+              style={{
+                backgroundColor: sSuccess ? C.green : undefined,
+                borderColor: sSuccess ? C.green : C.buttonLightGreenOutline,
+              }}
+            >
         {/* Header */}
         <div className={styles.header}>
           <span
@@ -254,8 +262,10 @@ export const LoginModal = forwardRef(function LoginModal(
             <img src={resolveIcon(ICONS.check)} alt="" style={{ width: 30, height: 30, filter: "brightness(0) invert(1)" }} />
           </div>
         )}
-      </div>
-    </div>,
-    document.body
+            </div>
+          </div>
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 });

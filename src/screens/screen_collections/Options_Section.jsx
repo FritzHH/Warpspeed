@@ -3,7 +3,8 @@
 import { checkInternetConnection, convertMillisToHoursMins, dim, localStorageWrapper, log } from "../../utils";
 import { Button, Tooltip, LoadingIndicator } from "../../dom_components";
 import { TabMenuButton } from "../../dom_components/TabMenuButton/TabMenuButton";
-import { C, COLOR_GRADIENTS, Fonts, ICONS, Z } from "../../styles";
+import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../styles";
+import { useZ } from "../../hooks/useZ";
 import { TAB_NAMES } from "../../data";
 import tabBarStyles from "./OptionsTabBar.module.css";
 import styles from "./Options_Section.module.css";
@@ -474,6 +475,7 @@ const UserClockModal = ({ user, handleExit, handleViewHistory, handleOpenMessage
   const zInAppMessages = useLoginStore((state) => state.inAppMessages) || {};
   const [sNoteText, _setNoteText] = useState("");
   const [sNoteSent, _setNoteSent] = useState(false);
+  const z = useZ("modal");
 
   let unreadMsgCount = Object.values(zInAppMessages).filter((m) => {
     if (!m) return false;
@@ -552,7 +554,7 @@ const UserClockModal = ({ user, handleExit, handleViewHistory, handleOpenMessage
   let todayStr = dayjs().format("YYYY-MM-DD");
 
   return ReactDOM.createPortal(
-    <div className={styles.modalOverlay} style={{ zIndex: Z.modal }}>
+    <div className={styles.modalOverlay} style={{ zIndex: z }}>
       <button
         type="button"
         aria-label="Close"
@@ -697,6 +699,7 @@ const UserClockModal = ({ user, handleExit, handleViewHistory, handleOpenMessage
 const CameraPreviewModal = ({ visible, onClose }) => {
   const videoRef = useRef(null);
   const zCameraStream = useLoginStore((state) => state.cameraStream);
+  const z = useZ("modal", visible);
 
   useEffect(() => {
     if (!visible || !videoRef.current || !zCameraStream) return;
@@ -707,7 +710,7 @@ const CameraPreviewModal = ({ visible, onClose }) => {
   if (!visible) return null;
 
   return ReactDOM.createPortal(
-    <div className={styles.camOverlay} style={{ zIndex: Z.modal }}>
+    <div className={styles.camOverlay} style={{ zIndex: z }}>
       <button
         type="button"
         aria-label="Close"

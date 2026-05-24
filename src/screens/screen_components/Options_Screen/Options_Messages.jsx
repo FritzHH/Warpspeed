@@ -14,7 +14,8 @@ import {
   SmallLoadingIndicator as SmallLoadingIndicatorDom,
   PhoneNumberInput,
 } from "../../../dom_components";
-import { C, COLOR_GRADIENTS, Colors, ICONS, Fonts, Z } from "../../../styles";
+import { C, COLOR_GRADIENTS, Colors, ICONS, Fonts } from "../../../styles";
+import { useZ } from "../../../hooks/useZ";
 import hubStyles from "./Messages.module.css";
 import { useTranslation } from "../../../useTranslation";
 import {
@@ -1809,6 +1810,7 @@ function ThreadCard({ thread, isSelected, isHovered, isUnread, activeWO, onPress
 
 function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, onOpenWorkorder, onOpenWorkorderKeepHub, onSendPaymentLink, hasMatchingWorkorder, matchingWorkorders = [], exitHubButton }) {
   const [sWoDropdown, _setWoDropdown] = useState(null);
+  const zWo = useZ("dropdown", !!sWoDropdown);
   // Initialize from cache synchronously to avoid layout flash on hover
   const [sMessages, _setMessages] = useState(() => {
     let cached = useCustMessagesStore.getState().getHubCachedThread(phone);
@@ -2381,7 +2383,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
         </TouchableOpacityDom>
       </div>
       {sWoDropdown && createPortal(
-        <div className={hubStyles.woDropdownBackdrop} style={{ zIndex: Z.dropdown }} onClick={() => _setWoDropdown(null)}>
+        <div className={hubStyles.woDropdownBackdrop} style={{ zIndex: zWo }} onClick={() => _setWoDropdown(null)}>
           <div
             className={hubStyles.woDropdownMenu}
             style={{ top: sWoDropdown.y, left: sWoDropdown.x, backgroundColor: C.listItemWhite, borderColor: C.buttonLightGreenOutline }}

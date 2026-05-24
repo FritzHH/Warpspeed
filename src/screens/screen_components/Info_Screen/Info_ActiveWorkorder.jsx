@@ -12,10 +12,12 @@ import {
   ScreenModal,
   TextInput as TextInput_,
   TimePicker as TimePicker_,
+  Toast,
   Tooltip,
 } from "../../../dom_components";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
-import { C, COLOR_GRADIENTS, Colors, ICONS, Z } from "../../../styles";
+import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
+import { useZ } from "../../../hooks/useZ";
 import {
   SETTINGS_OBJ,
   WORKORDER_PROTO,
@@ -64,6 +66,9 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
   const [sShowDatePicker, _sSetShowDatePicker] = useState(false);
   const [sShowStartPicker, _sSetShowStartPicker] = useState(false);
   const [sShowEndPicker, _sSetShowEndPicker] = useState(false);
+  const zDate = useZ("dropdown", sShowDatePicker);
+  const zStart = useZ("dropdown", sShowStartPicker);
+  const zEnd = useZ("dropdown", sShowEndPicker);
 
   const pillStyle = {
     padding: "4px 8px",
@@ -92,7 +97,7 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
           </button>
         </PopoverPrimitive.Anchor>
         <PopoverPrimitive.Portal>
-          <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: Z.dropdown }}>
+          <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: zDate }}>
             <div>
               <DatePicker_
                 initialMonth={Number(pd.month) || new Date().getMonth() + 1}
@@ -116,7 +121,7 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
             </button>
           </PopoverPrimitive.Anchor>
           <PopoverPrimitive.Portal>
-            <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: Z.dropdown }}>
+            <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: zStart }}>
               <div>
                 <TimePicker_
                   initialHour={startParts.hour}
@@ -142,7 +147,7 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
             </button>
           </PopoverPrimitive.Anchor>
           <PopoverPrimitive.Portal>
-            <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: Z.dropdown }}>
+            <PopoverPrimitive.Content sideOffset={4} collisionPadding={10} style={{ zIndex: zEnd }}>
               <div>
                 <TimePicker_
                   initialHour={endParts.hour}
@@ -198,6 +203,12 @@ export const ActiveWorkorderComponent = ({}) => {
   const sUploadProgress = useUploadProgressStore((s) => s.progress);
   const [sPrinterAlert, _setPrinterAlert] = useState(null); // { x, y }
   const [sTrackingModalVisible, _setTrackingModalVisible] = useState(false);
+  const [sToastText, _sSetToastText] = useState("");
+  const [sToastVisible, _sSetToastVisible] = useState(false);
+  const showToast = (text) => {
+    _sSetToastText(text);
+    _sSetToastVisible(true);
+  };
 
   // Show/hide for Ordering Info section
   const [sShowItemOrdering, _sSetShowItemOrdering] = useState(false);
@@ -466,14 +477,12 @@ export const ActiveWorkorderComponent = ({}) => {
     <Suspense fallback={null}>
       <CustomerInfoScreenModalComponent
         customerID={zOpenWorkorder?.customerID}
-        button1Text={"New Workorder"}
-        button2Text={"Close"}
-        handleButton1Press={(customerInfoFromModal) =>
+        onNewWorkorder={(customerInfoFromModal) =>
           handleCustomerNewWorkorderPress(
             customerInfoFromModal || useCurrentCustomerStore.getState().customer
           )
         }
-        handleButton2Press={() => _setShowCustomerInfoScreen(false)}
+        onClose={() => _setShowCustomerInfoScreen(false)}
       />
     </Suspense>
   ), [zOpenWorkorder?.customerID]);
@@ -847,7 +856,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       borderRadius: 5,
                       maxHeight: 200,
                       overflow: "auto",
-                      zIndex: 999,
+                      zIndex: 999, /* z-allow: local autocomplete dropdown */
                       boxSizing: "border-box",
                     }}
                   >
@@ -1013,7 +1022,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       borderRadius: 5,
                       maxHeight: 200,
                       overflow: "auto",
-                      zIndex: 999,
+                      zIndex: 999, /* z-allow: local autocomplete dropdown */
                       boxSizing: "border-box",
                     }}
                   >
@@ -1157,7 +1166,7 @@ export const ActiveWorkorderComponent = ({}) => {
                         borderRadius: 5,
                         maxHeight: 200,
                         overflow: "auto",
-                        zIndex: 999,
+                        zIndex: 999, /* z-allow: local autocomplete dropdown */
                         boxSizing: "border-box",
                       }}
                     >
@@ -1239,7 +1248,7 @@ export const ActiveWorkorderComponent = ({}) => {
                         borderRadius: 5,
                         maxHeight: 200,
                         overflow: "auto",
-                        zIndex: 999,
+                        zIndex: 999, /* z-allow: local autocomplete dropdown */
                         boxSizing: "border-box",
                       }}
                     >
@@ -1760,7 +1769,7 @@ export const ActiveWorkorderComponent = ({}) => {
                             borderRadius: 5,
                             maxHeight: 200,
                             overflow: "auto",
-                            zIndex: 999,
+                            zIndex: 999, /* z-allow: local autocomplete dropdown */
                             boxSizing: "border-box",
                           }}
                         >
@@ -2103,22 +2112,21 @@ export const ActiveWorkorderComponent = ({}) => {
             iconSize={30}
             iconStyle={{ paddingHorizontal: 0 }}
             buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
-            onPress={handleWorkorderPrintPress}
+            onPress={() => { showToast("Workorder sent to printer"); handleWorkorderPrintPress(); }}
             enabled={!isPrinterOffline}
-            // onPress={}
           />
         </Tooltip>
         <Tooltip text={isPrinterOffline ? `${printerOfflineLabel}, right-click to send text/email` : "Print intake/estimate, right-click to send text/email"} position="top">
         <Pressable_
-          onPress={isPrinterOffline ? undefined : handleIntakePrintPress}
-          onRightPress={handleIntakeSendElectronic}
+          onPress={isPrinterOffline ? undefined : () => { showToast("Intake receipt sent to printer"); handleIntakePrintPress(); }}
+          onRightPress={() => { showToast("Intake receipt sent"); handleIntakeSendElectronic(); }}
           >
           <Button_
             icon={ICONS.receipt}
             iconSize={35}
             iconStyle={{ paddingHorizontal: 0 }}
             buttonStyle={{ paddingHorizontal: 0, paddingVertical: 0 }}
-            onPress={handleIntakePrintPress}
+            onPress={() => { showToast("Intake receipt sent to printer"); handleIntakePrintPress(); }}
             enabled={!isPrinterOffline}
           />
           </Pressable_>
@@ -2196,7 +2204,7 @@ export const ActiveWorkorderComponent = ({}) => {
               paddingHorizontal: 0,
               paddingVertical: 0,
             }}
-            onPress={handleStartStandaloneSalePress}
+            onPress={() => { showToast("Register popped"); handleStartStandaloneSalePress(); }}
           />
         </Tooltip>
       </div>
@@ -2216,6 +2224,12 @@ export const ActiveWorkorderComponent = ({}) => {
         x={sPrinterAlert?.x}
         y={sPrinterAlert?.y}
         onDone={() => _setPrinterAlert(null)}
+      />
+      <Toast
+        visible={sToastVisible}
+        text={sToastText}
+        position="top-middle"
+        onHide={() => _sSetToastVisible(false)}
       />
     </div>
   );

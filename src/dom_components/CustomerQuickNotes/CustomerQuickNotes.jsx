@@ -3,6 +3,7 @@ import ReactDOM from "react-dom";
 import { C, Fonts } from "../../styles";
 import { lightenRGBByPercent } from "../../utils";
 import styles from "./CustomerQuickNotes.module.css";
+import { useZ } from "../../hooks/useZ";
 
 export const CustomerQuickNotes = forwardRef(function CustomerQuickNotes(
   {
@@ -17,6 +18,7 @@ export const CustomerQuickNotes = forwardRef(function CustomerQuickNotes(
   },
   ref
 ) {
+  const z = useZ("dropdown", visible);
   if (!visible) return null;
 
   const dropdownWidth = 340;
@@ -39,12 +41,14 @@ export const CustomerQuickNotes = forwardRef(function CustomerQuickNotes(
     <div
       ref={ref}
       className={`${styles.backdrop} ${className}`}
+      style={{ zIndex: z }}
       onClick={onClose}
       data-testid={testId}
     >
       <div
         className={styles.dropdown}
         style={{
+          zIndex: z + 1,
           width: dropdownWidth,
           maxHeight,
           borderColor: C.buttonLightGreenOutline,

@@ -4,6 +4,7 @@ import { C, ICONS } from "../../styles";
 import { lightenRGBByPercent, usdTypeMask } from "../../utils";
 import { DISCOUNT_TYPES } from "../../constants";
 import styles from "./LineActionsDropdown.module.css";
+import { useZ } from "../../hooks/useZ";
 
 const VIEWPORT_PAD = 10;
 const SYSTEM_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", sans-serif';
@@ -259,6 +260,7 @@ export const LineActionsDropdown = forwardRef(function LineActionsDropdown(
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = openProp !== undefined;
   const isOpen = isControlled ? openProp : internalOpen;
+  const z = useZ("dropdown", isOpen);
   const [menuPos, setMenuPos] = useState({
     anchorCenterX: 0,
     anchorBottom: 10,
@@ -401,7 +403,7 @@ export const LineActionsDropdown = forwardRef(function LineActionsDropdown(
               el.style.left = left + "px";
             }}
             className={styles.menu}
-            style={{ borderColor: C.borderSubtle }}
+            style={{ zIndex: z, borderColor: C.borderSubtle }}
             role="menu"
           >
             <MenuContent

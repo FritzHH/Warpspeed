@@ -32,7 +32,8 @@ import cloneDeep from "lodash/cloneDeep";
 import React, { Children, useEffect, useRef, useState, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
-import { C, COLOR_GRADIENTS, Fonts, ICONS, Z } from "../../../../styles";
+import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
+import { useZ } from "../../../../hooks/useZ";
 import defaultLogo from "../../../../resources/default_app_logo_large.png";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
 import { APP_USER, COLORS, INTAKE_QUICK_BUTTON_PROTO, NOTE_HELPER_PROTO, NOTE_HELPER_ITEM_PROTO, QUICK_CUSTOMER_NOTE_PROTO, QUICK_CUSTOMER_NOTE_ITEM_PROTO, WORKORDER_ITEM_PROTO, SETTINGS_OBJ, STATUS_AUTO_TEXT_PROTO, TIME_PUNCH_PROTO, TAB_NAMES as APP_TAB_NAMES, QB_DEFAULT_W, QB_DEFAULT_H, QB_SNAP_PCT, levelToPrivilegeName } from "../../../../data";
@@ -1652,6 +1653,7 @@ const WorkorderStatusesComponent = ({
   const [sDragIdx, _setDragIdx] = useState(null);
   const [sDragOverIdx, _setDragOverIdx] = useState(null);
   const [sShowAutoText, _setShowAutoText] = useState(false);
+  const zColorModal = useZ("modal", !!sColorModalItem);
 
   function reorderStatuses(fromIdx, toIdx) {
     if (fromIdx === null || toIdx === null || fromIdx === toIdx) return;
@@ -2020,7 +2022,7 @@ const WorkorderStatusesComponent = ({
             display: "flex",
             justifyContent: "center",
             alignItems: "center",
-            zIndex: Z.modal,
+            zIndex: zColorModal,
           }}
         >
           <div
@@ -2542,6 +2544,7 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
     buttonObj.inventoryItemID || ""
   );
   const [sLabel, _setLabel] = useState(buttonObj.label || "");
+  const z = useZ("modal");
 
   function handleSearch(val) {
     _setSearchString(val);
@@ -2578,7 +2581,7 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
         display: "flex",
         justifyContent: "center",
         alignItems: "center",
-        zIndex: Z.modal,
+        zIndex: z,
       }}
     >
       <div

@@ -5280,6 +5280,93 @@ async function cleanupSmsCanRespond(db, tenantID, storeID) {
   }
 }
 
+/**
+ * Cull in-app messages stored as a single map document at
+ * tenants/{tenantID}/stores/{storeID}/messages/current.
+ *
+ * Shape: { messages: { [messageID]: { fromUserID, toUserIDs, createdMillis, readBy, deletedBy, ... } } }
+ *
+ * Deletes a message if EITHER:
+ *  1) createdMillis is older than 30 days, OR
+ *  2) createdMillis is older than 7 days AND every participant
+ *     (fromUserID + every id in toUserIDs) appears as a key in readBy or deletedBy.
+ *
+ * One read + one write per store regardless of message count.
+ */
+async function cleanupInAppMessages(db, tenantID, storeID) {
+  const now = Date.now();
+  const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+  const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+  const hardCutoff = now - THIRTY_DAYS_MS;
+  const ackCutoff = now - SEVEN_DAYS_MS;
+  const basePath = `tenants/${tenantID}/stores/${storeID}`;
+
+  let examined = 0;
+  let deleted = 0;
+  const errors = [];
+
+  try {
+    const docRef = db.doc(`${basePath}/messages/current`);
+    const snap = await docRef.get();
+    if (!snap.exists) return { success: true, examined: 0, deleted: 0, errors: [] };
+
+    const data = snap.data() || {};
+    const messages = data.messages || {};
+    const kept = {};
+
+    for (const [messageID, msg] of Object.entries(messages)) {
+      examined++;
+      try {
+        const createdMillis = Number(msg?.createdMillis);
+        if (!Number.isFinite(createdMillis) || createdMillis <= 0) {
+          // Malformed — preserve so it can be inspected rather than silently culled.
+          kept[messageID] = msg;
+          continue;
+        }
+
+        if (createdMillis < hardCutoff) {
+          deleted++;
+          continue;
+        }
+
+        if (createdMillis < ackCutoff) {
+          const toUserIDs = Array.isArray(msg?.toUserIDs) ? msg.toUserIDs : [];
+          const participants = [msg?.fromUserID, ...toUserIDs].filter(Boolean);
+          const readBy = msg?.readBy || {};
+          const deletedBy = msg?.deletedBy || {};
+          const allAcked =
+            participants.length > 0 &&
+            participants.every((uid) => uid in readBy || uid in deletedBy);
+          if (allAcked) {
+            deleted++;
+            continue;
+          }
+        }
+
+        kept[messageID] = msg;
+      } catch (msgErr) {
+        errors.push({ messageID, error: msgErr.message });
+        kept[messageID] = msg;
+      }
+    }
+
+    if (deleted > 0) {
+      await docRef.update({ messages: kept });
+      log("cleanupInAppMessages: Culled " + tenantID + "/" + storeID, { examined, deleted });
+    }
+
+    return { success: true, examined, deleted, errors };
+  } catch (err) {
+    log("cleanupInAppMessages: Error for " + tenantID + "/" + storeID, err.message);
+    return {
+      success: false,
+      examined,
+      deleted,
+      errors: [...errors, { error: err.message }],
+    };
+  }
+}
+
 const ARCHIVE_COLLECTIONS = [
   "completed-workorders",
   "completed-sales",
@@ -5486,6 +5573,7 @@ exports.nightlyArchiveAndCleanup = onSchedule(
           const activeSaleResults = await cleanupActiveSales(db, tenantID, storeID);
           const smsCleanupResults = await cleanupSmsCanRespond(db, tenantID, storeID);
           const deletedWorkorderResults = await cleanupDeletedWorkorders(db, tenantID, storeID);
+          const inAppMessageResults = await cleanupInAppMessages(db, tenantID, storeID);
 
           // Write audit log
           const now = Date.now();
@@ -5506,6 +5594,7 @@ exports.nightlyArchiveAndCleanup = onSchedule(
               activeSaleCleanup: activeSaleResults,
               smsCleanup: smsCleanupResults,
               deletedWorkorderCleanup: deletedWorkorderResults,
+              inAppMessageCleanup: inAppMessageResults,
             });
 
           log("nightlyArchive: Completed " + tenantID + "/" + storeID, {
@@ -5514,6 +5603,7 @@ exports.nightlyArchiveAndCleanup = onSchedule(
             activeSaleCleanup: activeSaleResults,
             smsCleanup: smsCleanupResults,
             deletedWorkorderCleanup: deletedWorkorderResults,
+            inAppMessageCleanup: inAppMessageResults,
           });
         } catch (err) {
           log(

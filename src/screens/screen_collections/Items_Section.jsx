@@ -23,6 +23,8 @@ const preloadItemsDashboard = () =>
   import("../screen_components/Items_Screen/Items_Dashboard");
 import { CustomerSearchListComponent } from "../screen_components/Items_Screen/Items_CustomerSearchList";
 import { Items_WorkorderItemsTab } from "../screen_components/Items_Screen/Items_WorkorderItems";
+import { TestLargeModal } from "../../dom_components/TestModals/TestLargeModal";
+import { TestConfirmModal } from "../../dom_components/TestModals/TestConfirmModal";
 
 import {
   useOpenWorkordersStore,
@@ -67,6 +69,8 @@ export const Items_Section = React.memo(({}) => {
   // setters ///////////////////////////////////////////////////////////////////
   const [sShowTranslateModal, _sSetShowTranslateModal] = useState(false);
   const [sShowDevNotes, _sSetShowDevNotes] = useState(false);
+  const [sShowTestModal, _sSetShowTestModal] = useState(false);
+  const [sShowTestConfirm, _sSetShowTestConfirm] = useState(false);
 
   // getters ///////////////////////////////////////////////////////////////////
   const zItemsTabName = useTabNamesStore((state) => state.itemsTabName);
@@ -122,6 +126,10 @@ export const Items_Section = React.memo(({}) => {
       <TabBar
         onTranslatePress={() => _sSetShowTranslateModal(true)}
         onDevNotesPress={() => _sSetShowDevNotes(true)}
+        onTestModalPress={() => {
+          _sSetShowTestModal(true);
+          _sSetShowTestConfirm(true);
+        }}
       />
       {ScreenComponent()}
       <TranslateModal
@@ -136,6 +144,22 @@ export const Items_Section = React.memo(({}) => {
           />
         </Suspense>
       )}
+      <TestLargeModal
+        visible={sShowTestModal}
+        onClose={() => {
+          _sSetShowTestModal(false);
+          _sSetShowTestConfirm(false);
+        }}
+        onShowConfirm={() => _sSetShowTestConfirm(true)}
+      />
+      <TestConfirmModal
+        visible={sShowTestConfirm}
+        onClose={() => _sSetShowTestConfirm(false)}
+        onConfirm={() => {
+          _sSetShowTestConfirm(false);
+          _sSetShowTestModal(false);
+        }}
+      />
     </div>
   );
 });
@@ -341,7 +365,7 @@ const TranslateModal = ({ visible, onClose }) => {
   );
 };
 
-const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
+const TabBar = ({ onTranslatePress, onDevNotesPress, onTestModalPress }) => {
   const zItemsTabName = useTabNamesStore((state) => state.itemsTabName);
   const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
   const zIsPreview = useOpenWorkordersStore((s) => !!s.workorderPreviewID && s.workorderPreviewID !== s.openWorkorderID);
@@ -375,6 +399,11 @@ const TabBar = ({ onTranslatePress, onDevNotesPress }) => {
       </div>
 
       <div className={sectionStyles.rightGroup}>
+        <Tooltip text="Open test modals (design preview)" position="bottom">
+          <button type="button" className={sectionStyles.iconButton} onClick={onTestModalPress}>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: 0.5 }}>TEST</span>
+          </button>
+        </Tooltip>
         <Tooltip text="Notes for the app dev" position="bottom">
           <button type="button" className={sectionStyles.iconButton} onClick={onDevNotesPress}>
             <Image icon={ICONS.thoughtBubble} size={22} />

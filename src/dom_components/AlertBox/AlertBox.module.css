@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: var(--z-alert);
+  /* z-index supplied inline from useZ("alert", showAlert) */
   background-color: var(--surface-overlay);
   display: flex;
   align-items: center;
@@ -17,7 +17,7 @@
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: calc(var(--z-alert) + 1);
+  /* z-index = overlay z + 1, supplied inline */
   border-radius: 15px;
   display: flex;
   flex-direction: column;

@@ -3,6 +3,7 @@ import ReactDOM from "react-dom";
 import { C, Fonts } from "../../styles";
 import { lightenRGBByPercent } from "../../utils";
 import styles from "./NoteHelper.module.css";
+import { useZ } from "../../hooks/useZ";
 
 export const NoteHelper = forwardRef(function NoteHelper(
   {
@@ -27,6 +28,7 @@ export const NoteHelper = forwardRef(function NoteHelper(
   const [sTarget, _sSetTarget] = useState(noteHelpersTarget);
   const [sClickedMap, _sSetClickedMap] = useState({});
   const [sMeasuredHeight, _setMeasuredHeight] = useState(0);
+  const z = useZ("dropdown", visible);
   const openTimeRef = useRef(0);
   const prevVisibleRef = useRef(visible);
   const dropdownRef = useRef(null);
@@ -164,13 +166,14 @@ export const NoteHelper = forwardRef(function NoteHelper(
     <div
       ref={ref}
       className={`${styles.backdrop} ${className}`}
+      style={{ zIndex: z }}
       onClick={() => { if (Date.now() - openTimeRef.current > 150) onClose(); }}
       data-testid={testId}
     >
       <div
         ref={dropdownRef}
         className={styles.dropdown}
-        style={{ ...positionStyle, borderColor: C.buttonLightGreenOutline }}
+        style={{ zIndex: z + 1, ...positionStyle, borderColor: C.buttonLightGreenOutline }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Item header */}

@@ -4,18 +4,16 @@
    Sizing: percentages of the parent card; flex-shrink: 0 locks them.
    ──────────────────────────────────────────────────────────────────────── */
 
-/* Radix Dialog primitives */
+/* Radix Dialog primitives (dead — component uses shared <Dialog>; z-index handled there) */
 .radixOverlay {
   position: fixed;
   inset: 0;
   background-color: var(--surface-overlay);
-  z-index: 1000;
 }
 
 .radixContent {
   position: fixed;
   inset: 0;
-  z-index: 1001;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -610,6 +608,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* z-allow: local loading overlay inside modal, position: absolute inset:0 */
   z-index: 1100;
 }
 

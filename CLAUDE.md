@@ -89,6 +89,14 @@ Before acting on any request:
 - For non-CSS contexts (canvas, jsPDF, charts, color math), use `resolveToken("text-muted")` from `src/styles.js`.
 - Legacy `gray()` and old `C.*` names work during migration (Phases 5–9) and retire in Phase 9. Migration is opportunistic ("touch-it-fix-it"), never dedicated.
 
+**Z-index — pure-claim policy for portal-stacked layers.** Every full-screen / portal-rendered overlay (modal, dropdown, tooltip, toast, alert) MUST get its z-index from the `useZ` hook. Static `var(--z-*)` in CSS modules and `Z.*` constants in JSX are forbidden for these layers — the claim allocator must own every value in the band so stacking stays deterministic across nested/sibling overlays.
+
+- Hook: `useZ(band, active?)` from `src/hooks/useZ.js`. Returns a band-allocated z-index integer; auto-releases on unmount. Usage: `const z = useZ("modal");` then `style={{ zIndex: z }}` on the overlay element. Pass `active=false` to temporarily release while the component stays mounted (e.g., toggling visibility without unmount). Bands: `"modal"`, `"dropdown"`, `"tooltip"`, `"toast"`, `"alert"`, `"debug"`.
+- Bands (100 wide, `STEP=10`, 10 nested instances per band) live in `src/styles.js` (`Z.bands.*`) and `src/styles/tokens.css` (`--z-*`). These are infrastructure for `useZ`; components do not consume them directly.
+- **Sub-overlays inside a claimed parent** (confirm prompt within a modal, loading veil): use `z + 5` (offset from the parent's claimed value) to sub-stack within the same slot without colliding with the next sibling claim.
+- **Local sub-stacking** (raw `z-index` <500 inside a parent CSS stacking context — e.g., an autocomplete dropdown inside a `position: relative` form field) stays raw. Browser stacking contexts scope these naturally; promoting them to a global band is overkill. Mark each site with `/* z-allow: <reason> */` (CSS) or `// z-allow: <reason>` (JSX) so the lint ignores it.
+- Lint: `yarn lint:z-index` flags raw values ≥500 in `src/screens/`, `src/dom_components/`, and `src/App.jsx`, plus any direct `var(--z-*)` or `Z.*` reference in those files. Run before commits that touch stacking.
+
 ## Sizing — percentages by default, anchored by JS-measured root
 
 The app is a single-screen layout. `BaseScreen.js` measures the viewport (`innerWidth`, `innerHeight`) and re-measures on resize. Every child of BaseScreen is sized as a percentage of its parent, all the way down. This is how the UI stays proportional across screen sizes without media queries.

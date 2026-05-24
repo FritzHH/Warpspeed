@@ -2,6 +2,7 @@ import React, { forwardRef, useState, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { C } from "../../styles";
 import styles from "./StatusPickerModal.module.css";
+import { useZ } from "../../hooks/useZ";
 
 const StatusPickerRow = ({ status, idx, total, onPress, itemHeight, itemTextStyle }) => {
   return (
@@ -52,6 +53,7 @@ export const StatusPickerModal = forwardRef(function StatusPickerModal(
 ) {
   const [sVisible, _setVisible] = useState(false);
   const [sLeft, _setLeft] = useState(0);
+  const z = useZ("dropdown", sVisible);
   const anchorRef = useRef(null);
 
   const MENU_WIDTH = menuWidth || 320;
@@ -98,7 +100,7 @@ export const StatusPickerModal = forwardRef(function StatusPickerModal(
       </button>
 
       {sVisible && ReactDOM.createPortal(
-        <div className={styles.overlay} onClick={handleClose}>
+        <div className={styles.overlay} style={{ zIndex: z }} onClick={handleClose}>
           <div
             className={styles.menu}
             style={{

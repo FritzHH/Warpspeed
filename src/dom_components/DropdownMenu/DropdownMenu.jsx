@@ -4,6 +4,7 @@ import { C, ICONS } from "../../styles";
 import { lightenRGBByPercent, ifNumIsOdd, usdTypeMask } from "../../utils";
 import { DISCOUNT_TYPES } from "../../constants";
 import styles from "./DropdownMenu.module.css";
+import { useZ } from "../../hooks/useZ";
 
 const VIEWPORT_PAD = 10;
 const SYSTEM_FONT = 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Ubuntu, "Helvetica Neue", sans-serif';
@@ -94,6 +95,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
   const [internalOpen, setInternalOpen] = useState(false);
   const isControlled = openProp !== undefined;
   const isOpen = isControlled ? openProp : internalOpen;
+  const z = useZ("dropdown", isOpen);
   const [menuPos, setMenuPos] = useState({ anchorCenterX: 0, anchorBottom: 10, anchorWidth: 0 });
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const anchorRef = useRef(null);
@@ -311,6 +313,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
             }}
             className={styles.menu}
             style={{
+              zIndex: z,
               borderColor: menuBorderColor || C.borderSubtle,
               borderRadius: br,
               minWidth: menuPos.anchorWidth || undefined,

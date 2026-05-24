@@ -1,5 +1,5 @@
 /* eslint-disable */
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect, useLayoutEffect } from "react";
 import ReactDOM from "react-dom";
 import { C, ICONS } from "../../../styles";
 import {
@@ -8,10 +8,13 @@ import {
   useOpenWorkordersStore,
   useAlertScreenStore,
 } from "../../../stores";
-import { capitalizeFirstLetterOfString, formatMillisForDisplay, resolveStatus } from "../../../utils";
+import { capitalizeFirstLetterOfString, formatMillisForDisplay, resolveStatus, generate36CharUUID } from "../../../utils";
 import { selectOpenWorkorderByID } from "../../../shared/selectOpenWorkorder";
 import { sortWorkorders } from "../Options_Screen/Options_Workorders/utils";
 import styles from "./UserMessagesModal.module.css";
+import { useZ } from "../../../hooks/useZ";
+import { Tooltip, DropdownMenu } from "../../../dom_components";
+import { dbSetUserPersonalNotes, dbSendSMS, dbSendEmail } from "../../../db_calls_wrapper";
 
 const SUPPRESS_OPTIONS = [
   { label: "Off", millis: 0 },
@@ -43,6 +46,34 @@ function statusDisplay(statusID, settings) {
   return statusObj?.label || statusID;
 }
 
+function autoCapText(text) {
+  if (!text) return text;
+  let result = text.charAt(0).toUpperCase() + text.slice(1);
+  result = result.replace(/([.\n]\s*)([a-z])/g, (_, prefix, letter) => prefix + letter.toUpperCase());
+  return result;
+}
+
+function AutoGrowTextarea({ value, onChange, placeholder, className, minRows = 2, autoFocus = false }) {
+  const ref = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = el.scrollHeight + "px";
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      className={className}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      rows={minRows}
+      autoFocus={autoFocus}
+    />
+  );
+}
+
 export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
   const zUsers = useSettingsStore((state) => state.settings?.users) || [];
   const zSettings = useSettingsStore((state) => state.settings);
@@ -60,6 +91,13 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
   const [sSendStatus, _setSendStatus] = useState("");
   const [sReplyDrafts, _setReplyDrafts] = useState({});
   const [sShowWorkorderPicker, _setShowWorkorderPicker] = useState(false);
+  const [sNewNote, _setNewNote] = useState("");
+  const [sEditingNoteID, _setEditingNoteID] = useState(null);
+  const [sEditDraft, _setEditDraft] = useState("");
+  const [sNoteSendStatus, _setNoteSendStatus] = useState({});
+
+  const zMain = useZ("modal");
+  const zPicker = useZ("modal", sShowWorkorderPicker);
   const [sSuppressMillis, _setSuppressMillis] = useState(() => {
     let until = zCurrentUser?.loginMessageSuppressUntil || 0;
     if (!until || Date.now() >= until) return 0;
@@ -123,6 +161,24 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
     );
   }, [zManagerNotes]);
 
+  const personalNotes = useMemo(() => {
+    let liveUser = zUsers.find((u) => u.id === zCurrentUser?.id);
+    let arr = liveUser?.personalNotes || [];
+    return [...arr].sort((a, b) => (b.createdMillis || 0) - (a.createdMillis || 0));
+  }, [zUsers, zCurrentUser]);
+
+  const userHasPhone = useMemo(() => {
+    let liveUser = zUsers.find((u) => u.id === zCurrentUser?.id);
+    let phone = (liveUser?.phone || "").replace(/\D/g, "");
+    return phone.length >= 10;
+  }, [zUsers, zCurrentUser]);
+
+  const userHasEmail = useMemo(() => {
+    let liveUser = zUsers.find((u) => u.id === zCurrentUser?.id);
+    let email = (liveUser?.email || "").trim();
+    return email.includes("@") && email.includes(".");
+  }, [zUsers, zCurrentUser]);
+
   const managerUnreadCount = useMemo(() => {
     return managerNotesList.filter((n) => !n.read).length;
   }, [managerNotesList]);
@@ -169,6 +225,14 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
       workorderStatus: parent?.workorderStatus || null,
       replyToID: parentMessageID,
     });
+    Object.values(zMessages || {}).forEach((m) => {
+      if (!m) return;
+      let mThreadID = m.threadID || m.id;
+      if (mThreadID !== threadID) return;
+      if (m.fromUserID === zCurrentUser?.id) return;
+      if (m.readBy?.[zCurrentUser?.id]) return;
+      useLoginStore.getState().setMarkInAppMessageRead(m.id);
+    });
     _setReplyDrafts((prev) => ({ ...prev, [threadID]: "" }));
   }
 
@@ -196,6 +260,125 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
     });
   }
 
+  function handleRemoveThread(thread) {
+    useAlertScreenStore.getState().setValues({
+      title: "REMOVE THREAD",
+      message: "Remove this thread from your inbox? Other participants will still see it.",
+      btn1Text: "REMOVE",
+      btn2Text: "CANCEL",
+      handleBtn1Press: () => {
+        thread.messages.forEach((m) => {
+          useLoginStore.getState().setDeleteInAppMessageForCurrentUser(m.id);
+        });
+      },
+      handleBtn2Press: () => null,
+      showAlert: true,
+    });
+  }
+
+  async function persistPersonalNotes(nextNotes) {
+    if (!zCurrentUser?.id) return;
+    await dbSetUserPersonalNotes(zCurrentUser.id, nextNotes);
+  }
+
+  function handleAddNote() {
+    let text = sNewNote.trim();
+    if (!text) return;
+    let now = Date.now();
+    let newNote = {
+      id: generate36CharUUID(),
+      text,
+      createdMillis: now,
+      updatedMillis: now,
+    };
+    let next = [newNote, ...personalNotes];
+    _setNewNote("");
+    persistPersonalNotes(next);
+  }
+
+  function handleStartEdit(note) {
+    _setEditingNoteID(note.id);
+    _setEditDraft(note.text || "");
+  }
+
+  function handleCancelEdit() {
+    _setEditingNoteID(null);
+    _setEditDraft("");
+  }
+
+  function handleSaveEdit(note) {
+    let text = sEditDraft.trim();
+    if (!text) return;
+    let next = personalNotes.map((n) =>
+      n.id === note.id ? { ...n, text, updatedMillis: Date.now() } : n
+    );
+    _setEditingNoteID(null);
+    _setEditDraft("");
+    persistPersonalNotes(next);
+  }
+
+  function handleDeleteNote(note) {
+    useAlertScreenStore.getState().setValues({
+      title: "DELETE NOTE",
+      message: "Delete this note permanently?",
+      btn1Text: "DELETE",
+      btn2Text: "CANCEL",
+      handleBtn1Press: () => {
+        let next = personalNotes.filter((n) => n.id !== note.id);
+        persistPersonalNotes(next);
+      },
+      handleBtn2Press: () => null,
+      showAlert: true,
+    });
+  }
+
+  async function handleSendNote(note, channel) {
+    if (!note?.text) return;
+    let liveUser = zUsers.find((u) => u.id === zCurrentUser?.id);
+    if (!liveUser) return;
+    _setNoteSendStatus((prev) => ({ ...prev, [note.id]: "Sending..." }));
+    let prefix = "💬 Forwarded to yourself:\n";
+    try {
+      if (channel === "text") {
+        let cleaned = (liveUser.phone || "").replace(/\D/g, "");
+        if (cleaned.length < 10) {
+          _setNoteSendStatus((prev) => ({ ...prev, [note.id]: "No phone on file" }));
+          return;
+        }
+        let tenDigit = cleaned.length === 11 && cleaned.startsWith("1") ? cleaned.slice(1) : cleaned;
+        let result = await dbSendSMS({ phoneNumber: tenDigit, message: `${prefix}${note.text}` });
+        _setNoteSendStatus((prev) => ({
+          ...prev,
+          [note.id]: result?.success ? "Sent" : "Failed",
+        }));
+      } else if (channel === "email") {
+        let email = (liveUser.email || "").trim();
+        if (!email.includes("@")) {
+          _setNoteSendStatus((prev) => ({ ...prev, [note.id]: "No email on file" }));
+          return;
+        }
+        let escapedBody = note.text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+        let htmlBody = `<div style="font-family: sans-serif; white-space: pre-wrap;">${escapedBody}</div>`;
+        let result = await dbSendEmail(email, "Your note", htmlBody);
+        _setNoteSendStatus((prev) => ({
+          ...prev,
+          [note.id]: result?.success ? "Sent" : "Failed",
+        }));
+      }
+    } catch (e) {
+      _setNoteSendStatus((prev) => ({ ...prev, [note.id]: "Failed" }));
+    }
+    setTimeout(() => {
+      _setNoteSendStatus((prev) => {
+        let { [note.id]: _, ...rest } = prev;
+        return rest;
+      });
+    }, 2500);
+  }
+
   function handleWorkorderChipClick(message) {
     let wo = selectOpenWorkorderByID(message?.workorderID);
     if (!wo) {
@@ -215,93 +398,120 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
   }
 
   function renderRecipientNames(toIDs) {
-    if (!toIDs || toIDs.length === 0) return "";
-    return toIDs
-      .map((id) => userDisplayName(zUsers.find((u) => u.id === id)))
-      .join(", ");
+    if (!toIDs || toIDs.length === 0) return null;
+    return toIDs.map((id, idx) => (
+      <React.Fragment key={id}>
+        {idx > 0 && ", "}
+        <span className={styles.recipientToName}>
+          {userDisplayName(zUsers.find((u) => u.id === id))}
+        </span>
+      </React.Fragment>
+    ));
   }
 
-  function renderMessage(message, threadID) {
+  function renderMessage(message, threadID, hideDelete = false) {
     let isUnread = message.fromUserID !== zCurrentUser?.id && !message.readBy?.[zCurrentUser?.id];
     let isMine = message.fromUserID === zCurrentUser?.id;
     let timeText = message.createdMillis ? formatMillisForDisplay(message.createdMillis, true) : "";
     let alreadyRead = !!message.readBy?.[zCurrentUser?.id];
+    let bubbleClass = isMine
+      ? styles.messageBubbleMine
+      : `${styles.messageBubbleTheirs} ${isUnread ? styles.messageBubbleTheirsUnread : ""}`;
+    let showRead = !isMine;
+    let showDelete = !hideDelete;
+    let showActions = showRead || showDelete;
     return (
       <div
         key={message.id}
-        className={`${styles.messageRow} ${isUnread ? styles.messageRowUnread : ""}`}
+        className={`${styles.messageBubbleRow} ${
+          isMine ? styles.messageBubbleRowMine : styles.messageBubbleRowTheirs
+        }`}
       >
-        <div className={styles.messageMeta}>
-          <span className={styles.messageAuthor} style={{ color: C.text }}>
-            {isMine ? "You" : message.fromAuthorName || "Unknown"}
-          </span>
-          <span className={styles.messageTime}>{timeText}</span>
+        <div className={styles.messageBubbleColumn}>
+          <div className={styles.messageMeta}>
+            {!isMine && (
+              <span className={styles.messageAuthor} style={{ color: C.text }}>
+                {message.fromAuthorName || "Unknown"}
+              </span>
+            )}
+            <span className={styles.messageTime}>{timeText}</span>
+          </div>
+          {message.toUserIDs?.length > 0 && (
+            <div className={styles.recipients}>
+              To: {renderRecipientNames(message.toUserIDs)}
+            </div>
+          )}
+          <div className={`${styles.messageBubble} ${bubbleClass}`}>
+            <div className={styles.messageBody}>{message.message}</div>
+            {!!message.workorderID && (
+              <button
+                type="button"
+                className={styles.workorderChip}
+                onClick={() => handleWorkorderChipClick(message)}
+              >
+                <span>WO</span>
+                <span style={{ fontWeight: 700 }}>
+                  {message.workorderCustomerName || "Workorder"}
+                </span>
+                {message.workorderStatus && <span>· {message.workorderStatus}</span>}
+              </button>
+            )}
+          </div>
+          {showActions && (
+            <div className={styles.messageActions}>
+              {showRead && (
+                <button
+                  type="button"
+                  className={`${styles.actionBtn} ${alreadyRead ? styles.actionBtnReadDone : styles.actionBtnRead}`}
+                  onClick={() => handleMarkReadToggle(message)}
+                >
+                  {alreadyRead ? "MARK UNREAD" : "MARK READ"}
+                </button>
+              )}
+              {showDelete && (
+                <button
+                  type="button"
+                  className={`${styles.actionBtn} ${styles.actionBtnDelete}`}
+                  onClick={() => handleDelete(message)}
+                >
+                  DELETE
+                </button>
+              )}
+            </div>
+          )}
         </div>
-        {message.toUserIDs?.length > 0 && (
-          <div className={styles.recipients}>
-            To: {renderRecipientNames(message.toUserIDs)}
-          </div>
-        )}
-        <div className={styles.messageBody} style={{ color: C.text }}>
-          {message.message}
-        </div>
-        {!!message.workorderID && (
-          <button
-            type="button"
-            className={styles.workorderChip}
-            onClick={() => handleWorkorderChipClick(message)}
-          >
-            <span>WO</span>
-            <span style={{ fontWeight: 700 }}>
-              {message.workorderCustomerName || "Workorder"}
-            </span>
-            {message.workorderStatus && <span>· {message.workorderStatus}</span>}
-          </button>
-        )}
-        {!isMine && (
-          <div className={styles.messageActions}>
-            <button
-              type="button"
-              className={`${styles.actionBtn} ${styles.actionBtnRead}`}
-              onClick={() => handleMarkReadToggle(message)}
-            >
-              {alreadyRead ? "MARK UNREAD" : "MARK READ"}
-            </button>
-            <button
-              type="button"
-              className={`${styles.actionBtn} ${styles.actionBtnDelete}`}
-              onClick={() => handleDelete(message)}
-            >
-              DELETE
-            </button>
-          </div>
-        )}
-        {isMine && (
-          <div className={styles.messageActions}>
-            <button
-              type="button"
-              className={`${styles.actionBtn} ${styles.actionBtnDelete}`}
-              onClick={() => handleDelete(message)}
-            >
-              DELETE
-            </button>
-          </div>
-        )}
       </div>
     );
   }
 
-  function renderThread(thread) {
+  function renderThread(thread, isSentTab = false) {
     let last = thread.messages[thread.messages.length - 1];
     let draft = sReplyDrafts[thread.threadID] || "";
+    let placeholder = isSentTab ? "Add more...." : "Reply...";
+    let buttonLabel = isSentTab ? "Send" : "REPLY";
+    let isStarted = thread.messages.length > 1;
+    let hideDelete = isStarted;
     return (
       <div key={thread.threadID} className={styles.threadCard} style={{ backgroundColor: C.surfaceAlt }}>
-        {thread.messages.map((m) => renderMessage(m, thread.threadID))}
+        {isStarted && (
+          <div className={styles.threadHeader}>
+            <Tooltip text="Remove thread from your inbox" position="left">
+              <button
+                type="button"
+                className={styles.threadRemoveBtn}
+                onClick={() => handleRemoveThread(thread)}
+              >
+                Remove thread
+              </button>
+            </Tooltip>
+          </div>
+        )}
+        {thread.messages.map((m) => renderMessage(m, thread.threadID, hideDelete))}
         <div className={styles.replyRow}>
           <input
             type="text"
             className={styles.replyInput}
-            placeholder="Reply..."
+            placeholder={placeholder}
             value={draft}
             onChange={(e) =>
               _setReplyDrafts((prev) => ({ ...prev, [thread.threadID]: e.target.value }))
@@ -319,7 +529,7 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
             disabled={!draft.trim()}
             onClick={() => handleReply(thread.threadID, last.id)}
           >
-            REPLY
+            {buttonLabel}
           </button>
         </div>
       </div>
@@ -329,7 +539,7 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
   return (
     <>
       {ReactDOM.createPortal(
-    <div className={styles.overlay} onClick={handleExit}>
+    <div className={styles.overlay} style={{ zIndex: zMain }} onClick={handleExit}>
       <div className={styles.card} onClick={(e) => e.stopPropagation()}>
         <div className={styles.header}>
           <div className={styles.suppressGroup}>
@@ -406,6 +616,14 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
               )}
             </button>
           )}
+          <button
+            type="button"
+            className={`${styles.tabBtn} ${sTab === "notes" ? styles.tabBtnActive : ""}`}
+            style={{ color: sTab === "notes" ? C.green : C.textMuted }}
+            onClick={() => _setTab("notes")}
+          >
+            Notes
+          </button>
         </div>
 
         <div className={styles.body}>
@@ -546,7 +764,160 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
               {sentThreads.length === 0 && (
                 <div className={styles.emptyMessage}>No sent messages awaiting a reply.</div>
               )}
-              {sentThreads.map(renderThread)}
+              {sentThreads.map((t) => renderThread(t, true))}
+            </div>
+          )}
+
+          {sTab === "notes" && (
+            <div className={styles.notesScroll}>
+              <div className={styles.noteComposeRow}>
+                <AutoGrowTextarea
+                  className={styles.noteTextarea}
+                  value={sNewNote}
+                  onChange={(e) => _setNewNote(autoCapText(e.target.value))}
+                  placeholder="Write a note to yourself..."
+                  minRows={2}
+                />
+                <div className={styles.noteComposeActions}>
+                  <button
+                    type="button"
+                    className={styles.noteAddBtn}
+                    disabled={!sNewNote.trim()}
+                    onClick={handleAddNote}
+                  >
+                    ADD NOTE
+                  </button>
+                </div>
+              </div>
+
+              {personalNotes.length === 0 && (
+                <div className={styles.emptyMessage}>No notes yet.</div>
+              )}
+
+              {personalNotes.map((note) => {
+                let isEditing = sEditingNoteID === note.id;
+                let timeText = note.createdMillis
+                  ? formatMillisForDisplay(note.createdMillis, true)
+                  : "";
+                let sendStatus = sNoteSendStatus[note.id] || "";
+                return (
+                  <div key={note.id} className={styles.noteCard}>
+                    <div className={styles.noteHeader}>
+                      <span className={styles.noteTime}>{timeText}</span>
+                      <div className={styles.noteIconActions}>
+                        {!isEditing && (
+                          <Tooltip text="Edit note" position="top">
+                            <button
+                              type="button"
+                              className={styles.noteIconBtn}
+                              onClick={() => handleStartEdit(note)}
+                              aria-label="Edit note"
+                            >
+                              <img
+                                src={ICONS.editPencil}
+                                alt=""
+                                className={styles.noteIcon}
+                              />
+                            </button>
+                          </Tooltip>
+                        )}
+                        <Tooltip text="Delete note" position="top">
+                          <button
+                            type="button"
+                            className={styles.noteIconBtn}
+                            onClick={() => handleDeleteNote(note)}
+                            aria-label="Delete note"
+                          >
+                            <img
+                              src={ICONS.trash}
+                              alt=""
+                              className={styles.noteIcon}
+                            />
+                          </button>
+                        </Tooltip>
+                      </div>
+                    </div>
+
+                    {isEditing ? (
+                      <>
+                        <AutoGrowTextarea
+                          className={styles.noteTextarea}
+                          value={sEditDraft}
+                          onChange={(e) => _setEditDraft(autoCapText(e.target.value))}
+                          placeholder="Edit note..."
+                          minRows={2}
+                          autoFocus
+                        />
+                        <div className={styles.noteEditActions}>
+                          <button
+                            type="button"
+                            className={styles.noteCancelBtn}
+                            onClick={handleCancelEdit}
+                          >
+                            CANCEL
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.noteSaveBtn}
+                            disabled={!sEditDraft.trim()}
+                            onClick={() => handleSaveEdit(note)}
+                          >
+                            SAVE
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className={styles.noteBody}>{note.text}</div>
+                    )}
+
+                    <div className={styles.noteFooter}>
+                      <span
+                        className={styles.noteSendStatus}
+                        style={{ color: sendStatus ? C.green : "transparent" }}
+                      >
+                        {sendStatus || "placeholder"}
+                      </span>
+                      <div className={styles.noteSendDropdownWrap}>
+                        <DropdownMenu
+                          buttonText="Send it to me"
+                          buttonStyle={{
+                            backgroundColor: C.surfaceBase,
+                            borderColor: C.borderSubtle,
+                            borderWidth: 1,
+                            borderStyle: "solid",
+                            paddingVertical: 6,
+                            paddingHorizontal: 10,
+                          }}
+                          buttonTextStyle={{ fontSize: 12, color: C.text }}
+                          buttonIcon={null}
+                          dataArr={[
+                            {
+                              id: "text",
+                              label: userHasPhone ? "Text" : "Text (no phone on file)",
+                              disabled: !userHasPhone,
+                              textColor: !userHasPhone ? C.textMuted : C.text,
+                              strikethrough: !userHasPhone,
+                            },
+                            {
+                              id: "email",
+                              label: userHasEmail ? "Email" : "Email (no email on file)",
+                              disabled: !userHasEmail,
+                              textColor: !userHasEmail ? C.textMuted : C.text,
+                              strikethrough: !userHasEmail,
+                            },
+                          ]}
+                          onSelect={(item) => {
+                            if (item.disabled) return;
+                            handleSendNote(note, item.id);
+                          }}
+                          itemTextAlign="left"
+                          itemStyle={{ paddingVertical: 8, paddingHorizontal: 12 }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
 
@@ -627,6 +998,7 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
       {sShowWorkorderPicker && ReactDOM.createPortal(
         <div
           className={styles.pickerOverlay}
+          style={{ zIndex: zPicker }}
           onClick={(e) => {
             e.stopPropagation();
             _setShowWorkorderPicker(false);

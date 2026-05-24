@@ -4,7 +4,7 @@ import React, { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { TransformWrapper, TransformComponent, useTransformEffect } from "react-zoom-pan-pinch";
 import { LoadingIndicator as LoadingIndicatorDom } from "../../../dom_components";
-import { Z } from "../../../styles";
+import { useZ } from "../../../hooks/useZ";
 import s from "./Messages.module.css";
 
 function ZoomCursorHelper({ wrapperRef }) {
@@ -18,12 +18,13 @@ export default function MediaLightbox({ url, isVideo, onClose, onDownload }) {
   const [sFullLoading, _setFullLoading] = useState(true);
   const [sFullDims, _setFullDims] = useState(null);
   const wrapperDivRef = useRef(null);
+  const z = useZ("modal");
 
   return createPortal(
     <div
       onClick={onClose}
       className={s.mediaFullOverlay}
-      style={{ zIndex: Z.modal + 100 }}
+      style={{ zIndex: z }}
     >
       <div
         onClick={(e) => e.stopPropagation()}

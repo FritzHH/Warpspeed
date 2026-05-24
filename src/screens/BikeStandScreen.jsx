@@ -4,7 +4,8 @@ import { useState, useEffect, useRef, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import cloneDeep from "lodash/cloneDeep";
 import * as faceapi from "face-api.js";
-import { C, ICONS, COLOR_GRADIENTS, Z } from "../styles";
+import { C, ICONS, COLOR_GRADIENTS } from "../styles";
+import { useZ } from "../hooks/useZ";
 import {
   useSettingsStore,
   useOpenWorkordersStore,
@@ -333,6 +334,12 @@ export function BikeStandScreen() {
   const countdownRef = useRef(null);
   const modelsLoadedRef = useRef(false);
   const pendingActionRef = useRef(null);
+
+  const zStandSettings = useZ("modal", sShowStandSettings);
+  const zFaceModal = useZ("modal", sShowFaceModal);
+  const zPinModal = useZ("modal", sShowPinModal);
+  const zIntakeNotes = useZ("modal", !!sIntakeNotesLineID);
+  const zFooterMenu = useZ("dropdown", sShowFooterMenu);
   const inactivityTimerRef = useRef(null);
 
   const INACTIVITY_TIMEOUT = 5 * 60 * 1000;
@@ -2022,7 +2029,7 @@ export function BikeStandScreen() {
 
       {/* Stand settings modal */}
       {sShowStandSettings && (
-        <div className={styles.standModalBackdrop} style={{ zIndex: Z.modal }}>
+        <div className={styles.standModalBackdrop} style={{ zIndex: zStandSettings }}>
           <div className={styles.standSettingsDialog}>
             <StandTouch touchStart={false} onPress={() => _setShowStandSettings(false)}>
               <div className={styles.standSettingsHeader} style={{ borderBottomColor: C.borderSubtle }}>
@@ -2060,7 +2067,7 @@ export function BikeStandScreen() {
 
       {/* Face recognition modal */}
       {sShowFaceModal && (
-        <div className={styles.standModalBackdropStrong} style={{ zIndex: 200 }}>
+        <div className={styles.standModalBackdropStrong} style={{ zIndex: zFaceModal }}>
           <div className={styles.standFaceDialog}>
             <SmallLoadingIndicator />
             <span className={styles.standFaceTitle} style={{ color: C.text }}>
@@ -2095,7 +2102,7 @@ export function BikeStandScreen() {
 
       {/* Pin login modal */}
       {sShowPinModal && (
-        <div className={styles.standModalBackdropStrong} style={{ zIndex: 200 }}>
+        <div className={styles.standModalBackdropStrong} style={{ zIndex: zPinModal }}>
           <div className={styles.standPinDialog}>
             <span className={styles.standPinTitle} style={{ color: C.text }}>
               Enter PIN
@@ -2719,7 +2726,7 @@ export function BikeStandScreen() {
 
                   {/* Footer action menu popover */}
                   <PopoverPrimitive.Portal>
-                    <PopoverPrimitive.Content side="top" align="start" sideOffset={10} collisionPadding={10} style={{ zIndex: Z.dropdown }}>
+                    <PopoverPrimitive.Content side="top" align="start" sideOffset={10} collisionPadding={10} style={{ zIndex: zFooterMenu }}>
                       <div className={styles.standFooterMenuContent} style={{ borderColor: C.buttonLightGreenOutline }}>
                         <StandTouch
                           onPress={() => { _setShowFooterMenu(false); _setSelectedWorkorderID(null); _setPendingCustomer(null); _setShowWorkorderList(true); }}
@@ -3372,7 +3379,7 @@ export function BikeStandScreen() {
             }
 
             return (
-            <StandTouch touchStart={false} className={styles.notesBackdrop} style={{ zIndex: Z.modal }} onPress={() => _setIntakeNotesLineID(null)}>
+            <StandTouch touchStart={false} className={styles.notesBackdrop} style={{ zIndex: zIntakeNotes }} onPress={() => _setIntakeNotesLineID(null)}>
               <div
                 className={styles.notesDialog}
                 onClick={(e) => { e.stopPropagation(); _setNotesDiscountOpen(false); }}
@@ -3935,6 +3942,7 @@ function sortWorkordersForStand(inputArr) {
 }
 
 const WorkorderListModal = ({ onSelect, onClose, onNewWorkorder, activeWorkorderID }) => {
+  const z = useZ("modal");
   const zWorkorders = useOpenWorkordersStore((state) => state.workorders);
   const zStatuses = useSettingsStore((s) => s.settings?.statuses);
   const [sSearch, _setSearch] = useState("");
@@ -3952,7 +3960,7 @@ const WorkorderListModal = ({ onSelect, onClose, onNewWorkorder, activeWorkorder
   let sortedWorkorders = sortWorkordersForStand(filtered);
 
   return (
-    <StandTouch touchStart={false} className={styles.wlmBackdrop} style={{ zIndex: Z.modal }} onPress={onClose}>
+    <StandTouch touchStart={false} className={styles.wlmBackdrop} style={{ zIndex: z }} onPress={onClose}>
       <div
         className={styles.wlmDialog}
         onClick={(e) => e.stopPropagation()}
@@ -4156,6 +4164,7 @@ const WorkorderListModal = ({ onSelect, onClose, onNewWorkorder, activeWorkorder
 ////////////////////////////////////////////////////////////////////////////////
 
 const NewWorkorderModal = ({ onSelect, onClose }) => {
+  const z = useZ("modal");
   const [sMode, _setMode] = useState("search"); // "search" | "create"
   const [sKeypadMode, _setKeypadMode] = useState("phone"); // "phone" | "alpha"
   const [sSearchText, _setSearchText] = useState("");
@@ -4295,7 +4304,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
 
   return (
     <StandTouch touchStart={false} onPress={onClose}>
-      <div onClick={onClose} onClickCapture={mountGuard} onTouchStartCapture={mountGuard} className={styles.nwmBackdrop} style={{ zIndex: Z.modal }}>
+      <div onClick={onClose} onClickCapture={mountGuard} onTouchStartCapture={mountGuard} className={styles.nwmBackdrop} style={{ zIndex: z }}>
         <div onClick={(e) => e.stopPropagation()} className={styles.nwmDialog}>
           {/* Header */}
           {sMode === "create" ? (
@@ -4467,6 +4476,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
 ////////////////////////////////////////////////////////////////////////////////
 
 const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
+  const z = useZ("modal");
   const zDiscounts = useSettingsStore((s) => s.settings?.discounts);
   const zLaborRate = useSettingsStore((s) => s.settings?.laborRateByHour);
   const zSettings = useSettingsStore((s) => s.settings) || {};
@@ -4632,7 +4642,7 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
   }
 
   return (
-    <div onClick={onClose} className={styles.scimBackdrop} style={{ zIndex: Z.modal }}>
+    <div onClick={onClose} className={styles.scimBackdrop} style={{ zIndex: z }}>
       <div onClick={(e) => e.stopPropagation()} className={styles.scimDialog}>
         {/* Header — tap to close */}
         <StandTouch onPress={onClose}>
@@ -4831,6 +4841,7 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
 ////////////////////////////////////////////////////////////////////////////////
 
 const PhoneSearchModal = ({ onSelect, onClose }) => {
+  const z = useZ("modal");
   const [sPhoneInput, _setPhoneInput] = useState("");
   const [sSearchResults, _setSearchResults] = useState([]);
   const [sIsSearching, _setIsSearching] = useState(false);
@@ -4861,7 +4872,7 @@ const PhoneSearchModal = ({ onSelect, onClose }) => {
   }
 
   return createPortal(
-    <div onClick={onClose} className={styles.psmBackdrop} style={{ zIndex: Z.modal }}>
+    <div onClick={onClose} className={styles.psmBackdrop} style={{ zIndex: z }}>
       <div onClick={(e) => e.stopPropagation()} className={styles.psmDialog}>
         {/* Header */}
         <div className={styles.psmHeader} style={{ borderBottomColor: C.borderSubtle }}>
@@ -5407,6 +5418,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
 ////////////////////////////////////////////////////////////////////////////////
 
 const CustomerInfoViewModal = ({ customer, onClose }) => {
+  const z = useZ("modal", !!customer);
   if (!customer) return null;
 
   let fields = [
@@ -5428,7 +5440,7 @@ const CustomerInfoViewModal = ({ customer, onClose }) => {
   ].filter((f) => f.value);
 
   return createPortal(
-    <div onClick={onClose} className={styles.cimBackdrop} style={{ zIndex: Z.modal }}>
+    <div onClick={onClose} className={styles.cimBackdrop} style={{ zIndex: z }}>
       <div onClick={(e) => e.stopPropagation()} className={styles.cimDialog}>
         <div className={styles.cimHeader} style={{ borderBottomColor: C.borderSubtle }}>
           <span className={styles.cimTitle} style={{ color: C.text }}>Customer Info</span>

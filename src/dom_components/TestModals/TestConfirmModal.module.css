@@ -1,0 +1,63 @@
+.card {
+  width: 380px;
+  background-color: var(--surface-base);
+  border-radius: 12px;
+  border: 1px solid var(--border-default);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  padding: 16px 20px 0 20px;
+}
+
+.title {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-default);
+}
+
+.body {
+  padding: 12px 20px 20px 20px;
+}
+
+.message {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--text-default);
+  margin: 0;
+}
+
+.footer {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  background-color: var(--gray-200);
+}
+
+.actionBtn {
+  flex: 1;
+  height: 27px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-on-accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.1s;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.actionBtn:not(:last-child) {
+  border-right: 1px solid var(--border-default);
+}
+
+.actionBtn:hover {
+  opacity: 0.75;
+}

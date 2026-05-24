@@ -2,7 +2,8 @@
 import { useState, memo } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import { Dialog, Button, SmallLoadingIndicator, CheckBox } from "../../../../dom_components";
-import { C, COLOR_GRADIENTS, Fonts, Z } from "../../../../styles";
+import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
+import { useZ } from "../../../../hooks/useZ";
 import { useCurrentCustomerStore, useSettingsStore, useLoginStore } from "../../../../stores";
 import { formatCurrencyDisp, formatMillisForDisplay, lightenRGBByPercent, log, generateEAN13Barcode, localStorageWrapper, findTemplateByType, printBuilder } from "../../../../utils";
 import { readTransaction, writeCashRefund, newCheckoutProcessStripeRefund } from "./newCheckoutFirebaseCalls";
@@ -26,6 +27,8 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
   const [sShowConfirm, _setShowConfirm] = useState(false);
   const [sShowRemoveConfirm, _setShowRemoveConfirm] = useState(false);
   const [sRemoved, _setRemoved] = useState(false);
+  const zConfirm = useZ("alert", sShowConfirm);
+  const zRemoveConfirm = useZ("alert", sShowRemoveConfirm);
 
   let hasPhone = !!customer?.phone || !!customer?.customerCell;
   let hasEmail = !!customer?.email;
@@ -514,7 +517,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
           </div>
 
           {sShowConfirm && (
-            <div className={styles.confirmOverlay} style={{ zIndex: Z.alert }}>
+            <div className={styles.confirmOverlay} style={{ zIndex: zConfirm }}>
               <div className={styles.confirmCard} style={{ backgroundColor: C.backgroundWhite }}>
                 <span className={styles.confirmTitle} style={{ color: "red" }}>
                   Confirm Refund
@@ -546,7 +549,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
           )}
 
           {sShowRemoveConfirm && (
-            <div className={styles.confirmOverlay} style={{ zIndex: Z.alert }}>
+            <div className={styles.confirmOverlay} style={{ zIndex: zRemoveConfirm }}>
               <div className={styles.confirmCard} style={{ backgroundColor: C.backgroundWhite }}>
                 <span className={styles.confirmTitle} style={{ color: "red" }}>
                   {"Remove " + label}

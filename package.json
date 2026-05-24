@@ -66,6 +66,7 @@
     "functionswarp": "firebase deploy --only functions -P default",
     "auth": "firebase login --reauth",
     "lint:tokens": "node scripts/check-tokens.js",
+    "lint:z-index": "node scripts/check-z-index.js",
     "host:bonita": "yarn warp && yarn build:bonita && firebase deploy --only hosting --account=fritz@bonitabikes.com",
     "host:rss": "yarn rss && yarn build:rss && firebase deploy --only hosting --account=fritz@retailsoftsystems.com",
     "host": "node -e \"console.error('Use yarn host:bonita or yarn host:rss to deploy explicitly'); process.exit(1)\"",

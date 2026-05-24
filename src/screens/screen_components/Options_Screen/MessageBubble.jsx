@@ -10,7 +10,8 @@ import {
 } from "../../../dom_components";
 
 const MediaLightbox = lazy(() => import("./MediaLightbox"));
-import { C, ICONS, Z } from "../../../styles";
+import { C, ICONS } from "../../../styles";
+import { useZ } from "../../../hooks/useZ";
 import { formatDateTimeForReceipt } from "../../../utils";
 import { translateText } from "../../../db_calls";
 import { dbSaveMessageTranslation } from "../../../db_calls_wrapper";
@@ -126,6 +127,7 @@ export const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom, autoTr
       : { text: "", loading: false, langCode: "" }
   );
   const [sContextMenu, _setContextMenu] = useState({ x: 0, y: 0, visible: false });
+  const zCtx = useZ("dropdown", sContextMenu.visible);
   const autoTranslatedRef = useRef(false);
 
   useEffect(() => {
@@ -235,7 +237,7 @@ export const IncomingMessageComponent = memo(({ msgObj, onScrollToBottom, autoTr
         <div
           onMouseDown={(e) => e.stopPropagation()}
           className={s.translateContextMenu}
-          style={{ left: sContextMenu.x, bottom: window.innerHeight - sContextMenu.y, zIndex: Z.dropdown }}
+          style={{ left: sContextMenu.x, bottom: window.innerHeight - sContextMenu.y, zIndex: zCtx }}
         >
           <div className={s.translateContextHeader}>Translate to</div>
           {TRANSLATION_LANGUAGES.map((lang) => (

@@ -1,6 +1,7 @@
 import React, { forwardRef, useState } from "react";
 import ReactDOM from "react-dom";
 import { C } from "../../styles";
+import { useZ } from "../../hooks/useZ";
 import styles from "./WebPageModal.module.css";
 
 export const WebPageModal = forwardRef(function WebPageModal(
@@ -18,6 +19,7 @@ export const WebPageModal = forwardRef(function WebPageModal(
   ref
 ) {
   const [sVisible, _setVisible] = useState(false);
+  const z = useZ("modal", sVisible);
 
   return (
     <>
@@ -37,6 +39,7 @@ export const WebPageModal = forwardRef(function WebPageModal(
       {sVisible && ReactDOM.createPortal(
         <div
           className={styles.backdrop}
+          style={{ zIndex: z }}
           onClick={() => _setVisible(false)}
           role="dialog"
           aria-modal="true"

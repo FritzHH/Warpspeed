@@ -1470,6 +1470,28 @@ export async function dbSetUserLoginMessageSuppress(userID, untilMillis) {
 }
 
 /**
+ * Set personalNotes array on a user in settings.users.
+ * Read-modify-write the users array, then persist with field-level updateDoc.
+ */
+export async function dbSetUserPersonalNotes(userID, notes) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !userID) return { success: false };
+    const path = buildSettingsPath(tenantID, storeID);
+    const currentSettings = await firestoreRead(path);
+    if (!currentSettings) return { success: false, error: "Not Found" };
+    const updatedUsers = (currentSettings.users || []).map((u) =>
+      u?.id === userID ? { ...u, personalNotes: notes || [] } : u
+    );
+    await firestoreUpdate(path, { users: updatedUsers });
+    return { success: true };
+  } catch (error) {
+    log("Error in dbSetUserPersonalNotes:", error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
  * Save current punch clock object to Firestore (overwrites entire punch_clock node)
  * @param {Object} punchClockData - Current punch clock object to save (required)
  * @returns {Promise<Object>} Save result

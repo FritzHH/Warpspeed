@@ -5,7 +5,6 @@
   right: 0;
   bottom: 0;
   background-color: var(--surface-overlay);
-  z-index: 9000;
 }
 
 .anchored {

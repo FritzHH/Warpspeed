@@ -37,6 +37,7 @@ import {
   MILLIS_IN_MINUTE,
 } from "../../../constants";
 import styles from "./PayrollModal.module.css";
+import { useZ } from "../../../hooks/useZ";
 
 const DAY_NAMES = [
   "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
@@ -174,6 +175,8 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
   const zEmailTemplates = useSettingsStore((s) => s.settings?.emailTemplates, deepEqual);
   const zUsers = useSettingsStore((s) => s.settings?.users, deepEqual);
   const zCurrentUserLevel = useLoginStore((s) => s.currentUser?.permissions?.level || 0);
+
+  const z = useZ("modal");
 
   let isAdmin = !employeeUser && zCurrentUserLevel >= 4;
 
@@ -627,9 +630,10 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
   return (
     <DialogPrimitive.Root open={true} onOpenChange={(open) => { if (!open) handleExit(); }}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className={styles.radixOverlay} />
+        <DialogPrimitive.Overlay className={styles.radixOverlay} style={{ zIndex: z }} />
         <DialogPrimitive.Content
           className={styles.radixContent}
+          style={{ zIndex: z + 1 }}
           onOpenAutoFocus={(e) => e.preventDefault()}
           aria-label="Payroll"
         >

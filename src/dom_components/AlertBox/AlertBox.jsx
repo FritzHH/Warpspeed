@@ -5,6 +5,7 @@ import { C, Colors, COLOR_GRADIENTS, ICONS } from "../../styles";
 import { useAlertScreenStore } from "../../stores";
 import { Button } from "../Button/Button";
 import styles from "./AlertBox.module.css";
+import { useZ } from "../../hooks/useZ";
 
 export const AlertBox = ({ showAlert }) => {
   const zCanExitOnOuterClick = useAlertScreenStore((state) => state.canExitOnOuterClick);
@@ -29,6 +30,7 @@ export const AlertBox = ({ showAlert }) => {
   const zAutoDismissMs = useAlertScreenStore((state) => state.autoDismissMs);
 
   const [fadedIn, setFadedIn] = useState(false);
+  const z = useZ("alert", showAlert);
 
   useEffect(() => {
     if (showAlert) {
@@ -76,7 +78,7 @@ export const AlertBox = ({ showAlert }) => {
         <AlertDialogPrimitive.Overlay asChild>
           <div
             className={styles.overlay}
-            style={{ opacity: fadedIn ? 1 : 0 }}
+            style={{ zIndex: z, opacity: fadedIn ? 1 : 0 }}
             onClick={() => zCanExitOnOuterClick && useAlertScreenStore.getState().resetAll()}
           />
         </AlertDialogPrimitive.Overlay>
@@ -84,6 +86,7 @@ export const AlertBox = ({ showAlert }) => {
           <div
             className={styles.content}
             style={{
+              zIndex: z + 1,
               backgroundColor: C.backgroundWhite,
               opacity: fadedIn ? 1 : 0,
               ...zAlertBoxStyle,

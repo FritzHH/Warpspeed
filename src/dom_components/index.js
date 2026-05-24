@@ -20,6 +20,7 @@ export { TabMenuButton } from "./TabMenuButton/TabMenuButton";
 export { Dialog } from "./Dialog/Dialog";
 export { Tooltip } from "./Tooltip/Tooltip";
 export { AlertBox } from "./AlertBox/AlertBox";
+export { Toast } from "./Toast/Toast";
 
 // Batch 4 - Complex interactive components
 export { ScreenModal } from "./ScreenModal/ScreenModal";

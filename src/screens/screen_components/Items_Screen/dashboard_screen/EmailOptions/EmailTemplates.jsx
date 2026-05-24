@@ -7,7 +7,8 @@ import {
   Tooltip,
   TouchableOpacity,
 } from "../../../../../dom_components";
-import { C, COLOR_GRADIENTS, ICONS, Z } from "../../../../../styles";
+import { C, COLOR_GRADIENTS, ICONS } from "../../../../../styles";
+import { useZ } from "../../../../../hooks/useZ";
 
 import { COLORS, SETTINGS_OBJ } from "../../../../../data";
 import {
@@ -27,6 +28,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
   const [sEmojiModalRefKey, _setEmojiModalRefKey] = useState(null);
   const cursorRefs = useRef({});
   const inputRefs = useRef({});
+  const zEmoji = useZ("modal", !!sEmojiModalRefKey);
 
   let savedTemplates = zSettingsObj?.emailTemplates || [];
   let hasMergedEmail = useRef(false);
@@ -541,7 +543,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
 
         {/* Emoji picker modal */}
         {!!sEmojiModalRefKey && createPortal(
-          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", zIndex: Z.modal }}>
+          <div style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, display: "flex", justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.4)", zIndex: zEmoji }}>
             <div
               onClick={() => _setEmojiModalRefKey(null)}
               style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}

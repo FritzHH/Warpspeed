@@ -14,7 +14,8 @@ import {
   useTabNamesStore,
   useInventoryStore,
 } from "../../../../stores";
-import { C, COLOR_GRADIENTS, ICONS, Z } from "../../../../styles";
+import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
+import { useZ } from "../../../../hooks/useZ";
 import { formatCurrencyDisp } from "../../../../utils";
 import {
   QB_DEFAULT_W,
@@ -72,6 +73,7 @@ const QBInventorySearchModal = ({
   const [sInvSearch, _setInvSearch] = useState("");
   const [sInvResults, _setInvResults] = useState([]);
   const [sSelectedIDs, _setSelectedIDs] = useState(new Set());
+  const z = useZ("modal");
 
   function doSearch(val) {
     _setInvSearch(val);
@@ -110,7 +112,7 @@ const QBInventorySearchModal = ({
   return createPortal(
     <div
       className={styles.modalOverlay}
-      style={{ zIndex: Z.modal }}
+      style={{ zIndex: z }}
       onClick={onClose}
     >
       <div

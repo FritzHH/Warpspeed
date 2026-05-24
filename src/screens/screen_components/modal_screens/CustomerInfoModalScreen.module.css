@@ -2,14 +2,80 @@
 .shell {
   width: 95%;
   height: 90%;
-  padding: 20px;
   background-color: var(--bg-white, var(--surface-base));
   border-radius: 15px;
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   box-shadow: 2px 2px 5px var(--shadow-color-default);
   box-sizing: border-box;
   flex-shrink: 0;
+  overflow: hidden;
+}
+
+/* Body — wraps the column layout above the footer */
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  padding: 20px;
+  box-sizing: border-box;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Footer — full-width button row at modal bottom */
+.footer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  background-color: var(--gray-200);
+}
+
+.footerSlot {
+  flex: 1;
+  display: flex;
+  align-items: stretch;
+}
+
+.footerSlot + .footerSlot {
+  border-left: 1px solid var(--border-default);
+}
+
+.footerBtn {
+  flex: 1;
+  height: 37px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: var(--text-on-accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.1s;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+}
+
+.footerBtn:hover:not(:disabled) {
+  opacity: 0.75;
+}
+
+.footerBtn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.footerBtnPrimary {
+  background-color: var(--orange-300);
+}
+
+.footerBtnAccent {
+  background-color: var(--success);
 }
 
 /* Form column (15%) */
@@ -20,8 +86,36 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  justify-content: space-around;
+  justify-content: space-between;
   overflow-y: auto;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background-color: var(--surface-success-muted);
+  flex-shrink: 0;
+}
+
+.fieldGroup > *:first-child {
+  margin-top: 0;
+}
+
+.fieldGroupTitle {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+  text-align: center;
+}
+
+.fieldGroupTitle + .input {
+  margin-top: 0;
 }
 
 .contactRow {
@@ -114,8 +208,8 @@
   padding: 8px;
   outline: none;
   border-radius: 7px;
-  min-height: 60px;
-  max-height: 60px;
+  min-height: 70px;
+  max-height: 70px;
   box-sizing: border-box;
   font-family: inherit;
   font-size: 14px;
@@ -153,14 +247,6 @@
 .langLabel {
   font-size: 13px;
   margin-right: 8px;
-}
-
-.actionStack {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 15px;
-  flex-shrink: 0;
 }
 
 /* Workorders column (30%) */

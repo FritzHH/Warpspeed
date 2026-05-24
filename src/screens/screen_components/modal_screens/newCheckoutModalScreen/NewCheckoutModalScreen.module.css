@@ -95,8 +95,6 @@
   bottom: 0;
   width: 100%;
   height: 100%;
-  /* Above the checkout Dialog (--z-modal-content 9001), below dropdowns (9500) */
-  z-index: 9100;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -203,6 +201,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
+  /* z-allow: local sub-overlay inside checkout modal */
   z-index: 998;
 }
 

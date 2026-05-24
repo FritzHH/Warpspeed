@@ -2,6 +2,7 @@
 import React, { useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { COLOR_GRADIENTS } from "../../../styles";
+import { useZ } from "../../../hooks/useZ";
 import { Button } from "../../../dom_components";
 import { ColorWheel } from "../../../ColorWheel";
 import styles from "./ColorPickerModal.module.css";
@@ -21,6 +22,7 @@ export const ColorPickerModal = ({
   const [sBgColor, _setBgColor] = useState(initialBgColor || "#ffffff");
   const [sTextColor, _setTextColor] = useState(initialTextColor || "#000000");
   const [sLayout, _setLayout] = useState(null);
+  const z = useZ("modal");
 
   let hasSchemes = colorSchemes && colorSchemes.length > 0;
   let modalMaxWidth = hasSchemes ? 900 : 650;
@@ -42,7 +44,7 @@ export const ColorPickerModal = ({
   }, []);
 
   return createPortal(
-    <div onClick={onClose} className={styles.overlay}>
+    <div onClick={onClose} className={styles.overlay} style={{ zIndex: z }}>
       <div
         ref={measureRef}
         onClick={(e) => e.stopPropagation()}

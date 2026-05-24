@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
+import { useZ } from "../../../hooks/useZ";
 import { Button, TextInput, Image } from "../../../dom_components";
 import { usdTypeMask, applyDiscountToWorkorderItem, generateEAN13Barcode } from "../../../utils";
 import { INVENTORY_ITEM_PROTO, WORKORDER_ITEM_PROTO } from "../../../data";
@@ -40,6 +41,8 @@ export const CustomItemModal = ({
   const [sCustomDollarVal, _setCustomDollarVal] = useState("");
   const [sCustomDollarCents, _setCustomDollarCents] = useState(0);
   const discountBtnRef = useRef(null);
+  const zModal = useZ("modal", visible);
+  const zDropdown = useZ("dropdown", visible && sDiscountDropdownOpen);
 
   // Populate fields when editing or when modal opens
   useEffect(() => {
@@ -212,7 +215,7 @@ export const CustomItemModal = ({
   if (top < margin) top = margin;
 
   return createPortal(
-    <div onClick={onClose} className={styles.overlay}>
+    <div onClick={onClose} className={styles.overlay} style={{ zIndex: zModal }}>
       <div
         onClick={(e) => e.stopPropagation()}
         className={styles.anchored}
@@ -367,11 +370,12 @@ export const CustomItemModal = ({
             <div
               onClick={(e) => { e.stopPropagation(); _setDiscountDropdownOpen(false); }}
               className={styles.dropdownBackdrop}
+              style={{ zIndex: zDropdown }}
             />
             <div
               onClick={(e) => e.stopPropagation()}
               className={styles.dropdown}
-              style={{ top: pos.top, left: pos.left, width: pos.width }}
+              style={{ top: pos.top, left: pos.left, width: pos.width, zIndex: zDropdown + 1 }}
             >
               <div
                 onClick={() => handleDiscountSelect(null)}

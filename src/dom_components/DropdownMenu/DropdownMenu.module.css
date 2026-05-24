@@ -39,7 +39,7 @@
 
 .menu {
   position: fixed;
-  z-index: 9500;
+  /* z-index supplied inline from useZ("dropdown", isOpen) */
   border-width: 2px;
   border-style: solid;
   background-color: var(--surface-base);

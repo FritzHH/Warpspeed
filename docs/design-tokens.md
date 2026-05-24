@@ -302,28 +302,37 @@ This is a SaaS-grade system, not a free-for-all. Token changes need a low-fricti
 
 ## Z-Index Registry
 
-Stacking is centralized to avoid the "increment until it works" antipattern. Tokens live in `src/styles/tokens.css` as `--z-*` and are mirrored on the `Z` object in `src/styles.js` (values must match by hand - no runtime read).
+Stacking is centralized to avoid the "increment until it works" antipattern. The system uses **bands** rather than fixed single-value tiers - each layer gets a 100-value band with STEP=10, fitting up to 10 stacked instances before colliding with the next band up.
 
-CSS modules consume via `var(--z-*)`. Inline styles / Radix portal props consume via `Z.<name>`.
+CSS modules consume flat tokens via `var(--z-*)`. Inline styles / Radix portal props consume the flat `Z.<name>` mirrors. Runtime stacking (nested Dialogs, sub-overlays inside a modal) uses the `claimZ(band)` / `releaseZ(band, z)` allocator from `src/styles.js`.
 
-| Token (CSS / JS) | Value | Purpose |
-|---|---|---|
-| `--z-modal-inner-overlay` / `Z.modalInnerOverlay` | 100 | Overlays painted inside a modal card (split confirm, search picker, etc). Requires `isolation: isolate` on the modal card so the local z-index does not compete with the modal's own backdrop. |
-| `--z-modal-loading` / `Z.modalLoading` | 200 | Loading spinner overlay inside a modal card. Sits above inner overlays. |
-| `--z-modal` / `Z.modal` | 9000 | Modal backdrop scrim layer (Radix `.overlay`). |
-| `--z-modal-content` / `Z.modalContent` | 9001 | Modal card itself (Radix `.content`). One unit above its scrim. |
-| `--z-dropdown` / `Z.dropdown` | 9500 | Popover/dropdown surfaces - above all modals so they can open from inside one. |
-| `--z-tooltip` / `Z.tooltip` | 9700 | Tooltips - above dropdowns so they can label dropdown items. |
-| `--z-toast` / `Z.toast` | 9800 | Toast notifications - above tooltips. |
-| `--z-alert` / `Z.alert` | 9900 | Alert dialogs - always on top. |
+### Bands
 
-### Nested modal stacking
+| Band | Range | Flat token | Purpose |
+|---|---|---|---|
+| modal | 9000 - 9099 | `--z-modal` / `Z.modal` (9000), `--z-modal-content` / `Z.modalContent` (9001) | Modal scrim, content, nested modals, and sub-overlays inside a modal - all share this band via `claimZ('modal')`. |
+| dropdown | 9500 - 9599 | `--z-dropdown` / `Z.dropdown` | Popovers / menus. Above all modals so they can open from inside one. |
+| tooltip | 9700 - 9799 | `--z-tooltip` / `Z.tooltip` | Above dropdowns so they can label dropdown items. |
+| toast | 9800 - 9899 | `--z-toast` / `Z.toast` | Non-blocking notifications. |
+| alert | 9900 - 9999 | `--z-alert` / `Z.alert` | Always on top - blocking confirms, error dialogs. |
+| debug | 100000 - 100099 | `--z-debug` / `Z.debug` | Dev-only overlays (emulator badge etc). |
 
-Radix portals append to `document.body` in mount order. A child Dialog opened from a parent Dialog gets the same z-index (9000/9001) but stacks above by DOM order. This is the intended behavior - do not depth-offset z-index per dialog instance.
+### Static vs runtime stacking
 
-### Adding a new layer
+- **Static (single-instance):** A modal scrim is always 9000 - use `var(--z-modal)` or `Z.modal`. A tooltip is always 9700 - use `var(--z-tooltip)` or `Z.tooltip`.
+- **Runtime (instance-stacked):** Nested Dialogs, sub-overlays inside a modal, anything where the actual z-index depends on how many siblings are already mounted - use `claimZ('modal')` to get the next free slot in the band. Pair with `releaseZ('modal', z)` on unmount.
 
-Stay inside the bands above. If a real new tier is needed (very rare), pick a value with breathing room (e.g. 6000 for a hypothetical "above-modal-but-below-dropdown" tier) and document it here, in `tokens.css`, and in `styles.js` in the same commit.
+### Nested stacking
+
+Each `claimZ('modal')` call returns the lowest unused slot in the modal band, stepping by 10. The first Dialog claims 9000, a nested Dialog claims 9010, a sub-overlay inside that claims 9020, and so on. With a 100-wide band and STEP=10, the ceiling is 10 stacked instances before the allocator throws. If that ceiling is ever hit, the right fix is to widen the band (push dropdown to 9700, tooltip to 9800, etc) rather than silently overflow.
+
+### Killed tiers (history)
+
+Earlier versions had `--z-modal-inner-overlay` (100) and `--z-modal-loading` (200) for sub-stacking inside a modal card. These required `isolation: isolate` on every modal card to create a local stacking context, which was inconsistently applied and easy to forget. The band system replaces both: sub-overlays just claim another slot from the modal band, so the same allocator handles nested modals and in-modal sub-stacking uniformly.
+
+### Adding a new band
+
+Rare. Pick a value with breathing room (e.g. 6000 for a hypothetical "above-modal-but-below-dropdown" band) and document it here, in `tokens.css` (flat token), and in `src/styles.js` (band metadata + flat derivation) in the same commit.
 
 ---
 

@@ -8,7 +8,7 @@
   justify-content: center;
   align-items: center;
   background-color: var(--surface-overlay);
-  z-index: var(--z-modal);
+  /* z-index supplied inline from useZ("modal") */
 }
 
 .card {
@@ -257,7 +257,7 @@
   justify-content: center;
   align-items: center;
   background-color: var(--surface-overlay);
-  z-index: var(--z-modal-content);
+  /* z-index supplied inline from useZ("modal", sShowWorkorderPicker) */
 }
 
 .pickerCard {
@@ -405,6 +405,30 @@
   gap: 8px;
 }
 
+.threadHeader {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.threadRemoveBtn {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.threadRemoveBtn:hover {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
 .messageRow {
   display: flex;
   flex-direction: column;
@@ -418,6 +442,81 @@
 .messageRowUnread {
   border-color: var(--border-default);
   background-color: var(--surface-accent-muted);
+}
+
+.messageBubbleRow {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+}
+
+.messageBubbleRowMine {
+  justify-content: flex-end;
+}
+
+.messageBubbleRowTheirs {
+  justify-content: flex-start;
+}
+
+.messageBubbleColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 75%;
+  min-width: 0;
+}
+
+.messageBubbleRowMine .messageBubbleColumn {
+  align-items: flex-end;
+}
+
+.messageBubbleRowTheirs .messageBubbleColumn {
+  align-items: flex-start;
+}
+
+.messageBubble {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: 14px;
+  box-sizing: border-box;
+  max-width: 100%;
+}
+
+.messageBubbleMine {
+  background-color: var(--info);
+  border-bottom-right-radius: 4px;
+}
+
+.messageBubbleTheirs {
+  background-color: var(--surface-base);
+  border: 1px solid var(--border-subtle);
+  border-bottom-left-radius: 4px;
+}
+
+.messageBubbleTheirsUnread {
+  border-color: var(--info);
+  border-width: 2px;
+}
+
+.messageBubble .messageBody {
+  color: var(--text-default);
+  margin: 0;
+}
+
+.messageBubbleMine .messageBody {
+  color: var(--text-on-accent);
+}
+
+.messageBubbleMine .workorderChip {
+  background-color: var(--surface-base);
+  border-color: var(--surface-base);
+  color: var(--text-default);
+}
+
+.messageBubbleMine .workorderChip:hover {
+  border-color: var(--text-on-accent);
 }
 
 .messageMeta {
@@ -445,9 +544,13 @@
 }
 
 .recipients {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-muted);
   font-style: italic;
+}
+
+.recipientToName {
+  color: var(--danger);
 }
 
 .workorderChip {
@@ -489,6 +592,11 @@
 .actionBtnRead {
   border: 1px solid var(--accent);
   color: var(--accent);
+}
+
+.actionBtnReadDone {
+  border: 1px solid var(--text-muted);
+  color: var(--text-muted);
 }
 
 .actionBtnDelete {
@@ -537,4 +645,179 @@
   font-style: italic;
   text-align: center;
   margin-top: 40px;
+}
+
+.notesScroll {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.noteComposeRow {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background-color: var(--surface-base);
+  margin-bottom: 6px;
+}
+
+.noteComposeActions {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+}
+
+.noteTextarea {
+  width: 100%;
+  min-height: 56px;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border-subtle);
+  background-color: var(--surface-base);
+  color: var(--text-default);
+  box-sizing: border-box;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.4;
+}
+
+.noteAddBtn {
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 5px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.noteAddBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.noteCard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background-color: var(--surface-alt);
+}
+
+.noteHeader {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.noteTime {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.noteIconActions {
+  display: flex;
+  flex-direction: row;
+  gap: 4px;
+}
+
+.noteIconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.noteIconBtn:hover {
+  border-color: var(--border-subtle);
+  background-color: var(--surface-base);
+}
+
+.noteIcon {
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+}
+
+.noteBody {
+  font-size: 13px;
+  color: var(--text-default);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.noteEditActions {
+  display: flex;
+  flex-direction: row;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.noteCancelBtn {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.noteCancelBtn:hover {
+  border-color: var(--text-muted);
+}
+
+.noteSaveBtn {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 4px 14px;
+  border-radius: 4px;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  background: transparent;
+  cursor: pointer;
+}
+
+.noteSaveBtn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.noteFooter {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.noteSendStatus {
+  font-size: 12px;
+  font-style: italic;
+}
+
+.noteSendDropdownWrap {
+  display: inline-flex;
+  min-width: 150px;
+  max-width: 180px;
 }

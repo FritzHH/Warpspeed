@@ -5,12 +5,12 @@
   right: 0;
   bottom: 0;
   background-color: var(--surface-overlay);
-  z-index: 1999;
+  /* z-index supplied inline from useZ("dropdown", visible) */
 }
 
 .dropdown {
   position: absolute;
-  z-index: 2000;
+  /* z-index = backdrop z + 1, supplied inline */
   background-color: var(--surface-base);
   border-radius: 10px;
   border: 2px solid;

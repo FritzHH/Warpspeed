@@ -307,6 +307,7 @@ export const APP_USER = {
   emailInboxes: [],
   pendingWorkorderIDs: [],
   loginMessageSuppressUntil: 0,
+  personalNotes: [],
 };
 
 export const TIME_PUNCH_PROTO = {

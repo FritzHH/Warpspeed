@@ -38,7 +38,8 @@
   justify-content: center;
   align-items: center;
   background-color: rgba(255, 255, 255, 0.7);
-  z-index: 999;
+  /* z-allow: local sub-stacking inside parent panel (position: absolute) */
+  z-index: 1;
 }
 
 .sendingText {
@@ -470,6 +471,7 @@
   left: 0;
   right: 0;
   top: 100%;
+  /* z-allow: local autocomplete anchor, position: absolute */
   z-index: 999;
 }
 

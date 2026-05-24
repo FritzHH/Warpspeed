@@ -1,6 +1,7 @@
 import React, { forwardRef, useState, useRef, useEffect } from "react";
 import ReactDOM from "react-dom";
 import { C, Fonts, ICONS } from "../../styles";
+import { useZ } from "../../hooks/useZ";
 import { deepEqual, localStorageWrapper } from "../../utils";
 import { permissionToLevel } from "../../data";
 import { useLoginStore, useSettingsStore, useAlertScreenStore } from "../../stores";
@@ -23,6 +24,7 @@ export const LoginModal = forwardRef(function LoginModal(
   const [sSuccess, _setSuccess] = useState(false);
   const [sExpandedTo4, _setExpandedTo4] = useState(false);
   const pinInputRef = useRef(null);
+  const z = useZ("modal", modalVisible);
 
   const requiredLevel = permissionToLevel(zAdminPrivilege);
   const adminEntryRequired = requiredLevel >= 4;
@@ -146,6 +148,7 @@ export const LoginModal = forwardRef(function LoginModal(
     <div
       ref={ref}
       className={`${styles.backdrop} ${className}`}
+      style={{ zIndex: z }}
       onClick={handleClose}
       data-testid={testId}
       role="dialog"

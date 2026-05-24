@@ -1,0 +1,50 @@
+.toast {
+  position: fixed;
+  z-index: var(--z-toast);
+  pointer-events: none;
+  background-color: rgba(60, 60, 60, 0.7);
+  border-radius: 9999px;
+  padding: 10px 22px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 480px;
+  box-shadow: 0 4px 14px var(--shadow-color-default);
+  opacity: var(--toast-opacity, 1);
+}
+
+.entering {
+  animation: toastIn 180ms ease-out;
+}
+
+.exiting {
+  animation: toastOut 420ms ease-in forwards;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; }
+  to   { opacity: var(--toast-opacity, 1); }
+}
+
+@keyframes toastOut {
+  from { opacity: var(--toast-opacity, 1); }
+  to   { opacity: 0; }
+}
+
+.text {
+  color: var(--text-on-accent);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  white-space: pre-wrap;
+}
+
+.posTopLeft         { top: 16px; left: 16px; }
+.posTopMiddle       { top: 16px; left: 50%; transform: translateX(-50%); }
+.posTopRight        { top: 16px; right: 16px; }
+.posMidTopMiddle    { top: 25%; left: 50%; transform: translateX(-50%); }
+.posMiddle          { top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.posMidBottomMiddle { bottom: 25%; left: 50%; transform: translateX(-50%); }
+.posBottomLeft      { bottom: 16px; left: 16px; }
+.posBottomMiddle    { bottom: 16px; left: 50%; transform: translateX(-50%); }
+.posBottomRight     { bottom: 16px; right: 16px; }

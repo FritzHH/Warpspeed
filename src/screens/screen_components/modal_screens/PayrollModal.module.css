@@ -9,18 +9,17 @@
    ──────────────────────────────────────────────────────────────────────── */
 
 /* Radix Dialog primitives — give the content a definite viewport-sized box
-   so the card's percentage sizing has a known parent. */
+   so the card's percentage sizing has a known parent. z-index supplied
+   inline from useZ("modal"). */
 .radixOverlay {
   position: fixed;
   inset: 0;
   background-color: var(--surface-overlay);
-  z-index: var(--z-modal);
 }
 
 .radixContent {
   position: fixed;
   inset: 0;
-  z-index: var(--z-modal-content);
   display: flex;
   align-items: center;
   justify-content: center;

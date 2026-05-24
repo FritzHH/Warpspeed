@@ -1,7 +1,8 @@
 /* eslint-disable */
 import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { C, COLOR_GRADIENTS, ICONS, Z } from "../../../styles";
+import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
+import { useZ } from "../../../hooks/useZ";
 import { Button, Image, Tooltip, CheckBox } from "../../../dom_components";
 import { log, compressImage } from "../../../utils";
 import {
@@ -47,6 +48,7 @@ export const WorkorderMediaModal = ({
   const [sCastToDisplay, _setCastToDisplay] = useState(false);
   const fileInputRef = useRef(null);
   const [sDeleting, _setDeleting] = useState(false);
+  const z = useZ("modal", visible);
 
   if (!visible) return null;
 
@@ -275,7 +277,7 @@ export const WorkorderMediaModal = ({
       <div
         className={styles.fullOverlay}
         onClick={handleCloseFullView}
-        style={{ zIndex: Z.modal + 100 }}
+        style={{ zIndex: z }}
       >
         <div className={styles.fullContent} onClick={(e) => e.stopPropagation()}>
           {hasPrev && (
@@ -319,7 +321,7 @@ export const WorkorderMediaModal = ({
     <div
       className={styles.overlay}
       onClick={onClose}
-      style={{ zIndex: Z.modal }}
+      style={{ zIndex: z }}
     >
       <div
         className={styles.modal}
@@ -601,7 +603,7 @@ export const WorkorderMediaModal = ({
         <div
           className={styles.confirmOverlay}
           onClick={(e) => e.stopPropagation()}
-          style={{ zIndex: 10000 }}
+          style={{ zIndex: z + 5 }}
         >
           <div className={styles.confirmBackdrop} onClick={handleCancelUpload} />
           <div

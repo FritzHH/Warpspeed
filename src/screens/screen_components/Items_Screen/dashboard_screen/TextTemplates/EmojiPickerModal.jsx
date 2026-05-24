@@ -1,12 +1,14 @@
 import React, { useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { C, Z } from "../../../../../styles";
+import { C } from "../../../../../styles";
+import { useZ } from "../../../../../hooks/useZ";
 import { TEMPLATE_EMOJIS } from "./templateConstants";
 import styles from "./EmojiPickerModal.module.css";
 
 export function EmojiPickerModal({ onSelectEmoji, onClose, anchorRect }) {
   const modalRef = useRef(null);
   const [pos, setPos] = useState(anchorRect ? { left: -9999, top: -9999 } : null);
+  const z = useZ("modal");
 
   useLayoutEffect(() => {
     if (!anchorRect || !modalRef.current) return;
@@ -58,12 +60,12 @@ export function EmojiPickerModal({ onSelectEmoji, onClose, anchorRect }) {
 
   return createPortal(
     anchorRect ? (
-      <div className={styles.anchoredWrap} style={{ zIndex: Z.modal }}>
+      <div className={styles.anchoredWrap} style={{ zIndex: z }}>
         <div className={styles.backdropClickCatcher} onClick={onClose} />
         {modalContent}
       </div>
     ) : (
-      <div className={styles.backdrop} style={{ zIndex: Z.modal }}>
+      <div className={styles.backdrop} style={{ zIndex: z }}>
         <div className={styles.backdropClickCatcher} onClick={onClose} />
         {modalContent}
       </div>

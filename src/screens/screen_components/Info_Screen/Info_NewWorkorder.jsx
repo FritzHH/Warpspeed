@@ -453,10 +453,8 @@ export function NewWorkorderComponent({}) {
                     <CustomerInfoScreenModalComponent
                       incomingCustomer={sCustomerInfo}
                       isNewCustomer={true}
-                      button1Text={"Create Customer"}
-                      button2Text={"Cancel"}
-                      handleButton1Press={handleCreateNewCustomerPressed}
-                      handleButton2Press={handleCancelCreateNewCustomerPress}
+                      onCreateCustomer={handleCreateNewCustomerPressed}
+                      onClose={handleCancelCreateNewCustomerPress}
                     />
                   </Suspense>
                 )}

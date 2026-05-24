@@ -2,6 +2,7 @@ import React, { forwardRef, useEffect, useRef } from "react";
 import ReactDOM from "react-dom";
 import { ICONS } from "../../styles";
 import styles from "./PrinterAlert.module.css";
+import { useZ } from "../../hooks/useZ";
 
 export const PrinterAlert = forwardRef(function PrinterAlert(
   {
@@ -14,6 +15,7 @@ export const PrinterAlert = forwardRef(function PrinterAlert(
   ref
 ) {
   const containerRef = useRef(null);
+  const z = useZ("toast", visible);
 
   useEffect(() => {
     if (!visible) return;
@@ -53,6 +55,7 @@ export const PrinterAlert = forwardRef(function PrinterAlert(
       }}
       className={styles.container}
       style={{
+        zIndex: z,
         left: (x || 0) - 25,
         top: (y || 0) - 25,
       }}

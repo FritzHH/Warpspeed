@@ -19,6 +19,7 @@ import { startNewWorkorder } from "../../../db_calls_wrapper";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import defaultLogo from "../../../resources/default_app_logo_large.png";
 import styles from "./Items_CustomerSearchList.module.css";
+import { useZ } from "../../../hooks/useZ";
 
 export function CustomerSearchListComponent({}) {
   // store getters //////////////////////////////////////////////////////////////////////
@@ -75,6 +76,7 @@ export function CustomerSearchListComponent({}) {
   const [sSelectedCustomer, _setSelectedCustomer] = useState(null);
   const [sModalY, _setModalY] = useState(0);
   const [sModalX, _setModalX] = useState(0);
+  const z = useZ("dropdown", !!sSelectedCustomer);
 
   function handleCustomerSelected(customer) {
     useLoginStore.getState().requireLogin(async () => {
@@ -174,12 +176,10 @@ export function CustomerSearchListComponent({}) {
                 <CustomerInfoScreenModalComponent
                   isCurrentCustomer={false}
                   incomingCustomer={sCustomerInfo}
-                  button1Text={"New Workorder"}
-                  button2Text={"Close"}
-                  handleButton1Press={(customerInfo) =>
+                  onNewWorkorder={(customerInfo) =>
                     handleCustomerSelected(customerInfo)
                   }
-                  handleButton2Press={() => _setCustomerInfo()}
+                  onClose={() => _setCustomerInfo()}
                 />
               </Suspense>
             )}
@@ -190,6 +190,7 @@ export function CustomerSearchListComponent({}) {
       {sSelectedCustomer && (
         <div
           className={styles.actionOverlay}
+          style={{ zIndex: z }}
           onClick={() => _setSelectedCustomer(null)}
         >
           <div

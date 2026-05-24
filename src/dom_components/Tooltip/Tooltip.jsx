@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useLayoutEffect, useCallback } from "react";
 import { createPortal } from "react-dom";
-import { C } from "../../styles";
+import { C, claimZ, releaseZ } from "../../styles";
 import styles from "./Tooltip.module.css";
 
 const GAP = 6;
@@ -87,6 +87,17 @@ export const Tooltip = ({
   const suppressShowRef = useRef(false);
   const [visible, setVisible] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, ready: false });
+  const [zClaim, setZClaim] = useState(null);
+
+  useLayoutEffect(() => {
+    if (!visible) return;
+    const z = claimZ("tooltip");
+    setZClaim(z);
+    return () => {
+      releaseZ("tooltip", z);
+      setZClaim(null);
+    };
+  }, [visible]);
 
   const showTooltip = useCallback(() => {
     if (!text || disabled) return;
@@ -193,6 +204,7 @@ export const Tooltip = ({
               left: pos.left,
               backgroundColor: bgColor,
               opacity: pos.ready ? 1 : 0,
+              zIndex: zClaim ?? undefined,
             }}
           >
             <span className={styles.text} style={{ color: textColor }}>

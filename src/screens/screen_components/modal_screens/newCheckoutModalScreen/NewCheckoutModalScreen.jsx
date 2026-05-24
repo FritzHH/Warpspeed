@@ -16,6 +16,7 @@ import {
 } from "../../../../dom_components";
 import styles from "./NewCheckoutModalScreen.module.css";
 import { C, Fonts, COLOR_GRADIENTS, ICONS, SHADOW_RADIUS_PROTO } from "../../../../styles";
+import { useZ } from "../../../../hooks/useZ";
 import {
   useCheckoutStore,
   useOpenWorkordersStore,
@@ -261,6 +262,7 @@ export function NewCheckoutModalScreen() {
   const [sPickupKeepOpenExpanded, _setPickupKeepOpenExpanded] = useState(false);
   const [sPickupKeepOpenReason, _setPickupKeepOpenReason] = useState("");
   const [sPickupCountdown, _setPickupCountdown] = useState(10);
+  const zPickup = useZ("modal", sShowPickupModal);
   const [sReceiptSentOverlay, _setReceiptSentOverlay] = useState(null);
   const [sTransactions, _setTransactions] = useState([]);   // real payments (cash/card)
   const [sCredits, _setCredits] = useState([]);              // applied credits/deposits/gift cards
@@ -2340,7 +2342,7 @@ export function NewCheckoutModalScreen() {
             </Suspense>
           )}
           {sShowPickupModal && (
-            <div className={styles.pickupOverlay}>
+            <div className={styles.pickupOverlay} style={{ zIndex: zPickup }}>
               <div className={styles.pickupBox} style={{ backgroundColor: C.backgroundWhite, borderColor: C.buttonLightGreenOutline }}>
                 <span className={styles.pickupTitle} style={{ color: C.text }}>Payment Complete</span>
                 <span className={styles.pickupSubtitle} style={{ color: C.textMuted }}>

@@ -19,6 +19,7 @@ const CustomerInfoScreenModalComponent = lazy(() =>
   import("../modal_screens/CustomerInfoModalScreen").then((m) => ({ default: m.CustomerInfoScreenModalComponent }))
 );
 import styles from "./Items_RecentCustomers.module.css";
+import { useZ } from "../../../hooks/useZ";
 
 const RECENT_CUSTOMER_WINDOW_MS = 2 * 60 * 60 * 1000;
 
@@ -32,6 +33,7 @@ export function RecentCustomersComponent() {
   const [sSelectedCustomer, _setSelectedCustomer] = useState(null);
   const [sModalY, _setModalY] = useState(0);
   const [sModalX, _setModalX] = useState(0);
+  const z = useZ("dropdown", !!sSelectedCustomer);
 
   function handleRecentCustomerSelected(customer) {
     useLoginStore.getState().requireLogin(async () => {
@@ -97,12 +99,10 @@ export function RecentCustomersComponent() {
                 <CustomerInfoScreenModalComponent
                   isCurrentCustomer={false}
                   incomingCustomer={sCustomerInfo}
-                  button1Text={"New Workorder"}
-                  button2Text={"Close"}
-                  handleButton1Press={(customerInfo) =>
+                  onNewWorkorder={(customerInfo) =>
                     handleRecentCustomerSelected(customerInfo)
                   }
-                  handleButton2Press={() => _setCustomerInfo(null)}
+                  onClose={() => _setCustomerInfo(null)}
                 />
               </Suspense>
             )}
@@ -113,6 +113,7 @@ export function RecentCustomersComponent() {
       {sSelectedCustomer && (
         <div
           className={styles.actionOverlay}
+          style={{ zIndex: z }}
           onClick={() => _setSelectedCustomer(null)}
         >
           <div

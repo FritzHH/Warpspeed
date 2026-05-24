@@ -15,7 +15,7 @@
 
 .menu {
   position: fixed;
-  z-index: 2000;
+  /* z-index supplied inline from useZ("dropdown", isOpen) */
   background-color: white;
   border-width: 2px;
   border-style: solid;

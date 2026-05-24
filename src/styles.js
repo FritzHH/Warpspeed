@@ -1,21 +1,61 @@
 import { dim, getRgbFromNamedColor, lightenRGBByPercent } from "./utils";
 // const { getDefaultConfig } = require("metro"); // Or require('metro-config') for bare React Native
 
-// Z-index registry. MUST match the --z-* tokens in src/styles/tokens.css.
-// CSS modules should prefer var(--z-*); JS/inline styles consume these.
-// Tier order (low to high): inner overlays inside a modal card (100, 200) <
-// modal + content (9000, 9001) < dropdowns (9500) < tooltips (9700) <
-// toasts (9800) < alerts (9900, always on top).
-export const Z = {
-  modalInnerOverlay: 100,
-  modalLoading: 200,
-  modal: 9000,
-  modalContent: 9001,
-  dropdown: 9500,
-  tooltip: 9700,
-  toast: 9800,
-  alert: 9900,
+// Z-index registry (band-based). MUST match the --z-* tokens in
+// src/styles/tokens.css. Bands are 100-wide with STEP=10, fitting
+// up to 10 stacked instances per band.
+//
+// Usage:
+//   - Static (single-instance) stacking: read Z.modal, Z.dropdown,
+//     etc. CSS modules should prefer var(--z-*) directly.
+//   - Runtime (instance-stacked) stacking - nested Dialogs, sub-
+//     overlays inside a modal, anything where the value depends on
+//     how many siblings are mounted: call claimZ('modal') for the
+//     next free slot in the band, pair with releaseZ on unmount.
+//
+// See docs/design-tokens.md "Z-Index Registry" for the full design.
+const _zBands = {
+  modal:    { base: 9000, step: 10, max: 9099 },
+  dropdown: { base: 9500, step: 10, max: 9599 },
+  tooltip:  { base: 9700, step: 10, max: 9799 },
+  toast:    { base: 9800, step: 10, max: 9899 },
+  alert:    { base: 9900, step: 10, max: 9999 },
+  debug:    { base: 100000, step: 10, max: 100099 },
 };
+
+export const Z = {
+  modal:        _zBands.modal.base,         // 9000
+  modalContent: _zBands.modal.base + 1,     // 9001
+  dropdown:     _zBands.dropdown.base,      // 9500
+  tooltip:      _zBands.tooltip.base,       // 9700
+  toast:        _zBands.toast.base,         // 9800
+  alert:        _zBands.alert.base,         // 9900
+  debug:        _zBands.debug.base,         // 100000
+  bands:        _zBands,
+};
+
+const _zClaimed = new Map();
+
+export function claimZ(bandName) {
+  const band = _zBands[bandName];
+  if (!band) throw new Error(`claimZ: unknown band "${bandName}"`);
+  if (!_zClaimed.has(bandName)) _zClaimed.set(bandName, new Set());
+  const used = _zClaimed.get(bandName);
+  let z = band.base;
+  while (used.has(z) && z <= band.max) z += band.step;
+  if (z > band.max) {
+    throw new Error(
+      `claimZ: band "${bandName}" exhausted (base ${band.base}, max ${band.max}, step ${band.step}). Widen the band in tokens.css and styles.js.`,
+    );
+  }
+  used.add(z);
+  return z;
+}
+
+export function releaseZ(bandName, z) {
+  const used = _zClaimed.get(bandName);
+  if (used) used.delete(z);
+}
 
 export const Colors = {
   // mainBackground: "white",

@@ -1,6 +1,7 @@
 /* eslint-disable */
 import { useState, useRef } from "react";
-import { C, Z } from "../../../styles";
+import { C } from "../../../styles";
+import { useZ } from "../../../hooks/useZ";
 import { formatCurrencyDisp } from "../../../utils";
 import { CheckBox, Pressable, Button } from "../../../dom_components";
 import { workerSearchInventory } from "../../../inventorySearchManager";
@@ -15,6 +16,7 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
   const [sKeypadMode, _setKeypadMode] = useState("alpha");
   const searchTimerRef = useRef(null);
   const headerSwipeRef = useRef(null);
+  const z = useZ("modal");
 
   function handleSearchTextChange(newText) {
     _setSearchText(newText);
@@ -64,7 +66,7 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
   let checkedCount = sCheckedIDs.size;
 
   return (
-    <div onClick={onClose} className={styles.backdrop} style={{ zIndex: Z.modal }}>
+    <div onClick={onClose} className={styles.backdrop} style={{ zIndex: z }}>
       <div onClick={(e) => e.stopPropagation()} className={styles.dialog}>
         {/* Header */}
         <div

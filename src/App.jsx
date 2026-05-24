@@ -6,6 +6,7 @@ import { LoginScreen } from "./screens/LoginScreen";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { LoadingIndicator } from "./dom_components";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
+import { useZ } from "./hooks/useZ";
 const CustomerDisplayScreen = lazy(() =>
   import("./screens/CustomerDisplayScreen").then((m) => ({
     default: m.CustomerDisplayScreen,
@@ -189,6 +190,10 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const setIsMobile = useLayoutStore((state) => state.setIsMobile);
   const setDeviceType = useLayoutStore((state) => state.setDeviceType);
+  const zEmulatorBadge = useZ(
+    "debug",
+    import.meta.env.DEV && import.meta.env.VITE_USE_EMULATORS === "true",
+  );
 
   // Detect if app is running on mobile, tablet, or desktop
   useEffect(() => {
@@ -306,7 +311,7 @@ function App() {
           fontSize: 11,
           fontWeight: "bold",
           borderRadius: 4,
-          zIndex: 999999,
+          zIndex: zEmulatorBadge,
           pointerEvents: "none",
           letterSpacing: 0.5,
         }}

@@ -88,11 +88,13 @@ export const CustomerInfoScreenModalComponent = ({
   customerID = null,
   isNewCustomer = false,
   isCurrentCustomer = true,
-  button1Text,
-  button2Text,
-  handleButton1Press,
-  handleButton2Press,
+  onCreateCustomer,
+  onNewWorkorder,
+  onClose,
 }) => {
+  const primaryHandler = isNewCustomer ? onCreateCustomer : onNewWorkorder;
+  const primaryText = isNewCustomer ? "Create Customer" : "New Workorder";
+  const dismissText = isNewCustomer ? "Cancel" : "Close";
   const getInitialCustomer = () => {
     if (incomingCustomer) return incomingCustomer;
     if (customerID) {
@@ -406,320 +408,285 @@ export const CustomerInfoScreenModalComponent = ({
   }
 
   const cellHasError = sCellDuplicateStatus === "duplicate" || sCellDuplicateStatus === "error";
+  const primaryEnabled =
+    sCellDuplicateStatus !== "duplicate" &&
+    sCellDuplicateStatus !== "error" &&
+    sCellDuplicateStatus !== "checking";
 
   return (
     <div className={styles.shell} onClick={(e) => e.stopPropagation()}>
+      <div className={styles.body}>
       <div className={styles.formCol}>
-        <div className={styles.contactRow}>
-          <CheckBox
-            text={"Call Only"}
-            isChecked={sCustomerInfo?.contactRestriction === CONTACT_RESTRICTIONS.call}
-            onCheck={() => {
-              let val = sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.call ? "" : CONTACT_RESTRICTIONS.call;
-              saveField("contactRestriction", val);
-            }}
-          />
-          <CheckBox
-            text={"Email Only"}
-            isChecked={sCustomerInfo?.contactRestriction === CONTACT_RESTRICTIONS.email}
-            onCheck={() => {
-              let val = sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.email ? "" : CONTACT_RESTRICTIONS.email;
-              saveField("contactRestriction", val);
-            }}
-          />
-        </div>
+        <div className={styles.fieldGroup}>
+          <div className={styles.fieldGroupTitle}>Contact</div>
+          <div className={styles.contactRow}>
+            <CheckBox
+              text={"Call Only"}
+              textStyle={{ fontSize: 12 }}
+              isChecked={sCustomerInfo?.contactRestriction === CONTACT_RESTRICTIONS.call}
+              onCheck={() => {
+                let val = sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.call ? "" : CONTACT_RESTRICTIONS.call;
+                saveField("contactRestriction", val);
+              }}
+            />
+            <CheckBox
+              text={"Email Only"}
+              textStyle={{ fontSize: 12 }}
+              isChecked={sCustomerInfo?.contactRestriction === CONTACT_RESTRICTIONS.email}
+              onCheck={() => {
+                let val = sCustomerInfo.contactRestriction === CONTACT_RESTRICTIONS.email ? "" : CONTACT_RESTRICTIONS.email;
+                saveField("contactRestriction", val);
+              }}
+            />
+          </div>
 
-        <div>
-          {(!!sCustomerInfo?.customerCell || sCellEditing) && (
-            <div className={styles.cellHeader}>
-              {sCellDuplicateStatus === "duplicate" ? (
-                <span className={styles.cellLabelError} style={{ color: C.red }}>Phone number duplicate</span>
-              ) : sCellDuplicateStatus === "error" ? (
-                <span className={styles.cellLabelError} style={{ color: C.red }}>Network error - cannot verify</span>
-              ) : sCellDuplicateStatus === "checking" ? (
-                <>
+          <div>
+            {(!!sCustomerInfo?.customerCell || sCellEditing) && (
+              <div className={styles.cellHeader}>
+                {sCellDuplicateStatus === "duplicate" ? (
+                  <span className={styles.cellLabelError} style={{ color: C.red }}>Phone number duplicate</span>
+                ) : sCellDuplicateStatus === "error" ? (
+                  <span className={styles.cellLabelError} style={{ color: C.red }}>Network error - cannot verify</span>
+                ) : sCellDuplicateStatus === "checking" ? (
+                  <>
+                    <span className={styles.cellLabel} style={{ color: C.textDisabled }}>Cell</span>
+                    <span style={{ marginLeft: 5, display: "flex", alignItems: "center" }}>
+                      <SmallLoadingIndicator />
+                    </span>
+                  </>
+                ) : (
                   <span className={styles.cellLabel} style={{ color: C.textDisabled }}>Cell</span>
-                  <span style={{ marginLeft: 5, display: "flex", alignItems: "center" }}>
+                )}
+              </div>
+            )}
+
+            {(!isNewCustomer && !sCellEditing) ? (
+              <div className={styles.cellInlineRow}>
+                <TextInput
+                  editable={false}
+                  placeholder="Cell phone"
+                  className={styles.input}
+                  style={{
+                    ...INPUT_BASE_STYLE,
+                    flex: 1,
+                    marginTop: sCustomerInfo.customerCell ? 1 : 15,
+                    backgroundColor: C.surfaceAlt,
+                  }}
+                  value={formatPhoneWithDashes(sCustomerInfo.customerCell)}
+                />
+                {sCellMigrating ? (
+                  <span style={{ marginLeft: 8, display: "flex", alignItems: "center" }}>
                     <SmallLoadingIndicator />
                   </span>
-                </>
-              ) : (
-                <span className={styles.cellLabel} style={{ color: C.textDisabled }}>Cell</span>
-              )}
-            </div>
-          )}
-
-          {(!isNewCustomer && !sCellEditing) ? (
-            <div className={styles.cellInlineRow}>
-              <TextInput
-                editable={false}
-                placeholder="Cell phone"
-                className={styles.input}
-                style={{
-                  ...INPUT_BASE_STYLE,
-                  flex: 1,
-                  marginTop: sCustomerInfo.customerCell ? 1 : 15,
-                  backgroundColor: C.surfaceAlt,
-                }}
-                value={formatPhoneWithDashes(sCustomerInfo.customerCell)}
-              />
-              {sCellMigrating ? (
-                <span style={{ marginLeft: 8, display: "flex", alignItems: "center" }}>
-                  <SmallLoadingIndicator />
-                </span>
-              ) : (
+                ) : (
+                  <button
+                    type="button"
+                    disabled={(sCustomerInfo.customerCell || "").replace(/\D/g, "").length !== 10}
+                    onClick={handleCellEditStart}
+                    className={
+                      styles.cellIconBtn +
+                      ((sCustomerInfo.customerCell || "").replace(/\D/g, "").length !== 10
+                        ? " " + styles.cellIconBtnDisabled
+                        : "")
+                    }
+                    title="Edit customer cell phone number"
+                  >
+                    <Image icon={ICONS.editPencil} style={{ width: 18, height: 18 }} />
+                  </button>
+                )}
+              </div>
+            ) : sCellEditing ? (
+              <div className={styles.cellInlineRow}>
+                <TextInput
+                  onChangeText={(val) => {
+                    val = removeDashesFromPhone(val);
+                    if (val.length > 10) return;
+                    _sCellEditValue(val);
+                    checkCellPhoneUnique(val);
+                  }}
+                  placeholder="Cell phone"
+                  className={styles.input}
+                  style={{
+                    ...INPUT_BASE_STYLE,
+                    flex: 1,
+                    marginTop: 1,
+                    ...(cellHasError ? { borderColor: C.red, borderWidth: 2 } : {}),
+                  }}
+                  value={formatPhoneWithDashes(sCellEditValue)}
+                />
+                {sCellEditValue.replace(/\D/g, "").length === 10 && sCellDuplicateStatus !== "duplicate" ? (
+                  <button
+                    type="button"
+                    onClick={handleCellSavePress}
+                    className={styles.cellIconBtn}
+                    title="Save new phone number"
+                  >
+                    <Image icon={ICONS.check1} style={{ width: 18, height: 18 }} />
+                  </button>
+                ) : null}
                 <button
                   type="button"
-                  disabled={(sCustomerInfo.customerCell || "").replace(/\D/g, "").length !== 10}
-                  onClick={handleCellEditStart}
-                  className={
-                    styles.cellIconBtn +
-                    ((sCustomerInfo.customerCell || "").replace(/\D/g, "").length !== 10
-                      ? " " + styles.cellIconBtnDisabled
-                      : "")
-                  }
-                  title="Edit customer cell phone number"
+                  onClick={handleCellEditCancel}
+                  className={styles.cellIconBtn}
+                  style={{ marginLeft: 6 }}
+                  title="Cancel"
                 >
-                  <Image icon={ICONS.editPencil} style={{ width: 18, height: 18 }} />
+                  <Image icon={ICONS.close1} style={{ width: 16, height: 16 }} />
                 </button>
-              )}
-            </div>
-          ) : sCellEditing ? (
-            <div className={styles.cellInlineRow}>
+              </div>
+            ) : (
               <TextInput
                 onChangeText={(val) => {
                   val = removeDashesFromPhone(val);
                   if (val.length > 10) return;
-                  _sCellEditValue(val);
+                  saveField("customerCell", val);
                   checkCellPhoneUnique(val);
                 }}
                 placeholder="Cell phone"
                 className={styles.input}
                 style={{
                   ...INPUT_BASE_STYLE,
-                  flex: 1,
-                  marginTop: 1,
+                  marginTop: sCustomerInfo.customerCell ? 1 : 15,
                   ...(cellHasError ? { borderColor: C.red, borderWidth: 2 } : {}),
                 }}
-                value={formatPhoneWithDashes(sCellEditValue)}
+                value={formatPhoneWithDashes(sCustomerInfo.customerCell)}
               />
-              {sCellEditValue.replace(/\D/g, "").length === 10 && sCellDuplicateStatus !== "duplicate" ? (
-                <button
-                  type="button"
-                  onClick={handleCellSavePress}
-                  className={styles.cellIconBtn}
-                  title="Save new phone number"
-                >
-                  <Image icon={ICONS.check1} style={{ width: 18, height: 18 }} />
-                </button>
-              ) : null}
-              <button
-                type="button"
-                onClick={handleCellEditCancel}
-                className={styles.cellIconBtn}
-                style={{ marginLeft: 6 }}
-                title="Cancel"
-              >
-                <Image icon={ICONS.close1} style={{ width: 16, height: 16 }} />
-              </button>
-            </div>
-          ) : (
-            <TextInput
-              onChangeText={(val) => {
-                val = removeDashesFromPhone(val);
-                if (val.length > 10) return;
-                saveField("customerCell", val);
-                checkCellPhoneUnique(val);
-              }}
-              placeholder="Cell phone"
-              className={styles.input}
-              style={{
-                ...INPUT_BASE_STYLE,
-                marginTop: sCustomerInfo.customerCell ? 1 : 15,
-                ...(cellHasError ? { borderColor: C.red, borderWidth: 2 } : {}),
-              }}
-              value={formatPhoneWithDashes(sCustomerInfo.customerCell)}
-            />
-          )}
-        </div>
+            )}
+          </div>
 
-        <TextInput
-          onChangeText={(val) => {
-            val = removeDashesFromPhone(val);
-            if (val.length > 10) return;
-            saveField("customerLandline", val);
-          }}
-          placeholder="Landline"
-          className={styles.input}
-          style={INPUT_BASE_STYLE}
-          value={formatPhoneWithDashes(sCustomerInfo.customerLandline)}
-        />
-        <TextInput
-          onChangeText={(val) => saveField("first", capitalizeFirstLetterOfString(val))}
-          placeholder="First name"
-          className={styles.input}
-          style={INPUT_BASE_STYLE}
-          value={capitalizeFirstLetterOfString(sCustomerInfo.first)}
-          capitalize={true}
-        />
-        <TextInput
-          onChangeText={(val) => saveField("last", capitalizeFirstLetterOfString(val))}
-          placeholder="Last name"
-          className={styles.input}
-          style={INPUT_BASE_STYLE}
-          value={capitalizeFirstLetterOfString(sCustomerInfo.last)}
-          capitalize={true}
-        />
-        <TextInput
-          onChangeText={(val) => saveField("email", val)}
-          placeholder="Email address"
-          className={styles.input}
-          style={INPUT_BASE_STYLE}
-          value={sCustomerInfo.email}
-        />
-        <TextInput
-          onChangeText={(val) => saveField("streetAddress", capitalizeFirstLetterOfString(val))}
-          placeholder="Street address"
-          className={styles.input}
-          style={INPUT_BASE_STYLE}
-          value={capitalizeFirstLetterOfString(sCustomerInfo.streetAddress)}
-          capitalize={true}
-        />
-        <div className={styles.unitCityRow}>
-          <TextInput
-            onChangeText={(val) => saveField("unit", val)}
-            placeholder="Unit"
-            className={styles.input}
-            style={{ ...INPUT_BASE_STYLE, marginTop: 0, width: "20%", height: "100%" }}
-            value={sCustomerInfo.unit}
-          />
-          <TextInput
-            onChangeText={(val) => saveField("city", capitalizeFirstLetterOfString(val))}
-            placeholder="City"
-            className={styles.input}
-            style={{ ...INPUT_BASE_STYLE, marginTop: 0, width: "70%", height: "100%" }}
-            value={capitalizeFirstLetterOfString(sCustomerInfo.city)}
-            capitalize={true}
-          />
-        </div>
-        <TextInput
-          onChangeText={(val) => saveField("state", val.toUpperCase())}
-          placeholder="State"
-          className={styles.input}
-          style={INPUT_BASE_STYLE}
-          value={(sCustomerInfo.state || "").toUpperCase()}
-        />
-
-        <div className={styles.zipMapsRow}>
           <TextInput
             onChangeText={(val) => {
-              if (!checkInputForNumbersOnly(val)) return;
-              saveField("zip", val);
+              val = removeDashesFromPhone(val);
+              if (val.length > 10) return;
+              saveField("customerLandline", val);
             }}
-            placeholder="Zip code"
+            placeholder="Landline"
             className={styles.input}
-            style={{ ...INPUT_BASE_STYLE, marginTop: 0, flex: 1, height: "100%" }}
-            value={sCustomerInfo.zip}
+            style={INPUT_BASE_STYLE}
+            value={formatPhoneWithDashes(sCustomerInfo.customerLandline)}
           />
-          {!!sCustomerInfo.streetAddress && !!sCustomerInfo.city && !!sCustomerInfo.state && (
-            <Button
-              text="Maps"
-              icon={ICONS.map}
-              iconSize={16}
-              onPress={() => _sSetShowMapsModal(true)}
-              colorGradientArr={COLOR_GRADIENTS.blue}
-              buttonStyle={{
-                paddingTop: 2,
-                paddingBottom: 2,
-                height: "100%",
-                borderRadius: 7,
-                marginLeft: 10,
-                justifyContent: "center",
-              }}
-              textStyle={{ color: C.textWhite, fontSize: 13, fontWeight: "600" }}
-            />
-          )}
-        </div>
-
-        <TextInput
-          onChangeText={(val) => saveField("notes", capitalizeFirstLetterOfString(val))}
-          placeholder="Address notes"
-          multiline={true}
-          numberOfLines={3}
-          className={styles.notes}
-          style={{ ...INPUT_BASE_STYLE, minHeight: 60, maxHeight: 60 }}
-          value={capitalizeFirstLetterOfString(sCustomerInfo.notes)}
-          capitalize={true}
-        />
-
-        <CheckBox
-          isChecked={!!sCustomerInfo.gatedCommunity}
-          text="Gated community"
-          textStyle={{ fontSize: 13 }}
-          buttonStyle={{ backgroundColor: "transparent", marginTop: 15 }}
-          onCheck={() => saveField("gatedCommunity", !sCustomerInfo.gatedCommunity)}
-        />
-
-        <div className={styles.langRow}>
-          <span className={styles.langLabel} style={{ color: C.textMuted }}>Language</span>
-          <DropdownMenu
-            dataArr={Object.values(CUSTOMER_LANGUAGES).map((lang) => ({ label: lang, value: lang }))}
-            buttonText={sCustomerInfo.language || CUSTOMER_LANGUAGES.english}
-            onSelect={(item) => saveField("language", item.value)}
-            useSelectedAsButtonTitle={false}
+          <TextInput
+            onChangeText={(val) => saveField("email", val)}
+            placeholder="Email address"
+            className={styles.input}
+            style={INPUT_BASE_STYLE}
+            value={sCustomerInfo.email}
           />
         </div>
 
-        <div className={styles.actionStack}>
-          {!!button1Text && (
-            <Button
-              onPress={() => handleButton1Press(sCustomerInfo)}
-              enabled={
-                sCellDuplicateStatus !== "duplicate" &&
-                sCellDuplicateStatus !== "error" &&
-                sCellDuplicateStatus !== "checking"
-              }
-              fullWidth
-              colorGradientArr={COLOR_GRADIENTS.yellow}
-              buttonStyle={{
-                height: 40,
-                borderWidth: 1,
-                borderColor: C.borderSubtle,
-              }}
-              icon={ICONS.gears1}
-              iconSize={19}
-              textStyle={{ color: C.textWhite }}
-              text={button1Text}
+        <div className={styles.fieldGroup}>
+          <div className={styles.fieldGroupTitle}>Info</div>
+          <TextInput
+            onChangeText={(val) => saveField("first", capitalizeFirstLetterOfString(val))}
+            placeholder="First name"
+            className={styles.input}
+            style={INPUT_BASE_STYLE}
+            value={capitalizeFirstLetterOfString(sCustomerInfo.first)}
+            capitalize={true}
+          />
+          <TextInput
+            onChangeText={(val) => saveField("last", capitalizeFirstLetterOfString(val))}
+            placeholder="Last name"
+            className={styles.input}
+            style={INPUT_BASE_STYLE}
+            value={capitalizeFirstLetterOfString(sCustomerInfo.last)}
+            capitalize={true}
+          />
+          <div className={styles.langRow}>
+            <span className={styles.langLabel} style={{ color: C.textMuted }}>Language</span>
+            <DropdownMenu
+              dataArr={Object.values(CUSTOMER_LANGUAGES).map((lang) => ({ label: lang, value: lang }))}
+              buttonText={sCustomerInfo.language || CUSTOMER_LANGUAGES.english}
+              onSelect={(item) => saveField("language", item.value)}
+              useSelectedAsButtonTitle={false}
             />
-          )}
-          {!isNewCustomer && (
-            <Tooltip text="Deposits, gift cards and credits" position="top" darkMode style={{ width: "100%" }}>
+          </div>
+        </div>
+
+        <div className={styles.fieldGroup}>
+          <div className={styles.fieldGroupTitle}>Address</div>
+          <TextInput
+            onChangeText={(val) => saveField("streetAddress", capitalizeFirstLetterOfString(val))}
+            placeholder="Street address"
+            className={styles.input}
+            style={INPUT_BASE_STYLE}
+            value={capitalizeFirstLetterOfString(sCustomerInfo.streetAddress)}
+            capitalize={true}
+          />
+          <div className={styles.unitCityRow}>
+            <TextInput
+              onChangeText={(val) => saveField("unit", val)}
+              placeholder="Unit"
+              className={styles.input}
+              style={{ ...INPUT_BASE_STYLE, marginTop: 0, width: "24%", height: "100%" }}
+              value={sCustomerInfo.unit}
+            />
+            <TextInput
+              onChangeText={(val) => saveField("city", capitalizeFirstLetterOfString(val))}
+              placeholder="City"
+              className={styles.input}
+              style={{ ...INPUT_BASE_STYLE, marginTop: 0, width: "70%", height: "100%" }}
+              value={capitalizeFirstLetterOfString(sCustomerInfo.city)}
+              capitalize={true}
+            />
+          </div>
+          <TextInput
+            onChangeText={(val) => saveField("state", val.toUpperCase())}
+            placeholder="State"
+            className={styles.input}
+            style={INPUT_BASE_STYLE}
+            value={(sCustomerInfo.state || "").toUpperCase()}
+          />
+
+          <div className={styles.zipMapsRow}>
+            <TextInput
+              onChangeText={(val) => {
+                if (!checkInputForNumbersOnly(val)) return;
+                saveField("zip", val);
+              }}
+              placeholder="Zip code"
+              className={styles.input}
+              style={{ ...INPUT_BASE_STYLE, marginTop: 0, flex: 1, height: "100%" }}
+              value={sCustomerInfo.zip}
+            />
+            {!!sCustomerInfo.streetAddress && !!sCustomerInfo.city && !!sCustomerInfo.state && (
               <Button
-                onPress={() => _sSetShowDepositModal(true)}
-                fullWidth
-                colorGradientArr={COLOR_GRADIENTS.green}
-                icon={ICONS.greenDollar}
-                buttonStyle={{ height: 36 }}
+                text="Maps"
+                icon={ICONS.map}
                 iconSize={16}
-                textStyle={{ color: C.textWhite, fontSize: 13 }}
-                text={"Add Money"}
-              />
-            </Tooltip>
-          )}
-          {!!button2Text && (
-            <Tooltip text="All edits auto-saved" position="top" darkMode style={{ width: "100%" }}>
-              <Button
-                icon={ICONS.close1}
-                fullWidth
+                onPress={() => _sSetShowMapsModal(true)}
                 colorGradientArr={COLOR_GRADIENTS.blue}
-                onPress={handleButton2Press}
-                buttonStyle={{ height: 40 }}
-                iconSize={17}
-                textStyle={{ marginLeft: 15, color: C.textWhite }}
-                text={button2Text}
+                buttonStyle={{
+                  paddingTop: 2,
+                  paddingBottom: 2,
+                  height: "100%",
+                  borderRadius: 7,
+                  marginLeft: 10,
+                  justifyContent: "center",
+                }}
+                textStyle={{ color: C.textWhite, fontSize: 13, fontWeight: "600" }}
               />
-            </Tooltip>
-          )}
+            )}
+          </div>
+
+          <TextInput
+            onChangeText={(val) => saveField("notes", capitalizeFirstLetterOfString(val))}
+            placeholder="Address notes"
+            multiline={true}
+            numberOfLines={3}
+            className={styles.notes}
+            style={{ ...INPUT_BASE_STYLE, minHeight: 70, maxHeight: 70 }}
+            value={capitalizeFirstLetterOfString(sCustomerInfo.notes)}
+            capitalize={true}
+          />
+
+          <CheckBox
+            isChecked={!!sCustomerInfo.gatedCommunity}
+            text="Gated community"
+            textStyle={{ fontSize: 13 }}
+            buttonStyle={{ backgroundColor: "transparent", marginTop: 15 }}
+            onCheck={() => saveField("gatedCommunity", !sCustomerInfo.gatedCommunity)}
+          />
         </div>
       </div>
 
@@ -791,7 +758,7 @@ export const CustomerInfoScreenModalComponent = ({
                 transactionsMap={sSaleTransactionsMap}
                 onSelect={(sale) => {
                   if (sale._isActiveSale) {
-                    if (handleButton2Press) handleButton2Press();
+                    if (onClose) onClose();
                     useCheckoutStore.getState().setViewOnlySale(sale);
                     useCheckoutStore.getState().setIsCheckingOut(true);
                   } else {
@@ -818,6 +785,48 @@ export const CustomerInfoScreenModalComponent = ({
           />
         </div>
       )}
+      </div>
+
+      <div className={styles.footer}>
+        <div className={styles.footerSlot}>
+          <Tooltip text="All edits auto-saved" position="top" darkMode>
+            <button
+              type="button"
+              className={styles.footerBtn}
+              onClick={onClose}
+            >
+              <span>{dismissText}</span>
+            </button>
+          </Tooltip>
+        </div>
+        {!!primaryHandler && (
+          <div className={styles.footerSlot}>
+            <button
+              type="button"
+              className={`${styles.footerBtn} ${primaryEnabled ? styles.footerBtnPrimary : ""}`}
+              disabled={!primaryEnabled}
+              onClick={() => primaryHandler(sCustomerInfo)}
+            >
+              <Image icon={ICONS.gears1} size={16} />
+              <span>{primaryText}</span>
+            </button>
+          </div>
+        )}
+        {!isNewCustomer && (
+          <div className={styles.footerSlot}>
+            <Tooltip text="Deposits, gift cards and credits" position="top" darkMode>
+              <button
+                type="button"
+                className={`${styles.footerBtn} ${styles.footerBtnAccent}`}
+                onClick={() => _sSetShowDepositModal(true)}
+              >
+                <Image icon={ICONS.greenDollar} size={16} />
+                <span>Add Money</span>
+              </button>
+            </Tooltip>
+          </div>
+        )}
+      </div>
 
       <DepositModal
         visible={sShowDepositModal}
@@ -825,7 +834,7 @@ export const CustomerInfoScreenModalComponent = ({
         customer={sCustomerInfo}
         onPay={(depositInfo) => {
           _sSetShowDepositModal(false);
-          if (handleButton2Press) handleButton2Press();
+          if (onClose) onClose();
           useCheckoutStore.getState().setDepositInfo(depositInfo);
           useCheckoutStore.getState().setIsCheckingOut(true);
         }}
@@ -870,7 +879,7 @@ export const CustomerInfoScreenModalComponent = ({
             onClose={() => _sSetClosedWorkorder(null)}
             onRefund={(saleID) => {
               _sSetClosedWorkorder(null);
-              if (handleButton2Press) handleButton2Press();
+              if (onClose) onClose();
               useCheckoutStore.getState().setPendingRefundSaleID(saleID);
             }}
             onGoToWorkorder={(wo) => {
@@ -893,7 +902,7 @@ export const CustomerInfoScreenModalComponent = ({
                 });
               }
               _sSetClosedWorkorder(null);
-              if (handleButton2Press) handleButton2Press();
+              if (onClose) onClose();
             }}
           />
         </Suspense>
@@ -937,7 +946,7 @@ export const CustomerInfoScreenModalComponent = ({
             onClose={() => _sSetSaleModalItem(null)}
             onRefund={(saleID) => {
               _sSetSaleModalItem(null);
-              if (handleButton2Press) handleButton2Press();
+              if (onClose) onClose();
               useCheckoutStore.getState().setPendingRefundSaleID(saleID);
             }}
           />

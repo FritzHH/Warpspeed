@@ -5,7 +5,6 @@
   right: 0;
   bottom: 0;
   background-color: var(--surface-overlay);
-  z-index: 9000;
 }
 
 .anchored {
@@ -191,12 +190,10 @@
   left: 0;
   right: 0;
   bottom: 0;
-  z-index: 10000;
 }
 
 .dropdown {
   position: fixed;
-  z-index: 10001;
   background-color: var(--surface-base);
   border-radius: 6px;
   border: 2px solid var(--border-subtle);

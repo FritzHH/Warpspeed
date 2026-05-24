@@ -595,7 +595,7 @@
 }
 
 .actionBtnReadDone {
-  border: 1px solid var(--text-muted);
+  border: 1px solid var(--text-disabled);
   color: var(--text-muted);
 }
 

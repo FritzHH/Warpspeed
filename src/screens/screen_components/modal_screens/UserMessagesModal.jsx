@@ -409,7 +409,7 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
     ));
   }
 
-  function renderMessage(message, threadID, hideDelete = false) {
+  function renderMessage(message, threadID, hideDelete = false, hideIncomingTo = false) {
     let isUnread = message.fromUserID !== zCurrentUser?.id && !message.readBy?.[zCurrentUser?.id];
     let isMine = message.fromUserID === zCurrentUser?.id;
     let timeText = message.createdMillis ? formatMillisForDisplay(message.createdMillis, true) : "";
@@ -420,6 +420,7 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
     let showRead = !isMine;
     let showDelete = !hideDelete;
     let showActions = showRead || showDelete;
+    let showRecipients = message.toUserIDs?.length > 0 && !(hideIncomingTo && !isMine);
     return (
       <div
         key={message.id}
@@ -436,7 +437,7 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
             )}
             <span className={styles.messageTime}>{timeText}</span>
           </div>
-          {message.toUserIDs?.length > 0 && (
+          {showRecipients && (
             <div className={styles.recipients}>
               To: {renderRecipientNames(message.toUserIDs)}
             </div>
@@ -491,6 +492,12 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
     let buttonLabel = isSentTab ? "Send" : "REPLY";
     let isStarted = thread.messages.length > 1;
     let hideDelete = isStarted;
+    let participantIDs = new Set();
+    thread.messages.forEach((m) => {
+      if (m.fromUserID) participantIDs.add(m.fromUserID);
+      (m.toUserIDs || []).forEach((uid) => participantIDs.add(uid));
+    });
+    let hideIncomingTo = !isSentTab && participantIDs.size < 3;
     return (
       <div key={thread.threadID} className={styles.threadCard} style={{ backgroundColor: C.surfaceAlt }}>
         {isStarted && (
@@ -506,7 +513,7 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
             </Tooltip>
           </div>
         )}
-        {thread.messages.map((m) => renderMessage(m, thread.threadID, hideDelete))}
+        {thread.messages.map((m) => renderMessage(m, thread.threadID, hideDelete, hideIncomingTo))}
         <div className={styles.replyRow}>
           <input
             type="text"

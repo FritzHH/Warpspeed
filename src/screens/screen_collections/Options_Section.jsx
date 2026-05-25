@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import { checkInternetConnection, convertMillisToHoursMins, dim, localStorageWrapper, log } from "../../utils";
-import { Button, Tooltip, LoadingIndicator } from "../../dom_components";
+import { Button, Tooltip, LoadingIndicator, ModalFooter, ModalFooterButton } from "../../dom_components";
 import { TabMenuButton } from "../../dom_components/TabMenuButton/TabMenuButton";
 import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../styles";
 import { useZ } from "../../hooks/useZ";
@@ -664,32 +664,44 @@ const UserClockModal = ({ user, handleExit, handleViewHistory, handleOpenMessage
           <span className={styles.noteSubtitle} style={{ color: C.textMuted }}>
             Forgot to punch in or out? Let your manager know.
           </span>
-          <textarea
-            className={styles.noteTextarea}
-            value={sNoteText}
-            onChange={(e) => {
-              let val = e.target.value;
-              if (val.length > 0) val = val.charAt(0).toUpperCase() + val.slice(1);
-              _setNoteText(val);
-            }}
-            placeholder="e.g. Forgot to clock in at 8:00 AM today"
-            style={{ borderColor: C.borderSubtle, color: C.text, backgroundColor: C.surfaceBase }}
-          />
+          <div
+            className={styles.noteInputRow}
+            style={{ borderColor: C.borderSubtle, backgroundColor: C.surfaceBase }}
+          >
+            <textarea
+              className={styles.noteInputField}
+              value={sNoteText}
+              onChange={(e) => {
+                let val = e.target.value;
+                if (val.length > 0) val = val.charAt(0).toUpperCase() + val.slice(1);
+                _setNoteText(val);
+              }}
+              placeholder="e.g. Forgot to clock in at 8:00 AM today"
+              style={{ color: C.text }}
+            />
+            <div className={styles.noteSendColumn}>
+              <button
+                type="button"
+                className={styles.noteSendBtn}
+                disabled={!sNoteText.trim()}
+                onClick={handleSendNote}
+                style={{ opacity: !sNoteText.trim() ? 0.3 : 1 }}
+              >
+                <img src={ICONS.airplane} alt="Send" className={styles.noteSendIcon} />
+              </button>
+            </div>
+          </div>
           <div className={styles.noteFooter}>
             <span className={styles.noteConfirmation} style={{ color: sNoteSent ? C.green : "transparent" }}>
               Sent to manager
             </span>
-            <button
-              type="button"
-              className={styles.noteSendBtn}
-              disabled={!sNoteText.trim()}
-              onClick={handleSendNote}
-              style={{ borderColor: C.green, color: C.green }}
-            >
-              SEND
-            </button>
           </div>
         </div>
+        <ModalFooter style={{ width: "100%" }}>
+          <ModalFooterButton onClick={handleExit}>
+            Close
+          </ModalFooterButton>
+        </ModalFooter>
       </div>
     </div>,
     document.body
@@ -718,32 +730,27 @@ const CameraPreviewModal = ({ visible, onClose }) => {
         onClick={onClose}
       />
       <div className={styles.camCard}>
-        <div className={styles.camHeader}>
-          <span
-            className={styles.camTitle}
-            style={{ fontWeight: Fonts.weight.textHeavy }}
-          >
-            Camera Preview
-          </span>
-          <button
-            type="button"
-            className={styles.camCloseBtn}
-            onClick={onClose}
-            aria-label="Close camera preview"
-          >
-            <img
-              src={typeof ICONS.close1 === "object" ? ICONS.close1.default || ICONS.close1 : ICONS.close1}
-              alt=""
-              className={styles.camCloseIcon}
-            />
-          </button>
+        <div className={styles.camBody}>
+          <div className={styles.camHeader}>
+            <span
+              className={styles.camTitle}
+              style={{ fontWeight: Fonts.weight.textHeavy }}
+            >
+              Camera Preview
+            </span>
+          </div>
+          <div className={styles.camVideoWrap}>
+            <video ref={videoRef} autoPlay muted className={styles.camVideo} />
+          </div>
+          {!zCameraStream && (
+            <p className={styles.camNoStream}>No camera stream available</p>
+          )}
         </div>
-        <div className={styles.camVideoWrap}>
-          <video ref={videoRef} autoPlay muted className={styles.camVideo} />
-        </div>
-        {!zCameraStream && (
-          <p className={styles.camNoStream}>No camera stream available</p>
-        )}
+        <ModalFooter>
+          <ModalFooterButton variant="danger" onClick={onClose}>
+            Close
+          </ModalFooterButton>
+        </ModalFooter>
       </div>
     </div>,
     document.body

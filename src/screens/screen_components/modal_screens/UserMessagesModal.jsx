@@ -514,10 +514,10 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
           </div>
         )}
         {thread.messages.map((m) => renderMessage(m, thread.threadID, hideDelete, hideIncomingTo))}
-        <div className={styles.replyRow}>
+        <div className={styles.replyInputRow}>
           <input
             type="text"
-            className={styles.replyInput}
+            className={styles.replyInputField}
             placeholder={placeholder}
             value={draft}
             onChange={(e) =>
@@ -530,14 +530,18 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
               }
             }}
           />
-          <button
-            type="button"
-            className={styles.replyBtn}
-            disabled={!draft.trim()}
-            onClick={() => handleReply(thread.threadID, last.id)}
-          >
-            {buttonLabel}
-          </button>
+          <div className={styles.replySendColumn}>
+            <button
+              type="button"
+              className={styles.replySendBtn}
+              disabled={!draft.trim()}
+              onClick={() => handleReply(thread.threadID, last.id)}
+              style={{ opacity: !draft.trim() ? 0.3 : 1 }}
+              aria-label={buttonLabel}
+            >
+              <img src={ICONS.airplane} alt={buttonLabel} className={styles.replySendIcon} />
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -723,30 +727,36 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
               <div className={styles.formLabel} style={{ color: C.textMuted }}>
                 Message
               </div>
-              <textarea
-                className={styles.messageTextarea}
-                value={sMessage}
-                onChange={(e) => {
-                  let val = e.target.value;
-                  if (val.length > 0) val = val.charAt(0).toUpperCase() + val.slice(1);
-                  _setMessage(val);
-                }}
-                placeholder="Type your message..."
-                style={{ color: C.text }}
-              />
+              <div className={styles.messageInputRow}>
+                <textarea
+                  className={styles.messageInputField}
+                  value={sMessage}
+                  onChange={(e) => {
+                    let val = e.target.value;
+                    if (val.length > 0) val = val.charAt(0).toUpperCase() + val.slice(1);
+                    _setMessage(val);
+                  }}
+                  placeholder="Type your message..."
+                  style={{ color: C.text }}
+                />
+                <div className={styles.messageSendColumn}>
+                  <button
+                    type="button"
+                    className={styles.messageSendBtn}
+                    disabled={!sMessage.trim() || sRecipientIDs.length === 0}
+                    onClick={handleSend}
+                    style={{ opacity: !sMessage.trim() || sRecipientIDs.length === 0 ? 0.3 : 1 }}
+                    aria-label="Send"
+                  >
+                    <img src={ICONS.airplane} alt="Send" className={styles.messageSendIcon} />
+                  </button>
+                </div>
+              </div>
 
               <div className={styles.sendRow}>
                 <span className={styles.sendStatus} style={{ color: sSendStatus ? C.green : "transparent" }}>
                   {sSendStatus || "placeholder"}
                 </span>
-                <button
-                  type="button"
-                  className={styles.sendBtn}
-                  disabled={!sMessage.trim() || sRecipientIDs.length === 0}
-                  onClick={handleSend}
-                >
-                  SEND
-                </button>
               </div>
             </div>
           )}
@@ -772,22 +782,26 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
           {sTab === "notes" && (
             <div className={styles.notesScroll}>
               <div className={styles.noteComposeRow}>
-                <AutoGrowTextarea
-                  className={styles.noteTextarea}
-                  value={sNewNote}
-                  onChange={(e) => _setNewNote(autoCapText(e.target.value))}
-                  placeholder="Write a note to yourself..."
-                  minRows={2}
-                />
-                <div className={styles.noteComposeActions}>
-                  <button
-                    type="button"
-                    className={styles.noteAddBtn}
-                    disabled={!sNewNote.trim()}
-                    onClick={handleAddNote}
-                  >
-                    ADD NOTE
-                  </button>
+                <div className={styles.noteInputRow}>
+                  <AutoGrowTextarea
+                    className={styles.noteInputField}
+                    value={sNewNote}
+                    onChange={(e) => _setNewNote(autoCapText(e.target.value))}
+                    placeholder="Write a note to yourself..."
+                    minRows={2}
+                  />
+                  <div className={styles.noteSendColumn}>
+                    <button
+                      type="button"
+                      className={styles.noteSendBtn}
+                      disabled={!sNewNote.trim()}
+                      onClick={handleAddNote}
+                      style={{ opacity: !sNewNote.trim() ? 0.3 : 1 }}
+                      aria-label="Add note"
+                    >
+                      <img src={ICONS.check} alt="Add note" className={styles.noteSendIcon} />
+                    </button>
+                  </div>
                 </div>
               </div>
 

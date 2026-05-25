@@ -393,6 +393,35 @@ export async function newCheckoutCompleteWorkorder(workorder) {
   }
 }
 
+// Inverse of newCheckoutCompleteWorkorder. Used by the "Keep Workorder Open" flow:
+// after a sale is completed and the WO is archived, the user can opt to bring the WO
+// back into the open list. The sale stays in completed-sales (it really is paid).
+export async function newCheckoutUnarchiveWorkorder(workorder) {
+  dlog(DCAT.FIREBASE_REQ, "newCheckoutUnarchiveWorkorder", "FirebaseCalls", { workorderId: workorder?.id });
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !workorder?.id) {
+      log("newCheckoutUnarchiveWorkorder: missing tenantID/storeID/workorder.id");
+      dlog(DCAT.FIREBASE_ERR, "newCheckoutUnarchiveWorkorder", "FirebaseCalls", { reason: "missing params" });
+      return { success: false };
+    }
+
+    const openPath = buildWorkorderPath(tenantID, storeID, workorder.id);
+    await firestoreWrite(openPath, workorder);
+    dlog(DCAT.FIREBASE_RES, "newCheckoutUnarchiveWorkorder_write", "FirebaseCalls", { openPath });
+
+    const completedPath = buildCompletedWorkorderPath(tenantID, storeID, workorder.id);
+    await firestoreDelete(completedPath);
+    dlog(DCAT.FIREBASE_RES, "newCheckoutUnarchiveWorkorder_delete", "FirebaseCalls", { completedPath });
+
+    return { success: true };
+  } catch (error) {
+    log("newCheckoutUnarchiveWorkorder error:", error);
+    dlog(DCAT.FIREBASE_ERR, "newCheckoutUnarchiveWorkorder", "FirebaseCalls", { message: error?.message });
+    return { success: false, error };
+  }
+}
+
 export async function newCheckoutUpdateCompletedWorkorder(workorder) {
   dlog(DCAT.FIREBASE_REQ, "newCheckoutUpdateCompletedWorkorder", "FirebaseCalls", { workorderId: workorder?.id });
   try {

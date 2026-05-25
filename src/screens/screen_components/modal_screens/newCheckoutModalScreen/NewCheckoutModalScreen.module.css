@@ -86,97 +86,83 @@
   flex-shrink: 0;
 }
 
-/* ─── PickupDecisionModal ──────────────────────────────────── */
-.pickupOverlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background-color: var(--surface-overlay);
-}
-
-.pickupBox {
+/* ─── Keep-Workorder-Open toast ──────────────────────────────
+   Translucent panel between mainRow and ModalFooter. Full-width, rounded.
+   Default state: single "Keep Workorder Open" button.
+   Expanded state: 2-line textarea above, Cancel + Save buttons below (Save replaces the original label). */
+.keepOpenToast {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
-  width: 380px;
-  border-radius: 12px;
-  border-width: 2px;
-  border-style: solid;
-  padding: 24px;
-  flex-shrink: 0;
-}
-
-.pickupTitle {
-  font-size: 18px;
-  font-weight: 700;
-  text-align: center;
-  margin-bottom: 6px;
-  display: block;
-}
-
-.pickupSubtitle {
-  font-size: 13px;
-  text-align: center;
-  margin-bottom: 20px;
-  display: block;
-}
-
-.pickupPrimaryBtn {
-  height: 56px;
+  width: 100%;
+  background-color: var(--surface-overlay-medium);
   border-radius: 8px;
-  border: none;
-  font-size: 17px;
-  font-weight: 700;
-  cursor: pointer;
-  margin-bottom: 12px;
+  padding: 8px 12px;
+  gap: 6px;
   flex-shrink: 0;
+  box-sizing: border-box;
 }
 
-.pickupCountdown {
-  margin-left: 12px;
-  font-size: 17px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
-.pickupSecondaryBtn {
-  height: 36px;
-  border-radius: 6px;
-  border-width: 1px;
-  border-style: solid;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
-  flex-shrink: 0;
-  align-self: center;
-  padding: 0 18px;
-}
-
-.pickupReasonInput {
-  margin-top: 16px;
-  margin-bottom: 0;
+.keepOpenTextarea {
   width: 100%;
   border-width: 1px;
   border-style: solid;
-  border-radius: 6px;
-  padding: 8px 10px;
+  border-color: var(--border-default);
+  border-radius: 4px;
+  padding: 6px 8px;
   font-size: 13px;
   font-family: inherit;
-  resize: vertical;
+  resize: none;
   outline: none;
   box-sizing: border-box;
+  background-color: var(--surface-base);
+  color: var(--text);
+}
+
+.keepOpenTextarea::placeholder {
+  color: var(--text-disabled);
+}
+
+.keepOpenButtonRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  gap: 8px;
   flex-shrink: 0;
 }
 
-.pickupReasonInput::placeholder {
-  color: var(--text-disabled);
+.keepOpenCancelBtn {
+  padding: 0 14px;
+  height: 30px;
+  border-width: 1px;
+  border-style: solid;
+  border-color: var(--border-default);
+  border-radius: 5px;
+  background-color: transparent;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.keepOpenMainBtn {
+  padding: 0 16px;
+  height: 30px;
+  border: none;
+  border-radius: 5px;
+  background-color: var(--success);
+  color: var(--text-on-accent);
+  font-size: 12px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.keepOpenMainBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* ─── Main checkout modal ────────────────────────────────────── */

@@ -371,10 +371,10 @@ export const ActiveWorkorderComponent = ({}) => {
   const brandWrapperRef = useRef(null);
   const brandBackspaced = useRef(false);
 
-  const brandSuggestions = sBrandFocused && zOpenWorkorder?.brand?.trim().length >= 2
+  const brandSuggestions = sBrandFocused && zOpenWorkorder?.brand?.trim().length >= 1
     ? (zSettings.allBrands || []).filter(
         (b) => b.toLowerCase().startsWith(zOpenWorkorder.brand.trim().toLowerCase()) && b.toLowerCase() !== zOpenWorkorder.brand.trim().toLowerCase()
-      ).slice(0, 8)
+      )
     : [];
 
   function saveBrandToAllBrands(brand) {
@@ -393,10 +393,10 @@ export const ActiveWorkorderComponent = ({}) => {
   const color1InputRef = useRef(null);
   const descBackspaced = useRef(false);
 
-  const descSuggestions = sDescFocused && zOpenWorkorder?.description?.trim().length >= 2
+  const descSuggestions = sDescFocused && zOpenWorkorder?.description?.trim().length >= 1
     ? (zSettings.allDescriptions || []).filter(
         (d) => d.toLowerCase().startsWith(zOpenWorkorder.description.trim().toLowerCase()) && d.toLowerCase() !== zOpenWorkorder.description.trim().toLowerCase()
-      ).slice(0, 8)
+      )
     : [];
 
   function saveDescToAllDescriptions(desc) {
@@ -800,7 +800,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 overflow: "visible",
               }}
             >
-              <div ref={brandWrapperRef} style={{ width: "45%", zIndex: 10, flexShrink: 0 }}>
+              <div ref={brandWrapperRef} style={{ width: "45%", position: "relative", zIndex: sBrandFocused ? 200 : 10, flexShrink: 0 }}>
                 <TextInput_
                   placeholder={"Brand"}
                   editable={!isDonePaid}
@@ -854,7 +854,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       borderStyle: "solid",
                       borderColor: C.buttonLightGreenOutline,
                       borderRadius: 5,
-                      maxHeight: 200,
+                      maxHeight: window.innerHeight * 0.5,
                       overflow: "auto",
                       zIndex: 999, /* z-allow: local autocomplete dropdown */
                       boxSizing: "border-box",
@@ -966,7 +966,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 // backgroundColor: "blue",
               }}
             >
-              <div ref={descInputRef} style={{ width: "45%", zIndex: 10, flexShrink: 0 }}>
+              <div ref={descInputRef} style={{ width: "45%", position: "relative", zIndex: sDescFocused ? 200 : 10, flexShrink: 0 }}>
                 <TextInput_
                   placeholder={"Model / description"}
                   editable={!isDonePaid}
@@ -1020,7 +1020,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       borderStyle: "solid",
                       borderColor: C.buttonLightGreenOutline,
                       borderRadius: 5,
-                      maxHeight: 200,
+                      maxHeight: window.innerHeight * 0.5,
                       overflow: "auto",
                       zIndex: 999, /* z-allow: local autocomplete dropdown */
                       boxSizing: "border-box",

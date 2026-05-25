@@ -125,6 +125,14 @@ Inner modal card sizing by class:
 - **Small** (compact, confirmation/picker style): fixed px is fine. Flex-centering means the modal sits dead-center regardless of viewport, so resize doesn't break it.
 - **Click-positioned popovers**: sized by content or small percent, positioned relative to the trigger.
 
+**Modal action buttons — use the `ModalFooter` primitive. No border on the modal card.** When creating a new modal (or editing an existing one), the modal's action buttons go in `<ModalFooter>` at the bottom of the card — not in the header, not scattered inline, not as a top-right X. The outer modal card has **no `border:` rule** — rely on shadow + background for separation. Both defaults unless the user instructs otherwise.
+
+- Primitive: `import { ModalFooter, ModalFooterButton } from "src/dom_components"`.
+- Variants on `ModalFooterButton`: `default` (gray — neutral close), `primary`, `accent` (green — confirm/save/submit), `danger` (red — destructive or "cancel/close that loses work"). Props: `variant`, `icon`, `iconSize`, `disabled`, `tooltip`, `onClick`, `children`.
+- The card's root must be `display: flex; flex-direction: column; overflow: hidden;` so `ModalFooter` sits flush at the bottom. Wrap the existing scrollable content in an inner `.cardInner` (or equivalent) with `flex: 1; min-height: 0;` if it's not already structured that way.
+- **Button order — Cancel/Close LEFT, Confirm RIGHT.** The primary affirmative action (Confirm/Save/Submit/OK) is always the **rightmost** button with `variant="accent"` (green), unless the user specifies otherwise. Cancel/Close (destructive-to-progress) goes on the left. Applies to both small (alert/confirm) and large modals. This matches OS convention.
+- **Complex multi-column modals** (Payroll, NewRefund, NewCheckout): the modal-wide Close action still lives in a card-bottom `<ModalFooter>`. In-column toolbars (post-action receipt/print/send icons, language pickers, etc.) stay where they are.
+
 **Do not use** `vw`/`vh`/`vmin`/`vmax`, `rem`/`em`, or media queries — the JS-measured root binds the layout to the viewport; these are redundant.
 
 If unsure which approach a new layout calls for, default to percentages and ask. Silent use of flex sizing where percentages were intended produces layouts that behave differently across screens and are hard to debug later.

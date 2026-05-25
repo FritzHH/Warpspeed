@@ -32,13 +32,13 @@ const STATUS_BUTTON_TEXT_BASE_STYLE = {
 };
 const STATUS_ITEM_TEXT_STYLE = { fontSize: 16 };
 
-export function WorkorderDetailModal({ workorder, zSettings, onClose }) {
+export function WorkorderDetailModal({ workorder, zSettings, onClose, initialShowMessages = false }) {
   let { runningTotal, runningQty } = calculateRunningTotals(workorder);
   let rs = resolveStatus(workorder.status, zSettings?.statuses);
 
   const zShowAlert = useAlertScreenStore((s) => s.showAlert);
 
-  const [sShowMessages, _setShowMessages] = useState(false);
+  const [sShowMessages, _setShowMessages] = useState(!!initialShowMessages);
   const [sShowItemSearch, _setShowItemSearch] = useState(false);
 
   function setField(fieldName, val) {

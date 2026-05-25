@@ -18,7 +18,6 @@
   max-height: 720px;
   background-color: var(--surface-base);
   border-radius: 12px;
-  border: 2px solid var(--border-default);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -266,7 +265,6 @@
   max-height: calc(100vh - 40px);
   background-color: var(--surface-base);
   border-radius: 12px;
-  border: 2px solid var(--border-default);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -371,6 +369,62 @@
   background-color: var(--surface-base);
   box-sizing: border-box;
   margin-bottom: 12px;
+}
+
+.messageInputRow {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background-color: var(--surface-base);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  margin-bottom: 12px;
+}
+
+.messageInputField {
+  flex: 1;
+  min-height: 100px;
+  resize: vertical;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 10px 4px 10px 10px;
+  margin: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.messageSendColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.messageSendBtn {
+  margin: 0 4px 4px 4px;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.messageSendBtn:disabled {
+  cursor: default;
+}
+
+.messageSendIcon {
+  width: 41px;
+  height: 41px;
+  object-fit: contain;
 }
 
 .sendRow {
@@ -630,6 +684,60 @@
   background-color: var(--surface-base);
 }
 
+.replyInputRow {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 5px;
+  background-color: var(--surface-base);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.replyInputField {
+  flex: 1;
+  font-family: inherit;
+  font-size: 12px;
+  padding: 6px 4px 6px 8px;
+  margin: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  box-sizing: border-box;
+}
+
+.replySendColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.replySendBtn {
+  margin: 0 4px;
+  padding: 2px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.replySendBtn:disabled {
+  cursor: default;
+}
+
+.replySendIcon {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
 .replyBtn {
   font-family: inherit;
   font-size: 11px;
@@ -665,10 +773,6 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px;
-  border: 1px solid var(--border-subtle);
-  border-radius: 8px;
-  background-color: var(--surface-base);
   margin-bottom: 6px;
 }
 
@@ -676,6 +780,64 @@
   display: flex;
   flex-direction: row;
   justify-content: flex-end;
+}
+
+.noteInputRow {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+  background-color: var(--surface-base);
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.noteInputField {
+  flex: 1;
+  min-height: 56px;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 4px 8px 10px;
+  margin: 0;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-default);
+  box-sizing: border-box;
+  resize: none;
+  overflow: hidden;
+  line-height: 1.4;
+}
+
+.noteSendColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.noteSendBtn {
+  margin: 0 4px 4px 4px;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.noteSendBtn:disabled {
+  cursor: default;
+}
+
+.noteSendIcon {
+  width: 41px;
+  height: 41px;
+  object-fit: contain;
 }
 
 .noteTextarea {

@@ -130,6 +130,7 @@ export const C = {
   surfaceWarningMuted:   "var(--surface-warning-muted)",
   surfaceOverlay:        "var(--surface-overlay)",
   surfaceOverlayLight:   "var(--surface-overlay-light)",
+  surfaceOverlayMedium:  "var(--surface-overlay-medium)",
   surfaceOverlayHeavy:   "var(--surface-overlay-heavy)",
 
   // Borders

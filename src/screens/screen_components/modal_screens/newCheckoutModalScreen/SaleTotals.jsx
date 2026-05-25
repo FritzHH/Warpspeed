@@ -45,30 +45,20 @@ export const PaymentStatus = memo(function PaymentStatus({ sale, amountRemaining
 
   return (
     <div className={styles.statusContainer}>
-      {(sale.amountCaptured || 0) > 0 && !sale.paymentComplete && (
+      {(sale.amountCaptured || 0) > 0 && (
         <span className={styles.amountText} style={{ color: C.textSecondary }}>
           {"AMOUNT PAID:   $" + formatCurrencyDisp(sale.amountCaptured || 0)}
         </span>
       )}
 
-      {amountRemaining > 0 && (
-        <span className={styles.amountText} style={{ color: C.green }}>
-          {"AMOUNT LEFT TO PAY:   $" + formatCurrencyDisp(amountRemaining)}
-        </span>
-      )}
-
-      {sale.paymentComplete && (
-        <div className={styles.successPill} style={{ backgroundColor: C.green }}>
-          <span className={styles.successText} style={{ color: C.textWhite }}>
-            PAYMENT COMPLETE
-          </span>
-        </div>
-      )}
+      <span className={styles.amountText} style={{ color: C.green }}>
+        {"AMOUNT LEFT TO PAY:   $" + formatCurrencyDisp(amountRemaining)}
+      </span>
     </div>
   );
 });
 
-export const CashChangeNeeded = memo(function CashChangeNeeded({ cashChangeNeeded }) {
+export const CashChangeNeeded = memo(function CashChangeNeeded({ cashChangeNeeded, style }) {
   if (!cashChangeNeeded || cashChangeNeeded <= 0) return null;
   return (
     <div
@@ -76,9 +66,10 @@ export const CashChangeNeeded = memo(function CashChangeNeeded({ cashChangeNeede
       style={{
         borderColor: C.buttonLightGreenOutline,
         backgroundColor: C.green,
+        ...style,
       }}
     >
-      <span className={styles.changeLabel} style={{ color: C.textSecondary }}>
+      <span className={styles.changeLabel} style={{ color: C.textWhite }}>
         CHANGE NEEDED
       </span>
       <span className={styles.changeAmount} style={{ color: C.textWhite }}>

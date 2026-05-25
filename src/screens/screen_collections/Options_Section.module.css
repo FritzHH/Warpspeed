@@ -150,44 +150,69 @@
   margin-bottom: 4px;
 }
 
-.noteTextarea {
+.noteInputRow {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
   width: 100%;
+  border-width: 1px;
+  border-style: solid;
+  border-radius: 6px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.noteInputField {
+  flex: 1;
   min-height: 60px;
   resize: vertical;
   font-family: inherit;
   font-size: 13px;
-  padding: 8px 10px;
-  border-radius: 6px;
-  border-width: 1px;
-  border-style: solid;
+  padding: 8px 4px 8px 10px;
+  margin: 0;
+  border: none;
   outline: none;
+  background: transparent;
   box-sizing: border-box;
+}
+
+.noteSendColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  flex-shrink: 0;
+}
+
+.noteSendBtn {
+  margin: 0 4px 4px 4px;
+  padding: 4px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.noteSendBtn:disabled {
+  cursor: default;
+}
+
+.noteSendIcon {
+  width: 41px;
+  height: 41px;
+  object-fit: contain;
 }
 
 .noteFooter {
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   margin-top: 6px;
   gap: 10px;
-}
-
-.noteSendBtn {
-  font-family: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  padding: 6px 14px;
-  border-radius: 5px;
-  border-width: 1px;
-  border-style: solid;
-  cursor: pointer;
-  background-color: transparent;
-}
-
-.noteSendBtn:disabled {
-  cursor: default;
-  opacity: 0.4;
+  min-height: 16px;
 }
 
 .noteConfirmation {
@@ -284,16 +309,19 @@
   width: 520px;
   background-color: var(--surface-base);
   border-radius: 12px;
-  border: 2px solid var(--border-default);
-  padding: 20px;
+  overflow: hidden;
   box-sizing: border-box;
   position: relative;
+}
+
+.camBody {
+  padding: 20px;
 }
 
 .camHeader {
   display: flex;
   flex-direction: row;
-  justify-content: space-between;
+  justify-content: center;
   align-items: center;
   margin-bottom: 16px;
 }
@@ -302,24 +330,6 @@
   font-size: 18px;
   color: var(--text-default);
   margin: 0;
-}
-
-.camCloseBtn {
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-}
-
-.camCloseBtn:active {
-  opacity: 0.7;
-}
-
-.camCloseIcon {
-  width: 18px;
-  height: 18px;
-  object-fit: contain;
-  display: block;
 }
 
 .camVideoWrap {

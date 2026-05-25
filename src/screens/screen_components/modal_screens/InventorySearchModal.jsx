@@ -163,15 +163,15 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
         </div>
 
         <ModalFooter>
+          <ModalFooterButton onClick={onClose}>
+            Close
+          </ModalFooterButton>
           <ModalFooterButton
             variant="accent"
             disabled={checkedCount === 0}
             onClick={handleAddChecked}
           >
             {checkedCount > 0 ? `Add ${checkedCount} Item${checkedCount > 1 ? "s" : ""}` : "Add Items"}
-          </ModalFooterButton>
-          <ModalFooterButton variant="danger" onClick={onClose}>
-            Close
           </ModalFooterButton>
         </ModalFooter>
       </div>

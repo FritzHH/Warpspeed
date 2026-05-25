@@ -49,19 +49,7 @@ import { translateText } from "../../../db_calls";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { scheduleAutoSend, clearAutoSend, buildForwardToArray, initialSelectedForwardIDs } from "./ReplyOptionsBar";
 import { ComposeArea } from "./ComposeArea";
-import { IncomingMessageComponent, OutgoingMessageComponent, MediaThumbnail } from "./MessageBubble";
-
-// Optimistic thread patch so bubble icons (block/forward) reflect send intent
-// immediately, instead of flickering once the Firestore listener round-trips
-// the server-side thread update.
-function applyOptimisticThreadPatch(phone, canRespondVal, forwardToArray) {
-  if (!phone || phone.length !== 10) return;
-  let patch = {};
-  if (canRespondVal !== undefined) patch.canRespond = canRespondVal ? true : null;
-  if (Array.isArray(forwardToArray)) patch.forwardToArray = forwardToArray;
-  if (patch.canRespond === undefined && !patch.forwardToArray) return;
-  useCustMessagesStore.getState().patchSmsThread(phone, patch);
-}
+import { IncomingMessageComponent, OutgoingMessageComponent, MediaThumbnail, applyOptimisticThreadPatch } from "./MessageBubble";
 
 
 const TRANSLATION_LANGUAGES = [
@@ -1003,16 +991,19 @@ export function MessagesComponent({}) {
     let newCanRespond = sCanRespond ? null : true;
     userOverrodeCanRespondRef.current = true;
     _setCanRespond(!sCanRespond);
+    applyOptimisticThreadPatch(phone, !!newCanRespond, null);
+    let currentUser = useLoginStore.getState().getCurrentUser();
+    let thread = zSmsThreads.find(t => t.phone === phone);
+    let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
+    let alsoUnforward =
+      !newCanRespond && currentUser?.id && arr.some((f) => f.userID === currentUser.id);
+    if (alsoUnforward) {
+      let nextForward = arr.filter((f) => f.userID !== currentUser.id);
+      applyOptimisticThreadPatch(phone, undefined, nextForward);
+    }
     await dbUpdateMessageCanRespond(phone, null, newCanRespond);
-    if (!newCanRespond) {
-      let currentUser = useLoginStore.getState().getCurrentUser();
-      if (currentUser?.id) {
-        let thread = zSmsThreads.find(t => t.phone === phone);
-        let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
-        if (arr.some((f) => f.userID === currentUser.id)) {
-          await dbToggleSMSForwarding(phone, currentUser.id, false, currentUser.phone, currentUser.first);
-        }
-      }
+    if (alsoUnforward) {
+      await dbToggleSMSForwarding(phone, currentUser.id, false, currentUser.phone, currentUser.first);
     }
   }
 
@@ -1034,10 +1025,12 @@ export function MessagesComponent({}) {
           btn3Text: "Cancel",
           handleBtn1Press: async () => {
             useAlertScreenStore.getState().setShowAlert(false);
+            applyOptimisticThreadPatch(phone, undefined, arr.filter((f) => f.userID !== currentUser.id));
             await dbToggleSMSForwarding(phone, currentUser.id, false, currentUser.phone, currentUser.first);
           },
           handleBtn2Press: async () => {
             useAlertScreenStore.getState().setShowAlert(false);
+            applyOptimisticThreadPatch(phone, undefined, []);
             await dbSetSMSForwardTo(phone, []);
           },
           handleBtn3Press: () => {
@@ -1046,6 +1039,11 @@ export function MessagesComponent({}) {
         });
         return;
       }
+      let nextForward = isCurrentlyForwarding
+        ? arr.filter((f) => f.userID !== currentUser.id)
+        : [...arr, { userID: currentUser.id, phone: currentUser.phone || "", first: currentUser.first || "" }];
+      let nextCanRespond = (!isCurrentlyForwarding && !sCanRespond) ? true : undefined;
+      applyOptimisticThreadPatch(phone, nextCanRespond, nextForward);
       if (!isCurrentlyForwarding && !sCanRespond) {
         userOverrodeCanRespondRef.current = true;
         _setCanRespond(true);
@@ -2101,19 +2099,23 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     if (!last?.id) return;
     let newCanRespond = sCanRespond ? null : true;
     log("handleToggleBlock", { phone, id: last.id, newCanRespond });
-    let result = await dbUpdateMessageCanRespond(phone, last.id, newCanRespond);
-    log("handleToggleBlock result", result);
     _setCanRespond(!sCanRespond);
     let updated = sMessages.map(m => m.id === last.id ? { ...m, canRespond: newCanRespond } : m);
     sMessagesRef.current = updated;
     _setMessages(updated);
     updateCache(updated, noMoreRef.current);
-    if (!newCanRespond) {
-      let currentUser = useLoginStore.getState().getCurrentUser();
-      let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
-      if (currentUser?.id && arr.some((f) => f.userID === currentUser.id)) {
-        await dbToggleSMSForwarding(phone, currentUser.id, false, currentUser.phone, currentUser.first);
-      }
+    applyOptimisticThreadPatch(phone, !!newCanRespond, null);
+    let currentUser = useLoginStore.getState().getCurrentUser();
+    let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
+    let alsoUnforward =
+      !newCanRespond && currentUser?.id && arr.some((f) => f.userID === currentUser.id);
+    if (alsoUnforward) {
+      applyOptimisticThreadPatch(phone, undefined, arr.filter((f) => f.userID !== currentUser.id));
+    }
+    let result = await dbUpdateMessageCanRespond(phone, last.id, newCanRespond);
+    log("handleToggleBlock result", result);
+    if (alsoUnforward) {
+      await dbToggleSMSForwarding(phone, currentUser.id, false, currentUser.phone, currentUser.first);
     }
   }
 
@@ -2133,10 +2135,12 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
           btn3Text: "Cancel",
           handleBtn1Press: async () => {
             useAlertScreenStore.getState().setShowAlert(false);
+            applyOptimisticThreadPatch(phone, undefined, arr.filter((f) => f.userID !== currentUser.id));
             await dbToggleSMSForwarding(phone, currentUser.id, false, currentUser.phone, currentUser.first);
           },
           handleBtn2Press: async () => {
             useAlertScreenStore.getState().setShowAlert(false);
+            applyOptimisticThreadPatch(phone, undefined, []);
             await dbSetSMSForwardTo(phone, []);
           },
           handleBtn3Press: () => {
@@ -2145,6 +2149,11 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
         });
         return;
       }
+      let nextForward = isCurrentlyForwarding
+        ? arr.filter((f) => f.userID !== currentUser.id)
+        : [...arr, { userID: currentUser.id, phone: currentUser.phone || "", first: currentUser.first || "" }];
+      let nextCanRespond = (!isCurrentlyForwarding && !sCanRespond) ? true : undefined;
+      applyOptimisticThreadPatch(phone, nextCanRespond, nextForward);
       if (!isCurrentlyForwarding && !sCanRespond) {
         _setCanRespond(true);
         let outgoing = sMessages.filter(m => m.type === "outgoing");

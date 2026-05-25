@@ -228,9 +228,10 @@ function CardPaymentForm({
     fontWeight: Fonts.weight.textHeavy,
   };
 
-  let celebrationGif = saleComplete ? ICONS.guyCelebrating : ICONS.popperCelebration;
+  let isPaidInFull = saleComplete || amountLeftToPay <= 0;
+  let celebrationGif = isPaidInFull ? ICONS.guyCelebrating : ICONS.popperCelebration;
 
-  if (sDone) {
+  if (sDone || isPaidInFull) {
     return (
       <div className={styles.containerDone}>
         <div className={styles.celebrationInner}>
@@ -242,7 +243,7 @@ function CardPaymentForm({
             style={{ marginBottom: 14, backgroundColor: "transparent" }}
           />
           <span className={styles.celebrationText} style={{ color: C.green }}>
-            {saleComplete ? "Full payment complete!" : sSuccess}
+            {isPaidInFull ? "Full payment complete!" : sSuccess}
           </span>
         </div>
       </div>

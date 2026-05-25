@@ -530,6 +530,9 @@ export const WorkorderMediaModal = ({
         )}
 
         <ModalFooter>
+          <ModalFooterButton onClick={onClose}>
+            Close
+          </ModalFooterButton>
           {selectedCount > 0 ? (
             <ModalFooterButton
               variant="danger"
@@ -562,9 +565,6 @@ export const WorkorderMediaModal = ({
               {sSending ? "Sending..." : "Email Media"}
             </ModalFooterButton>
           ) : null}
-          <ModalFooterButton variant="danger" onClick={onClose}>
-            Close
-          </ModalFooterButton>
         </ModalFooter>
       </div>
 

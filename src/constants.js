@@ -54,12 +54,12 @@ export const PERMISSION_LEVELS = {
     id: "ownr_lvl",
   },
   superUser: {
-    name: "Super-User",
+    name: "Admin",
     level: 4,
     id: "dkfnkd",
   },
   admin: {
-    name: "Admin",
+    name: "Manager",
     level: 3,
     id: "dkfngggdkn",
   },

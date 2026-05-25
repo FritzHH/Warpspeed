@@ -413,6 +413,7 @@ export const useTicketSearchStore = create((set, get) => ({
 export const useAlertScreenStore = create((set, get) => ({
   showAlert: false,
   title: "Alert",
+  severity: "warning",
   message: "",
   alertBoxStyle: {},
   subMessage: "",
@@ -455,8 +456,11 @@ export const useAlertScreenStore = create((set, get) => ({
   getIcon3Size: () => get().icon3Size,
   getAlertBoxStyle: () => get().alertBoxStyle,
 
+  getSeverity: () => get().severity,
+
   setValues: ({
     title,
+    severity = "warning",
     message,
     subMessage,
     btn1Text,
@@ -482,6 +486,7 @@ export const useAlertScreenStore = create((set, get) => ({
   }) => {
     set(() => ({
       title,
+      severity,
       message,
       subMessage,
       btn1Text,
@@ -550,6 +555,7 @@ export const useAlertScreenStore = create((set, get) => ({
     set(() => ({
       showAlert: false,
       title: "Alert",
+      severity: "warning",
       message: "",
       alertBoxStyle: {},
       subMessage: "",

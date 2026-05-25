@@ -1,0 +1,30 @@
+.banner {
+  position: fixed;
+  top: 2px;
+  left: 20px;
+  right: 20px;
+  pointer-events: none;
+  border-radius: 9999px;
+  padding: 8px 22px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  isolation: isolate;
+}
+
+.banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: var(--danger);
+  border-radius: inherit;
+  opacity: 0.4;
+  z-index: -1;
+}
+
+.text {
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}

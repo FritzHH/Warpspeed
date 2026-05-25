@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import throttle from "lodash/throttle";
 import {
   useSettingsStore,
@@ -32,6 +33,10 @@ export function PhoneScreen() {
   const [sPin, _setPin] = useState("");
   const [sPinError, _setPinError] = useState("");
   const [sSearch, _setSearch] = useState("");
+  const [sDeepLinkOpenMessages, _setDeepLinkOpenMessages] = useState(false);
+  const deepLinkHandledRef = useRef(false);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
 
   const [sLoginPhase, _setLoginPhase] = useState(() => {
     const storedUserID = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -82,6 +87,33 @@ export function PhoneScreen() {
 
   const selectedWorkorder = zWorkorders.find((w) => w.id === sSelectedWorkorderID) || null;
 
+  // Deep-link handler: SMS forwards include /phone?conv=<custPhone> links.
+  // When that param is present after login + workorders are loaded, auto-open
+  // the matching workorder in messaging mode.
+  useEffect(() => {
+    if (deepLinkHandledRef.current) return;
+    if (sLoginPhase === "pin") return;
+    const convPhone = searchParams.get("conv");
+    if (!convPhone) return;
+    if (!zWorkorders || zWorkorders.length === 0) return;
+
+    const normalizedConv = String(convPhone).replace(/\D/g, "");
+    const match = zWorkorders.find((w) => {
+      const wPhone = String(w.customerCell || "").replace(/\D/g, "");
+      return wPhone === normalizedConv;
+    });
+
+    deepLinkHandledRef.current = true;
+
+    if (match) {
+      _setSelectedWorkorderID(match.id);
+      _setActiveModal("workorderDetail");
+      _setDeepLinkOpenMessages(true);
+    }
+
+    navigate("/phone", { replace: true });
+  }, [searchParams, zWorkorders, sLoginPhase, navigate]);
+
   function openWorkorder(workorder) {
     _setSelectedWorkorderID(workorder.id);
     _setActiveModal("workorderDetail");
@@ -90,6 +122,7 @@ export function PhoneScreen() {
   function closeModal() {
     _setActiveModal(null);
     _setSelectedWorkorderID(null);
+    _setDeepLinkOpenMessages(false);
   }
 
   function handleToggleClock() {
@@ -156,6 +189,7 @@ export function PhoneScreen() {
         workorder={selectedWorkorder}
         zSettings={zSettings}
         onClose={closeModal}
+        initialShowMessages={sDeepLinkOpenMessages}
       />
     );
   }

@@ -30,7 +30,7 @@ export const TestConfirmModal = ({
         <ModalFooter size="small">
           <ModalFooterButton onClick={onClose}>Cancel</ModalFooterButton>
           <ModalFooterButton onClick={onClose}>Discard</ModalFooterButton>
-          <ModalFooterButton variant="primary" onClick={onConfirm}>
+          <ModalFooterButton variant="accent" onClick={onConfirm}>
             Confirm
           </ModalFooterButton>
         </ModalFooter>

@@ -58,6 +58,7 @@ import {
 import {
   IncomingMessageComponent,
   OutgoingMessageComponent,
+  applyOptimisticThreadPatch,
 } from "../Options_Screen/MessageBubble";
 import { ComposeArea } from "../Options_Screen/ComposeArea";
 import {
@@ -1393,6 +1394,7 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     let zCurrentUserObj = useLoginStore.getState().getCurrentUser();
     let useCanRespond = canRespondVal !== undefined ? canRespondVal : sCanRespond;
     let forwardTo = Array.isArray(forwardToArrayOrNull) ? forwardToArrayOrNull : null;
+    applyOptimisticThreadPatch(customerPhone, useCanRespond, forwardTo);
     let msg = { ...SMS_PROTO };
     msg.message = text;
     msg.phoneNumber = customerPhone;
@@ -1432,13 +1434,17 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     if (!customerPhone || customerPhone.length !== 10) return;
     let newCanRespond = sCanRespond ? null : true;
     _sSetCanRespond(!sCanRespond);
+    applyOptimisticThreadPatch(customerPhone, !!newCanRespond, null);
+    let user = useLoginStore.getState().getCurrentUser();
+    let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
+    let alsoUnforward =
+      !newCanRespond && user?.id && arr.some((f) => f.userID === user.id);
+    if (alsoUnforward) {
+      applyOptimisticThreadPatch(customerPhone, undefined, arr.filter((f) => f.userID !== user.id));
+    }
     await dbUpdateMessageCanRespond(customerPhone, null, newCanRespond);
-    if (!newCanRespond) {
-      let user = useLoginStore.getState().getCurrentUser();
-      let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
-      if (user?.id && arr.some((f) => f.userID === user.id)) {
-        await dbToggleSMSForwarding(customerPhone, user.id, false, user.phone, user.first);
-      }
+    if (alsoUnforward) {
+      await dbToggleSMSForwarding(customerPhone, user.id, false, user.phone, user.first);
     }
   }
 
@@ -1448,6 +1454,11 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     if (!user?.id) return;
     let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
     let isCurrentlyForwarding = arr.some((f) => f.userID === user.id);
+    let nextForward = isCurrentlyForwarding
+      ? arr.filter((f) => f.userID !== user.id)
+      : [...arr, { userID: user.id, phone: user.phone || "", first: user.first || "" }];
+    let nextCanRespond = (!isCurrentlyForwarding && !sCanRespond) ? true : undefined;
+    applyOptimisticThreadPatch(customerPhone, nextCanRespond, nextForward);
     if (!isCurrentlyForwarding && !sCanRespond) {
       _sSetCanRespond(true);
       await dbUpdateMessageCanRespond(customerPhone, null, true);

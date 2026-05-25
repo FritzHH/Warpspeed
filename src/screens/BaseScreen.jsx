@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, Suspense, lazy } from "react";
 import { C, Colors, ICONS, ViewStyles } from "../styles";
 
-import { AlertBox, LoginModal, SmallLoadingIndicator } from "../dom_components";
+import { AlertBox, LoginModal, SmallLoadingIndicator, SuperUserBanner } from "../dom_components";
 import { Info_Section } from "./screen_collections/Info_Section";
 import styles from "./BaseScreen.module.css";
 import { Items_Section } from "./screen_collections/Items_Section";
@@ -60,7 +60,7 @@ import {
   dbListenToEmails,
   dbListenToEmailAuth,
 } from "../db_calls_wrapper";
-import { SETTINGS_OBJ, TAB_NAMES, CUSTOMER_PROTO } from "../data";
+import { SETTINGS_OBJ, TAB_NAMES, CUSTOMER_PROTO, permissionToLevel } from "../data";
 import { clog, log, recoverPendingAutoTexts, localStorageWrapper } from "../utils";
 import { register, reconnectAll, teardownAll, useListenerStatusStore } from "../listenerManager";
 import cloneDeep from "lodash/cloneDeep";
@@ -95,6 +95,7 @@ export function BaseScreen() {
   const zShowAlert = useAlertScreenStore((state) => state.showAlert);
   const zLoginMessagesShowForUserID = useLoginStore((state) => state.loginMessagesShowForUserID);
   const zLoginMessagesShowTab = useLoginStore((state) => state.loginMessagesShowTab);
+  const zCurrentUser = useLoginStore((state) => state.currentUser);
   const zListenerStatuses = useListenerStatusStore((state) => state.statuses);
   const zEverConnected = useListenerStatusStore((state) => state.everConnected);
   const zReconnectingNames = [];
@@ -632,6 +633,9 @@ export function BaseScreen() {
 
 
   const greenShadow = `1px 1px 10px ${C.green.replace("rgb", "rgba").replace(")", ", 0.5)")}`;
+  const redShadow = `1px 1px 10px ${C.red.replace("rgb", "rgba").replace(")", ", 0.5)")}`;
+  const isSuperUser = permissionToLevel(zCurrentUser?.permissions) >= 4;
+  const sectionShadow = isSuperUser ? redShadow : greenShadow;
 
   return (
     <div
@@ -677,6 +681,7 @@ export function BaseScreen() {
         </Suspense>
       )}
       <AlertBox showAlert={zShowAlert} />
+      <SuperUserBanner />
       {zLoginMessagesShowForUserID && (
         <Suspense fallback={null}>
           <UserMessagesModalForLogin
@@ -742,7 +747,7 @@ export function BaseScreen() {
             style={{
               backgroundColor: C.backgroundWhite,
               borderColor: C.buttonLightGreen,
-              boxShadow: greenShadow,
+              boxShadow: sectionShadow,
             }}
           >
             <Info_Section />
@@ -752,7 +757,7 @@ export function BaseScreen() {
             style={{
               backgroundColor: C.backgroundWhite,
               borderColor: C.buttonLightGreen,
-              boxShadow: greenShadow,
+              boxShadow: sectionShadow,
             }}
           >
             <Items_Section />
@@ -763,7 +768,7 @@ export function BaseScreen() {
           style={{
             backgroundColor: C.backgroundWhite,
             borderColor: C.buttonLightGreen,
-            boxShadow: greenShadow,
+            boxShadow: sectionShadow,
           }}
         >
           <Notes_Section />
@@ -774,7 +779,7 @@ export function BaseScreen() {
         style={{
           backgroundColor: C.backgroundWhite,
           borderColor: C.buttonLightGreen,
-          boxShadow: greenShadow,
+          boxShadow: sectionShadow,
         }}
       >
         <Options_Section />

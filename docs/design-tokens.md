@@ -134,6 +134,7 @@ This is the only layer components ever touch.
 | `--surface-success-muted`| `var(--brand-50)`      | `var(--brand-800)`    | Success status banners |
 | `--surface-warning-muted`| `rgb(255,248,230)`     | `rgb(60,45,15)`       | Warning/caution banners (amber wash) |
 | `--surface-overlay-light`| `rgba(0,0,0,0.1)`      | `rgba(0,0,0,0.3)`     | Faint dim (background blur, subtle wash) - 47 inline uses |
+| `--surface-overlay-medium`| `rgba(0,0,0,0.3)`     | `rgba(0,0,0,0.5)`     | Mid-weight tint (in-modal toasts, soft dimmers) |
 | `--surface-overlay`      | `rgba(0,0,0,0.5)`      | `rgba(0,0,0,0.7)`     | Standard modal scrim / backdrop (workhorse - 76 inline uses) |
 | `--surface-overlay-heavy`| `rgba(0,0,0,0.75)`     | `rgba(0,0,0,0.85)`    | Heavy scrim - image/video lightbox - 16 inline uses |
 

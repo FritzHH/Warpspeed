@@ -339,6 +339,7 @@ export function BikeStandScreen() {
   const zFaceModal = useZ("modal", sShowFaceModal);
   const zPinModal = useZ("modal", sShowPinModal);
   const zIntakeNotes = useZ("modal", !!sIntakeNotesLineID);
+  const zBikeInfoModal = useZ("modal", sShowBikeInfoModal);
   const zFooterMenu = useZ("dropdown", sShowFooterMenu);
   const inactivityTimerRef = useRef(null);
 
@@ -1411,7 +1412,7 @@ export function BikeStandScreen() {
       {sShowBikeInfoModal && selectedWorkorder && (() => {
         let modalKeypadMode = sDetailKeypadOverride || (sDetailField === "waitDays" ? "phone" : "alpha");
         return (
-          <div className={styles.bmBackdrop}>
+          <div className={styles.bmBackdrop} style={{ zIndex: zBikeInfoModal }}>
             <div className={styles.bmDialog} onClick={(e) => e.stopPropagation()}>
               {/* Header */}
               <div className={styles.bmHeader} style={{ borderBottomColor: C.borderSubtle }}>
@@ -1512,6 +1513,7 @@ export function BikeStandScreen() {
                 )}
                 {/* Brand row */}
                 <div className={styles.bmFieldLabel} style={{ color: C.textMuted }}>Brand</div>
+                {/* z-allow: autocomplete row stacking inside bmDialog (each row sits above the next so suggestion list overlaps) */}
                 <div className={styles.bmFieldRow} style={{ zIndex: 12 }}>
                   <div className={styles.bmFieldHalf} style={{ zIndex: 10 }}>
                     <StandTouch onPress={() => activateDetailField("brand")}>
@@ -1610,6 +1612,7 @@ export function BikeStandScreen() {
 
                 {/* Description row */}
                 <div className={styles.bmFieldLabel} style={{ color: C.textMuted }}>Model / Description</div>
+                {/* z-allow: autocomplete row stacking inside bmDialog */}
                 <div className={styles.bmFieldRow} style={{ zIndex: 11 }}>
                   <div className={styles.bmFieldHalf} style={{ zIndex: 9 }}>
                     <StandTouch onPress={() => activateDetailField("description")}>
@@ -1690,8 +1693,10 @@ export function BikeStandScreen() {
 
                 {/* Color row */}
                 <div className={styles.bmFieldLabel} style={{ color: C.textMuted }}>Colors</div>
+                {/* z-allow: autocomplete row stacking inside bmDialog (color1/color2 popovers nested inside) */}
                 <div className={styles.bmFieldRow} style={{ zIndex: 10 }}>
                   <div style={{ width: "50%", display: "flex", flexDirection: "row", alignItems: "center", overflow: "visible", flexShrink: 0 }}>
+                    {/* z-allow: color1 autocomplete column */}
                     <div style={{ width: "48%", position: "relative", zIndex: 8, overflow: "visible", flexShrink: 0 }}>
                       <StandTouch onPress={() => activateDetailField("color1")}>
                         <div style={{ pointerEvents: "none" }}>
@@ -1742,6 +1747,7 @@ export function BikeStandScreen() {
                       )}
                     </div>
                     <div style={{ width: "4%", flexShrink: 0 }} />
+                    {/* z-allow: color2 autocomplete column (sits below color1 in stack so color1 popover overlaps) */}
                     <div style={{ width: "48%", position: "relative", zIndex: 7, overflow: "visible", flexShrink: 0 }}>
                       <StandTouch onPress={() => activateDetailField("color2")}>
                         <div style={{ pointerEvents: "none" }}>
@@ -1960,7 +1966,7 @@ export function BikeStandScreen() {
                       onPress={() => { if (!hasBrand) return; saveDetailOnLeave(sDetailField); _setShowBikeInfoModal(false); _setDetailField(null); }}
                     >
                       <Image icon={ICONS.gears1} size={36} />
-                      <span className={styles.bmAddItemsText} style={{ color: hasBrand ? C.textWhite : C.textMuted }}>Back to Workorder</span>
+                      <span className={styles.bmAddItemsText} style={{ color: hasBrand ? C.textWhite : C.textMuted }}>Edit Workorder</span>
                     </StandTouch>
                   </div>
                 );
@@ -2578,6 +2584,7 @@ export function BikeStandScreen() {
 
           {/* Centered new/search overlay when no workorder */}
           {!hasWorkorderReady && (
+            // z-allow: absolute-positioned empty-state overlay covering the buttons view (local sub-stacking inside bvOuter)
             <div className={styles.shoOverlay} style={{ zIndex: 10 }}>
               <div className={styles.shoColumn}>
                 <StandTouch
@@ -2915,6 +2922,7 @@ export function BikeStandScreen() {
                             </span>
                           )}
                           {/* Discount dropdown on long-press */}
+                          {/* z-allow: local popover below the canvas item card (sub-stacking within positioned standCanvasItem) */}
                           {sDiscountCardID === itemObj.inventoryItemID && (
                             <div
                               onClick={(e) => e.stopPropagation()}

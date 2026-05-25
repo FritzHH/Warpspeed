@@ -3,6 +3,17 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  gap: 15px;
+  flex-shrink: 0;
+}
+
+.sectionHeader {
+  width: 100%;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-muted);
+  letter-spacing: 0.5px;
+  margin-bottom: 10px;
   flex-shrink: 0;
 }
 

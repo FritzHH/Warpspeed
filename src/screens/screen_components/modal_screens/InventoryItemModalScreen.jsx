@@ -164,9 +164,8 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
     showAlert({
       title: "Delete Item",
       message: `Are you sure you want to delete "${sItem.formalName || sItem.informalName || "this item"}"?`,
-      btn1Text: "Cancel",
-      btn2Text: "Delete",
-      handleBtn2Press: () => {
+      btn1Text: "Delete",
+      handleBtn1Press: () => {
         useLoginStore.getState().execute(() => {
           // clean up auto customer note from settings
           const autoNotes = useSettingsStore.getState().settings?.autoCustomerNoteTexts || [];
@@ -640,6 +639,9 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
           </div>
 
           <ModalFooter>
+            <ModalFooterButton onClick={handleExit}>
+              Close
+            </ModalFooterButton>
             {!isNew ? (
               <ModalFooterButton
                 variant="danger"
@@ -673,9 +675,6 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                 Save
               </ModalFooterButton>
             ) : null}
-            <ModalFooterButton onClick={handleExit}>
-              Close
-            </ModalFooterButton>
           </ModalFooter>
       </div>
   );

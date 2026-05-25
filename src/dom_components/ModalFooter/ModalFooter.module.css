@@ -13,10 +13,6 @@
   align-items: stretch;
 }
 
-.slot + .slot {
-  border-left: 1px solid var(--border-default);
-}
-
 .btn {
   flex: 1;
   padding: 0;
@@ -46,7 +42,7 @@
 
 /* Size variants */
 .sizeLarge {
-  height: 37px;
+  height: 40px;
 }
 
 .sizeSmall {

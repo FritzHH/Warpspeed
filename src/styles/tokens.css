@@ -81,6 +81,7 @@
   --surface-warning-muted:  rgb(255, 248, 230);  /* amber warning banner bg */
   --surface-overlay:        rgba(0, 0, 0, 0.5);  /* modal scrim - 76 inline uses */
   --surface-overlay-light:  rgba(0, 0, 0, 0.1);
+  --surface-overlay-medium: rgba(0, 0, 0, 0.3);
   --surface-overlay-heavy:  rgba(0, 0, 0, 0.75);
 
   /* Borders */
@@ -165,6 +166,7 @@
   --surface-warning-muted:  rgb(60, 45, 15);
   --surface-overlay:        rgba(0, 0, 0, 0.7);
   --surface-overlay-light:  rgba(0, 0, 0, 0.3);
+  --surface-overlay-medium: rgba(0, 0, 0, 0.5);
   --surface-overlay-heavy:  rgba(0, 0, 0, 0.85);
 
   /* Borders */

@@ -8,6 +8,7 @@ import {
   useLoginStore,
   useCheckoutStore,
   useActiveSalesStore,
+  useSettingsStore,
 } from "../../../stores";
 import { Button, ScreenModal, Tooltip } from "../../../dom_components";
 import { TicketSearchInput } from "../../../shared/TicketSearchInput";
@@ -19,8 +20,14 @@ import styles from "./Info_StandaloneSale.module.css";
 export const StandaloneSaleComponent = ({}) => {
   const zOpenWorkorder = useOpenWorkordersStore((state) => state.getOpenWorkorder());
   const zActiveSales = useActiveSalesStore((state) => state.activeSales);
+  const zSettings = useSettingsStore((state) => state.settings);
   const standaloneSales = zActiveSales.filter((s) => !s.customerID && !s.paymentComplete);
   const [sShowActiveSalesModal, _setShowActiveSalesModal] = useState(false);
+
+  const selectedPrinterID = localStorageWrapper.getItem("selectedPrinterID");
+  const selectedPrinter = selectedPrinterID && zSettings?.printers?.[selectedPrinterID];
+  const isPrinterOffline = !!(selectedPrinter && selectedPrinter.active !== true);
+  const printerOfflineLabel = selectedPrinter?.name ? `Printer "${selectedPrinter.name}" is offline` : "Selected printer is offline";
 
   const clearDisabled =
     !zOpenWorkorder ||
@@ -198,10 +205,11 @@ export const StandaloneSaleComponent = ({}) => {
             />
           </Tooltip>
         )}
-        <Tooltip text="Pop cash register" position="top">
+        <Tooltip text={isPrinterOffline ? printerOfflineLabel : "Pop cash register"} position="top">
           <Button
             icon={ICONS.openCashRegister}
             iconSize={40}
+            enabled={!isPrinterOffline}
             onPress={() =>
               dbSavePrintObj(
                 { id: crypto.randomUUID(), receiptType: RECEIPT_TYPES.register },

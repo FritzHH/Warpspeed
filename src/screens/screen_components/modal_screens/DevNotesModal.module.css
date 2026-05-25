@@ -3,7 +3,6 @@
   height: 80vh;
   background-color: var(--surface-base);
   border-radius: 12px;
-  border: 2px solid var(--border-default);
   display: flex;
   flex-direction: column;
   overflow: hidden;

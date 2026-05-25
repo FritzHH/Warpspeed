@@ -114,7 +114,7 @@ export function WorkordersComponent({}) {
       _setSearchTerm("");
       searchInputRef.current?.blur();
       showOpenedFlash(wo);
-      workorderSelected(wo);
+      workorderSelected(wo, { fromSearch: true });
     }
   }
 
@@ -238,7 +238,7 @@ export function WorkordersComponent({}) {
     useCustMessagesStore.getState().setMessagesUnsub(unsub);
   }
 
-  function workorderSelected(obj) {
+  function workorderSelected(obj, opts) {
     // Finished & Paid workorders kept in the open list (pickup-pending) open in the
     // read-only closed-workorder modal instead of the live editing flow.
     if (obj.status === "finished_and_paid") {
@@ -262,7 +262,9 @@ export function WorkordersComponent({}) {
       itemsTabName: TAB_NAMES.itemsTab.workorderItems,
     });
     useTabNamesStore.getState().setMessagesHubMode(false);
-    if (obj.hasNewSMS) {
+    if (opts?.fromSearch) {
+      useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.inventory);
+    } else if (obj.hasNewSMS) {
       useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.messages);
     }
     useWorkorderPreviewStore.getState().setPreviewObj(null);

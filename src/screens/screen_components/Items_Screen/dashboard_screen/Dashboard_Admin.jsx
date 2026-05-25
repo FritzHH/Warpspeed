@@ -147,17 +147,29 @@ export function Dashboard_Admin({}) {
 
   function commitUserInfoChange(userObj, isNewUser) {
     const liveUsers = useSettingsStore.getState().settings.users;
+    const prevUser = isNewUser ? null : liveUsers.find((o) => o.id === userObj.id);
+    const prevLinkedID = prevUser?.linkedUserID || "";
+    const newLinkedID = userObj.linkedUserID || "";
+
     let userArr;
     if (isNewUser) {
       userArr = [userObj, ...liveUsers];
     } else {
-      userArr = liveUsers.map((o) => {
-        if (o.id === userObj.id) {
-          return { ...userObj };
+      userArr = liveUsers.map((o) => (o.id === userObj.id ? { ...userObj } : o));
+    }
+
+    if (prevLinkedID !== newLinkedID) {
+      userArr = userArr.map((o) => {
+        if (o.id === prevLinkedID && o.linkedUserID === userObj.id) {
+          return { ...o, linkedUserID: "" };
+        }
+        if (o.id === newLinkedID) {
+          return { ...o, linkedUserID: userObj.id };
         }
         return o;
       });
     }
+
     useSettingsStore.getState().setField("users", userArr);
     if (isNewUser) {
       useLoginStore.getState().setSendWelcomeMessageToUser(userObj);
@@ -1052,7 +1064,7 @@ const AppUserListComponent = ({
           });
           let pickerItems = sortedUsers.map((u) => {
             let level = u.permissions?.level || 1;
-            let roleName = u.permissions?.name || "User";
+            let roleName = levelToPrivilegeName(level);
             let badge = roleBadgeColors(level);
             let fullName = (capitalizeFirstLetterOfString(u.first || "") + " " + capitalizeFirstLetterOfString(u.last || "")).trim() || "(no name)";
             return {
@@ -1363,19 +1375,28 @@ const AppUserListComponent = ({
                         <div className={adminStyles.ucRoleBadgeWrap}>
                           <DomDropdownMenu
                             enabled={editable && selectedRoleLevel < PERMISSION_LEVELS.owner.level}
-                            dataArr={Object.values(PERMISSION_LEVELS).map((o) => o.name)}
+                            dataArr={Object.values(PERMISSION_LEVELS).map((o) => ({
+                              id: o.id,
+                              label: o.name,
+                              disabled: o.level >= PERMISSION_LEVELS.superUser.level
+                                ? zCurrentUserLevel < PERMISSION_LEVELS.owner.level
+                                : zCurrentUserLevel < PERMISSION_LEVELS.superUser.level,
+                            }))}
                             onSelect={(item) => {
                               if (!editable) return;
                               if (selectedRoleLevel >= PERMISSION_LEVELS.owner.level) return;
-                              let perm = Object.values(PERMISSION_LEVELS).find((o) => o.name === item);
+                              let perm = Object.values(PERMISSION_LEVELS).find((o) => o.id === item.id);
                               if (!perm) return;
                               let patch = { permissions: perm };
                               if (perm.level >= PERMISSION_LEVELS.superUser.level && (sDraftUser.pin || "").length > 4) {
                                 patch.pin = (sDraftUser.pin || "").slice(0, 4);
                               }
+                              if (perm.level < PERMISSION_LEVELS.superUser.level && sDraftUser.linkedUserID) {
+                                patch.linkedUserID = "";
+                              }
                               updateDraft(patch);
                             }}
-                            buttonText={sDraftUser.permissions?.name || "User"}
+                            buttonText={levelToPrivilegeName(sDraftUser.permissions?.level || 1)}
                             buttonStyle={{
                               paddingLeft: 10,
                               paddingRight: 10,
@@ -1398,6 +1419,54 @@ const AppUserListComponent = ({
                           />
                         </div>
                       </div>
+                      {selectedRoleLevel >= PERMISSION_LEVELS.superUser.level && (() => {
+                        const otherUsers = (zSettingsObj?.users || []).filter((u) => u.id !== sDraftUser.id);
+                        const linkItems = [
+                          { id: "__none__", label: "None" },
+                          ...otherUsers.map((u) => ({
+                            id: u.id,
+                            label: ((capitalizeFirstLetterOfString(u.first || "") + " " + capitalizeFirstLetterOfString(u.last || "")).trim() || "(no name)") + " — " + levelToPrivilegeName(u.permissions?.level || 1),
+                          })),
+                        ];
+                        const linkedId = sDraftUser.linkedUserID || "";
+                        const linkedUser = linkedId ? otherUsers.find((u) => u.id === linkedId) : null;
+                        const buttonText = linkedUser
+                          ? ((capitalizeFirstLetterOfString(linkedUser.first || "") + " " + capitalizeFirstLetterOfString(linkedUser.last || "")).trim() || "(no name)")
+                          : "Link to user...";
+                        return (
+                          <div className={adminStyles.ucEditorRow}>
+                            <DomDropdownMenu
+                              enabled={editable}
+                              dataArr={linkItems}
+                              onSelect={(item) => {
+                                if (!editable) return;
+                                const newId = item.id === "__none__" ? "" : item.id;
+                                updateDraft({ linkedUserID: newId });
+                              }}
+                              buttonText={buttonText}
+                              buttonStyle={{
+                                paddingLeft: 10,
+                                paddingRight: 10,
+                                paddingTop: 4,
+                                paddingBottom: 4,
+                                borderColor: C.borderDefault,
+                                borderStyle: "solid",
+                                borderWidth: 1,
+                                borderRadius: 4,
+                                minWidth: 200,
+                                height: 28,
+                                alignItems: "center",
+                                backgroundColor: C.surfaceBase,
+                              }}
+                              buttonTextStyle={{
+                                color: linkedUser ? C.text : C.textMuted,
+                                fontSize: 13,
+                                fontWeight: 600,
+                              }}
+                            />
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* FACE ENROLLMENT */}

@@ -13,6 +13,7 @@ import {
   ReceiptSentOverlay,
   StaleBanner,
   TextInput,
+  Toast,
   Tooltip,
   TouchableOpacity,
 } from "../../../../dom_components";
@@ -50,6 +51,7 @@ import { translateSalesReceipt } from "../../../../shared/receiptTranslator";
 import {
   newCheckoutSaveWorkorder,
   newCheckoutCompleteWorkorder,
+  newCheckoutUnarchiveWorkorder,
   newCheckoutGetStripeReaders,
   saveItemSales,
   writeTransaction,
@@ -87,6 +89,9 @@ import { dlog, DCAT } from "./checkoutDebugLog";
 
 // Stable empty array reference to prevent re-renders from || [] patterns
 const EMPTY_ARR = [];
+
+// DEV: flip to true to bypass the gate and render the keep-open toast full-time for layout iteration
+const DEV_ALWAYS_SHOW_KEEP_OPEN_TOAST = false;
 
 // Map CUSTOMER_LANGUAGES keys to Google Translate ISO codes
 const LANG_TO_ISO = { spanish: "es", english: "en" };
@@ -260,15 +265,28 @@ export function NewCheckoutModalScreen() {
   const [sDepositInputDisp, _setDepositInputDisp] = useState("");
   const [sDepositInputCents, _setDepositInputCents] = useState(0);
   const [sShowSendReceiptModal, _sSetShowSendReceiptModal] = useState(false);
-  const [sShowPickupModal, _setShowPickupModal] = useState(false);
   const [sPickupKeepOpenExpanded, _setPickupKeepOpenExpanded] = useState(false);
   const [sPickupKeepOpenReason, _setPickupKeepOpenReason] = useState("");
-  const [sPickupCountdown, _setPickupCountdown] = useState(10);
-  const zPickup = useZ("modal", sShowPickupModal);
+  const [sKeepOpenToastDismissed, _setKeepOpenToastDismissed] = useState(false);
+  const autoCloseTimerRef = useRef(null);
+  // Holds the marked-paid WO objects after archive, so the "Keep Workorder Open" path
+  // can un-archive them (write back to open-workorders) with all the completion fields intact.
+  const archivedWOsRef = useRef([]);
+  // Captures isStandalone at sale-complete time so the 30s timer's close callback can do
+  // the right cleanup regardless of post-archive store state.
+  const wasStandaloneSaleRef = useRef(false);
   const [sReceiptSentOverlay, _setReceiptSentOverlay] = useState(null);
   const [sTransactions, _setTransactions] = useState([]);   // real payments (cash/card)
   const [sCredits, _setCredits] = useState([]);              // applied credits/deposits/gift cards
   const salePersistedRef = useRef(false);
+  // Tracks whether handleSaleComplete has already fired for this session.
+  // Ref guards re-entry synchronously (state updates are async); state drives the UI swap.
+  const completedFiredRef = useRef(false);
+  const [sSaleCompletedFired, _setSaleCompletedFired] = useState(false);
+  // Force-open: when change is owed during a partial sale, the change card covers CashPayment.
+  // Cashier clicks "Accept More Cash" to bring CashPayment back. Reset on each capture so the
+  // cover-up reappears with any new accumulated change.
+  const [sCashPaymentForcedOpen, _setCashPaymentForcedOpen] = useState(false);
   // ─── Derived Values ───────────────────────────────────────
   let isDepositMode = !!zDepositInfo;
   let isStandalone = !zOpenWorkorder?.customerID;
@@ -287,27 +305,6 @@ export function NewCheckoutModalScreen() {
     let refunded = (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0);
     return (t.amountCaptured || 0) > refunded;
   }) || sCredits.length > 0;
-
-  // Auto-close after sale completion (only when pickup-decision modal is NOT awaiting input — e.g., deposit/gift-card sales).
-  useEffect(() => {
-    if (!saleComplete) return;
-    if (sShowPickupModal) return;
-    let timer = setTimeout(() => closeModal(), 15000);
-    return () => clearTimeout(timer);
-  }, [saleComplete, sShowPickupModal]);
-
-  // Pickup-decision modal: 10-second countdown that auto-fires Complete & Close at zero.
-  // Pauses (cancels) the moment the user clicks "Keep Ticket Open" (expanded = true).
-  useEffect(() => {
-    if (!sShowPickupModal) return;
-    if (sPickupKeepOpenExpanded) return;
-    if (sPickupCountdown <= 0) {
-      handlePickupCompleteAndClose();
-      return;
-    }
-    let t = setTimeout(() => _setPickupCountdown((n) => n - 1), 1000);
-    return () => clearTimeout(t);
-  }, [sShowPickupModal, sPickupKeepOpenExpanded, sPickupCountdown]);
 
   // ─── Initialization ──────────────────────────────────────
   useEffect(() => {
@@ -953,6 +950,10 @@ export function NewCheckoutModalScreen() {
     sale.pendingTransactionIDs = (sale.pendingTransactionIDs || []).filter((id) => id !== payment.id);
     sale.workorderIDs = sCombinedWorkorders.map((o) => o.id);
 
+    // Reset force-open: each capture returns the left col to its default cover-up behavior.
+    // If change is now owed (or still owed from a prior partial), the change card reappears.
+    _setCashPaymentForcedOpen(false);
+
     recomputeSaleAmounts(sale, newTransactions, sCredits);
 
     if (sale.paymentComplete) {
@@ -1112,6 +1113,15 @@ export function NewCheckoutModalScreen() {
   }
 
   async function handleSaleComplete(sale, txns, creds) {
+    // Re-entry guard: prevents double-firing side effects (duplicate receipts, register pops,
+    // SMS sends, deposit consumption) if the manual "Complete Sale" button is clicked after
+    // an auto-fire from handlePaymentCapture / credit application, or on a fast double-click.
+    if (completedFiredRef.current) {
+      dlog(DCAT.ACTION, "handleSaleComplete_reentry_blocked", "CheckoutModal", { saleID: sale?.id });
+      return;
+    }
+    completedFiredRef.current = true;
+    _setSaleCompletedFired(true);
     dlog(DCAT.ACTION, "handleSaleComplete", "CheckoutModal", { saleID: sale?.id, total: sale?.total, amountCaptured: sale?.amountCaptured, paymentComplete: sale?.paymentComplete, isDepositSale: sale?.isDepositSale, transactionCount: (txns || sTransactions)?.length, creditCount: (creds || sCredits)?.length, workorderCount: sCombinedWorkorders?.length });
     let localTxns = txns || sTransactions;
     let localCreds = creds || sCredits;
@@ -1121,13 +1131,19 @@ export function NewCheckoutModalScreen() {
       handleDepositSaleComplete(sale, localTxns, localCreds);
       return;
     }
-    // Mark all combined workorders as paid IN-PLACE (still in open list).
-    // Archival (newCheckoutCompleteWorkorder + removeWorkorder) is deferred to the pickup modal selection.
-    // If the user steps away / crashes mid-modal, the WO stays in the open list with Finished & Paid status — safe default.
+    // Capture standalone status before archive — the 30s timer's close callback needs
+    // the pre-archive value to decide whether to clear customer/tab state.
+    wasStandaloneSaleRef.current = isStandalone;
+
+    // Mark every combined workorder as paid and archive immediately:
+    // write to completed-workorders, delete from open-workorders, remove from local store.
+    // The "Keep Workorder Open" flow can later un-archive (inverse: write back to open,
+    // delete from completed).
     let settings = useSettingsStore.getState().getSettings();
     let statuses = settings?.statuses || [];
     let user = useLoginStore.getState().currentUser?.first || "System";
     let timestamp = Date.now();
+    let archivedWOs = [];
 
     for (let wo of sCombinedWorkorders) {
       let woUpdated = cloneDeep(wo);
@@ -1148,8 +1164,11 @@ export function NewCheckoutModalScreen() {
       woUpdated.changeLog = [...(woUpdated.changeLog || []), ...entries];
       woUpdated.endedOnMillis = Date.now();
 
-      useOpenWorkordersStore.getState().setWorkorder(woUpdated, true);
+      await newCheckoutCompleteWorkorder(woUpdated);
+      useOpenWorkordersStore.getState().removeWorkorder(woUpdated, false);
+      archivedWOs.push(woUpdated);
     }
+    archivedWOsRef.current = archivedWOs;
 
     // Transactions were already persisted on capture (persistSale). Just write the completed-sale and delete the active-sale.
     let saleToPersist = prepareSaleForPersist(sale, localTxns, localCreds);
@@ -1259,30 +1278,34 @@ export function NewCheckoutModalScreen() {
     // sale is done, no reason to keep the checkout on the customer screen.
     broadcastClear();
 
-    // Ask the user: archive the workorder, or keep it open for pickup.
+    // Pop the register for any cash sale (fires async while the user makes any subsequent modal selection).
+    let isCashSale = localTxns.some((t) => t.method === "cash");
+    if (isCashSale) handlePopRegister();
+
+    // 30-second auto-close timer — the ONLY auto-close path after payment complete.
+    // Fires regardless of cash change owed. Cancelled by manual close, by the
+    // "Keep Workorder Open" save (which un-archives), or by modal unmount.
     _setPickupKeepOpenExpanded(false);
     _setPickupKeepOpenReason("");
-    _setPickupCountdown(10);
-    _setShowPickupModal(true);
+    let wasStandaloneSale = wasStandaloneSaleRef.current;
+    if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
+    autoCloseTimerRef.current = setTimeout(() => {
+      dlog(DCAT.ACTION, "checkout_autoClose30s", "CheckoutModal", { saleID: sale?.id });
+      handlePickupCompleteAndClose(wasStandaloneSale);
+    }, 30000);
   }
 
-  // ─── Pickup-Decision Modal Handlers ───────────────────────
-  // Called when user picks "Complete & Close" — archive each WO and close the checkout modal.
-  async function handlePickupCompleteAndClose() {
-    dlog(DCAT.BUTTON, "pickup_completeAndClose", "CheckoutModal", { saleID: sSale?.id, workorderCount: sCombinedWorkorders?.length });
-    _setShowPickupModal(false);
-    // Pull fresh copies from the open-workorders store (handleSaleComplete already wrote the paid-state to them).
-    let woStore = useOpenWorkordersStore.getState();
-    for (let wo of sCombinedWorkorders) {
-      let current = woStore.workorders.find((w) => w.id === wo.id);
-      let woToArchive = cloneDeep(current || wo);
-      await newCheckoutCompleteWorkorder(woToArchive);
-      woStore.removeWorkorder(woToArchive, false);
-    }
+  // ─── Keep-Open / Close Handlers ───────────────────────────
+  // Close the checkout modal post-completion. Archive already happened in handleSaleComplete,
+  // so this is purely UI cleanup + close. Called by the 30s auto-close timer.
+  // wasStandaloneSale is captured pre-archive so the standalone cleanup runs correctly
+  // (post-archive, isStandalone is unreliable because zOpenWorkorder may be undefined).
+  function handlePickupCompleteAndClose(wasStandaloneSale) {
+    dlog(DCAT.BUTTON, "pickup_completeAndClose", "CheckoutModal", { saleID: sSale?.id, workorderCount: sCombinedWorkorders?.length, wasStandaloneSale });
     useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.customer);
     useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.workorders);
-    // For standalone sales, also clear the open-workorder pointer + customer (mirrors closeModal's standalone branch).
-    if (isStandalone) {
+    if (wasStandaloneSale) {
+      let woStore = useOpenWorkordersStore.getState();
       let oldWoId = woStore.openWorkorderID;
       if (oldWoId) woStore.removeWorkorder(oldWoId, false);
       woStore.setOpenWorkorderID(null);
@@ -1296,25 +1319,29 @@ export function NewCheckoutModalScreen() {
     resetAndClose();
   }
 
-  // Called when user picks "Keep Ticket Open" — expand the modal to collect a required reason.
+  // Called when user clicks "Keep Workorder Open" in the layered overlay — expand the reason input.
   function handlePickupKeepOpen() {
     dlog(DCAT.BUTTON, "pickup_keepOpen", "CheckoutModal", { saleID: sSale?.id, workorderCount: sCombinedWorkorders?.length });
     _setPickupKeepOpenExpanded(true);
   }
 
-  // Called when user clicks "Save & Close" after entering the keep-alive reason.
-  // Writes the reason into each combined workorder's internalNotes (matches the Notes-tab add pattern), then closes.
-  function handlePickupSaveKeepOpenReason() {
+  // Called when user submits the keep-alive reason (≥5 chars).
+  // Un-archives each WO (writes back to open-workorders, deletes from completed-workorders),
+  // adds the reason to internalNotes. Closes the modal only if no cash change is owed —
+  // when change is owed, stays open so the cashier can count it out.
+  async function handlePickupSaveKeepOpenReason() {
     let reason = sPickupKeepOpenReason.trim();
-    if (reason.length < 7) return;
-    dlog(DCAT.BUTTON, "pickup_saveKeepOpenReason", "CheckoutModal", { saleID: sSale?.id, workorderCount: sCombinedWorkorders?.length, reasonLength: reason.length });
+    if (reason.length < 5) return;
+    dlog(DCAT.BUTTON, "pickup_saveKeepOpenReason", "CheckoutModal", { saleID: sSale?.id, workorderCount: archivedWOsRef.current?.length, reasonLength: reason.length });
+    if (autoCloseTimerRef.current) {
+      clearTimeout(autoCloseTimerRef.current);
+      autoCloseTimerRef.current = null;
+    }
     let currentUser = useLoginStore.getState().currentUser;
     let userName = "(" + (currentUser?.first || "") + " " + ((currentUser?.last || "")[0] || "") + ")  ";
     let woStore = useOpenWorkordersStore.getState();
-    for (let wo of sCombinedWorkorders) {
-      let current = woStore.workorders.find((w) => w.id === wo.id);
-      if (!current) continue;
-      let updated = cloneDeep(current);
+    for (let wo of (archivedWOsRef.current || [])) {
+      let updated = cloneDeep(wo);
       let notes = [...(updated.internalNotes || [])];
       notes.unshift({
         id: crypto.randomUUID(),
@@ -1324,14 +1351,21 @@ export function NewCheckoutModalScreen() {
         createdAt: Date.now(),
       });
       updated.internalNotes = notes;
-      woStore.setWorkorder(updated, true);
+      await newCheckoutUnarchiveWorkorder(updated);
+      woStore.setWorkorder(updated, false);
     }
-    _setShowPickupModal(false);
     _setPickupKeepOpenExpanded(false);
     _setPickupKeepOpenReason("");
-    useTabNamesStore.getState().setInfoTabName(TAB_NAMES.infoTab.customer);
-    useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.workorders);
-    resetAndClose();
+    _setKeepOpenToastDismissed(true);
+    let cashOwed = sTransactions.some((t) => t.method === "cash" && (t.amountTendered || 0) > (t.amountCaptured || 0));
+    if (!cashOwed) resetAndClose();
+  }
+
+  // Cancel button in expanded toast — collapse back to the default "Keep Workorder Open" button.
+  function handlePickupCancel() {
+    dlog(DCAT.BUTTON, "pickup_cancelKeepOpen", "CheckoutModal", {});
+    _setPickupKeepOpenExpanded(false);
+    _setPickupKeepOpenReason("");
   }
 
   function handleCashChange(change) {
@@ -1501,6 +1535,16 @@ export function NewCheckoutModalScreen() {
       }
     }
     salePersistedRef.current = false;
+    completedFiredRef.current = false;
+    if (autoCloseTimerRef.current) {
+      clearTimeout(autoCloseTimerRef.current);
+      autoCloseTimerRef.current = null;
+    }
+    archivedWOsRef.current = [];
+    wasStandaloneSaleRef.current = false;
+    _setPickupKeepOpenExpanded(false);
+    _setPickupKeepOpenReason("");
+    _setKeepOpenToastDismissed(false);
     broadcastClear();
     _setSale(null);
     _setTransactions([]);
@@ -1509,6 +1553,8 @@ export function NewCheckoutModalScreen() {
     _setCashChangeNeeded(0);
     _setCardProcessingAmount(0);
     _setReaderError("");
+    _setSaleCompletedFired(false);
+    _setCashPaymentForcedOpen(false);
     if (readerPollRef.current) {
       clearInterval(readerPollRef.current);
       readerPollRef.current = null;
@@ -1677,7 +1723,6 @@ export function NewCheckoutModalScreen() {
     log("handlePopRegister printObj:", JSON.stringify(printObj));
     dbSavePrintObj(printObj, localStorageWrapper.getItem("selectedPrinterID") || "");
     _setShowPopConfirm(true);
-    setTimeout(() => _setShowPopConfirm(false), 1000);
   }
 
   function applyTaxFree(newVal) {
@@ -1760,16 +1805,35 @@ export function NewCheckoutModalScreen() {
                 </div>
               ) : isFullyPaid ? (
                 <div className={styles.zeroTotalBox} style={{ ...SHADOW_RADIUS_PROTO }}>
-                  <span className={styles.fullyPaidLabel} style={{ color: C.textMuted }}>AMOUNT PAID</span>
-                  <span className={styles.fullyPaidAmount} style={{ fontWeight: Fonts.weight.textSuperheavy, color: C.green }}>{"$" + formatCurrencyDisp(sSale?.amountCaptured || 0)}</span>
-                  <span className={styles.fullyPaidTotal} style={{ color: C.textMuted }}>{"Sale total: $" + formatCurrencyDisp(sSale?.total || 0)}</span>
+                  <CashChangeNeeded
+                    cashChangeNeeded={sCashChangeNeeded}
+                    style={{ width: "70%", alignSelf: "center", marginTop: 0 }}
+                  />
+                </div>
+              ) : sCashChangeNeeded > 0 && !sCashPaymentForcedOpen ? (
+                // Partial cash payment with change owed: cover CashPayment with change display.
+                // Cashier clicks "Accept More Cash" to bring CashPayment back if customer wants to pay more cash.
+                <div className={styles.zeroTotalBox} style={{ ...SHADOW_RADIUS_PROTO }}>
+                  <CashChangeNeeded
+                    cashChangeNeeded={sCashChangeNeeded}
+                    style={{ width: "70%", alignSelf: "center", marginTop: 0 }}
+                  />
                   <button
                     type="button"
-                    onClick={handleFullyPaidComplete}
-                    className={styles.completeButton}
-                    style={{ backgroundColor: C.green }}
+                    onClick={() => _setCashPaymentForcedOpen(true)}
+                    style={{
+                      backgroundColor: "transparent",
+                      color: C.green,
+                      border: `1px solid ${C.green}`,
+                      borderRadius: 6,
+                      padding: "6px 14px",
+                      fontSize: 12,
+                      cursor: "pointer",
+                      marginTop: 10,
+                      alignSelf: "center",
+                    }}
                   >
-                    <span className={styles.completeButtonText} style={{ fontWeight: Fonts.weight.textHeavy }}>Complete Sale</span>
+                    Accept More Cash
                   </button>
                 </div>
               ) : (
@@ -1785,7 +1849,7 @@ export function NewCheckoutModalScreen() {
                   cardIsProcessing={cardIsProcessing}
                 />
               )}
-              {!isZeroTotal && !isFullyPaid && (sCardMode === "manual" ? (
+              {!isZeroTotal && (sCardMode === "manual" ? (
                 <CardPayment
                   amountLeftToPay={amountLeftToPay}
                   onPaymentCapture={handlePaymentCapture}
@@ -1895,39 +1959,6 @@ export function NewCheckoutModalScreen() {
                     onRefund={(payment) => { dlog(DCAT.BUTTON, "openRefundModal_deposit", "CheckoutModal", { transactionID: payment?.id, method: payment?.method, amountCaptured: payment?.amountCaptured }); _setRefundPayment(payment); _setShowRefundModal(true); }}
                     onPrintReceipt={handlePrintReceipt}
                   />
-                </div>
-
-                <CashChangeNeeded cashChangeNeeded={sCashChangeNeeded} />
-
-                {/* Bottom Buttons */}
-                <div
-                  className={styles.bottomButtonsRow}
-                  style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.backgroundListWhite }}
-                >
-                  {saleComplete && (
-                    <Tooltip text="Reprint receipt" position="top">
-                      <button type="button" onClick={handleReprint} className={styles.iconButton}>
-                        <Image icon={ICONS.print} size={35} />
-                      </button>
-                    </Tooltip>
-                  )}
-                  {saleComplete && (
-                    <Tooltip text="Send receipt" position="top">
-                      <button type="button" onClick={handleSendSaleReceipt} className={styles.iconButton}>
-                        <Image icon={ICONS.paperPlane} size={35} />
-                      </button>
-                    </Tooltip>
-                  )}
-                  <Tooltip text={saleComplete ? "Close" : isStandalone ? "Cancel sale" : "Cancel"} position="top">
-                    <button type="button" onClick={closeModal} className={styles.iconButton}>
-                      <Image icon={ICONS.close1} size={35} />
-                    </button>
-                  </Tooltip>
-                  <Tooltip text="Pop register" position="top">
-                    <button type="button" onClick={handlePopRegister} className={styles.iconButton}>
-                      <Image icon={ICONS.openCashRegister} size={30} />
-                    </button>
-                  </Tooltip>
                 </div>
               </div>
             ) : (
@@ -2179,7 +2210,47 @@ export function NewCheckoutModalScreen() {
 
               <div className={styles.flexSpacer} />
 
-              <CashChangeNeeded cashChangeNeeded={sCashChangeNeeded} />
+              {/* Keep-Workorder-Open toast — sits in the middle column, above bottomButtonsRowMain.
+                  Width = container (middle column) width. Gated on (saleComplete && !isStandalone) in production;
+                  DEV flag forces full-time render for layout iteration. */}
+              {(DEV_ALWAYS_SHOW_KEEP_OPEN_TOAST || (saleComplete && !!sCombinedWorkorders[0]?.customerID)) && !sKeepOpenToastDismissed && (
+                <div className={styles.keepOpenToast}>
+                  {sPickupKeepOpenExpanded && (
+                    <textarea
+                      className={styles.keepOpenTextarea}
+                      placeholder="Reason (required)...."
+                      value={sPickupKeepOpenReason}
+                      onChange={(e) => {
+                        let v = e.target.value;
+                        if (v.length > 0) v = v.charAt(0).toUpperCase() + v.slice(1);
+                        _setPickupKeepOpenReason(v);
+                      }}
+                      autoCapitalize="sentences"
+                      rows={2}
+                      autoFocus
+                    />
+                  )}
+                  <div className={styles.keepOpenButtonRow}>
+                    {sPickupKeepOpenExpanded && (
+                      <button
+                        type="button"
+                        className={styles.keepOpenCancelBtn}
+                        onClick={handlePickupCancel}
+                      >
+                        Cancel
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className={styles.keepOpenMainBtn}
+                      onClick={sPickupKeepOpenExpanded ? handlePickupSaveKeepOpenReason : handlePickupKeepOpen}
+                      disabled={sPickupKeepOpenExpanded && sPickupKeepOpenReason.trim().length < 5}
+                    >
+                      {sPickupKeepOpenExpanded ? "Save" : "Keep Workorder Open"}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Bottom Buttons: Cancel/Close + Reprint */}
               <div
@@ -2282,7 +2353,11 @@ export function NewCheckoutModalScreen() {
 
           <ModalFooter>
             <ModalFooterButton
-              variant="danger"
+              variant={
+                (hasRealPayments && !saleComplete) || (isStandalone && !saleComplete)
+                  ? "danger"
+                  : "default"
+              }
               disabled={cardIsProcessing}
               onClick={hasRealPayments && !saleComplete ? handlePartialPayment : closeModal}
             >
@@ -2294,6 +2369,36 @@ export function NewCheckoutModalScreen() {
                     ? "Cancel Sale"
                     : "Close"}
             </ModalFooterButton>
+            {isDepositMode && saleComplete && (
+              <ModalFooterButton
+                icon={ICONS.print}
+                iconSize={18}
+                onClick={handleReprint}
+                tooltip="Reprint receipt"
+              >
+                Reprint
+              </ModalFooterButton>
+            )}
+            {isDepositMode && saleComplete && (
+              <ModalFooterButton
+                icon={ICONS.paperPlane}
+                iconSize={18}
+                onClick={handleSendSaleReceipt}
+                tooltip="Send receipt"
+              >
+                Send Receipt
+              </ModalFooterButton>
+            )}
+            {isDepositMode && (
+              <ModalFooterButton
+                icon={ICONS.openCashRegister}
+                iconSize={18}
+                onClick={handlePopRegister}
+                tooltip="Pop register"
+              >
+                Pop Register
+              </ModalFooterButton>
+            )}
           </ModalFooter>
 
           {/* Tax-Free Confirmation Overlay (inline to avoid z-index issues with global AlertBox_) */}
@@ -2325,20 +2430,14 @@ export function NewCheckoutModalScreen() {
             </div>
           )}
 
-          {/* Pop Register Confirmation */}
-          {sShowPopConfirm && (
-            <div className={`${styles.confirmOverlay} ${styles.confirmOverlayPop}`}>
-              <div className={styles.confirmBoxPop} style={{ backgroundColor: C.backgroundWhite }}>
-                <Image
-                  src={ICONS.openCashRegister}
-                  style={{ width: 60, height: 60, marginBottom: 12 }}
-                />
-                <span className={styles.popRegisterText} style={{ color: C.text }}>
-                  Register Opened
-                </span>
-              </div>
-            </div>
-          )}
+          {/* Pop Register Confirmation toast */}
+          <Toast
+            text="Register Opened"
+            visible={sShowPopConfirm}
+            position="middle"
+            duration={1500}
+            onHide={() => _setShowPopConfirm(false)}
+          />
           <ReceiptSentOverlay visible={!!sReceiptSentOverlay} sentSMS={sReceiptSentOverlay?.sentSMS} sentEmail={sReceiptSentOverlay?.sentEmail} onDone={() => _setReceiptSentOverlay(null)} />
           {sNewItemModal && (
             <Suspense fallback={<LoadingIndicator />}>
@@ -2349,75 +2448,6 @@ export function NewCheckoutModalScreen() {
                 handleExit={() => _setNewItemModal(null)}
               />
             </Suspense>
-          )}
-          {sShowPickupModal && (
-            <div className={styles.pickupOverlay} style={{ zIndex: zPickup }}>
-              <div className={styles.pickupBox} style={{ backgroundColor: C.backgroundWhite, borderColor: C.buttonLightGreenOutline }}>
-                <span className={styles.pickupTitle} style={{ color: C.text }}>Payment Complete</span>
-                <span className={styles.pickupSubtitle} style={{ color: C.textMuted }}>
-                  Close out this ticket, or keep it open for pickup?
-                </span>
-                <button
-                  type="button"
-                  className={styles.pickupPrimaryBtn}
-                  style={{ backgroundColor: C.green, color: C.textWhite }}
-                  onClick={handlePickupCompleteAndClose}
-                  disabled={sPickupKeepOpenExpanded}
-                >
-                  Complete & Close
-                  {!sPickupKeepOpenExpanded && (
-                    <span
-                      className={styles.pickupCountdown}
-                      style={{ color: sPickupCountdown <= 3 ? C.red : C.textWhite }}
-                    >
-                      {sPickupCountdown}
-                    </span>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  className={styles.pickupSecondaryBtn}
-                  style={{ borderColor: C.borderDefault, color: C.text, backgroundColor: C.backgroundWhite }}
-                  onClick={handlePickupKeepOpen}
-                  disabled={sPickupKeepOpenExpanded}
-                >
-                  Keep Ticket Open
-                </button>
-                {sPickupKeepOpenExpanded && (
-                  <>
-                    <textarea
-                      className={styles.pickupReasonInput}
-                      style={{ borderColor: C.borderDefault, color: C.text, backgroundColor: C.backgroundWhite }}
-                      placeholder="Enter keep alive reason  REQUIRED"
-                      value={sPickupKeepOpenReason}
-                      onChange={(e) => {
-                        let v = e.target.value;
-                        if (v.length > 0) v = v.charAt(0).toUpperCase() + v.slice(1);
-                        _setPickupKeepOpenReason(v);
-                      }}
-                      autoCapitalize="sentences"
-                      rows={3}
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      className={styles.pickupPrimaryBtn}
-                      style={{
-                        backgroundColor: sPickupKeepOpenReason.trim().length >= 7 ? C.green : C.textDisabled,
-                        color: C.textWhite,
-                        cursor: sPickupKeepOpenReason.trim().length >= 7 ? "pointer" : "not-allowed",
-                        marginTop: 12,
-                        marginBottom: 0,
-                      }}
-                      onClick={handlePickupSaveKeepOpenReason}
-                      disabled={sPickupKeepOpenReason.trim().length < 7}
-                    >
-                      Save & Close
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
           )}
         </div>
     </Dialog>

@@ -346,6 +346,7 @@ const QuickItemCanvasCard = ({
         isSelected && styles.canvasCardSelected,
         sEditMode && styles.canvasCardEdit,
         !sEditMode && sShowActions && styles.canvasCardWithActions,
+        !sEditMode && styles.canvasCardLift,
       ].filter(Boolean).join(" ")}
       style={{
         left: (itemObj.x || 0) + "%",

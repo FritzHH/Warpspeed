@@ -189,7 +189,6 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
                       showButtonShadow={false}
                       modalCoordX={-80}
                       modalCoordY={25}
-                      menuMaxHeight={200}
                       centerMenuVertically={true}
                     />
                   </div>

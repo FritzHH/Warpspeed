@@ -400,7 +400,7 @@
   color: var(--text-on-accent);
   font-weight: 400;
   flex-shrink: 0;
-  transition: opacity 120ms ease;
+  transition: opacity 120ms ease, transform 120ms ease, box-shadow 120ms ease;
 }
 
 .subMenuBtn:hover {
@@ -419,7 +419,7 @@
 .canvas {
   flex: 1;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
   border-radius: 6px;
   min-height: 200px;
 }
@@ -462,6 +462,12 @@
   user-select: none;
   -webkit-user-select: none;
   overflow: hidden;
+  transition: transform 120ms ease;
+}
+
+.canvasCardLift:hover {
+  transform: translateY(-3px);
+  z-index: 2;
 }
 
 .canvasCardSelected {

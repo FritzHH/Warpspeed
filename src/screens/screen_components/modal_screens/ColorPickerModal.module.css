@@ -14,7 +14,6 @@
 .modal {
   background-color: var(--surface-raised);
   border-radius: 10px;
-  border: 2px solid var(--border-default);
   display: flex;
   flex-direction: column;
   overflow: hidden;

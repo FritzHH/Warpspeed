@@ -1876,6 +1876,7 @@ export function lightenRGB(r, g, b, amount) {
 
 export function showAlert({
   title,
+  severity = "warning",
   message,
   subMessage,
   btn1Text,
@@ -1896,6 +1897,7 @@ export function showAlert({
 }) {
   useAlertScreenStore.setState({
     title,
+    severity,
     message,
     subMessage,
     btn1Text,
@@ -1913,6 +1915,17 @@ export function showAlert({
     canExitOnOuterClick,
     alertBoxStyle,
     showAlert,
+  });
+}
+
+export function showPrinterOfflineAlert({ printerName, onContinue } = {}) {
+  const name = printerName ? `"${printerName}"` : "The selected printer";
+  showAlert({
+    title: "Printer Offline",
+    severity: "warning",
+    message: `${name} is offline. All receipts will be sent electronically.`,
+    btn1Text: "Continue",
+    handleBtn1Press: onContinue,
   });
 }
 

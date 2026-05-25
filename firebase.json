@@ -42,6 +42,10 @@
     ],
     "rewrites": [
       {
+        "source": "/r/**",
+        "function": "shortLinkRedirector"
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

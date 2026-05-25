@@ -1,5 +1,5 @@
 /* eslint-disable */
-import { memo } from "react";
+import { memo, useState } from "react";
 import styles from "./PaymentsList.module.css";
 import { C } from "../../../../styles";
 import { Tooltip, Pressable } from "../../../../dom_components";
@@ -7,6 +7,8 @@ import { formatCurrencyDisp, formatMillisForDisplay } from "../../../../utils";
 import { dlog, DCAT } from "./checkoutDebugLog";
 
 const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress }) {
+  let [sRefundHovered, _setRefundHovered] = useState(false);
+
   let isCash = payment.method === "cash";
   let isCheck = payment.method === "check";
   let isCard = !isCash && !isCheck;
@@ -29,33 +31,39 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress }) {
   let content = (
     <div
       className={styles.card}
-      style={{ backgroundColor: C.listItemWhite }}
+      style={{ backgroundColor: "transparent", border: `1px solid ${C.green}` }}
     >
       <div className={styles.cardTopRow}>
         <span className={styles.typeLabel} style={{ color: C.green }}>
           {getPaymentLabel()}
         </span>
         {fullyRefunded && (
-          <div className={styles.pill} style={{ backgroundColor: C.borderStrong }}>
-            <span className={styles.pillText} style={{ color: C.textWhite }}>Fully Refunded</span>
+          <div className={styles.pill} style={{ backgroundColor: "transparent", border: `1px solid ${C.borderStrong}` }}>
+            <span className={styles.pillText} style={{ color: C.borderStrong }}>Fully Refunded</span>
           </div>
         )}
         {onRefund && !fullyRefunded && (
-          <Tooltip text="Refund this payment" position="top">
-            <Pressable
-              onPress={(e) => {
-                if (e && e.stopPropagation) e.stopPropagation();
-                dlog(DCAT.BUTTON, "refund", "PaymentsList", { paymentId: payment.id, method: payment.method, amount: payment.amountCaptured });
-                onRefund();
-              }}
-              className={styles.pill}
-              style={{ backgroundColor: C.green }}
-            >
-              <span className={styles.pillText} style={{ color: C.textWhite }}>
-                REFUND
-              </span>
-            </Pressable>
-          </Tooltip>
+          <span
+            style={{ display: "inline-flex" }}
+            onPointerEnter={() => _setRefundHovered(true)}
+            onPointerLeave={() => _setRefundHovered(false)}
+          >
+            <Tooltip text="Refund this payment" position="top">
+              <Pressable
+                onPress={(e) => {
+                  if (e && e.stopPropagation) e.stopPropagation();
+                  dlog(DCAT.BUTTON, "refund", "PaymentsList", { paymentId: payment.id, method: payment.method, amount: payment.amountCaptured });
+                  onRefund();
+                }}
+                className={styles.pill}
+                style={{ backgroundColor: "transparent", border: `1px solid ${C.green}` }}
+              >
+                <span className={styles.pillText} style={{ color: C.green }}>
+                  REFUND
+                </span>
+              </Pressable>
+            </Tooltip>
+          </span>
         )}
       </div>
 
@@ -98,7 +106,7 @@ const PaymentRow = memo(function PaymentRow({ payment, onRefund, onPress }) {
   );
 
   return (
-    <Tooltip text="Click to print paper receipt" position="top">
+    <Tooltip text="Click to print paper receipt" position="top" disabled={sRefundHovered}>
       <Pressable
         onPress={onPress || undefined}
         activeOpacity={onPress ? 0.6 : 1}
@@ -128,7 +136,7 @@ const CreditRow = memo(function CreditRow({ credit, onPrintDepositReceipt, onRem
   let content = (
     <div
       className={styles.card}
-      style={{ backgroundColor: C.listItemWhite }}
+      style={{ backgroundColor: "transparent", border: `1px solid ${labelColor}` }}
     >
       <div className={styles.cardTopRow}>
         <span className={styles.typeLabel} style={{ color: labelColor }}>

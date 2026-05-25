@@ -287,11 +287,29 @@ export const LineActionsDropdown = forwardRef(function LineActionsDropdown(
         e.stopPropagation();
       }
     };
+    // Capture-phase focus listeners: the menu portals to document.body, OUTSIDE
+    // any parent Radix Dialog's FocusScope. Without these handlers, FocusScope
+    // sees focus moving "outside" the dialog and yanks it back, preventing the
+    // inputs in this menu from ever holding focus (so typing does nothing).
+    const onFocusInCapture = (e) => {
+      if (menuRef.current && menuRef.current.contains(e.target)) {
+        e.stopPropagation();
+      }
+    };
+    const onFocusOutCapture = (e) => {
+      if (menuRef.current && menuRef.current.contains(e.target)) {
+        e.stopPropagation();
+      }
+    };
     document.addEventListener("pointerdown", onPointerDownCapture, true);
     document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("focusin", onFocusInCapture, true);
+    document.addEventListener("focusout", onFocusOutCapture, true);
     return () => {
       document.removeEventListener("pointerdown", onPointerDownCapture, true);
       document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("focusin", onFocusInCapture, true);
+      document.removeEventListener("focusout", onFocusOutCapture, true);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);

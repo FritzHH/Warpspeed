@@ -717,9 +717,8 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
     useAlertScreenStore.getState().setValues({
       title: "Delete Layout",
       message: 'Delete layout "' + (sCurrentLayout?.name || sCurrentSlug) + '"?',
-      btn1Text: "Cancel",
-      btn2Text: "Delete",
-      handleBtn2Press: () => {
+      btn1Text: "Delete",
+      handleBtn1Press: () => {
         let updatedTemplates = { ...(zSettingsObj?.labelTemplates || {}) };
         delete updatedTemplates[sCurrentSlug];
         handleSettingsFieldChange("labelTemplates", updatedTemplates);
@@ -742,9 +741,8 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
       useAlertScreenStore.getState().setValues({
         title: "Unsaved Changes",
         message: "You have unsaved changes. Exit anyway?",
-        btn1Text: "Cancel",
-        btn2Text: "Exit",
-        handleBtn2Press: handleExit,
+        btn1Text: "Exit",
+        handleBtn1Press: handleExit,
       });
     } else {
       handleExit();
@@ -987,15 +985,15 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
           </div>
         )}
         <ModalFooter>
+          <ModalFooterButton variant="danger" onClick={handleExitPress}>
+            Exit
+          </ModalFooterButton>
           <ModalFooterButton
             variant="accent"
             disabled={sFields.length === 0}
             onClick={handleTestPrint}
           >
             Test Print Label Design
-          </ModalFooterButton>
-          <ModalFooterButton variant="danger" onClick={handleExitPress}>
-            Exit
           </ModalFooterButton>
         </ModalFooter>
       </div>

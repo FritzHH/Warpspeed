@@ -8,6 +8,7 @@ import {
   PAUSE_USER_CLOCK_IN_CHECK_MILLIS,
 } from "./constants";
 import { useAlertScreenStore, useLoginStore, useSettingsStore } from "./stores";
+import { permissionToLevel } from "./data";
 import { Button, SmallLoadingIndicator } from "./dom_components";
 import { C, COLOR_GRADIENTS } from "./styles";
 import styles from "./faceDetection.module.css";
@@ -343,7 +344,21 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
 
     try {
       const descriptor = await getFaceDescriptor();
-      const matchedUser = descriptor ? findMatchingUser(descriptor) : null;
+      let matchedUser = descriptor ? findMatchingUser(descriptor) : null;
+
+      // Suppress kick-down: when a 4+ admin is logged in, ignore matches on
+      // their linked lower-privilege account so face rec doesn't demote them.
+      if (matchedUser) {
+        const currentUser = useLoginStore.getState().currentUser;
+        if (
+          currentUser
+          && permissionToLevel(currentUser.permissions) >= 4
+          && matchedUser.linkedUserID
+          && matchedUser.linkedUserID === currentUser.id
+        ) {
+          matchedUser = null;
+        }
+      }
 
       if (matchedUser) {
         let prevUserId = useLoginStore.getState().currentUser?.id;

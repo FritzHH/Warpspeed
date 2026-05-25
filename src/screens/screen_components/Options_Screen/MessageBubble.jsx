@@ -15,7 +15,7 @@ import { useZ } from "../../../hooks/useZ";
 import { formatDateTimeForReceipt } from "../../../utils";
 import { translateText } from "../../../db_calls";
 import { dbSaveMessageTranslation } from "../../../db_calls_wrapper";
-import { useLoginStore } from "../../../stores";
+import { useLoginStore, useCustMessagesStore } from "../../../stores";
 import s from "./Messages.module.css";
 
 const TRANSLATION_LANGUAGES = [
@@ -26,6 +26,18 @@ const TRANSLATION_LANGUAGES = [
   { label: "Creole", code: "ht" },
   { label: "Arabic", code: "ar" },
 ];
+
+// Optimistic thread patch so bubble icons (block/forward) reflect user intent
+// immediately, instead of waiting for the Firestore listener round-trip.
+// Pass undefined for canRespondVal to skip; pass non-array for forwardToArray to skip.
+export function applyOptimisticThreadPatch(phone, canRespondVal, forwardToArray) {
+  if (!phone || phone.length !== 10) return;
+  let patch = {};
+  if (canRespondVal !== undefined) patch.canRespond = canRespondVal ? true : null;
+  if (Array.isArray(forwardToArray)) patch.forwardToArray = forwardToArray;
+  if (patch.canRespond === undefined && !patch.forwardToArray) return;
+  useCustMessagesStore.getState().patchSmsThread(phone, patch);
+}
 
 const URL_REGEX = /(https?:\/\/[^\s]+)/;
 

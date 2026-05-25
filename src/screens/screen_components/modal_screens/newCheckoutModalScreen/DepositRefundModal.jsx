@@ -463,6 +463,11 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
             )}
 
             <ModalFooter>
+              {!sRemoved && !sRefundComplete ? (
+                <ModalFooterButton variant="danger" disabled={sProcessing} onClick={handleClose}>
+                  {sLoading ? "Close" : "Cancel"}
+                </ModalFooterButton>
+              ) : null}
               {!sLoading && !sTransaction && sLoadMessage && !sRemoved ? (
                 <ModalFooterButton variant="danger" onClick={() => _setShowRemoveConfirm(true)}>
                   {"Remove " + label}
@@ -483,11 +488,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                 <ModalFooterButton variant="accent" onClick={handleClose}>
                   Done
                 </ModalFooterButton>
-              ) : (
-                <ModalFooterButton variant="danger" disabled={sProcessing} onClick={handleClose}>
-                  {sLoading ? "Close" : "Cancel"}
-                </ModalFooterButton>
-              )}
+              ) : null}
             </ModalFooter>
           </div>
 

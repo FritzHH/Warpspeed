@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { Button } from "../../../../../dom_components";
+import { Button, CheckBox } from "../../../../../dom_components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../../styles";
 
 import { SETTINGS_OBJ } from "../../../../../data";
@@ -172,8 +172,26 @@ export const TextTemplatesComponent = ({
     _setEmojiModalTemplateId(null);
   }
 
+  let allowStaffPhoneReply = zSettingsObj?.allowStaffPhoneReply !== false;
+
   return (
     <div className={styles.outer}>
+      <div className={styles.inner}>
+        <div className={styles.sectionHeader}>TEXT SETTINGS</div>
+        <CheckBox
+          isChecked={allowStaffPhoneReply}
+          textStyle={{ fontSize: 15 }}
+          buttonStyle={{ backgroundColor: "transparent" }}
+          text="Allow staff to reply to forwarded customer messages from their phone"
+          onCheck={() =>
+            handleSettingsFieldChange(
+              "allowStaffPhoneReply",
+              !allowStaffPhoneReply
+            )
+          }
+        />
+      </div>
+
       <div className={styles.inner}>
         {/* Add button */}
         <div className={styles.addRow}>

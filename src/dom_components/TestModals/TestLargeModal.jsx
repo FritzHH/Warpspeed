@@ -41,7 +41,7 @@ export const TestLargeModal = ({ visible, onClose, onShowConfirm }) => {
         <ModalFooter>
           <ModalFooterButton onClick={onClose}>Cancel</ModalFooterButton>
           <ModalFooterButton onClick={onClose}>Save Draft</ModalFooterButton>
-          <ModalFooterButton variant="primary" onClick={onShowConfirm}>
+          <ModalFooterButton variant="accent" onClick={onShowConfirm}>
             Show Confirm
           </ModalFooterButton>
         </ModalFooter>

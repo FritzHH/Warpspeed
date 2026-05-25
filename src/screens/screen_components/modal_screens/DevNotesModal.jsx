@@ -3,7 +3,8 @@ import React, { useState, useEffect } from "react";
 import { C, ICONS, COLOR_GRADIENTS } from "../../../styles";
 import { Button, TextInput, Dialog, ModalFooter, ModalFooterButton } from "../../../dom_components";
 import { useLoginStore, useSettingsStore } from "../../../stores";
-import { PRIVILEDGE_LEVELS } from "../../../data";
+import { permissionToLevel } from "../../../data";
+import { PERMISSION_LEVELS } from "../../../constants";
 import { formatMillisForDisplay } from "../../../utils";
 import {
   firestoreWrite,
@@ -39,8 +40,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
   if (!visible) return null;
 
   const currentUser = useLoginStore.getState().getCurrentUser();
-  const userPerm = currentUser?.permissions?.name || currentUser?.permissions;
-  const isOwner = userPerm === PRIVILEDGE_LEVELS.owner;
+  const isOwner = permissionToLevel(currentUser?.permissions) >= PERMISSION_LEVELS.owner.level;
 
   async function handlePost() {
     let text = sNewNoteText.trim();
@@ -56,6 +56,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
       updatedAt: now,
     });
     _sSetNewNoteText("");
+    onClose();
   }
 
   async function handleDeleteNote(note) {

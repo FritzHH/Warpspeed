@@ -1333,6 +1333,216 @@ exports.incomingSMSEnhanced = onRequest(
       const messageDocRef = (msgId) => conversationRef.collection("messages").doc(msgId);
 
       // ============================================================================
+      // EARLY: LOAD STORE SETTINGS (used by staff-reply detection AND thread-status check below)
+      // ============================================================================
+
+      let storeSettings = {};
+      try {
+        const settingsDocEarly = await db
+          .collection("tenants").doc(tenantID)
+          .collection("stores").doc(storeID)
+          .collection("settings").doc("settings")
+          .get();
+        storeSettings = settingsDocEarly.exists ? settingsDocEarly.data() : {};
+      } catch (settingsErr) {
+        log("Error loading store settings (non-fatal)", { error: settingsErr.message });
+      }
+
+      // ============================================================================
+      // STAFF-PHONE-REPLY DETECTION & ROUTING
+      // If the incoming SMS is from a staff phone (matches a user.phone in
+      // settings.users), route it as an outbound reply to whatever customer
+      // was last forwarded to that staff member (via user-sms-pointers/{userID}).
+      // Gated by settings.allowStaffPhoneReply (default ON; undefined = on for
+      // existing tenants with no field).
+      // ============================================================================
+
+      const settingsUsers = Array.isArray(storeSettings.users) ? storeSettings.users : [];
+      const staffUser = settingsUsers.find((u) => (u?.phone || "").replace(/\D/g, "") === normalizedPhone);
+
+      if (staffUser) {
+        if (storeSettings.allowStaffPhoneReply === false) {
+          log("Staff phone detected but allowStaffPhoneReply is off - dropping silently", {
+            userID: staffUser.id,
+          });
+          return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+        }
+        try {
+          log("Incoming SMS is from a staff phone - routing as reply", {
+            userID: staffUser.id,
+            userName: `${staffUser.first || ""} ${staffUser.last || ""}`.trim(),
+          });
+
+          const pointerRef = db
+            .collection("tenants").doc(tenantID)
+            .collection("stores").doc(storeID)
+            .collection("user-sms-pointers").doc(staffUser.id);
+          const pointerDoc = await pointerRef.get();
+
+          if (!pointerDoc.exists) {
+            log("No staff-reply pointer found - dropping silently", { userID: staffUser.id });
+            return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+          }
+
+          const pointer = pointerDoc.data();
+          const custPhone = (pointer.custPhone || "").replace(/\D/g, "");
+          if (custPhone.length !== 10) {
+            log("Staff-reply pointer has invalid custPhone - dropping silently", { userID: staffUser.id, custPhone: pointer.custPhone });
+            return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+          }
+
+          const targetConvRef = db
+            .collection("tenants").doc(tenantID)
+            .collection("stores").doc(storeID)
+            .collection("sms-messages").doc(custPhone);
+          const targetConvDoc = await targetConvRef.get();
+          const targetConv = targetConvDoc.exists ? targetConvDoc.data() : null;
+
+          if (!targetConv) {
+            log("Target thread missing - dropping silently", { custPhone });
+            return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+          }
+
+          const targetForwardTo = Array.isArray(targetConv.forwardTo) ? targetConv.forwardTo : [];
+          if (targetForwardTo.length > 1) {
+            log("Target thread has multi-staff forwardTo - dropping silently (must use app)", {
+              custPhone,
+              forwardCount: targetForwardTo.length,
+            });
+            // TODO: When multi-staff replies become possible via the app deep-link,
+            // also fan out a "team echo" Twilio SMS to other users in forwardTo.
+            return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+          }
+
+          // Build outgoing message data (matches the shape used by sendSMS path)
+          const outgoingMessageData = {
+            id: messageSid,
+            customerID: targetConv.customerInfo?.id || "",
+            message: incomingMessage,
+            phoneNumber: custPhone,
+            messageSid,
+            fromNumber: twilioData.To || "",
+            tenantID,
+            storeID,
+            type: "outgoing",
+            millis: Date.now(),
+            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            canRespond: true,
+            origin: "staff-phone",
+            senderUserID: staffUser.id,
+            senderFirst: staffUser.first || "",
+            senderLast: staffUser.last || "",
+          };
+
+          // Download/store any media from Twilio so we can echo it to the
+          // customer AND keep it in Cloud Storage for the in-app thread view.
+          let staffMediaPublicUrls = [];
+          if (numMedia > 0) {
+            const mediaUrls = [];
+            const bucket = admin.storage().bucket(STORAGE_BUCKET);
+            const accountSid = twilioSecretAccountNumber.value();
+            const authToken = twilioSecretKey.value();
+            const authHeader = "Basic " + Buffer.from(`${accountSid}:${authToken}`).toString("base64");
+
+            for (let i = 0; i < numMedia; i++) {
+              const twilioUrl = twilioData[`MediaUrl${i}`];
+              const contentType = twilioData[`MediaContentType${i}`] || "application/octet-stream";
+              if (!twilioUrl) continue;
+              try {
+                const mediaResponse = await fetch(twilioUrl, { headers: { Authorization: authHeader } });
+                if (!mediaResponse.ok) throw new Error(`Twilio fetch failed: ${mediaResponse.status}`);
+                const arrayBuffer = await mediaResponse.arrayBuffer();
+                const rawBuffer = Buffer.from(arrayBuffer);
+                const { compressedBuffer, thumbnailBuffer } = await compressImageServer(rawBuffer, contentType);
+                if (compressedBuffer && thumbnailBuffer) {
+                  const mainPath = `${tenantID}/${storeID}/sms-media/${custPhone}/${messageSid}_${i}.jpg`;
+                  const thumbPath = `${tenantID}/${storeID}/sms-media/${custPhone}/thumbnails/${messageSid}_${i}.jpg`;
+                  const mainFile = bucket.file(mainPath);
+                  await mainFile.save(compressedBuffer, { contentType: "image/jpeg", metadata: { contentType: "image/jpeg" } });
+                  await mainFile.makePublic();
+                  const mainUrl = `https://storage.googleapis.com/${bucket.name}/${mainPath}`;
+                  const thumbFile = bucket.file(thumbPath);
+                  await thumbFile.save(thumbnailBuffer, { contentType: "image/jpeg", metadata: { contentType: "image/jpeg" } });
+                  await thumbFile.makePublic();
+                  const thumbUrl = `https://storage.googleapis.com/${bucket.name}/${thumbPath}`;
+                  mediaUrls.push({ url: mainUrl, thumbnailUrl: thumbUrl, contentType: "image/jpeg" });
+                } else {
+                  const ext = contentType.startsWith("image/jpeg") ? ".jpg"
+                    : contentType.startsWith("image/png") ? ".png"
+                    : contentType.startsWith("image/gif") ? ".gif"
+                    : contentType.startsWith("video/mp4") ? ".mp4"
+                    : contentType.startsWith("application/pdf") ? ".pdf"
+                    : "";
+                  const storagePath = `${tenantID}/${storeID}/sms-media/${custPhone}/${messageSid}_${i}${ext}`;
+                  const file = bucket.file(storagePath);
+                  await file.save(rawBuffer, { contentType, metadata: { contentType } });
+                  await file.makePublic();
+                  const publicUrl = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+                  mediaUrls.push({ url: publicUrl, contentType });
+                }
+              } catch (mediaError) {
+                log("Error downloading staff-reply media from Twilio", { index: i, error: mediaError.message });
+              }
+            }
+            outgoingMessageData.mediaUrls = mediaUrls;
+            staffMediaPublicUrls = mediaUrls.map((m) => m.url);
+          }
+
+          await targetConvRef.collection("messages").doc(messageSid).set(outgoingMessageData);
+
+          // Update thread parent - re-open if was closed
+          await targetConvRef.set({
+            canRespond: true,
+            lastMessage: incomingMessage,
+            lastMillis: Date.now(),
+            lastType: "outgoing",
+            hasMedia: numMedia > 0,
+            threadStatus: "open",
+            lastOutgoingMessageID: messageSid,
+            lastOutgoingMessageStatus: "queued",
+            lastOutgoingMillis: Date.now(),
+            lastOutgoingSenderID: staffUser.id,
+          }, { merge: true });
+
+          // Send to customer via Twilio
+          if (!twilioClient) {
+            twilioClient = require("twilio")(
+              twilioSecretAccountNumber.value(),
+              twilioSecretKey.value().trim()
+            );
+          }
+          const _tnStaff = (storeSettings?.storeInfo?.textingNumber || "").replace(/\D/g, "");
+          const staffFromNumber = twilioData.To || (_tnStaff.length === 10 ? `+1${_tnStaff}` : "");
+          if (!staffFromNumber) {
+            log("No from number for staff-reply outbound - message stored in thread but not sent");
+            return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+          }
+          const twilioPayload = {
+            body: incomingMessage,
+            to: `+1${custPhone}`,
+            from: staffFromNumber,
+          };
+          if (staffMediaPublicUrls.length > 0) twilioPayload.mediaUrl = staffMediaPublicUrls;
+          await twilioClient.messages.create(twilioPayload);
+
+          log("Staff-phone reply sent to customer", {
+            senderID: staffUser.id,
+            custPhone,
+            messageSid,
+            hasMedia: numMedia > 0,
+          });
+
+          return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+        } catch (staffReplyError) {
+          log("Error in staff-phone-reply branch - dropping silently", {
+            error: staffReplyError.message,
+            stack: staffReplyError.stack,
+          });
+          return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+        }
+      }
+
+      // ============================================================================
       // STEP 3: OPTIONAL CUSTOMER LOOKUP (metadata only, not for routing)
       // ============================================================================
 
@@ -1373,16 +1583,9 @@ exports.incomingSMSEnhanced = onRequest(
       let canRespond = false;
       let threadStatus = "closed";
       let conversationData = {};
-      let storeSettings = {};
 
       try {
-        // Fetch settings for timeout
-        const settingsDoc = await db
-          .collection("tenants").doc(tenantID)
-          .collection("stores").doc(storeID)
-          .collection("settings").doc("settings")
-          .get();
-        storeSettings = settingsDoc.exists ? settingsDoc.data() : {};
+        // (storeSettings already loaded earlier for staff-reply detection)
 
         // Read thread state from parent doc (canonical source for canRespond and forwardTo)
         const parentDoc = await conversationRef.get();
@@ -1608,11 +1811,50 @@ exports.incomingSMSEnhanced = onRequest(
 
           let fwdFirst = (customerData.first || "").charAt(0).toUpperCase() + (customerData.first || "").slice(1).toLowerCase();
           let fwdLast = (customerData.last || "").charAt(0).toUpperCase() + (customerData.last || "").slice(1).toLowerCase();
-          let forwardBody = `💬 Reply from ${fwdFirst} ${fwdLast}: ${forwardMessageText}`;
-          if (incomingMessageData.mediaUrls && incomingMessageData.mediaUrls.length > 0) {
-            const mediaLinks = incomingMessageData.mediaUrls.map((m) => m.url).join("\n");
+
+          const isMultiStaff = forwardTo.length > 1;
+
+          // Generate one short link per forward batch (same destination for
+          // all recipients — they all open the same conversation).
+          let appLink = "";
+          try {
+            appLink = await createShortLink(db, {
+              tenantID,
+              storeID,
+              destination: `/phone?conv=${encodeURIComponent(normalizedPhone)}`,
+            });
+          } catch (linkErr) {
+            log("Error creating short link (non-fatal, sending without link)", {
+              error: linkErr.message,
+            });
+          }
+
+          let customerName = `${fwdFirst} ${fwdLast}`.trim();
+          if (!customerName) customerName = "Customer";
+
+          let forwardBody = `REPLY FROM ${customerName}:`;
+          if (forwardMessageText) {
+            forwardBody += `\n"${forwardMessageText}"`;
+          }
+          if (
+            incomingMessageData.mediaUrls &&
+            incomingMessageData.mediaUrls.length > 0
+          ) {
+            const mediaLinks = incomingMessageData.mediaUrls
+              .map((m) => m.url)
+              .join("\n");
             forwardBody += `\n${mediaLinks}`;
           }
+          if (isMultiStaff) {
+            forwardBody += appLink
+              ? `\nREPLIES NOT ALLOWED. Respond in App:\n${appLink}`
+              : `\nREPLIES NOT ALLOWED`;
+          } else {
+            forwardBody += appLink
+              ? `\nReply here, or respond in App:\n${appLink}`
+              : `\nReply here`;
+          }
+
           let _tnFwd = (storeSettings?.storeInfo?.textingNumber || "").replace(/\D/g, "");
           const fromNumber = twilioData.To || (_tnFwd.length === 10 ? `+1${_tnFwd}` : "");
           if (!fromNumber) { log("No from number for forwarding, skipping"); return; }
@@ -1625,6 +1867,25 @@ exports.incomingSMSEnhanced = onRequest(
                 from: fromNumber,
               });
               log("Forwarded SMS to user", { userID: entry.userID, userName: entry.first });
+
+              // Write/overwrite the user-sms-pointer so this staff member can
+              // reply via SMS from their phone (single-staff threads only;
+              // multi-staff threads are gated off in the staff-reply branch).
+              if (entry.userID) {
+                try {
+                  await db
+                    .collection("tenants").doc(tenantID)
+                    .collection("stores").doc(storeID)
+                    .collection("user-sms-pointers").doc(entry.userID)
+                    .set({
+                      custPhone: normalizedPhone,
+                      threadPath: `tenants/${tenantID}/stores/${storeID}/sms-messages/${normalizedPhone}`,
+                      forwardedAtMs: Date.now(),
+                    });
+                } catch (pointerError) {
+                  log("Error writing user-sms-pointer (non-fatal)", { userID: entry.userID, error: pointerError.message });
+                }
+              }
             } catch (fwdError) {
               log("Error forwarding SMS to user", { userID: entry?.userID, error: fwdError.message });
             }
@@ -1684,6 +1945,101 @@ exports.incomingSMSEnhanced = onRequest(
         .send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
     }
   })
+);
+
+///////////////////////////////////////////////////////////////////////////////
+// Short-link helpers + redirector
+//
+// SMS bodies include a `/r/{id}` URL that 302s to the real in-app destination
+// (e.g., /phone?conv=<custPhone>). Keeps the SMS short and lets us change the
+// landing URL format later without breaking already-sent links.
+//
+// Docs live in the top-level `short-links` collection. Each doc has an
+// `expiresAt` Timestamp; a Firestore TTL policy on that field auto-deletes
+// old docs (must be enabled manually in the console — code can't set TTL).
+const SHORT_LINK_ALPHABET =
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+const SHORT_LINK_ID_LENGTH = 6;
+const SHORT_LINK_TTL_DAYS = 30;
+
+function generateShortLinkId() {
+  const cryptoMod = require("crypto");
+  const bytes = cryptoMod.randomBytes(SHORT_LINK_ID_LENGTH);
+  let id = "";
+  for (let i = 0; i < SHORT_LINK_ID_LENGTH; i++) {
+    id += SHORT_LINK_ALPHABET[bytes[i] % SHORT_LINK_ALPHABET.length];
+  }
+  return id;
+}
+
+async function createShortLink(db, { tenantID, storeID, destination, ttlDays }) {
+  const id = generateShortLinkId();
+  const days = ttlDays || SHORT_LINK_TTL_DAYS;
+  const nowMs = Date.now();
+  const expiresAt = new Date(nowMs + days * 24 * 60 * 60 * 1000);
+  await db.collection("short-links").doc(id).set({
+    destination,
+    tenantID: tenantID || "",
+    storeID: storeID || "",
+    createdAtMs: nowMs,
+    expiresAt,
+  });
+  return `${WEB_APP_URL}/r/${id}`;
+}
+
+exports.shortLinkRedirector = onRequest(
+  {
+    cors: false,
+    secrets: [firebaseServiceAccountKey],
+  },
+  async (request, response) => {
+    try {
+      const db = await getDB(firebaseServiceAccountKey);
+
+      // Hosting rewrite passes the original path through as request.path.
+      // Accept either `/r/{id}` or bare `/{id}` for flexibility.
+      const path = request.path || "";
+      const match =
+        path.match(/^\/?r\/([A-Za-z0-9]+)\/?$/) ||
+        path.match(/^\/?([A-Za-z0-9]+)\/?$/);
+      if (!match) {
+        log("shortLinkRedirector: invalid path", { path });
+        return response.redirect(302, `${WEB_APP_URL}/phone?error=invalid-link`);
+      }
+      const id = match[1];
+
+      const docSnap = await db.collection("short-links").doc(id).get();
+      if (!docSnap.exists) {
+        log("shortLinkRedirector: link not found", { id });
+        return response.redirect(302, `${WEB_APP_URL}/phone?error=expired-link`);
+      }
+
+      const data = docSnap.data() || {};
+      const expiresAt = data.expiresAt;
+      const expiresMs =
+        expiresAt && typeof expiresAt.toMillis === "function"
+          ? expiresAt.toMillis()
+          : 0;
+      if (expiresMs && expiresMs < Date.now()) {
+        log("shortLinkRedirector: link expired", { id });
+        return response.redirect(302, `${WEB_APP_URL}/phone?error=expired-link`);
+      }
+
+      const destination = data.destination || "/phone";
+      const fullDestination = destination.startsWith("http")
+        ? destination
+        : `${WEB_APP_URL}${destination}`;
+
+      log("shortLinkRedirector: redirecting", { id, destination: fullDestination });
+      return response.redirect(302, fullDestination);
+    } catch (err) {
+      log("shortLinkRedirector: error", {
+        error: err.message,
+        stack: err.stack,
+      });
+      return response.redirect(302, `${WEB_APP_URL}/phone?error=link-error`);
+    }
+  }
 );
 
 ///////////////////////////////////////////////////////////////////////////////

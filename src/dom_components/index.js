@@ -47,3 +47,4 @@ export { AnimatedSwitch } from "./AnimatedSwitch/AnimatedSwitch";
 export { StaleBanner } from "./StaleBanner/StaleBanner";
 export { PrinterAlert } from "./PrinterAlert/PrinterAlert";
 export { ReceiptSentOverlay } from "./ReceiptSentOverlay/ReceiptSentOverlay";
+export { SuperUserBanner } from "./SuperUserBanner/SuperUserBanner";

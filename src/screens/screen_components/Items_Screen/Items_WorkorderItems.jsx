@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import { applyDiscountToWorkorderItem, calculateRunningTotals, deepEqual, formatCurrencyDisp, getWorkorderPaymentState, lightenRGBByPercent, log, replaceOrAddToArr, resolveStatus, showAlert } from "../../../utils";
+import { applyDiscountToWorkorderItem, calculateRunningTotals, deepEqual, formatCurrencyDisp, getWorkorderPaymentState, lightenRGBByPercent, localStorageWrapper, log, replaceOrAddToArr, resolveStatus, showAlert, showPrinterOfflineAlert } from "../../../utils";
 import { DISCOUNT_TYPES } from "../../../constants";
 import {
   Button,
@@ -447,7 +447,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     showAlert({
       title: "Confirm Delete Workorder",
       message: "Recoverable from the deleted-workorders list until tonight's cleanup.",
-      btn1Icon: ICONS.trash,
+      btn1Text: "Delete",
       handleBtn1Press: deleteFun,
     });
     });
@@ -751,11 +751,22 @@ export const Items_WorkorderItemsTab = ({}) => {
             enabled={!isDonePaid && !hasMissingReceiptNotes && !hasPlaceholderItems}
             buttonStyle={{ paddingVertical: 0, opacity: (isDonePaid || hasMissingReceiptNotes || hasPlaceholderItems) ? 0.3 : 1 }}
             onPress={() => useLoginStore.getState().requireLogin(() => {
-              if (useOpenWorkordersStore.getState().castingToDisplay) {
-                broadcastClear();
-                useOpenWorkordersStore.setState({ castingToDisplay: false });
+              const proceed = () => {
+                if (useOpenWorkordersStore.getState().castingToDisplay) {
+                  broadcastClear();
+                  useOpenWorkordersStore.setState({ castingToDisplay: false });
+                }
+                useCheckoutStore.getState().setIsCheckingOut(true);
+              };
+              const selectedPrinterID = localStorageWrapper.getItem("selectedPrinterID");
+              const settings = useSettingsStore.getState().getSettings();
+              const selectedPrinter = selectedPrinterID && settings?.printers?.[selectedPrinterID];
+              const isPrinterOffline = !!(selectedPrinter && selectedPrinter.active !== true);
+              if (isPrinterOffline) {
+                showPrinterOfflineAlert({ printerName: selectedPrinter?.name, onContinue: proceed });
+                return;
               }
-              useCheckoutStore.getState().setIsCheckingOut(true);
+              proceed();
             })}
           />
         </Tooltip>

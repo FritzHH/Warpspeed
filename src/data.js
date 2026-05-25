@@ -299,6 +299,7 @@ export const APP_USER = {
   email: "",
   pin: "",
   faceDescriptor: "",
+  linkedUserID: "",
   hourlyWage: "",
   preview: true,
   forwardSMS: false,
@@ -999,6 +1000,7 @@ export const SETTINGS_OBJ = {
   useCardFee: false,
   cardFeePercent: 3,
   cardFeeRefund: false,
+  allowStaffPhoneReply: true,
   lockScreenWhenUserLogsOut: false,
   useFacialRecognition: true,
   faceRecognitionThreshold: 0.55,
@@ -1460,8 +1462,8 @@ export const RECEIPT_PROTO = {
 // END RECEIPT STUFF /////////////////////////////////////////////
 
 export const PRIVILEDGE_LEVELS = {
-  admin: "Admin",
-  superUser: "Editor",
+  admin: "Manager",
+  superUser: "Admin",
   owner: "Owner",
   user: "User",
 };
@@ -1473,8 +1475,9 @@ export function permissionToLevel(perm) {
   if (typeof perm === "string") {
     switch (perm) {
       case "Owner": return 5;
-      case "Super-User": return 4;
-      case "Admin": return 3;
+      case "Admin": return 4;
+      case "Super-User": return 4; // legacy
+      case "Manager": return 3;
       case "Editor": return 2;
       case "User": return 1;
     }
@@ -1484,8 +1487,8 @@ export function permissionToLevel(perm) {
 
 export function levelToPrivilegeName(level) {
   if (level >= 5) return "Owner";
-  if (level >= 4) return "Super-User";
-  if (level >= 3) return "Admin";
+  if (level >= 4) return "Admin";
+  if (level >= 3) return "Manager";
   if (level >= 2) return "Editor";
   return "User";
 }

@@ -149,7 +149,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
   ] : [];
 
   const fullDataArr = [...dataArr, ...discountRows];
-  const selectableItems = fullDataArr.filter((item) => !item._isDivider && !item._isCustomInput && !item.component);
+  const selectableItems = fullDataArr.filter((item) => !item._isDivider && !item._isCustomInput && !item.component && !item.disabled);
   const br = menuButtonStyle.borderRadius || 5;
 
   const matchNorm = matchValue == null || matchValue === ""
@@ -344,6 +344,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
 
               const isFocused = selectableItems.indexOf(item) === focusedIdx;
               const isSelected = idx === effectiveSelectedIdx;
+              const isItemDisabled = !!item.disabled;
               return (
                 <div
                   key={item.id ?? item.label ?? idx}
@@ -354,18 +355,21 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
                     backgroundColor: isSelected && !preserveItemBackground
                       ? lightenRGBByPercent(C.blue, 85)
                       : (getItemBg(item.backgroundColor, idx) || getItemBg(C.surfaceAlt, idx)),
-                    opacity: isSelected && preserveItemBackground ? selectedItemOpacity : undefined,
+                    opacity: isItemDisabled ? 0.4 : (isSelected && preserveItemBackground ? selectedItemOpacity : undefined),
                     outline: isFocused ? `2px solid ${C.borderFocus}` : undefined,
+                    cursor: isItemDisabled ? "not-allowed" : undefined,
                     ...itemBorderRadius(idx),
                     ...resolvedItemStyle,
                   }}
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (isItemDisabled) return;
                     setOpen(false);
                     onSelect(item, idx);
                   }}
                   role="option"
                   aria-selected={isSelected}
+                  aria-disabled={isItemDisabled || undefined}
                 >
                   <span
                     className={styles.itemLabel}

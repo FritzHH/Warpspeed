@@ -459,9 +459,10 @@ export const CardReaderPayment = memo(function CardReaderPayment({
     }
   }
 
-  let celebrationGif = saleComplete ? ICONS.guyCelebrating : ICONS.popperCelebration;
+  let isPaidInFull = saleComplete || amountLeftToPay <= 0;
+  let celebrationGif = isPaidInFull ? ICONS.guyCelebrating : ICONS.popperCelebration;
 
-  if (sDone) {
+  if (sDone || isPaidInFull) {
     return (
       <div className={styles.containerCentered} style={SHADOW_PROTO}>
         <div className={styles.celebrationInner}>
@@ -473,7 +474,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
             className={styles.celebrationImage}
           />
           <span className={styles.successText} style={{ color: C.green }}>
-            {saleComplete ? "Full payment complete!" : sSuccessMsg}
+            {isPaidInFull ? "Full payment complete!" : sSuccessMsg}
           </span>
         </div>
       </div>

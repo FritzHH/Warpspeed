@@ -56,6 +56,15 @@ export function Notes_MainComponent() {
     return "(" + user.first.toString() + " " + user.last[0] + ")  ";
   }
 
+  function noteDisplayText(value) {
+    const text = capitalizeFirstLetterOfString(value) || "Empty note";
+    // Pad trailing newlines with zero-width spaces so empty trailing lines reserve
+    // line-height (matches textarea behavior, prevents shift when entering edit mode).
+    const m = (value || "").match(/\n+$/);
+    if (!m) return text;
+    return text + "\u200B" + "\n\u200B".repeat(m[0].length - 1);
+  }
+
   function formatNoteDateShort(millis) {
     if (!millis) return "";
     const d = new Date(millis);
@@ -261,7 +270,7 @@ export function Notes_MainComponent() {
                         className={styles.noteText}
                         style={{ color: item.value ? C.text : C.textMuted }}
                       >
-                        {capitalizeFirstLetterOfString(item.value) || "Empty note"}
+                        {noteDisplayText(item.value)}
                       </span>
                     </div>
                   )}
@@ -355,7 +364,7 @@ export function Notes_MainComponent() {
                         className={styles.noteText}
                         style={{ color: item.value ? C.text : C.textMuted }}
                       >
-                        {capitalizeFirstLetterOfString(item.value) || "Empty note"}
+                        {noteDisplayText(item.value)}
                       </span>
                     </div>
                   )}

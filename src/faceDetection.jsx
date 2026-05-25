@@ -441,6 +441,8 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
     useAlertScreenStore.getState().setValues({
       title: "PUNCH CLOCK",
       message: "Hi " + user.first + ", you are not clocked in. Would you like to punch in now?",
+      btn1Text: "CLOCK IN",
+      btn2Text: "NOT NOW",
       handleBtn1Press: () => {
         useLoginStore.getState().setCreateUserClock(user.id, Date.now(), "in");
         useLoginStore.getState().setLastActionMillis();

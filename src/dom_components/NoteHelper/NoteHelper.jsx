@@ -4,6 +4,7 @@ import { C, Fonts } from "../../styles";
 import { lightenRGBByPercent } from "../../utils";
 import styles from "./NoteHelper.module.css";
 import { useZ } from "../../hooks/useZ";
+import { ModalFooter, ModalFooterButton } from "../ModalFooter/ModalFooter";
 
 export const NoteHelper = forwardRef(function NoteHelper(
   {
@@ -20,6 +21,7 @@ export const NoteHelper = forwardRef(function NoteHelper(
     fontSizeAdj = 0,
     chipPaddingVertAdj = 0,
     onViewItem,
+    readOnly = false,
     className = "",
     "data-testid": testId,
   },
@@ -129,11 +131,13 @@ export const NoteHelper = forwardRef(function NoteHelper(
               <button
                 key={(item.id || label) + i}
                 className={styles.chip}
+                disabled={readOnly}
                 onClick={() => toggleChip(item, targetForRender, category.id)}
                 style={{
                   backgroundColor: active ? lightenRGBByPercent(C.red, 70) : C.buttonLightGreenOutline,
                   paddingTop: 5 + chipPaddingVertAdj,
                   paddingBottom: 5 + chipPaddingVertAdj,
+                  cursor: readOnly ? "default" : "pointer",
                 }}
               >
                 <span style={{ fontSize: 15 + fontSizeAdj, color: active ? C.red : C.textMuted }}>
@@ -173,9 +177,10 @@ export const NoteHelper = forwardRef(function NoteHelper(
       <div
         ref={dropdownRef}
         className={styles.dropdown}
-        style={{ zIndex: z + 1, ...positionStyle, borderColor: C.buttonLightGreenOutline }}
+        style={{ zIndex: z + 1, ...positionStyle }}
         onClick={(e) => e.stopPropagation()}
       >
+        <div className={styles.cardInner}>
         {/* Item header */}
         <div className={styles.header} style={{ borderBottomColor: C.buttonLightGreenOutline }}>
           <div className={styles.itemNameRow}>
@@ -247,23 +252,32 @@ export const NoteHelper = forwardRef(function NoteHelper(
             <span className={styles.noteLabel} style={{ fontSize: 11 + fontSizeAdj, color: C.textMuted }}>Intake notes</span>
             <textarea
               className={styles.noteTextarea}
+              disabled={readOnly}
               value={workorderLine.intakeNotes || ""}
               onChange={(e) => onUpdateLine({ ...workorderLine, intakeNotes: e.target.value })}
               placeholder="Intake notes"
-              style={{ fontSize: 15 + fontSizeAdj, color: "orange", borderColor: C.borderStrong, minHeight: 32 + fontSizeAdj }}
+              style={{ fontSize: 15 + fontSizeAdj, color: "orange", borderColor: C.borderStrong, minHeight: 32 + fontSizeAdj, cursor: readOnly ? "default" : "text" }}
             />
           </div>
           <div className={styles.noteBlock}>
             <span className={styles.noteLabel} style={{ fontSize: 11 + fontSizeAdj, color: C.textMuted }}>Receipt notes</span>
             <textarea
               className={styles.noteTextarea}
+              disabled={readOnly}
               value={workorderLine.receiptNotes || ""}
               onChange={(e) => onUpdateLine({ ...workorderLine, receiptNotes: e.target.value })}
               placeholder="Receipt notes"
-              style={{ fontSize: 15 + fontSizeAdj, color: "green", borderColor: C.borderStrong, minHeight: 32 + fontSizeAdj }}
+              style={{ fontSize: 15 + fontSizeAdj, color: "green", borderColor: C.borderStrong, minHeight: 32 + fontSizeAdj, cursor: readOnly ? "default" : "text" }}
             />
           </div>
         </div>
+        </div>
+
+        <ModalFooter size="small">
+          <ModalFooterButton variant="default" onClick={onClose}>
+            Close
+          </ModalFooterButton>
+        </ModalFooter>
       </div>
     </div>,
     document.body

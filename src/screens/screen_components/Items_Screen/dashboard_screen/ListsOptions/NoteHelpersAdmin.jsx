@@ -1,12 +1,18 @@
 import React, { useState } from "react";
 import cloneDeep from "lodash/cloneDeep";
-import { Tooltip, TouchableOpacity, Image } from "../../../../../dom_components";
+import { Tooltip, TouchableOpacity, Image, NoteHelper } from "../../../../../dom_components";
 import { C, ICONS } from "../../../../../styles";
 
 import { NOTE_HELPER_PROTO } from "../../../../../data";
 import { BoxButton1, BoxContainerInner } from "./_helpers";
 import { NoteHelperEditorModal } from "./NoteHelperEditorModal";
 import styles from "./ListOptions.module.css";
+
+const TEST_WORKORDER_LINE = {
+  inventoryItem: { formalName: "Sample Item" },
+  intakeNotes: "",
+  receiptNotes: "",
+};
 
 export const NoteHelpersAdmin = ({
   zSettingsObj,
@@ -15,6 +21,7 @@ export const NoteHelpersAdmin = ({
   const [sCatDragIdx, _setCatDragIdx] = useState(null);
   const [sCatDragOverIdx, _setCatDragOverIdx] = useState(null);
   const [sEditorModal, _setEditorModal] = useState(null);
+  const [sTestMenuOpen, _setTestMenuOpen] = useState(false);
 
   const noteHelpers = zSettingsObj?.noteHelpers || [];
 
@@ -79,6 +86,33 @@ export const NoteHelpersAdmin = ({
           </span>
           <Tooltip text="Add category">
             <BoxButton1 onPress={handleAddCategory} />
+          </Tooltip>
+        </div>
+
+        {/* See Menu (read-only preview) */}
+        <div
+          style={{
+            marginTop: 10,
+            width: "95%",
+            display: "flex",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <Tooltip text="Preview the menu users see in the workorder flow (read-only)">
+            <BoxButton1
+              label="See Menu"
+              icon={ICONS.eyeballs}
+              iconSize={20}
+              onPress={() => _setTestMenuOpen(true)}
+              style={{
+                paddingLeft: 10,
+                paddingRight: 10,
+                paddingTop: 4,
+                paddingBottom: 4,
+              }}
+              textStyle={{ fontSize: 13, marginLeft: 6 }}
+            />
           </Tooltip>
         </div>
 
@@ -212,6 +246,17 @@ export const NoteHelpersAdmin = ({
         onClose={() => _setEditorModal(null)}
         onSave={handleSaveCategory}
         onDelete={handleDeleteCategory}
+      />
+
+      <NoteHelper
+        visible={sTestMenuOpen}
+        onClose={() => _setTestMenuOpen(false)}
+        workorderLine={TEST_WORKORDER_LINE}
+        onUpdateLine={() => {}}
+        noteHelpers={noteHelpers}
+        noteHelpersTarget="intakeNotes"
+        centered
+        readOnly
       />
     </BoxContainerInner>
   );

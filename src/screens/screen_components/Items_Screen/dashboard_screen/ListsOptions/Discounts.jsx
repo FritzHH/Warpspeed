@@ -60,19 +60,21 @@ export const Discounts = ({ zSettingsObj, handleSettingsFieldChange }) => {
                 debounceMs={500}
                 onChangeText={(val) => {
                   let raw = val.replace(/[^0-9]/g, "");
-                  if (raw === "") raw = "0";
-                  let num = Number(raw);
                   let isPercent = item.type === DISCOUNT_TYPES.percent;
-                  if (isPercent) {
-                    if (num > 100) num = 100;
-                    if (num < 1) num = 1;
-                    raw = String(num);
+                  let stored;
+                  if (raw === "") {
+                    stored = "";
                   } else {
-                    if (num < 1) num = 1;
-                    raw = String(num * 100);
+                    let num = Number(raw);
+                    if (isPercent) {
+                      if (num > 100) num = 100;
+                      stored = String(num);
+                    } else {
+                      stored = String(num * 100);
+                    }
                   }
                   let discountsArr = zSettingsObj.discounts.map((o) => {
-                    if (o.id === item.id) return { ...o, value: raw };
+                    if (o.id === item.id) return { ...o, value: stored };
                     return o;
                   });
                   handleSettingsFieldChange("discounts", discountsArr);
@@ -87,9 +89,11 @@ export const Discounts = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   backgroundColor: C.listItemWhite,
                 }}
                 value={
-                  item.type === DISCOUNT_TYPES.percent
-                    ? item.value
-                    : String(Math.round(Number(item.value || 0) / 100))
+                  item.value === "" || item.value == null
+                    ? ""
+                    : item.type === DISCOUNT_TYPES.percent
+                      ? item.value
+                      : String(Math.round(Number(item.value) / 100))
                 }
               />
               <div className={styles.actionsGroup40}>

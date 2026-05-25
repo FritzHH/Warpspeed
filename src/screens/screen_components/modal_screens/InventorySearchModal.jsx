@@ -43,7 +43,7 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
     } else if (key === " ") {
       handleSearchTextChange(sSearchText + " ");
     } else {
-      handleSearchTextChange(sSearchText + key.toLowerCase());
+      handleSearchTextChange(sSearchText + key);
     }
   }
 

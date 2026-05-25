@@ -210,27 +210,6 @@
   justify-content: center;
 }
 
-.emojiButton {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  margin-right: 2px;
-  padding: 0;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  font-size: 22px;
-  line-height: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-}
-
-.emojiButton:hover {
-  background-color: var(--surface-overlay-light);
-}
-
 .footerRow > *,
 .footerGroup > * {
   flex: 0 0 auto !important;

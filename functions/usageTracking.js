@@ -24,18 +24,48 @@ const admin = require("firebase-admin");
 // ─────────────────────────────────────────────────────────────────────────────
 // Named admin app for analytics writes
 // Isolated from the default app so analytics init never conflicts with the
-// service-account-creds default app initialized inside getDB().
+// service-account-creds default app initialized inside getDB(). We must,
+// however, reuse the same credential — the Cloud Run runtime service account
+// lacks roles/datastore.user, so ADC-based writes fail with PERMISSION_DENIED.
 // ─────────────────────────────────────────────────────────────────────────────
 let _analyticsApp = null;
+function resolveAnalyticsCredential() {
+  const defaultApp = admin.apps.find((a) => a && a.name === "[DEFAULT]");
+  if (defaultApp && defaultApp.options && defaultApp.options.credential) {
+    return defaultApp.options.credential;
+  }
+  const saEnv = process.env.SERVICE_ACCOUNT_KEY;
+  if (saEnv) {
+    try {
+      return admin.credential.cert(JSON.parse(saEnv));
+    } catch (err) {
+      logger.warn("usage.serviceAccountParseFailed", { error: err && err.message });
+    }
+  }
+  return null;
+}
+
 function getAnalyticsApp() {
-  if (_analyticsApp) return _analyticsApp;
+  if (_analyticsApp && _analyticsApp.options && _analyticsApp.options.credential) {
+    return _analyticsApp;
+  }
   const existing = admin.apps.find((a) => a && a.name === "analytics");
-  if (existing) {
+  if (existing && existing.options && existing.options.credential) {
     _analyticsApp = existing;
     return _analyticsApp;
   }
-  _analyticsApp = admin.initializeApp({}, "analytics");
-  return _analyticsApp;
+  const credential = resolveAnalyticsCredential();
+  // If we still don't have a credential, don't cache — try again next call once
+  // the default app has been initialized by getDB().
+  if (existing && !existing.options.credential && credential) {
+    // Delete the credential-less app so we can reinitialize with the real one.
+    try { existing.delete(); } catch (_) {}
+  } else if (existing) {
+    return existing;
+  }
+  const app = admin.initializeApp(credential ? { credential } : {}, "analytics");
+  if (credential) _analyticsApp = app;
+  return app;
 }
 
 function getAnalyticsDB() {

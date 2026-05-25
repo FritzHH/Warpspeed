@@ -13,9 +13,17 @@
   /* z-index = backdrop z + 1, supplied inline */
   background-color: var(--surface-base);
   border-radius: 10px;
-  border: 2px solid;
   box-shadow: 0 2px 4px var(--shadow-color-default);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.cardInner {
+  flex: 1;
+  min-height: 0;
   padding: 10px;
+  overflow: auto;
 }
 
 .header {

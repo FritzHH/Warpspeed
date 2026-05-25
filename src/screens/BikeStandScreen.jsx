@@ -15,6 +15,7 @@ import {
   useLoginStore,
   useAlertScreenStore,
   useActiveSalesStore,
+  useKeypadScaleStore,
 } from "../stores";
 import { getWorkorderDeleteGuard } from "../shared/workorderDeleteGuard";
 import { resolveStatus, formatCurrencyDisp, lightenRGBByPercent, capitalizeFirstLetterOfString, applyDiscountToWorkorderItem, calculateRunningTotals, deepEqual, removeDashesFromPhone, formatPhoneWithDashes, checkInputForNumbersOnly, calculateWaitEstimateLabel, formatMillisForDisplay, compressImage, createNewWorkorder, scheduleAutoText, usdTypeMask, generateEAN13Barcode, log, printBuilder, localStorageWrapper, replaceOrAddToArr, findTemplateByType } from "../utils";
@@ -248,6 +249,9 @@ export function BikeStandScreen() {
   const [sShowInventoryModal, _setShowInventoryModal] = useState(false);
   const [sShowWorkorderList, _setShowWorkorderList] = useState(false);
   const [sShowStandSettings, _setShowStandSettings] = useState(false);
+  const zKeypadScale = useKeypadScaleStore((st) => st.scale);
+  const zKeypadAdjust = useKeypadScaleStore((st) => st.adjustScale);
+  const [sShowKeypadPreview, _setShowKeypadPreview] = useState(false);
   const [sShowFooterMenu, _setShowFooterMenu] = useState(false);
   const [sFooterMenuCoords, _setFooterMenuCoords] = useState({ x: 0, y: 0 });
   const [sBypassFaceRecognition, _setBypassFaceRecognition] = useState(() => localStorageWrapper.getItem("standBypassFaceRecognition") === "true");
@@ -978,7 +982,7 @@ export function BikeStandScreen() {
         if (!/^\d$/.test(key)) return;
         val = val + key;
       } else {
-        val = val + key.toLowerCase();
+        val = val + key;
       }
     }
     detailBackspaced.current = isBackspace;
@@ -2036,37 +2040,73 @@ export function BikeStandScreen() {
       {/* Stand settings modal */}
       {sShowStandSettings && (
         <div className={styles.standModalBackdrop} style={{ zIndex: zStandSettings }}>
-          <div className={styles.standSettingsDialog}>
-            <StandTouch touchStart={false} onPress={() => _setShowStandSettings(false)}>
-              <div className={styles.standSettingsHeader} style={{ borderBottomColor: C.borderSubtle }}>
-                <span className={styles.standSettingsHeaderTitle} style={{ color: C.text }}>Stand Settings</span>
-                <span className={styles.standSettingsHeaderHint} style={{ color: C.textDisabled }}>Tap to close</span>
-              </div>
-            </StandTouch>
-            <div className={styles.standSettingsBody}>
-              <div className={styles.standSettingsSectionLabel} style={{ color: C.textMuted }}>LOGIN</div>
-              <StandTouch onPress={() => {
-                  let next = !sBypassFaceRecognition;
-                  _setBypassFaceRecognition(next);
-                  localStorageWrapper.setItem("standBypassFaceRecognition", String(next));
-                }}
-                className={styles.standSettingsToggleRow}
-                style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
-              >
-                <CheckBox
-                  isChecked={sBypassFaceRecognition}
-                  onCheck={() => {
+          <div className={styles.standSettingsStack}>
+            <div className={styles.standSettingsDialog}>
+              <StandTouch touchStart={false} onPress={() => _setShowStandSettings(false)}>
+                <div className={styles.standSettingsHeader} style={{ borderBottomColor: C.borderSubtle }}>
+                  <span className={styles.standSettingsHeaderTitle} style={{ color: C.text }}>Stand Settings</span>
+                  <span className={styles.standSettingsHeaderHint} style={{ color: C.textDisabled }}>Tap to close</span>
+                </div>
+              </StandTouch>
+              <div className={styles.standSettingsBody}>
+                <div className={styles.standSettingsSectionLabel} style={{ color: C.textMuted }}>LOGIN</div>
+                <StandTouch onPress={() => {
                     let next = !sBypassFaceRecognition;
                     _setBypassFaceRecognition(next);
                     localStorageWrapper.setItem("standBypassFaceRecognition", String(next));
                   }}
-                />
-                <div className={styles.standSettingsToggleTextCol}>
-                  <span className={styles.standSettingsToggleTitle} style={{ color: C.text }}>Bypass facial recognition</span>
-                  <span className={styles.standSettingsToggleSubtitle} style={{ color: C.textMuted }}>Skip face scan and go straight to PIN entry on this device</span>
-                </div>
-              </StandTouch>
+                  className={styles.standSettingsToggleRow}
+                  style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
+                >
+                  <CheckBox
+                    isChecked={sBypassFaceRecognition}
+                    onCheck={() => {
+                      let next = !sBypassFaceRecognition;
+                      _setBypassFaceRecognition(next);
+                      localStorageWrapper.setItem("standBypassFaceRecognition", String(next));
+                    }}
+                  />
+                  <div className={styles.standSettingsToggleTextCol}>
+                    <span className={styles.standSettingsToggleTitle} style={{ color: C.text }}>Bypass facial recognition</span>
+                    <span className={styles.standSettingsToggleSubtitle} style={{ color: C.textMuted }}>Skip face scan and go straight to PIN entry on this device</span>
+                  </div>
+                </StandTouch>
+
+                <div className={styles.standSettingsSectionLabel} style={{ color: C.textMuted, marginTop: 24 }}>KEYPAD</div>
+                <StandTouch onPress={() => _setShowKeypadPreview(!sShowKeypadPreview)}
+                  className={styles.standSettingsToggleRow}
+                  style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
+                >
+                  <CheckBox
+                    isChecked={sShowKeypadPreview}
+                    onCheck={() => _setShowKeypadPreview(!sShowKeypadPreview)}
+                  />
+                  <div className={styles.standSettingsToggleTextCol}>
+                    <span className={styles.standSettingsToggleTitle} style={{ color: C.text }}>Edit Keyboard Size</span>
+                    <span className={styles.standSettingsToggleSubtitle} style={{ color: C.textMuted }}>Show the keypad below and adjust scale with − / +</span>
+                  </div>
+                </StandTouch>
+                {sShowKeypadPreview && (
+                  <div className={styles.standSettingsScaleRow} style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}>
+                    <span className={styles.standSettingsScaleLabel} style={{ color: C.text }}>Scale</span>
+                    <div className={styles.standSettingsScaleControls}>
+                      <StandTouch onPress={() => zKeypadAdjust(-0.1)}>
+                        <div className={styles.standSettingsScaleBtn} style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite, color: C.text }}>−</div>
+                      </StandTouch>
+                      <span className={styles.standSettingsScaleValue} style={{ color: C.text }}>{zKeypadScale.toFixed(1)}×</span>
+                      <StandTouch onPress={() => zKeypadAdjust(0.1)}>
+                        <div className={styles.standSettingsScaleBtn} style={{ borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite, color: C.text }}>+</div>
+                      </StandTouch>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
+            {sShowKeypadPreview && (
+              <div className={styles.standSettingsKeypadPreview}>
+                <StandKeypad mode="phone" onKeyPress={() => {}} />
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2134,7 +2174,7 @@ export function BikeStandScreen() {
                 );
               })}
             </div>
-            <StandKeypad mode="phone" onKeyPress={handleStandPinKeyPress} fontSizeAdj={7} paddingAdj={42} />
+            <StandKeypad mode="phone" onKeyPress={handleStandPinKeyPress} scale={2} />
             <StandTouch
               onPress={() => { _setShowPinModal(false); _setPin(""); pendingActionRef.current = null; }}
               className={styles.standPinCancel}
@@ -3680,8 +3720,8 @@ export function BikeStandScreen() {
                               _setNotesCursorPos(pos + 1);
                               return;
                             }
-                            let char = key === " " ? " " : key.toLowerCase();
-                            if (pos === 0) char = key.toUpperCase();
+                            let char = key;
+                            if (pos === 0 && key !== " ") char = key.toUpperCase();
                             activeSetText(activeText.slice(0, pos) + char + activeText.slice(pos));
                             _setNotesCursorPos(pos + 1);
                           }} />
@@ -4227,7 +4267,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
         if (sSearchText.replace(/\D/g, "").length >= 10) return;
         handleSearchTextChange(sSearchText + key);
       } else {
-        let char = (sSearchText.length === 0 || sSearchText.endsWith(" ")) ? key.toUpperCase() : key.toLowerCase();
+        let char = (sSearchText.length === 0 || sSearchText.endsWith(" ")) ? key.toUpperCase() : key;
         handleSearchTextChange(sSearchText + char);
       }
     }
@@ -4250,9 +4290,9 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
         val = val + key;
       } else {
         if (field === "first" || field === "last") {
-          val = val + ((val.length === 0 || val.endsWith(" ")) ? key.toUpperCase() : key.toLowerCase());
+          val = val + ((val.length === 0 || val.endsWith(" ")) ? key.toUpperCase() : key);
         } else {
-          val = val + key.toLowerCase();
+          val = val + key;
         }
       }
     }
@@ -4373,7 +4413,7 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
 
               {/* Keypad */}
               <div className={styles.nwmKeypadWrap}>
-                <StandKeypad mode={effectiveKeypadMode} onKeyPress={handleKeyPress} fontSizeAdj={23} paddingAdj={35} />
+                <StandKeypad mode={effectiveKeypadMode} onKeyPress={handleKeyPress} scale={1.85} />
               </div>
 
               {/* Search results */}
@@ -4517,7 +4557,7 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
       } else if (key === " ") {
         setter(getter + " ");
       } else {
-        let char = key.toLowerCase();
+        let char = key;
         if (getter.length === 0) char = key.toUpperCase();
         setter(getter + char);
       }
@@ -4672,7 +4712,7 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
               let priceVal = getFieldValue("price");
               return (
                 <div key="minutes-price" className={styles.scimPairedRow}>
-                  <StandTouch onPress={() => _setActiveField("minutes")} style={{ flex: 1, display: "flex", minWidth: 0 }}>
+                  <StandTouch onPress={() => _setActiveField("minutes")} style={{ display: "flex", minWidth: 0 }}>
                     <div
                       className={styles.scimPairedField}
                       style={{
@@ -4694,7 +4734,7 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
                       </span>
                     </div>
                   </StandTouch>
-                  <StandTouch onPress={() => _setActiveField("price")} style={{ flex: 1, display: "flex", minWidth: 0 }}>
+                  <StandTouch onPress={() => _setActiveField("price")} style={{ display: "flex", minWidth: 0 }}>
                     <div
                       className={styles.scimPairedField}
                       style={{
@@ -4805,7 +4845,7 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
 
         {/* Keypad */}
         <div className={styles.scimKeypadWrap}>
-          <StandKeypad mode={keypadMode} onKeyPress={handleKeyPress} fontSizeAdj={keypadMode === "phone" ? 28 : 0} paddingAdj={keypadMode === "phone" ? 42 : 0} />
+          <StandKeypad mode={keypadMode} onKeyPress={handleKeyPress} scale={keypadMode === "phone" ? 2 : 1} />
         </div>
 
         {/* Save button */}

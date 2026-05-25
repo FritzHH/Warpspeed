@@ -611,48 +611,53 @@
 .scimPairedRow {
   display: flex;
   flex-direction: row;
+  justify-content: space-around;
+  align-items: center;
   gap: 6px;
   margin-bottom: 6px;
 }
 
 .scimPairedFieldWrap {
-  flex: 1;
   display: flex;
   min-width: 0;
 }
 
 .scimPairedField {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
+  justify-content: center;
+  gap: 8px;
+  padding: 22px 16px;
   border-radius: 8px;
   border-width: 2px;
   border-style: solid;
   cursor: pointer;
-  flex: 1;
+  width: 230px;
   min-width: 0;
 }
 
 .scimPairedLabelCol {
   display: flex;
   flex-direction: column;
+  align-items: center;
   flex-shrink: 0;
 }
 
 .scimPairedLabel {
   font-size: 17px;
+  text-align: center;
 }
 
 .scimPairedSublabel {
   font-size: 14px;
+  text-align: center;
 }
 
 .scimPairedValue {
-  font-size: 20px;
+  font-size: 56px;
   font-weight: 500;
-  flex: 1;
+  text-align: center;
   min-width: 0;
 }
 
@@ -685,7 +690,7 @@
 }
 
 .scimFieldValue {
-  font-size: 20px;
+  font-size: 23px;
   font-weight: 500;
   flex: 1;
   min-width: 0;
@@ -1023,12 +1028,79 @@
   align-items: center;
 }
 
+.standSettingsStack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  max-height: 100%;
+  overflow: auto;
+  padding: 16px 0;
+}
+
 .standSettingsDialog {
   width: 70%;
   max-width: 500px;
   background-color: var(--surface-base);
   border-radius: 14px;
   overflow: hidden;
+  flex-shrink: 0;
+}
+
+.standSettingsKeypadPreview {
+  background-color: var(--surface-base);
+  border-radius: 14px;
+  padding: 14px;
+  flex-shrink: 0;
+}
+
+.standSettingsScaleRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border-width: 2px;
+  border-style: solid;
+  margin-top: 10px;
+}
+
+.standSettingsScaleControls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+.standSettingsScaleBtn {
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
+  border-width: 2px;
+  border-style: solid;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32px;
+  font-weight: 600;
+  cursor: pointer;
+  user-select: none;
+}
+
+.standSettingsScaleValue {
+  font-size: 24px;
+  font-weight: 600;
+  min-width: 70px;
+  text-align: center;
+}
+
+.standSettingsScaleLabel {
+  font-size: 16px;
+  font-weight: 500;
 }
 
 .standSettingsHeader {

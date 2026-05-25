@@ -120,6 +120,24 @@ export const useLayoutStore = create((set, get) => ({
   setIsMobile: (isMobile) => set({ isMobile }),
 }));
 
+export const useKeypadScaleStore = create((set, get) => ({
+  scale: (() => {
+    try {
+      let v = parseFloat(window.localStorage.getItem("standKeypadScale"));
+      return v && v > 0 ? v : 1;
+    } catch { return 1; }
+  })(),
+  getScale: () => get().scale,
+  setScale: (scale) => {
+    let next = Math.max(0.7, Math.min(1.6, Math.round(scale * 10) / 10));
+    try { window.localStorage.setItem("standKeypadScale", String(next)); } catch {}
+    set({ scale: next });
+  },
+  adjustScale: (delta) => {
+    get().setScale(get().scale + delta);
+  },
+}));
+
 export const useTabNamesStore = create(
   persist(
     (set, get) => ({

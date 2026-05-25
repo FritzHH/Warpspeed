@@ -1169,6 +1169,33 @@ const AppUserListComponent = ({
               {sDraftUser && (() => {
                 let editable = canEditUsers;
                 let borderColor = editable ? C.buttonLightGreenOutline : "transparent";
+                const canSave = sIsDirty && editable && !sPinError;
+                const sectionSaveButton = (
+                  <DomButton
+                    text="Save"
+                    onPress={() => canSave && handleSave()}
+                    buttonStyle={{
+                      borderWidth: 1,
+                      borderStyle: "solid",
+                      borderColor: canSave ? C.green : C.borderSubtle || C.buttonLightGreenOutline,
+                      backgroundColor: canSave ? C.green : C.surfaceAlt,
+                      paddingTop: 2,
+                      paddingBottom: 2,
+                      paddingLeft: 10,
+                      paddingRight: 10,
+                      borderRadius: 4,
+                      opacity: canSave ? 1 : 0.5,
+                      cursor: canSave ? "pointer" : "default",
+                    }}
+                    textStyle={{
+                      fontSize: 11,
+                      color: canSave ? C.textWhite : C.textMuted,
+                      fontWeight: 700,
+                      textTransform: "none",
+                      letterSpacing: 0,
+                    }}
+                  />
+                );
                 return (
                   <div
                     className={adminStyles.ucEditor}
@@ -1176,33 +1203,6 @@ const AppUserListComponent = ({
                   >
                     {/* ACTIONS */}
                     <div className={adminStyles.ucActionsBar}>
-                      {(() => {
-                        const canSave = sIsDirty && editable && !sPinError;
-                        return (
-                          <DomButton
-                            text="Save"
-                            onPress={() => canSave && handleSave()}
-                            buttonStyle={{
-                              borderWidth: 1,
-                              borderStyle: "solid",
-                              borderColor: canSave ? C.green : C.borderSubtle || C.buttonLightGreenOutline,
-                              backgroundColor: canSave ? C.green : C.surfaceAlt,
-                              paddingTop: 6,
-                              paddingBottom: 6,
-                              paddingLeft: 18,
-                              paddingRight: 18,
-                              borderRadius: 5,
-                              opacity: canSave ? 1 : 0.5,
-                              cursor: canSave ? "pointer" : "default",
-                            }}
-                            textStyle={{
-                              fontSize: 13,
-                              color: canSave ? C.textWhite : C.textMuted,
-                              fontWeight: 700,
-                            }}
-                          />
-                        );
-                      })()}
                       <DomButton
                         text={sIsNewUser ? "Discard" : "Cancel"}
                         onPress={handleCancel}
@@ -1242,7 +1242,10 @@ const AppUserListComponent = ({
 
                     {/* IDENTITY */}
                     <div className={adminStyles.ucEditorSection}>
-                      <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>Identity</div>
+                      <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>
+                        <span className={adminStyles.ucEditorSectionTitleText}>Identity</span>
+                        {sectionSaveButton}
+                      </div>
                       <div className={adminStyles.ucEditorRow}>
                         <DomTextInput
                           debounceMs={300}
@@ -1305,7 +1308,10 @@ const AppUserListComponent = ({
 
                     {/* CREDENTIALS / ROLE */}
                     <div className={adminStyles.ucEditorSection}>
-                      <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>Credentials & Role</div>
+                      <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>
+                        <span className={adminStyles.ucEditorSectionTitleText}>Credentials & Role</span>
+                        {sectionSaveButton}
+                      </div>
                       <div className={adminStyles.ucEditorRow}>
                         <div className={adminStyles.ucCredField} style={{ borderColor: borderColor }}>
                           {(() => {
@@ -1472,7 +1478,10 @@ const AppUserListComponent = ({
                     {/* FACE ENROLLMENT */}
                     {zSettingsObj?.useFacialRecognition !== false && (
                       <div className={adminStyles.ucEditorSection}>
-                        <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>Face Enrollment</div>
+                        <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>
+                          <span className={adminStyles.ucEditorSectionTitleText}>Face Enrollment</span>
+                          {sectionSaveButton}
+                        </div>
                         <div className={adminStyles.ucEditorRow}>
                           <div
                             className={adminStyles.ucEnrollBtn}
@@ -1518,7 +1527,10 @@ const AppUserListComponent = ({
 
                     {/* STATUSES */}
                     <div className={adminStyles.ucEditorSection}>
-                      <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>Connected Statuses</div>
+                      <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>
+                        <span className={adminStyles.ucEditorSectionTitleText}>Connected Statuses</span>
+                        {sectionSaveButton}
+                      </div>
                       <div className={adminStyles.ucChipRow}>
                         {editable && (
                           <DomStatusPickerModal
@@ -1580,7 +1592,10 @@ const AppUserListComponent = ({
 
                     {/* EMAIL INBOXES */}
                     <div className={adminStyles.ucEditorSection}>
-                      <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>Visible Email Accounts</div>
+                      <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>
+                        <span className={adminStyles.ucEditorSectionTitleText}>Visible Email Accounts</span>
+                        {sectionSaveButton}
+                      </div>
                       <div className={adminStyles.ucChipRow}>
                         {(() => {
                           let availableInboxes = (zSettingsObj?.emailAccounts || [])

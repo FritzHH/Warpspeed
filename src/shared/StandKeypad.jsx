@@ -1,6 +1,7 @@
 /* eslint-disable */
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { C } from "../styles";
+import { useKeypadScaleStore } from "../stores";
 
 export const PHONE_KEYS = [
   ["1", "2", "3"],
@@ -50,13 +51,26 @@ function KeyButton({ keyLabel, displayLabel, onClick, style, mountTime }) {
   );
 }
 
-export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, paddingAdj = 0, toggleLabel, onToggle }) {
+export function StandKeypad({ mode, onKeyPress, showNumberRow, scale = 1, toggleLabel, onToggle }) {
   const mountTimeRef = useRef(Date.now());
   const mt = mountTimeRef.current;
-  const fAdj = fontSizeAdj;
-  const pAdj = paddingAdj;
+  const userScale = useKeypadScaleStore((st) => st.scale);
+  const adjustScale = useKeypadScaleStore((st) => st.adjustScale);
+  const s = scale * userScale;
+  const [shifted, setShifted] = useState(false);
+  const [showCog, setShowCog] = useState(false);
   const _actionColor = (key) => (key === "CLR" || key === "\u232B") ? { color: C.textMuted } : {};
-  const _backspaceStyle = (key) => key === "\u232B" ? { flex: 3, maxWidth: 200, fontSize: 72 + fAdj } : {};
+  const _backspaceStyle = (key) => key === "\u232B" ? { flex: 3, maxWidth: 200 * s, fontSize: 72 * s } : {};
+
+  function handleKey(key) {
+    if (/^[A-Z]$/.test(key)) {
+      let out = shifted ? key : key.toLowerCase();
+      onKeyPress(out);
+      if (shifted) setShifted(false);
+      return;
+    }
+    onKeyPress(key);
+  }
 
   if (mode === "phone") {
     return (
@@ -64,13 +78,13 @@ export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, 
         {PHONE_KEYS.map((row, ri) => (
           <div key={ri} style={{ display: "flex", flexDirection: "row", gap: 6, justifyContent: "center" }}>
             {row.map((key) => (
-              <KeyButton key={key} keyLabel={key} onClick={onKeyPress} mountTime={mt} style={{ width: 102 + pAdj * 2, height: 84 + pAdj * 2, fontSize: 28 + fAdj, ..._actionColor(key) }} />
+              <KeyButton key={key} keyLabel={key} onClick={handleKey} mountTime={mt} style={{ width: 102 * s, height: 84 * s, fontSize: 28 * s, ..._actionColor(key) }} />
             ))}
             {ri === PHONE_KEYS.length - 1 && toggleLabel && onToggle && (
               <div
                 onClick={() => { if (_touchFired) { _touchFired = false; return; } onToggle(); }}
                 onTouchStart={(e) => { e.preventDefault(); _touchFired = true; onToggle(); }}
-                style={{ ...KEY_STYLE, width: 102 + pAdj * 2, height: 84 + pAdj * 2, fontSize: 20 + fAdj, backgroundColor: C.blue, color: "white", borderColor: C.blue }}
+                style={{ ...KEY_STYLE, width: 102 * s, height: 84 * s, fontSize: 20 * s, backgroundColor: C.blue, color: "white", borderColor: C.blue }}
               >
                 {toggleLabel}
               </div>
@@ -81,36 +95,95 @@ export function StandKeypad({ mode, onKeyPress, showNumberRow, fontSizeAdj = 0, 
     );
   }
 
+  const shiftButton = (
+    <div
+      onClick={() => { if (_touchFired) { _touchFired = false; return; } setShifted((p) => !p); }}
+      onTouchStart={(e) => { e.preventDefault(); _touchFired = true; setShifted((p) => !p); }}
+      style={{ ...KEY_STYLE, flex: 1, height: 78 * s, fontSize: 28 * s, backgroundColor: shifted ? C.blue : C.listItemWhite, color: shifted ? "white" : C.text, borderColor: shifted ? C.blue : C.buttonLightGreenOutline }}
+    >
+      ⇧
+    </div>
+  );
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       {showNumberRow && (
         <div style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
           {NUMBER_ROW.map((key) => (
-            <KeyButton key={key} keyLabel={key} onClick={onKeyPress} mountTime={mt} style={{ flex: 1, height: 84 + pAdj * 2, maxWidth: 90 + pAdj * 2, fontSize: 28 + fAdj }} />
+            <KeyButton key={key} keyLabel={key} onClick={handleKey} mountTime={mt} style={{ flex: 1, height: 84 * s, maxWidth: 90 * s, fontSize: 28 * s }} />
           ))}
         </div>
       )}
       {QWERTY_ROWS.map((row, ri) => (
         <div key={ri} style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
           {row.map((key) => (
-            <KeyButton key={key} keyLabel={key} onClick={onKeyPress} mountTime={mt} style={{ flex: 1, height: 84 + pAdj * 2, maxWidth: 90 + pAdj * 2, fontSize: 28 + fAdj, ..._actionColor(key), ..._backspaceStyle(key) }} />
+            <KeyButton key={key} keyLabel={key} onClick={handleKey} mountTime={mt} style={{ flex: 1, height: 84 * s, maxWidth: 90 * s, fontSize: 28 * s, ..._actionColor(key), ..._backspaceStyle(key) }} />
           ))}
         </div>
       ))}
       <div style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
-        <KeyButton keyLabel=" " displayLabel="SPACE" onClick={onKeyPress} mountTime={mt} style={{ flex: 3, height: 78 + pAdj * 2, fontSize: 28 + fAdj }} />
+        <KeyButton keyLabel=" " displayLabel="SPACE" onClick={handleKey} mountTime={mt} style={{ flex: toggleLabel && onToggle ? 3 : 1, height: 78 * s, fontSize: 28 * s }} />
         {toggleLabel && onToggle && (
           <div
             onClick={() => { if (_touchFired) { _touchFired = false; return; } onToggle(); }}
             onTouchStart={(e) => { e.preventDefault(); _touchFired = true; onToggle(); }}
-            style={{ ...KEY_STYLE, flex: 1.3, height: 78 + pAdj * 2, fontSize: 20 + fAdj, backgroundColor: C.blue, color: "white", borderColor: C.blue }}
+            style={{ ...KEY_STYLE, flex: 1.3, height: 78 * s, fontSize: 20 * s, backgroundColor: C.blue, color: "white", borderColor: C.blue }}
           >
             {toggleLabel}
           </div>
         )}
-        <KeyButton keyLabel="ENTER" displayLabel="↵" onClick={onKeyPress} mountTime={mt} style={{ flex: 1, height: 78 + pAdj * 2, fontSize: 28 + fAdj }} />
-        <KeyButton keyLabel="CLR" onClick={onKeyPress} mountTime={mt} style={{ flex: 1, height: 78 + pAdj * 2, fontSize: 18 + fAdj, color: C.textMuted }} />
       </div>
+      <div style={{ display: "flex", flexDirection: "row", gap: 3, justifyContent: "center" }}>
+        <KeyButton keyLabel="CLR" displayLabel="CLEAR" onClick={handleKey} mountTime={mt} style={{ flex: 1, height: 78 * s, fontSize: 18 * s, color: C.textMuted }} />
+        {shiftButton}
+        <KeyButton keyLabel="ENTER" displayLabel="NEW LINE" onClick={handleKey} mountTime={mt} style={{ flex: 1, height: 78 * s, fontSize: 18 * s }} />
+        <div
+          onClick={() => { if (_touchFired) { _touchFired = false; return; } setShowCog((p) => !p); }}
+          onTouchStart={(e) => { e.preventDefault(); _touchFired = true; setShowCog((p) => !p); }}
+          style={{ ...KEY_STYLE, flex: 0.6, height: 78 * s, fontSize: 28 * s, backgroundColor: showCog ? C.blue : C.listItemWhite, color: showCog ? "white" : C.textMuted, borderColor: showCog ? C.blue : C.buttonLightGreenOutline }}
+        >
+          ⚙
+        </div>
+      </div>
+      {showCog && (
+        <div
+          onClick={() => { if (_touchFired) { _touchFired = false; return; } setShowCog(false); }}
+          onTouchStart={(e) => { e.preventDefault(); _touchFired = true; setShowCog(false); }}
+          style={{ position: "fixed", top: 0, left: 0, right: 0, bottom: 0, width: "100%", height: "100%", display: "flex", justifyContent: "center", alignItems: "center", backgroundColor: "rgba(0,0,0,0.45)", zIndex: 99999 }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            onTouchStart={(e) => e.stopPropagation()}
+            style={{ display: "flex", flexDirection: "column", gap: 20, padding: 28, borderRadius: 12, backgroundColor: C.listItemWhite, boxShadow: "0 12px 40px rgba(0,0,0,0.35)", minWidth: 360 }}
+          >
+            <span style={{ fontSize: 16, fontWeight: 700, color: C.textMuted, letterSpacing: 1, textAlign: "center" }}>KEYPAD SIZE</span>
+            <div style={{ display: "flex", flexDirection: "row", gap: 16, justifyContent: "center", alignItems: "center" }}>
+              <div
+                onClick={() => { if (_touchFired) { _touchFired = false; return; } adjustScale(-0.1); }}
+                onTouchStart={(e) => { e.preventDefault(); _touchFired = true; adjustScale(-0.1); }}
+                style={{ ...KEY_STYLE, width: 72, height: 64, fontSize: 36 }}
+              >
+                −
+              </div>
+              <span style={{ fontSize: 28, fontWeight: 700, color: C.text, minWidth: 90, textAlign: "center" }}>{userScale.toFixed(1)}×</span>
+              <div
+                onClick={() => { if (_touchFired) { _touchFired = false; return; } adjustScale(0.1); }}
+                onTouchStart={(e) => { e.preventDefault(); _touchFired = true; adjustScale(0.1); }}
+                style={{ ...KEY_STYLE, width: 72, height: 64, fontSize: 36 }}
+              >
+                +
+              </div>
+            </div>
+            <div
+              onClick={() => { if (_touchFired) { _touchFired = false; return; } setShowCog(false); }}
+              onTouchStart={(e) => { e.preventDefault(); _touchFired = true; setShowCog(false); }}
+              style={{ ...KEY_STYLE, height: 52, fontSize: 16, color: C.textMuted }}
+            >
+              CLOSE
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

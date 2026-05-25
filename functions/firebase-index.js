@@ -1360,7 +1360,11 @@ exports.incomingSMSEnhanced = onRequest(
       const settingsUsers = Array.isArray(storeSettings.users) ? storeSettings.users : [];
       const staffUser = settingsUsers.find((u) => (u?.phone || "").replace(/\D/g, "") === normalizedPhone);
 
-      if (staffUser) {
+      // Labeled block so the "nothing to reply to" branches can `break` out and
+      // fall through to normal customer-message handling below, instead of
+      // dropping the message. Lets a staff member text the store from their
+      // own phone (e.g., for self-testing) without losing the message.
+      staffReplyBlock: if (staffUser) {
         if (storeSettings.allowStaffPhoneReply === false) {
           log("Staff phone detected but allowStaffPhoneReply is off - dropping silently", {
             userID: staffUser.id,
@@ -1380,15 +1384,15 @@ exports.incomingSMSEnhanced = onRequest(
           const pointerDoc = await pointerRef.get();
 
           if (!pointerDoc.exists) {
-            log("No staff-reply pointer found - dropping silently", { userID: staffUser.id });
-            return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+            log("No staff-reply pointer found - falling through to customer-message handling", { userID: staffUser.id });
+            break staffReplyBlock;
           }
 
           const pointer = pointerDoc.data();
           const custPhone = (pointer.custPhone || "").replace(/\D/g, "");
           if (custPhone.length !== 10) {
-            log("Staff-reply pointer has invalid custPhone - dropping silently", { userID: staffUser.id, custPhone: pointer.custPhone });
-            return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+            log("Staff-reply pointer has invalid custPhone - falling through to customer-message handling", { userID: staffUser.id, custPhone: pointer.custPhone });
+            break staffReplyBlock;
           }
 
           const targetConvRef = db
@@ -1399,8 +1403,8 @@ exports.incomingSMSEnhanced = onRequest(
           const targetConv = targetConvDoc.exists ? targetConvDoc.data() : null;
 
           if (!targetConv) {
-            log("Target thread missing - dropping silently", { custPhone });
-            return response.status(200).send('<?xml version="1.0" encoding="UTF-8"?><Response></Response>');
+            log("Target thread missing - falling through to customer-message handling", { custPhone });
+            break staffReplyBlock;
           }
 
           const targetForwardTo = Array.isArray(targetConv.forwardTo) ? targetConv.forwardTo : [];
@@ -1814,27 +1818,45 @@ exports.incomingSMSEnhanced = onRequest(
 
           const isMultiStaff = forwardTo.length > 1;
 
-          // Generate one short link per forward batch (same destination for
-          // all recipients — they all open the same conversation).
-          let appLink = "";
-          try {
-            appLink = await createShortLink(db, {
-              tenantID,
-              storeID,
-              destination: `/phone?conv=${encodeURIComponent(normalizedPhone)}`,
-            });
-          } catch (linkErr) {
-            log("Error creating short link (non-fatal, sending without link)", {
-              error: linkErr.message,
-            });
-          }
+          // ────────────────────────────────────────────────────────────────
+          // APP LINK DISABLED (2026-05-25)
+          // Including a `*.web.app` short link in the forward body caused
+          // US carriers to filter the outbound SMS as spam (Twilio error
+          // 30007 — "Message filtered" by the carrier). Unbranded shared
+          // hosting domains are a top trigger for 10DLC carrier filtering.
+          //
+          // To re-enable in-app reply links, switch to ONE of:
+          //   1. Twilio Messaging Service link shortening + click tracking
+          //      on a verified sender domain (preferred — Twilio brokers
+          //      carrier trust for the shortened URL).
+          //   2. A branded short domain (e.g. wrpsp.co) registered against
+          //      the Twilio 10DLC campaign so carriers whitelist it.
+          //   3. Keep `createShortLink()` + `shortLinkRedirector` but host
+          //      them on a registered branded domain rather than *.web.app.
+          //
+          // The short-link infra (`createShortLink`, `shortLinkRedirector`,
+          // Firestore `short-links` collection) is intentionally left in
+          // place so it can be re-wired once a branded domain is ready.
+          // ────────────────────────────────────────────────────────────────
+          // let appLink = "";
+          // try {
+          //   appLink = await createShortLink(db, {
+          //     tenantID,
+          //     storeID,
+          //     destination: `/phone?conv=${encodeURIComponent(normalizedPhone)}`,
+          //   });
+          // } catch (linkErr) {
+          //   log("Error creating short link (non-fatal, sending without link)", {
+          //     error: linkErr.message,
+          //   });
+          // }
 
           let customerName = `${fwdFirst} ${fwdLast}`.trim();
           if (!customerName) customerName = "Customer";
 
           let forwardBody = `REPLY FROM ${customerName}:`;
           if (forwardMessageText) {
-            forwardBody += `\n"${forwardMessageText}"`;
+            forwardBody += `\n\n${forwardMessageText}\n`;
           }
           if (
             incomingMessageData.mediaUrls &&
@@ -1846,13 +1868,9 @@ exports.incomingSMSEnhanced = onRequest(
             forwardBody += `\n${mediaLinks}`;
           }
           if (isMultiStaff) {
-            forwardBody += appLink
-              ? `\nREPLIES NOT ALLOWED. Respond in App:\n${appLink}`
-              : `\nREPLIES NOT ALLOWED`;
+            forwardBody += `\nDO NOT reply here`;
           } else {
-            forwardBody += appLink
-              ? `\nReply here, or respond in App:\n${appLink}`
-              : `\nReply here`;
+            forwardBody += `\nReply here`;
           }
 
           let _tnFwd = (storeSettings?.storeInfo?.textingNumber || "").replace(/\D/g, "");

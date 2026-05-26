@@ -12,10 +12,8 @@
 }
 
 .card {
-  width: 720px;
-  max-width: 92%;
-  height: 80vh;
-  max-height: 720px;
+  width: 35%;
+  height: 90%;
   background-color: var(--surface-base);
   border-radius: 12px;
   display: flex;

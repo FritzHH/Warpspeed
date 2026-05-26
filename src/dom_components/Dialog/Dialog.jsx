@@ -52,7 +52,26 @@ export const Dialog = ({
         </DialogPrimitive.Overlay>
         <DialogPrimitive.Content
           asChild
-          onPointerDownOutside={(e) => { if (preventClose) e.preventDefault(); }}
+          onPointerDownOutside={(e) => {
+            const t = e.target;
+            if (t && typeof t.closest === "function" && t.closest("[data-dropdown-menu-portal]")) {
+              e.preventDefault();
+              return;
+            }
+            if (preventClose) e.preventDefault();
+          }}
+          onInteractOutside={(e) => {
+            const t = e.target;
+            if (t && typeof t.closest === "function" && t.closest("[data-dropdown-menu-portal]")) {
+              e.preventDefault();
+            }
+          }}
+          onFocusOutside={(e) => {
+            const t = e.target;
+            if (t && typeof t.closest === "function" && t.closest("[data-dropdown-menu-portal]")) {
+              e.preventDefault();
+            }
+          }}
           onEscapeKeyDown={(e) => { if (preventClose) e.preventDefault(); }}
           onOpenAutoFocus={onOpenAutoFocus}
           onCloseAutoFocus={onCloseAutoFocus}

@@ -35,6 +35,79 @@ const QuickButtonPickerModal = lazy(() =>
 
 const CATEGORIES = ["Item", "Labor"];
 
+function QtyStepper({ value, onChange }) {
+  const inputRef = useRef(null);
+  const display = value > 0 ? String(value) : "";
+  const btnStyle = {
+    width: 26,
+    height: 26,
+    border: `1px solid ${C.borderSubtle}`,
+    borderRadius: 4,
+    backgroundColor: C.surfaceBase,
+    color: C.text,
+    fontSize: 16,
+    lineHeight: 1,
+    cursor: "pointer",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  };
+  return (
+    <div
+      style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, width: "100%", padding: "0 12px" }}
+      onClick={(e) => { e.stopPropagation(); }}
+      onMouseDown={(e) => e.stopPropagation()}
+    >
+      <span style={{ fontSize: 13, color: C.textMuted }}>Qty</span>
+      <button
+        type="button"
+        style={btnStyle}
+        onClick={(e) => { e.stopPropagation(); onChange(Math.max(1, (value || 1) - 1)); }}
+        aria-label="Decrease quantity"
+      >
+        {"\u2212"}
+      </button>
+      <input
+        ref={inputRef}
+        type="text"
+        inputMode="numeric"
+        value={display}
+        placeholder="0"
+        maxLength={2}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        onFocus={(e) => e.target.select()}
+        onChange={(e) => {
+          const cleaned = e.target.value.replace(/[^0-9]/g, "");
+          if (cleaned === "") { onChange(0); return; }
+          let n = parseInt(cleaned, 10);
+          if (n > 99) n = 99;
+          onChange(n);
+        }}
+        style={{
+          width: 36,
+          textAlign: "center",
+          fontSize: 15,
+          color: C.text,
+          fontWeight: 600,
+          border: `1px solid ${C.borderSubtle}`,
+          borderRadius: 4,
+          padding: "2px 4px",
+          backgroundColor: C.surfaceBase,
+        }}
+      />
+      <button
+        type="button"
+        style={btnStyle}
+        onClick={(e) => { e.stopPropagation(); onChange(Math.min(99, (value || 0) + 1)); }}
+        aria-label="Increase quantity"
+      >
+        {"+"}
+      </button>
+    </div>
+  );
+}
+
 // ─── helpers ───────────────────────────────────────────────────────────────
 
 function buildPathForButton(buttonID, allButtons) {
@@ -79,6 +152,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
   const [sShowQBPicker, _setShowQBPicker] = useState(false);
   const [sDirty, _setDirty] = useState(false);
   const [sPrintSuccess, _setPrintSuccess] = useState(false);
+  const [sPrintQty, _setPrintQty] = useState(1);
 
   // debounced inventory save
   const debouncedInvSaveRef = useRef(
@@ -149,7 +223,13 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
     const digits = rawInput.replace(/\D/g, "");
     let mins = digits === "" ? 0 : Number(digits);
     let updated = { ...sItem, minutes: mins };
-    if (mins > 0) { updated.price = 0; updated.salePrice = 0; }
+    if (mins > 0) {
+      const laborRate = useSettingsStore.getState().settings?.laborRateByHour || 0;
+      updated.price = Math.round((mins / 60) * laborRate);
+      updated.salePrice = 0;
+    } else {
+      updated.price = 0;
+    }
     _setItem(updated);
     _setDirty(true);
     if (!isNew) {
@@ -176,7 +256,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
           useInventoryStore.getState().removeItem(sItem);
           dbDeleteInventoryItem(sItem.id);
           handleExit();
-        }, "Admin");
+        }, "Editor");
       },
     });
   }
@@ -236,7 +316,8 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
       return;
     }
     let template = allTemplates[slug];
-    let printJob = labelPrintBuilder.zplLabel(slug, { ...sItem, storeDisplayName: zSettings?.storeInfo?.displayName || "" }, 1, template);
+    let qty = Math.max(1, Math.min(99, sPrintQty || 1));
+    let printJob = labelPrintBuilder.zplLabel(slug, { ...sItem, storeDisplayName: zSettings?.storeInfo?.displayName || "" }, qty, template);
     dbSavePrintObj(printJob, printerID);
     _setPrintSuccess(true);
     setTimeout(() => _setPrintSuccess(false), 2000);
@@ -377,8 +458,18 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
               {!isNew && templateEntries.length > 0 && (
                 <div className={styles.printWrap}>
                   <DropdownMenu
-                    dataArr={templateEntries.map(([slug, t]) => t.name)}
-                    onSelect={(name, idx) => handleQuickPrint(templateEntries[idx][0])}
+                    portal={false}
+                    dataArr={[
+                      {
+                        component: (
+                          <QtyStepper value={sPrintQty} onChange={_setPrintQty} />
+                        ),
+                      },
+                      { _isDivider: true },
+                      ...templateEntries.map(([slug, t]) => ({ label: t.name, slug })),
+                    ]}
+                    onOpenChange={(open) => { if (open) _setPrintQty(1); }}
+                    onSelect={(item) => handleQuickPrint(item.slug)}
                     buttonText=""
                     buttonIcon={ICONS.print}
                     buttonIconSize={26}
@@ -617,7 +708,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                     lineHeight: "18px",
                     padding: "6px 4px",
                   }}
-                  rows={10}
+                  rows={1}
                   value={sAutoNoteText}
                   onChange={(e) => handleAutoNoteChange(e.target.value)}
                   placeholder="Enter custom receipt note here"

@@ -74,7 +74,10 @@ Before acting on any request:
 3. **Stack** — This is the Warpspeed multi-tenant SaaS POS (Bonita Bikes is one tenant). React + Vite, Firebase, Stripe. Don't introduce new frameworks or redundant deps unless asked.
 4. **Safety** — Prefer small targeted edits. Do not commit secrets or hardcoded credentials; flag if you see them.
 5. **Scope** — Fulfill what was asked. Don't add unrelated features, refactors, or docs.
-6. **Deploy commands** — When a Cloud Function changes, give the deploy command in a standalone code block, only for the changed functions — never `--only functions`.
+6. **Deploy commands** — When a Cloud Function changes, give the deploy command in a standalone code block, only for the changed functions — never `--only functions`. ALWAYS include `--project=<projectId>` and `--account=<email>` flags so the user doesn't have to identify the target manually. Pick based on what's being changed:
+   - **Bonita (warpspeed-bonitabikes)** — anything inside `if (DEPLOY_TARGET === "bonita")` in `functions/firebase-index.js`, or any function unrelated to the SaaS Pub/Sub scaffold: `firebase deploy --only functions:NAME --project=warpspeed-bonitabikes --account=fritz@bonitabikes.com`
+   - **SaaS (cadence-pos)** — anything inside `if (DEPLOY_TARGET === "saas")` (e.g., `pubsubStripeEventSubscriber`, `pubsubStripeDeadLetterIngestor`, future Connect/refund/dispute handlers): `firebase deploy --only functions:NAME --project=cadence-pos --account=fritz@retailsoftsystems.com`
+   - Without `--account`, the IAM precheck uses the global default firebase login and may fail with `iam.serviceAccounts.ActAs`. Without `--project`, the deploy targets whatever the current alias is, which can be wrong.
 7. **Command code blocks must be copyable** — Any shell command intended for the user to run (deploy commands, build commands, git commands, etc.) MUST be presented in a plain fenced code block with no language tag, or with `` ```bash `` only. Do NOT use `` ```cmd ``, `` ```terminal ``, `` ```powershell ``, `` ```shell ``, or any other tag — Claude Terminal's renderer treats those as styled/display blocks rather than copyable code, defeating the purpose. One command per block when possible; the user copies by clicking the block.
 
 **No new `useEffect` without permission.** Explain why you need it first; the user will confirm before you add it.
@@ -121,7 +124,7 @@ display: flex; justify-content: center; align-items: center;
 ```
 Inner modal card sizing by class:
 - **Full** (80–90% of viewport): percent. The modal scales with the screen.
-- **Large** (medium): percent with a max-px cap (e.g., `60% × 85%` capped at `800px`). Caps prevent over-sizing on large screens.
+- **Large** (medium): percent of viewport (e.g., `60% × 85%`). Modal scales with screen size; no fixed px caps.
 - **Small** (compact, confirmation/picker style): fixed px is fine. Flex-centering means the modal sits dead-center regardless of viewport, so resize doesn't break it.
 - **Click-positioned popovers**: sized by content or small percent, positioned relative to the trigger.
 

@@ -38,6 +38,53 @@ const {
 } = require("./usageTracking");
 
 // ═══════════════════════════════════════════════════════════════
+// DEPLOY TARGET RESOLUTION
+// ═══════════════════════════════════════════════════════════════
+// Resolves which tenant's codebase to load: "bonita" (single-tenant
+// direct charges) or "saas" (multi-tenant Connect + Pub/Sub).
+//
+// 1. If DEPLOY_TARGET is set (emulator/CI override), use it.
+// 2. Otherwise derive from the Firebase project ID — firebase-tools
+//    strips parent env vars when spawning the discovery loader, but
+//    it always sets GCLOUD_PROJECT/GOOGLE_CLOUD_PROJECT, and Google
+//    sets the same vars in the live Cloud Functions runtime.
+//
+// The parent-side verify-deploy-target.js script guards against
+// alias/target mismatch before the deploy ever reaches this file.
+function _resolveDeployTarget() {
+  if (process.env.DEPLOY_TARGET) return process.env.DEPLOY_TARGET;
+
+  let projectId =
+    process.env.GCLOUD_PROJECT || process.env.GOOGLE_CLOUD_PROJECT || null;
+  if (!projectId && process.env.FIREBASE_CONFIG) {
+    try {
+      projectId = JSON.parse(process.env.FIREBASE_CONFIG).projectId || null;
+    } catch (_) {
+      // ignore parse failure, fall through to error below
+    }
+  }
+
+  if (projectId === "warpspeed-bonitabikes") return "bonita";
+  if (projectId === "cadence-pos") return "saas";
+
+  throw new Error(
+    "Cannot resolve DEPLOY_TARGET. No DEPLOY_TARGET env var was set, " +
+      "and the Firebase project ID did not match a known target. " +
+      "Got projectId=" +
+      JSON.stringify(projectId)
+  );
+}
+const DEPLOY_TARGET = _resolveDeployTarget();
+
+// ═══════════════════════════════════════════════════════════════
+// BONITA-SPECIFIC EXPORTS (direct charges, single-tenant secrets)
+// Everything below until the matching closing brace at EOF is the
+// existing single-tenant function set. SaaS-side functions live
+// further below in the `if (DEPLOY_TARGET === "saas")` block.
+// ═══════════════════════════════════════════════════════════════
+if (DEPLOY_TARGET === "bonita") {
+
+// ═══════════════════════════════════════════════════════════════
 // PROJECT CONFIG
 // ═══════════════════════════════════════════════════════════════
 const PROJECT_ID = "warpspeed-bonitabikes";
@@ -45,6 +92,14 @@ const RTDB_URL = `https://${PROJECT_ID}-default-rtdb.firebaseio.com`;
 const STORAGE_BUCKET = `${PROJECT_ID}.firebasestorage.app`;
 const FUNCTIONS_BASE_URL = `https://us-central1-${PROJECT_ID}.cloudfunctions.net`;
 const WEB_APP_URL = `https://${PROJECT_ID}.web.app`;
+
+// Branded short-link domain registered with the 10DLC campaign. When set,
+// forwarded SMS includes a `/r/{id}` link on this domain (carriers whitelist
+// branded domains; *.web.app gets filtered as 30007). The Firebase Hosting
+// rewrite for /r/** → shortLinkRedirector handles the actual 302.
+// Leave empty during 10DLC review or if forwarding links aren't wanted —
+// the SMS goes out without a link instead of with a filtered link.
+const SHORT_LINK_PUBLIC_DOMAIN = ""; // Carrier-filtered (30007) even with branded domain. Re-enable after A2P campaign URL allowlist update.
 
 // Firebase Admin SDK - initialize once at module load (don't delete/recreate)
 let DB = null;
@@ -1012,7 +1067,7 @@ exports.sendSMSEnhanced = onCall(
             lastOutgoingMillis: Date.now(),
             lastOutgoingSenderID: senderID || "",
             forwardTo: currentForwardTo,
-            ...(translatedTo ? { translatedTo } : {}),
+            translatedTo: translatedTo || "",
             ...(customerFirst ? { customerFirst } : {}),
             ...(customerLast ? { customerLast } : {}),
           }, { merge: true });
@@ -1349,13 +1404,31 @@ exports.incomingSMSEnhanced = onRequest(
       }
 
       // ============================================================================
-      // STAFF-PHONE-REPLY DETECTION & ROUTING
-      // If the incoming SMS is from a staff phone (matches a user.phone in
-      // settings.users), route it as an outbound reply to whatever customer
+      // STAFF-PHONE-REPLY DETECTION & ROUTING — PAUSED 2026-05-25
+      //
+      // Original design: an SMS from a staff phone (matches a user.phone in
+      // settings.users) was routed as an outbound reply to whatever customer
       // was last forwarded to that staff member (via user-sms-pointers/{userID}).
-      // Gated by settings.allowStaffPhoneReply (default ON; undefined = on for
-      // existing tenants with no field).
+      //
+      // Why paused: stale pointers route legitimate staff-to-shop SMS to the
+      // wrong customer. Real-world scenario: shop texts staff via Custom Phone
+      // Mode → staff's natural reply (e.g. "9am") gets sent to whatever customer
+      // was last forwarded to that staff. Not just a testing edge case.
+      //
+      // Before re-enabling, the design must include AT LEAST:
+      //   1. TTL on user-sms-pointers — auto-expire after N hours of inactivity,
+      //      renewed on each new customer message in the pointed thread.
+      //   2. Validation that the staff member was the most recent outgoing
+      //      sender on the pointed-at customer thread (otherwise the pointer is
+      //      stale relative to the staff's intent).
+      //   3. Optional opt-out prefix (e.g. `!new`) so staff can deliberately
+      //      send a fresh message to the shop without leaking to a customer.
+      //
+      // The detection block below is preserved (gated by a constant) so it can
+      // be re-enabled cleanly once the safeguards above are in place.
       // ============================================================================
+
+      const STAFF_PHONE_REPLY_ENABLED = false; // PAUSED 2026-05-25 — see comment above
 
       const settingsUsers = Array.isArray(storeSettings.users) ? storeSettings.users : [];
       const staffUser = settingsUsers.find((u) => (u?.phone || "").replace(/\D/g, "") === normalizedPhone);
@@ -1364,7 +1437,7 @@ exports.incomingSMSEnhanced = onRequest(
       // fall through to normal customer-message handling below, instead of
       // dropping the message. Lets a staff member text the store from their
       // own phone (e.g., for self-testing) without losing the message.
-      staffReplyBlock: if (staffUser) {
+      staffReplyBlock: if (STAFF_PHONE_REPLY_ENABLED && staffUser) {
         if (storeSettings.allowStaffPhoneReply === false) {
           log("Staff phone detected but allowStaffPhoneReply is off - dropping silently", {
             userID: staffUser.id,
@@ -1816,40 +1889,29 @@ exports.incomingSMSEnhanced = onRequest(
           let fwdFirst = (customerData.first || "").charAt(0).toUpperCase() + (customerData.first || "").slice(1).toLowerCase();
           let fwdLast = (customerData.last || "").charAt(0).toUpperCase() + (customerData.last || "").slice(1).toLowerCase();
 
-          const isMultiStaff = forwardTo.length > 1;
-
           // ────────────────────────────────────────────────────────────────
-          // APP LINK DISABLED (2026-05-25)
-          // Including a `*.web.app` short link in the forward body caused
-          // US carriers to filter the outbound SMS as spam (Twilio error
-          // 30007 — "Message filtered" by the carrier). Unbranded shared
-          // hosting domains are a top trigger for 10DLC carrier filtering.
-          //
-          // To re-enable in-app reply links, switch to ONE of:
-          //   1. Twilio Messaging Service link shortening + click tracking
-          //      on a verified sender domain (preferred — Twilio brokers
-          //      carrier trust for the shortened URL).
-          //   2. A branded short domain (e.g. wrpsp.co) registered against
-          //      the Twilio 10DLC campaign so carriers whitelist it.
-          //   3. Keep `createShortLink()` + `shortLinkRedirector` but host
-          //      them on a registered branded domain rather than *.web.app.
-          //
-          // The short-link infra (`createShortLink`, `shortLinkRedirector`,
-          // Firestore `short-links` collection) is intentionally left in
-          // place so it can be re-wired once a branded domain is ready.
+          // APP LINK — branded short domain, gated on SHORT_LINK_PUBLIC_DOMAIN.
+          // History: *.web.app short links were filtered by US carriers as
+          // spam (Twilio 30007). Re-enabled 2026-05-25 with the requirement
+          // that the link host is a branded domain registered with the 10DLC
+          // campaign. When SHORT_LINK_PUBLIC_DOMAIN is empty the SMS goes out
+          // without a link, so this is safe to deploy before the domain is
+          // live.
           // ────────────────────────────────────────────────────────────────
-          // let appLink = "";
-          // try {
-          //   appLink = await createShortLink(db, {
-          //     tenantID,
-          //     storeID,
-          //     destination: `/phone?conv=${encodeURIComponent(normalizedPhone)}`,
-          //   });
-          // } catch (linkErr) {
-          //   log("Error creating short link (non-fatal, sending without link)", {
-          //     error: linkErr.message,
-          //   });
-          // }
+          let appLink = "";
+          if (SHORT_LINK_PUBLIC_DOMAIN) {
+            try {
+              appLink = await createShortLink(db, {
+                tenantID,
+                storeID,
+                destination: `/phone?conv=${encodeURIComponent(normalizedPhone)}`,
+              });
+            } catch (linkErr) {
+              log("Error creating short link (non-fatal, sending without link)", {
+                error: linkErr.message,
+              });
+            }
+          }
 
           let customerName = `${fwdFirst} ${fwdLast}`.trim();
           if (!customerName) customerName = "Customer";
@@ -1867,10 +1929,8 @@ exports.incomingSMSEnhanced = onRequest(
               .join("\n");
             forwardBody += `\n${mediaLinks}`;
           }
-          if (isMultiStaff) {
-            forwardBody += `\nDO NOT reply here`;
-          } else {
-            forwardBody += `\nReply here`;
+          if (appLink) {
+            forwardBody += `\n\nOpen in app: ${appLink}`;
           }
 
           let _tnFwd = (storeSettings?.storeInfo?.textingNumber || "").replace(/\D/g, "");
@@ -2002,7 +2062,8 @@ async function createShortLink(db, { tenantID, storeID, destination, ttlDays }) 
     createdAtMs: nowMs,
     expiresAt,
   });
-  return `${WEB_APP_URL}/r/${id}`;
+  const linkHost = SHORT_LINK_PUBLIC_DOMAIN || WEB_APP_URL;
+  return `${linkHost}/r/${id}`;
 }
 
 exports.shortLinkRedirector = onRequest(
@@ -8758,4 +8819,91 @@ exports.gmailReconnectWatch = onCall(
 const _vendorTotals = require("./usageVendorTotals");
 exports.pullVendorTotals = _vendorTotals.pullVendorTotals;
 exports.reconcileUsageEvents = _vendorTotals.reconcileUsageEvents;
+
+} // ─── end of if (DEPLOY_TARGET === "bonita") ───
+
+// ═══════════════════════════════════════════════════════════════
+// SAAS EXPORTS (Stripe Connect + Pub/Sub, multi-tenant)
+// Deployed only to cadence-pos via yarn functionsrss.
+// ═══════════════════════════════════════════════════════════════
+if (DEPLOY_TARGET === "saas") {
+  const pubsubSubscriber = require("./saas/pubsub-subscriber");
+  const pubsubDeadLetter = require("./saas/pubsub-dead-letter");
+  const connectCallables = require("./saas/stripe-connect-callables");
+  const connectPI = require("./saas/stripe-connect-payment-intent");
+  const connectWebhook = require("./saas/stripe-connect-webhook");
+  const connectRefunds = require("./saas/stripe-connect-refunds");
+  const connectReaders = require("./saas/stripe-connect-readers");
+  const connectCheckoutSession = require("./saas/stripe-connect-checkout-session");
+  const dlqAdmin = require("./saas/pubsub-dlq-admin");
+  const twilioSubaccounts = require("./saas/twilio-subaccounts");
+  const twilioNumbers = require("./saas/twilio-numbers");
+  const twilioWebhookInbound = require("./saas/twilio-webhook-inbound");
+  const twilioWebhookStatus = require("./saas/twilio-webhook-status");
+  const twilioPubsubInbound = require("./saas/twilio-pubsub-inbound");
+  const twilioPubsubDeadLetter = require("./saas/twilio-pubsub-dead-letter");
+  const twilioSend = require("./saas/twilio-send");
+  const twilioA2P = require("./saas/twilio-a2p");
+
+  exports.pubsubStripeEventSubscriber = pubsubSubscriber.handler;
+  exports.pubsubStripeDeadLetterIngestor = pubsubDeadLetter.ingestor;
+
+  exports.provisionTenantTwilioSubaccount =
+    twilioSubaccounts.provisionTenantTwilioSubaccount;
+  exports.deactivateTenantTwilioSubaccount =
+    twilioSubaccounts.deactivateTenantTwilioSubaccount;
+  exports.closeTenantTwilioSubaccount =
+    twilioSubaccounts.closeTenantTwilioSubaccount;
+
+  exports.purchaseTwilioNumber = twilioNumbers.purchaseTwilioNumber;
+  exports.portInTwilioNumber = twilioNumbers.portInTwilioNumber;
+  exports.releaseTwilioNumber = twilioNumbers.releaseTwilioNumber;
+  exports.transferNumberBetweenStores =
+    twilioNumbers.transferNumberBetweenStores;
+  exports.scheduledTwilioPortInPoll = twilioNumbers.scheduledTwilioPortInPoll;
+
+  // Phase 3 — inbound pipeline + outbound status. Function names MUST match
+  // the webhook URLs hardcoded in twilio-common.js (every purchased number
+  // points to these exact names).
+  exports.twilioInboundWebhook = twilioWebhookInbound.handler;
+  exports.twilioStatusCallbackWebhook = twilioWebhookStatus.handler;
+  exports.pubsubTwilioInboundSubscriber = twilioPubsubInbound.handler;
+  exports.pubsubTwilioDeadLetterIngestor = twilioPubsubDeadLetter.ingestor;
+
+  // Phase 4 — outbound send.
+  exports.sendTwilioMessage = twilioSend.sendTwilioMessage;
+
+  // Phase 5 — A2P 10DLC registration (ISV/partner model, lives on master).
+  exports.submitTenantA2PBrand = twilioA2P.submitTenantA2PBrand;
+  exports.submitTenantA2PCampaign = twilioA2P.submitTenantA2PCampaign;
+  exports.linkNumberToA2PCampaign = twilioA2P.linkNumberToA2PCampaign;
+  exports.unlinkNumberFromA2PCampaign = twilioA2P.unlinkNumberFromA2PCampaign;
+  exports.getTenantA2PStatus = twilioA2P.getTenantA2PStatus;
+  exports.scheduledA2PStatusPoll = twilioA2P.scheduledA2PStatusPoll;
+
+  exports.stripeConnectAccountCreate = connectCallables.stripeConnectAccountCreate;
+  exports.stripeConnectAccountLinkCreate = connectCallables.stripeConnectAccountLinkCreate;
+  exports.stripeConnectAccountStatusCallable = connectCallables.stripeConnectAccountStatusCallable;
+
+  exports.stripeConnectInitiatePaymentIntentV2 = connectPI.stripeConnectInitiatePaymentIntentV2;
+  exports.stripeConnectCancelPaymentIntentV2 = connectPI.stripeConnectCancelPaymentIntentV2;
+
+  exports.stripeWebhookV2_Connect = connectWebhook.handler;
+
+  exports.stripeRefundChargeCallable_V2 = connectRefunds.stripeRefundChargeCallable_V2;
+
+  exports.stripeConnectCreateTerminalLocationCallable =
+    connectReaders.stripeConnectCreateTerminalLocationCallable;
+  exports.stripeConnectRegisterReaderCallable =
+    connectReaders.stripeConnectRegisterReaderCallable;
+  exports.stripeConnectListReadersCallable =
+    connectReaders.stripeConnectListReadersCallable;
+
+  exports.stripeConnectCreateCheckoutSessionV2 =
+    connectCheckoutSession.stripeConnectCreateCheckoutSessionV2;
+
+  exports.dlqRetryCallable = dlqAdmin.dlqRetryCallable;
+  exports.dlqUpdateStatusCallable = dlqAdmin.dlqUpdateStatusCallable;
+  exports.dlqEscalationCheckScheduled = dlqAdmin.dlqEscalationCheckScheduled;
+}
 

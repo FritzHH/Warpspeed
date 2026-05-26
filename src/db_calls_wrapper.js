@@ -2576,6 +2576,104 @@ export function dbListenToActiveSales(onSnapshot, onError) {
 }
 
 /**
+ * Listen to the SaaS per-store inbound messages collection
+ * (tenants/{tid}/stores/{sid}/incoming-messages).
+ *
+ * Docs are keyed by Twilio MessageSid and written by the inbound Pub/Sub
+ * subscriber on the SaaS Functions deploy target. SaaS-only — for Bonita
+ * builds, this listener will simply return an empty collection.
+ *
+ * @param {Function} onSnapshot - called with array of inbound message docs
+ * @param {Function} onError - optional error callback
+ * @returns {Function} unsubscribe function (or null if pre-conditions fail)
+ */
+export function dbListenToSaasIncomingMessages(onSnapshot, onError) {
+  const name = "saasIncomingMessages";
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: tenantID/storeID not configured for dbListenToSaasIncomingMessages");
+      return null;
+    }
+    if (!onSnapshot || typeof onSnapshot !== "function") {
+      log("Error: onSnapshot callback required for dbListenToSaasIncomingMessages");
+      return null;
+    }
+    const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.INCOMING_MESSAGES}`;
+    __logListenerAttach(name);
+    const unsubscribe = firestoreSubscribeCollection(
+      collectionPath,
+      (messages, error, meta) => {
+        if (error) {
+          log("SaaS incoming messages listener error", { tenantID, storeID, error });
+          if (onError) onError(error);
+          return;
+        }
+        __logListenerEmit(name, meta);
+        onSnapshot(messages);
+      }
+    );
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
+  } catch (error) {
+    log("Error setting up SaaS incoming messages listener:", error);
+    if (onError) onError(error);
+    return null;
+  }
+}
+
+/**
+ * Listen to the SaaS per-store outbound messages collection
+ * (tenants/{tid}/stores/{sid}/outgoing-messages).
+ *
+ * Docs are keyed by Twilio MessageSid. Multi-image MMS produces N docs
+ * sharing a primaryMessageSid + sequenceIndex — group on primaryMessageSid
+ * in UI to display them as a single user-level message.
+ *
+ * @param {Function} onSnapshot - called with array of outbound message docs
+ * @param {Function} onError - optional error callback
+ * @returns {Function} unsubscribe function (or null if pre-conditions fail)
+ */
+export function dbListenToSaasOutgoingMessages(onSnapshot, onError) {
+  const name = "saasOutgoingMessages";
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: tenantID/storeID not configured for dbListenToSaasOutgoingMessages");
+      return null;
+    }
+    if (!onSnapshot || typeof onSnapshot !== "function") {
+      log("Error: onSnapshot callback required for dbListenToSaasOutgoingMessages");
+      return null;
+    }
+    const collectionPath = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.OUTGOING_MESSAGES}`;
+    __logListenerAttach(name);
+    const unsubscribe = firestoreSubscribeCollection(
+      collectionPath,
+      (messages, error, meta) => {
+        if (error) {
+          log("SaaS outgoing messages listener error", { tenantID, storeID, error });
+          if (onError) onError(error);
+          return;
+        }
+        __logListenerEmit(name, meta);
+        onSnapshot(messages);
+      }
+    );
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
+  } catch (error) {
+    log("Error setting up SaaS outgoing messages listener:", error);
+    if (onError) onError(error);
+    return null;
+  }
+}
+
+/**
  * Listen to changes on a single workorder document
  * @param {string} workorderID
  * @param {Function} callback - called with workorder data (or null)

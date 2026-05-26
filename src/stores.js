@@ -2216,6 +2216,62 @@ export const useSubscriptionStore = create((set, get) => ({
   hasFeature: (featureName) => get().subscription?.features?.[featureName] === true,
 }));
 
+// SaaS Twilio per-store inbox.
+//
+// Backed by two Firestore collections under the current store:
+//   incoming-messages — inbound SMS/MMS, keyed by Twilio MessageSid
+//   outgoing-messages — outbound, keyed by Twilio MessageSid (one doc per
+//                        sent message; multi-image MMS produces N docs sharing
+//                        a primaryMessageSid + sequenceIndex)
+//
+// The store holds the flat arrays; threading by other-party phone is derived
+// in selectors / components. The "From the company only" display rule (no
+// sender name prepended) is enforced UI-side; the docs themselves carry the
+// raw `body` from Twilio.
+export const useSaasInboxStore = create((set, get) => ({
+  incomingMessages: [],
+  outgoingMessages: [],
+  selectedThreadPhone: null,
+  selectedFromPhone: null,
+  _incomingUnsub: null,
+  _outgoingUnsub: null,
+
+  getIncomingMessages: () => get().incomingMessages,
+  getOutgoingMessages: () => get().outgoingMessages,
+  getSelectedThreadPhone: () => get().selectedThreadPhone,
+  getSelectedFromPhone: () => get().selectedFromPhone,
+
+  setIncomingMessages: (incomingMessages) => set({ incomingMessages }),
+  setOutgoingMessages: (outgoingMessages) => set({ outgoingMessages }),
+  setSelectedThreadPhone: (selectedThreadPhone) => set({ selectedThreadPhone }),
+  setSelectedFromPhone: (selectedFromPhone) => set({ selectedFromPhone }),
+
+  setIncomingUnsub: (unsub) => {
+    const prev = get()._incomingUnsub;
+    if (prev) prev();
+    set({ _incomingUnsub: unsub });
+  },
+  setOutgoingUnsub: (unsub) => {
+    const prev = get()._outgoingUnsub;
+    if (prev) prev();
+    set({ _outgoingUnsub: unsub });
+  },
+
+  clearInbox: () => {
+    const { _incomingUnsub, _outgoingUnsub } = get();
+    if (_incomingUnsub) _incomingUnsub();
+    if (_outgoingUnsub) _outgoingUnsub();
+    set({
+      incomingMessages: [],
+      outgoingMessages: [],
+      selectedThreadPhone: null,
+      selectedFromPhone: null,
+      _incomingUnsub: null,
+      _outgoingUnsub: null,
+    });
+  },
+}));
+
 // Clear all persisted Zustand stores (called on logout)
 export function clearPersistedStores() {
   useOpenWorkordersStore.persist.clearStorage();
@@ -2228,6 +2284,7 @@ export function clearPersistedStores() {
   useCustMessagesStore.getState()._threadsUnsub?.();
   useCustMessagesStore.getState().setSmsThreads([]);
   useCustMessagesStore.setState({ hubConversationCache: {} });
+  useSaasInboxStore.getState().clearInbox();
   useEmailStore.persist.clearStorage();
   useEmailStore.getState().clearEmailStore();
   // Clear IndexedDB hub cache (async, fire-and-forget)

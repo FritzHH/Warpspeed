@@ -553,6 +553,9 @@ const UserClockModal = ({ user, handleExit, handleViewHistory, handleOpenMessage
   let nextWeekStart = dayjs(thisWeekStart).add(7, "day").format("YYYY-MM-DD");
   let todayStr = dayjs().format("YYYY-MM-DD");
 
+  let headerLastInitial = user?.last?.length ? user.last[0].toUpperCase() + "." : "";
+  let headerDisplayName = ((user?.first || "") + (headerLastInitial ? " " + headerLastInitial : "")).trim();
+
   return ReactDOM.createPortal(
     <div className={styles.modalOverlay} style={{ zIndex: z }}>
       <button
@@ -562,6 +565,10 @@ const UserClockModal = ({ user, handleExit, handleViewHistory, handleOpenMessage
         onClick={handleExit}
       />
       <div className={styles.modalCard}>
+        {/* ─── green header ───────────────────────────────────── */}
+        <div className={styles.modalHeader}>
+          <h2 className={styles.modalHeaderTitle}>{headerDisplayName}</h2>
+        </div>
         {/* ─── top-right notes button row ─────────────────────── */}
         <div className={styles.modalTopRow}>
           <button
@@ -577,13 +584,12 @@ const UserClockModal = ({ user, handleExit, handleViewHistory, handleOpenMessage
             )}
           </button>
         </div>
-        {/* ─── title + clock status ───────────────────────────── */}
-        <p className={styles.modalTitle}>PUNCH CLOCK</p>
+        {/* ─── clock status ───────────────────────────────────── */}
         <p className={styles.modalClockMessage} style={{ color: C.textDisabled }}>
           {clockMessage}
         </p>
 
-        {/* ─── 3 buttons in a row ─────────────────────────────── */}
+        {/* ─── action buttons row ─────────────────────────────── */}
         <div className={styles.modalButtonsRow}>
           <Button
             colorGradientArr={COLOR_GRADIENTS.green}
@@ -602,15 +608,6 @@ const UserClockModal = ({ user, handleExit, handleViewHistory, handleOpenMessage
             onPress={handleViewHistory}
             iconSize={60}
             icon={ICONS.listGif}
-          />
-          <Button
-            colorGradientArr={COLOR_GRADIENTS.purple}
-            text="CANCEL"
-            buttonStyle={{ paddingVertical: 4, marginHorizontal: 6, flex: 1 }}
-            textStyle={{ color: C.textWhite, fontWeight: "600" }}
-            onPress={handleExit}
-            iconSize={60}
-            icon={ICONS.cancelGif}
           />
         </div>
 

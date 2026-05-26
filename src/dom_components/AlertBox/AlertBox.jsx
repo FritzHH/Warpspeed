@@ -145,7 +145,6 @@ export const AlertBox = ({ showAlert }) => {
                     <button
                       type="button"
                       className={`${styles.footerBtn} ${styles.btnSecondary}`}
-                      style={gradientStyle(COLOR_GRADIENTS.blue)}
                       onClick={handleButton2Press}
                     >
                       {zButton2Text}

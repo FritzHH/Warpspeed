@@ -123,13 +123,18 @@
   outline-offset: -2px;
 }
 
-.btnCancel {
+.btnCancel,
+.btnSecondary {
   background-color: var(--surface-alt);
   color: var(--text-muted);
 }
 
+.btnSecondary:hover {
+  opacity: 1;
+  filter: brightness(0.94);
+}
+
 .btnAccept,
-.btnSecondary,
 .btnTertiary {
   /* gradient applied via inline style; class is a styling hook for future overrides */
 }

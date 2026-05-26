@@ -84,6 +84,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
     itemTextAlign = "center",
     itemSeparatorStyle = {},
     disabled = false,
+    portal = true,
     className = "",
     buttonClassName = "",
     buttonTextClassName = "",
@@ -295,7 +296,8 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
         )}
       </div>
 
-      {isOpen && ReactDOM.createPortal(
+      {isOpen && (() => {
+        const menuNode = (
         <div
             ref={(el) => {
               menuRef.current = el;
@@ -318,8 +320,10 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
               borderRadius: br,
               minWidth: menuPos.anchorWidth || undefined,
               maxHeight: menuMaxHeight || "calc(100vh - 20px)",
+              pointerEvents: "auto",
             }}
             role="listbox"
+            data-dropdown-menu-portal=""
           >
             {fullDataArr.map((item, idx) => {
               if (item._isDivider) {
@@ -396,9 +400,10 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
                 </div>
               );
             })}
-          </div>,
-        document.body
-      )}
+          </div>
+        );
+        return portal ? ReactDOM.createPortal(menuNode, document.body) : menuNode;
+      })()}
     </div>
   );
 });

@@ -43,6 +43,11 @@ const TokensScreen = lazy(() =>
     default: m.TokensScreen,
   }))
 );
+const StripeConnectScreen = lazy(() =>
+  import("./screens/StripeConnectScreen").then((m) => ({
+    default: m.StripeConnectScreen,
+  }))
+);
 import {
   onAuthStateChange,
   loadTenantAndSettings,
@@ -363,6 +368,38 @@ function App() {
             <ProtectedRoute user={user}>
               <Suspense fallback={<LoadingIndicator />}>
                 <TokensScreen />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Protected route - Stripe Connect onboarding (SaaS) */}
+        <Route
+          path={ROUTES.stripeConnect}
+          element={
+            <ProtectedRoute user={user}>
+              <Suspense fallback={<LoadingIndicator />}>
+                <StripeConnectScreen />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.stripeConnectRefresh}
+          element={
+            <ProtectedRoute user={user}>
+              <Suspense fallback={<LoadingIndicator />}>
+                <StripeConnectScreen mode="refresh" />
+              </Suspense>
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.stripeConnectComplete}
+          element={
+            <ProtectedRoute user={user}>
+              <Suspense fallback={<LoadingIndicator />}>
+                <StripeConnectScreen mode="complete" />
               </Suspense>
             </ProtectedRoute>
           }

@@ -1,0 +1,210 @@
+.screen {
+  width: 100vw;
+  height: 100vh;
+  background-color: var(--surface-alt);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  width: 100%;
+  height: 60px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border-default);
+  background-color: var(--surface-base);
+  flex-shrink: 0;
+}
+
+.backButton {
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 6px 14px;
+  cursor: pointer;
+  color: var(--text-default);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.backButton:hover {
+  background-color: var(--surface-raised);
+}
+
+.title {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text-default);
+  margin: 0;
+}
+
+.headerSpacer {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.body {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 40px 20px;
+}
+
+.card {
+  width: 100%;
+  max-width: 560px;
+  background-color: var(--surface-base);
+  border-radius: 12px;
+  padding: 32px;
+  box-shadow: 2px 2px 15px var(--shadow-color-default);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.cardTitle {
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--text-default);
+  margin: 0 0 8px 0;
+}
+
+.cardSubtitle {
+  font-size: 14px;
+  color: var(--text-muted);
+  margin: 0 0 20px 0;
+  line-height: 1.5;
+}
+
+.accountID {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 16px 0;
+}
+
+.accountID code {
+  font-family: "Courier New", monospace;
+  background-color: var(--surface-raised);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.muted {
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.label {
+  display: block;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-default);
+  margin-bottom: 6px;
+}
+
+.error {
+  color: var(--danger);
+  font-size: 13px;
+  margin: 0 0 12px 0;
+  padding: 8px 12px;
+  background-color: var(--danger-muted);
+  border-radius: 6px;
+}
+
+.warning {
+  color: var(--danger);
+  font-size: 14px;
+  margin: 0 0 16px 0;
+  padding: 12px;
+  background-color: var(--danger-muted);
+  border-radius: 6px;
+  border-left: 3px solid var(--danger);
+}
+
+.statusGrid {
+  display: flex;
+  flex-direction: column;
+  margin: 16px 0;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.statusRow {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.statusRow:last-child {
+  border-bottom: none;
+}
+
+.statusLabel {
+  font-size: 14px;
+  color: var(--text-default);
+}
+
+.statusOk {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--success);
+  background-color: var(--surface-success-muted);
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+
+.statusPending {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  background-color: var(--surface-raised);
+  padding: 2px 10px;
+  border-radius: 12px;
+}
+
+.requirements {
+  margin: 16px 0;
+  padding: 14px;
+  background-color: var(--surface-warning-muted);
+  border-radius: 8px;
+  border-left: 3px solid var(--text-warning);
+}
+
+.requirementsTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-default);
+  margin-bottom: 6px;
+}
+
+.requirementsList {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 13px;
+  color: var(--text-default);
+}
+
+.requirementsList li {
+  margin-bottom: 3px;
+}
+
+.buttonRow {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  margin-top: 8px;
+  flex-shrink: 0;
+}

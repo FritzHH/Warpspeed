@@ -15,6 +15,9 @@ export const ROUTES = {
   phone: "/phone",
   dbViewer: "/db-viewer",
   tokens: "/tokens",
+  stripeConnect: "/stripe-connect",
+  stripeConnectRefresh: "/onboarding/refresh",
+  stripeConnectComplete: "/onboarding/complete",
   mobile: {
     home: "/",
     workorders: "/workorders",

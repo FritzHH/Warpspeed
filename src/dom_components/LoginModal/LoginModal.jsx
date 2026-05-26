@@ -123,6 +123,7 @@ export const LoginModal = forwardRef(function LoginModal(
 
     useAlertScreenStore.getState().setValues({
       title: "PUNCH CLOCK",
+      severity: "info",
       message: "Hi " + userObj.first + ", you are not clocked in. Would you like to punch in now?",
       btn1Text: "CLOCK IN",
       btn2Text: "NOT NOW",
@@ -169,7 +170,6 @@ export const LoginModal = forwardRef(function LoginModal(
               onClick={(e) => { e.stopPropagation(); pinInputRef.current?.focus(); }}
               style={{
                 backgroundColor: sSuccess ? C.green : undefined,
-                borderColor: sSuccess ? C.green : C.buttonLightGreenOutline,
               }}
             >
               <div className={styles.body}>

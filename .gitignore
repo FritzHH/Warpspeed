@@ -17,6 +17,8 @@ scripts/node_modules
 .env
 .env.*
 !.env.example
+!functions/.env.warpspeed-bonitabikes
+!functions/.env.cadence-pos
 
 npm-debug.log*
 yarn-debug.log*

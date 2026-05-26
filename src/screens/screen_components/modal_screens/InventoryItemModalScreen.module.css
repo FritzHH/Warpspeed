@@ -2,7 +2,7 @@
 .card {
   width: 760px;
   max-width: 90vw;
-  height: 90vh;
+  max-height: 90vh;
   background-color: var(--surface-base);
   border-radius: 15px;
   box-shadow: 3px 3px 12px var(--shadow-color-default);
@@ -137,6 +137,7 @@
   font-family: inherit;
   width: 100%;
   box-sizing: border-box;
+  field-sizing: content;
 }
 
 /* Category select */

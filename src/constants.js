@@ -224,6 +224,8 @@ export const DB_NODES = {
     PUNCH_CLOCK: "punch_clock",
     MESSAGES: "messages",
     PRINTERS: "printers",
+    INCOMING_MESSAGES: "incoming-messages",
+    OUTGOING_MESSAGES: "outgoing-messages",
     PAYMENT_PROCESSING: "payment-processing",
     COMPLETED_WORKORDERS: "completed-workorders",
     COMPLETED_SALES: "completed-sales",

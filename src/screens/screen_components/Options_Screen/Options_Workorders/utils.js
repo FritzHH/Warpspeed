@@ -172,6 +172,46 @@ export function sortWorkorders(inputArr, statuses, currentUser) {
     });
   }
 
+  const finishedStatusIDs = new Set(
+    (statuses || [])
+      .filter((s) => (s.label || "").toLowerCase().includes("finished"))
+      .map((s) => s.id)
+  );
+  const finishedCountByCustomer = {};
+  finalArr.forEach((wo) => {
+    if (wo.customerID && finishedStatusIDs.has(wo.status)) {
+      finishedCountByCustomer[wo.customerID] = (finishedCountByCustomer[wo.customerID] || 0) + 1;
+    }
+  });
+  const customersToGroup = new Set(
+    Object.keys(finishedCountByCustomer).filter((id) => finishedCountByCustomer[id] >= 2)
+  );
+  if (customersToGroup.size > 0) {
+    const grouped = [];
+    const placed = new Array(finalArr.length).fill(false);
+    for (let i = 0; i < finalArr.length; i++) {
+      if (placed[i]) continue;
+      const wo = finalArr[i];
+      grouped.push(wo);
+      placed[i] = true;
+      if (
+        wo.customerID &&
+        finishedStatusIDs.has(wo.status) &&
+        customersToGroup.has(wo.customerID)
+      ) {
+        for (let j = i + 1; j < finalArr.length; j++) {
+          if (placed[j]) continue;
+          const other = finalArr[j];
+          if (other.customerID === wo.customerID && finishedStatusIDs.has(other.status)) {
+            grouped.push(other);
+            placed[j] = true;
+          }
+        }
+      }
+    }
+    finalArr = grouped;
+  }
+
   const now = new Date();
   const todayMonth = now.getMonth() + 1;
   const todayDay = now.getDate();

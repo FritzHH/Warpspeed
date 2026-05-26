@@ -201,6 +201,21 @@ async function loadSubaccountAuthToken(tenantID) {
   return version.payload.data.toString("utf8");
 }
 
+// Permanently deletes the per-tenant subaccount secret. Called from the churn
+// cleanup path after the subaccount is closed and all numbers released. Safe
+// to call when the secret doesn't exist (NOT_FOUND is swallowed) so the
+// scheduled job can re-run on partial-completion without erroring.
+async function destroySubaccountSecret(tenantID) {
+  const client = secretsClient();
+  try {
+    await client.deleteSecret({ name: secretManagerRef(tenantID) });
+  } catch (err) {
+    // gRPC NOT_FOUND code is 5. Treat as already-gone.
+    if (err && err.code === 5) return;
+    throw err;
+  }
+}
+
 function masterTwilioClient() {
   return twilio(
     TWILIO_MASTER_ACCOUNT_SID.value(),
@@ -212,7 +227,12 @@ function masterTwilioClient() {
 // operation that should be billed/owned by the subaccount (number purchase,
 // outbound send, subaccount-scoped resource lookups). Reads Firestore once
 // for the SID, Secret Manager once for the auth token.
-async function getTenantTwilioClient(tenantID) {
+//
+// When `opts.allowSuspended` is true the client is built from master
+// credentials and scoped to the subaccount via the master Accounts endpoint —
+// a suspended subaccount cannot self-auth against the Twilio API, so admin
+// teardown (release numbers, close subaccount) must go through the master.
+async function getTenantTwilioClient(tenantID, opts = {}) {
   const db = getFirestore();
   const snap = await tenantTwilioDocRef(db, tenantID).get();
   if (!snap.exists) {
@@ -225,6 +245,20 @@ async function getTenantTwilioClient(tenantID) {
   if (!subaccountSid) {
     throw new HttpsError("internal", `Subaccount SID missing for ${tenantID}.`);
   }
+  if (opts.allowSuspended) {
+    if (status !== "active" && status !== "suspended") {
+      throw new HttpsError(
+        "failed-precondition",
+        `Subaccount for ${tenantID} is ${status || "in unknown state"}.`
+      );
+    }
+    // Master credentials, scoped to the subaccount for resource paths.
+    return twilio(
+      TWILIO_MASTER_ACCOUNT_SID.value(),
+      TWILIO_MASTER_AUTH_TOKEN.value(),
+      { accountSid: subaccountSid }
+    );
+  }
   if (status !== "active") {
     throw new HttpsError(
       "failed-precondition",
@@ -233,6 +267,25 @@ async function getTenantTwilioClient(tenantID) {
   }
   const authToken = await loadSubaccountAuthToken(tenantID);
   return twilio(subaccountSid, authToken);
+}
+
+// Flips routing-doc status for every number owned by a tenant. Used to put
+// numbers into "grace" when the subaccount is suspended (inbound still flows,
+// outbound blocked) and back to "active" if a tenant is reactivated. The
+// scheduled churn cleanup eventually deletes these routing docs entirely.
+async function flipTenantRoutingDocs(db, tenantID, fromStatus, toStatus) {
+  const snap = await db
+    .collection("twilio-number-routing")
+    .where("tenantID", "==", tenantID)
+    .where("status", "==", fromStatus)
+    .get();
+  if (snap.empty) return 0;
+  // 500-write Firestore batch cap. A single tenant won't realistically own
+  // that many numbers — split if it ever happens.
+  const batch = db.batch();
+  snap.docs.forEach((d) => batch.update(d.ref, { status: toStatus }));
+  await batch.commit();
+  return snap.size;
 }
 
 module.exports = {
@@ -253,6 +306,8 @@ module.exports = {
   secretManagerRef,
   storeSubaccountAuthToken,
   loadSubaccountAuthToken,
+  destroySubaccountSecret,
   masterTwilioClient,
   getTenantTwilioClient,
+  flipTenantRoutingDocs,
 };

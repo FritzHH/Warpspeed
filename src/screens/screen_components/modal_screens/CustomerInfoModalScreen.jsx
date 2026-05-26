@@ -40,8 +40,6 @@ import {
   dbGetCustomer,
   dbGetCompletedWorkorder,
   dbGetCompletedSale,
-  dbGetCustomerMessages,
-  dbListenToNewMessages,
   dbCheckCellPhoneExists,
   dbMigrateCustomerPhone,
   dbSavePrintObj,
@@ -1338,7 +1336,7 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
     }
     let cancelled = false;
     _sSetLoading(true);
-    dbGetCustomerMessages(customerPhone, null, 20)
+    smsService.getCustomerMessages(customerPhone, null, 20)
       .then((result) => {
         if (cancelled) return;
         _sSetLoading(false);
@@ -1348,7 +1346,7 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
         let lastMillis = 0;
         sorted.forEach((m) => { if (m.millis > lastMillis) lastMillis = m.millis; });
         if (!lastMillis) lastMillis = Date.now();
-        unsubRef.current = dbListenToNewMessages(customerPhone, lastMillis, (newMessages) => {
+        unsubRef.current = smsService.listenToNewMessages(customerPhone, lastMillis, (newMessages) => {
           if (cancelled) return;
           _sSetMessages((prev) => {
             let existingIDs = new Set(prev.map((m) => m.id));

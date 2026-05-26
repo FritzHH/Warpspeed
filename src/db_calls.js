@@ -727,6 +727,12 @@ export const createTextToPayInvoiceCallable = httpsCallable(
 export const generateIdCallable = httpsCallable(functions, "generateId");
 export const migrateCustomerPhoneCallable = httpsCallable(functions, "migrateCustomerPhone");
 
+// SaaS Twilio — outbound SMS/MMS (deployed to cadence-pos project only)
+export const sendTwilioMessageCallable = httpsCallable(
+  functions,
+  "sendTwilioMessage"
+);
+
 // Stripe Connect — SaaS onboarding (deployed to cadence-pos project only)
 export const stripeConnectAccountCreateCallable = httpsCallable(
   functions,

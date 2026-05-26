@@ -48,6 +48,11 @@ const StripeConnectScreen = lazy(() =>
     default: m.StripeConnectScreen,
   }))
 );
+const InviteAcceptScreen = lazy(() =>
+  import("./screens/InviteAcceptScreen").then((m) => ({
+    default: m.InviteAcceptScreen,
+  }))
+);
 import {
   onAuthStateChange,
   loadTenantAndSettings,
@@ -246,6 +251,20 @@ function App() {
           await loadTenantAndSettings(tenantID, storeID);
           topUpPool();
 
+          // Stash SaaS claims for new SaaS-only UI gates. tokenResult.claims
+          // also carries privilege, stores, and platformAdmin when present;
+          // legacy Bonita users only have {tenantID, storeID} so the others
+          // fall back to safe defaults.
+          useLoginStore.getState().setAuthClaims({
+            tenantID: tokenResult.claims.tenantID || null,
+            storeID: tokenResult.claims.storeID || null,
+            privilege: tokenResult.claims.privilege || null,
+            stores: Array.isArray(tokenResult.claims.stores)
+              ? tokenResult.claims.stores
+              : [],
+            platformAdmin: tokenResult.claims.platformAdmin === true,
+          });
+
           // DEV-ONLY: auto-login the user with id "1234" so owner-permissioned
           // functions are available without waiting on face recognition.
           // Stripped from production builds via Vite's import.meta.env.DEV.
@@ -270,6 +289,7 @@ function App() {
         }
       } else if (!firebaseUser) {
         setUser(null);
+        useLoginStore.getState().setAuthClaims(null);
       }
       initialLoad = false;
       setIsLoading(false);
@@ -402,6 +422,16 @@ function App() {
                 <StripeConnectScreen mode="complete" />
               </Suspense>
             </ProtectedRoute>
+          }
+        />
+
+        {/* Public route - Invite accept (email-link sign-in landing) */}
+        <Route
+          path={ROUTES.inviteAccept}
+          element={
+            <Suspense fallback={<LoadingIndicator />}>
+              <InviteAcceptScreen />
+            </Suspense>
           }
         />
 

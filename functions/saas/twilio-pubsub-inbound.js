@@ -59,6 +59,7 @@ exports.handler = onMessagePublished(
       numMedia,
       numSegments,
       rawParams,
+      duringSuspension,
     } = envelope;
     const deliveryAttempt = event.data.deliveryAttempt || 1;
 
@@ -143,6 +144,12 @@ exports.handler = onMessagePublished(
         media: [],
         mediaStatus: numMedia > 0 ? "pending" : "none",
         read: false,
+        // Inbound during a post-churn grace window. UI surfaces query on this
+        // flag to suppress user-visible notifications (and to surface in an
+        // admin audit view); doc itself is still written so opt-out events
+        // are auditable.
+        duringSuspension: duringSuspension === true,
+        suppressNotification: duringSuspension === true,
         receivedAt: FieldValue.serverTimestamp(),
         twilioReceivedAt: envelope.receivedAt || null,
       });

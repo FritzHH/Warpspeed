@@ -18,6 +18,7 @@ export const ROUTES = {
   stripeConnect: "/stripe-connect",
   stripeConnectRefresh: "/onboarding/refresh",
   stripeConnectComplete: "/onboarding/complete",
+  inviteAccept: "/invite-accept",
   mobile: {
     home: "/",
     workorders: "/workorders",

@@ -1,19 +1,31 @@
 /* eslint-disable */
 
-import { dbSendSMS } from "./db_calls_wrapper";
+import {
+  dbSendSMS,
+  dbSendTwilioMessage,
+  dbListenToNewMessages,
+  dbListenToSaasNewMessages,
+  dbGetCustomerMessages,
+  dbGetSaasCustomerMessages,
+} from "./db_calls_wrapper";
 import { useCustMessagesStore } from "./stores";
 import { log } from "./utils";
+import { APP_BRAND } from "./private_user_constants";
+
+const IS_SAAS = APP_BRAND === "rss";
 
 export const smsService = {
+  isSaas: IS_SAAS,
+
   send: async (message) => {
-    log("Sending SMS", message);
+    log("Sending SMS", { brand: APP_BRAND, message });
     try {
-      // Set status to sending and post to store
       message.status = "sending";
       useCustMessagesStore.getState().setOutgoingMessage(message);
 
-      // Send SMS via database wrapper
-      const result = await dbSendSMS(message);
+      const result = IS_SAAS
+        ? await dbSendTwilioMessage(message)
+        : await dbSendSMS(message);
 
       if (result.success) {
         log("SMS Service: SMS sent successfully", result.data);
@@ -21,7 +33,11 @@ export const smsService = {
         return { success: true, message: "SMS sent successfully" };
       } else {
         log("SMS Service: SMS send failed", result.error);
-        useCustMessagesStore.getState().updateMessageStatus(message.id, "failed", result.error || "Failed to send");
+        useCustMessagesStore.getState().updateMessageStatus(
+          message.id,
+          "failed",
+          result.error || "Failed to send"
+        );
         return {
           success: false,
           error: result.error || "Failed to send SMS",
@@ -30,9 +46,12 @@ export const smsService = {
       }
     } catch (error) {
       log("SMS Service: Error in send function", error);
-      // Update message status to failed if it was posted to store
       if (message && message.id) {
-        useCustMessagesStore.getState().updateMessageStatus(message.id, "failed", error.message || "Unknown error");
+        useCustMessagesStore.getState().updateMessageStatus(
+          message.id,
+          "failed",
+          error.message || "Unknown error"
+        );
       }
       return {
         success: false,
@@ -40,5 +59,19 @@ export const smsService = {
         code: "SERVICE_ERROR",
       };
     }
+  },
+
+  listenToNewMessages: (phone, afterMillis, callback) => {
+    if (IS_SAAS) {
+      return dbListenToSaasNewMessages(phone, afterMillis, callback);
+    }
+    return dbListenToNewMessages(phone, afterMillis, callback);
+  },
+
+  getCustomerMessages: async (phone, startAfterTimestamp = null, pageSize = 10) => {
+    if (IS_SAAS) {
+      return dbGetSaasCustomerMessages(phone, startAfterTimestamp, pageSize);
+    }
+    return dbGetCustomerMessages(phone, startAfterTimestamp, pageSize);
   },
 };

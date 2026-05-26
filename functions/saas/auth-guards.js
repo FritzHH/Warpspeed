@@ -1,32 +1,42 @@
 /* eslint-disable */
-// Tenant-isolation guards for SaaS callables.
+// Tenant-isolation + privilege guards for SaaS callables.
 //
-// All tenant-scoped callables (Connect onboarding, PI, checkout sessions,
-// refunds, reader registration) must verify the caller's auth claim matches
-// the resource's tenantID. Without this, any signed-in user from tenant A
-// could pass tenantID="B" in request.data and act on tenant B's resources.
+// Three layers of authorization, all driven by the ID token's custom claims:
 //
-// Two flavors:
-//   - assertTenantMatch(auth, tenantID)        Direct: caller passed tenantID
-//                                              in the request, compare to
-//                                              the auth-token claim.
-//   - lookupTenantForConnectAccount(stripeID)  Indirect: caller passed only
-//                                              a Stripe account/charge ID;
-//                                              resolve owning tenant via
-//                                              the platform's index, then
-//                                              compare.
+//   1. Tenant match — every tenant-scoped callable must verify the caller's
+//      `tenantID` claim matches the resource it's acting on. Otherwise any
+//      signed-in user from tenant A could pass tenantID="B" in request.data
+//      and act on tenant B's data.
+//        - assertTenantMatch(auth, tenantID)         direct (caller passes tenantID)
+//        - lookupTenantForConnectAccount(stripeID)   indirect (resolve via index)
 //
-// Claim source: the App.jsx auth bootstrap reads `tenantID` and `storeID`
-// from the ID token claims. createAppUserCallable stamps these claims at
-// user creation; if a user predates claim provisioning they'll need to
-// re-sign-in to refresh the token.
+//   2. Privilege — tenant-owner-only callables (Stripe Connect onboarding,
+//      billing, user invites) check the caller's `privilege` claim. The
+//      hierarchy from highest to lowest: owner > admin > manager > editor >
+//      user. assertPrivilege requires the caller's rank ≥ the required rank.
+//        - assertPrivilege(auth, "owner")
 //
-// Out of scope (deferred to the auth-claims design pass):
-//   - Super-admin / platform-operator override (DLQ admin, cross-tenant ops)
-//   - Store-level granularity (does tenant admin act across all stores?)
-//   - Multi-tenant users (user belongs to >1 tenant)
+//   3. Platform admin — cross-tenant operations (creating new tenants,
+//      DLQ admin retry/status, anything touching `connect-accounts-index`
+//      or `saas-dlq` collections) require the `platformAdmin: true` claim.
+//      Set manually for fritz's account; never grantable via callable.
+//        - assertPlatformAdmin(auth)
+//
+// Claim shape (per project-auth-claims-design.md):
+//   { tenantID, privilege, stores: [...] }    tenant users
+//   { platformAdmin: true }                   platform operators (fritz)
+//
+// setUserClaims is the internal helper auth-claims.js callables use to write
+// claims; not exposed as a callable itself.
 const { HttpsError } = require("firebase-functions/v2/https");
+const admin = require("firebase-admin");
 const { getFirestore } = require("firebase-admin/firestore");
+
+const PRIVILEGES = ["user", "editor", "manager", "admin", "owner"];
+const PRIVILEGE_RANK = PRIVILEGES.reduce((acc, name, idx) => {
+  acc[name] = idx + 1;
+  return acc;
+}, {});
 
 function getTokenTenantID(auth) {
   const claim = auth && auth.token && auth.token.tenantID;
@@ -48,6 +58,40 @@ function assertTenantMatch(auth, tenantID) {
     throw new HttpsError(
       "permission-denied",
       "Cross-tenant access is not allowed."
+    );
+  }
+}
+
+function assertPrivilege(auth, minPrivilege) {
+  const tokenPrivilege = auth && auth.token && auth.token.privilege;
+  const need = PRIVILEGE_RANK[minPrivilege];
+  if (!need) {
+    throw new HttpsError(
+      "internal",
+      `assertPrivilege called with unknown level ${minPrivilege}.`
+    );
+  }
+  const have = PRIVILEGE_RANK[tokenPrivilege];
+  if (!have) {
+    throw new HttpsError(
+      "permission-denied",
+      "Token is missing the privilege claim. Sign out and back in."
+    );
+  }
+  if (have < need) {
+    throw new HttpsError(
+      "permission-denied",
+      `Requires ${minPrivilege} privilege or higher.`
+    );
+  }
+}
+
+function assertPlatformAdmin(auth) {
+  const flag = auth && auth.token && auth.token.platformAdmin === true;
+  if (!flag) {
+    throw new HttpsError(
+      "permission-denied",
+      "Platform-admin privilege required."
     );
   }
 }
@@ -77,8 +121,39 @@ async function lookupTenantForConnectAccount(stripeAccountID) {
   return data.tenantID;
 }
 
+// Writes the SaaS custom-claim shape onto a user. Owner ignores `stores`
+// (sees all). Non-owners get `stores` defaulted to []. Throws if `privilege`
+// is unrecognized so a caller can't accidentally grant a typo'd role.
+async function setUserClaims(uid, { tenantID, privilege, stores }) {
+  if (!uid) {
+    throw new HttpsError("invalid-argument", "uid is required.");
+  }
+  if (!tenantID) {
+    throw new HttpsError("invalid-argument", "tenantID is required.");
+  }
+  if (!PRIVILEGE_RANK[privilege]) {
+    throw new HttpsError(
+      "invalid-argument",
+      `privilege must be one of: ${PRIVILEGES.join(", ")}.`
+    );
+  }
+  const claims = { tenantID, privilege };
+  if (privilege === "owner") {
+    claims.stores = [];
+  } else {
+    claims.stores = Array.isArray(stores) ? stores.filter(Boolean) : [];
+  }
+  await admin.auth().setCustomUserClaims(uid, claims);
+  return claims;
+}
+
 module.exports = {
+  PRIVILEGES,
+  PRIVILEGE_RANK,
   getTokenTenantID,
   assertTenantMatch,
+  assertPrivilege,
+  assertPlatformAdmin,
   lookupTenantForConnectAccount,
+  setUserClaims,
 };

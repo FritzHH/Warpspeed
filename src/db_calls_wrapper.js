@@ -38,6 +38,7 @@ import {
   rehydrateFromArchiveCallable,
   manualArchiveAndCleanupCallable,
   createTextToPayInvoiceCallable,
+  sendTwilioMessageCallable,
   firestoreBatchWrite,
   firestoreBatchDelete,
   migrateCustomerPhoneCallable,
@@ -2610,7 +2611,10 @@ export function dbListenToSaasIncomingMessages(onSnapshot, onError) {
           return;
         }
         __logListenerEmit(name, meta);
-        onSnapshot(messages);
+        const normalized = (messages || [])
+          .map(normalizeSaasMessageToBonita)
+          .filter(Boolean);
+        onSnapshot(normalized);
       }
     );
     return () => {
@@ -2622,6 +2626,60 @@ export function dbListenToSaasIncomingMessages(onSnapshot, onError) {
     if (onError) onError(error);
     return null;
   }
+}
+
+// Convert a SaaS message doc (incoming-messages or outgoing-messages) to the
+// Bonita-shape object the existing messaging UI expects. Lets us reuse
+// Options_Messages.jsx across both backends without per-component branching.
+function normalizeSaasMessageToBonita(saasMsg) {
+  if (!saasMsg || typeof saasMsg !== "object") return null;
+  const isInbound = saasMsg.direction === "inbound";
+  const phoneRaw = isInbound ? saasMsg.from : saasMsg.to;
+  const phoneNumber = String(phoneRaw || "").replace(/\D/g, "").slice(-10);
+
+  let millis = 0;
+  if (typeof saasMsg.twilioReceivedAt === "string") {
+    const parsed = Date.parse(saasMsg.twilioReceivedAt);
+    if (!isNaN(parsed)) millis = parsed;
+  }
+  if (!millis && saasMsg.sentAt && typeof saasMsg.sentAt.toMillis === "function") {
+    millis = saasMsg.sentAt.toMillis();
+  }
+  if (!millis && saasMsg.receivedAt && typeof saasMsg.receivedAt.toMillis === "function") {
+    millis = saasMsg.receivedAt.toMillis();
+  }
+  if (!millis) millis = Date.now();
+
+  const mediaUrls = isInbound
+    ? (saasMsg.media || []).map((m) => m && (m.signedUrl || m.gcsUri || m.storagePath)).filter(Boolean)
+    : (saasMsg.mediaUrlsOriginal || []);
+
+  return {
+    id: saasMsg.messageSid || saasMsg.id || "",
+    messageSid: saasMsg.messageSid || "",
+    primaryMessageSid: saasMsg.primaryMessageSid || saasMsg.messageSid || "",
+    sequenceIndex: saasMsg.sequenceIndex || 0,
+    message: saasMsg.body || "",
+    phoneNumber,
+    type: isInbound ? "incoming" : "outgoing",
+    millis,
+    status: saasMsg.latestStatus || (isInbound ? "received" : "sent"),
+    hasMedia: (saasMsg.numMedia || 0) > 0,
+    numMedia: saasMsg.numMedia || 0,
+    mediaUrls,
+    read: !!saasMsg.read,
+    customerID: saasMsg.customerID || "",
+    workorderID: saasMsg.workorderID || "",
+    sentByUser: saasMsg.sentByUserID || "",
+    senderUserObj: saasMsg.sentByUserID
+      ? { id: saasMsg.sentByUserID, first: saasMsg.sentByName || "" }
+      : null,
+    canRespond: true,
+    forwardTo: null,
+    threadStatus: "active",
+    firstName: "",
+    lastName: "",
+  };
 }
 
 /**
@@ -2659,7 +2717,10 @@ export function dbListenToSaasOutgoingMessages(onSnapshot, onError) {
           return;
         }
         __logListenerEmit(name, meta);
-        onSnapshot(messages);
+        const normalized = (messages || [])
+          .map(normalizeSaasMessageToBonita)
+          .filter(Boolean);
+        onSnapshot(normalized);
       }
     );
     return () => {
@@ -3462,6 +3523,192 @@ export async function dbSendSMS(
       },
       timestamp: new Date().toISOString(),
     };
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// SaaS Twilio send — Bonita-shape `message` in, sendTwilioMessage callable out.
+// The callable writes the outgoing-messages doc and tracks usage. Caller is
+// the smsService layer, which keeps the Bonita send path untouched.
+// ─────────────────────────────────────────────────────────────────────────
+export async function dbSendTwilioMessage(message) {
+  try {
+    if (!message || typeof message !== "object") {
+      throw new Error("Message object is required");
+    }
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      throw new Error("Missing tenantID/storeID");
+    }
+
+    const settings = useSettingsStore.getState().getSettings() || {};
+    const fromRaw = (settings?.storeInfo?.textingNumber || "").replace(/\D/g, "");
+    if (fromRaw.length !== 10) {
+      throw new Error("Store texting number not configured (storeInfo.textingNumber must be 10 digits)");
+    }
+    const fromPhoneNumber = `+1${fromRaw}`;
+
+    const toRaw = (message.phoneNumber || "").replace(/\D/g, "");
+    if (toRaw.length !== 10) {
+      throw new Error("Recipient phone must be 10 digits");
+    }
+    const to = `+1${toRaw}`;
+
+    const body = (message.message || "").trim();
+    const mediaUrls = Array.isArray(message.mediaUrls)
+      ? message.mediaUrls.filter(Boolean)
+      : (message.imageUrl ? [message.imageUrl] : []);
+    if (!body && mediaUrls.length === 0) {
+      throw new Error("Message body or media is required");
+    }
+
+    const senderUser = message.senderUserObj || {};
+    const sentByName = [senderUser.first, senderUser.last].filter(Boolean).join(" ") || null;
+
+    const args = {
+      tenantID,
+      storeID,
+      fromPhoneNumber,
+      to,
+      body,
+      mediaUrls,
+      sentByName,
+      workorderID: message.workorderID || null,
+      customerID: message.customerID || null,
+    };
+
+    const result = await sendTwilioMessageCallable(args);
+    return {
+      success: true,
+      message: "SMS sent",
+      data: result?.data || {},
+      timestamp: new Date().toISOString(),
+    };
+  } catch (error) {
+    log("Error in dbSendTwilioMessage:", error);
+    return {
+      success: false,
+      error: error.message || "Send failed",
+      code: error.code || "TWILIO_SEND_ERROR",
+      timestamp: new Date().toISOString(),
+    };
+  }
+}
+
+// SaaS analog of dbGetCustomerMessages — paginated history fetch from the
+// flat incoming-messages + outgoing-messages collections, filtered to one
+// phone and merged in millis-desc order. Mirrors the Bonita return shape.
+export async function dbGetSaasCustomerMessages(
+  customerPhone,
+  startAfterMillis = null,
+  pageSize = 10
+) {
+  try {
+    if (!customerPhone || typeof customerPhone !== "string") {
+      throw new Error("Customer phone number is required and must be a string");
+    }
+    const cleanPhone = customerPhone.replace(/\D/g, "");
+    if (cleanPhone.length !== 10) throw new Error("Phone number must be 10 digits");
+    const e164 = `+1${cleanPhone}`;
+
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) throw new Error("Missing tenantID or storeID");
+
+    const { getDocs } = await import("firebase/firestore");
+
+    const inboundCol = collection(
+      DB, "tenants", tenantID, "stores", storeID, DB_NODES.FIRESTORE.INCOMING_MESSAGES
+    );
+    const outboundCol = collection(
+      DB, "tenants", tenantID, "stores", storeID, DB_NODES.FIRESTORE.OUTGOING_MESSAGES
+    );
+
+    const [inSnap, outSnap] = await Promise.all([
+      getDocs(query(inboundCol, where("from", "==", e164))),
+      getDocs(query(outboundCol, where("to", "==", e164))),
+    ]);
+
+    const raw = [];
+    inSnap.forEach((d) => raw.push(d.data()));
+    outSnap.forEach((d) => raw.push(d.data()));
+
+    let merged = raw
+      .map(normalizeSaasMessageToBonita)
+      .filter(Boolean);
+    merged.sort((a, b) => b.millis - a.millis);
+    if (typeof startAfterMillis === "number" && startAfterMillis > 0) {
+      merged = merged.filter((m) => m.millis < startAfterMillis);
+    }
+    const page = merged.slice(0, pageSize);
+    const lastMillis = page.length ? page[page.length - 1].millis : null;
+
+    return {
+      success: true,
+      messages: page,
+      hasMore: merged.length > pageSize,
+      count: page.length,
+      customerPhone: cleanPhone,
+      nextPageTimestamp: lastMillis,
+    };
+  } catch (error) {
+    log("Error retrieving SaaS customer messages", {
+      error: error.message,
+      phone: customerPhone,
+    });
+    return {
+      success: false,
+      error: error.message || "Failed to retrieve messages",
+      messages: [],
+      hasMore: false,
+      count: 0,
+      customerPhone,
+    };
+  }
+}
+
+// SaaS analog of dbListenToNewMessages — listens to incoming-messages and
+// outgoing-messages, filters to one phone, emits Bonita-shape messages with
+// millis > afterMillis. Returns a combined unsubscribe.
+export function dbListenToSaasNewMessages(customerPhone, afterMillis, callback) {
+  try {
+    const cleanPhone = (customerPhone || "").replace(/\D/g, "");
+    if (cleanPhone.length !== 10) return null;
+    const e164 = `+1${cleanPhone}`;
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return null;
+
+    const inboundCol = collection(
+      DB, "tenants", tenantID, "stores", storeID, DB_NODES.FIRESTORE.INCOMING_MESSAGES
+    );
+    const outboundCol = collection(
+      DB, "tenants", tenantID, "stores", storeID, DB_NODES.FIRESTORE.OUTGOING_MESSAGES
+    );
+
+    const emit = (docs) => {
+      const normalized = docs
+        .map(normalizeSaasMessageToBonita)
+        .filter((m) => m && (typeof afterMillis !== "number" || m.millis > afterMillis));
+      if (normalized.length) callback(normalized);
+    };
+
+    const unsubIn = onSnapshot(
+      query(inboundCol, where("from", "==", e164)),
+      (snap) => emit(snap.docs.map((d) => d.data())),
+      (err) => log("SaaS new-messages inbound listener error", err)
+    );
+    const unsubOut = onSnapshot(
+      query(outboundCol, where("to", "==", e164)),
+      (snap) => emit(snap.docs.map((d) => d.data())),
+      (err) => log("SaaS new-messages outbound listener error", err)
+    );
+
+    return () => {
+      try { unsubIn && unsubIn(); } catch (_) {}
+      try { unsubOut && unsubOut(); } catch (_) {}
+    };
+  } catch (error) {
+    log("Error setting up SaaS new-messages listener:", error);
+    return null;
   }
 }
 

@@ -686,6 +686,11 @@ export const useLoginStore = create(
   cameraRetryTrigger: 0,
   cameraStream: null,
 
+  // SaaS auth claims pulled from the Firebase ID token. Populated by
+  // App.jsx onAuthStateChange. Shape: { tenantID, privilege, stores: [],
+  // platformAdmin: false } — null when signed out.
+  authClaims: null,
+
   // face login
   runBackgroundRecognition: true,
 
@@ -698,6 +703,8 @@ export const useLoginStore = create(
   getCurrentUser: () => get().currentUser,
   getAdminPrivilege: () => get().adminPrivilege,
   getModalVisible: () => get().modalVisible,
+  getAuthClaims: () => get().authClaims,
+  setAuthClaims: (authClaims) => set({ authClaims }),
   getUserHasEditRole: () => {},
   getUserHasAdminRole: () => {
     let user = get().currentUserObj;

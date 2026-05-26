@@ -62,6 +62,11 @@ const AnalyticsModalScreen = lazy(() =>
     default: m.AnalyticsModalScreen,
   }))
 );
+const InviteUserModal = lazy(() =>
+  import("../../modal_screens/InviteUserModal").then((m) => ({
+    default: m.InviteUserModal,
+  }))
+);
 import { TodaysHistoryComponent } from "./TodaysHistoryComponent";
 import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection, dbSaveInventoryItem, dbGmailDisconnect, dbGmailInitiateAuth } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses, mapEmployees, mapPunchHistory, parseCSV } from "../../../../lightspeed_import";
@@ -629,6 +634,7 @@ const AppUserListComponent = ({
   const [sShowWage, _setShowWage] = useState(false);
   const [sPinError, _setPinError] = useState("");
   const [sFaceModalDraftActive, _setFaceModalDraftActive] = useState(false);
+  const [sShowInviteSaasModal, _setShowInviteSaasModal] = useState(false);
   const [sLoginTimeout, _setLoginTimeout] = useState(zSettingsObj?.activeLoginTimeoutSeconds || "");
   const [sLockHours, _setLockHours] = useState(zSettingsObj?.idleLoginTimeoutHours ? String(Math.round(zSettingsObj.idleLoginTimeoutHours)) : "");
   const [sPinLength, _setPinLength] = useState(zSettingsObj?.userPinStrength || "");
@@ -1156,7 +1162,36 @@ const AppUserListComponent = ({
                   }}
                   textStyle={{ fontSize: 13, color: C.text, fontWeight: 600 }}
                 />
+                <DomButton
+                  text="Invite SaaS User"
+                  onPress={() => {
+                    if (!canEditUsers) return;
+                    _setShowInviteSaasModal(true);
+                  }}
+                  buttonStyle={{
+                    borderWidth: 1,
+                    borderStyle: "solid",
+                    borderColor: C.buttonLightGreenOutline,
+                    backgroundColor: C.buttonLightGreen,
+                    paddingTop: 4,
+                    paddingBottom: 4,
+                    paddingLeft: 10,
+                    paddingRight: 10,
+                    borderRadius: 5,
+                    opacity: canEditUsers ? 1 : 0.4,
+                  }}
+                  textStyle={{ fontSize: 13, color: C.text, fontWeight: 600 }}
+                />
               </div>
+
+              {sShowInviteSaasModal && (
+                <Suspense fallback={null}>
+                  <InviteUserModal
+                    visible={sShowInviteSaasModal}
+                    onClose={() => _setShowInviteSaasModal(false)}
+                  />
+                </Suspense>
+              )}
 
               {!sDraftUser && (
                 <div className={adminStyles.ucEditorEmpty}>

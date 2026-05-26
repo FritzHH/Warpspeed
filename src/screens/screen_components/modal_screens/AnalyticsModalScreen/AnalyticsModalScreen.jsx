@@ -39,12 +39,18 @@ import {
   computeBreakeven,
   makeGrowthCurve,
   reconcileVendor,
+  loadSmsEventsAllStores,
+  sumSmsDimensions,
+  rollupSmsByStore,
+  rollupSmsByFeature,
+  bucketSmsByDay,
 } from "./analyticsHelpers";
 
 const TABS = [
   { key: "overview",    label: "Overview" },
   { key: "averages",    label: "Averages" },
   { key: "features",    label: "Per Feature" },
+  { key: "sms",         label: "SMS" },
   { key: "pricing",     label: "Pricing Strategy" },
   { key: "forecast",    label: "Forecast" },
   { key: "reconcile",   label: "Reconcile" },
@@ -70,6 +76,14 @@ export const AnalyticsModalScreen = ({ handleExit }) => {
   const [sIncludeAnalytics, _setIncludeAnalytics] = useState(true);
   const [sError, _setError] = useState(null);
 
+  // SMS-tab data is multi-store (fan-out across every store under the
+  // tenant). Lazy-loaded the first time the SMS tab is activated, then
+  // cached per date range so re-opening the tab is instant.
+  const [sSmsEvents, _setSmsEvents] = useState([]);
+  const [sSmsStoreIDs, _setSmsStoreIDs] = useState([]);
+  const [sSmsLoading, _setSmsLoading] = useState(false);
+  const [sSmsLoadedForRange, _setSmsLoadedForRange] = useState(null);
+
   // ── Load on range change ──
   useEffect(() => {
     let cancelled = false;
@@ -92,8 +106,35 @@ export const AnalyticsModalScreen = ({ handleExit }) => {
         _setVendorTotals([]);
         _setLoading(false);
       });
+    // Invalidate SMS cache; re-fetches on next SMS tab activation.
+    _setSmsLoadedForRange(null);
     return () => { cancelled = true; };
   }, [sStartMs, sEndMs]);
+
+  // ── SMS multi-store fan-out (lazy: first SMS tab activation per range) ──
+  useEffect(() => {
+    if (sActiveTab !== "sms") return;
+    const rangeKey = sStartMs + "-" + sEndMs;
+    if (sSmsLoadedForRange === rangeKey) return;
+
+    let cancelled = false;
+    _setSmsLoading(true);
+    loadSmsEventsAllStores(sStartMs, sEndMs, { limit: 10000 })
+      .then(({ events, storeIDs }) => {
+        if (cancelled) return;
+        _setSmsEvents(events || []);
+        _setSmsStoreIDs(storeIDs || []);
+        _setSmsLoadedForRange(rangeKey);
+        _setSmsLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        _setSmsEvents([]);
+        _setSmsStoreIDs([]);
+        _setSmsLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [sActiveTab, sStartMs, sEndMs, sSmsLoadedForRange]);
 
   // ── Rollups (memoized) ──
   const featureRoll = useMemo(() => rollupByFeature(sEvents), [sEvents]);
@@ -108,6 +149,18 @@ export const AnalyticsModalScreen = ({ handleExit }) => {
   );
   const perSale = useMemo(() => avgCostPerSale(sEvents), [sEvents]);
   const reconRows = useMemo(() => reconcileVendor(sEvents, sVendorTotals), [sEvents, sVendorTotals]);
+
+  // SMS rollups (cross-store)
+  const smsTotals = useMemo(() => sumSmsDimensions(sSmsEvents), [sSmsEvents]);
+  const smsByStore = useMemo(
+    () => rollupSmsByStore(sSmsEvents, sSmsStoreIDs),
+    [sSmsEvents, sSmsStoreIDs]
+  );
+  const smsByFeature = useMemo(() => rollupSmsByFeature(sSmsEvents), [sSmsEvents]);
+  const smsDayBuckets = useMemo(
+    () => bucketSmsByDay(sSmsEvents, sStartMs, sEndMs),
+    [sSmsEvents, sStartMs, sEndMs]
+  );
 
   function handlePreset(p) {
     _setPresetLabel(p.label);
@@ -235,6 +288,18 @@ export const AnalyticsModalScreen = ({ handleExit }) => {
           )}
           {!sLoading && !sError && sActiveTab === "features" && (
             <FeaturesTab featureRoll={featureRoll} totalProjected={totalProjected} />
+          )}
+          {!sLoading && !sError && sActiveTab === "sms" && (
+            <SMSTab
+              smsLoading={sSmsLoading}
+              smsTotals={smsTotals}
+              smsByStore={smsByStore}
+              smsByFeature={smsByFeature}
+              smsDayBuckets={smsDayBuckets}
+              storeIDs={sSmsStoreIDs}
+              currentStoreID={sSmsStoreIDs[0] || null}
+              days={days}
+            />
           )}
           {!sLoading && !sError && sActiveTab === "pricing" && (
             <PricingTab
@@ -540,6 +605,196 @@ function FeaturesTab({ featureRoll, totalProjected }) {
                   </tr>
                 );
               })}
+            </tbody>
+          </table>
+        </div>
+      </SectionCard>
+    </div>
+  );
+}
+
+// ════════════════════════ SMS TAB ════════════════════════
+function SMSTab({
+  smsLoading,
+  smsTotals,
+  smsByStore,
+  smsByFeature,
+  smsDayBuckets,
+  storeIDs,
+  currentStoreID,
+  days,
+}) {
+  if (smsLoading) {
+    return (
+      <div className={styles.loadingWrap}>
+        <LoadingIndicator size="large" color={C.blue} message="Loading SMS data across stores..." />
+      </div>
+    );
+  }
+
+  const maxDayCents = Math.max(1, ...smsDayBuckets.map((b) => b.projectedCents));
+  const storeCount = storeIDs.length;
+  const dailyAvgCost = smsTotals.costCents / Math.max(1, days);
+  const monthlyProjection = dailyAvgCost * 30;
+  // ≤3 stores → side-by-side cards. More → table. Single-store tenants
+  // skip the section entirely (nothing to compare).
+  const showStoreCards = storeCount > 1 && storeCount <= 3;
+  const showStoreTable = storeCount > 3;
+
+  return (
+    <div className={styles.scroll}>
+      {/* Top metric cards */}
+      <div className={styles.metricRow}>
+        <MetricCard
+          label="Total SMS Cost (window)"
+          value={centsToDisplay(smsTotals.costCents)}
+          accent={C.green}
+          sub={"~" + centsToDisplay(monthlyProjection) + "/mo extrapolated"}
+        />
+        <MetricCard
+          label="Outbound Segments"
+          value={smsTotals.outboundSegments.toLocaleString()}
+          accent={C.blue}
+          sub={smsTotals.outboundSegments
+            ? "~" + Math.round(smsTotals.outboundSegments / days) + "/day"
+            : "no outbound traffic"}
+        />
+        <MetricCard
+          label="Inbound Segments"
+          value={smsTotals.inboundSegments.toLocaleString()}
+          accent={C.orange}
+          sub={smsTotals.inboundSegments
+            ? "~" + Math.round(smsTotals.inboundSegments / days) + "/day"
+            : "no inbound traffic"}
+        />
+        <MetricCard
+          label="MMS Messages"
+          value={smsTotals.mmsCount.toLocaleString()}
+          accent={C.purple}
+          sub={smsTotals.mmsCount + " media-bearing sends"}
+        />
+      </div>
+
+      {/* Daily SMS cost trend */}
+      <SectionCard title="Daily SMS Cost Trend">
+        <div className={styles.barChart}>
+          {smsDayBuckets.length === 0 && (
+            <span style={{ color: C.textMuted, fontSize: 12 }}>No SMS activity in this window.</span>
+          )}
+          {smsDayBuckets.map((b) => {
+            const h = Math.max(2, Math.round((b.projectedCents / maxDayCents) * 100));
+            return (
+              <div
+                key={b.dayMs}
+                className={styles.barCol}
+                title={dayjs(b.dayMs).format("MMM D") + ": " + centsToDisplay(b.projectedCents)}
+              >
+                <div
+                  className={styles.bar}
+                  style={{
+                    height: h + "%",
+                    backgroundColor: lightenRGBByPercent(C.orange, 30),
+                  }}
+                />
+                <span className={styles.barLabel}>{dayjs(b.dayMs).format("M/D")}</span>
+              </div>
+            );
+          })}
+        </div>
+      </SectionCard>
+
+      {/* Per-store breakdown */}
+      {showStoreCards && (
+        <SectionCard title={"Per Store (" + storeCount + " stores)"}>
+          <div className={styles.metricRow}>
+            {smsByStore.map((row) => {
+              const isCurrent = row.storeID === currentStoreID;
+              return (
+                <div
+                  key={row.storeID}
+                  className={styles.metricCard}
+                  style={{ borderTopColor: isCurrent ? C.orange : C.blue }}
+                >
+                  <div className={styles.metricLabel}>
+                    {row.storeID}{isCurrent ? " (this store)" : ""}
+                  </div>
+                  <div className={styles.metricValue} style={{ color: isCurrent ? C.orange : C.blue }}>
+                    {centsToDisplay(row.costCents)}
+                  </div>
+                  <div className={styles.metricSub}>
+                    {row.outboundSegments.toLocaleString()} out · {row.inboundSegments.toLocaleString()} in
+                    {row.mmsCount > 0 ? " · " + row.mmsCount + " MMS" : ""}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </SectionCard>
+      )}
+      {showStoreTable && (
+        <SectionCard title={"Per Store (" + storeCount + " stores)"}>
+          <div className={styles.tableWrap}>
+            <table className={styles.table}>
+              <thead>
+                <tr>
+                  <th style={{ textAlign: "left" }}>Store</th>
+                  <th style={{ textAlign: "right" }}>Outbound</th>
+                  <th style={{ textAlign: "right" }}>Inbound</th>
+                  <th style={{ textAlign: "right" }}>MMS</th>
+                  <th style={{ textAlign: "right" }}>Cost</th>
+                </tr>
+              </thead>
+              <tbody>
+                {smsByStore.map((row) => {
+                  const isCurrent = row.storeID === currentStoreID;
+                  return (
+                    <tr key={row.storeID}>
+                      <td style={{ fontWeight: isCurrent ? 700 : 400 }}>
+                        {row.storeID}{isCurrent ? " (this store)" : ""}
+                      </td>
+                      <td style={{ textAlign: "right" }}>{row.outboundSegments.toLocaleString()}</td>
+                      <td style={{ textAlign: "right" }}>{row.inboundSegments.toLocaleString()}</td>
+                      <td style={{ textAlign: "right" }}>{row.mmsCount.toLocaleString()}</td>
+                      <td style={{ textAlign: "right" }}>{centsToDisplay(row.costCents)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </SectionCard>
+      )}
+
+      {/* Top SMS-emitting features */}
+      <SectionCard title="Top SMS Features by Cost">
+        <div className={styles.tableWrap}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: "left" }}>Feature</th>
+                <th style={{ textAlign: "right" }}>Calls</th>
+                <th style={{ textAlign: "right" }}>Outbound Segs</th>
+                <th style={{ textAlign: "right" }}>Inbound Segs</th>
+                <th style={{ textAlign: "right" }}>MMS</th>
+                <th style={{ textAlign: "right" }}>Total Cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              {smsByFeature.length === 0 && (
+                <tr><td colSpan={6} style={{ textAlign: "center", color: C.textMuted, padding: 16 }}>
+                  No SMS-emitting features in this window.
+                </td></tr>
+              )}
+              {smsByFeature.map((f) => (
+                <tr key={f.feature}>
+                  <td><code className={styles.code}>{f.feature}</code></td>
+                  <td style={{ textAlign: "right" }}>{f.count.toLocaleString()}</td>
+                  <td style={{ textAlign: "right" }}>{f.outboundSegments.toLocaleString()}</td>
+                  <td style={{ textAlign: "right" }}>{f.inboundSegments.toLocaleString()}</td>
+                  <td style={{ textAlign: "right" }}>{f.mmsCount.toLocaleString()}</td>
+                  <td style={{ textAlign: "right" }}>{centsToDisplay(f.costCents)}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

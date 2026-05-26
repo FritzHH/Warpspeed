@@ -1,32 +1,41 @@
 /* eslint-disable */
 // Phase 9 — DLQ admin functions: retry, status update, escalation.
 //
-// Three functions, all backed by the `saas-dlq` Firestore collection that
-// `pubsub-dead-letter.js` populates whenever the subscriber sends an event
-// to the dead-letter topic after exhausting retries:
+// Backs TWO Firestore DLQ collections that share the same doc-lifecycle
+// shape (status / firstSeenAt / lastSeenAt / retryCount / audit):
 //
-//   - dlqRetryCallable          Republishes a DLQ entry back to the main
-//                               `stripe-events` topic so the subscriber
-//                               can retry. Bumps `retryCount`, stamps
-//                               `lastRetryAt`.
+//   - `saas-dlq`        — Stripe webhook events (populated by
+//                         pubsub-dead-letter.js)
+//   - `saas-twilio-dlq` — Twilio inbound/outbound envelopes (populated by
+//                         twilio-pubsub-dead-letter.js)
 //
-//   - dlqUpdateStatusCallable   Moves an entry through its lifecycle:
-//                               new → acknowledged → resolved (or directly
-//                               to resolved). Optional note + actor audit.
+//   - dlqRetryCallable          Stripe-only for now. Republishes the DLQ
+//                               entry to `stripe-events`. Twilio retry is
+//                               deferred until Stage 2 (real subaccount
+//                               traffic) since the topic routing differs
+//                               by direction and the dedup-clear path
+//                               touches per-store incoming-messages docs.
+//
+//   - dlqUpdateStatusCallable   Lifecycle: new → acknowledged → resolved
+//                               (or directly to resolved/ignored). Accepts
+//                               `dlqSource: "stripe" | "twilio"` to pick
+//                               the collection. Optional note + actor
+//                               audit row appended.
 //
 //   - dlqEscalationCheckScheduled
-//                               Every 30 min, scans for `status == "new"`
-//                               entries older than 1h. Stamps the entry
-//                               with `escalated: true` + bumps a counter
-//                               so the admin UI can render a "critical"
-//                               badge. SMS hookup deferred until a SaaS
-//                               admin phone number is configured.
+//                               Every 30 min, scans BOTH DLQ collections
+//                               for `status == "new"` entries older than
+//                               1h. Stamps `escalated: true` + bumps a
+//                               counter so the admin UI can render a
+//                               "critical" badge. SMS hookup deferred
+//                               until a SaaS admin phone number is wired.
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const { PubSub } = require("@google-cloud/pubsub");
+const { assertPlatformAdmin } = require("./auth-guards");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -35,6 +44,22 @@ const ESCALATION_THRESHOLD_MS = 60 * 60 * 1000; // 1 hour
 const ESCALATION_BATCH_LIMIT = 50;
 
 const ALLOWED_STATUSES = new Set(["new", "acknowledged", "resolved", "ignored"]);
+
+const COLLECTION_BY_SOURCE = {
+  stripe: "saas-dlq",
+  twilio: "saas-twilio-dlq",
+};
+
+function collectionForSource(dlqSource) {
+  const c = COLLECTION_BY_SOURCE[dlqSource];
+  if (!c) {
+    throw new HttpsError(
+      "invalid-argument",
+      `dlqSource must be one of: ${Object.keys(COLLECTION_BY_SOURCE).join(", ")}.`
+    );
+  }
+  return c;
+}
 
 let _pubsub = null;
 function pubsub() {
@@ -56,6 +81,7 @@ exports.dlqRetryCallable = onCall(
   },
   async (request) => {
     const auth = requireAuth(request);
+    assertPlatformAdmin(auth);
 
     const { dlqDocID } = request.data || {};
     if (!dlqDocID || typeof dlqDocID !== "string") {
@@ -157,8 +183,9 @@ exports.dlqUpdateStatusCallable = onCall(
   },
   async (request) => {
     const auth = requireAuth(request);
+    assertPlatformAdmin(auth);
 
-    const { dlqDocID, status, note } = request.data || {};
+    const { dlqDocID, status, note, dlqSource } = request.data || {};
     if (!dlqDocID || typeof dlqDocID !== "string") {
       throw new HttpsError("invalid-argument", "dlqDocID is required.");
     }
@@ -168,12 +195,13 @@ exports.dlqUpdateStatusCallable = onCall(
         `status must be one of: ${Array.from(ALLOWED_STATUSES).join(", ")}.`
       );
     }
+    const collectionName = collectionForSource(dlqSource || "stripe");
 
     const db = getFirestore();
-    const dlqRef = db.collection("saas-dlq").doc(dlqDocID);
+    const dlqRef = db.collection(collectionName).doc(dlqDocID);
     const snap = await dlqRef.get();
     if (!snap.exists) {
-      throw new HttpsError("not-found", `DLQ entry ${dlqDocID} not found.`);
+      throw new HttpsError("not-found", `DLQ entry ${dlqDocID} not found in ${collectionName}.`);
     }
 
     const auditEntry = {
@@ -200,12 +228,13 @@ exports.dlqUpdateStatusCallable = onCall(
     await dlqRef.set(updates, { merge: true });
 
     logger.info("dlqUpdateStatusCallable: status updated", {
+      collection: collectionName,
       dlqDocID,
       status,
       uid: auth.uid,
     });
 
-    return { success: true, dlqDocID, status };
+    return { success: true, dlqDocID, status, dlqSource: dlqSource || "stripe" };
   }
 );
 
@@ -220,37 +249,43 @@ exports.dlqEscalationCheckScheduled = onSchedule(
     const db = getFirestore();
     const cutoff = Timestamp.fromDate(new Date(Date.now() - ESCALATION_THRESHOLD_MS));
 
-    // Stale "new" entries: untouched for >1h. These are the ones that need
-    // a human looking at them.
-    const staleSnap = await db
-      .collection("saas-dlq")
-      .where("status", "==", "new")
-      .where("firstSeenAt", "<=", cutoff)
-      .limit(ESCALATION_BATCH_LIMIT)
-      .get();
+    let totalEscalated = 0;
+    for (const collectionName of Object.values(COLLECTION_BY_SOURCE)) {
+      // Stale "new" entries: untouched for >1h. These are the ones that
+      // need a human looking at them.
+      const staleSnap = await db
+        .collection(collectionName)
+        .where("status", "==", "new")
+        .where("firstSeenAt", "<=", cutoff)
+        .limit(ESCALATION_BATCH_LIMIT)
+        .get();
 
-    if (staleSnap.empty) {
-      logger.info("dlqEscalationCheckScheduled: no stale DLQ entries");
-      return;
+      if (staleSnap.empty) continue;
+
+      logger.warn("dlqEscalationCheckScheduled: stale DLQ entries detected", {
+        collection: collectionName,
+        count: staleSnap.size,
+      });
+
+      const batch = db.batch();
+      staleSnap.forEach((doc) => {
+        batch.set(
+          doc.ref,
+          {
+            escalated: true,
+            escalationCount: FieldValue.increment(1),
+            lastEscalatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      });
+      await batch.commit();
+      totalEscalated += staleSnap.size;
     }
 
-    logger.warn("dlqEscalationCheckScheduled: stale DLQ entries detected", {
-      count: staleSnap.size,
-    });
-
-    const batch = db.batch();
-    staleSnap.forEach((doc) => {
-      batch.set(
-        doc.ref,
-        {
-          escalated: true,
-          escalationCount: FieldValue.increment(1),
-          lastEscalatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-    });
-    await batch.commit();
+    if (totalEscalated === 0) {
+      logger.info("dlqEscalationCheckScheduled: no stale DLQ entries");
+    }
 
     // SMS hookup deferred until SaaS admin phone number is configured.
     // For now, the dashboard's "needs attention" badge surfaces these.

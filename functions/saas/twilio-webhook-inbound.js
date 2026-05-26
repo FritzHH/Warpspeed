@@ -109,8 +109,13 @@ exports.handler = onRequest(
       return res.status(200).send(EMPTY_TWIML);
     }
 
-    if (routingStatus !== "active") {
-      logger.warn("twilioInboundWebhook: routing not active, dropping", {
+    // "grace" = subaccount suspended, in TCPA opt-out window. We still
+    // receive inbound (so consumer STOP messages get logged), but tag the
+    // message so the subscriber + UI can suppress notifications. Any other
+    // non-active status (pending, failed, suspended-without-grace) is
+    // dropped.
+    if (routingStatus !== "active" && routingStatus !== "grace") {
+      logger.warn("twilioInboundWebhook: routing not active/grace, dropping", {
         toNumber,
         status: routingStatus,
         tenantID,
@@ -118,6 +123,7 @@ exports.handler = onRequest(
       res.set("Content-Type", "text/xml");
       return res.status(200).send(EMPTY_TWIML);
     }
+    const duringSuspension = routingStatus === "grace";
 
     // Sanity check — if the routing's recorded subaccount SID doesn't match
     // the AccountSid Twilio is claiming, somebody else is hitting our URL
@@ -181,6 +187,7 @@ exports.handler = onRequest(
             fromZip: params.FromZip || null,
             fromCountry: params.FromCountry || null,
             messagingServiceSid: params.MessagingServiceSid || null,
+            duringSuspension,
             // Pass the raw params so the subscriber can pull MediaUrl0..N
             // without us hardcoding a media limit here.
             rawParams: params,

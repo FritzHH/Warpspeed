@@ -25,7 +25,34 @@
 const { logger } = require("firebase-functions");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
+const { SecretManagerServiceClient } = require("@google-cloud/secret-manager");
+const twilio = require("twilio");
 const { withFeatureTrackingSchedule } = require("./usageTracking");
+
+// SaaS deploy gates Twilio reconciliation. Bonita has no `private/twilio`
+// subaccount docs, so the puller would early-return there anyway — but
+// pinning the secret-manager project ID here keeps Bonita deploys from
+// even constructing a (futile) reference.
+const SAAS_PROJECT_ID = "cadence-pos";
+function isSaasDeploy() {
+  const id = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT;
+  return id === SAAS_PROJECT_ID;
+}
+
+let _secretsClient = null;
+function secretsClient() {
+  if (!_secretsClient) _secretsClient = new SecretManagerServiceClient();
+  return _secretsClient;
+}
+
+async function loadSubaccountAuthToken(tenantID) {
+  const name = `projects/${SAAS_PROJECT_ID}/secrets/twilio-subaccount-${tenantID}/versions/latest`;
+  const [version] = await secretsClient().accessSecretVersion({ name });
+  if (!version || !version.payload || !version.payload.data) {
+    throw new Error(`No secret version for tenant ${tenantID}.`);
+  }
+  return version.payload.data.toString("utf8");
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Named admin app (matches usageTracking.js — analytics writes are isolated
@@ -96,18 +123,144 @@ async function writeDailyTotals(db, tenantID, storeID, day, vendor, dimensions) 
  * Twilio: Usage Records API
  *   GET https://api.twilio.com/2010-04-01/Accounts/{AccountSid}/Usage/Records/Daily.json?Category=sms&StartDate=...
  *
- * Per-tenant account credentials live in settings (each tenant has their own
- * Twilio subaccount if multi-tenant; for now Bonita is the only tenant and
- * uses a single account-level credential).
+ * Twilio bills per subaccount (one per tenant), not per store. For multi-
+ * store tenants we fetch once per (tenantID, day) — cached at module scope
+ * so the outer forEachStore loop hits the Twilio API once per tenant per
+ * scheduled run — and allocate proportionally to each store based on its
+ * share of SMS-bearing usage-events that day. If no events were recorded
+ * tenant-wide, falls back to an even split across stores.
  *
- * Dimensions to capture:
- *   - smsSegments (inbound + outbound)
- *   - mmsSegments
- *   - usdCharged
+ * Dimensions captured (matches src/.../vendorRates.js):
+ *   - twilioSegments         — outbound SMS segments (Twilio `usage` field)
+ *   - twilioInboundSegments  — inbound SMS segments
+ *   - twilioMms              — outbound MMS message count (Twilio `count`)
+ *
+ * Returns { ok:false, error:"..." } for:
+ *   - non-SaaS deploys (Bonita has no subaccount layer)
+ *   - tenants without a provisioned subaccount
+ *   - suspended/closed subaccounts (can't pull historical usage)
+ *   - Secret Manager / Twilio API failures (error includes the cause)
  */
-async function pullTwilioTotals(/* tenantID, storeID, day, settings */) {
-  // TODO: implement once Twilio API credentials are wired in here.
-  return { ok: false, dimensions: {}, error: "not_implemented" };
+const _twilioFetchCache = new Map();
+
+async function pullTwilioTotals(tenantID, storeID, day /* , settings */) {
+  if (!isSaasDeploy()) {
+    return { ok: false, dimensions: {}, error: "non_saas_deploy" };
+  }
+  const cacheKey = `${tenantID}|${day}`;
+  if (!_twilioFetchCache.has(cacheKey)) {
+    _twilioFetchCache.set(cacheKey, fetchAndAllocateTwilio(tenantID, day));
+  }
+  const cached = await _twilioFetchCache.get(cacheKey);
+  if (!cached.ok) {
+    return { ok: false, dimensions: {}, error: cached.error };
+  }
+  const dims = cached.storeShares[storeID];
+  if (!dims) {
+    return { ok: false, dimensions: {}, error: "store_not_in_tenant" };
+  }
+  return { ok: true, dimensions: dims };
+}
+
+async function fetchAndAllocateTwilio(tenantID, day) {
+  const db = getDB();
+
+  const twilioDoc = await db
+    .collection("tenants").doc(tenantID)
+    .collection("private").doc("twilio").get();
+  if (!twilioDoc.exists) {
+    return { ok: false, error: "no_twilio_subaccount" };
+  }
+  const data = twilioDoc.data() || {};
+  const subaccountSid = data.subaccountSid;
+  const subaccountStatus = data.status;
+  if (!subaccountSid) {
+    return { ok: false, error: "no_twilio_subaccount" };
+  }
+  if (subaccountStatus !== "active") {
+    return { ok: false, error: `subaccount_${subaccountStatus || "unknown"}` };
+  }
+
+  let twilioClient;
+  try {
+    const authToken = await loadSubaccountAuthToken(tenantID);
+    twilioClient = twilio(subaccountSid, authToken);
+  } catch (err) {
+    return { ok: false, error: `secret_or_auth_failed: ${(err && err.message) || err}` };
+  }
+
+  // Twilio Daily Usage Records — one call per (tenant, day). Subcategories
+  // like sms-outbound-longcode/shortcode/tollfree are summed into the parent
+  // dimension since our analytics events don't distinguish route types.
+  let outboundSegs = 0;
+  let inboundSegs = 0;
+  let mmsCount = 0;
+  try {
+    const records = await twilioClient.usage.records.daily.list({
+      startDate: day,
+      endDate: day,
+    });
+    for (const r of records) {
+      const cat = String(r.category || "");
+      const usage = Number(r.usage) || 0;
+      const count = Number(r.count) || 0;
+      if (cat.startsWith("sms-outbound")) {
+        outboundSegs += usage;
+      } else if (cat.startsWith("sms-inbound")) {
+        inboundSegs += usage;
+      } else if (cat.startsWith("mms-outbound")) {
+        mmsCount += count;
+      }
+    }
+  } catch (err) {
+    return { ok: false, error: `twilio_usage_api_failed: ${(err && err.message) || err}` };
+  }
+
+  // Per-store allocation share = SMS-bearing event count for the day.
+  const storesSnap = await db
+    .collection("tenants").doc(tenantID)
+    .collection("stores").get();
+  const storeIDs = storesSnap.docs.map((d) => d.id);
+  if (storeIDs.length === 0) {
+    return { ok: true, storeShares: {} };
+  }
+  const { start, end } = dayMillisRange(day);
+  const perStoreCounts = {};
+  let totalCount = 0;
+  await Promise.all(storeIDs.map(async (sid) => {
+    const evSnap = await db
+      .collection("tenants").doc(tenantID)
+      .collection("stores").doc(sid)
+      .collection("usage-events")
+      .where("createdAtMs", ">=", start)
+      .where("createdAtMs", "<", end)
+      .get();
+    let n = 0;
+    for (const ev of evSnap.docs) {
+      const d = ev.data() || {};
+      if ((Number(d.twilioSegments) || 0) > 0 ||
+          (Number(d.twilioInboundSegments) || 0) > 0 ||
+          (Number(d.twilioMms) || 0) > 0) {
+        n++;
+      }
+    }
+    perStoreCounts[sid] = n;
+    totalCount += n;
+  }));
+
+  const storeShares = {};
+  for (const sid of storeIDs) {
+    const share = totalCount > 0
+      ? perStoreCounts[sid] / totalCount
+      : 1 / storeIDs.length;
+    storeShares[sid] = {
+      twilioSegments: Math.round(outboundSegs * share * 100) / 100,
+      twilioInboundSegments: Math.round(inboundSegs * share * 100) / 100,
+      twilioMms: Math.round(mmsCount * share * 100) / 100,
+    };
+  }
+
+  return { ok: true, storeShares };
 }
 
 /**
@@ -278,7 +431,7 @@ const RECONCILE_FLAG_THRESHOLD = 0.20; // 20% delta triggers a flag
 // Maps a vendor → list of instrumented dimension keys to sum for comparison.
 // Add to these as more dimensions land.
 const VENDOR_DIMENSIONS = {
-  twilio: ["twilioSegments", "twilioMms"],
+  twilio: ["twilioSegments", "twilioInboundSegments", "twilioMms"],
   stripe: ["stripeAmountCents", "stripeFeesCents"],
   gcp: ["firestoreReads", "firestoreWrites", "executionTimeMs"],
   gmail: ["gmailApiCalls", "gmailMessagesSent"],

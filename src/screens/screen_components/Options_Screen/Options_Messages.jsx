@@ -44,7 +44,7 @@ import {
 } from "../../../stores";
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
-import { dbSendReceipt, dbCreateTextToPayInvoice, dbListenToNewMessages, dbGetCustomerMessages, dbUpdateMessageCanRespond, dbToggleSMSForwarding, dbSetSMSForwardTo, dbGetCustomer, dbSaveMessageTranslation } from "../../../db_calls_wrapper";
+import { dbSendReceipt, dbCreateTextToPayInvoice, dbUpdateMessageCanRespond, dbToggleSMSForwarding, dbSetSMSForwardTo, dbGetCustomer, dbSaveMessageTranslation } from "../../../db_calls_wrapper";
 import { translateText } from "../../../db_calls";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { scheduleAutoSend, clearAutoSend, buildForwardToArray, initialSelectedForwardIDs } from "./ReplyOptionsBar";
@@ -240,7 +240,7 @@ export function MessagesComponent({}) {
     let cursor = msgStore.messagesNextCursor;
     if (!cursor) return;
     msgStore.setMessagesLoadingMore(true);
-    dbGetCustomerMessages(msgStore.messagesPhone, cursor, 7).then((result) => {
+    smsService.getCustomerMessages(msgStore.messagesPhone, cursor, 7).then((result) => {
       if (!result.success) {
         useCustMessagesStore.getState().setMessagesLoadingMore(false);
         return;
@@ -909,7 +909,7 @@ export function MessagesComponent({}) {
     let lastMillis = 0;
     msgs.forEach((m) => { if (m.millis > lastMillis) lastMillis = m.millis; });
     if (!lastMillis) lastMillis = Date.now();
-    let unsub = dbListenToNewMessages(phone, lastMillis, (newMessages) => {
+    let unsub = smsService.listenToNewMessages(phone, lastMillis, (newMessages) => {
       if (useCustMessagesStore.getState().getMessagesPhone() !== phone) return;
       let store = useCustMessagesStore.getState();
       store.mergeMessages(newMessages);
@@ -1939,7 +1939,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
           }
         } catch (e) { /* IndexedDB unavailable, fall through to Firestore */ }
         // Firestore fetch as last resort
-        let result = await dbGetCustomerMessages(phone, null, 7);
+        let result = await smsService.getCustomerMessages(phone, null, 7);
         if (cancelled || !result.success) { _setListenerConnecting(false); return; }
         let initialNoMore = result.messages.length < 7;
         let sorted = result.messages.sort((a, b) => (a.millis || 0) - (b.millis || 0));
@@ -1959,7 +1959,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     allForListener.forEach(m => { if (m.millis > maxMillis) maxMillis = m.millis; });
     let listenerStartMillis = maxMillis || Date.now();
 
-    let unsub = dbListenToNewMessages(phone, listenerStartMillis, (newMsgs) => {
+    let unsub = smsService.listenToNewMessages(phone, listenerStartMillis, (newMsgs) => {
       if (cancelled) return;
       _setListenerConnecting(false);
       _setMessages(prev => {
@@ -1987,7 +1987,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
     if (!sMessagesRef.current.length) return;
     _setLoadingMore(true);
     let oldestMillis = Math.min(...sMessagesRef.current.map(m => m.millis));
-    let result = await dbGetCustomerMessages(phone, oldestMillis, 7);
+    let result = await smsService.getCustomerMessages(phone, oldestMillis, 7);
     if (!result.success) { _setLoadingMore(false); return; }
     let sorted = result.messages.sort((a, b) => (a.millis || 0) - (b.millis || 0));
     let currentMessages = sMessagesRef.current;

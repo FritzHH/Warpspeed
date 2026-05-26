@@ -9,6 +9,7 @@
  */
 
 import { firestoreQuery } from "../../../../db_calls";
+import { dbGetTenantStoreIDs } from "../../../../db_calls_wrapper";
 import { useSettingsStore } from "../../../../stores";
 import {
   DIMENSION_RATES,
@@ -20,6 +21,14 @@ function getTenantStoreIDs() {
   const s = useSettingsStore.getState().getSettings() || {};
   return { tenantID: s.tenantID, storeID: s.storeID };
 }
+
+// SMS-only Twilio dimension keys. Filtered subset of DIMENSION_RATES used
+// by the SMS Analytics tab.
+const SMS_DIMENSION_KEYS = [
+  "twilioSegments",
+  "twilioInboundSegments",
+  "twilioMms",
+];
 
 // ─── Firestore loader ──────────────────────────────────────────────────────
 
@@ -455,4 +464,185 @@ export function makeGrowthCurve(currentWoPerMonth, currentCostPerWoCents, months
     });
   }
   return rows;
+}
+
+// ─── SMS Analytics (Phase 7) ───────────────────────────────────────────────
+// All helpers below produce SMS-only views (Twilio segments + MMS), and
+// loadSmsEventsAllStores fans out across every store under the tenant so a
+// multi-store tenant sees total SMS spend, not just one store's slice.
+
+/**
+ * Load usage-events from every store under the current tenant.
+ * Each event is tagged with `_storeID` so per-store rollups can attribute
+ * cost back to the source store. Filtered to SMS-bearing events only
+ * (any twilio* dimension > 0) to keep the payload small.
+ *
+ * Returns: [{ ...event, _storeID }]
+ */
+export async function loadSmsEventsAllStores(startMillis, endMillis, opts = {}) {
+  const { tenantID, storeID } = getTenantStoreIDs();
+  if (!tenantID || !storeID) return { events: [], storeIDs: [] };
+
+  const otherStoreIDs = await dbGetTenantStoreIDs();
+  const allStoreIDs = [storeID, ...otherStoreIDs];
+
+  const limit = opts.limit || 5000;
+  const where = [
+    { field: "createdAtMs", operator: ">=", value: startMillis },
+    { field: "createdAtMs", operator: "<=", value: endMillis },
+  ];
+
+  const perStore = await Promise.all(
+    allStoreIDs.map(async (sid) => {
+      try {
+        const path = `tenants/${tenantID}/stores/${sid}/usage-events`;
+        const events = await firestoreQuery(path, where, {
+          orderBy: { field: "createdAtMs", direction: "desc" },
+          limit,
+        });
+        return (events || [])
+          .filter((e) => SMS_DIMENSION_KEYS.some((k) => Number(e[k]) > 0))
+          .map((e) => ({ ...e, _storeID: sid }));
+      } catch (err) {
+        return [];
+      }
+    })
+  );
+
+  return {
+    events: perStore.flat(),
+    storeIDs: allStoreIDs,
+  };
+}
+
+/**
+ * Project the SMS-only portion of an event's cost (cents).
+ * Skips non-SMS dimensions so the SMS tab can ignore Stripe/etc. on
+ * events that happen to touch multiple vendors.
+ */
+export function projectSmsCost(event) {
+  if (!event) return 0;
+  let cents = 0;
+  for (const dim of SMS_DIMENSION_KEYS) {
+    const qty = Number(event[dim]) || 0;
+    if (qty <= 0) continue;
+    cents += qty * DIMENSION_RATES[dim].cents();
+  }
+  return cents;
+}
+
+/**
+ * Aggregate SMS dimensions across an event array.
+ * → { outboundSegments, inboundSegments, mmsCount, costCents, eventCount }
+ */
+export function sumSmsDimensions(events) {
+  let outboundSegments = 0;
+  let inboundSegments = 0;
+  let mmsCount = 0;
+  let costCents = 0;
+  for (const e of events) {
+    outboundSegments += Number(e.twilioSegments) || 0;
+    inboundSegments += Number(e.twilioInboundSegments) || 0;
+    mmsCount += Number(e.twilioMms) || 0;
+    costCents += projectSmsCost(e);
+  }
+  return {
+    outboundSegments,
+    inboundSegments,
+    mmsCount,
+    costCents,
+    eventCount: events.length,
+  };
+}
+
+/**
+ * Group SMS events by store. Returns rows even for stores with zero events
+ * so the per-store breakdown UI can show "no traffic yet" cells consistently.
+ *  → [{ storeID, outboundSegments, inboundSegments, mmsCount, costCents, eventCount }]
+ */
+export function rollupSmsByStore(events, allStoreIDs) {
+  const map = {};
+  for (const sid of allStoreIDs || []) {
+    map[sid] = {
+      storeID: sid,
+      outboundSegments: 0,
+      inboundSegments: 0,
+      mmsCount: 0,
+      costCents: 0,
+      eventCount: 0,
+    };
+  }
+  for (const e of events) {
+    const sid = e._storeID || "unknown";
+    if (!map[sid]) {
+      map[sid] = {
+        storeID: sid,
+        outboundSegments: 0,
+        inboundSegments: 0,
+        mmsCount: 0,
+        costCents: 0,
+        eventCount: 0,
+      };
+    }
+    map[sid].outboundSegments += Number(e.twilioSegments) || 0;
+    map[sid].inboundSegments += Number(e.twilioInboundSegments) || 0;
+    map[sid].mmsCount += Number(e.twilioMms) || 0;
+    map[sid].costCents += projectSmsCost(e);
+    map[sid].eventCount += 1;
+  }
+  return Object.values(map).sort((a, b) => b.costCents - a.costCents);
+}
+
+/**
+ * Per-feature rollup limited to SMS cost. Skips features that never touched
+ * a Twilio dimension. Useful for "which feature sends the most texts."
+ *  → [{ feature, count, outboundSegments, inboundSegments, mmsCount, costCents }]
+ */
+export function rollupSmsByFeature(events) {
+  const map = {};
+  for (const e of events) {
+    const cost = projectSmsCost(e);
+    if (cost <= 0) continue;
+    const key = e.feature || "unknown";
+    if (!map[key]) {
+      map[key] = {
+        feature: key,
+        count: 0,
+        outboundSegments: 0,
+        inboundSegments: 0,
+        mmsCount: 0,
+        costCents: 0,
+      };
+    }
+    map[key].count += 1;
+    map[key].outboundSegments += Number(e.twilioSegments) || 0;
+    map[key].inboundSegments += Number(e.twilioInboundSegments) || 0;
+    map[key].mmsCount += Number(e.twilioMms) || 0;
+    map[key].costCents += cost;
+  }
+  return Object.values(map).sort((a, b) => b.costCents - a.costCents);
+}
+
+/**
+ * Daily SMS cost buckets. Same shape as bucketByDay but only sums the SMS
+ * portion of each event so the trend chart is SMS-specific.
+ *  → [{ dayMs, count, projectedCents }]
+ */
+export function bucketSmsByDay(events, startMillis, endMillis) {
+  const dayMs = 24 * 60 * 60 * 1000;
+  const buckets = {};
+  const firstDay = Math.floor(startMillis / dayMs) * dayMs;
+  const lastDay = Math.floor(endMillis / dayMs) * dayMs;
+  for (let d = firstDay; d <= lastDay; d += dayMs) {
+    buckets[d] = { dayMs: d, count: 0, projectedCents: 0 };
+  }
+  for (const e of events) {
+    const ms = Number(e.createdAtMs) || 0;
+    if (!ms) continue;
+    const day = Math.floor(ms / dayMs) * dayMs;
+    if (!buckets[day]) buckets[day] = { dayMs: day, count: 0, projectedCents: 0 };
+    buckets[day].count += 1;
+    buckets[day].projectedCents += projectSmsCost(e);
+  }
+  return Object.values(buckets).sort((a, b) => a.dayMs - b.dayMs);
 }

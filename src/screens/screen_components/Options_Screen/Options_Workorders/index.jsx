@@ -12,7 +12,8 @@ import {
   useWorkorderPreviewStore,
   useCustMessagesStore,
 } from "../../../../stores";
-import { dbGetCustomer, dbGetCustomerMessages, dbListenToNewMessages } from "../../../../db_calls_wrapper";
+import { dbGetCustomer } from "../../../../db_calls_wrapper";
+import { smsService } from "../../../../data_service_modules";
 import { newCheckoutCompleteWorkorder } from "../../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { scoreWorkorder, sortWorkorders, isFinishedStatus, NUM_MILLIS_IN_DAY } from "./utils";
 import WorkorderRowItem from "./WorkorderRowItem";
@@ -205,7 +206,7 @@ export function WorkordersComponent({}) {
       } catch (e) { /* IndexedDB unavailable, fall through */ }
 
       if (useCustMessagesStore.getState().getMessagesPhone() !== customerCell) return;
-      dbGetCustomerMessages(customerCell, null, 7).then((result) => {
+      smsService.getCustomerMessages(customerCell, null, 7).then((result) => {
         if (!result.success || useCustMessagesStore.getState().getMessagesPhone() !== customerCell) {
           useCustMessagesStore.getState().setMessagesLoading(false);
           return;
@@ -228,7 +229,7 @@ export function WorkordersComponent({}) {
     let lastMillis = 0;
     existingMessages.forEach((m) => { if (m.millis > lastMillis) lastMillis = m.millis; });
     if (!lastMillis) lastMillis = Date.now();
-    let unsub = dbListenToNewMessages(customerCell, lastMillis, (newMessages) => {
+    let unsub = smsService.listenToNewMessages(customerCell, lastMillis, (newMessages) => {
       if (useCustMessagesStore.getState().getMessagesPhone() !== customerCell) return;
       let store = useCustMessagesStore.getState();
       store.mergeMessages(newMessages);

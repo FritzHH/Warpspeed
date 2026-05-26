@@ -8812,21 +8812,28 @@ exports.gmailReconnectWatch = onCall(
   })
 );
 
+} // ─── end of if (DEPLOY_TARGET === "bonita") ───
+
 // ============================================================================
 // Usage / cost analytics — vendor totals pull + reconciliation
 // (definitions live in ./usageVendorTotals.js)
+//
+// Exported on BOTH deploy targets: each Firebase project iterates its own
+// tenants/stores collections, so Bonita reconciles Bonita usage and the SaaS
+// project reconciles SaaS usage. The Twilio puller is the only vendor-specific
+// piece that's SaaS-only (per-tenant subaccounts don't exist on Bonita) and it
+// early-returns ok:false on non-SaaS deploys.
 // ============================================================================
 const _vendorTotals = require("./usageVendorTotals");
 exports.pullVendorTotals = _vendorTotals.pullVendorTotals;
 exports.reconcileUsageEvents = _vendorTotals.reconcileUsageEvents;
-
-} // ─── end of if (DEPLOY_TARGET === "bonita") ───
 
 // ═══════════════════════════════════════════════════════════════
 // SAAS EXPORTS (Stripe Connect + Pub/Sub, multi-tenant)
 // Deployed only to cadence-pos via yarn functionsrss.
 // ═══════════════════════════════════════════════════════════════
 if (DEPLOY_TARGET === "saas") {
+  const authClaims = require("./saas/auth-claims");
   const pubsubSubscriber = require("./saas/pubsub-subscriber");
   const pubsubDeadLetter = require("./saas/pubsub-dead-letter");
   const connectCallables = require("./saas/stripe-connect-callables");
@@ -8844,6 +8851,15 @@ if (DEPLOY_TARGET === "saas") {
   const twilioPubsubDeadLetter = require("./saas/twilio-pubsub-dead-letter");
   const twilioSend = require("./saas/twilio-send");
   const twilioA2P = require("./saas/twilio-a2p");
+  const twilioChurn = require("./saas/twilio-churn");
+  const twilioAlerts = require("./saas/twilio-alerts");
+
+  // Phase 1 auth-claims — tenant provisioning + invite flow.
+  exports.platformAdminCreateTenantCallable =
+    authClaims.platformAdminCreateTenantCallable;
+  exports.tenantAdminInviteUserCallable =
+    authClaims.tenantAdminInviteUserCallable;
+  exports.redeemInviteCallable = authClaims.redeemInviteCallable;
 
   exports.pubsubStripeEventSubscriber = pubsubSubscriber.handler;
   exports.pubsubStripeDeadLetterIngestor = pubsubDeadLetter.ingestor;
@@ -8880,6 +8896,17 @@ if (DEPLOY_TARGET === "saas") {
   exports.unlinkNumberFromA2PCampaign = twilioA2P.unlinkNumberFromA2PCampaign;
   exports.getTenantA2PStatus = twilioA2P.getTenantA2PStatus;
   exports.scheduledA2PStatusPoll = twilioA2P.scheduledA2PStatusPoll;
+
+  // Phase 7 — churn cleanup. Scheduled daily; force-close is SuperUser-only.
+  exports.scheduledTwilioChurnCleanup = twilioChurn.scheduledTwilioChurnCleanup;
+  exports.forceCloseTenantTwilioSubaccount =
+    twilioChurn.forceCloseTenantTwilioSubaccount;
+
+  // Phase 7 — alerting. DLQ depth emitter feeds a log-based metric so an
+  // alert policy can page when unresolved entries pile up. See
+  // saas/alerts/setup-alerts.sh for the full policy wiring.
+  exports.scheduledTwilioDLQDepthEmitter =
+    twilioAlerts.scheduledTwilioDLQDepthEmitter;
 
   exports.stripeConnectAccountCreate = connectCallables.stripeConnectAccountCreate;
   exports.stripeConnectAccountLinkCreate = connectCallables.stripeConnectAccountLinkCreate;

@@ -2,52 +2,120 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper: caller belongs to this tenant
+    // ── Helpers ────────────────────────────────────────────────
+    // Claim shapes supported:
+    //   Bonita (legacy):  { tenantID, storeID }
+    //   SaaS:             { tenantID, privilege, stores: [storeID, ...] }
+    //                     { platformAdmin: true }  (cross-tenant operator)
+    //
+    // Use token.get(key, default) to read fields that may not exist on
+    // every user, so the rule doesn't throw on legacy users.
+
+    function isAuthed() {
+      return request.auth != null;
+    }
+
+    function isPlatformAdmin() {
+      return isAuthed()
+          && request.auth.token.get('platformAdmin', false) == true;
+    }
+
     function isTenantMember(tenantID) {
-      return request.auth != null
-          && request.auth.token.tenantID == tenantID;
+      return isAuthed()
+          && request.auth.token.get('tenantID', '') == tenantID;
     }
 
-    // Helper: caller belongs to this tenant AND store
-    function isStoreMember(tenantID, storeID) {
+    function isOwner(tenantID) {
       return isTenantMember(tenantID)
-          && request.auth.token.storeID == storeID;
+          && request.auth.token.get('privilege', '') == 'owner';
     }
 
-    // ── Tenant-scoped data (primary security boundary) ──
+    // Store-level access: owner of the tenant (all stores), OR storeID is
+    // in the new `stores` array claim, OR the legacy singular `storeID`
+    // claim matches. Bonita users keep working without re-claiming.
+    function hasStoreAccess(tenantID, storeID) {
+      return isTenantMember(tenantID)
+          && (
+                isOwner(tenantID)
+             || storeID in request.auth.token.get('stores', [])
+             || request.auth.token.get('storeID', '') == storeID
+          );
+    }
+
+    // ── Tenant-scoped data ─────────────────────────────────────
+    // Store data is the bulk of the app. Members of the store (or tenant
+    // owners) get full read/write access. The app does direct Firestore
+    // writes for speed; mutations are not callable-gated.
     match /tenants/{tenantID}/stores/{storeID}/{document=**} {
-      allow read, write: if isStoreMember(tenantID, storeID);
+      allow read, write: if hasStoreAccess(tenantID, storeID);
     }
 
-    // Tenant-level docs (e.g. tenant metadata) - any member of the tenant
+    // Tenant document + non-store subcollections (e.g. connect-accounts,
+    // billing config). Tenant members can read; only platform-admins write
+    // these directly. Owner-scoped writes happen via callables (which have
+    // their own assertPrivilege checks), so direct-write is off for safety.
     match /tenants/{tenantID} {
-      allow read: if isTenantMember(tenantID);
-      allow write: if false;
+      allow read: if isTenantMember(tenantID) || isPlatformAdmin();
+      allow write: if isPlatformAdmin();
+    }
+    match /tenants/{tenantID}/{collection}/{docID=**} {
+      // /stores/** is handled by the deeper match above and reaches here
+      // only via this catch-all for other tenant-level collections.
+      allow read: if collection != 'stores'
+                   && (isTenantMember(tenantID) || isPlatformAdmin());
+      allow write: if collection != 'stores' && isPlatformAdmin();
     }
 
-    // ── Global user index (login lookup by UID) ──
-    match /users/{userID} {
-      allow read: if request.auth != null && request.auth.uid == userID;
-      allow write: if false;
+    // ── Platform-only top-level collections ────────────────────
+    // Routing caches and idempotency records — Cloud Functions only.
+    match /connect-accounts-index/{stripeAccountID} {
+      allow read, write: if false;
     }
-
-    // ── Email user index (tenant/store lookup during login) ──
-    match /email_users/{userID} {
-      allow read: if request.auth != null && request.auth.uid == userID;
-      allow write: if false;
+    match /payment-intents/{piID} {
+      allow read, write: if false;
     }
-
-    // ── Store phone routing (authenticated read, write by Cloud Functions only) ──
-    match /store_phones/{phone} {
-      allow read: if request.auth != null;
-      allow write: if false;
+    match /checkout-sessions/{sessionID} {
+      allow read, write: if false;
     }
-
-    // ── Error logs and SMS analytics (Cloud Functions admin SDK only) ──
-    match /error-logs/{document=**} {
+    match /processed-events/{eventID} {
+      allow read, write: if false;
+    }
+    match /dlq-escalations/{escalationID} {
       allow read, write: if false;
     }
 
+    // DLQ entries — platform-admin can read for the admin UI. Writes only
+    // happen via the ingestor + admin callables (Cloud Functions).
+    match /saas-dlq/{dlqEntryID} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+
+    // Invites — fully server-only. Redemption goes through redeemInvite
+    // callable; listing pending invites happens through a future callable
+    // so the token isn't exposed to clients beyond the original recipient.
+    match /invites/{token} {
+      allow read, write: if false;
+    }
+
+    // ── Legacy auth lookup tables ──────────────────────────────
+    match /users/{userID} {
+      allow read: if isAuthed() && request.auth.uid == userID;
+      allow write: if false;
+    }
+    match /email_users/{userID} {
+      allow read: if isAuthed() && request.auth.uid == userID;
+      allow write: if false;
+    }
+    match /store_phones/{phone} {
+      allow read: if isAuthed();
+      allow write: if false;
+    }
+
+    // ── Server-only diagnostics ────────────────────────────────
+    match /error-logs/{document=**} {
+      allow read, write: if false;
+    }
     match /sms-analytics/{document=**} {
       allow read, write: if false;
     }

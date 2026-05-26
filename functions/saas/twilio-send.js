@@ -101,6 +101,16 @@ exports.sendTwilioMessage = onCall(
       );
     }
     if (routing.status !== "active") {
+      // "grace" = subaccount suspended, TCPA opt-out window. Surface a
+      // distinct error so the UI can present "subaccount inactive, contact
+      // billing" instead of a generic "number not ready" message.
+      if (routing.status === "grace") {
+        throw new HttpsError(
+          "failed-precondition",
+          "Subaccount is in the post-churn grace window. Outbound sends are disabled — reactivate the tenant subaccount to resume sending.",
+          { routingStatus: "grace" }
+        );
+      }
       throw new HttpsError(
         "failed-precondition",
         `Number ${fromPhoneNumber} is ${routing.status}.`

@@ -15,7 +15,11 @@ const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const stripeConnect = require("./stripe-connect");
-const { assertTenantMatch, lookupTenantForConnectAccount } = require("./auth-guards");
+const {
+  assertTenantMatch,
+  assertPrivilege,
+  lookupTenantForConnectAccount,
+} = require("./auth-guards");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -63,6 +67,7 @@ exports.stripeConnectAccountCreate = onCall(
       );
     }
     assertTenantMatch(auth, tenantID);
+    assertPrivilege(auth, "owner");
 
     logger.info("stripeConnectAccountCreate: starting", {
       tenantID,
@@ -124,6 +129,7 @@ exports.stripeConnectAccountLinkCreate = onCall(
     }
     const ownerTenantID = await lookupTenantForConnectAccount(stripeAccountID);
     assertTenantMatch(auth, ownerTenantID);
+    assertPrivilege(auth, "owner");
 
     logger.info("stripeConnectAccountLinkCreate: starting", {
       stripeAccountID,
@@ -160,6 +166,7 @@ exports.stripeConnectAccountStatusCallable = onCall(
     }
     const ownerTenantID = await lookupTenantForConnectAccount(stripeAccountID);
     assertTenantMatch(auth, ownerTenantID);
+    assertPrivilege(auth, "owner");
     if (tenantID && tenantID !== ownerTenantID) {
       throw new HttpsError(
         "invalid-argument",

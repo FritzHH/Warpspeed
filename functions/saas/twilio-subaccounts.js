@@ -29,8 +29,16 @@ const {
   writeAuditEvent,
   secretManagerRef,
   storeSubaccountAuthToken,
+  destroySubaccountSecret,
   masterTwilioClient,
+  flipTenantRoutingDocs,
 } = common;
+
+// Default grace window between suspend and final closure. The window exists
+// so consumers can still text opt-out (STOP) to a number after a tenant has
+// churned — required for TCPA compliance. 30 days matches industry practice
+// and gives operators a buffer to reactivate without re-onboarding.
+const DEFAULT_GRACE_WINDOW_DAYS = 30;
 
 exports.provisionTenantTwilioSubaccount = onCall(
   {
@@ -146,18 +154,28 @@ exports.deactivateTenantTwilioSubaccount = onCall(
       throw new HttpsError("failed-precondition", "Subaccount already closed.");
     }
 
-    // Suspend on Twilio: subaccount cannot send/receive but the entity is
-    // retained for compliance history (TCPA opt-out records, A2P audit).
+    // Suspend on Twilio. Twilio API note: status="suspended" stops the
+    // subaccount from sending and from initiating API calls under its own
+    // auth, but the subaccount's numbers continue to RECEIVE inbound
+    // messages — exactly what we want for the TCPA opt-out grace window.
     const client = masterTwilioClient();
     await client.api.v2010
       .accounts(subaccountSid)
       .update({ status: "suspended" });
+
+    // Flip routing docs into "grace". The inbound webhook accepts both
+    // "active" and "grace"; the send callable rejects "grace". This is the
+    // single switch that controls send-vs-receive behavior during the
+    // grace window — no separate suspended-subaccount lookup needed on the
+    // hot path.
+    const flipped = await flipTenantRoutingDocs(db, tenantID, "active", "grace");
 
     await twilioRef.set(
       {
         status: "suspended",
         suspendedAt: FieldValue.serverTimestamp(),
         suspendedReason: reason || null,
+        graceWindowDays: DEFAULT_GRACE_WINDOW_DAYS,
         updatedAt: FieldValue.serverTimestamp(),
       },
       { merge: true }
@@ -167,15 +185,23 @@ exports.deactivateTenantTwilioSubaccount = onCall(
       type: "subaccount-deactivated",
       subaccountSid,
       reason: reason || null,
+      routingDocsFlippedToGrace: flipped,
+      graceWindowDays: DEFAULT_GRACE_WINDOW_DAYS,
       actorUID: auth.uid,
     });
 
     logger.info("deactivateTenantTwilioSubaccount: suspended", {
       tenantID,
       subaccountSid,
+      routingDocsFlippedToGrace: flipped,
     });
 
-    return { subaccountSid, status: "suspended" };
+    return {
+      subaccountSid,
+      status: "suspended",
+      graceWindowDays: DEFAULT_GRACE_WINDOW_DAYS,
+      routingDocsFlippedToGrace: flipped,
+    };
   }
 );
 
@@ -214,12 +240,27 @@ exports.closeTenantTwilioSubaccount = onCall(
     }
 
     // Number release is the caller's responsibility (releaseTwilioNumber,
-    // Phase 2). Twilio will reject the close if any numbers remain attached.
+    // Phase 2; scheduledTwilioChurnCleanup, Phase 7). Twilio rejects the
+    // close if any numbers remain attached.
 
     const client = masterTwilioClient();
     await client.api.v2010
       .accounts(subaccountSid)
       .update({ status: "closed" });
+
+    // Secret Manager cleanup. The auth token is useless after closure and
+    // keeping it around is needless attack surface. destroySubaccountSecret
+    // swallows NOT_FOUND so re-runs after partial failures are safe.
+    try {
+      await destroySubaccountSecret(tenantID);
+    } catch (err) {
+      logger.error("closeTenantTwilioSubaccount: secret destroy failed", {
+        tenantID,
+        error: err && err.message,
+      });
+      // Don't throw — the subaccount is closed on Twilio's side, which is
+      // the load-bearing step. Stale secret can be cleaned manually.
+    }
 
     await twilioRef.set(
       {

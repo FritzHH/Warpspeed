@@ -1831,26 +1831,6 @@ export async function dbGetInventoryItems() {
 }
 
 /**
- * Get tenant info from email_users collection by id field
- * @param {string} id - Tenant ID to search for
- * @returns {Promise<Object>} Tenant info data or null
- */
-export async function dbGetTenantById(id) {
-  try {
-    if (!id) {
-      log("Error: id is required for dbGetTenantById");
-      return null;
-    }
-
-    const tenant = await firestoreRead(`${DB_NODES.FIRESTORE.EMAIL_USERS}/${id}`);
-    return tenant;
-  } catch (error) {
-    log("Error retrieving tenant by id:", error);
-    return null;
-  }
-}
-
-/**
  * Get single workorder by ID from Firestore
  * @param {string} workorderID - Workorder ID (required)
  * @returns {Promise<Object>} Workorder object or null
@@ -4412,32 +4392,44 @@ export async function startNewWorkorder(customer, { status } = {}) {
 // ============================================================================
 // GMAIL EMAIL FUNCTIONS
 // ============================================================================
+// Tenant-scoped (not store-scoped). Inboxes can be "shared" across all stores
+// in a tenant or assigned to one store via the assignedStoreID field on the
+// email-accounts doc. Callables enforce tenantID match via auth-guards on the
+// SaaS deploy; Bonita is a single-tenant pass-through.
 
-function buildEmailsCollectionPath(tenantID, storeID) {
-  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.EMAILS}`;
+function buildEmailsCollectionPath(tenantID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.EMAILS}`;
 }
 
-function buildEmailAuthCollectionPath(tenantID, storeID) {
-  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.EMAIL_AUTH}`;
+function buildEmailAuthCollectionPath(tenantID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.EMAIL_AUTH}`;
+}
+
+function buildEmailAccountsCollectionPath(tenantID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.EMAIL_ACCOUNTS}`;
+}
+
+function buildEmailAccountDocPath(tenantID, accountKey) {
+  return `${buildEmailAccountsCollectionPath(tenantID)}/${accountKey}`;
 }
 
 export function dbListenToEmails(onSnapshot, onError) {
   const name = "emails";
   try {
-    const { tenantID, storeID } = getTenantAndStore();
-    if (!tenantID || !storeID) {
-      log("Error: tenantID and storeID are not configured for dbListenToEmails");
+    const { tenantID } = getTenantAndStore();
+    if (!tenantID) {
+      log("Error: tenantID is not configured for dbListenToEmails");
       return null;
     }
     if (!onSnapshot || typeof onSnapshot !== "function") {
       log("Error: onSnapshot callback function is required for dbListenToEmails");
       return null;
     }
-    const collectionPath = buildEmailsCollectionPath(tenantID, storeID);
+    const collectionPath = buildEmailsCollectionPath(tenantID);
     __logListenerAttach(name);
     const unsubscribe = firestoreSubscribeCollection(collectionPath, (data, error, meta) => {
       if (error) {
-        log("Email listener error", { tenantID, storeID, error });
+        log("Email listener error", { tenantID, error });
         if (onError) onError(error);
         return;
       }
@@ -4458,20 +4450,20 @@ export function dbListenToEmails(onSnapshot, onError) {
 export function dbListenToEmailAuth(onSnapshot, onError) {
   const name = "emailAuth";
   try {
-    const { tenantID, storeID } = getTenantAndStore();
-    if (!tenantID || !storeID) {
-      log("Error: tenantID and storeID are not configured for dbListenToEmailAuth");
+    const { tenantID } = getTenantAndStore();
+    if (!tenantID) {
+      log("Error: tenantID is not configured for dbListenToEmailAuth");
       return null;
     }
     if (!onSnapshot || typeof onSnapshot !== "function") {
       log("Error: onSnapshot callback function is required for dbListenToEmailAuth");
       return null;
     }
-    const collectionPath = buildEmailAuthCollectionPath(tenantID, storeID);
+    const collectionPath = buildEmailAuthCollectionPath(tenantID);
     __logListenerAttach(name);
     const unsubscribe = firestoreSubscribeCollection(collectionPath, (data, error, meta) => {
       if (error) {
-        log("Email auth listener error", { tenantID, storeID, error });
+        log("Email auth listener error", { tenantID, error });
         if (onError) onError(error);
         return;
       }
@@ -4489,69 +4481,147 @@ export function dbListenToEmailAuth(onSnapshot, onError) {
   }
 }
 
-export async function dbGmailInitiateAuth(accountKey) {
-  const { tenantID, storeID } = getTenantAndStore();
-  if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
-  return gmailInitiateAuth({ tenantID, storeID, accountKey });
+export function dbListenToEmailAccounts(onSnapshot, onError) {
+  const name = "emailAccounts";
+  try {
+    const { tenantID } = getTenantAndStore();
+    if (!tenantID) {
+      log("Error: tenantID is not configured for dbListenToEmailAccounts");
+      return null;
+    }
+    if (!onSnapshot || typeof onSnapshot !== "function") {
+      log("Error: onSnapshot callback function is required for dbListenToEmailAccounts");
+      return null;
+    }
+    const collectionPath = buildEmailAccountsCollectionPath(tenantID);
+    __logListenerAttach(name);
+    const unsubscribe = firestoreSubscribeCollection(collectionPath, (data, error, meta) => {
+      if (error) {
+        log("Email accounts listener error", { tenantID, error });
+        if (onError) onError(error);
+        return;
+      }
+      __logListenerEmit(name, meta);
+      onSnapshot(data);
+    });
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
+  } catch (error) {
+    log("Error setting up email accounts listener:", error);
+    if (onError) onError(error);
+    return null;
+  }
+}
+
+// CRUD for the tenant-scoped email-accounts collection. accountKey is the
+// stable per-inbox identifier (we use the email address lowercased, but the
+// callers don't need to know that — they just pass it through).
+export async function dbCreateEmailAccount(accountKey, accountData) {
+  const { tenantID } = getTenantAndStore();
+  if (!tenantID) return { success: false, error: "Missing tenantID" };
+  if (!accountKey) return { success: false, error: "accountKey required" };
+  const path = buildEmailAccountDocPath(tenantID, accountKey);
+  const toWrite = {
+    accountKey,
+    email: accountData.email || "",
+    displayName: accountData.displayName || "",
+    signature: accountData.signature || "",
+    assignedStoreID: accountData.assignedStoreID || null,
+    createdAt: Date.now(),
+    ...accountData,
+  };
+  await firestoreWrite(path, toWrite);
+  return { success: true, account: toWrite };
+}
+
+export async function dbUpdateEmailAccount(accountKey, partial) {
+  const { tenantID } = getTenantAndStore();
+  if (!tenantID) return { success: false, error: "Missing tenantID" };
+  if (!accountKey) return { success: false, error: "accountKey required" };
+  const path = buildEmailAccountDocPath(tenantID, accountKey);
+  await firestoreUpdate(path, partial);
+  return { success: true };
+}
+
+export async function dbDeleteEmailAccount(accountKey) {
+  const { tenantID } = getTenantAndStore();
+  if (!tenantID) return { success: false, error: "Missing tenantID" };
+  if (!accountKey) return { success: false, error: "accountKey required" };
+  const path = buildEmailAccountDocPath(tenantID, accountKey);
+  await firestoreDelete(path);
+  return { success: true };
+}
+
+export async function dbGmailInitiateAuth(accountKey, opts = {}) {
+  const { tenantID } = getTenantAndStore();
+  if (!tenantID) return { success: false, error: "Missing tenantID" };
+  // assignedStoreID === null  → shared across all tenant stores
+  // assignedStoreID === "xyz" → restricted to that store
+  return gmailInitiateAuth({
+    tenantID,
+    accountKey,
+    assignedStoreID: opts.assignedStoreID || null,
+  });
 }
 
 export async function dbGmailSyncEmails(accountKey, fullSync = false) {
-  const { tenantID, storeID } = getTenantAndStore();
-  log("dbGmailSyncEmails called", { tenantID, storeID, accountKey, fullSync });
-  if (!tenantID || !storeID) {
-    log("dbGmailSyncEmails - missing tenant/store");
-    return { success: false, error: "Missing tenant/store" };
+  const { tenantID } = getTenantAndStore();
+  log("dbGmailSyncEmails called", { tenantID, accountKey, fullSync });
+  if (!tenantID) {
+    log("dbGmailSyncEmails - missing tenantID");
+    return { success: false, error: "Missing tenantID" };
   }
-  const result = await gmailSyncEmails({ tenantID, storeID, accountKey, fullSync });
+  const result = await gmailSyncEmails({ tenantID, accountKey, fullSync });
   log("dbGmailSyncEmails result", JSON.stringify(result));
   return result;
 }
 
 export async function dbGmailReconnectWatch(accountKey) {
-  const { tenantID, storeID } = getTenantAndStore();
-  log("dbGmailReconnectWatch called", { tenantID, storeID, accountKey });
-  if (!tenantID || !storeID) {
-    return { success: false, error: "Missing tenant/store" };
+  const { tenantID } = getTenantAndStore();
+  log("dbGmailReconnectWatch called", { tenantID, accountKey });
+  if (!tenantID) {
+    return { success: false, error: "Missing tenantID" };
   }
   if (!accountKey) {
     return { success: false, error: "accountKey required" };
   }
-  const result = await gmailReconnectWatch({ tenantID, storeID, accountKey });
+  const result = await gmailReconnectWatch({ tenantID, accountKey });
   log("dbGmailReconnectWatch result", JSON.stringify(result));
   return result;
 }
 
 export async function dbGmailSendEmail(emailData) {
-  const { tenantID, storeID } = getTenantAndStore();
-  if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
+  const { tenantID } = getTenantAndStore();
+  if (!tenantID) return { success: false, error: "Missing tenantID" };
   if (!emailData.to || emailData.to.length === 0) return { success: false, error: "Recipient required" };
   if (!emailData.subject && !emailData.threadId) return { success: false, error: "Subject required for new emails" };
   return gmailSendNewEmail({
     tenantID,
-    storeID,
     accountKey: emailData.accountKey || getEmailStoreState().activeAccountKey,
     ...emailData,
   });
 }
 
 export async function dbGmailModifyLabels(messageIds, addLabelIds, removeLabelIds, accountKeyOverride) {
-  const { tenantID, storeID } = getTenantAndStore();
-  if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
+  const { tenantID } = getTenantAndStore();
+  if (!tenantID) return { success: false, error: "Missing tenantID" };
   const accountKey = accountKeyOverride || getEmailStoreState().activeAccountKey;
-  return gmailModifyLabels({ tenantID, storeID, accountKey, messageIds, addLabelIds, removeLabelIds });
+  return gmailModifyLabels({ tenantID, accountKey, messageIds, addLabelIds, removeLabelIds });
 }
 
 export async function dbGmailGetAttachment(messageId, attachmentId, filename) {
-  const { tenantID, storeID } = getTenantAndStore();
-  if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
+  const { tenantID } = getTenantAndStore();
+  if (!tenantID) return { success: false, error: "Missing tenantID" };
   const accountKey = getEmailStoreState().activeAccountKey;
-  return gmailGetAttachment({ tenantID, storeID, accountKey, messageId, attachmentId, filename });
+  return gmailGetAttachment({ tenantID, accountKey, messageId, attachmentId, filename });
 }
 
 export async function dbGmailDisconnect(accountKey) {
-  const { tenantID, storeID } = getTenantAndStore();
-  if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
-  return gmailDisconnect({ tenantID, storeID, accountKey });
+  const { tenantID } = getTenantAndStore();
+  if (!tenantID) return { success: false, error: "Missing tenantID" };
+  return gmailDisconnect({ tenantID, accountKey });
 }
 
 

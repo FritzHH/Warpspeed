@@ -11,16 +11,32 @@ import {
   Tooltip,
 } from "../../../../dom_components";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
-import { usdTypeMask, formatCurrencyDisp, log, localStorageWrapper } from "../../../../utils";
+import { usdTypeMask, formatCurrencyDisp, log } from "../../../../utils";
 import { takeId, getId } from "../../../../idPool";
-import { useStripePaymentStore } from "../../../../stores";
-import { buildCardTransaction } from "./newCheckoutUtils";
+import { useStripePaymentStore, useSettingsStore } from "../../../../stores";
+import { buildCardTransaction, buildCardTransactionFromSDK } from "./newCheckoutUtils";
 import {
   newCheckoutProcessStripePayment,
   newCheckoutCancelStripePayment,
   newCheckoutListenToPaymentUpdates,
+  newCheckoutProcessConnectStripePayment,
+  newCheckoutCancelConnectStripePayment,
+  newCheckoutCreateTapToPayPI,
 } from "./newCheckoutFirebaseCalls";
+import {
+  pairTapToPayOnIphone,
+  collectAndProcessPayment,
+  cancelCollect,
+  getConnectedSDKReader,
+  setConnectionTokenContext,
+} from "./stripeTerminalSDK";
 import { dlog, DCAT } from "./checkoutDebugLog";
+
+function isTTPiReader(reader) {
+  if (!reader) return false;
+  const dt = reader.device_type || reader.deviceType || "";
+  return dt === "apple_built_in";
+}
 
 function PulsingText({ text }) {
   return (
@@ -31,7 +47,6 @@ function PulsingText({ text }) {
 }
 
 const PAYMENT_TIMEOUT_MS = 120000; // 2 minutes
-const LS_CARD_READER_KEY = "warpspeed_selected_card_reader";
 
 // Maps Stripe decline_code and failure_code values to user-friendly messages
 function formatStripeError(code) {
@@ -142,6 +157,9 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   const zCardError = useStripePaymentStore((s) => s.cardError);
   const zCardMessage = useStripePaymentStore((s) => s.cardMessage);
   const zPaymentIntentID = useStripePaymentStore((s) => s.paymentIntentID);
+  const zIsConnectMode = useStripePaymentStore((s) => s.isConnectMode);
+  const zConnectAccountID = useStripePaymentStore((s) => s.connectAccountID);
+  const zTerminalLocationID = useStripePaymentStore((s) => s.terminalLocationID);
   const _zSetCardStatus = useStripePaymentStore((s) => s.setCardStatus);
   const _zSetCardError = useStripePaymentStore((s) => s.setCardError);
   const _zSetCardMessage = useStripePaymentStore((s) => s.setCardMessage);
@@ -150,10 +168,15 @@ export const CardReaderPayment = memo(function CardReaderPayment({
 
   function getInitialReader() {
     if (sCardReader) return sCardReader;
-    let saved = localStorageWrapper.getItem(LS_CARD_READER_KEY);
+    let saved = useSettingsStore.getState().getSettings()?.selectedCardReaderObj;
     if (saved?.id) {
       let match = stripeReaders.find((r) => r.id === saved.id);
-      if (match) return match;
+      // Only auto-select if reader is currently viable. TTPi auto-pairs on
+      // demand, so accept it regardless of reported status; everything else
+      // must be online or the dropdown won't surface it and Start would hang.
+      if (match && (match.status === "online" || isTTPiReader(match))) {
+        return match;
+      }
     }
     return null;
   }
@@ -282,7 +305,9 @@ export const CardReaderPayment = memo(function CardReaderPayment({
     _zSetCardMessage("");
     if (reader) {
       console.log("handleReaderSelect busy check:", JSON.stringify({ action: reader.action, zPaymentIntentID, zCardStatus }, null, 2));
-      localStorageWrapper.setItem(LS_CARD_READER_KEY, { id: reader.id, label: item.label || reader.id });
+      useSettingsStore
+        .getState()
+        .setField("selectedCardReaderObj", { id: reader.id, label: item.label || reader.id });
       if (reader.action && reader.action.type) {
         let piID = reader.action.process_payment_intent?.payment_intent || "";
         if (piID && piID === zPaymentIntentID) {
@@ -336,16 +361,101 @@ export const CardReaderPayment = memo(function CardReaderPayment({
         ? Math.round(saleSalesTax * (sRequestedAmount / saleTotal))
         : 0;
 
-      let result = await newCheckoutProcessStripePayment(
-        sRequestedAmount,
-        activeReader.id,
-        zPaymentIntentID || null,
-        saleID,
-        customerID,
-        customerEmail,
-        transactionID,
-        proportionalTax
-      );
+      // ── TTPi (Tap to Pay on iPhone) — JS SDK flow ───────────────────
+      if (isTTPiReader(activeReader) && zIsConnectMode && zConnectAccountID) {
+        try {
+          if (!zTerminalLocationID) {
+            throw new Error("Terminal location not configured. Set up Tap to Pay from the Stripe Connect screen first.");
+          }
+
+          setConnectionTokenContext({ connectAccountID: zConnectAccountID, locationID: zTerminalLocationID });
+
+          // Auto-pair if SDK isn't connected to this reader.
+          const sdkReader = getConnectedSDKReader();
+          if (!sdkReader || sdkReader.id !== activeReader.id) {
+            _zSetCardMessage("Connecting to Tap to Pay...");
+            await pairTapToPayOnIphone({
+              connectAccountID: zConnectAccountID,
+              tenantID: undefined,
+              storeID: undefined,
+              terminalLocationID: zTerminalLocationID,
+            });
+          }
+
+          _zSetCardMessage("Creating payment...");
+          let piResp = await newCheckoutCreateTapToPayPI({
+            amount: sRequestedAmount,
+            connectAccountID: zConnectAccountID,
+            saleID,
+            customerID,
+            customerEmail,
+            transactionID,
+            salesTax: proportionalTax,
+          });
+
+          if (!piResp?.success) {
+            throw new Error(piResp?.message || "Failed to create Tap to Pay payment.");
+          }
+
+          let clientSecret = piResp?.data?.clientSecret;
+          let piID = piResp?.data?.paymentIntentID;
+          if (!clientSecret) throw new Error("Tap to Pay payment is missing client_secret.");
+
+          _zSetPaymentIntentID(piID);
+          _zSetCardStatus("waitingForCard");
+          _zSetCardMessage("Hold customer's card or device to the iPhone");
+
+          let confirmedPI = await collectAndProcessPayment(clientSecret);
+
+          let payment = buildCardTransactionFromSDK(confirmedPI, transactionID);
+          pendingTransactionIDRef.current = null;
+          _zSetCardMessage("");
+          _zSetCardError("");
+          _zSetCardStatus("idle");
+          _zSetPaymentIntentID(null);
+          if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
+          if (callbacksRef.current.onPaymentCapture) callbacksRef.current.onPaymentCapture(payment);
+          if (showSuccessRef.current) showSuccessRef.current(payment);
+          return;
+        } catch (err) {
+          dlog(DCAT.ACTION, "startPaymentTTPiError", "CardReaderPayment", { errorMessage: err?.message });
+          let failedID = pendingTransactionIDRef.current;
+          pendingTransactionIDRef.current = null;
+          _zSetCardError(err?.message || "Tap to Pay failed.");
+          _zSetCardMessage("");
+          _zSetCardStatus("idle");
+          _zSetPaymentIntentID(null);
+          if (failedID && callbacksRef.current.onPaymentFailed) callbacksRef.current.onPaymentFailed(failedID);
+          if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
+          return;
+        }
+      }
+
+      // ── Server-driven payment (Connect or legacy) ────────────────────
+      let initiateFn = (zIsConnectMode && zConnectAccountID)
+        ? () => newCheckoutProcessConnectStripePayment({
+            amount: sRequestedAmount,
+            readerID: activeReader.id,
+            connectAccountID: zConnectAccountID,
+            saleID,
+            customerID,
+            customerEmail,
+            transactionID,
+            salesTax: proportionalTax,
+            paymentIntentID: zPaymentIntentID || null,
+          })
+        : () => newCheckoutProcessStripePayment(
+            sRequestedAmount,
+            activeReader.id,
+            zPaymentIntentID || null,
+            saleID,
+            customerID,
+            customerEmail,
+            transactionID,
+            proportionalTax
+          );
+
+      let result = await initiateFn();
 
       if (!result?.success) {
         dlog(DCAT.ACTION, "startPaymentInitFailed", "CardReaderPayment", { message: result?.message, transactionId: pendingTransactionIDRef.current });
@@ -399,8 +509,34 @@ export const CardReaderPayment = memo(function CardReaderPayment({
     _zSetCardError("");
     cleanupStoreListeners();
 
+    // TTPi: SDK-side cancel; there's no server reader action to clear.
+    if (isTTPiReader(activeReader) && zIsConnectMode) {
+      try {
+        await cancelCollect();
+        let failedID = pendingTransactionIDRef.current;
+        pendingTransactionIDRef.current = null;
+        _zSetCardMessage("Reader cleared");
+        _zResetCardTransaction();
+        if (failedID && callbacksRef.current.onPaymentFailed) callbacksRef.current.onPaymentFailed(failedID);
+        if (callbacksRef.current.onCardProcessingEnd) callbacksRef.current.onCardProcessingEnd();
+      } catch (err) {
+        _zSetCardError(err?.message || "Failed to cancel Tap to Pay.");
+        _zSetCardMessage("");
+        _zSetCardStatus("idle");
+      }
+      return;
+    }
+
+    let cancelFn = (zIsConnectMode && zConnectAccountID)
+      ? () => newCheckoutCancelConnectStripePayment({
+          readerID: activeReader.id,
+          connectAccountID: zConnectAccountID,
+          paymentIntentID: zPaymentIntentID || undefined,
+        })
+      : () => newCheckoutCancelStripePayment(activeReader.id);
+
     try {
-      let result = await newCheckoutCancelStripePayment(activeReader.id);
+      let result = await cancelFn();
       dlog(DCAT.ACTION, "clearReaderSuccess", "CardReaderPayment", { readerId: activeReader.id, message: result?.message });
       let failedID = pendingTransactionIDRef.current;
       pendingTransactionIDRef.current = null;
@@ -431,11 +567,14 @@ export const CardReaderPayment = memo(function CardReaderPayment({
 
   // -- Derived values --
   let savedCardReaders = settings?.cardReaders || [];
+  // TTPi readers are always selectable — the SDK auto-pairs them when needed,
+  // so their Stripe-reported status doesn't reflect real availability.
   let readerDropdownData = stripeReaders
-    .filter((r) => r.status === "online")
+    .filter((r) => r.status === "online" || isTTPiReader(r))
     .map((r) => {
       let saved = savedCardReaders.find((s) => s.id === r.id);
-      return { id: r.id, label: saved?.label || r.id };
+      let label = saved?.label || (isTTPiReader(r) ? "Tap to Pay on iPhone" : (r.label || r.id));
+      return { id: r.id, label };
     });
 
   let hasOnlineReaders = readerDropdownData.length > 0;

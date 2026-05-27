@@ -2,11 +2,16 @@ import React, { useState } from "react";
 import { TouchableOpacity } from "../../../../../dom_components";
 import { C, Fonts } from "../../../../../styles";
 import { lightenRGBByPercent } from "../../../../../utils";
+import { useEmailStore, useSettingsStore } from "../../../../../stores";
 import { BoxContainerInner, BoxContainerOuter } from "./_helpers";
 import { SignatureEditor } from "./SignatureEditor";
 
-export const EmailSignature = ({ zSettingsObj, handleSettingsFieldChange }) => {
-  const emailAccounts = zSettingsObj?.emailAccounts || [];
+export const EmailSignature = () => {
+  const zEmailAccounts = useEmailStore((state) => state.emailAccounts) || [];
+  const zCurrentStoreID = useSettingsStore((state) => state.getSettings()?.storeID);
+  const emailAccounts = zEmailAccounts.filter(
+    (a) => !a.assignedStoreID || a.assignedStoreID === zCurrentStoreID
+  );
   const [sSelectedAccountKey, _sSetSelectedAccountKey] = useState(emailAccounts[0]?.accountKey || "");
 
   if (emailAccounts.length === 0) {
@@ -57,8 +62,6 @@ export const EmailSignature = ({ zSettingsObj, handleSettingsFieldChange }) => {
         </div>
         <SignatureEditor
           key={sSelectedAccountKey}
-          zSettingsObj={zSettingsObj}
-          handleSettingsFieldChange={handleSettingsFieldChange}
           accountKey={sSelectedAccountKey}
         />
       </BoxContainerInner>

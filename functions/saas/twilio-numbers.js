@@ -15,6 +15,7 @@ const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const common = require("./twilio-common");
+const { assertPlatformAdmin } = require("./auth-guards");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -23,6 +24,8 @@ const {
   TWILIO_MASTER_AUTH_TOKEN,
   INBOUND_WEBHOOK_URL,
   STATUS_CALLBACK_URL,
+  CURRENT_WEBHOOK_CONFIG,
+  numberWebhooksAreCurrent,
   requireAuth,
   requireTenantMemberWithLevel,
   storeNumberDocRef,
@@ -36,8 +39,145 @@ const NUMBER_FUNCTION_OPTS = {
   secrets: [TWILIO_MASTER_ACCOUNT_SID, TWILIO_MASTER_AUTH_TOKEN],
 };
 
+// Max candidates returned by search. Twilio caps at 30; we cap at 20 by
+// default to keep the result list scannable in the UI.
+const SEARCH_DEFAULT_LIMIT = 20;
+const SEARCH_MAX_LIMIT = 30;
+
+// Shared body for both purchase callables. Takes a SPECIFIC phoneNumber that
+// has already been resolved (either by the tenant-admin callable's first-
+// match search, or by the platform-admin's explicit pick from search
+// results). Performs the Twilio purchase + Firestore batch (store doc +
+// routing doc) + audit event. Caller owns auth gating.
+async function purchaseNumberInternal({
+  tenantID,
+  storeID,
+  phoneNumber,
+  actorUID,
+  actorKind,
+}) {
+  const client = await getTenantTwilioClient(tenantID);
+
+  const purchase = await client.incomingPhoneNumbers.create({
+    phoneNumber,
+    friendlyName: `tenant-${tenantID}-store-${storeID}`,
+    ...CURRENT_WEBHOOK_CONFIG,
+  });
+
+  const db = getFirestore();
+  const batch = db.batch();
+
+  const storeRef = storeNumberDocRef(db, tenantID, storeID, purchase.sid);
+  batch.set(storeRef, {
+    phoneNumber: purchase.phoneNumber,
+    phoneNumberSid: purchase.sid,
+    capabilities: {
+      sms: purchase.capabilities && purchase.capabilities.sms === true,
+      mms: purchase.capabilities && purchase.capabilities.mms === true,
+      voice: purchase.capabilities && purchase.capabilities.voice === true,
+    },
+    friendlyName: purchase.friendlyName,
+    source: "purchased",
+    portStatus: null,
+    assignedAt: FieldValue.serverTimestamp(),
+    assignedByUID: actorUID,
+    webhooks: {
+      smsUrl: CURRENT_WEBHOOK_CONFIG.smsUrl,
+      statusCallback: CURRENT_WEBHOOK_CONFIG.statusCallback,
+      voiceUrl: CURRENT_WEBHOOK_CONFIG.voiceUrl,
+      configuredAt: FieldValue.serverTimestamp(),
+    },
+  });
+
+  const routingRef = routingDocRef(db, purchase.phoneNumber);
+  const subaccountSnap = await db
+    .collection("tenants")
+    .doc(tenantID)
+    .collection("private")
+    .doc("twilio")
+    .get();
+  const subaccountSid =
+    subaccountSnap.exists && subaccountSnap.data().subaccountSid;
+  batch.set(routingRef, {
+    tenantID,
+    storeID,
+    subaccountSid: subaccountSid || null,
+    phoneNumberSid: purchase.sid,
+    status: "active",
+    assignedAt: FieldValue.serverTimestamp(),
+  });
+
+  await batch.commit();
+
+  await writeAuditEvent(db, tenantID, {
+    type: "number-purchased",
+    phoneNumber: purchase.phoneNumber,
+    phoneNumberSid: purchase.sid,
+    storeID,
+    actorUID,
+    actorKind,
+  });
+
+  logger.info("purchaseNumberInternal: purchased", {
+    tenantID,
+    storeID,
+    phoneNumber: purchase.phoneNumber,
+    phoneNumberSid: purchase.sid,
+    actorKind,
+  });
+
+  return {
+    phoneNumber: purchase.phoneNumber,
+    phoneNumberSid: purchase.sid,
+    capabilities: purchase.capabilities,
+  };
+}
+
+// Reapplies CURRENT_WEBHOOK_CONFIG to a single number and stamps the per-
+// store doc's `webhooks` block. Idempotent: Twilio's .update() accepts the
+// same values repeatedly. Used by the bulk-configure callable below; also
+// available for future single-number backfill callers.
+//
+// Returns one of:
+//   { ok: true, alreadyCurrent: true, phoneNumber }
+//   { ok: true, phoneNumber }
+//   throws on hard Twilio/Firestore failure.
+async function configureNumberWebhooksInternal({
+  db,
+  subaccountClient,
+  perNumberRef,
+  perNumberData,
+}) {
+  const phoneNumberSid = perNumberRef.id;
+  const phoneNumber = (perNumberData || {}).phoneNumber || null;
+
+  if (numberWebhooksAreCurrent((perNumberData || {}).webhooks)) {
+    return { ok: true, alreadyCurrent: true, phoneNumber };
+  }
+
+  await subaccountClient
+    .incomingPhoneNumbers(phoneNumberSid)
+    .update(CURRENT_WEBHOOK_CONFIG);
+
+  await perNumberRef.set(
+    {
+      webhooks: {
+        smsUrl: CURRENT_WEBHOOK_CONFIG.smsUrl,
+        statusCallback: CURRENT_WEBHOOK_CONFIG.statusCallback,
+        voiceUrl: CURRENT_WEBHOOK_CONFIG.voiceUrl,
+        configuredAt: FieldValue.serverTimestamp(),
+      },
+    },
+    { merge: true }
+  );
+
+  return { ok: true, phoneNumber };
+}
+
 // ─────────────────────────────────────────────────────────────────────────
-// purchaseTwilioNumber — search + buy + configure webhooks + write docs.
+// purchaseTwilioNumber — tenant-admin variant. Searches by areaCode, picks
+// the first match, then delegates to the shared helper. Preserves the
+// existing auto-pick-first behavior for whenever tenant self-serve UI ships.
 // ─────────────────────────────────────────────────────────────────────────
 exports.purchaseTwilioNumber = onCall(NUMBER_FUNCTION_OPTS, async (request) => {
   const auth = requireAuth(request);
@@ -84,75 +224,243 @@ exports.purchaseTwilioNumber = onCall(NUMBER_FUNCTION_OPTS, async (request) => {
     );
   }
 
-  const purchase = await client.incomingPhoneNumbers.create({
+  return purchaseNumberInternal({
+    tenantID,
+    storeID,
     phoneNumber: available[0].phoneNumber,
-    friendlyName: `tenant-${tenantID}-store-${storeID}`,
-    smsUrl: INBOUND_WEBHOOK_URL,
-    smsMethod: "POST",
-    statusCallback: STATUS_CALLBACK_URL,
-    statusCallbackMethod: "POST",
-  });
-
-  const db = getFirestore();
-  const batch = db.batch();
-
-  const storeRef = storeNumberDocRef(db, tenantID, storeID, purchase.sid);
-  batch.set(storeRef, {
-    phoneNumber: purchase.phoneNumber,
-    phoneNumberSid: purchase.sid,
-    capabilities: {
-      sms: purchase.capabilities && purchase.capabilities.sms === true,
-      mms: purchase.capabilities && purchase.capabilities.mms === true,
-      voice: purchase.capabilities && purchase.capabilities.voice === true,
-    },
-    friendlyName: purchase.friendlyName,
-    source: "purchased",
-    portStatus: null,
-    assignedAt: FieldValue.serverTimestamp(),
-    assignedByUID: auth.uid,
-  });
-
-  const routingRef = routingDocRef(db, purchase.phoneNumber);
-  const subaccountSnap = await db
-    .collection("tenants")
-    .doc(tenantID)
-    .collection("private")
-    .doc("twilio")
-    .get();
-  const subaccountSid =
-    subaccountSnap.exists && subaccountSnap.data().subaccountSid;
-  batch.set(routingRef, {
-    tenantID,
-    storeID,
-    subaccountSid: subaccountSid || null,
-    phoneNumberSid: purchase.sid,
-    status: "active",
-    assignedAt: FieldValue.serverTimestamp(),
-  });
-
-  await batch.commit();
-
-  await writeAuditEvent(db, tenantID, {
-    type: "number-purchased",
-    phoneNumber: purchase.phoneNumber,
-    phoneNumberSid: purchase.sid,
-    storeID,
     actorUID: auth.uid,
+    actorKind: "tenant-admin",
   });
-
-  logger.info("purchaseTwilioNumber: purchased", {
-    tenantID,
-    storeID,
-    phoneNumber: purchase.phoneNumber,
-    phoneNumberSid: purchase.sid,
-  });
-
-  return {
-    phoneNumber: purchase.phoneNumber,
-    phoneNumberSid: purchase.sid,
-    capabilities: purchase.capabilities,
-  };
 });
+
+// ─────────────────────────────────────────────────────────────────────────
+// platformAdminSearchTwilioAvailableNumbers — host-site number picker.
+//
+// Returns a normalized candidate list with locality + region + rate center +
+// capabilities. Filters: state (inRegion), locality (city, exact match),
+// areaCode, contains (vanity pattern). At least one filter is required —
+// Twilio rejects an unfiltered search anyway, but we reject early with a
+// clearer message.
+// ─────────────────────────────────────────────────────────────────────────
+exports.platformAdminSearchTwilioAvailableNumbers = onCall(
+  NUMBER_FUNCTION_OPTS,
+  async (request) => {
+    const auth = requireAuth(request);
+    assertPlatformAdmin(auth);
+
+    const { tenantID, state, locality, areaCode, contains, limit } =
+      request.data || {};
+    if (!tenantID) {
+      throw new HttpsError("invalid-argument", "tenantID is required.");
+    }
+    if (!state && !locality && !areaCode && !contains) {
+      throw new HttpsError(
+        "invalid-argument",
+        "At least one of state, locality, areaCode, or contains is required."
+      );
+    }
+
+    const db = getFirestore();
+    const tenantSnap = await db.collection("tenants").doc(tenantID).get();
+    if (!tenantSnap.exists) {
+      throw new HttpsError("not-found", `Tenant ${tenantID} does not exist.`);
+    }
+
+    const cappedLimit = Math.min(
+      Math.max(parseInt(limit, 10) || SEARCH_DEFAULT_LIMIT, 1),
+      SEARCH_MAX_LIMIT
+    );
+
+    logger.info("platformAdminSearchTwilioAvailableNumbers: starting", {
+      tenantID,
+      state,
+      locality,
+      areaCode,
+      contains,
+      limit: cappedLimit,
+      uid: auth.uid,
+    });
+
+    const client = await getTenantTwilioClient(tenantID);
+
+    const searchOpts = {
+      smsEnabled: true,
+      mmsEnabled: true,
+      limit: cappedLimit,
+    };
+    if (state) searchOpts.inRegion = state;
+    if (locality) searchOpts.inLocality = locality;
+    if (areaCode) searchOpts.areaCode = parseInt(areaCode, 10);
+    if (contains) searchOpts.contains = contains;
+
+    const available = await client
+      .availablePhoneNumbers("US")
+      .local.list(searchOpts);
+
+    const candidates = available.map((n) => ({
+      phoneNumber: n.phoneNumber,
+      friendlyName: n.friendlyName,
+      locality: n.locality || null,
+      region: n.region || null,
+      rateCenter: n.rateCenter || null,
+      postalCode: n.postalCode || null,
+      lata: n.lata || null,
+      capabilities: {
+        sms: n.capabilities && n.capabilities.SMS === true,
+        mms: n.capabilities && n.capabilities.MMS === true,
+        voice: n.capabilities && n.capabilities.voice === true,
+      },
+    }));
+
+    logger.info("platformAdminSearchTwilioAvailableNumbers: results", {
+      tenantID,
+      count: candidates.length,
+    });
+
+    return { success: true, candidates };
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────
+// platformAdminPurchaseTwilioNumber — host-site buy. Takes a specific
+// phoneNumber (resolved from search) and purchases into the tenant's
+// subaccount. Verifies tenant + store exist before calling helper.
+// ─────────────────────────────────────────────────────────────────────────
+exports.platformAdminPurchaseTwilioNumber = onCall(
+  NUMBER_FUNCTION_OPTS,
+  async (request) => {
+    const auth = requireAuth(request);
+    assertPlatformAdmin(auth);
+
+    const { tenantID, storeID, phoneNumber } = request.data || {};
+    if (!tenantID || !storeID || !phoneNumber) {
+      throw new HttpsError(
+        "invalid-argument",
+        "tenantID, storeID, and phoneNumber are required."
+      );
+    }
+
+    const db = getFirestore();
+    const tenantSnap = await db.collection("tenants").doc(tenantID).get();
+    if (!tenantSnap.exists) {
+      throw new HttpsError("not-found", `Tenant ${tenantID} does not exist.`);
+    }
+    const storeSnap = await db
+      .collection("tenants")
+      .doc(tenantID)
+      .collection("stores")
+      .doc(storeID)
+      .get();
+    if (!storeSnap.exists) {
+      throw new HttpsError(
+        "not-found",
+        `Store ${storeID} does not exist under tenant ${tenantID}.`
+      );
+    }
+
+    logger.info("platformAdminPurchaseTwilioNumber: starting", {
+      tenantID,
+      storeID,
+      phoneNumber,
+      uid: auth.uid,
+    });
+
+    return purchaseNumberInternal({
+      tenantID,
+      storeID,
+      phoneNumber,
+      actorUID: auth.uid,
+      actorKind: "platform-admin",
+    });
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────
+// platformAdminConfigureTenantWebhooks — backfill webhook URLs across every
+// number owned by the tenant. Idempotent: numbers whose stored `webhooks`
+// block already matches CURRENT_WEBHOOK_CONFIG are skipped without hitting
+// Twilio. Returns the same shape as the A2P bulk-link callable:
+//   { configured: [...e164s], alreadyCurrent: [...e164s], failed: [{phoneNumber, error}] }
+// ─────────────────────────────────────────────────────────────────────────
+exports.platformAdminConfigureTenantWebhooks = onCall(
+  NUMBER_FUNCTION_OPTS,
+  async (request) => {
+    const auth = requireAuth(request);
+    assertPlatformAdmin(auth);
+
+    const { tenantID } = request.data || {};
+    if (!tenantID) {
+      throw new HttpsError("invalid-argument", "tenantID is required.");
+    }
+
+    const db = getFirestore();
+    const tenantSnap = await db.collection("tenants").doc(tenantID).get();
+    if (!tenantSnap.exists) {
+      throw new HttpsError("not-found", `Tenant ${tenantID} does not exist.`);
+    }
+
+    // allowSuspended=true so we can still reconfigure during the grace window —
+    // suspended numbers still receive inbound, so keeping their URLs current
+    // matters.
+    const subaccountClient = await getTenantTwilioClient(tenantID, {
+      allowSuspended: true,
+    });
+
+    const configured = [];
+    const alreadyCurrent = [];
+    const failed = [];
+
+    const storesSnap = await db
+      .collection("tenants").doc(tenantID).collection("stores").get();
+    for (const storeDoc of storesSnap.docs) {
+      const numbersSnap = await storeDoc.ref.collection("twilio").get();
+      for (const numDoc of numbersSnap.docs) {
+        const perNumberData = numDoc.data() || {};
+        // Skip port-in placeholders (no real phoneNumberSid yet — the doc ID
+        // is `port-<orderSid>` until the port completes).
+        if (numDoc.id.startsWith("port-") || !perNumberData.phoneNumberSid) {
+          continue;
+        }
+        try {
+          const result = await configureNumberWebhooksInternal({
+            db,
+            subaccountClient,
+            perNumberRef: numDoc.ref,
+            perNumberData,
+          });
+          if (result.alreadyCurrent) {
+            alreadyCurrent.push(result.phoneNumber || numDoc.id);
+          } else {
+            configured.push(result.phoneNumber || numDoc.id);
+          }
+        } catch (err) {
+          failed.push({
+            phoneNumber: perNumberData.phoneNumber || numDoc.id,
+            error: (err && err.message) || "unknown error",
+          });
+        }
+      }
+    }
+
+    await writeAuditEvent(db, tenantID, {
+      type: "webhooks-bulk-configured",
+      configuredCount: configured.length,
+      alreadyCurrentCount: alreadyCurrent.length,
+      failedCount: failed.length,
+      actorUID: auth.uid,
+      actorKind: "platform-admin",
+    });
+
+    logger.info("platformAdminConfigureTenantWebhooks: complete", {
+      tenantID,
+      configuredCount: configured.length,
+      alreadyCurrentCount: alreadyCurrent.length,
+      failedCount: failed.length,
+    });
+
+    return { configured, alreadyCurrent, failed };
+  }
+);
 
 // ─────────────────────────────────────────────────────────────────────────
 // portInTwilioNumber — initiates Twilio Hosted SMS port-in.

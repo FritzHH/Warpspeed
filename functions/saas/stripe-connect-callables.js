@@ -1,13 +1,23 @@
 /* eslint-disable */
 // Phase 2 — Connect Express onboarding backend.
 //
-// Three callables for the tenant-facing onboarding flow:
+// Tenant-admin callables (the merchant doing their own onboarding):
 //   - stripeConnectAccountCreate         creates a new Express acct + records
 //   - stripeConnectAccountLinkCreate     returns a one-time onboarding URL
 //   - stripeConnectAccountStatusCallable forces a fresh state pull from Stripe
 //
+// Platform-admin callables (cadence-dashboard, fritz acting on tenant's
+// behalf — common when we're setting up a brand-new tenant manually):
+//   - platformAdminStripeConnectAccountCreate     by {tenantID}
+//   - platformAdminStripeConnectAccountLinkCreate by {tenantID}
+//   - platformAdminStripeConnectAccountStatus     by {tenantID}
+//
+// Both surfaces delegate to the same internal helpers below — the only
+// difference is the guard pattern and how the {tenantID, stripeAccountID}
+// pair is resolved.
+//
 // Webhook-driven state updates live in pubsub-subscriber.js
-// (handleAccountUpdated). These callables write the initial record + index
+// (handleAccountUpdated). The create helper writes the initial record + index
 // entry; the webhook keeps the record in sync afterward.
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { defineSecret } = require("firebase-functions/params");
@@ -18,6 +28,7 @@ const stripeConnect = require("./stripe-connect");
 const {
   assertTenantMatch,
   assertPrivilege,
+  assertPlatformAdmin,
   lookupTenantForConnectAccount,
 } = require("./auth-guards");
 
@@ -51,6 +62,109 @@ function accountSummary(account) {
   };
 }
 
+// Throws not-found if the tenant doc doesn't exist. Used by platform-admin
+// variants so a typo'd tenantID surfaces clearly instead of failing deeper
+// (e.g. when fetching ownerEmail off an empty doc).
+async function loadTenantOrThrow(db, tenantID) {
+  const snap = await db.collection("tenants").doc(tenantID).get();
+  if (!snap.exists) {
+    throw new HttpsError("not-found", `Tenant ${tenantID} not found.`);
+  }
+  return snap.data() || {};
+}
+
+// Resolve the tenant's Connect account ID. Current design is one account per
+// tenant; if that changes we'll need a selector arg. Returns null if no
+// account has been created yet — callers decide whether that's an error.
+async function findTenantConnectAccountID(db, tenantID) {
+  const snap = await db
+    .collection("tenants")
+    .doc(tenantID)
+    .collection("connect-accounts")
+    .limit(1)
+    .get();
+  if (snap.empty) return null;
+  return snap.docs[0].id;
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers — shared by tenant-admin + platform-admin callables.
+// ---------------------------------------------------------------------------
+
+async function createAccountInternal({ secret, db, tenantID, email, businessName, byUID }) {
+  logger.info("stripeConnect.createAccountInternal: starting", {
+    tenantID,
+    email,
+    byUID,
+  });
+
+  const account = await stripeConnect.createConnectedAccount(secret, {
+    email,
+    businessName,
+  });
+
+  const batch = db.batch();
+
+  const tenantAccountRef = db
+    .collection("tenants")
+    .doc(tenantID)
+    .collection("connect-accounts")
+    .doc(account.id);
+  batch.set(tenantAccountRef, {
+    ...accountSummary(account),
+    createdAt: FieldValue.serverTimestamp(),
+    createdByUID: byUID,
+    lastWebhookEventAt: null,
+  });
+
+  const indexRef = db.collection("connect-accounts-index").doc(account.id);
+  batch.set(indexRef, {
+    tenantID,
+    createdAt: FieldValue.serverTimestamp(),
+  });
+
+  await batch.commit();
+
+  logger.info("stripeConnect.createAccountInternal: account created", {
+    stripeAccountID: account.id,
+    tenantID,
+  });
+
+  return { stripeAccountID: account.id };
+}
+
+async function createAccountLinkInternal({ secret, stripeAccountID }) {
+  const link = await stripeConnect.createAccountLink(secret, {
+    accountID: stripeAccountID,
+    returnURL: ONBOARDING_RETURN_URL,
+    refreshURL: ONBOARDING_REFRESH_URL,
+  });
+  return { url: link.url, expiresAt: link.expires_at };
+}
+
+async function getAccountStatusInternal({ secret, db, stripeAccountID, tenantID, syncCache }) {
+  const account = await stripeConnect.retrieveAccount(secret, stripeAccountID);
+  const summary = accountSummary(account);
+
+  if (syncCache && tenantID) {
+    await db
+      .collection("tenants")
+      .doc(tenantID)
+      .collection("connect-accounts")
+      .doc(stripeAccountID)
+      .set(
+        { ...summary, lastWebhookEventAt: FieldValue.serverTimestamp() },
+        { merge: true }
+      );
+  }
+
+  return summary;
+}
+
+// ---------------------------------------------------------------------------
+// Tenant-admin callables.
+// ---------------------------------------------------------------------------
+
 exports.stripeConnectAccountCreate = onCall(
   {
     region: "us-central1",
@@ -69,46 +183,14 @@ exports.stripeConnectAccountCreate = onCall(
     assertTenantMatch(auth, tenantID);
     assertPrivilege(auth, "owner");
 
-    logger.info("stripeConnectAccountCreate: starting", {
+    return createAccountInternal({
+      secret: STRIPE_PLATFORM_SECRET_KEY,
+      db: getFirestore(),
       tenantID,
       email,
-      uid: auth.uid,
+      businessName,
+      byUID: auth.uid,
     });
-
-    const account = await stripeConnect.createConnectedAccount(
-      STRIPE_PLATFORM_SECRET_KEY,
-      { email, businessName }
-    );
-
-    const db = getFirestore();
-    const batch = db.batch();
-
-    const tenantAccountRef = db
-      .collection("tenants")
-      .doc(tenantID)
-      .collection("connect-accounts")
-      .doc(account.id);
-    batch.set(tenantAccountRef, {
-      ...accountSummary(account),
-      createdAt: FieldValue.serverTimestamp(),
-      createdByUID: auth.uid,
-      lastWebhookEventAt: null,
-    });
-
-    const indexRef = db.collection("connect-accounts-index").doc(account.id);
-    batch.set(indexRef, {
-      tenantID,
-      createdAt: FieldValue.serverTimestamp(),
-    });
-
-    await batch.commit();
-
-    logger.info("stripeConnectAccountCreate: account created", {
-      stripeAccountID: account.id,
-      tenantID,
-    });
-
-    return { stripeAccountID: account.id };
   }
 );
 
@@ -136,16 +218,10 @@ exports.stripeConnectAccountLinkCreate = onCall(
       uid: auth.uid,
     });
 
-    const link = await stripeConnect.createAccountLink(
-      STRIPE_PLATFORM_SECRET_KEY,
-      {
-        accountID: stripeAccountID,
-        returnURL: ONBOARDING_RETURN_URL,
-        refreshURL: ONBOARDING_REFRESH_URL,
-      }
-    );
-
-    return { url: link.url, expiresAt: link.expires_at };
+    return createAccountLinkInternal({
+      secret: STRIPE_PLATFORM_SECRET_KEY,
+      stripeAccountID,
+    });
   }
 );
 
@@ -180,27 +256,142 @@ exports.stripeConnectAccountStatusCallable = onCall(
       uid: auth.uid,
     });
 
-    const account = await stripeConnect.retrieveAccount(
-      STRIPE_PLATFORM_SECRET_KEY,
-      stripeAccountID
-    );
-    const summary = accountSummary(account);
+    return getAccountStatusInternal({
+      secret: STRIPE_PLATFORM_SECRET_KEY,
+      db: getFirestore(),
+      stripeAccountID,
+      tenantID: tenantID || ownerTenantID,
+      syncCache: Boolean(tenantID),
+    });
+  }
+);
 
-    // If tenantID was supplied, sync the cache on the way out so the next
-    // read in the UI sees the fresh state without waiting for a webhook.
-    if (tenantID) {
-      const db = getFirestore();
-      await db
-        .collection("tenants")
-        .doc(tenantID)
-        .collection("connect-accounts")
-        .doc(stripeAccountID)
-        .set(
-          { ...summary, lastWebhookEventAt: FieldValue.serverTimestamp() },
-          { merge: true }
-        );
+// ---------------------------------------------------------------------------
+// Platform-admin callables — used by the cadence-dashboard host site.
+// All take {tenantID} (more natural for the dashboard's tenant-detail flow);
+// the stripeAccountID is looked up from the tenant's connect-accounts.
+// ---------------------------------------------------------------------------
+
+exports.platformAdminStripeConnectAccountCreate = onCall(
+  {
+    region: "us-central1",
+    secrets: [STRIPE_PLATFORM_SECRET_KEY],
+  },
+  async (request) => {
+    const auth = requireAuth(request);
+    assertPlatformAdmin(auth);
+
+    const { tenantID } = request.data || {};
+    if (!tenantID) {
+      throw new HttpsError("invalid-argument", "tenantID is required.");
     }
 
-    return summary;
+    const db = getFirestore();
+    const tenantData = await loadTenantOrThrow(db, tenantID);
+
+    const email = tenantData.ownerEmail;
+    const businessName = tenantData.name || tenantData.ownerEmail;
+    if (!email) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Tenant ${tenantID} has no ownerEmail; cannot create Connect account.`
+      );
+    }
+
+    const existing = await findTenantConnectAccountID(db, tenantID);
+    if (existing) {
+      throw new HttpsError(
+        "already-exists",
+        `Tenant ${tenantID} already has Connect account ${existing}.`
+      );
+    }
+
+    return createAccountInternal({
+      secret: STRIPE_PLATFORM_SECRET_KEY,
+      db,
+      tenantID,
+      email,
+      businessName,
+      byUID: auth.uid,
+    });
+  }
+);
+
+exports.platformAdminStripeConnectAccountLinkCreate = onCall(
+  {
+    region: "us-central1",
+    secrets: [STRIPE_PLATFORM_SECRET_KEY],
+  },
+  async (request) => {
+    const auth = requireAuth(request);
+    assertPlatformAdmin(auth);
+
+    const { tenantID } = request.data || {};
+    if (!tenantID) {
+      throw new HttpsError("invalid-argument", "tenantID is required.");
+    }
+
+    const db = getFirestore();
+    await loadTenantOrThrow(db, tenantID);
+
+    const stripeAccountID = await findTenantConnectAccountID(db, tenantID);
+    if (!stripeAccountID) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Tenant ${tenantID} has no Connect account; create one first.`
+      );
+    }
+
+    logger.info("platformAdminStripeConnectAccountLinkCreate: starting", {
+      tenantID,
+      stripeAccountID,
+      byUID: auth.uid,
+    });
+
+    return createAccountLinkInternal({
+      secret: STRIPE_PLATFORM_SECRET_KEY,
+      stripeAccountID,
+    });
+  }
+);
+
+exports.platformAdminStripeConnectAccountStatus = onCall(
+  {
+    region: "us-central1",
+    secrets: [STRIPE_PLATFORM_SECRET_KEY],
+  },
+  async (request) => {
+    const auth = requireAuth(request);
+    assertPlatformAdmin(auth);
+
+    const { tenantID } = request.data || {};
+    if (!tenantID) {
+      throw new HttpsError("invalid-argument", "tenantID is required.");
+    }
+
+    const db = getFirestore();
+    await loadTenantOrThrow(db, tenantID);
+
+    const stripeAccountID = await findTenantConnectAccountID(db, tenantID);
+    if (!stripeAccountID) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Tenant ${tenantID} has no Connect account.`
+      );
+    }
+
+    logger.info("platformAdminStripeConnectAccountStatus: fetching", {
+      tenantID,
+      stripeAccountID,
+      byUID: auth.uid,
+    });
+
+    return getAccountStatusInternal({
+      secret: STRIPE_PLATFORM_SECRET_KEY,
+      db,
+      stripeAccountID,
+      tenantID,
+      syncCache: true,
+    });
   }
 );

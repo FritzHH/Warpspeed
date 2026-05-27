@@ -35,6 +35,9 @@ let _newCheckoutProcessRefundCallable = null;
 let _newCheckoutGetAvailableReadersCallable = null;
 let _newCheckoutManualCardPaymentCallable = null;
 let _processCashRefundCallable = null;
+let _stripeConnectInitiatePICallable = null;
+let _stripeConnectCancelPICallable = null;
+let _stripeConnectCreateTTPiPICallable = null;
 
 async function getCallables() {
   if (!_newCheckoutInitiatePaymentIntentCallable) {
@@ -46,6 +49,9 @@ async function getCallables() {
     _newCheckoutGetAvailableReadersCallable = httpsCallable(fns, "newCheckoutGetAvailableReadersCallable");
     _newCheckoutManualCardPaymentCallable = httpsCallable(fns, "newCheckoutManualCardPaymentCallable");
     _processCashRefundCallable = httpsCallable(fns, "processCashRefundCallable");
+    _stripeConnectInitiatePICallable = httpsCallable(fns, "stripeConnectInitiatePaymentIntentV2");
+    _stripeConnectCancelPICallable = httpsCallable(fns, "stripeConnectCancelPaymentIntentV2");
+    _stripeConnectCreateTTPiPICallable = httpsCallable(fns, "stripeConnectCreateTapToPayPaymentIntentCallable");
   }
   return {
     initiatePayment: _newCheckoutInitiatePaymentIntentCallable,
@@ -55,6 +61,9 @@ async function getCallables() {
     getReaders: _newCheckoutGetAvailableReadersCallable,
     manualCardPayment: _newCheckoutManualCardPaymentCallable,
     processCashRefund: _processCashRefundCallable,
+    connectInitiatePI: _stripeConnectInitiatePICallable,
+    connectCancelPI: _stripeConnectCancelPICallable,
+    connectCreateTTPiPI: _stripeConnectCreateTTPiPICallable,
   };
 }
 
@@ -573,6 +582,102 @@ export async function newCheckoutCreatePaymentIntent(amount, saleID, customerID,
   } catch (error) {
     log("newCheckoutCreatePaymentIntent error:", error);
     dlog(DCAT.STRIPE_ERR, "createPaymentIntent", "FirebaseCalls", { message: error?.message, code: error?.code });
+    throw error;
+  }
+}
+
+// ─── Stripe Connect (SaaS) wrappers ──────────────────────────────
+// Used when the tenant has a Connect account configured. The PI is created
+// on the connected account (via stripeAccount header server-side) and the
+// reader registered there processes it. Webhooks land on the Connect
+// pipeline which writes the same `payment-updates/...` doc the listener
+// reads, so the UI flow is unchanged.
+
+export async function newCheckoutProcessConnectStripePayment({
+  amount,
+  readerID,
+  connectAccountID,
+  saleID,
+  customerID,
+  customerEmail,
+  transactionID,
+  salesTax,
+  paymentIntentID,
+  applicationFeeAmount,
+}) {
+  dlog(DCAT.STRIPE_REQ, "processConnectStripePayment", "FirebaseCalls", { amount, readerID, connectAccountID, saleID, transactionID });
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    const callables = await getCallables();
+    const result = await callables.connectInitiatePI({
+      amount: Number(amount),
+      readerID,
+      connectAccountID,
+      tenantID,
+      storeID,
+      saleID: saleID || "",
+      customerID: customerID || "",
+      customerEmail: customerEmail || "",
+      transactionID: transactionID || "",
+      salesTax: salesTax || 0,
+      paymentIntentID: paymentIntentID || null,
+      applicationFeeAmount: applicationFeeAmount || undefined,
+    });
+    dlog(DCAT.STRIPE_RES, "processConnectStripePayment", "FirebaseCalls", { success: true, paymentIntentID: result.data?.data?.paymentIntentID });
+    return result.data;
+  } catch (error) {
+    dlog(DCAT.STRIPE_ERR, "processConnectStripePayment", "FirebaseCalls", { message: error?.message, code: error?.code });
+    throw error;
+  }
+}
+
+export async function newCheckoutCancelConnectStripePayment({ readerID, connectAccountID, paymentIntentID }) {
+  dlog(DCAT.STRIPE_REQ, "cancelConnectStripePayment", "FirebaseCalls", { readerID, connectAccountID });
+  try {
+    const callables = await getCallables();
+    const result = await callables.connectCancelPI({
+      readerID,
+      connectAccountID,
+      paymentIntentID: paymentIntentID || undefined,
+    });
+    dlog(DCAT.STRIPE_RES, "cancelConnectStripePayment", "FirebaseCalls", { success: true });
+    return result.data;
+  } catch (error) {
+    dlog(DCAT.STRIPE_ERR, "cancelConnectStripePayment", "FirebaseCalls", { message: error?.message, code: error?.code });
+    throw error;
+  }
+}
+
+export async function newCheckoutCreateTapToPayPI({
+  amount,
+  connectAccountID,
+  saleID,
+  customerID,
+  customerEmail,
+  transactionID,
+  salesTax,
+  applicationFeeAmount,
+}) {
+  dlog(DCAT.STRIPE_REQ, "createTapToPayPI", "FirebaseCalls", { amount, connectAccountID, saleID, transactionID });
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    const callables = await getCallables();
+    const result = await callables.connectCreateTTPiPI({
+      amount: Number(amount),
+      connectAccountID,
+      tenantID,
+      storeID,
+      saleID: saleID || "",
+      customerID: customerID || "",
+      customerEmail: customerEmail || "",
+      transactionID: transactionID || "",
+      salesTax: salesTax || 0,
+      applicationFeeAmount: applicationFeeAmount || undefined,
+    });
+    dlog(DCAT.STRIPE_RES, "createTapToPayPI", "FirebaseCalls", { success: true, paymentIntentID: result.data?.data?.paymentIntentID });
+    return result.data;
+  } catch (error) {
+    dlog(DCAT.STRIPE_ERR, "createTapToPayPI", "FirebaseCalls", { message: error?.message, code: error?.code });
     throw error;
   }
 }

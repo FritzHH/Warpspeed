@@ -97,7 +97,7 @@ export const UserMessagesModal = ({ handleExit, defaultTab = "inbox" }) => {
   const [sNoteSendStatus, _setNoteSendStatus] = useState({});
 
   const zMain = useZ("modal");
-  const zPicker = useZ("modal", sShowWorkorderPicker);
+  const zPicker = zMain + 5;
   const [sSuppressMillis, _setSuppressMillis] = useState(() => {
     let until = zCurrentUser?.loginMessageSuppressUntil || 0;
     if (!until || Date.now() >= until) return 0;

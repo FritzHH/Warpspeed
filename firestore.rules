@@ -58,6 +58,20 @@ service cloud.firestore {
       allow read: if isTenantMember(tenantID) || isPlatformAdmin();
       allow write: if isPlatformAdmin();
     }
+
+    // Tenant-level Gmail collections: members read/write directly (app
+    // does fast Firestore writes for inbox/account state; Cloud Functions
+    // also write via Admin SDK which bypasses rules).
+    match /tenants/{tenantID}/email-accounts/{docID=**} {
+      allow read, write: if isTenantMember(tenantID);
+    }
+    match /tenants/{tenantID}/email-auth/{docID=**} {
+      allow read, write: if isTenantMember(tenantID);
+    }
+    match /tenants/{tenantID}/emails/{docID=**} {
+      allow read, write: if isTenantMember(tenantID);
+    }
+
     match /tenants/{tenantID}/{collection}/{docID=**} {
       // /stores/** is handled by the deeper match above and reaches here
       // only via this catch-all for other tenant-level collections.
@@ -87,6 +101,10 @@ service cloud.firestore {
     // DLQ entries — platform-admin can read for the admin UI. Writes only
     // happen via the ingestor + admin callables (Cloud Functions).
     match /saas-dlq/{dlqEntryID} {
+      allow read: if isPlatformAdmin();
+      allow write: if false;
+    }
+    match /saas-twilio-dlq/{dlqEntryID} {
       allow read: if isPlatformAdmin();
       allow write: if false;
     }

@@ -617,15 +617,31 @@ export const useStripePaymentStore = create((set, get) => ({
   reader: null,
   readersArr: null,
   paymentAmount: 0.53,
+  // Connect-mode context. null for Bonita / non-Connect tenants. When set, the
+  // checkout flow routes card payments through the Connect callables and TTPi
+  // readers can hand off to the JS SDK directly.
+  connectAccountID: null,
+  terminalLocationID: null,
+  isConnectMode: false,
   getReadersArr: () => get().readersArr,
   getPaymentAmount: () => get().paymentAmount,
   getPaymentIntentID: () => get().paymentIntentID,
   getReader: () => get().reader,
+  getConnectAccountID: () => get().connectAccountID,
+  getTerminalLocationID: () => get().terminalLocationID,
+  getIsConnectMode: () => get().isConnectMode,
   //
 
   setReadersArr: (readersArr) => {
     set(() => ({
       readersArr,
+    }));
+  },
+  setConnectContext: ({ connectAccountID, terminalLocationID, isConnectMode }) => {
+    set(() => ({
+      connectAccountID: connectAccountID ?? null,
+      terminalLocationID: terminalLocationID ?? null,
+      isConnectMode: !!isConnectMode,
     }));
   },
   setPaymentIntentID: (paymentIntentID) => {
@@ -1969,6 +1985,20 @@ export const useEmailStore = create(
     }));
   },
 
+  // Tenant-scoped inbox roster (was settings.emailAccounts). Each item:
+  //   { accountKey, email, displayName, signature, assignedStoreID, ... }
+  // assignedStoreID === null → shared across all stores in the tenant.
+  // Populated by BaseScreen's dbListenToEmailAccounts listener.
+  emailAccounts: [],
+  getEmailAccounts: () => get().emailAccounts,
+  setEmailAccounts: (emailAccounts) => set({ emailAccounts }),
+  getEmailAccountByKey: (accountKey) =>
+    (get().emailAccounts || []).find((a) => a.accountKey === accountKey || a.id === accountKey),
+  getEmailAccountsForStore: (storeID) =>
+    (get().emailAccounts || []).filter(
+      (a) => !a.assignedStoreID || a.assignedStoreID === storeID
+    ),
+
   activeFolder: "INBOX",
   getActiveFolder: () => get().activeFolder,
   setActiveFolder: (activeFolder) => set({ activeFolder }),
@@ -2121,6 +2151,12 @@ export const useEmailStore = create(
   getComposeMode: () => get().composeMode,
   setComposeMode: (composeMode) => set({ composeMode }),
 
+  // "hidden" | "open" | "minimized" — thread-inspector modal that overlays
+  // the Options column while user composes a reply.
+  threadInspectorState: "hidden",
+  getThreadInspectorState: () => get().threadInspectorState,
+  setThreadInspectorState: (threadInspectorState) => set({ threadInspectorState }),
+
   composeDraft: {
     to: [],
     cc: [],
@@ -2154,6 +2190,7 @@ export const useEmailStore = create(
         attachments: [],
       },
       composeMode: null,
+      threadInspectorState: "hidden",
     }),
 
   emailsLoading: false,
@@ -2174,6 +2211,9 @@ export const useEmailStore = create(
   _authUnsub: null,
   setAuthUnsub: (unsub) => set({ _authUnsub: unsub }),
 
+  _accountsUnsub: null,
+  setAccountsUnsub: (unsub) => set({ _accountsUnsub: unsub }),
+
   getTotalUnreadCount: () => {
     const auth = get().emailAuth;
     if (!auth) return 0;
@@ -2189,16 +2229,21 @@ export const useEmailStore = create(
     if (prevEmails) prevEmails();
     let prevAuth = get()._authUnsub;
     if (prevAuth) prevAuth();
+    let prevAccounts = get()._accountsUnsub;
+    if (prevAccounts) prevAccounts();
     set({
       emails: [],
       emailAuth: null,
+      emailAccounts: [],
       selectedThreadId: null,
       composeMode: null,
+      threadInspectorState: "hidden",
       emailsLoading: false,
       sendingEmail: false,
       syncError: null,
       _emailsUnsub: null,
       _authUnsub: null,
+      _accountsUnsub: null,
     });
   },
 }),
@@ -2208,6 +2253,7 @@ export const useEmailStore = create(
       partialize: (state) => ({
         emails: state.emails,
         emailAuth: state.emailAuth,
+        emailAccounts: state.emailAccounts,
         activeAccountKey: state.activeAccountKey,
         activeFolder: state.activeFolder,
       }),

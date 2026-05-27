@@ -208,3 +208,210 @@
   margin-top: 8px;
   flex-shrink: 0;
 }
+
+.section {
+  width: 100%;
+  max-width: 560px;
+  background-color: var(--surface-base);
+  border-radius: 12px;
+  padding: 24px 32px;
+  box-shadow: 2px 2px 15px var(--shadow-color-default);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  margin-top: 16px;
+}
+
+.sectionTitle {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text-default);
+  margin: 0 0 4px 0;
+}
+
+.sectionSubtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 16px 0;
+  line-height: 1.45;
+}
+
+.sectionHeaderRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.refreshButton {
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  padding: 5px 12px;
+  font-size: 12px;
+  color: var(--text-default);
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.refreshButton:hover:not(:disabled) {
+  background-color: var(--surface-raised);
+}
+
+.refreshButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.fieldGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.fieldFull {
+  grid-column: 1 / -1;
+}
+
+.select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border-default);
+  border-radius: 6px;
+  background-color: var(--surface-base);
+  font-size: 14px;
+  color: var(--text-default);
+  font-family: inherit;
+}
+
+.locationSummary {
+  padding: 12px 14px;
+  background-color: var(--surface-raised);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-default);
+  line-height: 1.5;
+  margin-bottom: 12px;
+}
+
+.locationSummary strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--text-default);
+}
+
+.readerList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.readerRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  background-color: var(--surface-base);
+}
+
+.readerStatusDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.readerStatusOnline {
+  background-color: var(--success);
+}
+
+.readerStatusOffline {
+  background-color: var(--text-muted);
+}
+
+.readerInfo {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.readerLabel {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-default);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.readerMeta {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.readerBadge {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background-color: var(--surface-raised);
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.emptyState {
+  padding: 18px 14px;
+  background-color: var(--surface-raised);
+  border-radius: 8px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 14px;
+}
+
+.ttpiBanner {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  background-color: var(--surface-success-muted);
+  border-radius: 8px;
+  border-left: 3px solid var(--success);
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: var(--text-default);
+  line-height: 1.45;
+}
+
+.ttpiBannerText {
+  flex: 1;
+  min-width: 0;
+}
+
+.ttpiBannerText strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.ttpiUnavailable {
+  padding: 12px 14px;
+  background-color: var(--surface-raised);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}

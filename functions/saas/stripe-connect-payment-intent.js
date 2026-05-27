@@ -231,6 +231,138 @@ exports.stripeConnectInitiatePaymentIntentV2 = onCall(
   }
 );
 
+// TTPi (Tap to Pay on iPhone) PI creation. Unlike the server-driven flow,
+// the JS Terminal SDK on the iPhone collects + processes the PI locally.
+// We create the PI on the connected account, write the cache doc so the
+// webhook can route status updates, and return the client_secret. No
+// `terminal.readers.processPaymentIntent` call — the SDK does that part.
+exports.stripeConnectCreateTapToPayPaymentIntentCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [STRIPE_PLATFORM_SECRET_KEY],
+  },
+  async (request) => {
+    const auth = requireAuth(request);
+
+    const {
+      amount,
+      connectAccountID,
+      tenantID,
+      storeID,
+      saleID,
+      workorderID,
+      customerID,
+      customerEmail,
+      transactionID,
+      salesTax,
+      applicationFeeAmount,
+    } = request.data || {};
+
+    if (!amount || typeof amount !== "number" || amount <= 0) {
+      throw new HttpsError("invalid-argument", "amount (positive cents) is required.");
+    }
+    if (!connectAccountID || typeof connectAccountID !== "string") {
+      throw new HttpsError("invalid-argument", "connectAccountID is required.");
+    }
+    if (!tenantID || !storeID) {
+      throw new HttpsError("invalid-argument", "tenantID and storeID are required.");
+    }
+    assertTenantMatch(auth, tenantID);
+    if (
+      applicationFeeAmount != null &&
+      (typeof applicationFeeAmount !== "number" || applicationFeeAmount < 0 || applicationFeeAmount >= amount)
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "applicationFeeAmount must be a non-negative number less than amount."
+      );
+    }
+
+    const db = getFirestore();
+
+    const accountDocSnap = await db
+      .collection("tenants")
+      .doc(tenantID)
+      .collection("connect-accounts")
+      .doc(connectAccountID)
+      .get();
+    if (accountDocSnap.exists) {
+      const accountDoc = accountDocSnap.data() || {};
+      if (accountDoc.status === "deauthorized") {
+        throw new HttpsError(
+          "failed-precondition",
+          "Connected account has been deauthorized. Reconnect Stripe to accept payments."
+        );
+      }
+    }
+
+    const stripe = getStripe();
+    const stripeOpts = { stripeAccount: connectAccountID };
+
+    const piParams = {
+      amount,
+      currency: "usd",
+      payment_method_types: ["card_present"],
+      capture_method: "automatic",
+      metadata: {
+        tenantID,
+        storeID,
+        connectAccountID,
+        saleID: saleID || "",
+        workorderID: workorderID || "",
+        customerID: customerID || "",
+        transactionID: transactionID || "",
+        salesTax: String(salesTax || 0),
+        flow: "tap_to_pay",
+      },
+    };
+    if (applicationFeeAmount && applicationFeeAmount > 0) {
+      piParams.application_fee_amount = applicationFeeAmount;
+    }
+    if (customerEmail) piParams.receipt_email = customerEmail;
+
+    const paymentIntent = await stripe.paymentIntents.create(piParams, stripeOpts);
+
+    await db
+      .collection("payment-intents")
+      .doc(paymentIntent.id)
+      .set({
+        tenantID,
+        storeID,
+        connectAccountID,
+        readerID: null,
+        flow: "tap_to_pay",
+        saleID: saleID || null,
+        workorderID: workorderID || null,
+        customerID: customerID || null,
+        transactionID: transactionID || null,
+        salesTax: salesTax || 0,
+        amount,
+        applicationFeeAmount: applicationFeeAmount || 0,
+        status: paymentIntent.status,
+        createdAt: FieldValue.serverTimestamp(),
+        createdByUID: auth.uid,
+      });
+
+    logger.info("stripeConnectCreateTapToPayPaymentIntentCallable: created", {
+      paymentIntentID: paymentIntent.id,
+      tenantID,
+      storeID,
+      connectAccountID,
+    });
+
+    return {
+      success: true,
+      message: `Tap to Pay payment intent for $${(amount / 100).toFixed(2)} created.`,
+      data: {
+        paymentIntentID: paymentIntent.id,
+        clientSecret: paymentIntent.client_secret,
+        status: paymentIntent.status,
+      },
+    };
+  }
+);
+
 exports.stripeConnectCancelPaymentIntentV2 = onCall(
   {
     region: "us-central1",

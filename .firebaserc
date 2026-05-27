@@ -3,6 +3,18 @@
     "default": "warpspeed-bonitabikes",
     "rss": "cadence-pos"
   },
-  "targets": {},
+  "targets": {
+    "warpspeed-bonitabikes": {
+      "hosting": {
+        "app": ["warpspeed-bonitabikes"]
+      }
+    },
+    "cadence-pos": {
+      "hosting": {
+        "app": ["cadence-pos"],
+        "dashboard": ["cadence-dashboard"]
+      }
+    }
+  },
   "etags": {}
 }

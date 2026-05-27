@@ -67,6 +67,11 @@ const InviteUserModal = lazy(() =>
     default: m.InviteUserModal,
   }))
 );
+const DLQAdminModalScreen = lazy(() =>
+  import("../../modal_screens/DLQAdminModalScreen/DLQAdminModalScreen").then((m) => ({
+    default: m.DLQAdminModalScreen,
+  }))
+);
 import { TodaysHistoryComponent } from "./TodaysHistoryComponent";
 import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection, dbSaveInventoryItem, dbGmailDisconnect, dbGmailInitiateAuth } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses, mapEmployees, mapPunchHistory, parseCSV } from "../../../../lightspeed_import";
@@ -105,6 +110,7 @@ const TAB_NAMES = {
   backup: "Backup & Recovery",
   labelDesigner: "Label Designer",
   analytics: "Analytics",
+  dlqAdmin: "DLQ Admin",
 };
 
 const TAB_GATES = {
@@ -132,6 +138,7 @@ export function Dashboard_Admin({}) {
   const zSettingsObj = useSettingsStore((state) => state.settings);
   const zLiveReaders = useStripePaymentStore((state) => state.readersArr) || [];
   const zCurrentUserLevel = useLoginStore((state) => state.currentUser?.permissions?.level || 0);
+  const zIsPlatformAdmin = useLoginStore((state) => state.getAuthClaims())?.platformAdmin === true;
   const guardedMenuPress = (action, level = 3) => () =>
     useLoginStore.getState().execute(action, levelToPrivilegeName(level));
   // local state ///////////////////////////////////////////////////////////
@@ -147,6 +154,7 @@ export function Dashboard_Admin({}) {
   const [sStandEditButtonObj, _setStandEditButtonObj] = useState(null);
   const [sShowLabelDesigner, _setShowLabelDesigner] = useState(false);
   const [sShowAnalyticsModal, _setShowAnalyticsModal] = useState(false);
+  const [sShowDLQAdminModal, _setShowDLQAdminModal] = useState(false);
 
   //////////////////////////////////////////////////////////////////////////
 
@@ -249,6 +257,11 @@ export function Dashboard_Admin({}) {
           <AnalyticsModalScreen handleExit={() => _setShowAnalyticsModal(false)} />
         </Suspense>
       )}
+      {!!sShowDLQAdminModal && zIsPlatformAdmin && (
+        <Suspense fallback={null}>
+          <DLQAdminModalScreen handleExit={() => _setShowDLQAdminModal(false)} />
+        </Suspense>
+      )}
       {!!sShowLabelDesigner && zCurrentUserLevel >= TAB_GATES[TAB_NAMES.labelDesigner] && (
         <LabelDesignerModal
           handleExit={() => _setShowLabelDesigner(false)}
@@ -304,6 +317,15 @@ export function Dashboard_Admin({}) {
                 { key: "import", label: TAB_NAMES.import, icon: ICONS.importIcon, gate: TAB_GATES[TAB_NAMES.import], tab: TAB_NAMES.import },
                 { key: "backup", label: TAB_NAMES.backup, icon: ICONS.tools, gate: TAB_GATES[TAB_NAMES.backup], tab: TAB_NAMES.backup },
               ];
+              if (zIsPlatformAdmin) {
+                menuItems.push({
+                  key: "dlqAdmin",
+                  label: TAB_NAMES.dlqAdmin,
+                  icon: ICONS.tools,
+                  gate: 4,
+                  onClick: () => _setShowDLQAdminModal(true),
+                });
+              }
               menuItems.sort((a, b) => (a.gate - b.gate) || a.label.localeCompare(b.label));
               return menuItems.map((item) => {
                 const selected = item.tab ? sExpand === item.tab : false;
@@ -641,7 +663,13 @@ const AppUserListComponent = ({
   const [sClockTick, _setClockTick] = useState(0);
   const zCurrentUserLevel = useLoginStore((state) => state.currentUser?.permissions?.level || 0);
   const zPunchClock = useLoginStore((state) => state.punchClock);
+  const zAuthClaims = useLoginStore((state) => state.authClaims);
+  const zEmailAccountsAll = useEmailStore((state) => state.emailAccounts) || [];
+  const zEmailAccounts = zEmailAccountsAll.filter(
+    (a) => !a.assignedStoreID || a.assignedStoreID === zSettingsObj?.storeID
+  );
   const canEditUsers = zCurrentUserLevel >= PERMISSION_LEVELS.superUser.level;
+  const isSaasOwner = zAuthClaims?.privilege === "owner";
 
   useEffect(() => {
     const id = setInterval(() => _setClockTick((n) => n + 1), 30000);
@@ -1162,29 +1190,31 @@ const AppUserListComponent = ({
                   }}
                   textStyle={{ fontSize: 13, color: C.text, fontWeight: 600 }}
                 />
-                <DomButton
-                  text="Invite SaaS User"
-                  onPress={() => {
-                    if (!canEditUsers) return;
-                    _setShowInviteSaasModal(true);
-                  }}
-                  buttonStyle={{
-                    borderWidth: 1,
-                    borderStyle: "solid",
-                    borderColor: C.buttonLightGreenOutline,
-                    backgroundColor: C.buttonLightGreen,
-                    paddingTop: 4,
-                    paddingBottom: 4,
-                    paddingLeft: 10,
-                    paddingRight: 10,
-                    borderRadius: 5,
-                    opacity: canEditUsers ? 1 : 0.4,
-                  }}
-                  textStyle={{ fontSize: 13, color: C.text, fontWeight: 600 }}
-                />
+                {isSaasOwner && (
+                  <DomButton
+                    text="Invite SaaS User"
+                    onPress={() => {
+                      if (!canEditUsers) return;
+                      _setShowInviteSaasModal(true);
+                    }}
+                    buttonStyle={{
+                      borderWidth: 1,
+                      borderStyle: "solid",
+                      borderColor: C.buttonLightGreenOutline,
+                      backgroundColor: C.buttonLightGreen,
+                      paddingTop: 4,
+                      paddingBottom: 4,
+                      paddingLeft: 10,
+                      paddingRight: 10,
+                      borderRadius: 5,
+                      opacity: canEditUsers ? 1 : 0.4,
+                    }}
+                    textStyle={{ fontSize: 13, color: C.text, fontWeight: 600 }}
+                  />
+                )}
               </div>
 
-              {sShowInviteSaasModal && (
+              {isSaasOwner && sShowInviteSaasModal && (
                 <Suspense fallback={null}>
                   <InviteUserModal
                     visible={sShowInviteSaasModal}
@@ -1633,7 +1663,7 @@ const AppUserListComponent = ({
                       </div>
                       <div className={adminStyles.ucChipRow}>
                         {(() => {
-                          let availableInboxes = (zSettingsObj?.emailAccounts || [])
+                          let availableInboxes = zEmailAccounts
                             .filter((a) => !(sDraftUser.emailInboxes || []).includes(a.accountKey));
                           if (!editable || availableInboxes.length === 0) return null;
                           return (
@@ -1664,7 +1694,7 @@ const AppUserListComponent = ({
                           );
                         })()}
                         {(sDraftUser.emailInboxes || []).map((accountKey) => {
-                          let acct = (zSettingsObj?.emailAccounts || []).find((a) => a.accountKey === accountKey);
+                          let acct = zEmailAccounts.find((a) => a.accountKey === accountKey);
                           if (!acct) return null;
                           return (
                             <div
@@ -1754,6 +1784,13 @@ const PaymentProcessingComponent = ({
             liveReaders={zLiveReaders}
             savedReaders={zSettingsObj?.cardReaders || []}
             onSaveReaders={(arr) => handleSettingsFieldChange("cardReaders", arr)}
+            selectedReader={zSettingsObj?.selectedCardReaderObj || { id: "", label: "" }}
+            onSelectReader={(obj) =>
+              handleSettingsFieldChange(
+                "selectedCardReaderObj",
+                obj || { id: "", label: "" }
+              )
+            }
           />
         </div>
       </BoxContainerInnerComponent>

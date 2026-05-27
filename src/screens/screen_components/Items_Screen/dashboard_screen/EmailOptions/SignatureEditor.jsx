@@ -7,7 +7,13 @@ import {
 } from "../../../../../dom_components";
 import { C, ICONS } from "../../../../../styles";
 import { log } from "../../../../../utils";
-import { useAlertScreenStore, useLoginStore, useSettingsStore } from "../../../../../stores";
+import {
+  useAlertScreenStore,
+  useEmailStore,
+  useLoginStore,
+  useSettingsStore,
+} from "../../../../../stores";
+import { dbUpdateEmailAccount } from "../../../../../db_calls_wrapper";
 import {
   FONT_FAMILIES,
   FONT_WEIGHTS,
@@ -15,24 +21,23 @@ import {
   MAX_SIG_IMAGE_WIDTH,
 } from "./_helpers";
 
-export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accountKey }) => {
+export const SignatureEditor = ({ accountKey }) => {
   const [sUploading, _sSetUploading] = useState(false);
   const imageInputRef = useRef(null);
   const editorRef = useRef(null);
   const saveTimerRef = useRef(null);
   const cursorPosRef = useRef(null);
 
-  const emailAccounts = zSettingsObj?.emailAccounts || [];
-  let selectedAccount = emailAccounts.find((a) => a.accountKey === accountKey);
+  const emailAccounts = useEmailStore((state) => state.emailAccounts) || [];
+  let selectedAccount = emailAccounts.find(
+    (a) => (a.accountKey || a.id) === accountKey
+  );
   let sig = selectedAccount?.signature || {};
   let sigImageUrl = sig.imageUrl || "";
 
   function saveSigField(updatedSig) {
-    let arr = [...emailAccounts];
-    let idx = arr.findIndex((a) => a.accountKey === accountKey);
-    if (idx < 0) return;
-    arr[idx] = { ...arr[idx], signature: updatedSig };
-    handleSettingsFieldChange("emailAccounts", arr);
+    if (!accountKey) return;
+    dbUpdateEmailAccount(accountKey, { signature: updatedSig });
   }
 
   const initSegments = () => {
@@ -357,7 +362,7 @@ export const SignatureEditor = ({ zSettingsObj, handleSettingsFieldChange, accou
       let { storageUpload } = await import("../../../../../db_calls");
       let settings = useSettingsStore.getState().getSettings();
       let url = await storageUpload(
-        `${settings.tenantID}/${settings.storeID}/email-signature-${accountKey}`,
+        `${settings.tenantID}/email-signature-${accountKey}`,
         shrunk,
         { contentType: shrunk.type }
       );

@@ -48,6 +48,7 @@ const UserMessagesModalForLogin = lazy(() =>
 import { isSaleID, isLightspeedID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { decodeLightspeedBarcode, lightenRGBByPercent } from "../utils";
 import { newCheckoutGetStripeReaders, readActiveSale, recoverPendingActiveSales } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { firestoreSubscribe, firestoreSubscribeCollection } from "../db_calls";
 import {
   dbListenToSettings,
   dbListenToOpenWorkorders,
@@ -59,6 +60,7 @@ import {
   dbListenToActiveMessageThreads,
   dbListenToEmails,
   dbListenToEmailAuth,
+  dbListenToEmailAccounts,
 } from "../db_calls_wrapper";
 import { SETTINGS_OBJ, TAB_NAMES, CUSTOMER_PROTO, permissionToLevel } from "../data";
 import { clog, log, recoverPendingAutoTexts, localStorageWrapper } from "../utils";
@@ -401,14 +403,85 @@ export function BaseScreen() {
     };
   }, []);
 
-  // Pre-load Stripe card readers on mount + refresh every 5 minutes
+  // Stripe card reader feed. Two source-of-truth paths:
+  //   • Connect tenants — Firestore listeners on `connect-accounts`,
+  //     `connect-config/config`, and the store's `readers` subcollection. The
+  //     reconcile callable keeps Firestore aligned with Stripe; we just read.
+  //   • Legacy (Bonita) — keep the old 5-min poll against
+  //     newCheckoutGetStripeReaders against the platform account.
+  // Detection: if any `connect-accounts` doc has chargesEnabled and isn't
+  // deauthorized, switch to Connect mode.
+  const zSettingsTenantID = useSettingsStore((s) => s.settings?.tenantID || "");
+  const zSettingsStoreID = useSettingsStore((s) => s.settings?.storeID || "");
+
   useEffect(() => {
+    if (!zSettingsTenantID) return;
+    const path = `tenants/${zSettingsTenantID}/connect-accounts`;
+    const unsub = firestoreSubscribeCollection(path, (docs) => {
+      const active = (docs || [])
+        .filter((d) => d?.chargesEnabled && d?.status !== "deauthorized")
+        .sort((a, b) => {
+          const aMs = a?.createdAt?.toMillis?.() || 0;
+          const bMs = b?.createdAt?.toMillis?.() || 0;
+          return bMs - aMs;
+        })[0] || null;
+      const connectAccountID = active?.stripeAccountID || null;
+      useStripePaymentStore.getState().setConnectContext({
+        connectAccountID,
+        terminalLocationID: useStripePaymentStore.getState().terminalLocationID,
+        isConnectMode: !!connectAccountID,
+      });
+    });
+    return () => unsub && unsub();
+  }, [zSettingsTenantID]);
+
+  useEffect(() => {
+    if (!zSettingsTenantID || !zSettingsStoreID) return;
+    const path = `tenants/${zSettingsTenantID}/stores/${zSettingsStoreID}/connect-config/config`;
+    const unsub = firestoreSubscribe(path, (data) => {
+      const terminalLocationID = data?.terminalLocationID || null;
+      const s = useStripePaymentStore.getState();
+      s.setConnectContext({
+        connectAccountID: s.connectAccountID,
+        terminalLocationID,
+        isConnectMode: s.isConnectMode,
+      });
+    });
+    return () => unsub && unsub();
+  }, [zSettingsTenantID, zSettingsStoreID]);
+
+  const zIsConnectMode = useStripePaymentStore((s) => s.isConnectMode);
+
+  // Connect path — subscribe to the store's readers subcollection. Reconcile
+  // happens server-side via stripeConnectListReadersCallable (called by the
+  // "Refresh from Stripe" button on the Connect screen).
+  useEffect(() => {
+    if (!zIsConnectMode || !zSettingsTenantID || !zSettingsStoreID) return;
+    const path = `tenants/${zSettingsTenantID}/stores/${zSettingsStoreID}/readers`;
+    const unsub = firestoreSubscribeCollection(path, (docs) => {
+      const arr = (docs || []).map((d) => ({
+        id: d.stripeReaderID || d.id,
+        label: d.label || d.stripeReaderID || d.id,
+        status: d.status || "offline",
+        device_type: d.deviceType || null,
+        deviceType: d.deviceType || null,
+        location: d.locationID || null,
+        serial_number: d.serialNumber || null,
+        livemode: !!d.livemode,
+        action: null,
+      }));
+      useStripePaymentStore.getState().setReadersArr(arr);
+    });
+    return () => unsub && unsub();
+  }, [zIsConnectMode, zSettingsTenantID, zSettingsStoreID]);
+
+  // Legacy (Bonita) path — only runs when NOT in Connect mode.
+  useEffect(() => {
+    if (zIsConnectMode) return;
     async function fetchReaders() {
-      // console.log("[CARD_READER] BaseScreen fetchReaders called");
       try {
         let result = await newCheckoutGetStripeReaders();
         let readersArr = result?.data?.data || [];
-        // console.log("[CARD_READER] BaseScreen fetchReaders:", readersArr.length, "readers found", readersArr.map(r => ({ id: r.id, label: r.label, status: r.status })));
         useStripePaymentStore.getState().setReadersArr(readersArr);
       } catch (e) {
         console.log("[CARD_READER] BaseScreen fetchReaders ERROR:", e?.message, e);
@@ -417,7 +490,7 @@ export function BaseScreen() {
     fetchReaders();
     let interval = setInterval(fetchReaders, 5 * 60 * 1000);
     return () => clearInterval(interval);
-  }, []);
+  }, [zIsConnectMode]);
 
   ////////  testing    //////////////////////////////////////////////////////////////////////
 
@@ -527,6 +600,14 @@ export function BaseScreen() {
       }, onError);
     });
     useEmailStore.getState().setAuthUnsub(emailAuthTeardown);
+
+    const emailAccountsTeardown = register("email-accounts", (onConnected, onError) => {
+      return dbListenToEmailAccounts((docs) => {
+        useEmailStore.getState().setEmailAccounts(docs || []);
+        onConnected();
+      }, onError);
+    });
+    useEmailStore.getState().setAccountsUnsub(emailAccountsTeardown);
 
     // SMS threads: load from IndexedDB FIRST, then start Firestore listener
     import("../hubMessageDB").then(async (hubDB) => {

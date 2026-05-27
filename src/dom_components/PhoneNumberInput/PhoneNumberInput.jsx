@@ -32,6 +32,8 @@ export const PhoneNumberInput = forwardRef(function PhoneNumberInput(
     textColor = C.textMuted,
     disabled = false,
     className = "",
+    autoComplete = "tel",
+    name,
     "aria-label": ariaLabel,
     "data-testid": testId,
   },
@@ -152,7 +154,8 @@ export const PhoneNumberInput = forwardRef(function PhoneNumberInput(
         ref={inputRef}
         type="text"
         inputMode="numeric"
-        autoComplete="tel"
+        autoComplete={autoComplete}
+        name={name}
         value={digits}
         onChange={handleTextChange}
         onFocus={handleFocusEvent}

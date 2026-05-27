@@ -8,6 +8,7 @@ import { useEmailStore, useLoginStore, useSettingsStore, useTabNamesStore } from
 import { TAB_NAMES } from "../../../data";
 import { dbGmailDisconnect, dbGmailModifyLabels, dbGmailReconnectWatch } from "../../../db_calls_wrapper";
 import { buildSignOffHtml } from "../Items_Screen/emailSignOff";
+import { MessageBubble } from "../Items_Screen/Items_EmailView";
 import { log, lightenRGBByPercent } from "../../../utils";
 import dayjs from "dayjs";
 import styles from "./OptionsEmail.module.css";
@@ -67,8 +68,17 @@ export const EmailOptionsPanel = React.memo(() => {
   const currentUser = useLoginStore((state) => state.currentUser);
   const zCurrentUserLevel = useLoginStore((state) => state.currentUser?.permissions?.level || 0);
   const userInboxes = currentUser?.emailInboxes || [];
-  const allEmailAccounts = zSettings?.emailAccounts || [];
-  const emailAccounts = allEmailAccounts.filter((a) => userInboxes.includes(a.accountKey));
+  // emailAccounts now lives in useEmailStore (tenant-scoped collection).
+  // Apply store-scope filter: assignedStoreID=null means shared, otherwise
+  // must match the current store.
+  const allEmailAccounts = useEmailStore((state) => state.getEmailAccounts()) || [];
+  const currentStoreID = zSettings?.storeID || "";
+  const visibleAccounts = allEmailAccounts.filter(
+    (a) => !a.assignedStoreID || a.assignedStoreID === currentStoreID
+  );
+  const emailAccounts = visibleAccounts.filter((a) =>
+    userInboxes.includes(a.accountKey || a.id)
+  );
   const connectedAccounts = emailAccounts.filter((a) => zEmailAuth?.[a.accountKey]?.status === "connected");
   const anyConnected = connectedAccounts.length > 0;
   const activeAuth = zEmailAuth?.[zActiveAccountKey];
@@ -334,7 +344,12 @@ export const EmailOptionsPanel = React.memo(() => {
               className={`${styles.emailRowFrom} ${item.isUnread ? styles.emailRowFromUnread : ""}`}
               style={{ color: C.text }}
             >
-              {item.fromName || item.from || "Unknown"}
+              {item.fromName || extractEmailAddr(item.from) || "Unknown"}
+              {item.fromName && extractEmailAddr(item.from) && (
+                <span className={styles.emailRowFromAddr} style={{ color: C.textMuted }}>
+                  {" "}&lt;{extractEmailAddr(item.from)}&gt;
+                </span>
+              )}
             </span>
             <span className={styles.emailRowDate}>{dateStr}</span>
           </div>
@@ -390,6 +405,7 @@ export const EmailOptionsPanel = React.memo(() => {
             style={{ width: 40, height: 40, borderWidth: 4, color: C.blue }}
           />
         </div>
+        <ThreadInspectorModal />
       </div>
     );
   }
@@ -409,6 +425,7 @@ export const EmailOptionsPanel = React.memo(() => {
               : "No email accounts have been assigned to you. Contact an admin to configure access in Dashboard → Email Options."}
           </span>
         </div>
+        <ThreadInspectorModal />
       </div>
     );
   }
@@ -428,6 +445,7 @@ export const EmailOptionsPanel = React.memo(() => {
             </div>
           )}
         </div>
+        <ThreadInspectorModal />
       </div>
     );
   }
@@ -511,6 +529,104 @@ export const EmailOptionsPanel = React.memo(() => {
       ) : (
         <div className={styles.listScroll}>
           {zThreadedEmails.map((item) => renderEmailItem(item))}
+        </div>
+      )}
+      <ThreadInspectorModal />
+    </div>
+  );
+});
+
+const ThreadInspectorModal = React.memo(() => {
+  const zState = useEmailStore((s) => s.threadInspectorState);
+  const zDraftThreadId = useEmailStore((s) => s.composeDraft?.threadId);
+  const zSelectedThreadId = useEmailStore((s) => s.selectedThreadId);
+  const zAccountKey = useEmailStore((s) => s.activeAccountKey);
+  const zEmails = useEmailStore((s) => s.emails);
+
+  // Forward nullifies composeDraft.threadId, so fall back to the
+  // thread currently open in Items so the modal still has context.
+  const threadId = zDraftThreadId || zSelectedThreadId;
+
+  const messages = useMemo(() => {
+    if (!threadId) return [];
+    return zEmails
+      .filter((e) => e.threadId === threadId && e.accountKey === zAccountKey)
+      .sort((a, b) => (a.internalDate || 0) - (b.internalDate || 0));
+  }, [zEmails, threadId, zAccountKey]);
+
+  const newestId = messages.length > 0 ? messages[messages.length - 1].id : null;
+  const [sExpanded, _sSetExpanded] = useState({});
+
+  if (zState !== "open") return null;
+
+  function toggleExpand(id) {
+    _sSetExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
+
+  function handleClose() {
+    useEmailStore.getState().setThreadInspectorState("hidden");
+  }
+
+  function handleMinimize() {
+    useEmailStore.getState().setThreadInspectorState("minimized");
+  }
+
+  return (
+    <div
+      className={styles.threadModalOverlay}
+      style={{ background: C.surfaceBase || "#fff" }}
+    >
+      <div
+        className={styles.threadModalHeader}
+        style={{ borderBottomColor: C.borderSubtle }}
+      >
+        <span className={styles.threadModalTitle} style={{ color: C.text }}>
+          Thread
+        </span>
+        <div className={styles.threadModalActions}>
+          <Tooltip text="Minimize" position="left">
+            <button
+              type="button"
+              className={styles.threadModalIconBtn}
+              onClick={handleMinimize}
+              style={{ color: C.text }}
+            >
+              −
+            </button>
+          </Tooltip>
+          <Tooltip text="Close" position="left">
+            <button
+              type="button"
+              className={styles.threadModalIconBtn}
+              onClick={handleClose}
+              style={{ color: C.text }}
+            >
+              ×
+            </button>
+          </Tooltip>
+        </div>
+      </div>
+      {messages.length === 0 ? (
+        <div className={styles.threadModalEmpty} style={{ color: C.textMuted }}>
+          No thread to display.
+        </div>
+      ) : (
+        <div className={styles.threadModalBody}>
+          {messages.map((message) => {
+            const isLast = message.id === newestId;
+            const isExpanded = isLast
+              ? sExpanded[message.id] !== false
+              : !!sExpanded[message.id];
+            return (
+              <MessageBubble
+                key={message.id}
+                message={message}
+                isExpanded={isExpanded}
+                onToggleExpand={() => toggleExpand(message.id)}
+                isLast={isLast}
+              />
+            );
+          })}
         </div>
       )}
     </div>

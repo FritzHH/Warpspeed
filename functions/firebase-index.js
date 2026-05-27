@@ -7606,1211 +7606,42 @@ exports.migrateCustomerPhone = onCall(
 );
 
 // ═══════════════════════════════════════════════════════════════
-// GMAIL INTEGRATION
+// GMAIL INTEGRATION — extracted to ./gmail.js so the SaaS deploy can wire
+// the same handlers with tenant-aware auth-guards. Bonita passes a no-op
+// guards bundle (single-tenant Bonita JWTs have no tenantID claim).
 // ═══════════════════════════════════════════════════════════════
-
-const GMAIL_API_BASE = "https://www.googleapis.com/gmail/v1/users/me";
-const GMAIL_SCOPES = [
-  "https://www.googleapis.com/auth/gmail.readonly",
-  "https://www.googleapis.com/auth/gmail.send",
-  "https://www.googleapis.com/auth/gmail.modify",
-].join(" ");
-
-async function getGmailAccessToken(db, tenantID, storeID, accountKey) {
-  const docRef = db
-    .collection("tenants").doc(tenantID)
-    .collection("stores").doc(storeID)
-    .collection("email-auth").doc(accountKey);
-  const snap = await docRef.get();
-  if (!snap.exists) throw new HttpsError("not-found", "No Gmail auth for " + accountKey);
-  const data = snap.data();
-  if (!data.refreshToken) throw new HttpsError("failed-precondition", "No refresh token");
-
-  if (Date.now() < (data.expiresAt || 0) - 60000) {
-    return data.accessToken;
-  }
-
-  const res = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      grant_type: "refresh_token",
-      refresh_token: data.refreshToken,
-      client_id: gmailOAuthClientId.value(),
-      client_secret: gmailOAuthClientSecret.value(),
-    }).toString(),
+{
+  const _gmail = require("./gmail");
+  const _gmailHandlers = _gmail.register({
+    projectId: PROJECT_ID,
+    storageBucket: STORAGE_BUCKET,
+    getDB,
+    secrets: {
+      gmailOAuthClientId,
+      gmailOAuthClientSecret,
+    },
+    guards: {
+      // Bonita is single-tenant — JWTs carry no tenantID claim, so a real
+      // tenant-match assertion would always throw. No-op preserves the
+      // existing Bonita auth model (signed-in user is enough).
+      assertTenantMatch: () => {},
+    },
+    withFeatureTracking,
+    withFeatureTrackingHttp,
+    withFeatureTrackingSchedule,
   });
-
-  if (!res.ok) {
-    const errBody = await res.text();
-    log("Gmail token refresh failed", errBody);
-    await docRef.update({ status: "error" });
-    throw new HttpsError("unauthenticated", "Gmail token refresh failed");
-  }
-
-  const tokens = await res.json();
-  const updated = {
-    accessToken: tokens.access_token,
-    expiresAt: Date.now() + (tokens.expires_in * 1000),
-    status: "connected",
-  };
-  await docRef.update(updated);
-  return updated.accessToken;
+  exports.gmailInitiateAuth = _gmailHandlers.gmailInitiateAuth;
+  exports.gmailOAuthCallback = _gmailHandlers.gmailOAuthCallback;
+  exports.gmailDisconnect = _gmailHandlers.gmailDisconnect;
+  exports.gmailSyncEmails = _gmailHandlers.gmailSyncEmails;
+  exports.gmailPushHandler = _gmailHandlers.gmailPushHandler;
+  exports.gmailSendEmail = _gmailHandlers.gmailSendEmail;
+  exports.gmailModifyLabels = _gmailHandlers.gmailModifyLabels;
+  exports.gmailGetAttachment = _gmailHandlers.gmailGetAttachment;
+  exports.gmailSetupWatch = _gmailHandlers.gmailSetupWatch;
+  exports.gmailReconnectWatch = _gmailHandlers.gmailReconnectWatch;
+  exports.gmailRenewWatch = _gmailHandlers.gmailRenewWatch;
 }
-
-function parseGmailMessage(msg) {
-  const headers = msg.payload?.headers || [];
-  const getHeader = (name) => headers.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || "";
-  const getAllHeaders = (name) => headers.filter((h) => h.name.toLowerCase() === name.toLowerCase()).map((h) => h.value);
-
-  const fromRaw = getHeader("From");
-  const fromMatch = fromRaw.match(/^"?([^"<]*)"?\s*<?([^>]*)>?$/);
-  const fromName = fromMatch?.[1]?.trim() || fromRaw;
-  const from = fromMatch?.[2]?.trim() || fromRaw;
-
-  const toRaw = getHeader("To");
-  const toList = toRaw ? toRaw.split(",").map((s) => {
-    const m = s.trim().match(/<([^>]+)>/);
-    return m ? m[1] : s.trim();
-  }) : [];
-
-  const ccRaw = getHeader("Cc");
-  const ccList = ccRaw ? ccRaw.split(",").map((s) => {
-    const m = s.trim().match(/<([^>]+)>/);
-    return m ? m[1] : s.trim();
-  }) : [];
-
-  let bodyHtml = "";
-  let bodyText = "";
-
-  function extractBody(part) {
-    if (part.mimeType === "text/html" && part.body?.data) {
-      bodyHtml = Buffer.from(part.body.data, "base64url").toString("utf-8");
-    }
-    if (part.mimeType === "text/plain" && part.body?.data) {
-      bodyText = Buffer.from(part.body.data, "base64url").toString("utf-8");
-    }
-    if (part.parts) part.parts.forEach(extractBody);
-  }
-  if (msg.payload) extractBody(msg.payload);
-
-  const attachments = [];
-  function extractAttachments(part) {
-    if (part.filename && part.body?.attachmentId) {
-      attachments.push({
-        attachmentId: part.body.attachmentId,
-        filename: part.filename,
-        mimeType: part.mimeType || "application/octet-stream",
-        size: part.body.size || 0,
-        storageUrl: "",
-      });
-    }
-    if (part.parts) part.parts.forEach(extractAttachments);
-  }
-  if (msg.payload) extractAttachments(msg.payload);
-
-  const labelIds = msg.labelIds || [];
-
-  return {
-    id: msg.id,
-    threadId: msg.threadId,
-    from,
-    fromName,
-    to: toList,
-    cc: ccList,
-    bcc: [],
-    replyTo: getHeader("Reply-To"),
-    subject: getHeader("Subject"),
-    snippet: msg.snippet || "",
-    bodyText: bodyText.length < 500000 ? bodyText : "",
-    bodyHtml: bodyHtml.length < 500000 ? bodyHtml : "",
-    hasLargeBody: bodyHtml.length >= 500000,
-    labelIds,
-    isUnread: labelIds.includes("UNREAD"),
-    isStarred: labelIds.includes("STARRED"),
-    internalDate: parseInt(msg.internalDate) || 0,
-    receivedAt: Date.now(),
-    attachments,
-    messageIdHeader: getHeader("Message-ID") || getHeader("Message-Id"),
-    inReplyTo: getHeader("In-Reply-To"),
-    references: getHeader("References"),
-    deliveredTo: getAllHeaders("Delivered-To"),
-    xForwardedFor: getHeader("X-Forwarded-For"),
-    xForwardedTo: getHeader("X-Forwarded-To"),
-    resentFrom: getHeader("Resent-From"),
-  };
-}
-
-exports.gmailInitiateAuth = onCall(
-  { secrets: [gmailOAuthClientId, firebaseServiceAccountKey] },
-  withFeatureTracking("gmail.auth.initiate", async (request, tracker) => {
-    const { tenantID, storeID, accountKey } = request.data;
-    if (!tenantID || !storeID || !accountKey) {
-      throw new HttpsError("invalid-argument", "tenantID, storeID, accountKey required");
-    }
-
-    const state = Buffer.from(JSON.stringify({ tenantID, storeID, accountKey })).toString("base64url");
-    const redirectUri = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/gmailOAuthCallback`;
-
-    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-      `client_id=${encodeURIComponent(gmailOAuthClientId.value())}` +
-      `&redirect_uri=${encodeURIComponent(redirectUri)}` +
-      `&response_type=code` +
-      `&scope=${encodeURIComponent(GMAIL_SCOPES)}` +
-      `&access_type=offline` +
-      `&prompt=consent` +
-      `&state=${state}`;
-
-    tracker.set("accountKey", accountKey);
-    return { success: true, authUrl };
-  })
-);
-
-exports.gmailOAuthCallback = onRequest(
-  { secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey], cors: true },
-  withFeatureTrackingHttp("gmail.auth.callback", async (req, res, tracker) => {
-    try {
-      const { code, state } = req.query;
-      if (!code || !state) {
-        res.status(400).send("Missing code or state");
-        return;
-      }
-
-      const { tenantID, storeID, accountKey } = JSON.parse(Buffer.from(state, "base64url").toString());
-      tracker.setContext({ tenantID, storeID });
-      tracker.set("accountKey", accountKey);
-      const redirectUri = `https://us-central1-${PROJECT_ID}.cloudfunctions.net/gmailOAuthCallback`;
-
-      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          code,
-          client_id: gmailOAuthClientId.value(),
-          client_secret: gmailOAuthClientSecret.value(),
-          redirect_uri: redirectUri,
-          grant_type: "authorization_code",
-        }).toString(),
-      });
-
-      if (!tokenRes.ok) {
-        const err = await tokenRes.text();
-        log("Gmail OAuth token exchange failed", err);
-        res.status(500).send("Token exchange failed");
-        return;
-      }
-
-      const tokens = await tokenRes.json();
-      const accessToken = tokens.access_token;
-
-      const profileRes = await fetch(`${GMAIL_API_BASE}/profile`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      const profile = await profileRes.json();
-      log("Gmail profile response", JSON.stringify(profile));
-
-      if (!profileRes.ok || !profile.emailAddress) {
-        log("Gmail profile fetch failed", JSON.stringify(profile));
-        res.status(500).send("Failed to retrieve Gmail profile. Check Cloud Function logs.");
-        return;
-      }
-
-      const db = await getDB(firebaseServiceAccountKey);
-      const authDocRef = db
-        .collection("tenants").doc(tenantID)
-        .collection("stores").doc(storeID)
-        .collection("email-auth").doc(accountKey);
-
-      await authDocRef.set({
-        email: profile.emailAddress,
-        accessToken: tokens.access_token,
-        refreshToken: tokens.refresh_token || "",
-        expiresAt: Date.now() + ((tokens.expires_in || 3600) * 1000),
-        historyId: profile.historyId || "",
-        connectedAt: Date.now(),
-        connectedBy: "",
-        status: "connected",
-        unreadCount: 0,
-        lastSyncedAt: 0,
-        watchExpiration: 0,
-      });
-
-      const lookupRef = db.collection("email-lookup").doc(profile.emailAddress.toLowerCase());
-      await lookupRef.set({ tenantID, storeID, accountKey });
-
-      try {
-        const watchRes = await fetch(`${GMAIL_API_BASE}/watch`, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            topicName: `projects/${PROJECT_ID}/topics/gmail-push-notifications`,
-            labelIds: ["INBOX"],
-          }),
-        });
-        if (watchRes.ok) {
-          const watchData = await watchRes.json();
-          log("Gmail watch registered successfully:", JSON.stringify(watchData));
-          await authDocRef.update({
-            historyId: watchData.historyId || profile.historyId,
-            watchExpiration: parseInt(watchData.expiration) || 0,
-          });
-        } else {
-          const watchErrText = await watchRes.text();
-          log("Gmail watch setup failed:", watchRes.status, watchErrText);
-        }
-      } catch (watchErr) {
-        log("Gmail watch setup error (non-fatal)", watchErr);
-      }
-
-      res.send(`
-        <html><body style="font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0">
-          <div style="text-align:center">
-            <h2 style="color:#2E7D32">Gmail Connected!</h2>
-            <p>You can close this tab and return to the app.</p>
-            <script>setTimeout(()=>window.close(),3000)</script>
-          </div>
-        </body></html>
-      `);
-    } catch (error) {
-      log("gmailOAuthCallback error", error);
-      res.status(500).send("OAuth callback failed: " + error.message);
-    }
-  })
-);
-
-exports.gmailDisconnect = onCall(
-  { secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey] },
-  withFeatureTracking("gmail.disconnect", async (request, tracker) => {
-    const { tenantID, storeID, accountKey } = request.data;
-    if (!tenantID || !storeID || !accountKey) {
-      throw new HttpsError("invalid-argument", "tenantID, storeID, accountKey required");
-    }
-
-    const db = await getDB(firebaseServiceAccountKey);
-    const authRef = db
-      .collection("tenants").doc(tenantID)
-      .collection("stores").doc(storeID)
-      .collection("email-auth").doc(accountKey);
-
-    const snap = await authRef.get();
-    tracker.bump("firestoreReads", 1);
-    if (snap.exists) {
-      const data = snap.data();
-      if (data.accessToken) {
-        try {
-          await fetch(`https://oauth2.googleapis.com/revoke?token=${data.accessToken}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-          });
-        } catch (e) {
-          log("Token revoke error (non-fatal)", e);
-        }
-      }
-      if (data.email) {
-        const lookupRef = db.collection("email-lookup").doc(data.email.toLowerCase());
-        await lookupRef.delete();
-        tracker.bump("firestoreWrites", 1);
-      }
-      await authRef.delete();
-      tracker.bump("firestoreWrites", 1);
-    }
-
-    tracker.set("accountKey", accountKey);
-    return { success: true };
-  })
-);
-
-exports.gmailSyncEmails = onCall(
-  {
-    secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey],
-    timeoutSeconds: 300,
-    memory: "512MiB",
-  },
-  withFeatureTracking("gmail.sync", async (request, tracker) => {
-    const { tenantID, storeID, accountKey, fullSync } = request.data;
-    if (!tenantID || !storeID || !accountKey) {
-      throw new HttpsError("invalid-argument", "tenantID, storeID, accountKey required");
-    }
-
-    tracker.set("accountKey", accountKey);
-    tracker.set("syncType", fullSync ? "full" : "incremental");
-    log("gmailSyncEmails called", { tenantID, storeID, accountKey, fullSync });
-
-    const db = await getDB(firebaseServiceAccountKey);
-    const accessToken = await getGmailAccessToken(db, tenantID, storeID, accountKey);
-    log("gmailSyncEmails - got access token:", accessToken ? "yes" : "no");
-
-    const authRef = db
-      .collection("tenants").doc(tenantID)
-      .collection("stores").doc(storeID)
-      .collection("email-auth").doc(accountKey);
-    const authSnap = await authRef.get();
-    const authData = authSnap.data();
-    tracker.bump("firestoreReads", 1);
-    log("gmailSyncEmails - authData:", JSON.stringify({ historyId: authData?.historyId, status: authData?.status, email: authData?.email }));
-
-    const emailsCollection = db
-      .collection("tenants").doc(tenantID)
-      .collection("stores").doc(storeID)
-      .collection("emails");
-
-    let synced = 0;
-
-    if (fullSync || !authData.historyId) {
-      log("gmailSyncEmails - doing full sync");
-      const allMessageIds = new Set();
-      const labels = ["INBOX", "SENT", "DRAFT", "TRASH", "SPAM"];
-      for (const label of labels) {
-        const listRes = await fetch(
-          `${GMAIL_API_BASE}/messages?maxResults=50&labelIds=${label}`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        tracker.bump("gmailApiCalls", 1);
-        if (listRes.ok) {
-          const listData = await listRes.json();
-          (listData.messages || []).forEach((m) => allMessageIds.add(m.id));
-        }
-      }
-      log("gmailSyncEmails - total unique messages to fetch:", allMessageIds.size);
-      const messageIds = [...allMessageIds];
-
-      const BATCH_SIZE = 20;
-      for (let i = 0; i < messageIds.length; i += BATCH_SIZE) {
-        const batch = messageIds.slice(i, i + BATCH_SIZE);
-        const messages = await Promise.all(
-          batch.map(async (msgId) => {
-            const msgRes = await fetch(
-              `${GMAIL_API_BASE}/messages/${msgId}?format=full`,
-              { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-            if (!msgRes.ok) return null;
-            return msgRes.json();
-          })
-        );
-        tracker.bump("gmailApiCalls", batch.length);
-
-        const writeBatch = db.batch();
-        let batchWrites = 0;
-        for (const msg of messages) {
-          if (!msg) continue;
-          const parsed = parseGmailMessage(msg);
-          parsed.accountKey = accountKey;
-          writeBatch.set(emailsCollection.doc(parsed.id), parsed, { merge: true });
-          synced++;
-          batchWrites++;
-        }
-        await writeBatch.commit();
-        tracker.bump("firestoreWrites", batchWrites);
-
-        if (i + BATCH_SIZE < messageIds.length) {
-          await new Promise((r) => setTimeout(r, 100));
-        }
-      }
-
-      const profileRes = await fetch(`${GMAIL_API_BASE}/profile`, {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      tracker.bump("gmailApiCalls", 1);
-      const profile = await profileRes.json();
-      await authRef.update({ historyId: profile.historyId || authData.historyId });
-      tracker.bump("firestoreWrites", 1);
-    } else {
-      let pageToken = "";
-      let historyId = authData.historyId;
-      let allChangedIds = new Set();
-
-      do {
-        const url = `${GMAIL_API_BASE}/history?startHistoryId=${historyId}&historyTypes=messageAdded&historyTypes=labelAdded&historyTypes=labelRemoved&historyTypes=messageDeleted${pageToken ? "&pageToken=" + pageToken : ""}`;
-        const histRes = await fetch(url, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        tracker.bump("gmailApiCalls", 1);
-
-        if (!histRes.ok) {
-          const status = histRes.status;
-          if (status === 404) {
-            return await syncFull(db, accessToken, tenantID, storeID, accountKey, emailsCollection, authRef);
-          }
-          throw new HttpsError("internal", "History list failed");
-        }
-
-        const histData = await histRes.json();
-        if (histData.history) {
-          for (const h of histData.history) {
-            (h.messagesAdded || []).forEach((m) => allChangedIds.add(m.message.id));
-            (h.labelsAdded || []).forEach((m) => allChangedIds.add(m.message.id));
-            (h.labelsRemoved || []).forEach((m) => allChangedIds.add(m.message.id));
-          }
-        }
-
-        pageToken = histData.nextPageToken || "";
-        if (histData.historyId) historyId = histData.historyId;
-      } while (pageToken);
-
-      const changedIds = [...allChangedIds];
-      const BATCH_SIZE = 20;
-      for (let i = 0; i < changedIds.length; i += BATCH_SIZE) {
-        const batch = changedIds.slice(i, i + BATCH_SIZE);
-        const messages = await Promise.all(
-          batch.map(async (msgId) => {
-            const msgRes = await fetch(
-              `${GMAIL_API_BASE}/messages/${msgId}?format=full`,
-              { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-            if (!msgRes.ok) return null;
-            return msgRes.json();
-          })
-        );
-        tracker.bump("gmailApiCalls", batch.length);
-
-        const writeBatch = db.batch();
-        let batchWrites = 0;
-        for (const msg of messages) {
-          if (!msg) continue;
-          const parsed = parseGmailMessage(msg);
-          parsed.accountKey = accountKey;
-          writeBatch.set(emailsCollection.doc(parsed.id), parsed, { merge: true });
-          synced++;
-          batchWrites++;
-        }
-        await writeBatch.commit();
-        tracker.bump("firestoreWrites", batchWrites);
-      }
-
-      await authRef.update({ historyId });
-      tracker.bump("firestoreWrites", 1);
-    }
-
-    const unreadSnap = await emailsCollection
-      .where("accountKey", "==", accountKey)
-      .where("isUnread", "==", true)
-      .where("labelIds", "array-contains", "INBOX")
-      .get();
-    tracker.bump("firestoreReads", unreadSnap.size || 1);
-    await authRef.update({
-      unreadCount: unreadSnap.size,
-      lastSyncedAt: Date.now(),
-    });
-    tracker.bump("firestoreWrites", 1);
-    tracker.set("messagesSynced", synced);
-
-    return { success: true, synced, unreadCount: unreadSnap.size };
-  })
-);
-
-async function syncFull(db, accessToken, tenantID, storeID, accountKey, emailsCollection, authRef) {
-  let synced = 0;
-  const allMessageIds = new Set();
-  const labels = ["INBOX", "SENT", "DRAFT", "TRASH", "SPAM"];
-  for (const label of labels) {
-    const listRes = await fetch(
-      `${GMAIL_API_BASE}/messages?maxResults=50&labelIds=${label}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    if (listRes.ok) {
-      const listData = await listRes.json();
-      (listData.messages || []).forEach((m) => allMessageIds.add(m.id));
-    }
-  }
-  const messageIds = [...allMessageIds];
-
-  const BATCH_SIZE = 20;
-  for (let i = 0; i < messageIds.length; i += BATCH_SIZE) {
-    const batch = messageIds.slice(i, i + BATCH_SIZE);
-    const messages = await Promise.all(
-      batch.map(async (msgId) => {
-        const msgRes = await fetch(
-          `${GMAIL_API_BASE}/messages/${msgId}?format=full`,
-          { headers: { Authorization: `Bearer ${accessToken}` } }
-        );
-        if (!msgRes.ok) return null;
-        return msgRes.json();
-      })
-    );
-    const writeBatch = db.batch();
-    for (const msg of messages) {
-      if (!msg) continue;
-      const parsed = parseGmailMessage(msg);
-      parsed.accountKey = accountKey;
-      writeBatch.set(emailsCollection.doc(parsed.id), parsed, { merge: true });
-      synced++;
-    }
-    await writeBatch.commit();
-  }
-
-  const profileRes = await fetch(`${GMAIL_API_BASE}/profile`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  const profile = await profileRes.json();
-  const unreadSnap = await emailsCollection
-    .where("accountKey", "==", accountKey)
-    .where("isUnread", "==", true)
-    .where("labelIds", "array-contains", "INBOX")
-    .get();
-  await authRef.update({
-    historyId: profile.historyId,
-    unreadCount: unreadSnap.size,
-    lastSyncedAt: Date.now(),
-  });
-  return { success: true, synced, unreadCount: unreadSnap.size };
-}
-
-exports.gmailPushHandler = onRequest(
-  { secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey] },
-  withFeatureTrackingHttp("gmail.push.handler", async (req, res, tracker) => {
-    try {
-      log("gmailPushHandler called, body:", JSON.stringify(req.body || {}).substring(0, 500));
-      const message = req.body?.message;
-      if (!message?.data) {
-        log("gmailPushHandler: no message data");
-        res.status(200).send("No data");
-        return;
-      }
-
-      const decoded = JSON.parse(Buffer.from(message.data, "base64").toString());
-      log("gmailPushHandler decoded:", JSON.stringify(decoded));
-      const emailAddress = decoded.emailAddress?.toLowerCase();
-      if (!emailAddress) {
-        log("gmailPushHandler: no emailAddress in decoded data");
-        res.status(200).send("No email");
-        return;
-      }
-      if (message.messageId) tracker.setContext({ correlationID: message.messageId });
-
-      const db = await getDB(firebaseServiceAccountKey);
-      const lookupSnap = await db.collection("email-lookup").doc(emailAddress).get();
-      tracker.bump("firestoreReads", 1);
-      if (!lookupSnap.exists) {
-        log("gmailPushHandler: no email-lookup doc for", emailAddress);
-        res.status(200).send("Unknown email");
-        return;
-      }
-      log("gmailPushHandler: found lookup for", emailAddress, "->", JSON.stringify(lookupSnap.data()));
-
-      const { tenantID, storeID, accountKey } = lookupSnap.data();
-      tracker.setContext({ tenantID, storeID });
-      tracker.set("accountKey", accountKey);
-      const accessToken = await getGmailAccessToken(db, tenantID, storeID, accountKey);
-      const authRef = db
-        .collection("tenants").doc(tenantID)
-        .collection("stores").doc(storeID)
-        .collection("email-auth").doc(accountKey);
-      const authSnap = await authRef.get();
-      const authData = authSnap.data();
-      tracker.bump("firestoreReads", 1);
-      const emailsCollection = db
-        .collection("tenants").doc(tenantID)
-        .collection("stores").doc(storeID)
-        .collection("emails");
-
-      let historyId = authData.historyId;
-      if (!historyId) {
-        res.status(200).send("No historyId");
-        return;
-      }
-
-      let allChangedIds = new Set();
-      let pageToken = "";
-      do {
-        const url = `${GMAIL_API_BASE}/history?startHistoryId=${historyId}&historyTypes=messageAdded&historyTypes=labelAdded&historyTypes=labelRemoved${pageToken ? "&pageToken=" + pageToken : ""}`;
-        const histRes = await fetch(url, {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
-        tracker.bump("gmailApiCalls", 1);
-        if (!histRes.ok) break;
-        const histData = await histRes.json();
-        if (histData.history) {
-          for (const h of histData.history) {
-            (h.messagesAdded || []).forEach((m) => allChangedIds.add(m.message.id));
-            (h.labelsAdded || []).forEach((m) => allChangedIds.add(m.message.id));
-            (h.labelsRemoved || []).forEach((m) => allChangedIds.add(m.message.id));
-          }
-        }
-        pageToken = histData.nextPageToken || "";
-        if (histData.historyId) historyId = histData.historyId;
-      } while (pageToken);
-
-      const changedIds = [...allChangedIds];
-      const BATCH_SIZE = 20;
-      for (let i = 0; i < changedIds.length; i += BATCH_SIZE) {
-        const batch = changedIds.slice(i, i + BATCH_SIZE);
-        const messages = await Promise.all(
-          batch.map(async (msgId) => {
-            const msgRes = await fetch(
-              `${GMAIL_API_BASE}/messages/${msgId}?format=full`,
-              { headers: { Authorization: `Bearer ${accessToken}` } }
-            );
-            if (!msgRes.ok) return null;
-            return msgRes.json();
-          })
-        );
-        tracker.bump("gmailApiCalls", batch.length);
-        const writeBatch = db.batch();
-        let batchWrites = 0;
-        for (const msg of messages) {
-          if (!msg) continue;
-          const parsed = parseGmailMessage(msg);
-          parsed.accountKey = accountKey;
-          writeBatch.set(emailsCollection.doc(parsed.id), parsed, { merge: true });
-          batchWrites++;
-        }
-        await writeBatch.commit();
-        tracker.bump("firestoreWrites", batchWrites);
-      }
-
-      const unreadSnap = await emailsCollection
-        .where("accountKey", "==", accountKey)
-        .where("isUnread", "==", true)
-        .where("labelIds", "array-contains", "INBOX")
-        .get();
-      tracker.bump("firestoreReads", unreadSnap.size || 1);
-      await authRef.update({
-        historyId,
-        unreadCount: unreadSnap.size,
-        lastSyncedAt: Date.now(),
-      });
-      tracker.bump("firestoreWrites", 1);
-      tracker.set("messagesSynced", changedIds.length);
-
-      log("gmailPushHandler success:", changedIds.length, "messages synced for", emailAddress);
-      res.status(200).send("OK");
-    } catch (error) {
-      log("gmailPushHandler error", error);
-      res.status(200).send("Error handled");
-    }
-  })
-);
-
-exports.gmailSendEmail = onCall(
-  {
-    secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey],
-    timeoutSeconds: 60,
-    memory: "256MiB",
-  },
-  withFeatureTracking("gmail.send", async (request, tracker) => {
-    const { tenantID, storeID, accountKey, to, cc, bcc, subject, bodyHtml, bodyText, threadId, inReplyTo, references, attachments, videoStorageUrl } = request.data;
-    tracker.set("accountKey", accountKey);
-    tracker.set("recipientCount", (to?.length || 0) + (cc?.length || 0) + (bcc?.length || 0));
-    tracker.set("attachmentCount", attachments?.length || 0);
-    tracker.set("hasVideo", videoStorageUrl ? 1 : 0);
-    if (!tenantID || !storeID || !accountKey) {
-      throw new HttpsError("invalid-argument", "tenantID, storeID, accountKey required");
-    }
-    if (!to || !to.length) {
-      throw new HttpsError("invalid-argument", "At least one recipient required");
-    }
-
-    const db = await getDB(firebaseServiceAccountKey);
-    const accessToken = await getGmailAccessToken(db, tenantID, storeID, accountKey);
-    const authRef = db
-      .collection("tenants").doc(tenantID)
-      .collection("stores").doc(storeID)
-      .collection("email-auth").doc(accountKey);
-    const authData = (await authRef.get()).data();
-    tracker.bump("firestoreReads", 1);
-    const fromEmail = authData.email;
-
-    let htmlContent = bodyHtml || "";
-    if (videoStorageUrl) {
-      htmlContent += `<br/><p><a href="${videoStorageUrl}">📎 Video attachment</a></p>`;
-    }
-
-    const boundary = "boundary_" + Date.now().toString(36);
-    const mixedBoundary = "mixed_" + Date.now().toString(36);
-    const hasAttachments = attachments && attachments.length > 0;
-
-    let rawHeaders = [
-      `From: ${fromEmail}`,
-      `To: ${to.join(", ")}`,
-    ];
-    if (cc?.length) rawHeaders.push(`Cc: ${cc.join(", ")}`);
-    if (bcc?.length) rawHeaders.push(`Bcc: ${bcc.join(", ")}`);
-    rawHeaders.push(`Subject: ${subject || ""}`);
-    if (inReplyTo) rawHeaders.push(`In-Reply-To: ${inReplyTo}`);
-    if (references) rawHeaders.push(`References: ${references}`);
-    rawHeaders.push(`MIME-Version: 1.0`);
-
-    let rawMessage;
-
-    if (hasAttachments) {
-      rawHeaders.push(`Content-Type: multipart/mixed; boundary="${mixedBoundary}"`);
-      let parts = rawHeaders.join("\r\n") + "\r\n\r\n";
-      parts += `--${mixedBoundary}\r\n`;
-      parts += `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n`;
-      if (bodyText) {
-        parts += `--${boundary}\r\nContent-Type: text/plain; charset="UTF-8"\r\n\r\n${bodyText}\r\n`;
-      }
-      parts += `--${boundary}\r\nContent-Type: text/html; charset="UTF-8"\r\n\r\n${htmlContent}\r\n`;
-      parts += `--${boundary}--\r\n`;
-
-      for (const att of attachments) {
-        parts += `--${mixedBoundary}\r\n`;
-        parts += `Content-Type: ${att.mimeType || "application/octet-stream"}; name="${att.filename}"\r\n`;
-        parts += `Content-Disposition: attachment; filename="${att.filename}"\r\n`;
-        parts += `Content-Transfer-Encoding: base64\r\n\r\n`;
-        parts += att.content + "\r\n";
-      }
-      parts += `--${mixedBoundary}--`;
-      rawMessage = parts;
-    } else {
-      rawHeaders.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
-      let parts = rawHeaders.join("\r\n") + "\r\n\r\n";
-      if (bodyText) {
-        parts += `--${boundary}\r\nContent-Type: text/plain; charset="UTF-8"\r\n\r\n${bodyText}\r\n`;
-      }
-      parts += `--${boundary}\r\nContent-Type: text/html; charset="UTF-8"\r\n\r\n${htmlContent}\r\n`;
-      parts += `--${boundary}--`;
-      rawMessage = parts;
-    }
-
-    const encodedMessage = Buffer.from(rawMessage)
-      .toString("base64")
-      .replace(/\+/g, "-")
-      .replace(/\//g, "_")
-      .replace(/=+$/, "");
-
-    const sendBody = { raw: encodedMessage };
-    if (threadId) sendBody.threadId = threadId;
-
-    const sendRes = await fetch(`${GMAIL_API_BASE}/messages/send`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(sendBody),
-    });
-    tracker.bump("gmailApiCalls", 1);
-    tracker.bump("gmailMessagesSent", 1);
-    tracker.bump("emailBytesSent", rawMessage.length);
-
-    if (!sendRes.ok) {
-      const errBody = await sendRes.text();
-      log("Gmail send failed", errBody);
-      throw new HttpsError("internal", "Failed to send email");
-    }
-
-    const sentMsg = await sendRes.json();
-    tracker.setContext({ correlationID: sentMsg.id });
-
-    const msgRes = await fetch(
-      `${GMAIL_API_BASE}/messages/${sentMsg.id}?format=full`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    tracker.bump("gmailApiCalls", 1);
-    if (msgRes.ok) {
-      const fullMsg = await msgRes.json();
-      const parsed = parseGmailMessage(fullMsg);
-      parsed.accountKey = accountKey;
-      const emailsCollection = db
-        .collection("tenants").doc(tenantID)
-        .collection("stores").doc(storeID)
-        .collection("emails");
-      await emailsCollection.doc(parsed.id).set(parsed, { merge: true });
-      tracker.bump("firestoreWrites", 1);
-    }
-
-    return { success: true, messageId: sentMsg.id, threadId: sentMsg.threadId };
-  })
-);
-
-exports.gmailModifyLabels = onCall(
-  { secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey] },
-  withFeatureTracking("gmail.modifyLabels", async (request, tracker) => {
-    const { tenantID, storeID, accountKey, messageIds, addLabelIds, removeLabelIds } = request.data;
-    if (!tenantID || !storeID || !accountKey || !messageIds?.length) {
-      throw new HttpsError("invalid-argument", "Missing required fields");
-    }
-
-    tracker.set("accountKey", accountKey);
-    tracker.set("messageCount", messageIds.length);
-
-    const db = await getDB(firebaseServiceAccountKey);
-    const accessToken = await getGmailAccessToken(db, tenantID, storeID, accountKey);
-
-    const modifyRes = await fetch(`${GMAIL_API_BASE}/messages/batchModify`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ids: messageIds,
-        addLabelIds: addLabelIds || [],
-        removeLabelIds: removeLabelIds || [],
-      }),
-    });
-    tracker.bump("gmailApiCalls", 1);
-
-    if (!modifyRes.ok) {
-      const errBody = await modifyRes.text();
-      log("Gmail batchModify failed", errBody);
-      throw new HttpsError("internal", "Failed to modify labels");
-    }
-
-    const emailsCollection = db
-      .collection("tenants").doc(tenantID)
-      .collection("stores").doc(storeID)
-      .collection("emails");
-
-    const writeBatch = db.batch();
-    let batchWrites = 0;
-    for (const msgId of messageIds) {
-      const docRef = emailsCollection.doc(msgId);
-      const snap = await docRef.get();
-      tracker.bump("firestoreReads", 1);
-      if (!snap.exists) continue;
-      const data = snap.data();
-      let labels = [...(data.labelIds || [])];
-      (removeLabelIds || []).forEach((l) => {
-        labels = labels.filter((x) => x !== l);
-      });
-      (addLabelIds || []).forEach((l) => {
-        if (!labels.includes(l)) labels.push(l);
-      });
-      writeBatch.update(docRef, {
-        labelIds: labels,
-        isUnread: labels.includes("UNREAD"),
-      });
-      batchWrites++;
-    }
-    await writeBatch.commit();
-    tracker.bump("firestoreWrites", batchWrites);
-
-    const unreadSnap = await emailsCollection
-      .where("accountKey", "==", accountKey)
-      .where("isUnread", "==", true)
-      .where("labelIds", "array-contains", "INBOX")
-      .get();
-    tracker.bump("firestoreReads", unreadSnap.size || 1);
-    const authRef = db
-      .collection("tenants").doc(tenantID)
-      .collection("stores").doc(storeID)
-      .collection("email-auth").doc(accountKey);
-    await authRef.update({ unreadCount: unreadSnap.size });
-    tracker.bump("firestoreWrites", 1);
-
-    return { success: true, unreadCount: unreadSnap.size };
-  })
-);
-
-exports.gmailGetAttachment = onCall(
-  { secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey] },
-  withFeatureTracking("gmail.attachment.fetch", async (request, tracker) => {
-    const { tenantID, storeID, accountKey, messageId, attachmentId, filename } = request.data;
-    if (!tenantID || !storeID || !accountKey || !messageId || !attachmentId) {
-      throw new HttpsError("invalid-argument", "Missing required fields");
-    }
-
-    tracker.set("accountKey", accountKey);
-    tracker.setContext({ correlationID: messageId });
-
-    const db = await getDB(firebaseServiceAccountKey);
-    const accessToken = await getGmailAccessToken(db, tenantID, storeID, accountKey);
-
-    const attRes = await fetch(
-      `${GMAIL_API_BASE}/messages/${messageId}/attachments/${attachmentId}`,
-      { headers: { Authorization: `Bearer ${accessToken}` } }
-    );
-    tracker.bump("gmailApiCalls", 1);
-
-    if (!attRes.ok) {
-      throw new HttpsError("internal", "Failed to get attachment");
-    }
-
-    const attData = await attRes.json();
-    const fileBuffer = Buffer.from(attData.data, "base64url");
-    tracker.bump("storageBytesAdded", fileBuffer.length);
-    tracker.set("attachmentBytes", fileBuffer.length);
-
-    const bucket = admin.storage().bucket(STORAGE_BUCKET);
-    const storagePath = `${tenantID}/${storeID}/email-attachments/${messageId}/${filename || "attachment"}`;
-    const file = bucket.file(storagePath);
-
-    await file.save(fileBuffer, {
-      metadata: { contentType: "application/octet-stream" },
-    });
-
-    const [downloadUrl] = await file.getSignedUrl({
-      action: "read",
-      expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
-    });
-
-    const emailsCollection = db
-      .collection("tenants").doc(tenantID)
-      .collection("stores").doc(storeID)
-      .collection("emails");
-    const emailDoc = await emailsCollection.doc(messageId).get();
-    tracker.bump("firestoreReads", 1);
-    if (emailDoc.exists) {
-      const emailData = emailDoc.data();
-      const updatedAttachments = (emailData.attachments || []).map((att) =>
-        att.attachmentId === attachmentId ? { ...att, storageUrl: downloadUrl } : att
-      );
-      await emailsCollection.doc(messageId).update({ attachments: updatedAttachments });
-      tracker.bump("firestoreWrites", 1);
-    }
-
-    return { success: true, downloadUrl };
-  })
-);
-
-exports.gmailSetupWatch = onCall(
-  { secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey] },
-  withFeatureTracking("gmail.watch.setup", async (request, tracker) => {
-    const { tenantID, storeID, accountKey } = request.data;
-    if (!tenantID || !storeID || !accountKey) {
-      throw new HttpsError("invalid-argument", "tenantID, storeID, accountKey required");
-    }
-    tracker.set("accountKey", accountKey);
-
-    const db = await getDB(firebaseServiceAccountKey);
-    const accessToken = await getGmailAccessToken(db, tenantID, storeID, accountKey);
-    const authRef = db
-      .collection("tenants").doc(tenantID)
-      .collection("stores").doc(storeID)
-      .collection("email-auth").doc(accountKey);
-
-    const watchRes = await fetch(`${GMAIL_API_BASE}/watch`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        topicName: `projects/${PROJECT_ID}/topics/gmail-push-notifications`,
-        labelIds: ["INBOX"],
-      }),
-    });
-    tracker.bump("gmailApiCalls", 1);
-
-    if (!watchRes.ok) {
-      const errText = await watchRes.text();
-      log("gmailSetupWatch failed", errText);
-      throw new HttpsError("internal", "Watch setup failed: " + errText);
-    }
-
-    const watchData = await watchRes.json();
-    await authRef.update({
-      watchExpiration: parseInt(watchData.expiration) || 0,
-      historyId: watchData.historyId,
-    });
-    tracker.bump("firestoreWrites", 1);
-    log("Watch set up for", accountKey, "expires", watchData.expiration);
-
-    return { success: true, expiration: watchData.expiration };
-  })
-);
-
-exports.gmailRenewWatch = onSchedule(
-  {
-    schedule: "0 0 * * *",
-    secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey],
-    timeoutSeconds: 120,
-  },
-  withFeatureTrackingSchedule("gmail.watch.renew", async (event, tracker) => {
-    log("[gmailRenewWatch] === START ===", { now: Date.now(), nowIso: new Date().toISOString() });
-    let stats = {
-      tenants: 0, stores: 0, accounts: 0,
-      skippedNotConnected: 0, skippedFresh: 0,
-      attempted: 0, renewed: 0, watchFetchFailed: 0, exceptions: 0,
-    };
-
-    try {
-      const db = await getDB(firebaseServiceAccountKey);
-      log("[gmailRenewWatch] db ready, querying tenants…");
-      const tenantsSnap = await db.collection("tenants").get();
-      log("[gmailRenewWatch] tenants found:", tenantsSnap.size);
-
-      for (const tenantDoc of tenantsSnap.docs) {
-        stats.tenants++;
-        const storesSnap = await tenantDoc.ref.collection("stores").get();
-        log(`[gmailRenewWatch] tenant=${tenantDoc.id} stores=${storesSnap.size}`);
-
-        for (const storeDoc of storesSnap.docs) {
-          stats.stores++;
-          const authSnap = await storeDoc.ref.collection("email-auth").get();
-          log(`[gmailRenewWatch]   store=${storeDoc.id} email-auth docs=${authSnap.size}`);
-
-          for (const authDoc of authSnap.docs) {
-            stats.accounts++;
-            const data = authDoc.data();
-            const ctx = {
-              tenant: tenantDoc.id,
-              store: storeDoc.id,
-              account: authDoc.id,
-              email: data.email,
-              status: data.status,
-              watchExpiration: data.watchExpiration,
-              watchExpirationIso: data.watchExpiration ? new Date(data.watchExpiration).toISOString() : null,
-              historyId: data.historyId,
-              lastSyncedAt: data.lastSyncedAt,
-              lastSyncedAtIso: data.lastSyncedAt ? new Date(data.lastSyncedAt).toISOString() : null,
-            };
-            log("[gmailRenewWatch]     evaluating account:", ctx);
-
-            if (data.status !== "connected") {
-              stats.skippedNotConnected++;
-              log(`[gmailRenewWatch]     SKIP (status !== "connected"): status=${data.status}`);
-              continue;
-            }
-
-            const twoDaysFromNow = Date.now() + 2 * 24 * 60 * 60 * 1000;
-            if (data.watchExpiration && data.watchExpiration > twoDaysFromNow) {
-              stats.skippedFresh++;
-              const daysLeft = ((data.watchExpiration - Date.now()) / (24 * 60 * 60 * 1000)).toFixed(2);
-              log(`[gmailRenewWatch]     SKIP (fresh): ${daysLeft} days until expiry`);
-              continue;
-            }
-
-            stats.attempted++;
-            log("[gmailRenewWatch]     ATTEMPTING renewal for", data.email);
-
-            try {
-              const accessToken = await getGmailAccessToken(
-                db, tenantDoc.id, storeDoc.id, authDoc.id
-              );
-              log("[gmailRenewWatch]     got access token, calling Gmail watch…");
-
-              const watchRes = await fetch(`${GMAIL_API_BASE}/watch`, {
-                method: "POST",
-                headers: {
-                  Authorization: `Bearer ${accessToken}`,
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  topicName: `projects/${PROJECT_ID}/topics/gmail-push-notifications`,
-                  labelIds: ["INBOX"],
-                }),
-              });
-              tracker.bump("gmailApiCalls", 1);
-
-              if (watchRes.ok) {
-                const watchData = await watchRes.json();
-                await authDoc.ref.update({
-                  watchExpiration: parseInt(watchData.expiration) || 0,
-                  historyId: watchData.historyId || data.historyId,
-                });
-                tracker.bump("firestoreWrites", 1);
-                stats.renewed++;
-                log("[gmailRenewWatch]     ✅ RENEWED:", {
-                  email: data.email,
-                  expiration: watchData.expiration,
-                  expirationIso: watchData.expiration ? new Date(parseInt(watchData.expiration)).toISOString() : null,
-                  historyId: watchData.historyId,
-                });
-              } else {
-                stats.watchFetchFailed++;
-                const errBody = await watchRes.text();
-                log("[gmailRenewWatch]     ❌ watch fetch FAILED:", {
-                  email: data.email,
-                  status: watchRes.status,
-                  statusText: watchRes.statusText,
-                  body: errBody.substring(0, 500),
-                });
-              }
-            } catch (e) {
-              stats.exceptions++;
-              log("[gmailRenewWatch]     ❌ EXCEPTION for", data.email, {
-                message: e.message,
-                code: e.code,
-                stack: e.stack?.substring(0, 1000),
-              });
-            }
-          }
-        }
-      }
-    } catch (outerErr) {
-      log("[gmailRenewWatch] ❌ OUTER EXCEPTION:", {
-        message: outerErr.message,
-        code: outerErr.code,
-        stack: outerErr.stack?.substring(0, 1000),
-      });
-    }
-
-    tracker.set("accountsScanned", stats.accounts);
-    tracker.set("watchesRenewed", stats.renewed);
-    tracker.set("watchFailures", stats.watchFetchFailed + stats.exceptions);
-    log("[gmailRenewWatch] === END ===", stats);
-  })
-);
-
-exports.gmailReconnectWatch = onCall(
-  {
-    secrets: [gmailOAuthClientId, gmailOAuthClientSecret, firebaseServiceAccountKey],
-    timeoutSeconds: 300,
-    memory: "512MiB",
-  },
-  withFeatureTracking("gmail.watch.reconnect", async (request, tracker) => {
-    const { tenantID, storeID, accountKey } = request.data;
-    if (!tenantID || !storeID || !accountKey) {
-      throw new HttpsError("invalid-argument", "tenantID, storeID, accountKey required");
-    }
-    tracker.set("accountKey", accountKey);
-
-    log("[gmailReconnectWatch] start", { tenantID, storeID, accountKey });
-
-    const db = await getDB(firebaseServiceAccountKey);
-    const accessToken = await getGmailAccessToken(db, tenantID, storeID, accountKey);
-    const authRef = db
-      .collection("tenants").doc(tenantID)
-      .collection("stores").doc(storeID)
-      .collection("email-auth").doc(accountKey);
-
-    const watchRes = await fetch(`${GMAIL_API_BASE}/watch`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        topicName: `projects/${PROJECT_ID}/topics/gmail-push-notifications`,
-        labelIds: ["INBOX"],
-      }),
-    });
-    tracker.bump("gmailApiCalls", 1);
-
-    if (!watchRes.ok) {
-      const errText = await watchRes.text();
-      log("[gmailReconnectWatch] watch failed", {
-        status: watchRes.status, body: errText.substring(0, 500),
-      });
-      throw new HttpsError("internal", "Watch setup failed: " + errText);
-    }
-
-    const watchData = await watchRes.json();
-    await authRef.update({
-      watchExpiration: parseInt(watchData.expiration) || 0,
-      historyId: watchData.historyId,
-    });
-    tracker.bump("firestoreWrites", 1);
-    log("[gmailReconnectWatch] watch re-established", {
-      expiration: watchData.expiration, historyId: watchData.historyId,
-    });
-
-    const emailsCollection = db
-      .collection("tenants").doc(tenantID)
-      .collection("stores").doc(storeID)
-      .collection("emails");
-
-    const fullResult = await syncFull(
-      db, accessToken, tenantID, storeID, accountKey, emailsCollection, authRef
-    );
-    tracker.set("backfillSynced", fullResult.synced);
-    log("[gmailReconnectWatch] backfill complete", fullResult);
-
-    return {
-      success: true,
-      expiration: watchData.expiration,
-      historyId: watchData.historyId,
-      synced: fullResult.synced,
-      unreadCount: fullResult.unreadCount,
-    };
-  })
-);
 
 } // ─── end of if (DEPLOY_TARGET === "bonita") ───
 
@@ -8833,6 +7664,55 @@ exports.reconcileUsageEvents = _vendorTotals.reconcileUsageEvents;
 // Deployed only to cadence-pos via yarn functionsrss.
 // ═══════════════════════════════════════════════════════════════
 if (DEPLOY_TARGET === "saas") {
+  // ───────────────────────────────────────────────────────────────
+  // SaaS-side project config (Bonita-side equivalents are scoped
+  // inside the bonita branch above and not visible here).
+  // ───────────────────────────────────────────────────────────────
+  const SAAS_PROJECT_ID = "cadence-pos";
+  const SAAS_STORAGE_BUCKET = `${SAAS_PROJECT_ID}.firebasestorage.app`;
+
+  // SaaS-side secrets. Same secret names as Bonita; their values live in
+  // cadence-pos's Secret Manager. Admin SDK inside Cloud Functions uses
+  // Application Default Credentials, so no service-account-key secret is
+  // needed for Gmail handlers.
+  const saasGmailOAuthClientId = defineSecret("GMAIL_OAUTH_CLIENT_ID");
+  const saasGmailOAuthClientSecret = defineSecret("GMAIL_OAUTH_CLIENT_SECRET");
+
+  // SaaS getDB wrapper. The SaaS modules call admin.initializeApp() at
+  // module load (see auth-claims.js) so admin.firestore() is ready by
+  // the time any handler fires; this just matches the gmail.js deps
+  // shape so the same module works on both deploys.
+  const _saasGetDB = async () => admin.firestore();
+
+  const _saasAuthGuards = require("./saas/auth-guards");
+  const _gmailSaas = require("./gmail");
+  const _gmailSaasHandlers = _gmailSaas.register({
+    projectId: SAAS_PROJECT_ID,
+    storageBucket: SAAS_STORAGE_BUCKET,
+    getDB: _saasGetDB,
+    secrets: {
+      gmailOAuthClientId: saasGmailOAuthClientId,
+      gmailOAuthClientSecret: saasGmailOAuthClientSecret,
+    },
+    guards: {
+      assertTenantMatch: _saasAuthGuards.assertTenantMatch,
+    },
+    withFeatureTracking,
+    withFeatureTrackingHttp,
+    withFeatureTrackingSchedule,
+  });
+  exports.gmailInitiateAuth = _gmailSaasHandlers.gmailInitiateAuth;
+  exports.gmailOAuthCallback = _gmailSaasHandlers.gmailOAuthCallback;
+  exports.gmailDisconnect = _gmailSaasHandlers.gmailDisconnect;
+  exports.gmailSyncEmails = _gmailSaasHandlers.gmailSyncEmails;
+  exports.gmailPushHandler = _gmailSaasHandlers.gmailPushHandler;
+  exports.gmailSendEmail = _gmailSaasHandlers.gmailSendEmail;
+  exports.gmailModifyLabels = _gmailSaasHandlers.gmailModifyLabels;
+  exports.gmailGetAttachment = _gmailSaasHandlers.gmailGetAttachment;
+  exports.gmailSetupWatch = _gmailSaasHandlers.gmailSetupWatch;
+  exports.gmailReconnectWatch = _gmailSaasHandlers.gmailReconnectWatch;
+  exports.gmailRenewWatch = _gmailSaasHandlers.gmailRenewWatch;
+
   const authClaims = require("./saas/auth-claims");
   const pubsubSubscriber = require("./saas/pubsub-subscriber");
   const pubsubDeadLetter = require("./saas/pubsub-dead-letter");
@@ -8847,42 +7727,63 @@ if (DEPLOY_TARGET === "saas") {
   const twilioNumbers = require("./saas/twilio-numbers");
   const twilioWebhookInbound = require("./saas/twilio-webhook-inbound");
   const twilioWebhookStatus = require("./saas/twilio-webhook-status");
+  const twilioVoiceFallback = require("./saas/twilio-voice-fallback");
   const twilioPubsubInbound = require("./saas/twilio-pubsub-inbound");
   const twilioPubsubDeadLetter = require("./saas/twilio-pubsub-dead-letter");
   const twilioSend = require("./saas/twilio-send");
   const twilioA2P = require("./saas/twilio-a2p");
   const twilioChurn = require("./saas/twilio-churn");
   const twilioAlerts = require("./saas/twilio-alerts");
+  const emailAdmin = require("./saas/email-admin-callables");
 
   // Phase 1 auth-claims — tenant provisioning + invite flow.
   exports.platformAdminCreateTenantCallable =
     authClaims.platformAdminCreateTenantCallable;
+  exports.listTenantsCallable = authClaims.listTenantsCallable;
+  exports.getTenantCallable = authClaims.getTenantCallable;
   exports.tenantAdminInviteUserCallable =
     authClaims.tenantAdminInviteUserCallable;
   exports.redeemInviteCallable = authClaims.redeemInviteCallable;
+  exports.platformAdminCreateStoreCallable =
+    authClaims.platformAdminCreateStoreCallable;
 
   exports.pubsubStripeEventSubscriber = pubsubSubscriber.handler;
   exports.pubsubStripeDeadLetterIngestor = pubsubDeadLetter.ingestor;
 
   exports.provisionTenantTwilioSubaccount =
     twilioSubaccounts.provisionTenantTwilioSubaccount;
+  exports.platformAdminProvisionTwilioSubaccount =
+    twilioSubaccounts.platformAdminProvisionTwilioSubaccount;
   exports.deactivateTenantTwilioSubaccount =
     twilioSubaccounts.deactivateTenantTwilioSubaccount;
+  exports.platformAdminDeactivateTwilioSubaccount =
+    twilioSubaccounts.platformAdminDeactivateTwilioSubaccount;
+  exports.platformAdminReactivateTwilioSubaccount =
+    twilioSubaccounts.platformAdminReactivateTwilioSubaccount;
   exports.closeTenantTwilioSubaccount =
     twilioSubaccounts.closeTenantTwilioSubaccount;
+  exports.platformAdminCloseTwilioSubaccount =
+    twilioSubaccounts.platformAdminCloseTwilioSubaccount;
 
   exports.purchaseTwilioNumber = twilioNumbers.purchaseTwilioNumber;
+  exports.platformAdminSearchTwilioAvailableNumbers =
+    twilioNumbers.platformAdminSearchTwilioAvailableNumbers;
+  exports.platformAdminPurchaseTwilioNumber =
+    twilioNumbers.platformAdminPurchaseTwilioNumber;
   exports.portInTwilioNumber = twilioNumbers.portInTwilioNumber;
   exports.releaseTwilioNumber = twilioNumbers.releaseTwilioNumber;
   exports.transferNumberBetweenStores =
     twilioNumbers.transferNumberBetweenStores;
   exports.scheduledTwilioPortInPoll = twilioNumbers.scheduledTwilioPortInPoll;
+  exports.platformAdminConfigureTenantWebhooks =
+    twilioNumbers.platformAdminConfigureTenantWebhooks;
 
   // Phase 3 — inbound pipeline + outbound status. Function names MUST match
   // the webhook URLs hardcoded in twilio-common.js (every purchased number
   // points to these exact names).
   exports.twilioInboundWebhook = twilioWebhookInbound.handler;
   exports.twilioStatusCallbackWebhook = twilioWebhookStatus.handler;
+  exports.twilioVoiceFallback = twilioVoiceFallback.handler;
   exports.pubsubTwilioInboundSubscriber = twilioPubsubInbound.handler;
   exports.pubsubTwilioDeadLetterIngestor = twilioPubsubDeadLetter.ingestor;
 
@@ -8896,6 +7797,17 @@ if (DEPLOY_TARGET === "saas") {
   exports.unlinkNumberFromA2PCampaign = twilioA2P.unlinkNumberFromA2PCampaign;
   exports.getTenantA2PStatus = twilioA2P.getTenantA2PStatus;
   exports.scheduledA2PStatusPoll = twilioA2P.scheduledA2PStatusPoll;
+
+  // Platform-admin variants — used by cadence-dashboard to punch in tenant
+  // business info and bulk-link numbers on the tenant's behalf.
+  exports.platformAdminSubmitTenantA2PBrand =
+    twilioA2P.platformAdminSubmitTenantA2PBrand;
+  exports.platformAdminSubmitTenantA2PCampaign =
+    twilioA2P.platformAdminSubmitTenantA2PCampaign;
+  exports.platformAdminLinkAllNumbersToA2PCampaign =
+    twilioA2P.platformAdminLinkAllNumbersToA2PCampaign;
+  exports.platformAdminGetTenantA2PStatus =
+    twilioA2P.platformAdminGetTenantA2PStatus;
 
   // Phase 7 — churn cleanup. Scheduled daily; force-close is SuperUser-only.
   exports.scheduledTwilioChurnCleanup = twilioChurn.scheduledTwilioChurnCleanup;
@@ -8911,9 +7823,24 @@ if (DEPLOY_TARGET === "saas") {
   exports.stripeConnectAccountCreate = connectCallables.stripeConnectAccountCreate;
   exports.stripeConnectAccountLinkCreate = connectCallables.stripeConnectAccountLinkCreate;
   exports.stripeConnectAccountStatusCallable = connectCallables.stripeConnectAccountStatusCallable;
+  exports.platformAdminStripeConnectAccountCreate =
+    connectCallables.platformAdminStripeConnectAccountCreate;
+  exports.platformAdminStripeConnectAccountLinkCreate =
+    connectCallables.platformAdminStripeConnectAccountLinkCreate;
+  exports.platformAdminStripeConnectAccountStatus =
+    connectCallables.platformAdminStripeConnectAccountStatus;
+
+  exports.platformAdminGetTenantEmailStatus =
+    emailAdmin.platformAdminGetTenantEmailStatus;
+  exports.platformAdminReconnectEmailWatch =
+    emailAdmin.platformAdminReconnectEmailWatch;
+  exports.platformAdminForceEmailSync =
+    emailAdmin.platformAdminForceEmailSync;
 
   exports.stripeConnectInitiatePaymentIntentV2 = connectPI.stripeConnectInitiatePaymentIntentV2;
   exports.stripeConnectCancelPaymentIntentV2 = connectPI.stripeConnectCancelPaymentIntentV2;
+  exports.stripeConnectCreateTapToPayPaymentIntentCallable =
+    connectPI.stripeConnectCreateTapToPayPaymentIntentCallable;
 
   exports.stripeWebhookV2_Connect = connectWebhook.handler;
 
@@ -8925,6 +7852,8 @@ if (DEPLOY_TARGET === "saas") {
     connectReaders.stripeConnectRegisterReaderCallable;
   exports.stripeConnectListReadersCallable =
     connectReaders.stripeConnectListReadersCallable;
+  exports.stripeConnectConnectionTokenCallable =
+    connectReaders.stripeConnectConnectionTokenCallable;
 
   exports.stripeConnectCreateCheckoutSessionV2 =
     connectCheckoutSession.stripeConnectCreateCheckoutSessionV2;

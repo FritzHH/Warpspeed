@@ -8,10 +8,35 @@ import { dlog, DCAT } from "./checkoutDebugLog";
 // Lazy-initialized module-level singleton. Persists across
 // component re-mounts. The SDK manages its own connection
 // token refresh cycle via onFetchConnectionToken.
+//
+// Connection-token source is configurable at runtime via
+// setConnectionTokenContext(). For SaaS (Connect) usage, callers
+// MUST set the context before the SDK is initialized so the first
+// fetchConnectionToken call mints a token scoped to the correct
+// connected account.
 
 let _terminal = null;
 let _initPromise = null;
 let _functions = null;
+
+// { mode: "connect" | "legacy", connectAccountID, locationID }
+let _tokenContext = { mode: "legacy", connectAccountID: null, locationID: null };
+
+export function setConnectionTokenContext({ connectAccountID, locationID } = {}) {
+  if (connectAccountID) {
+    _tokenContext = {
+      mode: "connect",
+      connectAccountID,
+      locationID: locationID || null,
+    };
+  } else {
+    _tokenContext = { mode: "legacy", connectAccountID: null, locationID: null };
+  }
+}
+
+export function getConnectionTokenContext() {
+  return { ..._tokenContext };
+}
 
 async function getFunctionsInstance() {
   if (!_functions) {
@@ -22,13 +47,28 @@ async function getFunctionsInstance() {
 }
 
 async function fetchConnectionToken() {
-  console.log("[CARD_READER] SDK fetchConnectionToken called");
-  dlog(DCAT.STRIPE_REQ, "fetchConnectionToken", "TerminalSDK", {});
+  console.log("[CARD_READER] SDK fetchConnectionToken called, mode:", _tokenContext.mode);
+  dlog(DCAT.STRIPE_REQ, "fetchConnectionToken", "TerminalSDK", { mode: _tokenContext.mode });
   const fns = await getFunctionsInstance();
-  const callable = httpsCallable(fns, "newCheckoutConnectionTokenCallable");
-  const result = await callable({});
+  let callableName;
+  let payload;
+  if (_tokenContext.mode === "connect") {
+    if (!_tokenContext.connectAccountID) {
+      throw new Error("Connection-token context is connect-mode but connectAccountID is unset");
+    }
+    callableName = "stripeConnectConnectionTokenCallable";
+    payload = {
+      connectAccountID: _tokenContext.connectAccountID,
+      locationID: _tokenContext.locationID || undefined,
+    };
+  } else {
+    callableName = "newCheckoutConnectionTokenCallable";
+    payload = {};
+  }
+  const callable = httpsCallable(fns, callableName);
+  const result = await callable(payload);
   const secret = result.data?.secret;
-  console.log("[CARD_READER] SDK fetchConnectionToken result:", secret ? "token received" : "NO TOKEN", JSON.stringify(result.data));
+  console.log("[CARD_READER] SDK fetchConnectionToken result:", secret ? "token received" : "NO TOKEN");
   dlog(DCAT.STRIPE_RES, "fetchConnectionToken", "TerminalSDK", { hasSecret: !!secret });
   if (!secret) throw new Error("Connection token missing from server response");
   return secret;
@@ -133,6 +173,19 @@ export async function connectToReader(reader) {
 }
 
 /**
+ * Returns the currently connected SDK reader (or null). Does not initialize
+ * the SDK — callers check this to decide whether they need to pair first.
+ */
+export function getConnectedSDKReader() {
+  if (!_terminal) return null;
+  try {
+    return _terminal.getConnectedReader() || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
  * Disconnect from the currently connected reader.
  */
 export async function disconnectReader() {
@@ -209,4 +262,107 @@ export async function cancelCollect() {
     console.log("[CARD_READER] SDK cancel error (non-fatal):", e?.message);
     log("Terminal SDK: cancel error (non-fatal)", e);
   }
+}
+
+/**
+ * Pair an iPhone as a Tap to Pay reader on a connected Stripe account.
+ *
+ * Stripe Terminal JS SDK flow:
+ *   1. Mint a connection token on the connected account (via the configured
+ *      context — caller is responsible for passing connectAccountID).
+ *   2. Discover with discoveryMethod="tap_to_pay" and the location ID. The
+ *      SDK returns one reader representing this iPhone.
+ *   3. Connect to that reader. Apple will prompt for Tap to Pay terms on
+ *      first use; subsequent pairings skip the prompt.
+ *
+ * Once connected, the reader exists as a Stripe terminal.Reader bound to the
+ * given location. Calling stripeConnectListReadersCallable afterwards (the
+ * dashboard's "Refresh from Stripe" button) will reconcile it into the
+ * tenant's Firestore `readers` subcollection.
+ *
+ * @param {Object} args
+ * @param {string} args.connectAccountID — Connected Stripe account ID (`acct_*`)
+ * @param {string} args.tenantID         — for telemetry / future use
+ * @param {string} args.storeID          — for telemetry / future use
+ * @param {string} args.terminalLocationID — `tml_*` for the store's location
+ * @returns {{ reader: object }} — the connected reader summary
+ */
+export async function pairTapToPayOnIphone({
+  connectAccountID,
+  tenantID,
+  storeID,
+  terminalLocationID,
+} = {}) {
+  if (!connectAccountID) throw new Error("connectAccountID is required");
+  if (!terminalLocationID) throw new Error("terminalLocationID is required");
+
+  console.log("[CARD_READER] TTPi pair starting", {
+    connectAccountID,
+    terminalLocationID,
+    tenantID,
+    storeID,
+  });
+  dlog(DCAT.ACTION, "pairTapToPayOnIphone:start", "TerminalSDK", {
+    connectAccountID,
+    terminalLocationID,
+  });
+
+  // Configure the token-fetcher BEFORE the SDK initializes so the first
+  // onFetchConnectionToken call mints a Connect-scoped token. If the SDK
+  // is already initialized (e.g., user re-paired earlier this session),
+  // the next refresh will pick up the new context.
+  setConnectionTokenContext({
+    connectAccountID,
+    locationID: terminalLocationID,
+  });
+
+  const terminal = await getTerminalInstance();
+
+  // Disconnect any previously connected reader so discovery is clean.
+  const current = terminal.getConnectedReader();
+  if (current) {
+    console.log("[CARD_READER] TTPi disconnecting previous reader:", current.id);
+    await terminal.disconnectReader();
+  }
+
+  console.log("[CARD_READER] TTPi calling discoverReaders(tap_to_pay)...");
+  const discoverResult = await terminal.discoverReaders({
+    discoveryMethod: "tap_to_pay",
+    location: terminalLocationID,
+  });
+  if ("error" in discoverResult) {
+    console.log("[CARD_READER] TTPi discoverReaders ERROR:", JSON.stringify(discoverResult.error));
+    dlog(DCAT.STRIPE_ERR, "pairTapToPayOnIphone:discover", "TerminalSDK", {
+      error: discoverResult.error.message,
+    });
+    throw discoverResult.error;
+  }
+
+  const discovered = discoverResult.discoveredReaders || [];
+  console.log("[CARD_READER] TTPi discovered", discovered.length, "readers");
+  if (discovered.length === 0) {
+    throw new Error(
+      "No Tap to Pay reader was returned. Confirm this iPhone is XS or later running iOS 16.7+ in Safari."
+    );
+  }
+
+  const ttpiReader = discovered[0];
+  console.log("[CARD_READER] TTPi calling connectReader on:", ttpiReader.id);
+  const connectResult = await terminal.connectReader(ttpiReader, {
+    allowCustomerCancel: false,
+  });
+  if ("error" in connectResult) {
+    console.log("[CARD_READER] TTPi connectReader ERROR:", JSON.stringify(connectResult.error));
+    dlog(DCAT.STRIPE_ERR, "pairTapToPayOnIphone:connect", "TerminalSDK", {
+      error: connectResult.error.message,
+    });
+    throw connectResult.error;
+  }
+
+  console.log("[CARD_READER] TTPi pair SUCCESS:", connectResult.reader?.id);
+  dlog(DCAT.STRIPE_RES, "pairTapToPayOnIphone:done", "TerminalSDK", {
+    readerId: connectResult.reader?.id,
+  });
+
+  return { reader: connectResult.reader };
 }

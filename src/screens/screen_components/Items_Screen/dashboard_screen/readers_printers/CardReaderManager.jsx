@@ -1,16 +1,19 @@
 import React, { useState } from "react";
 import { DropdownMenu, TextInput } from "../../../../../dom_components";
 import { C, ICONS } from "../../../../../styles";
-import { localStorageWrapper } from "../../../../../utils";
 import { useAlertScreenStore } from "../../../../../stores";
 import styles from "./CardReaderManager.module.css";
 
-const LS_CARD_READER_KEY = "warpspeed_selected_card_reader";
-
-export function CardReaderManager({ liveReaders = [], savedReaders = [], onSaveReaders }) {
+export function CardReaderManager({
+  liveReaders = [],
+  savedReaders = [],
+  onSaveReaders,
+  selectedReader,
+  onSelectReader,
+}) {
   const [sEditingId, _setEditingId] = useState(null);
   const [sLabelDraft, _setLabelDraft] = useState("");
-  const [sSelectedReader, _setSelectedReader] = useState(() => localStorageWrapper.getItem(LS_CARD_READER_KEY));
+  const sSelectedReader = selectedReader && selectedReader.id ? selectedReader : null;
 
   let mergedReaders = liveReaders.map((live) => {
     let saved = savedReaders.find((s) => s.id === live.id);
@@ -47,8 +50,7 @@ export function CardReaderManager({ liveReaders = [], savedReaders = [], onSaveR
         let updated = savedReaders.filter((s) => s.id !== reader.id);
         onSaveReaders(updated);
         if (sSelectedReader?.id === reader.id) {
-          _setSelectedReader(null);
-          localStorageWrapper.removeItem(LS_CARD_READER_KEY);
+          onSelectReader({ id: "", label: "" });
         }
         useAlertScreenStore.getState().setShowAlert(false);
       },
@@ -199,8 +201,7 @@ export function CardReaderManager({ liveReaders = [], savedReaders = [], onSaveR
           onSelect={(item) => {
             if (item.disabled) return;
             let obj = { id: item.id, label: item.rawLabel || "" };
-            _setSelectedReader(obj);
-            localStorageWrapper.setItem(LS_CARD_READER_KEY, obj);
+            onSelectReader(obj);
           }}
         />
       </div>

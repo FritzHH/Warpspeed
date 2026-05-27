@@ -37,6 +37,40 @@ const INBOUND_WEBHOOK_URL =
   `https://us-central1-${GCP_PROJECT_ID}.cloudfunctions.net/twilioInboundWebhook`;
 const STATUS_CALLBACK_URL =
   `https://us-central1-${GCP_PROJECT_ID}.cloudfunctions.net/twilioStatusCallbackWebhook`;
+// Voice fallback for SMS-only numbers. A customer who calls one of these
+// numbers hits a polite "this is SMS only" TwiML response served by the
+// twilioVoiceFallback HTTPS function — better than Twilio's default
+// "application not configured" Twimlet.
+const VOICE_URL =
+  `https://us-central1-${GCP_PROJECT_ID}.cloudfunctions.net/twilioVoiceFallback`;
+
+// Single source of truth for per-number webhook configuration. Used by the
+// purchase callable (passed into incomingPhoneNumbers.create), the
+// configure-webhooks helper (passed into .update), and the drift detector
+// (compared against the per-number doc's stored urls). When a URL changes
+// here, every number's stored webhooks become "drifted" until reconfigured
+// via the bulk callable.
+const CURRENT_WEBHOOK_CONFIG = {
+  smsUrl: INBOUND_WEBHOOK_URL,
+  smsMethod: "POST",
+  statusCallback: STATUS_CALLBACK_URL,
+  statusCallbackMethod: "POST",
+  voiceUrl: VOICE_URL,
+  voiceMethod: "POST",
+};
+
+// Returns true if the per-number doc's stored `webhooks` block matches the
+// current source-of-truth URLs. Missing block, missing fields, and mismatched
+// values all count as drift. Used by getTenantCallable to compute the
+// per-store drifted count surfaced in the UI.
+function numberWebhooksAreCurrent(stored) {
+  if (!stored) return false;
+  return (
+    stored.smsUrl === CURRENT_WEBHOOK_CONFIG.smsUrl &&
+    stored.statusCallback === CURRENT_WEBHOOK_CONFIG.statusCallback &&
+    stored.voiceUrl === CURRENT_WEBHOOK_CONFIG.voiceUrl
+  );
+}
 
 function requireAuth(request) {
   const auth = request.auth;
@@ -294,6 +328,9 @@ module.exports = {
   GCP_PROJECT_ID,
   INBOUND_WEBHOOK_URL,
   STATUS_CALLBACK_URL,
+  VOICE_URL,
+  CURRENT_WEBHOOK_CONFIG,
+  numberWebhooksAreCurrent,
   requireAuth,
   requireTenantMember,
   requireTenantMemberWithLevel,

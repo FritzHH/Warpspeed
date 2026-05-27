@@ -746,6 +746,26 @@ export const stripeConnectAccountStatusCallable = httpsCallable(
   functions,
   "stripeConnectAccountStatusCallable"
 );
+export const stripeConnectCreateTerminalLocationCallable = httpsCallable(
+  functions,
+  "stripeConnectCreateTerminalLocationCallable"
+);
+export const stripeConnectRegisterReaderCallable = httpsCallable(
+  functions,
+  "stripeConnectRegisterReaderCallable"
+);
+export const stripeConnectListReadersCallable = httpsCallable(
+  functions,
+  "stripeConnectListReadersCallable"
+);
+export const stripeConnectConnectionTokenCallable = httpsCallable(
+  functions,
+  "stripeConnectConnectionTokenCallable"
+);
+export const stripeConnectCreateTapToPayPaymentIntentCallable = httpsCallable(
+  functions,
+  "stripeConnectCreateTapToPayPaymentIntentCallable"
+);
 
 export function sendSMS(messageBody) {
   return sendSMSCallable(messageBody)

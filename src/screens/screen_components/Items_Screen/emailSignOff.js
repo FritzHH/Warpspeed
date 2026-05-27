@@ -1,12 +1,14 @@
-import { useSettingsStore, useLoginStore } from "../../../stores";
+import { useEmailStore, useLoginStore } from "../../../stores";
 
 function escapeHtml(s) {
   return (s || "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
 export function buildSignOffHtml(activeAccountKey) {
-  let zSettings = useSettingsStore.getState().settings;
-  let activeAccount = zSettings?.emailAccounts?.find((a) => a.accountKey === activeAccountKey) || {};
+  let accounts = useEmailStore.getState().getEmailAccounts() || [];
+  let activeAccount = accounts.find(
+    (a) => (a.accountKey || a.id) === activeAccountKey
+  ) || {};
   let currentUser = useLoginStore.getState().getCurrentUser();
   let firstName = currentUser?.first || "";
   let lastInitial = currentUser?.last ? currentUser.last.charAt(0) + "." : "";

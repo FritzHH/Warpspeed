@@ -392,7 +392,8 @@ export function NewWorkorderComponent({}) {
               color: C.text,
             }}
             autoFocus={true}
-            autoComplete="one-time-code"
+            autoComplete="off"
+            name="customer-search-phone"
             value={sTextInput}
             onChangeText={(val) => handleTextChange(val)}
             dashStyle={{ width: 10, marginHorizontal: 4 }}
@@ -405,7 +406,8 @@ export function NewWorkorderComponent({}) {
             placeholder="First, last or email"
             onChange={(e) => handleTextChange(e.target.value)}
             autoFocus
-            autoComplete="one-time-code"
+            autoComplete="off"
+            name="customer-search-name"
             className={styles.nameInput}
             style={{
               caretColor: C.cursorRed,

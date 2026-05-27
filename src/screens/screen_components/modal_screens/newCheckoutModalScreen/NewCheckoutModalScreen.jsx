@@ -1565,7 +1565,7 @@ export function NewCheckoutModalScreen() {
     let stripeStore = useStripePaymentStore.getState();
     // If reader is waiting for a card, cancel the payment on the terminal
     if (stripeStore.cardStatus === "waitingForCard" || stripeStore.cardStatus === "initiating") {
-      let savedReader = localStorageWrapper.getItem("warpspeed_selected_card_reader");
+      let savedReader = useSettingsStore.getState().getSettings()?.selectedCardReaderObj;
       if (savedReader?.id) {
         newCheckoutCancelStripePayment(savedReader.id).catch((err) => log("clearReader on close error:", err));
       }

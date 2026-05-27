@@ -10,10 +10,7 @@ export const EmailOptionsComponent = ({ zSettingsObj, handleSettingsFieldChange 
         zSettingsObj={zSettingsObj}
         handleSettingsFieldChange={handleSettingsFieldChange}
       />
-      <EmailSignature
-        zSettingsObj={zSettingsObj}
-        handleSettingsFieldChange={handleSettingsFieldChange}
-      />
+      <EmailSignature />
       <EmailTemplates
         zSettingsObj={zSettingsObj}
         handleSettingsFieldChange={handleSettingsFieldChange}

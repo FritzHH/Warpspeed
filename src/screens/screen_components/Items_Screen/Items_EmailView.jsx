@@ -107,6 +107,7 @@ const ThreadView = React.memo(() => {
     const msg = latestMessage;
     let signOff = buildSignOffHtml(zActiveAccountKey);
     useEmailStore.getState().setComposeMode("reply");
+    useEmailStore.getState().setThreadInspectorState("open");
     useEmailStore.getState().updateComposeDraft({
       to: [msg.from],
       subject: msg.subject?.startsWith("Re:") ? msg.subject : `Re: ${msg.subject}`,
@@ -120,11 +121,11 @@ const ThreadView = React.memo(() => {
   function handleReplyAll() {
     const msg = latestMessage;
     const allRecipients = [...new Set([msg.from, ...(msg.to || []), ...(msg.cc || [])])];
-    const zSettings = useSettingsStore.getState().settings;
-    const myEmail = zSettings?.emailAccounts?.find((a) => a.accountKey === zActiveAccountKey)?.email || "";
+    const myEmail = useEmailStore.getState().getEmailAccountByKey?.(zActiveAccountKey)?.email || "";
     const toList = allRecipients.filter((e) => e !== myEmail);
     let signOff = buildSignOffHtml(zActiveAccountKey);
     useEmailStore.getState().setComposeMode("replyAll");
+    useEmailStore.getState().setThreadInspectorState("open");
     useEmailStore.getState().updateComposeDraft({
       to: toList,
       subject: msg.subject?.startsWith("Re:") ? msg.subject : `Re: ${msg.subject}`,
@@ -139,6 +140,7 @@ const ThreadView = React.memo(() => {
     const msg = latestMessage;
     let signOff = buildSignOffHtml(zActiveAccountKey);
     useEmailStore.getState().setComposeMode("forward");
+    useEmailStore.getState().setThreadInspectorState("open");
     useEmailStore.getState().updateComposeDraft({
       to: [],
       subject: msg.subject?.startsWith("Fwd:") ? msg.subject : `Fwd: ${msg.subject}`,
@@ -250,7 +252,7 @@ const ThreadView = React.memo(() => {
 // MESSAGE BUBBLE
 // ============================================================================
 
-const MessageBubble = React.memo(({ message, isExpanded, onToggleExpand, isLast }) => {
+export const MessageBubble = React.memo(({ message, isExpanded, onToggleExpand, isLast }) => {
   const [sShowImages, _sSetShowImages] = useState(false);
   const [sDownloadingAttachment, _sSetDownloadingAttachment] = useState(null);
 
@@ -497,6 +499,9 @@ const EmailAutocompleteInput = React.memo(({ value, onChangeText, placeholder })
         placeholder={placeholder}
         style={{ fontSize: 14, outline: "none" }}
         debounceMs={0}
+        type="email"
+        autoComplete="email"
+        name="compose-recipient"
       />
       <div className={styles.autocompleteDropdownAnchor}>
         {showDropdown && (
@@ -553,7 +558,8 @@ const ComposeView = React.memo(() => {
   const zComposeDraft = useEmailStore((state) => state.composeDraft);
   const zSendingEmail = useEmailStore((state) => state.sendingEmail);
   const zActiveAccountKey = useEmailStore((state) => state.activeAccountKey);
-  const zSettings = useSettingsStore((state) => state.settings);
+  const zEmailAccounts = useEmailStore((state) => state.emailAccounts);
+  const zThreadInspectorState = useEmailStore((state) => state.threadInspectorState);
 
   const [sShowCc, _sSetShowCc] = useState(zComposeDraft.cc?.length > 0);
   const [sShowBcc, _sSetShowBcc] = useState(zComposeDraft.bcc?.length > 0);
@@ -573,7 +579,9 @@ const ComposeView = React.memo(() => {
     }
   }, []);
 
-  const myEmail = zSettings?.emailAccounts?.find((a) => a.accountKey === zActiveAccountKey)?.email || "";
+  const myEmail = (zEmailAccounts || []).find(
+    (a) => (a.accountKey || a.id) === zActiveAccountKey
+  )?.email || "";
 
   const modeLabel =
     zComposeMode === "reply" ? "Reply" :
@@ -751,6 +759,21 @@ const ComposeView = React.memo(() => {
         >
           {modeLabel}
         </span>
+        {zComposeMode !== "new" &&
+          zComposeMode !== null &&
+          zThreadInspectorState === "minimized" && (
+            <button
+              type="button"
+              className={styles.viewThreadPill}
+              onClick={() =>
+                useEmailStore.getState().setThreadInspectorState("open")
+              }
+              style={{ borderColor: C.borderSubtle, color: C.text }}
+            >
+              <img src={ICONS.eyeballs} alt="" className={styles.viewThreadIcon} />
+              <span>View Thread</span>
+            </button>
+          )}
         <span className={styles.composeFromLabel} style={{ color: C.textMuted }}>
           From: {myEmail}
         </span>

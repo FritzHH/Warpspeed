@@ -1208,20 +1208,7 @@ export function ean13CheckDigit(first12) {
   return (10 - (sum % 10)) % 10;
 }
 
-/**
- * Generate a 12-digit crypto-random numeric ID.
- * @returns {string} 12-digit numeric string
- */
-export function generateEAN13Barcode() {
-  const arr = crypto.getRandomValues(new Uint8Array(12));
-  const digits = Array.from(arr, b => b % 10);
-  let sum = 0;
-  for (let i = 0; i < 12; i++) {
-    sum += digits[i] * (i % 2 === 0 ? 1 : 3);
-  }
-  const checkDigit = (10 - (sum % 10)) % 10;
-  return digits.join('') + String(checkDigit);
-}
+export { generateEAN13Barcode } from "./shared/idGen";
 
 /**
  * Generate a 13-digit EAN-13 barcode with a forced first digit (prefix).

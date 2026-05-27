@@ -289,6 +289,29 @@
   font-size: 12px;
 }
 
+.viewThreadPill {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  border-width: 1px;
+  border-style: solid;
+  background: transparent;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.viewThreadPill:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.viewThreadIcon {
+  width: 16px;
+  height: 16px;
+}
+
 .composeScroll {
   flex: 1 1 0;
   min-height: 0;

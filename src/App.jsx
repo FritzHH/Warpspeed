@@ -247,22 +247,24 @@ function App() {
       if (firebaseUser && initialLoad) {
         try {
           const tokenResult = await firebaseUser.getIdTokenResult();
-          const { tenantID, storeID } = tokenResult.claims;
-          await loadTenantAndSettings(tenantID, storeID);
+          const claims = tokenResult.claims;
+          const { tenantID } = claims;
+          // SaaS claim shape carries `stores: [storeID, ...]` with no singular
+          // `storeID`. Legacy Bonita claim is `{tenantID, storeID}`. Pick the
+          // active store from whichever is present so first sign-in works for
+          // both. Owners with multiple stores land on stores[0] until an
+          // explicit switcher exists.
+          const claimStores = Array.isArray(claims.stores) ? claims.stores : [];
+          const activeStoreID = claims.storeID || claimStores[0] || null;
+          await loadTenantAndSettings(tenantID, activeStoreID);
           topUpPool();
 
-          // Stash SaaS claims for new SaaS-only UI gates. tokenResult.claims
-          // also carries privilege, stores, and platformAdmin when present;
-          // legacy Bonita users only have {tenantID, storeID} so the others
-          // fall back to safe defaults.
           useLoginStore.getState().setAuthClaims({
-            tenantID: tokenResult.claims.tenantID || null,
-            storeID: tokenResult.claims.storeID || null,
-            privilege: tokenResult.claims.privilege || null,
-            stores: Array.isArray(tokenResult.claims.stores)
-              ? tokenResult.claims.stores
-              : [],
-            platformAdmin: tokenResult.claims.platformAdmin === true,
+            tenantID: tenantID || null,
+            storeID: activeStoreID,
+            privilege: claims.privilege || null,
+            stores: claimStores,
+            platformAdmin: claims.platformAdmin === true,
           });
 
           // DEV-ONLY: auto-login the user with id "1234" so owner-permissioned
@@ -393,11 +395,11 @@ function App() {
           }
         />
 
-        {/* Protected route - Stripe Connect onboarding (SaaS) */}
+        {/* Protected route - Stripe Connect onboarding (SaaS, owner-only) */}
         <Route
           path={ROUTES.stripeConnect}
           element={
-            <ProtectedRoute user={user}>
+            <ProtectedRoute user={user} requirePrivilege="owner">
               <Suspense fallback={<LoadingIndicator />}>
                 <StripeConnectScreen />
               </Suspense>
@@ -407,7 +409,7 @@ function App() {
         <Route
           path={ROUTES.stripeConnectRefresh}
           element={
-            <ProtectedRoute user={user}>
+            <ProtectedRoute user={user} requirePrivilege="owner">
               <Suspense fallback={<LoadingIndicator />}>
                 <StripeConnectScreen mode="refresh" />
               </Suspense>
@@ -417,7 +419,7 @@ function App() {
         <Route
           path={ROUTES.stripeConnectComplete}
           element={
-            <ProtectedRoute user={user}>
+            <ProtectedRoute user={user} requirePrivilege="owner">
               <Suspense fallback={<LoadingIndicator />}>
                 <StripeConnectScreen mode="complete" />
               </Suspense>

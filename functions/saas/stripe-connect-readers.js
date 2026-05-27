@@ -286,6 +286,13 @@ exports.stripeConnectRegisterReaderCallable = onCall(
   }
 );
 
+// Lists readers on the Connect account and reconciles them into the store's
+// Firestore `readers` subcollection. Reconcile semantics: Stripe is the source
+// of truth — any Firestore reader doc whose `stripeReaderID` is no longer in
+// the Stripe list is deleted (keeps the UI from showing zombie readers after
+// a hardware swap). If `tenantID` + `storeID` are provided we scope the
+// reconcile to that store; otherwise the callable just returns the list
+// without writing.
 exports.stripeConnectListReadersCallable = onCall(
   {
     region: "us-central1",
@@ -296,6 +303,8 @@ exports.stripeConnectListReadersCallable = onCall(
 
     const {
       connectAccountID,
+      tenantID,
+      storeID,
       terminalLocationID,
       status,
       limit,
@@ -306,6 +315,12 @@ exports.stripeConnectListReadersCallable = onCall(
     }
     const ownerTenantID = await lookupTenantForConnectAccount(connectAccountID);
     assertTenantMatch(auth, ownerTenantID);
+    if (tenantID && tenantID !== ownerTenantID) {
+      throw new HttpsError(
+        "permission-denied",
+        "tenantID does not match the Connect account's owning tenant."
+      );
+    }
 
     const stripe = getStripe();
     const stripeOpts = { stripeAccount: connectAccountID };
@@ -328,10 +343,93 @@ exports.stripeConnectListReadersCallable = onCall(
 
     const readers = (listed.data || []).map(readerSummary);
 
+    let reconciled = false;
+    if (tenantID && storeID) {
+      const db = getFirestore();
+      const colRef = db
+        .collection("tenants")
+        .doc(tenantID)
+        .collection("stores")
+        .doc(storeID)
+        .collection("readers");
+      const existingSnap = await colRef.get();
+      const stripeIDs = new Set(readers.map((r) => r.stripeReaderID));
+      const batch = db.batch();
+      for (const summary of readers) {
+        batch.set(
+          colRef.doc(summary.stripeReaderID),
+          {
+            ...summary,
+            connectAccountID,
+            tenantID,
+            storeID,
+            lastSyncedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
+      for (const doc of existingSnap.docs) {
+        if (!stripeIDs.has(doc.id)) {
+          batch.delete(doc.ref);
+        }
+      }
+      await batch.commit();
+      reconciled = true;
+      logger.info("stripeConnectListReadersCallable: reconciled Firestore", {
+        tenantID,
+        storeID,
+        stripeCount: readers.length,
+        firestoreBefore: existingSnap.size,
+      });
+    }
+
     return {
       success: true,
       readers,
       hasMore: listed.has_more === true,
+      reconciled,
+    };
+  }
+);
+
+// Mints a Stripe Terminal connection token on the Connect account. The Terminal
+// JS SDK (browser) calls this via the SDK's `onFetchConnectionToken` hook to
+// authorize reader discovery + payment collection. Required for Tap to Pay on
+// iPhone (iOS Safari) which uses the JS SDK end-to-end.
+exports.stripeConnectConnectionTokenCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [STRIPE_PLATFORM_SECRET_KEY],
+  },
+  async (request) => {
+    const auth = requireAuth(request);
+
+    const { connectAccountID, locationID } = request.data || {};
+    if (!connectAccountID || typeof connectAccountID !== "string") {
+      throw new HttpsError("invalid-argument", "connectAccountID is required.");
+    }
+    const ownerTenantID = await lookupTenantForConnectAccount(connectAccountID);
+    assertTenantMatch(auth, ownerTenantID);
+
+    const stripe = getStripe();
+    const stripeOpts = { stripeAccount: connectAccountID };
+
+    let token;
+    try {
+      const params = {};
+      if (locationID) params.location = locationID;
+      token = await stripe.terminal.connectionTokens.create(params, stripeOpts);
+    } catch (err) {
+      logger.error("stripeConnectConnectionTokenCallable: stripe create failed", {
+        connectAccountID,
+        error: err && err.message,
+      });
+      throw new HttpsError("internal", err.message || "Connection token create failed.");
+    }
+
+    return {
+      success: true,
+      secret: token.secret,
     };
   }
 );

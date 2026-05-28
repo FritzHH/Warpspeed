@@ -60,6 +60,18 @@ const refreshConnectStatusCallable = httpsCallable(
   functions,
   "platformAdminStripeConnectAccountStatus"
 );
+const updateTenantBillingCallable = httpsCallable(
+  functions,
+  "platformAdminUpdateTenantBillingCallable"
+);
+const listBillingTiersCallable = httpsCallable(
+  functions,
+  "platformAdminListBillingTiersCallable"
+);
+const changeTenantTierCallable = httpsCallable(
+  functions,
+  "stripeBillingChangeTenantTierCallable"
+);
 const getEmailStatusCallable = httpsCallable(
   functions,
   "platformAdminGetTenantEmailStatus"
@@ -324,6 +336,24 @@ export function TenantDetailScreen() {
   const [connectLink, setConnectLink] = useState(null);
   const [showRequirements, setShowRequirements] = useState(false);
   const [connectLinkCopied, setConnectLinkCopied] = useState(false);
+
+  // Billing state. feeDraft mirrors the editable input string while the user
+  // types; we only validate on Save so partial inputs ("0.", ".5") don't trip
+  // the editor mid-keystroke. feeEditing gates the form visibility.
+  const [feeEditing, setFeeEditing] = useState(false);
+  const [feeDraft, setFeeDraft] = useState("");
+  const [feeBusy, setFeeBusy] = useState(false);
+  const [feeError, setFeeError] = useState("");
+
+  // Tier-change state. tierEditing toggles the picker, tierDraft holds the
+  // selected tierID, tiers caches the active-tier roster for the dropdown.
+  const [tierEditing, setTierEditing] = useState(false);
+  const [tierDraft, setTierDraft] = useState("");
+  const [tierBusy, setTierBusy] = useState(false);
+  const [tierError, setTierError] = useState("");
+  const [activeTiers, setActiveTiers] = useState(null);
+  const [activeTiersError, setActiveTiersError] = useState("");
+  const [prorationBehavior, setProrationBehavior] = useState("create_prorations");
 
   // Email state. emailAccounts is the deep status roster from
   // platformAdminGetTenantEmailStatus (richer than tenant.email.accounts
@@ -642,6 +672,100 @@ export function TenantDetailScreen() {
       setConnectLinkCopied(true);
     } catch {
       // clipboard API blocked — leave the URL visible for manual copy
+    }
+  };
+
+  const openFeeEdit = () => {
+    const current = tenant?.billing?.platformFeePercent;
+    setFeeDraft(
+      typeof current === "number" ? String(current) : ""
+    );
+    setFeeError("");
+    setFeeEditing(true);
+  };
+
+  const cancelFeeEdit = () => {
+    if (feeBusy) return;
+    setFeeEditing(false);
+    setFeeError("");
+  };
+
+  const saveFee = async () => {
+    const trimmed = feeDraft.trim();
+    const num = Number(trimmed);
+    if (!Number.isFinite(num) || num < 0 || num > 10) {
+      setFeeError("Enter a number between 0 and 10.");
+      return;
+    }
+    setFeeBusy(true);
+    setFeeError("");
+    try {
+      await updateTenantBillingCallable({
+        tenantID,
+        platformFeePercent: num,
+      });
+      await loadTenant();
+      setFeeEditing(false);
+    } catch (err) {
+      const code = err?.code || "";
+      const msg = err?.message || "Failed to update platform fee.";
+      setFeeError(code ? `${code}: ${msg}` : msg);
+    } finally {
+      setFeeBusy(false);
+    }
+  };
+
+  const openTierEdit = async () => {
+    setTierEditing(true);
+    setTierError("");
+    setTierDraft(tenant?.billing?.subscriptionTierID || "");
+    setProrationBehavior("create_prorations");
+    if (activeTiers === null) {
+      setActiveTiersError("");
+      try {
+        const res = await listBillingTiersCallable({});
+        const all = res.data?.tiers || [];
+        setActiveTiers(all.filter((t) => t.active && !t.archived));
+      } catch (err) {
+        const code = err?.code || "";
+        const msg = err?.message || "Failed to load tiers.";
+        setActiveTiersError(code ? `${code}: ${msg}` : msg);
+        setActiveTiers([]);
+      }
+    }
+  };
+
+  const cancelTierEdit = () => {
+    if (tierBusy) return;
+    setTierEditing(false);
+    setTierError("");
+  };
+
+  const saveTierChange = async () => {
+    if (!tierDraft) {
+      setTierError("Pick a tier.");
+      return;
+    }
+    if (tierDraft === tenant?.billing?.subscriptionTierID) {
+      setTierError("Already on this tier.");
+      return;
+    }
+    setTierBusy(true);
+    setTierError("");
+    try {
+      await changeTenantTierCallable({
+        tenantID,
+        tierID: tierDraft,
+        prorationBehavior,
+      });
+      await loadTenant();
+      setTierEditing(false);
+    } catch (err) {
+      const code = err?.code || "";
+      const msg = err?.message || "Failed to change tier.";
+      setTierError(code ? `${code}: ${msg}` : msg);
+    } finally {
+      setTierBusy(false);
     }
   };
 
@@ -2023,6 +2147,291 @@ export function TenantDetailScreen() {
             )}
           </>
         )}
+
+        <div className="sectionTitle">Billing</div>
+        {(() => {
+          const billing = tenant?.billing || {};
+          const model = billing.model;
+          if (!model) {
+            return (
+              <p className="placeholderText">
+                No billing model set. Tenants created before this screen exists
+                won't have one — recreate the tenant or set the field directly
+                in Firestore.
+              </p>
+            );
+          }
+          if (model === "per_sale") {
+            const fee = billing.platformFeePercent;
+            return (
+              <>
+                <div className="resultRow">
+                  <span className="resultLabel">Billing model</span>
+                  <span className="badge badge-info">Per sale</span>
+                </div>
+                <div className="resultRow">
+                  <span className="resultLabel">Platform fee percent</span>
+                  <span className="resultValue">
+                    {typeof fee === "number" ? `${fee}%` : "—"}
+                    {!feeEditing && (
+                      <>
+                        {" "}
+                        <button
+                          type="button"
+                          className="linkButton"
+                          onClick={openFeeEdit}
+                        >
+                          edit
+                        </button>
+                      </>
+                    )}
+                  </span>
+                </div>
+                {feeEditing && (
+                  <div className="inlineConfirm">
+                    <label className="fieldLabel">
+                      New platform fee percent
+                    </label>
+                    <input
+                      className="textInput"
+                      type="number"
+                      min="0"
+                      max="10"
+                      step="0.05"
+                      value={feeDraft}
+                      onChange={(e) => setFeeDraft(e.target.value)}
+                      disabled={feeBusy}
+                    />
+                    <p className="helperText">
+                      Carved from each charge via Stripe's
+                      application_fee_amount. 0.5 = 0.5%.
+                    </p>
+                    <div className="buttonRow">
+                      <button
+                        type="button"
+                        className="secondaryButton"
+                        onClick={cancelFeeEdit}
+                        disabled={feeBusy}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="primaryButton"
+                        onClick={saveFee}
+                        disabled={feeBusy}
+                      >
+                        {feeBusy ? "Saving…" : "Save"}
+                      </button>
+                    </div>
+                    {feeError && (
+                      <div className="errorText">{feeError}</div>
+                    )}
+                  </div>
+                )}
+              </>
+            );
+          }
+          if (model === "monthly_sub") {
+            const subStatus = billing.subscriptionStatus;
+            const graceUntil = billing.subscriptionGraceUntil;
+            const subStatusTone =
+              subStatus === "active" || subStatus === "trialing"
+                ? "accent"
+                : subStatus === "past_due"
+                ? "warn"
+                : subStatus === "canceled" || subStatus === "unpaid"
+                ? "danger"
+                : "info";
+            const tierLabel = billing.subscriptionTierLabel;
+            const tierAmount = billing.subscriptionTierMonthlyAmount;
+            const tierArchived = billing.subscriptionTierArchived === true;
+            const tierAmountDisplay =
+              typeof tierAmount === "number"
+                ? new Intl.NumberFormat("en-US", {
+                    style: "currency",
+                    currency: "USD",
+                  }).format(tierAmount / 100)
+                : null;
+            return (
+              <>
+                <div className="resultRow">
+                  <span className="resultLabel">Billing model</span>
+                  <span className="badge badge-info">Monthly subscription</span>
+                </div>
+                <div className="resultRow">
+                  <span className="resultLabel">Tier</span>
+                  <span className="resultValue">
+                    {tierLabel ? (
+                      <>
+                        {tierLabel}
+                        {tierAmountDisplay && (
+                          <> — {tierAmountDisplay} / mo</>
+                        )}
+                        {tierArchived && (
+                          <>
+                            {" "}
+                            <span className="badge badge-warn">archived</span>
+                          </>
+                        )}
+                      </>
+                    ) : (
+                      "—"
+                    )}
+                    {!tierEditing && (
+                      <>
+                        {" "}
+                        <button
+                          type="button"
+                          className="linkButton"
+                          onClick={openTierEdit}
+                        >
+                          change
+                        </button>
+                      </>
+                    )}
+                  </span>
+                </div>
+                {tierEditing && (
+                  <div className="inlineConfirm">
+                    <label className="fieldLabel">New tier</label>
+                    {activeTiers === null ? (
+                      <div className="helperText">Loading tiers…</div>
+                    ) : activeTiers.length === 0 ? (
+                      <div className="errorText">
+                        No active tiers configured. Add one from{" "}
+                        <Link to="/billing/tiers" className="linkButton">
+                          Billing tiers
+                        </Link>
+                        .
+                      </div>
+                    ) : (
+                      <select
+                        className="textInput"
+                        value={tierDraft}
+                        onChange={(e) => setTierDraft(e.target.value)}
+                        disabled={tierBusy}
+                      >
+                        <option value="">Pick a tier…</option>
+                        {activeTiers.map((t) => {
+                          const amount =
+                            typeof t.monthlyAmount === "number"
+                              ? new Intl.NumberFormat("en-US", {
+                                  style: "currency",
+                                  currency: (t.currency || "usd").toUpperCase(),
+                                }).format(t.monthlyAmount / 100)
+                              : "—";
+                          const isCurrent =
+                            t.tierID === billing.subscriptionTierID;
+                          return (
+                            <option key={t.tierID} value={t.tierID}>
+                              {t.label} — {amount} / mo
+                              {isCurrent ? " (current)" : ""}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    )}
+                    {activeTiersError && (
+                      <div className="errorText">{activeTiersError}</div>
+                    )}
+
+                    <label className="fieldLabel">Proration behavior</label>
+                    <div className="radioGroup">
+                      <label className="radioRow">
+                        <input
+                          type="radio"
+                          name="proration"
+                          value="create_prorations"
+                          checked={prorationBehavior === "create_prorations"}
+                          onChange={() =>
+                            setProrationBehavior("create_prorations")
+                          }
+                          disabled={tierBusy}
+                        />
+                        <span>
+                          <strong>Prorate now</strong> — invoice the difference
+                          immediately.
+                        </span>
+                      </label>
+                      <label className="radioRow">
+                        <input
+                          type="radio"
+                          name="proration"
+                          value="none"
+                          checked={prorationBehavior === "none"}
+                          onChange={() => setProrationBehavior("none")}
+                          disabled={tierBusy}
+                        />
+                        <span>
+                          <strong>No proration</strong> — change takes effect
+                          next billing cycle.
+                        </span>
+                      </label>
+                    </div>
+
+                    <div className="buttonRow">
+                      <button
+                        type="button"
+                        className="secondaryButton"
+                        onClick={cancelTierEdit}
+                        disabled={tierBusy}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        className="primaryButton"
+                        onClick={saveTierChange}
+                        disabled={
+                          tierBusy ||
+                          !tierDraft ||
+                          tierDraft === billing.subscriptionTierID
+                        }
+                      >
+                        {tierBusy ? "Updating…" : "Update tier"}
+                      </button>
+                    </div>
+                    {tierError && (
+                      <div className="errorText">{tierError}</div>
+                    )}
+                  </div>
+                )}
+                <div className="resultRow">
+                  <span className="resultLabel">Subscription status</span>
+                  <span className={`badge badge-${subStatusTone}`}>
+                    {subStatus || "not started"}
+                  </span>
+                </div>
+                {billing.stripeSubscriptionID && (
+                  <div className="resultRow">
+                    <span className="resultLabel">Subscription ID</span>
+                    <span className="resultValue">
+                      {truncateAcctID(billing.stripeSubscriptionID)}
+                    </span>
+                  </div>
+                )}
+                {graceUntil && (
+                  <div className="resultRow">
+                    <span className="resultLabel">Grace period until</span>
+                    <span className="resultValue">
+                      {formatDate(graceUntil)}
+                    </span>
+                  </div>
+                )}
+                <p className="helperText">
+                  Tenant manages payment method from inside the Cadence app.
+                  Tier changes here swap the Stripe subscription's price item.
+                </p>
+              </>
+            );
+          }
+          return (
+            <p className="placeholderText">
+              Unknown billing model: <code>{String(model)}</code>.
+            </p>
+          );
+        })()}
 
         <div className="sectionTitle">Email</div>
         {emailStatusBusy && !emailAccounts && (

@@ -1,0 +1,90 @@
+/* Modal header — title row at top of modal card */
+.header {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: var(--surface-base);
+  border-bottom: 1px solid var(--border-default);
+  gap: 12px;
+}
+
+/* Severity accent — left stripe */
+.severityInfo {
+  border-left: 4px solid var(--info);
+}
+
+.severityWarning {
+  border-left: 4px solid var(--warning);
+}
+
+.severityIcon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-default);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Button */
+.btn {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--border-default);
+  background-color: transparent;
+  color: var(--text-default);
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.1s, background-color 0.1s;
+}
+
+.btn:hover:not(:disabled) {
+  opacity: 0.75;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btnIconOnly {
+  padding: 6px;
+}
+
+/* Color variants */
+.variantDefault {
+  /* base styles already applied */
+}
+
+.variantPrimary {
+  background-color: var(--success);
+  border-color: var(--success);
+  color: var(--text-on-accent);
+  /* push primary buttons to the rightmost slot regardless of JSX order */
+  order: 1;
+}

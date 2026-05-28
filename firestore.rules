@@ -98,6 +98,14 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
+    // Billing tier catalog — any authed user can read so tenant-side UI can
+    // display its assigned tier's label and monthly amount. Writes are
+    // platform-admin only via the tier-management callables.
+    match /platform-billing-tiers/{tierID} {
+      allow read: if isAuthed();
+      allow write: if false;
+    }
+
     // DLQ entries — platform-admin can read for the admin UI. Writes only
     // happen via the ingestor + admin callables (Cloud Functions).
     match /saas-dlq/{dlqEntryID} {

@@ -1,0 +1,492 @@
+/* ─────────────────────────────────────────────────────────────────────
+   BillingModalScreen — tenant-owner subscription UI.
+   Outer card matches DLQAdmin / Analytics: 92%×94% inside the Dialog.
+   ───────────────────────────────────────────────────────────────────── */
+
+.card {
+  width: 92%;
+  height: 94%;
+  flex-shrink: 0;
+  background-color: var(--surface-base);
+  border-radius: 15px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* ══════════ HEADER ══════════ */
+.header {
+  width: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 20px;
+  box-sizing: border-box;
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-on-accent);
+  letter-spacing: 0.4px;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  margin-top: 2px;
+}
+
+/* ══════════ TABS ══════════ */
+.tabBar {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+  border-bottom-width: 1px;
+  border-bottom-style: solid;
+  padding: 0 18px;
+}
+
+.tab {
+  padding: 12px 18px;
+  font-size: 14px;
+  letter-spacing: 0.2px;
+}
+
+/* ══════════ BANNER ══════════ */
+.banner {
+  width: 100%;
+  flex-shrink: 0;
+  padding: 10px 20px;
+  font-size: 13px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+/* ══════════ BODY ══════════ */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background-color: var(--surface-base);
+}
+
+.loadingWrap,
+.errorWrap {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tabBody {
+  padding: 22px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.tabHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+/* ══════════ SECTIONS ══════════ */
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sectionLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-muted);
+}
+
+.statusRow {
+  display: flex;
+  flex-direction: row;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ══════════ TIER CARD ══════════ */
+.tierCard {
+  background-color: var(--surface-alt);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tierLabel {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-default);
+}
+
+.tierAmount {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-default);
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.tierSuffix {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.tierDescription {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* ══════════ PM ROWS ══════════ */
+.pmCard {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background-color: var(--surface-alt);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+}
+
+.pmList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pmRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  background-color: var(--surface-alt);
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+}
+
+.pmBrand {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  background-color: var(--surface-base);
+  border: 1px solid var(--border-default);
+  border-radius: 5px;
+  padding: 4px 8px;
+  min-width: 56px;
+  text-align: center;
+}
+
+.pmInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.pmLast4 {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-default);
+}
+
+.pmExpiry {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pmActions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ══════════ BADGES ══════════ */
+.badge {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.badge_success {
+  background-color: var(--success-soft, #d1fae5);
+  color: var(--success-strong, #065f46);
+}
+
+.badge_warning {
+  background-color: var(--warning-soft, #fef3c7);
+  color: var(--warning-strong, #92400e);
+}
+
+.badge_danger {
+  background-color: var(--danger-soft, #fee2e2);
+  color: var(--danger-strong, #991b1b);
+}
+
+.badge_info {
+  background-color: var(--info-soft, #dbeafe);
+  color: var(--info-strong, #1e40af);
+}
+
+/* ══════════ BUTTONS ══════════ */
+.linkButton {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+
+.linkButton:hover {
+  text-decoration: underline;
+}
+
+.linkButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.dangerLink {
+  background: none;
+  border: none;
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+
+.dangerLink:hover {
+  text-decoration: underline;
+}
+
+.dangerLink:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.primaryAction {
+  padding: 8px 14px;
+  border-radius: 8px;
+  background-color: var(--accent);
+  color: var(--text-inverse);
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.primaryAction:hover {
+  background-color: var(--accent-hover);
+}
+
+.primaryAction:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ══════════ EMPTY ══════════ */
+.emptyBlock {
+  padding: 24px;
+  background-color: var(--surface-alt);
+  border: 1px dashed var(--border-default);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.emptyText {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.muted {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.errorText {
+  font-size: 13px;
+  color: var(--danger);
+  line-height: 1.4;
+}
+
+/* ══════════ INVOICE TABLE ══════════ */
+.invoiceTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.invoiceTable th {
+  text-align: left;
+  padding: 8px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.invoiceTable td {
+  padding: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--text-default);
+}
+
+.invoiceTable tr:last-child td {
+  border-bottom: none;
+}
+
+/* ══════════ PER-SALE NOTICE ══════════ */
+.perSaleNotice {
+  padding: 28px 32px;
+  background-color: var(--surface-alt);
+  border: 1px solid var(--border-default);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 22px 28px;
+}
+
+.perSaleTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-default);
+}
+
+.perSaleText {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.45;
+}
+
+/* ══════════ ADD CARD MODAL ══════════ */
+.addCardCard {
+  width: 460px;
+  background-color: var(--surface-raised);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.addCardHeader {
+  padding: 16px 20px 0 20px;
+}
+
+.addCardTitle {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-default);
+}
+
+.addCardBody {
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.fieldLabel {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-left: 2px;
+}
+
+.textInput {
+  width: 100%;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 14px;
+  color: var(--text-default);
+  outline: none;
+  background-color: var(--surface-base);
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.textInput:disabled {
+  opacity: 0.5;
+}
+
+.stripeElement {
+  width: 100%;
+  border: 1px solid var(--border-default);
+  border-radius: 8px;
+  padding: 11px 12px;
+  background-color: var(--surface-base);
+  box-sizing: border-box;
+}
+
+.cardRow {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+}
+
+.startSubRow {
+  margin-top: 4px;
+}
+
+.checkboxRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-default);
+  cursor: pointer;
+}

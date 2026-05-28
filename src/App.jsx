@@ -58,9 +58,16 @@ import {
   loadTenantAndSettings,
   dbLogout,
 } from "./db_calls_wrapper";
+import { doc, onSnapshot } from "firebase/firestore";
+import { DB } from "./db_calls";
 import { log } from "./utils";
 import { C } from "./styles";
-import { useLayoutStore, useSettingsStore, useLoginStore } from "./stores";
+import {
+  useLayoutStore,
+  useSettingsStore,
+  useLoginStore,
+  useBillingStore,
+} from "./stores";
 import { ROUTES } from "./routes";
 import { topUpPool } from "./idPool";
 import { BUILD_VERSION } from "./buildVersion";
@@ -267,6 +274,25 @@ function App() {
             platformAdmin: claims.platformAdmin === true,
           });
 
+          // SaaS-only: subscribe to the tenant doc so client-side suspend
+          // gating (past_due / grace window) reflects the live Stripe state.
+          // Legacy Bonita claims have no `privilege` → skip the read.
+          if (tenantID && claims.privilege) {
+            useBillingStore.getState().teardown();
+            const unsubTenant = onSnapshot(
+              doc(DB, "tenants", tenantID),
+              (snap) => {
+                useBillingStore
+                  .getState()
+                  .setTenantDoc(snap.exists() ? snap.data() : null);
+              },
+              (err) => {
+                console.error("tenant doc onSnapshot error:", err);
+              }
+            );
+            useBillingStore.getState().setUnsub(unsubTenant);
+          }
+
           // DEV-ONLY: auto-login the user with id "1234" so owner-permissioned
           // functions are available without waiting on face recognition.
           // Stripped from production builds via Vite's import.meta.env.DEV.
@@ -292,12 +318,16 @@ function App() {
       } else if (!firebaseUser) {
         setUser(null);
         useLoginStore.getState().setAuthClaims(null);
+        useBillingStore.getState().teardown();
       }
       initialLoad = false;
       setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      useBillingStore.getState().teardown();
+    };
   }, []);
 
   if (isLoading) {

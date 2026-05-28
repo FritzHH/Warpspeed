@@ -102,9 +102,14 @@ export function HomeScreen({ user, claims }) {
             <h1 className="cardTitle">Cadence Dashboard</h1>
             <p className="cardSubtitle">Signed in as {user?.email}</p>
           </div>
-          <Link to="/tenants/new" className="primaryButton primaryButtonInline">
-            + New tenant
-          </Link>
+          <div className="buttonRow">
+            <Link to="/billing/tiers" className="secondaryButton">
+              Billing tiers
+            </Link>
+            <Link to="/tenants/new" className="primaryButton primaryButtonInline">
+              + New tenant
+            </Link>
+          </div>
         </div>
 
         <input

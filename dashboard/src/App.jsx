@@ -6,6 +6,7 @@ import { HomeScreen } from "./screens/HomeScreen";
 import { CreateTenantScreen } from "./screens/CreateTenantScreen";
 import { TenantDetailScreen } from "./screens/TenantDetailScreen";
 import { AddStoreScreen } from "./screens/AddStoreScreen";
+import { BillingTiersScreen } from "./screens/BillingTiersScreen";
 import { DeniedScreen } from "./screens/DeniedScreen";
 
 export function App() {
@@ -45,6 +46,7 @@ export function App() {
         path="/tenants/:tenantID/stores/new"
         element={<AddStoreScreen />}
       />
+      <Route path="/billing/tiers" element={<BillingTiersScreen />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

@@ -23,6 +23,7 @@ const admin = require("firebase-admin");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const Stripe = require("stripe");
 const { assertTenantMatch } = require("./auth-guards");
+const { resolveApplicationFeeAmount } = require("./billing-helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -63,7 +64,6 @@ exports.stripeConnectCreateCheckoutSessionV2 = onCall(
       workorderID,
       customerID,
       customerEmail,
-      applicationFeeAmount,
       successURL,
       cancelURL,
       expiresInSeconds,
@@ -82,19 +82,11 @@ exports.stripeConnectCreateCheckoutSessionV2 = onCall(
     if (!productName || typeof productName !== "string") {
       throw new HttpsError("invalid-argument", "productName is required.");
     }
-    if (
-      applicationFeeAmount != null &&
-      (typeof applicationFeeAmount !== "number" ||
-        applicationFeeAmount < 0 ||
-        applicationFeeAmount >= amount)
-    ) {
-      throw new HttpsError(
-        "invalid-argument",
-        "applicationFeeAmount must be a non-negative number less than amount."
-      );
-    }
 
     const db = getFirestore();
+    // Source of truth: tenant doc. Client-supplied applicationFeeAmount is
+    // ignored — a tampered client could pass 0 and evade the platform fee.
+    const applicationFeeAmount = await resolveApplicationFeeAmount(db, tenantID, amount);
 
     // Same deauthorize gate as the PI callable — refuse to issue a checkout
     // session if Stripe has revoked our access to this connected account.

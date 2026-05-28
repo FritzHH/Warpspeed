@@ -356,7 +356,23 @@ export const useCheckoutStore = create((set, get) => ({
   setPendingRefundSaleID: (pendingRefundSaleID) => set({ pendingRefundSaleID }),
   setLoading: (loading) => set({ loading }),
   // setSaleObj: (saleObj) => set({ saleObj }),
-  setIsCheckingOut: (isCheckingOut) => set({ isCheckingOut }),
+  setIsCheckingOut: (isCheckingOut) => {
+    if (isCheckingOut && useBillingStore.getState().isPaymentBlocked()) {
+      useAlertScreenStore.getState().setValues({
+        title: "Subscription Suspended",
+        severity: "danger",
+        message:
+          "Payment processing is disabled while your Cadence subscription is past due.",
+        subMessage:
+          "Open Subscription from the admin menu to update your payment method.",
+        btn1Text: "OK",
+        handleBtn1Press: () =>
+          useAlertScreenStore.getState().setShowAlert(false),
+      });
+      return;
+    }
+    set({ isCheckingOut });
+  },
   setDepositInfo: (depositInfo) => set({ depositInfo }),
   setViewOnlySale: (sale) => set({ viewOnlySale: sale, isViewOnly: !!sale?.paymentComplete }),
   setReceiptScan: (receiptScan, callback) => {
@@ -2269,59 +2285,57 @@ export const useSubscriptionStore = create((set, get) => ({
   hasFeature: (featureName) => get().subscription?.features?.[featureName] === true,
 }));
 
-// SaaS Twilio per-store inbox.
-//
-// Backed by two Firestore collections under the current store:
-//   incoming-messages — inbound SMS/MMS, keyed by Twilio MessageSid
-//   outgoing-messages — outbound, keyed by Twilio MessageSid (one doc per
-//                        sent message; multi-image MMS produces N docs sharing
-//                        a primaryMessageSid + sequenceIndex)
-//
-// The store holds the flat arrays; threading by other-party phone is derived
-// in selectors / components. The "From the company only" display rule (no
-// sender name prepended) is enforced UI-side; the docs themselves carry the
-// raw `body` from Twilio.
-export const useSaasInboxStore = create((set, get) => ({
-  incomingMessages: [],
-  outgoingMessages: [],
-  selectedThreadPhone: null,
-  selectedFromPhone: null,
-  _incomingUnsub: null,
-  _outgoingUnsub: null,
+// ─── useBillingStore ────────────────────────────────────────────────────
+// Tenant-level billing snapshot. Populated by an onSnapshot in App.jsx for
+// monthly_sub SaaS tenants; derived flags drive client-side suspend gating
+// in checkout. Per-sale / Bonita / signed-out → tenantDoc stays null, all
+// selectors return safe defaults so existing flows are unchanged.
+export const useBillingStore = create((set, get) => ({
+  tenantDoc: null,
+  _unsub: null,
 
-  getIncomingMessages: () => get().incomingMessages,
-  getOutgoingMessages: () => get().outgoingMessages,
-  getSelectedThreadPhone: () => get().selectedThreadPhone,
-  getSelectedFromPhone: () => get().selectedFromPhone,
+  getTenantDoc: () => get().tenantDoc,
+  setTenantDoc: (tenantDoc) => set({ tenantDoc }),
 
-  setIncomingMessages: (incomingMessages) => set({ incomingMessages }),
-  setOutgoingMessages: (outgoingMessages) => set({ outgoingMessages }),
-  setSelectedThreadPhone: (selectedThreadPhone) => set({ selectedThreadPhone }),
-  setSelectedFromPhone: (selectedFromPhone) => set({ selectedFromPhone }),
-
-  setIncomingUnsub: (unsub) => {
-    const prev = get()._incomingUnsub;
-    if (prev) prev();
-    set({ _incomingUnsub: unsub });
-  },
-  setOutgoingUnsub: (unsub) => {
-    const prev = get()._outgoingUnsub;
-    if (prev) prev();
-    set({ _outgoingUnsub: unsub });
+  setUnsub: (_unsub) => set({ _unsub }),
+  teardown: () => {
+    const u = get()._unsub;
+    if (typeof u === "function") u();
+    set({ tenantDoc: null, _unsub: null });
   },
 
-  clearInbox: () => {
-    const { _incomingUnsub, _outgoingUnsub } = get();
-    if (_incomingUnsub) _incomingUnsub();
-    if (_outgoingUnsub) _outgoingUnsub();
-    set({
-      incomingMessages: [],
-      outgoingMessages: [],
-      selectedThreadPhone: null,
-      selectedFromPhone: null,
-      _incomingUnsub: null,
-      _outgoingUnsub: null,
-    });
+  getBillingModel: () => get().tenantDoc?.billingModel || null,
+  getSubscriptionStatus: () => get().tenantDoc?.subscriptionStatus || null,
+  getSubscriptionGraceUntil: () => get().tenantDoc?.subscriptionGraceUntil || null,
+  getPlatformFeePercent: () => {
+    const v = get().tenantDoc?.platformFeePercent;
+    return typeof v === "number" ? v : null;
+  },
+
+  // True only for monthly_sub tenants where the grace window has expired
+  // while past_due. Used as a hard gate at the checkout entry.
+  isPaymentBlocked: () => {
+    const t = get().tenantDoc;
+    if (!t) return false;
+    if (t.billingModel !== "monthly_sub") return false;
+    const status = t.subscriptionStatus;
+    if (status === "canceled" || status === "unpaid") return true;
+    if (status !== "past_due") return false;
+    const grace = t.subscriptionGraceUntil;
+    if (typeof grace !== "number") return true;
+    return Date.now() > grace;
+  },
+
+  // True for monthly_sub tenants past_due but still inside the grace window.
+  // Surfaces the warning banner; does NOT block payment flows.
+  isInGracePeriod: () => {
+    const t = get().tenantDoc;
+    if (!t) return false;
+    if (t.billingModel !== "monthly_sub") return false;
+    if (t.subscriptionStatus !== "past_due") return false;
+    const grace = t.subscriptionGraceUntil;
+    if (typeof grace !== "number") return false;
+    return Date.now() <= grace;
   },
 }));
 
@@ -2337,7 +2351,6 @@ export function clearPersistedStores() {
   useCustMessagesStore.getState()._threadsUnsub?.();
   useCustMessagesStore.getState().setSmsThreads([]);
   useCustMessagesStore.setState({ hubConversationCache: {} });
-  useSaasInboxStore.getState().clearInbox();
   useEmailStore.persist.clearStorage();
   useEmailStore.getState().clearEmailStore();
   // Clear IndexedDB hub cache (async, fire-and-forget)

@@ -17,6 +17,7 @@ const admin = require("firebase-admin");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const Stripe = require("stripe");
 const { assertTenantMatch, lookupTenantForConnectAccount } = require("./auth-guards");
+const { resolveApplicationFeeAmount } = require("./billing-helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -58,7 +59,6 @@ exports.stripeConnectInitiatePaymentIntentV2 = onCall(
       customerEmail,
       transactionID,
       salesTax,
-      applicationFeeAmount,
     } = request.data || {};
 
     if (!amount || typeof amount !== "number" || amount <= 0) {
@@ -74,17 +74,11 @@ exports.stripeConnectInitiatePaymentIntentV2 = onCall(
       throw new HttpsError("invalid-argument", "tenantID and storeID are required.");
     }
     assertTenantMatch(auth, tenantID);
-    if (
-      applicationFeeAmount != null &&
-      (typeof applicationFeeAmount !== "number" || applicationFeeAmount < 0 || applicationFeeAmount >= amount)
-    ) {
-      throw new HttpsError(
-        "invalid-argument",
-        "applicationFeeAmount must be a non-negative number less than amount."
-      );
-    }
 
     const db = getFirestore();
+    // Source of truth: tenant doc. Client-supplied applicationFeeAmount is
+    // ignored — a tampered client could pass 0 and evade the platform fee.
+    const applicationFeeAmount = await resolveApplicationFeeAmount(db, tenantID, amount);
 
     // Refuse to create a PI on a deauthorized connected account. The
     // subscriber sets `status: "deauthorized"` on this doc when Stripe
@@ -255,7 +249,6 @@ exports.stripeConnectCreateTapToPayPaymentIntentCallable = onCall(
       customerEmail,
       transactionID,
       salesTax,
-      applicationFeeAmount,
     } = request.data || {};
 
     if (!amount || typeof amount !== "number" || amount <= 0) {
@@ -268,17 +261,11 @@ exports.stripeConnectCreateTapToPayPaymentIntentCallable = onCall(
       throw new HttpsError("invalid-argument", "tenantID and storeID are required.");
     }
     assertTenantMatch(auth, tenantID);
-    if (
-      applicationFeeAmount != null &&
-      (typeof applicationFeeAmount !== "number" || applicationFeeAmount < 0 || applicationFeeAmount >= amount)
-    ) {
-      throw new HttpsError(
-        "invalid-argument",
-        "applicationFeeAmount must be a non-negative number less than amount."
-      );
-    }
 
     const db = getFirestore();
+    // Source of truth: tenant doc. Client-supplied applicationFeeAmount is
+    // ignored — a tampered client could pass 0 and evade the platform fee.
+    const applicationFeeAmount = await resolveApplicationFeeAmount(db, tenantID, amount);
 
     const accountDocSnap = await db
       .collection("tenants")

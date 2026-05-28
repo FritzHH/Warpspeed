@@ -55,3 +55,9 @@ pubsub-debug.log
 # Dev scratch / scripts with embedded test credentials
 simulate_reader.bat
 TODO
+
+# Local secrets / scratch files (never commit)
+_stripekey.txt
+secret.txt
+_webhooks.json
+reg

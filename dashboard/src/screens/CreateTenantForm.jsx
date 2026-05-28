@@ -1,5 +1,5 @@
-import React, { useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { httpsCallable } from "firebase/functions";
 import { doc, getDoc } from "firebase/firestore";
 import { functions, db } from "../firebase";
@@ -9,6 +9,21 @@ import {
 } from "./StoreAddressFields";
 
 const TENANT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
+
+const listTiersCallable = httpsCallable(
+  functions,
+  "platformAdminListBillingTiersCallable"
+);
+
+function formatUSD(cents, currency = "usd") {
+  if (typeof cents !== "number") return "—";
+  const dollars = cents / 100;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currency.toUpperCase(),
+    minimumFractionDigits: 2,
+  }).format(dollars);
+}
 
 function slugify(s) {
   let out = (s || "")
@@ -32,6 +47,8 @@ function formatPhoneForDisplay(s) {
   return `+${digits}`;
 }
 
+const DEFAULT_PLATFORM_FEE_PERCENT_STR = "0.5";
+
 export function CreateTenantForm() {
   const navigate = useNavigate();
   const [tenantName, setTenantName] = useState("");
@@ -40,6 +57,13 @@ export function CreateTenantForm() {
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerPhone, setOwnerPhone] = useState("");
   const addr = useStoreAddressFields();
+  const [billingModel, setBillingModel] = useState("");
+  const [platformFeePercent, setPlatformFeePercent] = useState(
+    DEFAULT_PLATFORM_FEE_PERCENT_STR
+  );
+  const [subscriptionTierID, setSubscriptionTierID] = useState("");
+  const [tiers, setTiers] = useState(null);
+  const [tiersError, setTiersError] = useState("");
   const [tenantID, setTenantID] = useState("");
   const [idEditable, setIdEditable] = useState(false);
   const [idManuallyEdited, setIdManuallyEdited] = useState(false);
@@ -52,6 +76,31 @@ export function CreateTenantForm() {
   const checkTimerRef = useRef(null);
   const checkRequestRef = useRef(0);
   const idInputRef = useRef(null);
+
+  // Lazy-load active tiers only when the admin picks monthly_sub — saves a
+  // platform-admin callable round trip for the common per_sale case.
+  useEffect(() => {
+    if (billingModel !== "monthly_sub" || tiers !== null) return;
+    let cancelled = false;
+    setTiersError("");
+    listTiersCallable({})
+      .then((res) => {
+        if (cancelled) return;
+        const all = res.data?.tiers || [];
+        const active = all.filter((t) => t.active && !t.archived);
+        setTiers(active);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const code = err?.code || "";
+        const msg = err?.message || "Failed to load tiers.";
+        setTiersError(code ? `${code}: ${msg}` : msg);
+        setTiers([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [billingModel, tiers]);
 
   function startDupCheck(id) {
     if (checkTimerRef.current) {
@@ -118,6 +167,16 @@ export function CreateTenantForm() {
 
   const idIsValid = TENANT_ID_PATTERN.test(tenantID);
 
+  const platformFeePercentNum = Number(platformFeePercent);
+  const feePercentIsValid =
+    billingModel !== "per_sale" ||
+    (Number.isFinite(platformFeePercentNum) &&
+      platformFeePercentNum >= 0 &&
+      platformFeePercentNum <= 10);
+
+  const tierSelectionValid =
+    billingModel !== "monthly_sub" || Boolean(subscriptionTierID);
+
   const canSubmit =
     status !== "submitting" &&
     trimmedName &&
@@ -128,7 +187,10 @@ export function CreateTenantForm() {
     addr.allValid &&
     idIsValid &&
     idCheckStatus !== "taken" &&
-    idCheckStatus !== "checking";
+    idCheckStatus !== "checking" &&
+    (billingModel === "per_sale" || billingModel === "monthly_sub") &&
+    feePercentIsValid &&
+    tierSelectionValid;
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -145,6 +207,11 @@ export function CreateTenantForm() {
         ownerLastName: trimmedLastName,
         ownerPhone: ownerPhone.trim(),
         ...addr.payload,
+        billingModel,
+        platformFeePercent:
+          billingModel === "per_sale" ? platformFeePercentNum : undefined,
+        subscriptionTierID:
+          billingModel === "monthly_sub" ? subscriptionTierID : undefined,
       });
       setResult(res.data);
       setStatus("success");
@@ -163,6 +230,9 @@ export function CreateTenantForm() {
     setOwnerEmail("");
     setOwnerPhone("");
     addr.reset();
+    setBillingModel("");
+    setPlatformFeePercent(DEFAULT_PLATFORM_FEE_PERCENT_STR);
+    setSubscriptionTierID("");
     setTenantID("");
     setIdEditable(false);
     setIdManuallyEdited(false);
@@ -317,6 +387,107 @@ export function CreateTenantForm() {
         {...addr}
         disabled={status === "submitting"}
       />
+
+      <div className="sectionHeading">Billing</div>
+
+      <div className="fieldLabel">Billing model</div>
+      <div className="radioGroup">
+        <label className="radioRow">
+          <input
+            type="radio"
+            name="billingModel"
+            value="per_sale"
+            checked={billingModel === "per_sale"}
+            onChange={() => setBillingModel("per_sale")}
+            disabled={status === "submitting"}
+          />
+          <span>
+            <strong>Per sale</strong> — RSS takes a percent of every charge.
+          </span>
+        </label>
+        <label className="radioRow">
+          <input
+            type="radio"
+            name="billingModel"
+            value="monthly_sub"
+            checked={billingModel === "monthly_sub"}
+            onChange={() => setBillingModel("monthly_sub")}
+            disabled={status === "submitting"}
+          />
+          <span>
+            <strong>Monthly subscription</strong> — $50/mo billed to the tenant's
+            saved payment method. RSS takes nothing per sale.
+          </span>
+        </label>
+      </div>
+
+      {billingModel === "monthly_sub" && (
+        <>
+          <div className="fieldLabel">Subscription tier</div>
+          {tiers === null ? (
+            <div className="helperText">Loading tiers…</div>
+          ) : tiers.length === 0 ? (
+            <div className="errorText">
+              No active billing tiers configured.{" "}
+              <Link to="/billing/tiers" className="linkButton">
+                Add one
+              </Link>{" "}
+              before creating a monthly_sub tenant.
+            </div>
+          ) : (
+            <>
+              <select
+                className="textInput"
+                value={subscriptionTierID}
+                onChange={(e) => setSubscriptionTierID(e.target.value)}
+                disabled={status === "submitting"}
+              >
+                <option value="">Pick a tier…</option>
+                {tiers.map((t) => (
+                  <option key={t.tierID} value={t.tierID}>
+                    {t.label} — {formatUSD(t.monthlyAmount, t.currency)} / mo
+                  </option>
+                ))}
+              </select>
+              {subscriptionTierID && (() => {
+                const selected = tiers.find(
+                  (t) => t.tierID === subscriptionTierID
+                );
+                if (!selected) return null;
+                return selected.description ? (
+                  <div className="helperText">{selected.description}</div>
+                ) : null;
+              })()}
+            </>
+          )}
+          {tiersError && <div className="errorText">{tiersError}</div>}
+        </>
+      )}
+
+      {billingModel === "per_sale" && (
+        <>
+          <div className="fieldLabel">Platform fee percent</div>
+          <input
+            className="textInput"
+            type="number"
+            min="0"
+            max="10"
+            step="0.05"
+            placeholder="0.5"
+            value={platformFeePercent}
+            onChange={(e) => setPlatformFeePercent(e.target.value)}
+            disabled={status === "submitting"}
+          />
+          <div className="helperText">
+            Carved from each charge (e.g. 0.5 = 0.5%). Editable later.
+          </div>
+          {!feePercentIsValid && (
+            <div className="errorText">
+              Must be a number between 0 and 10.
+            </div>
+          )}
+        </>
+      )}
 
       <div className="fieldLabel">Tenant ID</div>
       <div className="idRow">

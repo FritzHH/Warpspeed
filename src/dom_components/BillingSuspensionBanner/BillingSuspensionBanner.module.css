@@ -1,0 +1,38 @@
+.banner {
+  position: fixed;
+  top: 38px;
+  left: 20px;
+  right: 20px;
+  pointer-events: none;
+  border-radius: 9999px;
+  padding: 8px 22px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  isolation: isolate;
+}
+
+.banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0.4;
+  z-index: -1;
+}
+
+.danger::before {
+  background-color: var(--danger);
+}
+
+.warning::before {
+  background-color: var(--warning, #f59e0b);
+}
+
+.text {
+  color: var(--text-strong);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  text-align: center;
+}

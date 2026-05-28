@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState, Suspense, lazy } from "react";
 import { C, Colors, ICONS, ViewStyles } from "../styles";
 
-import { AlertBox, LoginModal, SmallLoadingIndicator, SuperUserBanner } from "../dom_components";
+import { AlertBox, LoginModal, SmallLoadingIndicator, SuperUserBanner, BillingSuspensionBanner } from "../dom_components";
 import { Info_Section } from "./screen_collections/Info_Section";
 import styles from "./BaseScreen.module.css";
 import { Items_Section } from "./screen_collections/Items_Section";
@@ -763,6 +763,7 @@ export function BaseScreen() {
       )}
       <AlertBox showAlert={zShowAlert} />
       <SuperUserBanner />
+      <BillingSuspensionBanner />
       {zLoginMessagesShowForUserID && (
         <Suspense fallback={null}>
           <UserMessagesModalForLogin

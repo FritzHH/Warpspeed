@@ -159,18 +159,25 @@ const SaleCard = ({ sale, transactions = [], onPress }) => {
 
 // ─── Note Item ──────────────────────────────────────────────────
 
-const NoteItem = ({ note, color }) => {
+const NoteItem = ({ note, color, index }) => {
   if (!note) return null;
-  const text = typeof note === "string" ? note : note.text || note.note || "";
-  const millis = note.millis || note.timestamp || null;
-  const user = note.user || note.userName || "";
+  const text = typeof note === "string" ? note : note.value || note.text || note.note || "";
+  const millis = note.createdAt || note.millis || note.timestamp || null;
+  const user = note.name || note.user || note.userName || "";
   if (!text) return null;
+  const isAlt = index % 2 === 1;
   return (
-    <div className={styles.noteItem} style={{ borderLeftColor: color }}>
+    <div
+      className={`${styles.noteItem} ${isAlt ? styles.noteItemAlt : ""}`}
+      style={{
+        borderLeftColor: color,
+        backgroundColor: isAlt ? C.surfaceAlt : "transparent",
+      }}
+    >
       <span className={styles.noteText} style={{ color: C.text }}>{text}</span>
       {(!!millis || !!user) && (
-        <span className={styles.noteMeta} style={{ color: C.textMuted }}>
-          {[user, millis ? formatMillisForDisplay(millis) : ""].filter(Boolean).join(" - ")}
+        <span className={styles.noteMeta} style={{ color: C.textDisabled }}>
+          {[user, millis ? formatShortDate(millis) : ""].filter(Boolean).join(" - ")}
         </span>
       )}
     </div>
@@ -227,6 +234,8 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
   const [sTransactionsMap, _sSetTransactionsMap] = useState({});
   const [sLoadingSales, _sSetLoadingSales] = useState(false);
   const [sShowChangeLog, _sSetShowChangeLog] = useState(false);
+  const [sShowInternalNotes, _sSetShowInternalNotes] = useState(false);
+  const [sShowCustomerNotes, _sSetShowCustomerNotes] = useState(false);
   const [sSaleForModal, _sSetSaleForModal] = useState(null);
 
   // Fetch associated sales when workorder opens
@@ -705,9 +714,20 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
             {/* Internal Notes */}
             {internalNotes.length > 0 && (
               <div>
-                <SectionHeader text={"INTERNAL NOTES (" + internalNotes.length + ")"} />
-                {internalNotes.map((note, idx) => (
-                  <NoteItem key={idx} note={note} color={C.blue} />
+                <button
+                  type="button"
+                  className={styles.changeLogToggle}
+                  onClick={() => _sSetShowInternalNotes(!sShowInternalNotes)}
+                >
+                  <span className={styles.changeLogToggleTitle} style={{ color: C.textMuted }}>
+                    {"INTERNAL NOTES (" + internalNotes.length + ")"}
+                  </span>
+                  <span className={styles.changeLogToggleHint} style={{ color: C.textDisabled }}>
+                    {sShowInternalNotes ? "Hide" : "Show"}
+                  </span>
+                </button>
+                {sShowInternalNotes && internalNotes.map((note, idx) => (
+                  <NoteItem key={note?.id || idx} note={note} color={C.blue} index={idx} />
                 ))}
               </div>
             )}
@@ -715,9 +735,20 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
             {/* Customer Notes */}
             {customerNotes.length > 0 && (
               <div>
-                <SectionHeader text={"CUSTOMER NOTES (" + customerNotes.length + ")"} />
-                {customerNotes.map((note, idx) => (
-                  <NoteItem key={idx} note={note} color={C.green} />
+                <button
+                  type="button"
+                  className={styles.changeLogToggle}
+                  onClick={() => _sSetShowCustomerNotes(!sShowCustomerNotes)}
+                >
+                  <span className={styles.changeLogToggleTitle} style={{ color: C.textMuted }}>
+                    {"CUSTOMER NOTES (" + customerNotes.length + ")"}
+                  </span>
+                  <span className={styles.changeLogToggleHint} style={{ color: C.textDisabled }}>
+                    {sShowCustomerNotes ? "Hide" : "Show"}
+                  </span>
+                </button>
+                {sShowCustomerNotes && customerNotes.map((note, idx) => (
+                  <NoteItem key={note?.id || idx} note={note} color={C.green} index={idx} />
                 ))}
               </div>
             )}

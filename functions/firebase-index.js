@@ -7723,6 +7723,10 @@ if (DEPLOY_TARGET === "saas") {
   const connectReaders = require("./saas/stripe-connect-readers");
   const connectCheckoutSession = require("./saas/stripe-connect-checkout-session");
   const dlqAdmin = require("./saas/pubsub-dlq-admin");
+  const billingTiers = require("./saas/billing-tiers");
+  const stripeBilling = require("./saas/stripe-billing");
+  const stripeBillingWebhook = require("./saas/stripe-billing-webhook");
+  const pubsubBillingSubscriber = require("./saas/pubsub-billing-subscriber");
   const twilioSubaccounts = require("./saas/twilio-subaccounts");
   const twilioNumbers = require("./saas/twilio-numbers");
   const twilioWebhookInbound = require("./saas/twilio-webhook-inbound");
@@ -7746,6 +7750,8 @@ if (DEPLOY_TARGET === "saas") {
   exports.redeemInviteCallable = authClaims.redeemInviteCallable;
   exports.platformAdminCreateStoreCallable =
     authClaims.platformAdminCreateStoreCallable;
+  exports.platformAdminUpdateTenantBillingCallable =
+    authClaims.platformAdminUpdateTenantBillingCallable;
 
   exports.pubsubStripeEventSubscriber = pubsubSubscriber.handler;
   exports.pubsubStripeDeadLetterIngestor = pubsubDeadLetter.ingestor;
@@ -7861,5 +7867,44 @@ if (DEPLOY_TARGET === "saas") {
   exports.dlqRetryCallable = dlqAdmin.dlqRetryCallable;
   exports.dlqUpdateStatusCallable = dlqAdmin.dlqUpdateStatusCallable;
   exports.dlqEscalationCheckScheduled = dlqAdmin.dlqEscalationCheckScheduled;
+
+  // ───────────────────────────────────────────────────────────────
+  // Phase 3 — Stripe Billing on the PLATFORM Stripe account (NOT
+  // Connect). Tier catalog CRUD + customer/sub/PM/invoice callables
+  // + platform-account webhook + Pub/Sub fan-out + DLQ.
+  // ───────────────────────────────────────────────────────────────
+  exports.platformAdminListBillingTiersCallable =
+    billingTiers.platformAdminListBillingTiersCallable;
+  exports.platformAdminListStripePricesCallable =
+    billingTiers.platformAdminListStripePricesCallable;
+  exports.platformAdminCreateBillingTierCallable =
+    billingTiers.platformAdminCreateBillingTierCallable;
+  exports.platformAdminUpdateBillingTierCallable =
+    billingTiers.platformAdminUpdateBillingTierCallable;
+  exports.platformAdminArchiveBillingTierCallable =
+    billingTiers.platformAdminArchiveBillingTierCallable;
+
+  exports.stripeBillingCreateCustomerCallable =
+    stripeBilling.stripeBillingCreateCustomerCallable;
+  exports.stripeBillingCreateSetupIntentCallable =
+    stripeBilling.stripeBillingCreateSetupIntentCallable;
+  exports.stripeBillingCreateSubscriptionCallable =
+    stripeBilling.stripeBillingCreateSubscriptionCallable;
+  exports.stripeBillingChangeTenantTierCallable =
+    stripeBilling.stripeBillingChangeTenantTierCallable;
+  exports.stripeBillingListPaymentMethodsCallable =
+    stripeBilling.stripeBillingListPaymentMethodsCallable;
+  exports.stripeBillingDetachPaymentMethodCallable =
+    stripeBilling.stripeBillingDetachPaymentMethodCallable;
+  exports.stripeBillingUpdateDefaultPaymentMethodCallable =
+    stripeBilling.stripeBillingUpdateDefaultPaymentMethodCallable;
+  exports.stripeBillingListInvoicesCallable =
+    stripeBilling.stripeBillingListInvoicesCallable;
+  exports.stripeBillingCancelSubscriptionCallable =
+    stripeBilling.stripeBillingCancelSubscriptionCallable;
+
+  exports.stripeWebhookV2_Billing = stripeBillingWebhook.handler;
+  exports.pubsubStripeBillingEventSubscriber = pubsubBillingSubscriber.handler;
+  exports.pubsubStripeBillingDeadLetterIngestor = pubsubBillingSubscriber.ingestor;
 }
 

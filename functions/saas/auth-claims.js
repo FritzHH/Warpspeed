@@ -53,6 +53,7 @@ const {
 const { SETTINGS_OBJ } = require("../shared/data");
 const { generateEAN13Barcode } = require("../shared/idGen");
 const { numberWebhooksAreCurrent } = require("./twilio-common");
+const { getTierDoc } = require("./billing-helpers");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -138,6 +139,29 @@ function normalizeSalesTaxPercent(value) {
   if (value === undefined || value === null || value === "") return null;
   const num = Number(value);
   if (!Number.isFinite(num) || num < 0 || num > 100) return null;
+  return num;
+}
+
+const BILLING_MODELS = ["per_sale", "monthly_sub"];
+const DEFAULT_PLATFORM_FEE_PERCENT = 0.5;
+const PLATFORM_FEE_PERCENT_MAX = 10;
+
+function normalizeBillingModel(value) {
+  if (typeof value !== "string") return null;
+  return BILLING_MODELS.includes(value) ? value : null;
+}
+
+// platformFeePercent is stored as a percent (0.5 = 0.5%), not a fraction.
+// Only meaningful when billingModel === "per_sale". Capped at 10% as a sanity
+// guard — anything higher would be a typo, not a real fee.
+function normalizePlatformFeePercent(value) {
+  if (value === undefined || value === null || value === "") {
+    return DEFAULT_PLATFORM_FEE_PERCENT;
+  }
+  const num = Number(value);
+  if (!Number.isFinite(num) || num < 0 || num > PLATFORM_FEE_PERCENT_MAX) {
+    return null;
+  }
   return num;
 }
 
@@ -285,6 +309,9 @@ exports.platformAdminCreateTenantCallable = onCall(
       storeZip,
       storePhone,
       salesTaxPercent,
+      billingModel,
+      platformFeePercent,
+      subscriptionTierID,
     } = request.data || {};
 
     if (!tenantID || !TENANT_ID_PATTERN.test(tenantID)) {
@@ -351,7 +378,41 @@ exports.platformAdminCreateTenantCallable = onCall(
       );
     }
 
+    const normalizedBillingModel = normalizeBillingModel(billingModel);
+    if (!normalizedBillingModel) {
+      throw new HttpsError(
+        "invalid-argument",
+        `billingModel is required and must be one of: ${BILLING_MODELS.join(", ")}.`
+      );
+    }
+    const normalizedFeePercent =
+      normalizedBillingModel === "per_sale"
+        ? normalizePlatformFeePercent(platformFeePercent)
+        : null;
+    if (normalizedBillingModel === "per_sale" && normalizedFeePercent === null) {
+      throw new HttpsError(
+        "invalid-argument",
+        `platformFeePercent must be a number between 0 and ${PLATFORM_FEE_PERCENT_MAX}.`
+      );
+    }
+
     const db = getFirestore();
+
+    // monthly_sub tenants must be created against a specific tier from the
+    // catalog. We validate the tier exists + is active here so a tenant
+    // can't land in a "monthly_sub but no tier" state. per_sale tenants
+    // ignore subscriptionTierID entirely.
+    let normalizedTierID = null;
+    if (normalizedBillingModel === "monthly_sub") {
+      if (!subscriptionTierID || typeof subscriptionTierID !== "string") {
+        throw new HttpsError(
+          "invalid-argument",
+          "subscriptionTierID is required for monthly_sub tenants."
+        );
+      }
+      const tier = await getTierDoc(db, subscriptionTierID, { allowArchived: false });
+      normalizedTierID = tier.tierID;
+    }
 
     const tenantRef = db.collection("tenants").doc(tenantID);
     const existing = await tenantRef.get();
@@ -409,6 +470,14 @@ exports.platformAdminCreateTenantCallable = onCall(
       ownerFirstName: normalizedFirstName,
       ownerLastName: normalizedLastName,
       ownerPhone: normalizedPhone,
+      billingModel: normalizedBillingModel,
+      platformFeePercent: normalizedFeePercent,
+      subscriptionTierID: normalizedTierID,
+      subscriptionStatus: null,
+      stripeBillingCustomerID: null,
+      stripeSubscriptionID: null,
+      stripeSubscriptionPriceID: null,
+      subscriptionGraceUntil: null,
       createdAt: FieldValue.serverTimestamp(),
       createdByUID: auth.uid,
     });
@@ -667,6 +736,56 @@ exports.platformAdminCreateStoreCallable = onCall(
   }
 );
 
+// Platform-admin: edit a tenant's billing settings. Phase 1 only supports
+// editing platformFeePercent on per_sale tenants — switching billingModel
+// mid-flight is not allowed here (proration, payment-method state, sub teardown
+// are out of scope for this callable). Add a separate flow when that need
+// surfaces.
+exports.platformAdminUpdateTenantBillingCallable = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const auth = requireAuth(request);
+    assertPlatformAdmin(auth);
+
+    const { tenantID, platformFeePercent } = request.data || {};
+    if (!tenantID || typeof tenantID !== "string") {
+      throw new HttpsError("invalid-argument", "tenantID is required.");
+    }
+
+    const db = getFirestore();
+    const tenantRef = db.collection("tenants").doc(tenantID);
+    const snap = await tenantRef.get();
+    if (!snap.exists) {
+      throw new HttpsError("not-found", `Tenant ${tenantID} not found.`);
+    }
+    const tenantData = snap.data() || {};
+    if (tenantData.billingModel !== "per_sale") {
+      throw new HttpsError(
+        "failed-precondition",
+        `Tenant ${tenantID} is on ${tenantData.billingModel || "no"} billing — platformFeePercent only applies to per_sale tenants.`
+      );
+    }
+
+    const normalized = normalizePlatformFeePercent(platformFeePercent);
+    if (normalized === null) {
+      throw new HttpsError(
+        "invalid-argument",
+        `platformFeePercent must be a number between 0 and ${PLATFORM_FEE_PERCENT_MAX}.`
+      );
+    }
+
+    await tenantRef.update({ platformFeePercent: normalized });
+
+    logger.info("platformAdminUpdateTenantBillingCallable: updated", {
+      tenantID,
+      platformFeePercent: normalized,
+      uid: auth.uid,
+    });
+
+    return { success: true, tenantID, platformFeePercent: normalized };
+  }
+);
+
 // Platform-admin tenant list for the cadence-dashboard host site. Returns up
 // to `limit` tenants (default 100, max 500), ordered by createdAt desc, with
 // per-tenant provisioning-status flags pulled from the private/* docs and the
@@ -684,13 +803,20 @@ async function buildTenantSummary(db, tenantDoc) {
   const tdata = tenantDoc.data() || {};
   const tenantRef = db.collection("tenants").doc(tid);
 
-  const [twilioSnap, a2pSnap, connectSnap, storesCountSnap, emailAuthSnap] =
+  // Tier read is conditional — only fan out the extra read when the tenant
+  // is actually on a monthly_sub plan with a recorded tierID. Use a direct
+  // doc read (not getTierDoc) so archived/deleted tiers don't throw; the
+  // dashboard list view needs to render historical state gracefully.
+  const [twilioSnap, a2pSnap, connectSnap, storesCountSnap, emailAuthSnap, tierSnap] =
     await Promise.all([
       tenantRef.collection("private").doc("twilio").get(),
       tenantRef.collection("private").doc("twilio-a2p").get(),
       tenantRef.collection("connect-accounts").limit(1).get(),
       tenantRef.collection("stores").count().get(),
       tenantRef.collection("email-auth").get(),
+      tdata.subscriptionTierID
+        ? db.collection("platform-billing-tiers").doc(tdata.subscriptionTierID).get()
+        : Promise.resolve(null),
     ]);
 
   const twilioData = twilioSnap.exists ? twilioSnap.data() || {} : {};
@@ -698,6 +824,7 @@ async function buildTenantSummary(db, tenantDoc) {
   const connectData = connectSnap.empty
     ? null
     : connectSnap.docs[0].data() || {};
+  const tierData = tierSnap && tierSnap.exists ? tierSnap.data() || {} : null;
 
   // Per-account email summary. Status derives from the cached values written
   // by the OAuth callback / sync / renew-watch handlers in gmail.js. We
@@ -740,6 +867,12 @@ async function buildTenantSummary(db, tenantDoc) {
       ? tdata.createdAt.toMillis()
       : null;
 
+  const subscriptionGraceUntil =
+    tdata.subscriptionGraceUntil &&
+    typeof tdata.subscriptionGraceUntil.toMillis === "function"
+      ? tdata.subscriptionGraceUntil.toMillis()
+      : null;
+
   return {
     tenantID: tid,
     name: tdata.name || "",
@@ -750,6 +883,25 @@ async function buildTenantSummary(db, tenantDoc) {
     ownerPhone: tdata.ownerPhone || "",
     createdAt,
     storeCount: storesCountSnap.data().count,
+    billing: {
+      model: tdata.billingModel || null,
+      platformFeePercent:
+        typeof tdata.platformFeePercent === "number"
+          ? tdata.platformFeePercent
+          : null,
+      subscriptionStatus: tdata.subscriptionStatus || null,
+      subscriptionTierID: tdata.subscriptionTierID || null,
+      subscriptionTierLabel: tierData ? tierData.label || null : null,
+      subscriptionTierMonthlyAmount:
+        tierData && typeof tierData.monthlyAmount === "number"
+          ? tierData.monthlyAmount
+          : null,
+      subscriptionTierArchived: tierData ? tierData.archived === true : false,
+      stripeBillingCustomerID: tdata.stripeBillingCustomerID || null,
+      stripeSubscriptionID: tdata.stripeSubscriptionID || null,
+      stripeSubscriptionPriceID: tdata.stripeSubscriptionPriceID || null,
+      subscriptionGraceUntil,
+    },
     twilio: {
       hasSubaccount: Boolean(twilioData.subaccountSid),
       subaccountSid: twilioData.subaccountSid || null,

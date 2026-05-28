@@ -72,6 +72,11 @@ const DLQAdminModalScreen = lazy(() =>
     default: m.DLQAdminModalScreen,
   }))
 );
+const BillingModalScreen = lazy(() =>
+  import("../../modal_screens/BillingModalScreen/BillingModalScreen").then((m) => ({
+    default: m.BillingModalScreen,
+  }))
+);
 import { TodaysHistoryComponent } from "./TodaysHistoryComponent";
 import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection, dbSaveInventoryItem, dbGmailDisconnect, dbGmailInitiateAuth } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses, mapEmployees, mapPunchHistory, parseCSV } from "../../../../lightspeed_import";
@@ -111,6 +116,7 @@ const TAB_NAMES = {
   labelDesigner: "Label Designer",
   analytics: "Analytics",
   dlqAdmin: "DLQ Admin",
+  subscription: "Subscription",
 };
 
 const TAB_GATES = {
@@ -139,6 +145,7 @@ export function Dashboard_Admin({}) {
   const zLiveReaders = useStripePaymentStore((state) => state.readersArr) || [];
   const zCurrentUserLevel = useLoginStore((state) => state.currentUser?.permissions?.level || 0);
   const zIsPlatformAdmin = useLoginStore((state) => state.getAuthClaims())?.platformAdmin === true;
+  const zIsSaasOwner = useLoginStore((state) => state.getAuthClaims())?.privilege === "owner";
   const guardedMenuPress = (action, level = 3) => () =>
     useLoginStore.getState().execute(action, levelToPrivilegeName(level));
   // local state ///////////////////////////////////////////////////////////
@@ -155,6 +162,7 @@ export function Dashboard_Admin({}) {
   const [sShowLabelDesigner, _setShowLabelDesigner] = useState(false);
   const [sShowAnalyticsModal, _setShowAnalyticsModal] = useState(false);
   const [sShowDLQAdminModal, _setShowDLQAdminModal] = useState(false);
+  const [sShowBillingModal, _setShowBillingModal] = useState(false);
 
   //////////////////////////////////////////////////////////////////////////
 
@@ -262,6 +270,11 @@ export function Dashboard_Admin({}) {
           <DLQAdminModalScreen handleExit={() => _setShowDLQAdminModal(false)} />
         </Suspense>
       )}
+      {!!sShowBillingModal && zIsSaasOwner && (
+        <Suspense fallback={null}>
+          <BillingModalScreen handleExit={() => _setShowBillingModal(false)} />
+        </Suspense>
+      )}
       {!!sShowLabelDesigner && zCurrentUserLevel >= TAB_GATES[TAB_NAMES.labelDesigner] && (
         <LabelDesignerModal
           handleExit={() => _setShowLabelDesigner(false)}
@@ -324,6 +337,16 @@ export function Dashboard_Admin({}) {
                   icon: ICONS.tools,
                   gate: 4,
                   onClick: () => _setShowDLQAdminModal(true),
+                });
+              }
+              if (zIsSaasOwner) {
+                menuItems.push({
+                  key: "subscription",
+                  label: TAB_NAMES.subscription,
+                  icon: ICONS.greenDollar,
+                  iconSize: 25,
+                  gate: 4,
+                  onClick: () => _setShowBillingModal(true),
                 });
               }
               menuItems.sort((a, b) => (a.gate - b.gate) || a.label.localeCompare(b.label));

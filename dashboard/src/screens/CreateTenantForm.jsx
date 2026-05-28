@@ -4,9 +4,9 @@ import { httpsCallable } from "firebase/functions";
 import { doc, getDoc } from "firebase/firestore";
 import { functions, db } from "../firebase";
 import {
-  StoreAddressFields,
-  useStoreAddressFields,
-} from "./StoreAddressFields";
+  TenantAddressFields,
+  useTenantAddressFields,
+} from "./TenantAddressFields";
 
 const TENANT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 
@@ -56,7 +56,7 @@ export function CreateTenantForm() {
   const [ownerLastName, setOwnerLastName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
   const [ownerPhone, setOwnerPhone] = useState("");
-  const addr = useStoreAddressFields();
+  const addr = useTenantAddressFields();
   const [billingModel, setBillingModel] = useState("");
   const [platformFeePercent, setPlatformFeePercent] = useState(
     DEFAULT_PLATFORM_FEE_PERCENT_STR
@@ -381,9 +381,9 @@ export function CreateTenantForm() {
         </div>
       )}
 
-      <div className="sectionHeading">First store</div>
+      <div className="sectionHeading">Tenant Address</div>
 
-      <StoreAddressFields
+      <TenantAddressFields
         {...addr}
         disabled={status === "submitting"}
       />

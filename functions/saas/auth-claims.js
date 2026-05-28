@@ -201,6 +201,11 @@ function regenNestedCategoryIDs(categories) {
 // Mutates `settings` in place with the per-store substitutions that apply to
 // both fresh-bootstrap and copy-from-source paths. Returns the same object for
 // chaining.
+//
+// `storeAddress`, `storeDisplayName`, and `salesTaxPercent` may all be null
+// for stub-mode bootstraps (tenant created before the owner completes
+// onboarding). In that case storeInfo gets empty strings + shopContactBlurb
+// is cleared, and salesTaxPercent stays at whatever SETTINGS_OBJ defaults to.
 function applyStoreOverrides(settings, {
   tenantID,
   storeID,
@@ -213,18 +218,34 @@ function applyStoreOverrides(settings, {
   if (settings.amazonExtension) {
     settings.amazonExtension.storeId = storeID;
   }
-  settings.storeInfo = {
-    ...settings.storeInfo,
-    displayName: storeDisplayName,
-    street: storeAddress.street,
-    unit: storeAddress.unit,
-    city: storeAddress.city,
-    state: storeAddress.state,
-    zip: storeAddress.zip,
-    phone: storeAddress.phone,
-  };
-  settings.shopContactBlurb = buildShopContactBlurb(storeAddress);
-  settings.salesTaxPercent = salesTaxPercent;
+  if (storeAddress) {
+    settings.storeInfo = {
+      ...settings.storeInfo,
+      displayName: storeDisplayName || "",
+      street: storeAddress.street,
+      unit: storeAddress.unit,
+      city: storeAddress.city,
+      state: storeAddress.state,
+      zip: storeAddress.zip,
+      phone: storeAddress.phone,
+    };
+    settings.shopContactBlurb = buildShopContactBlurb(storeAddress);
+  } else {
+    settings.storeInfo = {
+      ...settings.storeInfo,
+      displayName: "",
+      street: "",
+      unit: "",
+      city: "",
+      state: "",
+      zip: "",
+      phone: "",
+    };
+    settings.shopContactBlurb = "";
+  }
+  if (typeof salesTaxPercent === "number") {
+    settings.salesTaxPercent = salesTaxPercent;
+  }
   return settings;
 }
 
@@ -302,13 +323,11 @@ exports.platformAdminCreateTenantCallable = onCall(
       ownerFirstName,
       ownerLastName,
       ownerPhone,
-      storeStreet,
-      storeUnit,
-      storeCity,
-      storeState,
-      storeZip,
-      storePhone,
-      salesTaxPercent,
+      tenantStreet,
+      tenantUnit,
+      tenantCity,
+      tenantState,
+      tenantZip,
       billingModel,
       platformFeePercent,
       subscriptionTierID,
@@ -343,39 +362,28 @@ exports.platformAdminCreateTenantCallable = onCall(
       );
     }
 
-    const normalizedStreet = normalizeStoreString(storeStreet, 200);
+    // Tenant address: the supervising-authority address. Per-store operational
+    // address is collected later from the owner via the cadence-pos onboarding
+    // flow. Tenant phone is the ownerPhone; tax % is per-store.
+    const normalizedStreet = normalizeStoreString(tenantStreet, 200);
     if (!normalizedStreet) {
-      throw new HttpsError("invalid-argument", "storeStreet is required (≤200 chars).");
+      throw new HttpsError("invalid-argument", "tenantStreet is required (≤200 chars).");
     }
-    const normalizedUnit = normalizeOptionalStoreString(storeUnit, 50);
+    const normalizedUnit = normalizeOptionalStoreString(tenantUnit, 50);
     if (normalizedUnit === null) {
-      throw new HttpsError("invalid-argument", "storeUnit must be a string ≤50 chars.");
+      throw new HttpsError("invalid-argument", "tenantUnit must be a string ≤50 chars.");
     }
-    const normalizedCity = normalizeStoreString(storeCity, 100);
+    const normalizedCity = normalizeStoreString(tenantCity, 100);
     if (!normalizedCity) {
-      throw new HttpsError("invalid-argument", "storeCity is required (≤100 chars).");
+      throw new HttpsError("invalid-argument", "tenantCity is required (≤100 chars).");
     }
-    const normalizedState = normalizeStoreString(storeState, 2);
+    const normalizedState = normalizeStoreString(tenantState, 2);
     if (!normalizedState || !/^[A-Za-z]{2}$/.test(normalizedState)) {
-      throw new HttpsError("invalid-argument", "storeState must be a 2-letter code.");
+      throw new HttpsError("invalid-argument", "tenantState must be a 2-letter code.");
     }
-    const normalizedZip = normalizeZip(storeZip);
+    const normalizedZip = normalizeZip(tenantZip);
     if (!normalizedZip) {
-      throw new HttpsError("invalid-argument", "storeZip must be 5 digits or ZIP+4.");
-    }
-    const normalizedStorePhone = normalizePhone(storePhone);
-    if (!normalizedStorePhone) {
-      throw new HttpsError(
-        "invalid-argument",
-        "storePhone is required and must be a valid 10-digit US number or E.164 international format."
-      );
-    }
-    const normalizedTax = normalizeSalesTaxPercent(salesTaxPercent);
-    if (normalizedTax === null) {
-      throw new HttpsError(
-        "invalid-argument",
-        "salesTaxPercent is required and must be a number between 0 and 100."
-      );
+      throw new HttpsError("invalid-argument", "tenantZip must be 5 digits or ZIP+4.");
     }
 
     const normalizedBillingModel = normalizeBillingModel(billingModel);
@@ -463,6 +471,10 @@ exports.platformAdminCreateTenantCallable = onCall(
       stores: [storeID],
     });
 
+    // Tenant doc: supervising authority. Holds owner identity, tenant address
+    // (the legal/billing address), and billing-model state. Tier is per-store
+    // — moved to the store doc below so each store under a multi-store tenant
+    // can sit on its own tier (one Stripe Subscription, N Subscription Items).
     await tenantRef.set({
       name: tenantName,
       ownerUID: ownerUser.uid,
@@ -470,47 +482,57 @@ exports.platformAdminCreateTenantCallable = onCall(
       ownerFirstName: normalizedFirstName,
       ownerLastName: normalizedLastName,
       ownerPhone: normalizedPhone,
-      billingModel: normalizedBillingModel,
-      platformFeePercent: normalizedFeePercent,
-      subscriptionTierID: normalizedTierID,
-      subscriptionStatus: null,
-      stripeBillingCustomerID: null,
-      stripeSubscriptionID: null,
-      stripeSubscriptionPriceID: null,
-      subscriptionGraceUntil: null,
-      createdAt: FieldValue.serverTimestamp(),
-      createdByUID: auth.uid,
-    });
-
-    const storeAddress = {
       street: normalizedStreet,
       unit: normalizedUnit,
       city: normalizedCity,
       state: normalizedState.toUpperCase(),
       zip: normalizedZip,
-      phone: normalizedStorePhone,
-    };
-
-    const storeRef = tenantRef.collection("stores").doc(storeID);
-    await storeRef.set({
-      displayName: tenantName,
-      street: storeAddress.street,
-      unit: storeAddress.unit,
-      city: storeAddress.city,
-      state: storeAddress.state,
-      zip: storeAddress.zip,
-      phone: storeAddress.phone,
-      salesTaxPercent: normalizedTax,
+      billingModel: normalizedBillingModel,
+      platformFeePercent: normalizedFeePercent,
+      subscriptionStatus: null,
+      stripeBillingCustomerID: null,
+      stripeSubscriptionID: null,
+      subscriptionGraceUntil: null,
       createdAt: FieldValue.serverTimestamp(),
       createdByUID: auth.uid,
     });
 
+    // Store doc: operational unit. Stubbed with null ops fields — the owner
+    // fills these in via the cadence-pos /welcome onboarding flow. Tier is set
+    // by the platform admin at create time and is the one thing the tenant
+    // owner cannot self-serve. `isSetupComplete: false` gates the rest of the
+    // app until onboarding finishes.
+    const storeRef = tenantRef.collection("stores").doc(storeID);
+    await storeRef.set({
+      displayName: null,
+      legalName: null,
+      street: null,
+      unit: null,
+      city: null,
+      state: null,
+      zip: null,
+      phone: null,
+      supportEmail: null,
+      officeEmail: null,
+      salesTaxPercent: null,
+      logoURL: null,
+      subscriptionTierID: normalizedTierID,
+      stripeSubscriptionItemID: null,
+      stripeSubscriptionPriceID: null,
+      isSetupComplete: false,
+      createdAt: FieldValue.serverTimestamp(),
+      createdByUID: auth.uid,
+    });
+
+    // Settings doc: SETTINGS_OBJ clone with regenerated IDs but null/empty
+    // store-specific overrides. Owner-completion will populate storeInfo +
+    // shopContactBlurb + salesTaxPercent.
     const settingsDoc = buildBootstrapSettings({
       tenantID,
       storeID,
-      storeDisplayName: tenantName,
-      storeAddress,
-      salesTaxPercent: normalizedTax,
+      storeDisplayName: null,
+      storeAddress: null,
+      salesTaxPercent: null,
     });
     await storeRef.collection("settings").doc("settings").set(settingsDoc);
 

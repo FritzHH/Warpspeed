@@ -1,10 +1,26 @@
+/* Print button in modal header — matches LargeModalHeader icon-only hover-lift */
+.printHeaderBtn.printHeaderBtn {
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+.printHeaderBtn.printHeaderBtn:hover {
+  opacity: 1;
+  transform: translateY(-2px);
+  filter: drop-shadow(0 3px 3px var(--shadow-color-default));
+}
+
+.printHeaderBtn.printHeaderBtn:active {
+  transform: translateY(0);
+  filter: drop-shadow(0 1px 1px var(--shadow-color-default));
+}
+
 /* Outer card */
 .card {
   width: 760px;
   max-width: 90vw;
   max-height: 90vh;
   background-color: var(--surface-base);
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   box-shadow: 3px 3px 12px var(--shadow-color-default);
   display: flex;
   flex-direction: column;
@@ -21,24 +37,14 @@
   box-sizing: border-box;
 }
 
-/* Header */
-.header {
+/* Toolbar (right-aligned actions) */
+.toolbar {
   display: flex;
   flex-direction: row;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   margin-bottom: 5px;
-}
-
-.headerTitle {
-  font-size: 18px;
-  font-weight: 600;
-}
-
-.headerRight {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
+  flex-shrink: 0;
 }
 
 .printWrap {
@@ -68,7 +74,7 @@
 /* Section cards */
 .sectionCard {
   border: 1px solid;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 12px;
   margin-top: 10px;
 }
@@ -132,7 +138,7 @@
   outline: none;
   resize: none;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   margin-top: 2px;
   font-family: inherit;
   width: 100%;
@@ -149,7 +155,7 @@
   width: 120px;
   margin-top: 4px;
   padding: 4px 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border: 1px solid;
   font-size: 14px;
   outline: none;
@@ -184,16 +190,6 @@
   flex: 1;
 }
 
-.barcodeDeleteBtn {
-  background: none;
-  border: none;
-  padding: 4px;
-  margin-left: 6px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-}
-
 .barcodeAddBtn {
   display: flex;
   flex-direction: row;
@@ -210,14 +206,6 @@
   margin-left: 4px;
 }
 
-/* Checkbox row */
-.receiptNoteRow {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 10px 0;
-}
-
 /* Two-column section row (Quick button + Auto note) */
 .twoCol {
   display: flex;
@@ -230,7 +218,7 @@
   flex: 1;
   margin-top: 0;
   border: 1px solid;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 12px;
 }
 
@@ -258,15 +246,6 @@
   opacity: 0.4;
 }
 
-.sectionAddBtn {
-  background: none;
-  border: none;
-  padding: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-}
-
 /* Quick button placements */
 .placementsEmpty {
   font-size: 13px;
@@ -286,21 +265,11 @@
   align-items: center;
   padding: 5px 8px;
   background-color: white;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
 }
 
 .placementChipText {
   font-size: 13px;
-}
-
-.placementChipDelete {
-  background: none;
-  border: none;
-  padding: 4px;
-  margin-left: 4px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
 }
 
 /* Auto note */
@@ -309,7 +278,7 @@
   flex-direction: row;
   align-items: center;
   border: 1px solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 4px 10px;
   cursor: pointer;
   font-family: inherit;
@@ -330,7 +299,7 @@
 
 .autoNoteChip {
   background-color: rgb(240, 200, 200);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 5px 10px;
   display: flex;
   flex-direction: row;

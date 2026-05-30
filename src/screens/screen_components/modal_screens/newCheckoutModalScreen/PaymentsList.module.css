@@ -15,7 +15,7 @@
 .card {
   padding: 5px;
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   margin-bottom: 5px;
   flex-shrink: 0;
   box-sizing: border-box;
@@ -44,7 +44,7 @@
 .pill {
   display: flex;
   flex-direction: column;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 2px 8px;
   flex-shrink: 0;
 }

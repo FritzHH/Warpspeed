@@ -2,7 +2,7 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "../../dom_components";
-import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../styles";
 import { useOpenWorkordersStore } from "../../stores";
 import { ROUTES } from "../../routes";
 import styles from "./MobileHomeScreen.module.css";
@@ -24,7 +24,7 @@ export function MobileHomeScreen() {
         buttonStyle={{
           width: "100%",
           paddingVertical: 24,
-          borderRadius: 5,
+          borderRadius: Radius.control,
           marginBottom: 16,
         }}
         textStyle={{
@@ -42,7 +42,7 @@ export function MobileHomeScreen() {
         buttonStyle={{
           width: "100%",
           paddingVertical: 18,
-          borderRadius: 5,
+          borderRadius: Radius.control,
           marginBottom: 16,
         }}
         textStyle={{

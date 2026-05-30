@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { useState } from "react";
-import { Dialog, TextInput, ModalFooter, ModalFooterButton } from "../../../../dom_components";
+import { Dialog, TextInput, LargeModalHeader, LargeModalHeaderButton } from "../../../../dom_components";
 import { C, Fonts } from "../../../../styles";
 import { formatPhoneWithDashes, removeDashesFromPhone } from "../../../../utils";
 import { dlog, DCAT } from "./checkoutDebugLog";
@@ -80,18 +80,31 @@ export function SendReceiptModal({ visible, onSend, onClose }) {
       visible={visible}
       onClose={onClose}
       preventClose={formLocked}
-      title="Send Receipt"
       aria-label="Send Receipt"
     >
       <div className={styles.panel} style={{ backgroundColor: C.backgroundWhite }}>
+        <LargeModalHeader
+          title="Send Receipt"
+          actions={[
+            <LargeModalHeaderButton
+              key="send"
+              variant="accent"
+              disabled={formLocked}
+              onClick={handleSend}
+            >
+              {sSending ? "SENDING..." : "SEND"}
+            </LargeModalHeaderButton>,
+            <LargeModalHeaderButton
+              key="close"
+              variant="default"
+              disabled={formLocked}
+              onClick={() => { dlog(DCAT.BUTTON, "cancel", "SendReceiptModal", {}); onClose(); }}
+            >
+              CLOSE
+            </LargeModalHeaderButton>,
+          ]}
+        />
         <div className={styles.panelInner}>
-        <span
-          className={styles.title}
-          style={{ color: C.textMuted, fontWeight: Fonts.weight.textHeavy }}
-        >
-          SEND RECEIPT
-        </span>
-
         <div className={`${styles.field} ${styles.fieldPhone}`}>
           <span className={styles.label} style={labelStyle}>Phone Number</span>
           <TextInput
@@ -133,22 +146,6 @@ export function SendReceiptModal({ visible, onSend, onClose }) {
         )}
 
         </div>
-        <ModalFooter>
-          <ModalFooterButton
-            variant="danger"
-            disabled={formLocked}
-            onClick={() => { dlog(DCAT.BUTTON, "cancel", "SendReceiptModal", {}); onClose(); }}
-          >
-            CANCEL
-          </ModalFooterButton>
-          <ModalFooterButton
-            variant="accent"
-            disabled={formLocked}
-            onClick={handleSend}
-          >
-            {sSending ? "SENDING..." : "SEND"}
-          </ModalFooterButton>
-        </ModalFooter>
       </div>
     </Dialog>
   );

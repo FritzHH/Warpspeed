@@ -121,9 +121,11 @@ async function lookupTenantForConnectAccount(stripeAccountID) {
   return data.tenantID;
 }
 
-// Writes the SaaS custom-claim shape onto a user. Owner ignores `stores`
-// (sees all). Non-owners get `stores` defaulted to []. Throws if `privilege`
-// is unrecognized so a caller can't accidentally grant a typo'd role.
+// Writes the SaaS custom-claim shape onto a user. `stores` is honored as
+// passed for every privilege level — owners are NOT auto-emptied; their
+// stores list must be maintained by callers (e.g. platformAdminCreate*).
+// Defaults to [] if not supplied. Throws if `privilege` is unrecognized so
+// a caller can't accidentally grant a typo'd role.
 async function setUserClaims(uid, { tenantID, privilege, stores }) {
   if (!uid) {
     throw new HttpsError("invalid-argument", "uid is required.");
@@ -137,12 +139,11 @@ async function setUserClaims(uid, { tenantID, privilege, stores }) {
       `privilege must be one of: ${PRIVILEGES.join(", ")}.`
     );
   }
-  const claims = { tenantID, privilege };
-  if (privilege === "owner") {
-    claims.stores = [];
-  } else {
-    claims.stores = Array.isArray(stores) ? stores.filter(Boolean) : [];
-  }
+  const claims = {
+    tenantID,
+    privilege,
+    stores: Array.isArray(stores) ? stores.filter(Boolean) : [],
+  };
   await admin.auth().setCustomUserClaims(uid, claims);
   return claims;
 }

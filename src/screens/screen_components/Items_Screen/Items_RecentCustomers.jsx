@@ -126,13 +126,19 @@ export function RecentCustomersComponent() {
             }}
           >
             <div className={styles.actionPopupHeader}>
-              <button
-                type="button"
-                className={styles.closeButton}
-                onClick={() => _setSelectedCustomer(null)}
-              >
-                <Image icon={ICONS.close1} className={styles.closeIcon} />
-              </button>
+              <Button
+                icon={ICONS.close1}
+                iconSize={28}
+                onPress={() => _setSelectedCustomer(null)}
+                buttonStyle={{
+                  paddingLeft: 0,
+                  paddingRight: 0,
+                  paddingTop: 0,
+                  paddingBottom: 0,
+                  backgroundColor: "transparent",
+                }}
+                iconStyle={{ marginRight: 0 }}
+              />
             </div>
             <div className={styles.actionPopupBody}>
               <Button

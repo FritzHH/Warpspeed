@@ -46,8 +46,41 @@ service cloud.firestore {
     // Store data is the bulk of the app. Members of the store (or tenant
     // owners) get full read/write access. The app does direct Firestore
     // writes for speed; mutations are not callable-gated.
-    match /tenants/{tenantID}/stores/{storeID}/{document=**} {
-      allow read, write: if hasStoreAccess(tenantID, storeID);
+    //
+    // Exception: settings/settings has a short list of protected fields
+    // (auth-sensitive + money-sensitive). On SaaS, non-admin writes are
+    // allowed only if NONE of those fields changed. Admin/owner can change
+    // anything. Bonita users (no privilege claim) retain legacy
+    // unrestricted writes — Bonita is out of scope here.
+    //
+    // Protected fields list lives in settingsProtectedFieldsUnchanged
+    // below; update both rule + the matching tenant-app memory note if
+    // the list changes.
+    match /tenants/{tenantID}/stores/{storeID} {
+      match /{collection}/{document=**} {
+        allow read, write: if hasStoreAccess(tenantID, storeID)
+                           && collection != 'settings';
+      }
+      match /settings/{docID=**} {
+        allow read: if hasStoreAccess(tenantID, storeID);
+        allow write: if hasStoreAccess(tenantID, storeID) && (
+          // Bonita: no privilege claim → unchanged
+          request.auth.token.get('privilege', '') == ''
+          // SaaS admin/owner: full access
+          || request.auth.token.get('privilege', '') in ['admin', 'owner']
+          // SaaS non-admin: only if protected fields are unchanged
+          || settingsProtectedFieldsUnchanged(request.resource, resource)
+        );
+      }
+    }
+
+    function settingsProtectedFieldsUnchanged(req, res) {
+      return req.data.users == res.data.users
+          && req.data.cardFeePercent == res.data.cardFeePercent
+          && req.data.useCardFee == res.data.useCardFee
+          && req.data.userPinStrength == res.data.userPinStrength
+          && req.data.adminAuthLogout == res.data.adminAuthLogout
+          && req.data.faceRecognitionThreshold == res.data.faceRecognitionThreshold;
     }
 
     // Tenant document + non-store subcollections (e.g. connect-accounts,

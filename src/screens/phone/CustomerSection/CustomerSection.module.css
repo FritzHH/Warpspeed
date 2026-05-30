@@ -16,7 +16,7 @@
 
 .card {
   margin-top: 12px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border-width: 1px;
   border-style: solid;
   padding: 12px;
@@ -53,7 +53,7 @@
   padding-left: 8px;
   padding-right: 8px;
   outline: none;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   font-size: 14px;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -68,7 +68,7 @@
   margin-top: 10px;
   padding: 8px;
   outline: none;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   font-size: 14px;
   box-sizing: border-box;
   font-family: inherit;

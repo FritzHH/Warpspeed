@@ -48,9 +48,10 @@ const UserMessagesModalForLogin = lazy(() =>
 import { isSaleID, isLightspeedID } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutUtils";
 import { decodeLightspeedBarcode, lightenRGBByPercent } from "../utils";
 import { newCheckoutGetStripeReaders, readActiveSale, recoverPendingActiveSales } from "./screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
-import { firestoreSubscribe, firestoreSubscribeCollection } from "../db_calls";
+import { AUTH, firestoreSubscribe, firestoreSubscribeCollection } from "../db_calls";
 import {
   dbListenToSettings,
+  dbListenToTenantUsers,
   dbListenToOpenWorkorders,
   dbListenToCurrentPunchClock,
   dbListenToInAppMessages,
@@ -61,6 +62,7 @@ import {
   dbListenToEmails,
   dbListenToEmailAuth,
   dbListenToEmailAccounts,
+  dbLogout,
 } from "../db_calls_wrapper";
 import { SETTINGS_OBJ, TAB_NAMES, CUSTOMER_PROTO, permissionToLevel } from "../data";
 import { clog, log, recoverPendingAutoTexts, localStorageWrapper } from "../utils";
@@ -68,6 +70,41 @@ import { register, reconnectAll, teardownAll, useListenerStatusStore } from "../
 import cloneDeep from "lodash/cloneDeep";
 import throttle from "lodash/throttle";
 import { ROUTES } from "../routes";
+
+// If the live settings update removes the signed-in user from this store's
+// users[] or flips their `disabled` flag, sign them out immediately. The
+// Auth user's uid (not the punched-in `currentUser`) is the gate, so the
+// owner who signed in stays in control even when a different staff member
+// is on the clock. Pre-Phase-7 Bonita auth has no `privilege` claim and
+// continues to use the legacy login path unaffected.
+function enforceUserAccessOrLogout(settings) {
+  const claims = useLoginStore.getState().authClaims;
+  if (!claims?.privilege) return;
+  const uid = AUTH.currentUser?.uid;
+  if (!uid) return;
+
+  const usersArr = Array.isArray(settings?.users) ? settings.users : [];
+  const entry = usersArr.find((u) => u && u.id === uid);
+  const removed = !entry;
+  const disabled = !!entry?.disabled;
+  if (!removed && !disabled) return;
+
+  try {
+    localStorage.setItem(
+      "warpspeed_access_revoked",
+      JSON.stringify({
+        reason: removed ? "removed" : "disabled",
+        at: Date.now(),
+      })
+    );
+  } catch {
+    /* localStorage may be unavailable; logout still proceeds */
+  }
+
+  dbLogout().catch((err) =>
+    log("enforceUserAccessOrLogout: dbLogout failed:", err)
+  );
+}
 
 function playNotificationBeep() {
   try {
@@ -539,6 +576,14 @@ export function BaseScreen() {
     register("settings", (onConnected, onError) => {
       return dbListenToSettings((data) => {
         useSettingsStore.getState().setSettings(data, false, false);
+        enforceUserAccessOrLogout(data);
+        onConnected();
+      }, onError);
+    });
+
+    register("tenant-users", (onConnected, onError) => {
+      return dbListenToTenantUsers((data) => {
+        useSettingsStore.getState().setTenantUsers(data);
         onConnected();
       }, onError);
     });
@@ -786,6 +831,14 @@ export function BaseScreen() {
               <span className={styles.bannerTextLg} style={{ color: C.textWhite }}>
                 Customer screen is closed
               </span>
+              {sDisplayLoading && (
+                <SmallLoadingIndicator
+                  size={14}
+                  color={C.textWhite}
+                  message=""
+                  style={{ padding: 0, marginLeft: 10 }}
+                />
+              )}
               <button
                 type="button"
                 disabled={sDisplayLoading}
@@ -793,13 +846,9 @@ export function BaseScreen() {
                 className={styles.bannerOpenBtn}
                 style={{ backgroundColor: C.green, opacity: sDisplayLoading ? 0.5 : 1 }}
               >
-                {sDisplayLoading ? (
-                  <SmallLoadingIndicator color={C.textWhite} />
-                ) : (
-                  <span className={styles.bannerBtnText} style={{ color: C.textWhite }}>
-                    Open
-                  </span>
-                )}
+                <span className={styles.bannerBtnText} style={{ color: C.textWhite }}>
+                  Open
+                </span>
               </button>
             </div>
           )}

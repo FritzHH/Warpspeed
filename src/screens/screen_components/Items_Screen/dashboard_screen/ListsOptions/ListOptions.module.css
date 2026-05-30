@@ -16,7 +16,7 @@
   align-items: center;
   border-width: 1px;
   border-style: solid;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 15px;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -27,7 +27,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 15px;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -46,7 +46,7 @@
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 5px 20px;
   width: 95%;
   flex-shrink: 0;
@@ -57,7 +57,7 @@
   flex-direction: row;
   align-items: center;
   justify-content: flex-end;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 5px;
   width: 95%;
   flex-shrink: 0;
@@ -68,7 +68,7 @@
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 5px 20px;
   margin-top: 20px;
   margin-bottom: 10px;
@@ -81,7 +81,7 @@
   flex-direction: row;
   align-items: center;
   justify-content: flex-end;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 0 5px;
   width: 100%;
   flex-shrink: 0;
@@ -92,7 +92,7 @@
   flex-direction: row;
   align-items: center;
   justify-content: flex-end;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 0 5px;
   width: 100%;
   flex-shrink: 0;
@@ -177,7 +177,7 @@
 .greenInput {
   border-width: 1px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 5px;
   text-align: center;
   outline-width: 0;
@@ -189,7 +189,7 @@
   margin-bottom: 5px;
   border-width: 1px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 5px;
   width: 80%;
   text-align: center;
@@ -201,7 +201,7 @@
 .smallInput {
   border-width: 1px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 5px;
   text-align: center;
   outline-width: 0;
@@ -214,7 +214,7 @@
 .discountInput {
   border-width: 1px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 5px;
   text-align: center;
   outline-width: 0;
@@ -225,7 +225,7 @@
 }
 
 .discountTypeToggle {
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   border-width: 1px;
   border-style: solid;
   padding: 3px 10px;
@@ -241,7 +241,7 @@
 
 .categoryRow {
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 8px;
   margin-bottom: 6px;
   cursor: grab;
@@ -283,7 +283,7 @@
 .categoryItemPreview {
   border-width: 1px;
   border-style: solid;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background-color: white;
   padding: 3px 8px;
   font-size: 13px;
@@ -324,7 +324,7 @@
 .targetCheckboxBox {
   width: 14px;
   height: 14px;
-  border-radius: 3px;
+  border-radius: var(--radius-control);
   border-width: 2px;
   border-style: solid;
   margin-right: 4px;
@@ -340,7 +340,7 @@
   width: 500px;
   height: 75vh;
   background-color: white;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   border-width: 2px;
   border-style: solid;
   overflow: hidden;
@@ -375,7 +375,7 @@
   flex: 1;
   border-width: 1px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 5px;
   font-size: 15px;
   font-weight: 600;
@@ -404,7 +404,7 @@
 .modalTargetCheckboxBox {
   width: 15px;
   height: 15px;
-  border-radius: 3px;
+  border-radius: var(--radius-control);
   border-width: 2px;
   border-style: solid;
   margin-right: 5px;
@@ -425,7 +425,7 @@
 .modalItemBox {
   border-width: 1px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 10px;
   margin-bottom: 8px;
   box-sizing: border-box;
@@ -461,7 +461,7 @@
   flex: 1;
   border-width: 1px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 5px 8px;
   font-size: 13px;
   outline-width: 0;
@@ -476,7 +476,7 @@
   align-items: center;
   justify-content: center;
   border-width: 1px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border-style: dashed;
   padding: 10px 0;
   width: 100%;

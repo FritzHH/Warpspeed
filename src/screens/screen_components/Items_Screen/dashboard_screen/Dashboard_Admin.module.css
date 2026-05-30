@@ -66,7 +66,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 13px 10px 13px 5px;
   background-color: var(--tab-bar-bg);
   border: 1px solid var(--tab-bar-border);
@@ -90,7 +90,7 @@
   margin-bottom: 4px;
   background-color: transparent;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 4px 6px;
   cursor: pointer;
   transition: opacity 100ms ease-out;
@@ -136,7 +136,7 @@
   padding: 15px;
   border: 1px solid var(--box-inner-border);
   background-color: var(--box-inner-bg);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   box-sizing: border-box;
 }
 
@@ -164,7 +164,7 @@
   width: 50px;
   margin-left: 10px;
   border: 1px solid var(--uc-input-border);
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding-left: 3px;
   outline: none;
   color: var(--uc-text);
@@ -222,6 +222,57 @@
   min-width: 0;
 }
 
+.appUserCard {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background-color: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  text-align: left;
+  box-sizing: border-box;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.appUserCard:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.1);
+}
+
+.appUserCard:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+.appUserCard:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.appUserCardSelected {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25);
+}
+
+.appUserCardSelected:hover:not(:disabled) {
+  border-color: #3b82f6 !important;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25), 0 6px 14px rgba(0, 0, 0, 0.1);
+}
+
+.appUserCardActions {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .ucEditorEmpty {
   width: 100%;
   padding: 24px 0;
@@ -237,7 +288,7 @@
   gap: 12px;
   border-width: 1px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 12px;
   background-color: rgba(0, 0, 0, 0.025);
   box-sizing: border-box;
@@ -250,7 +301,7 @@
   flex-direction: column;
   padding: 12px 14px;
   border: 1px solid #3b82f6;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background-color: #ffffff;
   box-shadow: 0 1px 2px rgba(59, 130, 246, 0.15);
   flex-shrink: 0;
@@ -349,7 +400,7 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   padding: 2px 6px;
 }
 
@@ -377,7 +428,7 @@
   width: 100%;
   border: 1px solid var(--uc-enroll-border);
   background-color: var(--uc-enroll-bg);
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 2px 4px;
   box-sizing: border-box;
   cursor: pointer;

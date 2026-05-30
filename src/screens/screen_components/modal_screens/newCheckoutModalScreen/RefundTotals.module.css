@@ -37,7 +37,7 @@
 }
 
 .exceedsBox {
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 8px;
   margin-top: 6px;
   flex-shrink: 0;
@@ -50,7 +50,7 @@
 }
 
 .completeBox {
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 0 14px 10px 14px;
   margin-top: 4px;
   display: flex;

@@ -238,6 +238,7 @@ export const DB_NODES = {
     EMAIL_LOOKUP: "email-lookup",
     EMAILS: "emails",
     SUBSCRIPTION: "subscription",
+    USERS: "users",
   },
 
   // Realtime Database nodes

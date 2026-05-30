@@ -25,7 +25,7 @@
 
 .messageBanner {
   padding: 15px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   margin-bottom: 20px;
   flex-shrink: 0;
 }
@@ -74,7 +74,7 @@
 .storeIdBox {
   flex: 1;
   padding: 12px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   min-width: 0;
 }
 
@@ -86,7 +86,7 @@
 
 .copyButton {
   padding: 12px 18px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   flex-shrink: 0;
   border: none;
   cursor: pointer;
@@ -116,7 +116,7 @@
 
 .fieldInput {
   padding: 10px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   font-size: 14px;
   width: 100%;
   background-color: var(--surface-base);
@@ -147,7 +147,7 @@
   padding: 15px;
   margin-bottom: 10px;
   background-color: var(--surface-base);
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   cursor: pointer;
 }
 
@@ -189,7 +189,7 @@
   margin-top: 30px;
   padding: 20px;
   background-color: var(--surface-warning-muted);
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border: 1px solid var(--border-warning);
   flex-shrink: 0;
 }
@@ -220,7 +220,7 @@
   margin-top: 20px;
   padding: 15px;
   background-color: #e7f3ff;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border: 1px solid #2196f3;
   flex-shrink: 0;
 }

@@ -13,7 +13,7 @@
 }
 
 .cardInfo {
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 8px;
   margin-bottom: 8px;
   flex-shrink: 0;
@@ -50,7 +50,7 @@
   align-items: center;
   border-width: 1px;
   border-style: solid;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 6px 8px;
   background-color: white;
 }

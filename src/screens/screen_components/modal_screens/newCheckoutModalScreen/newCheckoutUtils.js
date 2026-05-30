@@ -451,6 +451,9 @@ export function sendRefundReceipt(refundReceiptData, customer, settings, smsTemp
   const { tenantID, storeID } = useSettingsStore.getState().getSettings();
 
   const storagePath = build_db_path.cloudStorage.saleReceiptPDF(refundReceiptData.id, tenantID, storeID);
+  const firstNameVar = customer?.first
+    ? capitalizeFirstLetterOfString(customer.first.trim())
+    : "valued customer";
   dbSendReceipt({
     receiptType: "refund",
     receiptData: refundReceiptData,
@@ -463,7 +466,7 @@ export function sendRefundReceipt(refundReceiptData, customer, settings, smsTemp
     saleID: opts?.saleID || "",
     workorderID: opts?.workorderID || "",
     templateVars: {
-      firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
+      firstName: firstNameVar,
       storeName: settings?.storeInfo?.displayName || "our store",
       total: formatCurrencyDisp(refundReceiptData.refundAmount || 0, true),
     },

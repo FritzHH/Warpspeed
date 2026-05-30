@@ -14,7 +14,7 @@ import {
   useTabNamesStore,
   useInventoryStore,
 } from "../../../../stores";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../../../styles";
 import { useZ } from "../../../../hooks/useZ";
 import { formatCurrencyDisp } from "../../../../utils";
 import {
@@ -166,7 +166,7 @@ const QBInventorySearchModal = ({
             enabled={sSelectedIDs.size > 0}
             colorGradientArr={COLOR_GRADIENTS.green}
             buttonStyle={{
-              borderRadius: 5,
+              borderRadius: Radius.control,
               paddingTop: 8,
               paddingBottom: 8,
               opacity: sSelectedIDs.size > 0 ? 1 : 0.4,
@@ -477,13 +477,19 @@ const ParentButtonItemsList = ({
                   />
                 </div>
               )}
-              <button
-                type="button"
-                className={styles.itemRowDeleteBtn}
-                onClick={() => handleDeleteItem(inv.id)}
-              >
-                <Image icon={ICONS.trash} size={14} />
-              </button>
+              <Button
+                icon={ICONS.trash}
+                iconSize={14}
+                onPress={() => handleDeleteItem(inv.id)}
+                buttonStyle={{
+                  paddingLeft: 4,
+                  paddingRight: 4,
+                  paddingTop: 4,
+                  paddingBottom: 4,
+                  backgroundColor: "transparent",
+                }}
+                iconStyle={{ marginRight: 0 }}
+              />
               {isDragTarget && sDragIdx > idx && (
                 <Image
                   icon={ICONS.backRed}

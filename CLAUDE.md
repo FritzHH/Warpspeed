@@ -175,6 +175,12 @@ Components that wrap children (`Tooltip`, `Portal`, route guards, etc.) MUST NOT
 
 ---
 
+**PDF generators — single source of truth in `src/shared/`.** Sale receipt and workorder/intake ticket PDFs live in `src/shared/saleReceiptPdf.js` and `src/shared/intakeReceiptPdf.js`. Default labels live in `src/shared/receiptLabels.js`. The client imports them directly; Cloud Functions get CommonJS copies at deploy time via the `scripts/sync-shared-to-functions.js` predeploy hook, and `functions/pdfGenerator.js` re-exports them as `generateSaleReceiptPDF` / `generateWorkorderTicketPDF` (thin wrappers that convert the `doc` to base64).
+
+- **Edit ONLY `src/shared/*.js`** for sale/workorder design changes. The bundled CJS copies under `functions/shared/` are auto-generated — don't edit them; they're overwritten on every deploy.
+- **Refund, credit, gift-card, and transaction receipts remain functions-only.** They still live in `functions/pdfGenerator.js` (not used client-side) — keep them there unless a client print path appears.
+- After editing the shared files, the client picks them up immediately via Vite; for functions, the next `firebase deploy --only functions:NAME` runs the predeploy sync automatically.
+
 **Standalone / solo sale = no customerID.** A "standalone sale" or "solo sale" is a workorder with no `customerID` (`!workorder.customerID`). The absence of `customerID` is the sole indicator. Do not invent or reference an `isStandaloneSale` flag.
 
 **SaaS positioning.** This is a multi-tenant SaaS being prepared for distribution. When you see opportunities for professional-grade upgrades (reliability, onboarding polish, observability, security), surface them.
@@ -182,6 +188,27 @@ Components that wrap children (`Tooltip`, `Portal`, route guards, etc.) MUST NOT
 **"View pic" shortcut.** When the user says "view pic", read `C:\Users\hiebf\OneDrive\Desktop\snip.png`.
 
 **"Print a log" = serialized JSON.** When the user says "print a log" (or asks you to add/insert a log), default to printing the value as serialized JSON (e.g., `console.log(JSON.stringify(value, null, 2))`) unless they specify otherwise. Applies to any log added at the user's request.
+
+**Customer name fields use capitalize-first canonical storage — no display transform needed.** Customer `first` and `last` (and their denormalized copies `customerFirst` / `customerLast` on workorders and sales) are stored with `capitalizeFirstLetterOfString(value)` from `src/utils.js` — first letter forced uppercase, rest preserved as typed. Storage IS the display form; do NOT add another capitalization wrapper at render time.
+
+Every customer-write path MUST canonicalize on save. Current sites:
+- `CustomerInfoModalScreen.jsx` form entry (desktop)
+- `phone/CustomerSection/CustomerSection.jsx` form entry (phone mode)
+- `lightspeed_import.js` (CSV row → customer)
+- `BikeStandScreen.jsx` `handleCreateAndStart` (bike-stand quick create)
+
+Any new customer-write path must do the same.
+
+**Why capitalize-first specifically.** `dbSearchCustomersByName` (`db_calls_wrapper.js`) does Firestore range queries (`>=` / `<=` with `\uf8ff` upper bound) on `first` and `last` for typeahead search. Firestore range queries are case-sensitive lexicographic, so search input is canonicalized identically — both sides land in the same form and prefix matches work. Skip the canonicalization on a write path and those customers vanish from name search.
+
+**Accepted edge case:** Names with internal capitals (`McDonald`, `O'Brien`) preserve the user's typed casing intact. Search misses them past the position of the internal capital — e.g., searching "Mcd" misses "McDonald" because `D=68 < d=100` lexicographically. If this ever bites at scale, the fix is a `firstLower` / `lastLower` shadow field used only for search queries.
+
+**`city` and `streetAddress`.** Form entry applies `capitalizeFirstLetterOfString` for visual consistency, but these fields are never queried server-side — storage casing is cosmetic, not load-bearing. Display them as-stored; no transform at render time.
+
+**`addressNotes`.** Freeform sentence text. Apply `capitalizeFirstLetterOfString(value)` at display sites only.
+
+- Do NOT mutate the stored value or write the capitalized form back to Firestore — the lowercased form is the canonical storage shape. Capitalization is a display-only transform applied at render time.
+- Search-input fields and matching logic continue to operate on the raw lowercased values.
 
 Then execute the user's prompt according to these guidelines.
 

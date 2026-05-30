@@ -5,7 +5,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 5px 5px 0 5px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   box-sizing: border-box;
 }
 
@@ -16,7 +16,7 @@
   justify-content: space-between;
   align-items: center;
   border: 1px solid transparent;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 0 3px;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -44,7 +44,7 @@
   padding: 11px 0;
   border-width: 1px;
   border-style: solid;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   box-sizing: border-box;
   flex-shrink: 0;
 }
@@ -70,7 +70,7 @@
   display: inline-flex;
   align-items: center;
   padding: 3px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
 }
 
 .depositChipText {
@@ -98,7 +98,7 @@
   align-items: center;
   border-width: 1px;
   border-style: solid;
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   margin-top: 5px;
   padding: 5px 8px 5px 5px;
   box-sizing: border-box;

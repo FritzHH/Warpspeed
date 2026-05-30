@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { useState, useRef, memo } from "react";
 import { Button, CheckBox, TextInput, Image } from "../../../../dom_components";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../../../styles";
 import { usdTypeMask, formatCurrencyDisp } from "../../../../utils";
 import { buildCashTransaction } from "./newCheckoutUtils";
 import { takeId, getId } from "../../../../idPool";
@@ -273,7 +273,7 @@ export const CashPayment = memo(function CashPayment({
         textStyle={{ color: C.textWhite, fontSize: 16 }}
         buttonStyle={{
           cursor: canComplete ? "inherit" : "default",
-          borderRadius: 6,
+          borderRadius: Radius.control,
         }}
       />
     </div>

@@ -23,7 +23,7 @@
 }
 
 .spinner {
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   border-style: solid;
   border-color: var(--border-subtle);
   border-top-color: currentColor;

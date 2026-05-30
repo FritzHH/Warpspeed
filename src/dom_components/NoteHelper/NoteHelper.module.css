@@ -12,7 +12,7 @@
   position: absolute;
   /* z-index = backdrop z + 1, supplied inline */
   background-color: var(--surface-base);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   box-shadow: 0 2px 4px var(--shadow-color-default);
   display: flex;
   flex-direction: column;
@@ -52,7 +52,7 @@
 .viewItemBtn {
   flex-shrink: 0;
   padding: 4px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border: 1px solid;
   background-color: var(--surface-base);
   font-size: 12px;
@@ -85,7 +85,7 @@
 
 .targetBtn {
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border: none;
   cursor: pointer;
   font-weight: 600;
@@ -142,7 +142,7 @@
 }
 
 .chip {
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 5px 10px;
   border: none;
   cursor: pointer;
@@ -173,7 +173,7 @@
 .noteTextarea {
   width: 100%;
   border: 1px solid;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 6px 8px;
   outline: none;
   overflow: hidden;

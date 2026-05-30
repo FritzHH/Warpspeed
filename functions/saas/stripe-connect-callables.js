@@ -91,17 +91,55 @@ async function findTenantConnectAccountID(db, tenantID) {
 // Internal helpers — shared by tenant-admin + platform-admin callables.
 // ---------------------------------------------------------------------------
 
-async function createAccountInternal({ secret, db, tenantID, email, businessName, byUID }) {
+async function createAccountInternal({
+  secret,
+  db,
+  tenantID,
+  email,
+  businessName,
+  byUID,
+  businessType,
+  mcc,
+  companyPhone,
+  companyAddress,
+  representative,
+  fullBakeForTest = false,
+}) {
   logger.info("stripeConnect.createAccountInternal: starting", {
     tenantID,
     email,
     byUID,
+    fullBakeForTest,
   });
 
   const account = await stripeConnect.createConnectedAccount(secret, {
     email,
     businessName,
+    businessType,
+    mcc,
+    companyPhone,
+    companyAddress,
+    fullBakeForTest,
   });
+
+  // Best-effort representative pre-fill. If this fails the account still
+  // exists; the owner can fill in rep info via Stripe's hosted onboarding.
+  let representativeError = null;
+  if (representative) {
+    try {
+      await stripeConnect.createRepresentativePerson(secret, account.id, {
+        ...representative,
+        fullBakeForTest,
+      });
+    } catch (err) {
+      representativeError = err && err.message ? err.message : String(err);
+      logger.error("stripeConnect.createAccountInternal: representative create failed", {
+        tenantID,
+        stripeAccountID: account.id,
+        error: representativeError,
+      });
+    }
+  }
 
   const batch = db.batch();
 
@@ -128,9 +166,10 @@ async function createAccountInternal({ secret, db, tenantID, email, businessName
   logger.info("stripeConnect.createAccountInternal: account created", {
     stripeAccountID: account.id,
     tenantID,
+    representativeError,
   });
 
-  return { stripeAccountID: account.id };
+  return { stripeAccountID: account.id, representativeError };
 }
 
 async function createAccountLinkInternal({ secret, stripeAccountID }) {
@@ -159,6 +198,90 @@ async function getAccountStatusInternal({ secret, db, stripeAccountID, tenantID,
   }
 
   return summary;
+}
+
+// Pushes the Stripe Payments Info collected on the owner-bootstrap form to
+// the existing connected account. Each Stripe step is best-effort with its
+// own try/catch so a single API failure doesn't block the rest of bootstrap
+// (the store gets created either way, the owner can retry KYC fields from
+// Stripe's hosted onboarding if needed).
+//
+// Returns { businessUrlError, bankAccountError, representativeKYCError }
+// — all null on success. Caller surfaces these in the response so the
+// dashboard / owner UI can show which fields still need attention.
+async function applyOwnerKYCInternal({
+  secret,
+  stripeAccountID,
+  businessUrl,
+  bankRouting,
+  bankAccount,
+  accountHolderName,
+  accountHolderType,
+  dob,
+  ssnLast4,
+  tosIp,
+}) {
+  const errors = {
+    businessUrlError: null,
+    bankAccountError: null,
+    representativeKYCError: null,
+  };
+
+  if (businessUrl) {
+    try {
+      await stripeConnect.updateBusinessUrl(secret, stripeAccountID, businessUrl);
+    } catch (err) {
+      errors.businessUrlError = err && err.message ? err.message : String(err);
+      logger.error("applyOwnerKYCInternal: business_url update failed", {
+        stripeAccountID,
+        error: errors.businessUrlError,
+      });
+    }
+  }
+
+  if (bankRouting && bankAccount) {
+    try {
+      await stripeConnect.addBankAccount(secret, stripeAccountID, {
+        routingNumber: bankRouting,
+        accountNumber: bankAccount,
+        accountHolderName: accountHolderName || "",
+        accountHolderType: accountHolderType || "individual",
+      });
+    } catch (err) {
+      errors.bankAccountError = err && err.message ? err.message : String(err);
+      logger.error("applyOwnerKYCInternal: bank_account add failed", {
+        stripeAccountID,
+        error: errors.bankAccountError,
+      });
+    }
+  }
+
+  if (dob || ssnLast4 || tosIp) {
+    try {
+      const person = await stripeConnect.findRepresentativePerson(
+        secret,
+        stripeAccountID
+      );
+      if (!person) {
+        throw new Error(
+          "No representative person found on connected account; create one first."
+        );
+      }
+      await stripeConnect.updateRepresentativeKYC(secret, stripeAccountID, person.id, {
+        dob,
+        ssnLast4,
+        tosIp,
+      });
+    } catch (err) {
+      errors.representativeKYCError = err && err.message ? err.message : String(err);
+      logger.error("applyOwnerKYCInternal: representative KYC update failed", {
+        stripeAccountID,
+        error: errors.representativeKYCError,
+      });
+    }
+  }
+
+  return errors;
 }
 
 // ---------------------------------------------------------------------------
@@ -271,6 +394,16 @@ exports.stripeConnectAccountStatusCallable = onCall(
 // All take {tenantID} (more natural for the dashboard's tenant-detail flow);
 // the stripeAccountID is looked up from the tenant's connect-accounts.
 // ---------------------------------------------------------------------------
+
+// Exposed for callables in other modules (e.g. platformAdminCreateTenantCallable
+// bundles Connect Account creation into tenant create). Same helper, same
+// post-conditions — uses the same secret + writes the same Firestore records.
+exports._internals = {
+  createAccountInternal,
+  findTenantConnectAccountID,
+  applyOwnerKYCInternal,
+  STRIPE_PLATFORM_SECRET_KEY,
+};
 
 exports.platformAdminStripeConnectAccountCreate = onCall(
   {

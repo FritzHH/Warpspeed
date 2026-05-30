@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { C, COLOR_GRADIENTS, ICONS } from "../styles";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../styles";
 import { getTheme, setTheme, subscribeTheme } from "../styles/theme";
 import { Button, CheckBox } from "../dom_components";
 import { ROUTES } from "../routes";
@@ -104,7 +104,7 @@ export function HomeScreen() {
             iconSize={isMobileOrTablet ? 24 : 20}
             colorGradientArr={item.gradient}
             buttonStyle={{
-              borderRadius: 5,
+              borderRadius: Radius.control,
               paddingTop: isMobileOrTablet ? 16 : 12,
               paddingBottom: isMobileOrTablet ? 16 : 12,
               paddingLeft: 20,
@@ -158,7 +158,7 @@ export function HomeScreen() {
         text="Logout"
         colorGradientArr={COLOR_GRADIENTS.red}
         buttonStyle={{
-          borderRadius: 5,
+          borderRadius: Radius.control,
           paddingTop: isMobileOrTablet ? 14 : 10,
           paddingBottom: isMobileOrTablet ? 14 : 10,
           paddingLeft: 20,

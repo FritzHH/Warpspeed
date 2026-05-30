@@ -2,7 +2,7 @@
   position: fixed;
   z-index: var(--z-tooltip);
   pointer-events: none;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 7px 9px;
   display: inline-flex;
   align-items: center;

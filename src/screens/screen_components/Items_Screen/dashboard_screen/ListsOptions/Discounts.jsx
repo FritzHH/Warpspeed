@@ -20,13 +20,12 @@ export const Discounts = ({ zSettingsObj, handleSettingsFieldChange }) => {
             <span style={{ color: C.text, marginRight: 20 }}>Discounts</span>
             <BoxButton1
               onPress={() => {
-                let discountsArr = zSettingsObj.discounts;
                 let discount = {};
                 discount.name = "";
                 discount.type = DISCOUNT_TYPES.percent;
                 discount.value = "20";
                 discount.id = crypto.randomUUID();
-                discountsArr.push(discount);
+                let discountsArr = [discount, ...(zSettingsObj.discounts || [])];
                 handleSettingsFieldChange("discounts", discountsArr);
               }}
             />
@@ -34,7 +33,10 @@ export const Discounts = ({ zSettingsObj, handleSettingsFieldChange }) => {
         </div>
 
         <div className={styles.listContainer}>
-          {list.map((item, idx) => (
+          {list.map((item, idx) => {
+            const isEmptyName = !item.name || item.name.trim() === "";
+            const rowBg = isEmptyName ? C.lightred : C.listItemWhite;
+            return (
             <div key={item.id || idx} className={styles.rowSpaced} style={{ justifyContent: "center" }}>
               <TextInput
                 debounceMs={500}
@@ -52,7 +54,7 @@ export const Discounts = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   width: "50%",
                   borderColor: C.buttonLightGreenOutline,
                   color: C.text,
-                  backgroundColor: C.listItemWhite,
+                  backgroundColor: rowBg,
                 }}
                 value={item.name}
               />
@@ -86,7 +88,7 @@ export const Discounts = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   width: "10%",
                   borderColor: C.buttonLightGreenOutline,
                   color: C.text,
-                  backgroundColor: C.listItemWhite,
+                  backgroundColor: rowBg,
                 }}
                 value={
                   item.value === "" || item.value == null
@@ -143,7 +145,8 @@ export const Discounts = ({ zSettingsObj, handleSettingsFieldChange }) => {
                 />
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </BoxContainerInner>

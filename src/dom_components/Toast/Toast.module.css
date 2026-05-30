@@ -3,7 +3,7 @@
   z-index: var(--z-toast);
   pointer-events: none;
   background-color: rgba(60, 60, 60, 0.7);
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   padding: 10px 22px;
   display: inline-flex;
   align-items: center;

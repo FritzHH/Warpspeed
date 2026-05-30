@@ -34,7 +34,7 @@ import {
   useElements,
 } from "@stripe/react-stripe-js";
 import dayjs from "dayjs";
-import { Dialog, LoadingIndicator, ModalFooter, ModalFooterButton } from "../../../../dom_components";
+import { Dialog, LoadingIndicator, LargeModalHeader, LargeModalHeaderButton } from "../../../../dom_components";
 import { C } from "../../../../styles";
 import { DB, FUNCTIONS } from "../../../../db_calls";
 import { STRIPE_PUBLISHABLE_KEY } from "../../../../private_user_constants";
@@ -258,18 +258,21 @@ function BillingModalInner({ handleExit }) {
 
   if (!tenantID) {
     return (
-      <Dialog visible={true} onClose={handleExit} title="Subscription">
+      <Dialog visible={true} onClose={handleExit}>
         <div className={styles.card}>
+          <LargeModalHeader
+            title="Subscription"
+            actions={
+              <LargeModalHeaderButton variant="default" onClick={handleExit}>
+                CLOSE
+              </LargeModalHeaderButton>
+            }
+          />
           <div className={styles.body}>
             <div className={styles.errorWrap}>
               <span style={{ color: C.red, fontSize: 14 }}>Not signed in.</span>
             </div>
           </div>
-          <ModalFooter>
-            <ModalFooterButton variant="default" onClick={handleExit}>
-              Close
-            </ModalFooterButton>
-          </ModalFooter>
         </div>
       </Dialog>
     );
@@ -277,18 +280,21 @@ function BillingModalInner({ handleExit }) {
 
   if (sTenantErr) {
     return (
-      <Dialog visible={true} onClose={handleExit} title="Subscription">
+      <Dialog visible={true} onClose={handleExit}>
         <div className={styles.card}>
+          <LargeModalHeader
+            title="Subscription"
+            actions={
+              <LargeModalHeaderButton variant="default" onClick={handleExit}>
+                CLOSE
+              </LargeModalHeaderButton>
+            }
+          />
           <div className={styles.body}>
             <div className={styles.errorWrap}>
               <span style={{ color: C.red, fontSize: 14 }}>{sTenantErr}</span>
             </div>
           </div>
-          <ModalFooter>
-            <ModalFooterButton variant="default" onClick={handleExit}>
-              Close
-            </ModalFooterButton>
-          </ModalFooter>
         </div>
       </Dialog>
     );
@@ -296,8 +302,16 @@ function BillingModalInner({ handleExit }) {
 
   if (!sTenantDoc) {
     return (
-      <Dialog visible={true} onClose={handleExit} title="Subscription">
+      <Dialog visible={true} onClose={handleExit}>
         <div className={styles.card}>
+          <LargeModalHeader
+            title="Subscription"
+            actions={
+              <LargeModalHeaderButton variant="default" onClick={handleExit}>
+                CLOSE
+              </LargeModalHeaderButton>
+            }
+          />
           <div className={styles.body}>
             <div className={styles.loadingWrap}>
               <LoadingIndicator size="large" color={C.blue} message="Loading billing..." />
@@ -310,14 +324,21 @@ function BillingModalInner({ handleExit }) {
 
   if (isPerSale) {
     return (
-      <Dialog visible={true} onClose={handleExit} title="Subscription">
+      <Dialog visible={true} onClose={handleExit}>
         <div className={styles.card}>
-          <div className={styles.header}>
-            <div className={styles.headerLeft}>
-              <span className={styles.title}>Subscription</span>
-              <span className={styles.subtitle}>Per-sale billing tenant</span>
-            </div>
-          </div>
+          <LargeModalHeader
+            title={
+              <div className={styles.headerLeft}>
+                <span className={styles.title}>Subscription</span>
+                <span className={styles.subtitle}>Per-sale billing tenant</span>
+              </div>
+            }
+            actions={
+              <LargeModalHeaderButton variant="default" onClick={handleExit}>
+                CLOSE
+              </LargeModalHeaderButton>
+            }
+          />
           <div className={styles.body}>
             <div className={styles.perSaleNotice}>
               <div className={styles.perSaleTitle}>You are on per-sale billing.</div>
@@ -330,11 +351,6 @@ function BillingModalInner({ handleExit }) {
               </div>
             </div>
           </div>
-          <ModalFooter>
-            <ModalFooterButton variant="accent" onClick={handleExit}>
-              Close
-            </ModalFooterButton>
-          </ModalFooter>
         </div>
       </Dialog>
     );
@@ -342,8 +358,16 @@ function BillingModalInner({ handleExit }) {
 
   if (!isMonthlySub) {
     return (
-      <Dialog visible={true} onClose={handleExit} title="Subscription">
+      <Dialog visible={true} onClose={handleExit}>
         <div className={styles.card}>
+          <LargeModalHeader
+            title="Subscription"
+            actions={
+              <LargeModalHeaderButton variant="default" onClick={handleExit}>
+                CLOSE
+              </LargeModalHeaderButton>
+            }
+          />
           <div className={styles.body}>
             <div className={styles.errorWrap}>
               <span style={{ color: C.red, fontSize: 14 }}>
@@ -351,27 +375,29 @@ function BillingModalInner({ handleExit }) {
               </span>
             </div>
           </div>
-          <ModalFooter>
-            <ModalFooterButton variant="default" onClick={handleExit}>
-              Close
-            </ModalFooterButton>
-          </ModalFooter>
         </div>
       </Dialog>
     );
   }
 
   return (
-    <Dialog visible={true} onClose={handleExit} title="Subscription">
+    <Dialog visible={true} onClose={handleExit}>
       <div className={styles.card}>
-        <div className={styles.header} style={{ backgroundColor: C.darkBlue }}>
-          <div className={styles.headerLeft}>
-            <span className={styles.title}>Subscription</span>
-            <span className={styles.subtitle}>
-              {sTenantDoc.name || tenantID}
-            </span>
-          </div>
-        </div>
+        <LargeModalHeader
+          title={
+            <div className={styles.headerLeft}>
+              <span className={styles.title}>Subscription</span>
+              <span className={styles.subtitle}>
+                {sTenantDoc.name || tenantID}
+              </span>
+            </div>
+          }
+          actions={
+            <LargeModalHeaderButton variant="default" onClick={handleExit}>
+              CLOSE
+            </LargeModalHeaderButton>
+          }
+        />
 
         <div className={styles.tabBar} style={{ borderBottomColor: C.borderStrong }}>
           {TABS.map((t) => {
@@ -462,12 +488,6 @@ function BillingModalInner({ handleExit }) {
             />
           )}
         </div>
-
-        <ModalFooter>
-          <ModalFooterButton variant="default" onClick={handleExit}>
-            Close
-          </ModalFooterButton>
-        </ModalFooter>
 
         {sShowAddCard && (
           <AddCardModal
@@ -827,11 +847,24 @@ function AddCardModal({ tenantID, tier, hasSubscription, onClose, onSuccess, onE
   }
 
   return (
-    <Dialog visible={true} onClose={sBusy ? () => {} : onClose} title="Add card" preventClose={sBusy}>
+    <Dialog visible={true} onClose={sBusy ? () => {} : onClose} preventClose={sBusy}>
       <div className={styles.addCardCard}>
-        <div className={styles.addCardHeader}>
-          <span className={styles.addCardTitle}>Add payment method</span>
-        </div>
+        <LargeModalHeader
+          title="Add payment method"
+          actions={[
+            <LargeModalHeaderButton
+              key="save"
+              variant="accent"
+              onClick={handleSubmit}
+              disabled={!canSubmit}
+            >
+              {sBusy ? "Saving..." : sStartSub && !hasSubscription ? "Save and subscribe" : "Save card"}
+            </LargeModalHeaderButton>,
+            <LargeModalHeaderButton key="close" variant="default" onClick={onClose} disabled={sBusy}>
+              CLOSE
+            </LargeModalHeaderButton>,
+          ]}
+        />
         <div className={styles.addCardBody}>
           <div className={styles.fieldGroup}>
             <label className={styles.fieldLabel}>Cardholder name</label>
@@ -895,19 +928,6 @@ function AddCardModal({ tenantID, tier, hasSubscription, onClose, onSuccess, onE
 
           {sError && <div className={styles.errorText}>{sError}</div>}
         </div>
-
-        <ModalFooter>
-          <ModalFooterButton variant="default" onClick={onClose} disabled={sBusy}>
-            Cancel
-          </ModalFooterButton>
-          <ModalFooterButton
-            variant="accent"
-            onClick={handleSubmit}
-            disabled={!canSubmit}
-          >
-            {sBusy ? "Saving..." : sStartSub && !hasSubscription ? "Save and subscribe" : "Save card"}
-          </ModalFooterButton>
-        </ModalFooter>
       </div>
     </Dialog>
   );

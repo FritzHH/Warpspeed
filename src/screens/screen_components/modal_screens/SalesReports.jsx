@@ -4,6 +4,8 @@ import {
   Button,
   Dialog,
   LoadingIndicator,
+  LargeModalHeader,
+  LargeModalHeaderButton,
 } from "../../../dom_components";
 import { C, COLOR_GRADIENTS } from "../../../styles";
 import { getPreviousMondayDayJS, capitalizeFirstLetterOfString, formatCurrencyDisp, formatMillisForDisplay, lightenRGBByPercent } from "../../../utils";
@@ -521,15 +523,20 @@ export const SalesReportsModal = ({ handleExit }) => {
         visible={true}
         onClose={handleExit}
         overlayColor={C.surfaceOverlay}
-        title="Sales History"
       >
+        <div className={styles.shell}>
+        <LargeModalHeader
+          title="Sales History"
+          actions={
+            <LargeModalHeaderButton variant="default" onClick={handleExit}>
+              CLOSE
+            </LargeModalHeaderButton>
+          }
+        />
         <div className={styles.card}>
           {/* ═══ LEFT COLUMN: Quick Buttons ═══ */}
           <div className={styles.leftRail}>
             <div className={styles.leftRailTop}>
-              <span className={styles.title} style={{ color: C.text }}>
-                Sales History
-              </span>
               {DATE_SHORTCUTS.map((sc) => {
                 let isActive = sActiveShortcut === sc.label;
                 return (
@@ -549,15 +556,6 @@ export const SalesReportsModal = ({ handleExit }) => {
                   </button>
                 );
               })}
-            </div>
-            <div className={styles.leftRailBottom}>
-              <Button
-                text="CLOSE"
-                colorGradientArr={COLOR_GRADIENTS.red}
-                onPress={handleExit}
-                buttonStyle={{ paddingLeft: 30, paddingRight: 30, paddingVertical: 10 }}
-                textStyle={{ fontSize: 15, fontWeight: "700" }}
-              />
             </div>
           </div>
 
@@ -918,6 +916,7 @@ export const SalesReportsModal = ({ handleExit }) => {
             </div>
           )}
         </div>
+        </div>
       </Dialog>
 
       {/* Full Sale Modal (nested) */}
@@ -978,12 +977,16 @@ const TransactionViewerModal = ({ tx, onClose }) => {
       visible={true}
       onClose={onClose}
       overlayColor={C.surfaceOverlay}
-      title="Transaction Details"
     >
       <div className={styles.txModalCard}>
-        <div className={styles.txModalHeader}>
-          <span className={styles.txModalHeaderText}>Transaction Details</span>
-        </div>
+        <LargeModalHeader
+          title="Transaction Details"
+          actions={
+            <LargeModalHeaderButton variant="default" onClick={onClose}>
+              CLOSE
+            </LargeModalHeaderButton>
+          }
+        />
         <div className={styles.txModalBody}>
           {rows.map((row, idx) => {
             let isLast = idx === rows.length - 1;
@@ -1005,15 +1008,6 @@ const TransactionViewerModal = ({ tx, onClose }) => {
               </div>
             );
           })}
-        </div>
-        <div className={styles.txModalFooter}>
-          <Button
-            text="Close"
-            colorGradientArr={COLOR_GRADIENTS.grey}
-            onPress={onClose}
-            buttonStyle={{ paddingHorizontal: 30, paddingVertical: 8 }}
-            textStyle={{ fontSize: 13 }}
-          />
         </div>
       </div>
     </Dialog>

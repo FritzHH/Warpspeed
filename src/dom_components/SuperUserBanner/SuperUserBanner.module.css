@@ -4,7 +4,7 @@
   left: 20px;
   right: 20px;
   pointer-events: none;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   padding: 8px 22px;
   display: flex;
   justify-content: center;

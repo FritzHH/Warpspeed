@@ -4249,7 +4249,6 @@ exports.lightspeedImportData = onCall(
           amountPaid: 0,
           activeSaleID: "",
           sales: [],
-          endedOnMillis: "",
           saleID: "",
           id,
           customerID,
@@ -5890,7 +5889,7 @@ async function cleanupOldMedia(db, bucket, tenantID, storeID) {
       .collection("stores")
       .doc(storeID)
       .collection("completed-workorders")
-      .where("endedOnMillis", "<", cutoffMillis)
+      .where("paidOnMillis", "<", cutoffMillis)
       .get();
 
     let deletedMediaCount = 0;
@@ -6514,7 +6513,7 @@ async function completeSaleServerSide({
       wo.activeSaleID = "";
       wo.amountPaid = sale.total;
       wo.saleID = sale.id;
-      wo.endedOnMillis = timestamp;
+      wo.paidOnMillis = timestamp;
 
       let entries = [];
       if (oldStatus !== "finished_and_paid") {
@@ -7752,6 +7751,23 @@ if (DEPLOY_TARGET === "saas") {
     authClaims.platformAdminCreateStoreCallable;
   exports.platformAdminUpdateTenantBillingCallable =
     authClaims.platformAdminUpdateTenantBillingCallable;
+  exports.platformAdminSendOwnerWelcomeEmailCallable =
+    authClaims.platformAdminSendOwnerWelcomeEmailCallable;
+  exports.requestOwnerWelcomeResendCallable =
+    authClaims.requestOwnerWelcomeResendCallable;
+  exports.platformAdminDeleteTenantCallable =
+    authClaims.platformAdminDeleteTenantCallable;
+  exports.ownerCompleteBootstrapCallable =
+    authClaims.ownerCompleteBootstrapCallable;
+
+  // Phase 2 — admin-driven POS user CRUD (Dashboard_Admin user editor).
+  exports.tenantCreateUserCallable = authClaims.tenantCreateUserCallable;
+  exports.tenantUpdateUserCallable = authClaims.tenantUpdateUserCallable;
+  exports.tenantDeleteUserCallable = authClaims.tenantDeleteUserCallable;
+
+  // Phase 3 — passwordless sign-in via emailed code.
+  exports.requestSignInCodeCallable = authClaims.requestSignInCodeCallable;
+  exports.verifySignInCodeCallable = authClaims.verifySignInCodeCallable;
 
   exports.pubsubStripeEventSubscriber = pubsubSubscriber.handler;
   exports.pubsubStripeDeadLetterIngestor = pubsubDeadLetter.ingestor;

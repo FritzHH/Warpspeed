@@ -23,6 +23,7 @@ export { AlertBox } from "./AlertBox/AlertBox";
 export { Toast } from "./Toast/Toast";
 export { ModalFooter, ModalFooterButton } from "./ModalFooter/ModalFooter";
 export { ModalHeader, ModalHeaderButton } from "./ModalHeader/ModalHeader";
+export { LargeModalHeader, LargeModalHeaderButton } from "./LargeModalHeader/LargeModalHeader";
 
 // Batch 4 - Complex interactive components
 export { ScreenModal } from "./ScreenModal/ScreenModal";
@@ -46,7 +47,6 @@ export { CustomerQuickNotes } from "./CustomerQuickNotes/CustomerQuickNotes";
 // Batch 6 - Animated components
 export { AnimatedSwitch } from "./AnimatedSwitch/AnimatedSwitch";
 export { StaleBanner } from "./StaleBanner/StaleBanner";
-export { PrinterAlert } from "./PrinterAlert/PrinterAlert";
 export { ReceiptSentOverlay } from "./ReceiptSentOverlay/ReceiptSentOverlay";
 export { SuperUserBanner } from "./SuperUserBanner/SuperUserBanner";
 export { BillingSuspensionBanner } from "./BillingSuspensionBanner/BillingSuspensionBanner";

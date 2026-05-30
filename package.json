@@ -71,6 +71,7 @@
     "auth:rss": "firebase login:use fritz@retailsoftsystems.com && firebase login --reauth",
     "lint:tokens": "node scripts/check-tokens.js",
     "lint:z-index": "node scripts/check-z-index.js",
+    "lint:radius": "node scripts/check-radius.js",
     "host:bonita": "yarn warp && yarn build:bonita && firebase deploy --only hosting:app --account=fritz@bonitabikes.com",
     "host:rss": "yarn rss && yarn build:rss && firebase deploy --only hosting:app --account=fritz@retailsoftsystems.com",
     "host:dashboard": "yarn rss && yarn --cwd dashboard build && firebase deploy --only hosting:dashboard --account=fritz@retailsoftsystems.com",

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import { useParams } from "react-router-dom";
 import cloneDeep from "lodash/cloneDeep";
 import { TextInput, Button, DropdownMenu, Image } from "../../dom_components";
-import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../styles";
 import { formatCurrencyDisp, calculateRunningTotals, applyDiscountToWorkorderItem, replaceOrAddToArr } from "../../utils";
 import { workerSearchInventory } from "../../inventorySearchManager";
 import {
@@ -202,7 +202,7 @@ export function MobileItemEditScreen() {
                   style={{
                     borderWidth: 1,
                     borderColor: C.buttonLightGreenOutline,
-                    borderRadius: 8,
+                    borderRadius: Radius.row,
                     paddingVertical: 10,
                     paddingHorizontal: 12,
                     fontSize: 16,
@@ -276,7 +276,7 @@ export function MobileItemEditScreen() {
             onPress={() => _setShowSearch(true)}
             buttonStyle={{
               paddingVertical: 12,
-              borderRadius: 5,
+              borderRadius: Radius.control,
             }}
             textStyle={{ fontSize: 16, fontWeight: "500" }}
           />
@@ -420,7 +420,7 @@ export function MobileItemEditScreen() {
                       backgroundColor: C.buttonLightGreen,
                       borderColor: C.buttonLightGreenOutline,
                       borderWidth: 1,
-                      borderRadius: 6,
+                      borderRadius: Radius.control,
                       paddingVertical: 6,
                       paddingHorizontal: 10,
                     }}

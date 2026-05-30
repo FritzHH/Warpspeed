@@ -122,6 +122,16 @@ async function provisionSubaccountInternal({ tenantID, actorUID, actorKind }) {
 // and gives operators a buffer to reactivate without re-onboarding.
 const DEFAULT_GRACE_WINDOW_DAYS = 30;
 
+// Exposed for callables in other modules (e.g. platformAdminCreateTenantCallable
+// bundles subaccount provisioning into tenant create). Same helper, same
+// post-conditions — uses the same secrets + writes the same Firestore records.
+exports._internals = {
+  provisionSubaccountInternal,
+  closeSubaccountInternal,
+  TWILIO_MASTER_ACCOUNT_SID,
+  TWILIO_MASTER_AUTH_TOKEN,
+};
+
 exports.provisionTenantTwilioSubaccount = onCall(
   {
     region: "us-central1",
@@ -430,7 +440,7 @@ exports.platformAdminReactivateTwilioSubaccount = onCall(
 // Shared body for both close callables. Caller is responsible for auth
 // gating. Precondition status === "suspended" — close from active is rejected
 // to force the TCPA grace window.
-async function closeSubaccountInternal({ tenantID, actorUID, actorKind }) {
+async function closeSubaccountInternal({ tenantID, actorUID, actorKind, force = false }) {
   const db = getFirestore();
   const twilioRef = tenantTwilioDocRef(db, tenantID);
   const snap = await twilioRef.get();
@@ -438,7 +448,7 @@ async function closeSubaccountInternal({ tenantID, actorUID, actorKind }) {
     throw new HttpsError("not-found", "No Twilio subaccount for tenant.");
   }
   const { subaccountSid, status } = snap.data() || {};
-  if (status !== "suspended") {
+  if (status !== "suspended" && !force) {
     throw new HttpsError(
       "failed-precondition",
       "Subaccount must be suspended before closure (grace window must complete first)."
@@ -450,6 +460,11 @@ async function closeSubaccountInternal({ tenantID, actorUID, actorKind }) {
   // close if any numbers remain attached.
 
   const client = masterTwilioClient();
+  if (force && status === "active") {
+    await client.api.v2010
+      .accounts(subaccountSid)
+      .update({ status: "suspended" });
+  }
   await client.api.v2010
     .accounts(subaccountSid)
     .update({ status: "closed" });

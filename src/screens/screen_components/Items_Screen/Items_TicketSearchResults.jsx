@@ -1,7 +1,7 @@
 /* eslint-disable */
 
 import { useState, lazy, Suspense } from "react";
-import { formatCurrencyDisp, formatMillisForDisplay, formatWorkorderNumber, lightenRGBByPercent } from "../../../utils";
+import { formatCurrencyDisp, formatMillisForDisplay, formatWorkorderNumber, lightenRGBByPercent, capitalizeFirstLetterOfString } from "../../../utils";
 import {
   SmallLoadingIndicator,
   TouchableOpacity,
@@ -114,12 +114,12 @@ export function Items_TicketSearchResults({}) {
             WO #{formatWorkorderNumber(wo.workorderNumber) || wo.id}
           </span>
           <span className={styles.subText} style={{ color: C.textMuted }}>
-            {[wo.brand, wo.description].filter(Boolean).join(" / ") ||
+            {[capitalizeFirstLetterOfString(wo.brand), capitalizeFirstLetterOfString(wo.description)].filter(Boolean).join(" / ") ||
               "No vehicle info"}
           </span>
           {wo.customerFirst ? (
             <span className={styles.metaText} style={{ color: C.textMuted }}>
-              {wo.customerFirst} {wo.customerLast || ""}
+              {capitalizeFirstLetterOfString(wo.customerFirst)} {capitalizeFirstLetterOfString(wo.customerLast || "")}
             </span>
           ) : null}
         </div>

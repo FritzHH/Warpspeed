@@ -8,13 +8,13 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   z-index: 100;
 }
 
 .card {
   background-color: var(--surface-base);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   display: flex;
   flex-direction: column;
   align-items: center;

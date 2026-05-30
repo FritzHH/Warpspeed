@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { C, ICONS } from "../../../styles";
 import { useZ } from "../../../hooks/useZ";
-import { TextInput, Image, ModalFooter, ModalFooterButton } from "../../../dom_components";
+import { Button, TextInput, Image, ModalHeader, ModalHeaderButton, ModalFooter, ModalFooterButton } from "../../../dom_components";
 import { usdTypeMask, applyDiscountToWorkorderItem, generateEAN13Barcode } from "../../../utils";
 import { INVENTORY_ITEM_PROTO, WORKORDER_ITEM_PROTO } from "../../../data";
 import { DISCOUNT_TYPES } from "../../../constants";
@@ -199,7 +199,7 @@ export const CustomItemModal = ({
     }
   }
 
-  const canSave = sName.trim().length > 0 && sPriceCents > 0;
+  const canSave = sName.trim().length > 0 && (sPriceCents > 0 || (isLabor && Number(sMinutes) > 0));
 
   const modalWidth = 420;
   const modalHeight = 500;
@@ -222,14 +222,18 @@ export const CustomItemModal = ({
         style={{ top, left }}
       >
         <div className={styles.modal}>
+          <ModalHeader
+            title={`${isEditing ? "Edit" : "Add"} Custom ${isLabor ? "Labor" : "Item"}`}
+            actions={
+              <ModalHeaderButton
+                icon={ICONS.close1}
+                iconPosition="only"
+                label="Close"
+                onClick={onClose}
+              />
+            }
+          />
           <div className={styles.modalBody}>
-          {/* Header */}
-          <div className={styles.header}>
-            <span className={styles.headerTitle}>
-              {isEditing ? "Edit" : "Add"} Custom {isLabor ? "Labor" : "Item"}
-            </span>
-          </div>
-
           {/* Item Name */}
           <span className={styles.fieldLabel}>Item Name *</span>
           <TextInput
@@ -252,6 +256,11 @@ export const CustomItemModal = ({
                   value={sMinutes}
                   onChangeText={(val) => handleMinutesChange(val.replace(/\D/g, ""))}
                   onFocus={handleMinutesFocus}
+                  onKeyDown={(e) => {
+                    if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !/[0-9]/.test(e.key)) {
+                      e.preventDefault();
+                    }
+                  }}
                   debounceMs={0}
                   inputMode="numeric"
                   className={`${styles.input} ${styles.inputMinutes}`}
@@ -266,7 +275,7 @@ export const CustomItemModal = ({
           {/* Price */}
           <div className={styles.fieldGroup}>
             <span className={styles.fieldLabel}>Price *</span>
-            <div className={styles.fieldRow}>
+            <div className={styles.priceInputWrap}>
               <span className={styles.priceCurrency}>$</span>
               <TextInput
                 placeholder="0.00"
@@ -274,9 +283,14 @@ export const CustomItemModal = ({
                 value={sPriceDisplay}
                 onChangeText={handlePriceChange}
                 onFocus={handlePriceFocus}
+                onKeyDown={(e) => {
+                  if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey && !/[0-9]/.test(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
                 debounceMs={0}
                 inputMode="numeric"
-                className={`${styles.input} ${styles.inputPrice}`}
+                className={styles.inputPriceBare}
               />
             </div>
           </div>
@@ -346,10 +360,12 @@ export const CustomItemModal = ({
 
           </div>
           <ModalFooter>
-            <ModalFooterButton variant="danger" onClick={onClose}>
-              Cancel
-            </ModalFooterButton>
-            <ModalFooterButton variant="accent" disabled={!canSave} onClick={handleSave}>
+            <ModalFooterButton
+              variant="accent"
+              disabled={!canSave}
+              onClick={handleSave}
+              style={!canSave ? { opacity: 1, textDecoration: "none" } : undefined}
+            >
               {isEditing ? "Save" : "Add"}
             </ModalFooterButton>
           </ModalFooter>
@@ -403,13 +419,19 @@ export const CustomItemModal = ({
                   onKeyDown={(e) => { if (e.key === "Enter") submitCustomPct(); }}
                   className={`${styles.customInput} ${styles.customInputPct}`}
                 />
-                <button
-                  type="button"
-                  onClick={submitCustomPct}
-                  className={styles.customSubmit}
-                >
-                  <Image icon={ICONS.check1} size={14} />
-                </button>
+                <Button
+                  icon={ICONS.check1}
+                  iconSize={14}
+                  onPress={submitCustomPct}
+                  buttonStyle={{
+                    paddingLeft: 4,
+                    paddingRight: 4,
+                    paddingTop: 4,
+                    paddingBottom: 4,
+                    backgroundColor: "transparent",
+                  }}
+                  iconStyle={{ marginRight: 0 }}
+                />
               </div>
               <div className={styles.customRow}>
                 <span className={styles.customLabel}>Custom $</span>
@@ -428,13 +450,19 @@ export const CustomItemModal = ({
                   onKeyDown={(e) => { if (e.key === "Enter") submitCustomDollar(); }}
                   className={`${styles.customInput} ${styles.customInputDollar}`}
                 />
-                <button
-                  type="button"
-                  onClick={submitCustomDollar}
-                  className={styles.customSubmit}
-                >
-                  <Image icon={ICONS.check1} size={14} />
-                </button>
+                <Button
+                  icon={ICONS.check1}
+                  iconSize={14}
+                  onPress={submitCustomDollar}
+                  buttonStyle={{
+                    paddingLeft: 4,
+                    paddingRight: 4,
+                    paddingTop: 4,
+                    paddingBottom: 4,
+                    backgroundColor: "transparent",
+                  }}
+                  iconStyle={{ marginRight: 0 }}
+                />
               </div>
             </div>
           </>

@@ -62,9 +62,7 @@ export function WorkordersComponent({}) {
     return map;
   }, [zSmsThreads, zSettingsUsers]);
   const [sSearchTerm, _setSearchTerm] = useState("");
-  const [sOpenedFlash, _setOpenedFlash] = useState("");
   const [sClosedWorkorder, _sSetClosedWorkorder] = useState(null);
-  const openedFlashTimerRef = useRef(null);
 
   const hasRehydratedMsgsRef = useRef(false);
   useEffect(() => {
@@ -104,30 +102,6 @@ export function WorkordersComponent({}) {
 
   function handleSearchChange(val) {
     _setSearchTerm(val);
-    let q = val.trim();
-    if (!q) return;
-    if (q.length < 3) return;
-    let workorders = zOpenWorkorders.filter((wo) => !!wo.customerID);
-    let scored = workorders.map((wo) => ({ wo, score: scoreWorkorder(wo, q) }));
-    let matches = scored.filter((s) => s.score > 0);
-    if (matches.length === 1) {
-      let wo = matches[0].wo;
-      _setSearchTerm("");
-      searchInputRef.current?.blur();
-      showOpenedFlash(wo);
-      workorderSelected(wo, { fromSearch: true });
-    }
-  }
-
-  function showOpenedFlash(wo) {
-    let label = `${wo.customerFirst || ""} ${wo.customerLast || ""}`.trim();
-    if (!label) label = wo.workorderNumber ? `WO #${wo.workorderNumber}` : "Workorder";
-    _setOpenedFlash(label);
-    if (openedFlashTimerRef.current) clearTimeout(openedFlashTimerRef.current);
-    openedFlashTimerRef.current = setTimeout(() => {
-      _setOpenedFlash("");
-      openedFlashTimerRef.current = null;
-    }, 1700);
   }
 
   const searchInputRef = useRef(null);
@@ -239,7 +213,7 @@ export function WorkordersComponent({}) {
     useCustMessagesStore.getState().setMessagesUnsub(unsub);
   }
 
-  function workorderSelected(obj, opts) {
+  function workorderSelected(obj) {
     // Finished & Paid workorders kept in the open list (pickup-pending) open in the
     // read-only closed-workorder modal instead of the live editing flow.
     if (obj.status === "finished_and_paid") {
@@ -263,9 +237,7 @@ export function WorkordersComponent({}) {
       itemsTabName: TAB_NAMES.itemsTab.workorderItems,
     });
     useTabNamesStore.getState().setMessagesHubMode(false);
-    if (opts?.fromSearch) {
-      useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.inventory);
-    } else if (obj.hasNewSMS) {
+    if (obj.hasNewSMS) {
       useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.messages);
     }
     useWorkorderPreviewStore.getState().setPreviewObj(null);
@@ -309,6 +281,34 @@ export function WorkordersComponent({}) {
     return bubbled.concat(rest);
   }, [zOpenWorkorders, sSearchTerm, zCurrentUser, lastOutgoingSenderByPhone]);
 
+  // Scan auto-open: if the search input is a barcode-shaped numeric string (12+
+  // digits — workorder ID or LS EAN-13) and exactly one workorder matches, open
+  // it. Debounced so a partial mid-scan unique match doesn't pre-fire.
+  const lastAutoOpenedRef = useRef("");
+  const scanTimerRef = useRef(null);
+  useEffect(() => {
+    if (scanTimerRef.current) {
+      clearTimeout(scanTimerRef.current);
+      scanTimerRef.current = null;
+    }
+    const trimmed = sSearchTerm.trim();
+    if (!/^\d{12,}$/.test(trimmed)) return;
+    if (sortedData.length !== 1) return;
+    if (lastAutoOpenedRef.current === trimmed) return;
+    scanTimerRef.current = setTimeout(() => {
+      lastAutoOpenedRef.current = trimmed;
+      const target = sortedData[0];
+      _setSearchTerm("");
+      workorderSelected(target);
+    }, 100);
+    return () => {
+      if (scanTimerRef.current) {
+        clearTimeout(scanTimerRef.current);
+        scanTimerRef.current = null;
+      }
+    };
+  }, [sortedData, sSearchTerm]);
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -333,11 +333,6 @@ export function WorkordersComponent({}) {
             onChange={(e) => handleSearchChange(e.target.value)}
             autoFocus
           />
-          {sOpenedFlash && (
-            <div className={styles.openedPill} key={sOpenedFlash}>
-              Opened: {sOpenedFlash}
-            </div>
-          )}
         </div>
       </div>
 

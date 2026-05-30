@@ -58,7 +58,7 @@
 .resultsBox {
   margin-top: 8px;
   max-height: 250px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border-width: 1px;
   border-style: solid;
   overflow: hidden;
@@ -127,7 +127,7 @@
 }
 
 .lineCard {
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 14px;
   margin-bottom: 8px;
   border-width: 1px;
@@ -197,7 +197,7 @@
 .qtyBtn {
   width: 44px;
   height: 44px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -237,7 +237,7 @@
   align-items: center;
   border-width: 1px;
   border-style: solid;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 6px 10px;
   margin-right: 8px;
   min-height: 44px;
@@ -262,7 +262,7 @@
   flex-direction: row;
   align-items: center;
   border: none;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 6px 10px;
   margin-left: auto;
   min-height: 44px;

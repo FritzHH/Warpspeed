@@ -1,8 +1,8 @@
 /* eslint-disable */
 import { useState, memo } from "react";
 import cloneDeep from "lodash/cloneDeep";
-import { Dialog, Button, SmallLoadingIndicator, CheckBox, ModalFooter, ModalFooterButton } from "../../../../dom_components";
-import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
+import { Dialog, Button, SmallLoadingIndicator, CheckBox, LargeModalHeader, LargeModalHeaderButton } from "../../../../dom_components";
+import { C, COLOR_GRADIENTS, Fonts, Radius } from "../../../../styles";
 import { useZ } from "../../../../hooks/useZ";
 import { useCurrentCustomerStore, useSettingsStore, useLoginStore } from "../../../../stores";
 import { formatCurrencyDisp, formatMillisForDisplay, lightenRGBByPercent, log, generateEAN13Barcode, localStorageWrapper, findTemplateByType, printBuilder } from "../../../../utils";
@@ -214,7 +214,6 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
       visible={visible}
       onClose={handleClose}
       preventClose={formLocked}
-      title="Deposit Refund"
       aria-label="Deposit Refund"
     >
       <>
@@ -225,8 +224,49 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
             boxShadow: `0 4px 12px ${C.lightred}`,
           }}
         >
-            {/* Header */}
-            <div className={styles.header} style={{ borderBottomColor: C.borderSubtle }}>
+            <LargeModalHeader
+              title={`${label} Refund`}
+              actions={[
+                (!sLoading && !sTransaction && sLoadMessage && !sRemoved) && (
+                  <LargeModalHeaderButton
+                    key="remove"
+                    variant="danger"
+                    onClick={() => _setShowRemoveConfirm(true)}
+                  >
+                    {"Remove " + label}
+                  </LargeModalHeaderButton>
+                ),
+                (!sLoading && sTransaction && !fullyRefunded && !sRefundComplete) && (
+                  <LargeModalHeaderButton
+                    key="refund"
+                    variant="accent"
+                    disabled={sProcessing}
+                    onClick={() => _setShowConfirm(true)}
+                  >
+                    {sProcessing
+                      ? "PROCESSING..."
+                      : `REFUND FULL ${isGiftCard ? "GIFT CARD" : "DEPOSIT"}${isImportedCard ? " (CASH)" : ""}`}
+                  </LargeModalHeaderButton>
+                ),
+                (sRemoved || sRefundComplete) && (
+                  <LargeModalHeaderButton key="done" variant="accent" onClick={handleClose}>
+                    Done
+                  </LargeModalHeaderButton>
+                ),
+                (!sRemoved && !sRefundComplete) && (
+                  <LargeModalHeaderButton
+                    key="close"
+                    variant="default"
+                    disabled={sProcessing}
+                    onClick={handleClose}
+                  >
+                    CLOSE
+                  </LargeModalHeaderButton>
+                ),
+              ]}
+            />
+            {/* Sub-header */}
+            <div className={styles.subHeader} style={{ borderBottomColor: C.borderSubtle }}>
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <span
                   className={styles.headerTitle}
@@ -383,7 +423,7 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                     buttonStyle={{
                       height: 28,
                       paddingHorizontal: 12,
-                      borderRadius: 6,
+                      borderRadius: Radius.control,
                       opacity: (sPrint || sSMS || sEmail) && !sProcessing ? 1 : 0.3,
                     }}
                   />
@@ -462,34 +502,6 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
               </div>
             )}
 
-            <ModalFooter>
-              {!sRemoved && !sRefundComplete ? (
-                <ModalFooterButton variant="danger" disabled={sProcessing} onClick={handleClose}>
-                  {sLoading ? "Close" : "Cancel"}
-                </ModalFooterButton>
-              ) : null}
-              {!sLoading && !sTransaction && sLoadMessage && !sRemoved ? (
-                <ModalFooterButton variant="danger" onClick={() => _setShowRemoveConfirm(true)}>
-                  {"Remove " + label}
-                </ModalFooterButton>
-              ) : null}
-              {!sLoading && sTransaction && !fullyRefunded && !sRefundComplete ? (
-                <ModalFooterButton
-                  variant="accent"
-                  disabled={sProcessing}
-                  onClick={() => _setShowConfirm(true)}
-                >
-                  {sProcessing
-                    ? "PROCESSING..."
-                    : `REFUND FULL ${isGiftCard ? "GIFT CARD" : "DEPOSIT"}${isImportedCard ? " (CASH)" : ""}`}
-                </ModalFooterButton>
-              ) : null}
-              {sRemoved || sRefundComplete ? (
-                <ModalFooterButton variant="accent" onClick={handleClose}>
-                  Done
-                </ModalFooterButton>
-              ) : null}
-            </ModalFooter>
           </div>
 
           {sShowConfirm && (

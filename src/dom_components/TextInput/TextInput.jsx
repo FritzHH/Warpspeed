@@ -58,7 +58,7 @@ export const TextInput = forwardRef(function TextInput(
     if (!multiline) return;
     const node = typeof inputRef === "object" ? inputRef.current : null;
     if (node) adjustHeight(node);
-  }, [value, multiline]);
+  }, [localValue, multiline]);
 
   // Cleanup timeout on unmount
   useEffect(() => {

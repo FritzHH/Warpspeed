@@ -360,7 +360,7 @@ export const useCheckoutStore = create((set, get) => ({
     if (isCheckingOut && useBillingStore.getState().isPaymentBlocked()) {
       useAlertScreenStore.getState().setValues({
         title: "Subscription Suspended",
-        severity: "danger",
+        severity: "warning",
         message:
           "Payment processing is disabled while your Cadence subscription is past due.",
         subMessage:
@@ -444,174 +444,104 @@ export const useTicketSearchStore = create((set, get) => ({
   reset: () => set({ results: [], isSearching: false }),
 }));
 
+// Alert store — array-backed stack. Newest pushed is on top (LIFO).
+// Caller API: setValues(config) -> id, dismissAlert(id), dismissTop(), setShowAlert(false), resetAll().
+// Hard cap of 20 stacked alerts; pushing #21 throws.
+const _MAX_ALERTS = 20;
+let _alertIdCounter = 0;
+
+function _normalizeSeverity(severity) {
+  if (severity === "danger") return "warning";
+  if (severity === "info" || severity === "warning") return severity;
+  return "warning";
+}
+
 export const useAlertScreenStore = create((set, get) => ({
+  alerts: [],
   showAlert: false,
-  title: "Alert",
-  severity: "warning",
-  message: "",
-  alertBoxStyle: {},
-  subMessage: "",
-  btn1Text: "",
-  btn2Text: "",
-  btn3Text: "",
-  btn1Icon: null,
-  btn2Icon: null,
-  btn3Icon: null,
-  icon1Size: null,
-  icon2Size: null,
-  icon3Size: null,
-  handleBtn1Press: null,
-  handleBtn2Press: null,
-  handleBtn3Press: null,
-  canExitOnOuterClick: true,
-  pauseOnBaseComponent: false,
-  useCancelButton: false,
-  fullScreen: true,
-  autoDismiss: false,
-  autoDismissMs: 4000,
 
-  getPauseOnBaseComponent: () => get().pauseOnBaseComponent,
-  getMessage: () => get().message,
-  getSubMessage: () => get().subMessage,
-  getCanExitOnOuterClick: () => get().canExitOnOuterClick,
-  getTitle: () => get().title,
+  getAlerts: () => get().alerts,
   getShowAlert: () => get().showAlert,
-  getButton1Text: () => get().btn1Text,
-  getButton2Text: () => get().btn2Text,
-  getButton3Text: () => get().btn3Text,
-  getButton1Handler: () => get().handleBtn1Press,
-  getButton2Handler: () => get().handleBtn2Press,
-  getButton3Handler: () => get().handleBtn3Press,
-  getButton1Icon: () => get().btn1Icon,
-  getButton2Icon: () => get().btn2Icon,
-  getButton3Icon: () => get().btn3Icon,
-  getIcon1Size: () => get().icon1Size,
-  getIcon2Size: () => get().icon2Size,
-  getIcon3Size: () => get().icon3Size,
-  getAlertBoxStyle: () => get().alertBoxStyle,
+  getTopAlert: () => {
+    const arr = get().alerts;
+    return arr.length > 0 ? arr[arr.length - 1] : null;
+  },
 
-  getSeverity: () => get().severity,
+  setValues: (config = {}) => {
+    const state = get();
+    if (state.alerts.length >= _MAX_ALERTS) {
+      throw new Error(
+        `useAlertScreenStore: alert stack at hard cap of ${_MAX_ALERTS}; cannot push another`
+      );
+    }
+    _alertIdCounter += 1;
+    const id = `alert-${_alertIdCounter}`;
+    const alert = {
+      id,
+      title: config.title ?? "",
+      severity: _normalizeSeverity(config.severity),
+      message: config.message ?? "",
+      subMessage: config.subMessage ?? "",
+      btn1Text: config.btn1Text ?? "",
+      btn2Text: config.btn2Text ?? "",
+      btn3Text: config.btn3Text ?? "",
+      btn1Icon: config.btn1Icon ?? null,
+      btn2Icon: config.btn2Icon ?? null,
+      btn3Icon: config.btn3Icon ?? null,
+      icon1Size: config.icon1Size ?? null,
+      icon2Size: config.icon2Size ?? null,
+      icon3Size: config.icon3Size ?? null,
+      handleBtn1Press: config.handleBtn1Press ?? null,
+      handleBtn2Press: config.handleBtn2Press ?? null,
+      handleBtn3Press: config.handleBtn3Press ?? null,
+      btn1Disabled: config.btn1Disabled ?? false,
+      btn2Disabled: config.btn2Disabled ?? false,
+      btn3Disabled: config.btn3Disabled ?? false,
+      btn1Tooltip: config.btn1Tooltip ?? null,
+      btn2Tooltip: config.btn2Tooltip ?? null,
+      btn3Tooltip: config.btn3Tooltip ?? null,
+      canExitOnOuterClick: config.canExitOnOuterClick ?? false,
+      pauseOnBaseComponent: config.pauseOnBaseComponent ?? false,
+      useCancelButton: config.useCancelButton ?? false,
+      fullScreen: config.fullScreen ?? false,
+      autoDismiss: config.autoDismiss ?? false,
+      autoDismissMs: config.autoDismissMs ?? 4000,
+      alertBoxStyle: config.alertBoxStyle ?? {},
+    };
+    set((s) => ({ alerts: [...s.alerts, alert], showAlert: true }));
+    return id;
+  },
 
-  setValues: ({
-    title,
-    severity = "warning",
-    message,
-    subMessage,
-    btn1Text,
-    btn2Text,
-    btn3Text,
-    btn1Icon,
-    btn2Icon,
-    btn3Icon,
-    icon1Size,
-    icon2Size,
-    icon3Size,
-    handleBtn1Press,
-    handleBtn2Press,
-    handleBtn3Press,
-    canExitOnOuterClick = false,
-    alertBoxStyle = {},
-    showAlert = true,
-    pauseOnBaseComponent = false,
-    useCancelButton,
-    fullScreen = false,
-    autoDismiss = false,
-    autoDismissMs = 4000,
-  }) => {
-    set(() => ({
-      title,
-      severity,
-      message,
-      subMessage,
-      btn1Text,
-      btn2Text,
-      btn3Text,
-      btn1Icon,
-      btn2Icon,
-      btn3Icon,
-      icon1Size,
-      icon2Size,
-      icon3Size,
-      handleBtn1Press,
-      handleBtn2Press,
-      handleBtn3Press,
-      canExitOnOuterClick,
-      alertBoxStyle,
-      showAlert,
-      pauseOnBaseComponent,
-      useCancelButton,
-      fullScreen,
-      autoDismiss,
-      autoDismissMs,
-    }));
+  dismissAlert: (id) => {
+    set((s) => {
+      const next = s.alerts.filter((a) => a.id !== id);
+      return { alerts: next, showAlert: next.length > 0 };
+    });
   },
-  setMessage: (message) => {
-    set(() => ({ message }));
+
+  dismissTop: () => {
+    set((s) => {
+      if (s.alerts.length === 0) return s;
+      const next = s.alerts.slice(0, -1);
+      return { alerts: next, showAlert: next.length > 0 };
+    });
   },
-  setSubMessage: (subMessage) => {
-    set(() => ({ subMessage }));
-  },
-  setCanExitOnOuterClick: (canExitOnOuterClick) => {
-    set(() => ({ canExitOnOuterClick }));
-  },
-  setTitle: (title) => {
-    set(() => ({ title }));
-  },
+
+  // Backward-compat: setShowAlert(false) dismisses the top alert.
+  // setShowAlert(true) is a no-op — alerts only exist when pushed.
   setShowAlert: (showAlert) => {
-    set(() => ({ showAlert }));
-  },
-  setButton1Text: (btn1Text) => {
-    set(() => ({ btn1Text }));
-  },
-  setButton2Text: (btn2Text) => {
-    set(() => ({ btn2Text }));
-  },
-  setButton1Handler: (handleBtn1Press) => {
-    set(() => ({ handleBtn1Press }));
-  },
-  setButton2Handler: (handleBtn2Press) => {
-    set(() => ({ handleBtn2Press }));
-  },
-  setButton1Icon: (btn1Icon) => {
-    set(() => ({ btn1Icon }));
-  },
-  setButton2Icon: (btn2Icon) => {
-    set(() => ({ btn2Icon }));
-  },
-  setIcon1Size: (icon1Size) => {
-    set(() => ({ icon1Size }));
-  },
-  setIcon2Size: (icon2Size) => {
-    set(() => ({ icon2Size }));
+    if (!showAlert) get().dismissTop();
   },
 
+  // Backward-compat: existing callers use resetAll() inside button handlers
+  // to close "their" alert. In the stack model that's the top alert.
   resetAll: () => {
-    set(() => ({
-      showAlert: false,
-      title: "Alert",
-      severity: "warning",
-      message: "",
-      alertBoxStyle: {},
-      subMessage: "",
-      btn1Text: "",
-      btn2Text: "",
-      btn3Text: "",
-      btn1Icon: null,
-      btn2Icon: null,
-      btn3Icon: null,
-      icon1Size: null,
-      icon2Size: null,
-      icon3Size: null,
-      handleBtn1Press: null,
-      handleBtn2Press: null,
-      handleBtn3Press: null,
-      canExitOnOuterClick: true,
-      pauseOnBaseComponent: false,
-      useCancelButton: false,
-      fullScreen: true,
-      autoDismiss: false,
-      autoDismissMs: 4000,
-    }));
+    get().dismissTop();
+  },
+
+  // True "wipe everything" — use when no specific alert is in mind.
+  clearAllAlerts: () => {
+    set({ alerts: [], showAlert: false });
   },
 }));
 
@@ -1887,15 +1817,61 @@ export const useWorkorderPreviewStore = create((set, get) => ({
   setPreviewObj: (obj) => set((state) => ({ previewObj: obj })),
 }));
 
+// Identity fields hydrated from tenants/{tenantID}/users/{userID} docs into
+// per-store settings.users[i] entries. Per-store entries always own
+// `disabled` + ephemera; identity (name, phone, email, PIN, permissions,
+// faceDescriptor, hourlyWage, stores[], linkedUserID) lives canonically on
+// the tenant doc and is merged in on every settings/tenantUsers update.
+const TENANT_USER_IDENTITY_FIELDS = [
+  "first",
+  "last",
+  "permissions",
+  "phone",
+  "email",
+  "pin",
+  "faceDescriptor",
+  "linkedUserID",
+  "hourlyWage",
+  "stores",
+];
+
+function mergeTenantIdentityIntoUsers(rawUsers, tenantUsers) {
+  if (!Array.isArray(rawUsers)) return rawUsers;
+  const tenantMap = new Map(
+    (Array.isArray(tenantUsers) ? tenantUsers : []).map((u) => [u.id, u])
+  );
+  return rawUsers.map((perStore) => {
+    if (!perStore || !perStore.id) return perStore;
+    const tenant = tenantMap.get(perStore.id);
+    if (!tenant) return perStore;
+    const merged = { ...perStore };
+    for (const field of TENANT_USER_IDENTITY_FIELDS) {
+      if (tenant[field] !== undefined) merged[field] = tenant[field];
+    }
+    return merged;
+  });
+}
+
 export const useSettingsStore = create(
   persist(
     (set, get) => ({
       settings: null,
+      tenantUsers: [],
 
       getSettings: () => get().settings,
+      getTenantUsers: () => get().tenantUsers,
 
       setSettings: (settings, batch = true, sendToDB = true) => {
-        set({ settings });
+        const hydrated = settings
+          ? {
+              ...settings,
+              users: mergeTenantIdentityIntoUsers(
+                settings.users,
+                get().tenantUsers
+              ),
+            }
+          : settings;
+        set({ settings: hydrated });
 
         if (sendToDB) {
           dbSaveSettings(settings);
@@ -1903,13 +1879,33 @@ export const useSettingsStore = create(
       },
 
       setField: (fieldName, fieldVal, sendToDB = true) => {
-        set({ settings: { ...get().settings, [fieldName]: fieldVal } });
+        const current = get().settings || {};
+        const nextValue =
+          fieldName === "users"
+            ? mergeTenantIdentityIntoUsers(fieldVal, get().tenantUsers)
+            : fieldVal;
+        set({ settings: { ...current, [fieldName]: nextValue } });
         if (sendToDB) dbSaveSettingsField(fieldName, fieldVal);
+      },
+
+      setTenantUsers: (tenantUsers) => {
+        const current = get().settings;
+        if (current && Array.isArray(current.users)) {
+          set({
+            tenantUsers,
+            settings: {
+              ...current,
+              users: mergeTenantIdentityIntoUsers(current.users, tenantUsers),
+            },
+          });
+        } else {
+          set({ tenantUsers });
+        }
       },
     }),
     {
       name: "warpspeed_settings",
-      partialize: (s) => ({ settings: s.settings }),
+      partialize: (s) => ({ settings: s.settings, tenantUsers: s.tenantUsers }),
     }
   )
 );

@@ -10,7 +10,7 @@ import {
   TextInput,
   Tooltip,
 } from "../../../../dom_components";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../../../styles";
 import { usdTypeMask, formatCurrencyDisp, log } from "../../../../utils";
 import { takeId, getId } from "../../../../idPool";
 import { useStripePaymentStore, useSettingsStore } from "../../../../stores";
@@ -683,7 +683,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
             buttonStyle={{
               paddingVertical: 4,
               paddingHorizontal: 6,
-              borderRadius: 8,
+              borderRadius: Radius.row,
               borderWidth: 1,
               borderColor: C.buttonLightGreenOutline,
               backgroundColor: C.listItemWhite,
@@ -743,7 +743,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
             enabled={isEnabled}
             colorGradientArr={COLOR_GRADIENTS.green}
             textStyle={{ color: C.textWhite, fontSize: 10, fontWeight: "600" }}
-            buttonStyle={{ height: 18, borderRadius: 4, paddingHorizontal: 5 }}
+            buttonStyle={{ height: 18, borderRadius: Radius.control, paddingHorizontal: 5 }}
           />
         </div>
       </div>
@@ -780,7 +780,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
               enabled={zCardStatus !== "clearing"}
               colorGradientArr={COLOR_GRADIENTS.red}
               textStyle={{ color: C.textWhite, fontSize: 11 }}
-              buttonStyle={{ paddingRight: 10, width: 90, borderRadius: 3 }}
+              buttonStyle={{ paddingRight: 10, width: 90, borderRadius: Radius.control }}
             />
           </Tooltip>
         </div>
@@ -791,7 +791,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
             enabled={!startDisabled}
             colorGradientArr={COLOR_GRADIENTS.green}
             textStyle={{ color: C.textWhite, fontSize: 16, fontWeight: 600 }}
-            buttonStyle={{ paddingVertical: 10, paddingLeft: 25, paddingRight: 25, cursor: startDisabled ? "default" : "inherit", borderRadius: 5 }}
+            buttonStyle={{ paddingVertical: 10, paddingLeft: 25, paddingRight: 25, cursor: startDisabled ? "default" : "inherit", borderRadius: Radius.control }}
           />
         </div>
         <div className={styles.actionRight}>
@@ -802,7 +802,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
               enabled={!isProcessing && zCardStatus !== "waitingForCard"}
               colorGradientArr={COLOR_GRADIENTS.blue}
               textStyle={{ color: C.textWhite, fontSize: 11 }}
-              buttonStyle={{ paddingRight: 10, width: 90, cursor: (isProcessing || zCardStatus === "waitingForCard") ? "default" : "inherit", borderRadius: 3 }}
+              buttonStyle={{ paddingRight: 10, width: 90, cursor: (isProcessing || zCardStatus === "waitingForCard") ? "default" : "inherit", borderRadius: Radius.control }}
             />
           )}
         </div>

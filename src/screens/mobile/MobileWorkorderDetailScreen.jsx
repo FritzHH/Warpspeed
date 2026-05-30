@@ -6,7 +6,7 @@ import {
   useSettingsStore,
 } from "../../stores";
 import { TextInput, DropdownMenu, Image, Button } from "../../dom_components";
-import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../styles";
 import { COLORS } from "../../data";
 import { capitalizeFirstLetterOfString, formatPhoneWithDashes, formatMillisForDisplay, resolveStatus, formatCurrencyDisp, log, scheduleAutoText } from "../../utils";
 import {
@@ -77,7 +77,7 @@ export function MobileWorkorderDetailScreen() {
   const FIELD_STYLE = {
     borderWidth: 1,
     borderColor: C.buttonLightGreenOutline,
-    borderRadius: 8,
+    borderRadius: Radius.row,
     paddingVertical: 12,
     paddingHorizontal: 14,
     fontSize: 16,
@@ -186,7 +186,7 @@ export function MobileWorkorderDetailScreen() {
           onPress={() => !sUploading && fileInputRef.current?.click()}
           buttonStyle={{
             paddingVertical: 14,
-            borderRadius: 5,
+            borderRadius: Radius.control,
             marginBottom: 8,
             opacity: sUploading ? 0.6 : 1,
           }}
@@ -199,7 +199,7 @@ export function MobileWorkorderDetailScreen() {
             iconSize={18}
             colorGradientArr={COLOR_GRADIENTS.blue}
             onPress={() => _setShowMediaModal("view")}
-            buttonStyle={{ paddingVertical: 12, borderRadius: 5 }}
+            buttonStyle={{ paddingVertical: 12, borderRadius: Radius.control }}
             textStyle={{ fontSize: 15, fontWeight: "500" }}
           />
         )}
@@ -259,7 +259,7 @@ export function MobileWorkorderDetailScreen() {
                 width: "100%",
                 backgroundColor: rs.backgroundColor,
                 paddingVertical: 14,
-                borderRadius: 5,
+                borderRadius: Radius.control,
               }}
               buttonTextStyle={{
                 color: rs.textColor,

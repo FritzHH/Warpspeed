@@ -54,7 +54,7 @@ export const Dialog = ({
           asChild
           onPointerDownOutside={(e) => {
             const t = e.target;
-            if (t && typeof t.closest === "function" && t.closest("[data-dropdown-menu-portal]")) {
+            if (t && typeof t.closest === "function" && (t.closest("[data-dropdown-menu-portal]") || t.closest("[data-alert-portal]"))) {
               e.preventDefault();
               return;
             }
@@ -62,13 +62,13 @@ export const Dialog = ({
           }}
           onInteractOutside={(e) => {
             const t = e.target;
-            if (t && typeof t.closest === "function" && t.closest("[data-dropdown-menu-portal]")) {
+            if (t && typeof t.closest === "function" && (t.closest("[data-dropdown-menu-portal]") || t.closest("[data-alert-portal]"))) {
               e.preventDefault();
             }
           }}
           onFocusOutside={(e) => {
             const t = e.target;
-            if (t && typeof t.closest === "function" && t.closest("[data-dropdown-menu-portal]")) {
+            if (t && typeof t.closest === "function" && (t.closest("[data-dropdown-menu-portal]") || t.closest("[data-alert-portal]"))) {
               e.preventDefault();
             }
           }}

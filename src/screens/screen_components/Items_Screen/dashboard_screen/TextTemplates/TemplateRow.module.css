@@ -3,7 +3,7 @@
   margin-bottom: 15px;
   border-width: 1px;
   border-style: solid;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -25,7 +25,7 @@
   flex: 1;
   border-width: 1px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 5px;
   outline: none;
   font-weight: 500;
@@ -60,7 +60,7 @@
 .bodyInput {
   border-width: 1px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 8px;
   outline: none;
   font-size: 14px;
@@ -90,7 +90,7 @@
 .pillButton {
   border-width: 1px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 4px 8px;
   margin-right: 5px;
   margin-bottom: 5px;

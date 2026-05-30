@@ -1,5 +1,5 @@
 /*eslint-disable*/
-import { applyDiscountToWorkorderItem, calculateRunningTotals, deepEqual, formatCurrencyDisp, getWorkorderPaymentState, lightenRGBByPercent, localStorageWrapper, log, replaceOrAddToArr, resolveStatus, showAlert, showPrinterOfflineAlert } from "../../../utils";
+import { applyDiscountToWorkorderItem, calculateRunningTotals, deepEqual, formatCurrencyDisp, getPrinterStatus, getWorkorderPaymentState, lightenRGBByPercent, log, replaceOrAddToArr, resolveStatus, showAlert, showPrinterOfflineAlert } from "../../../utils";
 import { DISCOUNT_TYPES } from "../../../constants";
 import {
   Button,
@@ -583,7 +583,10 @@ export const Items_WorkorderItemsTab = ({}) => {
       return;
     }
     console.log("[PENCIL] setting sNoteHelperDropdown state");
-    _setNoteHelperDropdown({ workorderLine, targetField: "intakeNotes", anchorX: anchorX || 0, anchorY: anchorY || 0 });
+    const hasIntake = !!(workorderLine.intakeNotes || "").trim();
+    const hasReceipt = !!(workorderLine.receiptNotes || "").trim();
+    const defaultTarget = (hasIntake && !hasReceipt) ? "receiptNotes" : "intakeNotes";
+    _setNoteHelperDropdown({ workorderLine, targetField: defaultTarget, anchorX: anchorX || 0, anchorY: anchorY || 0 });
   }
 
   function handleNoteHelperUpdate(updatedLine) {
@@ -758,12 +761,9 @@ export const Items_WorkorderItemsTab = ({}) => {
                 }
                 useCheckoutStore.getState().setIsCheckingOut(true);
               };
-              const selectedPrinterID = localStorageWrapper.getItem("selectedPrinterID");
-              const settings = useSettingsStore.getState().getSettings();
-              const selectedPrinter = selectedPrinterID && settings?.printers?.[selectedPrinterID];
-              const isPrinterOffline = !!(selectedPrinter && selectedPrinter.active !== true);
+              const { isPrinterOffline, printerName } = getPrinterStatus();
               if (isPrinterOffline) {
-                showPrinterOfflineAlert({ printerName: selectedPrinter?.name, onContinue: proceed });
+                showPrinterOfflineAlert({ printerName, onContinue: proceed });
                 return;
               }
               proceed();
@@ -802,6 +802,7 @@ export const Items_WorkorderItemsTab = ({}) => {
         anchorX={sNoteHelperDropdown?.anchorX || 0}
         anchorY={sNoteHelperDropdown?.anchorY || 0}
         noteHelpers={zNoteHelpers || []}
+        noteHelpersTarget={sNoteHelperDropdown?.targetField || "intakeNotes"}
         onViewItem={(invItem) => {
           if (!invItem) return;
           const freshInv = useInventoryStore.getState().inventoryArr.find(

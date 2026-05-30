@@ -49,22 +49,51 @@ function formatPhoneForDisplay(s) {
 
 const DEFAULT_PLATFORM_FEE_PERCENT_STR = "0.5";
 
+// Dev-only autofill so we don't retype the same test tenant for every spin
+// through this flow during the provisioning refactor. Production builds get
+// blank fields. Tweak via this object only.
+const DEV_DEFAULTS = import.meta.env.DEV
+  ? {
+      tenantName: "Test Tenant",
+      ownerFirstName: "Jim",
+      ownerLastName: "Bob",
+      ownerEmail: "hieb.fritz@gmail.com",
+      ownerPhone: "(239) 336-9177",
+      tenantStreet: "1234 Main",
+      tenantCity: "Bonita Springs",
+      tenantState: "FL",
+      tenantZip: "34135",
+      billingModel: "monthly_sub",
+      // First-tier auto-pick is wired into the tier-load effect below — we
+      // can't seed a tierID at construction time because the catalog hasn't
+      // been fetched yet.
+    }
+  : {};
+
 export function CreateTenantForm() {
   const navigate = useNavigate();
-  const [tenantName, setTenantName] = useState("");
-  const [ownerFirstName, setOwnerFirstName] = useState("");
-  const [ownerLastName, setOwnerLastName] = useState("");
-  const [ownerEmail, setOwnerEmail] = useState("");
-  const [ownerPhone, setOwnerPhone] = useState("");
-  const addr = useTenantAddressFields();
-  const [billingModel, setBillingModel] = useState("");
+  const [tenantName, setTenantName] = useState(DEV_DEFAULTS.tenantName || "");
+  const [ownerFirstName, setOwnerFirstName] = useState(
+    DEV_DEFAULTS.ownerFirstName || ""
+  );
+  const [ownerLastName, setOwnerLastName] = useState(
+    DEV_DEFAULTS.ownerLastName || ""
+  );
+  const [ownerEmail, setOwnerEmail] = useState(DEV_DEFAULTS.ownerEmail || "");
+  const [ownerPhone, setOwnerPhone] = useState(DEV_DEFAULTS.ownerPhone || "");
+  const addr = useTenantAddressFields(DEV_DEFAULTS);
+  const [billingModel, setBillingModel] = useState(
+    DEV_DEFAULTS.billingModel || ""
+  );
   const [platformFeePercent, setPlatformFeePercent] = useState(
     DEFAULT_PLATFORM_FEE_PERCENT_STR
   );
   const [subscriptionTierID, setSubscriptionTierID] = useState("");
   const [tiers, setTiers] = useState(null);
   const [tiersError, setTiersError] = useState("");
-  const [tenantID, setTenantID] = useState("");
+  const [tenantID, setTenantID] = useState(
+    DEV_DEFAULTS.tenantName ? slugify(DEV_DEFAULTS.tenantName) : ""
+  );
   const [idEditable, setIdEditable] = useState(false);
   const [idManuallyEdited, setIdManuallyEdited] = useState(false);
   const [idCheckStatus, setIdCheckStatus] = useState("idle");
@@ -72,15 +101,17 @@ export function CreateTenantForm() {
   const [errorMsg, setErrorMsg] = useState("");
   const [result, setResult] = useState(null);
   const [copied, setCopied] = useState(false);
+  const [emailStatus, setEmailStatus] = useState("idle");
+  const [emailError, setEmailError] = useState("");
 
   const checkTimerRef = useRef(null);
   const checkRequestRef = useRef(0);
   const idInputRef = useRef(null);
 
-  // Lazy-load active tiers only when the admin picks monthly_sub — saves a
-  // platform-admin callable round trip for the common per_sale case.
+  // Preload tiers on mount so the picker is populated the instant the admin
+  // clicks monthly_sub — no visible Loading state, no wait between click and
+  // dropdown ready.
   useEffect(() => {
-    if (billingModel !== "monthly_sub" || tiers !== null) return;
     let cancelled = false;
     setTiersError("");
     listTiersCallable({})
@@ -89,6 +120,9 @@ export function CreateTenantForm() {
         const all = res.data?.tiers || [];
         const active = all.filter((t) => t.active && !t.archived);
         setTiers(active);
+        if (DEV_DEFAULTS.billingModel === "monthly_sub" && active.length > 0) {
+          setSubscriptionTierID((cur) => cur || active[0].tierID);
+        }
       })
       .catch((err) => {
         if (cancelled) return;
@@ -100,7 +134,7 @@ export function CreateTenantForm() {
     return () => {
       cancelled = true;
     };
-  }, [billingModel, tiers]);
+  }, []);
 
   function startDupCheck(id) {
     if (checkTimerRef.current) {
@@ -224,16 +258,22 @@ export function CreateTenantForm() {
   }
 
   function handleReset() {
-    setTenantName("");
-    setOwnerFirstName("");
-    setOwnerLastName("");
-    setOwnerEmail("");
-    setOwnerPhone("");
-    addr.reset();
-    setBillingModel("");
+    setTenantName(DEV_DEFAULTS.tenantName || "");
+    setOwnerFirstName(DEV_DEFAULTS.ownerFirstName || "");
+    setOwnerLastName(DEV_DEFAULTS.ownerLastName || "");
+    setOwnerEmail(DEV_DEFAULTS.ownerEmail || "");
+    setOwnerPhone(DEV_DEFAULTS.ownerPhone || "");
+    addr.reset(DEV_DEFAULTS);
+    setBillingModel(DEV_DEFAULTS.billingModel || "");
     setPlatformFeePercent(DEFAULT_PLATFORM_FEE_PERCENT_STR);
-    setSubscriptionTierID("");
-    setTenantID("");
+    setSubscriptionTierID(
+      DEV_DEFAULTS.billingModel === "monthly_sub" && tiers && tiers.length > 0
+        ? tiers[0].tierID
+        : ""
+    );
+    setTenantID(
+      DEV_DEFAULTS.tenantName ? slugify(DEV_DEFAULTS.tenantName) : ""
+    );
     setIdEditable(false);
     setIdManuallyEdited(false);
     setIdCheckStatus("idle");
@@ -241,6 +281,8 @@ export function CreateTenantForm() {
     setStatus("idle");
     setErrorMsg("");
     setCopied(false);
+    setEmailStatus("idle");
+    setEmailError("");
   }
 
   async function handleCopy() {
@@ -251,6 +293,25 @@ export function CreateTenantForm() {
       setTimeout(() => setCopied(false), 2000);
     } catch {
       setCopied(false);
+    }
+  }
+
+  async function handleSendEmail() {
+    if (!result?.tenantID) return;
+    setEmailStatus("sending");
+    setEmailError("");
+    try {
+      const fn = httpsCallable(
+        functions,
+        "platformAdminSendOwnerWelcomeEmailCallable"
+      );
+      await fn({ tenantID: result.tenantID });
+      setEmailStatus("sent");
+    } catch (err) {
+      const code = err?.code || "";
+      const msg = err?.message || "Failed to send email.";
+      setEmailError(code ? `${code}: ${msg}` : msg);
+      setEmailStatus("error");
     }
   }
 
@@ -272,6 +333,30 @@ export function CreateTenantForm() {
           <span className="resultLabel">Owner</span>
           <span className="resultValue">{result.ownerEmail}</span>
         </div>
+        {result.stripeAccountID && (
+          <div className="resultRow">
+            <span className="resultLabel">Stripe Connect</span>
+            <span className="resultValue">{result.stripeAccountID}</span>
+          </div>
+        )}
+        {result.connectAccountError && (
+          <div className="errorText">
+            Connect account creation failed: {result.connectAccountError}. Retry
+            from the tenant detail screen.
+          </div>
+        )}
+        {result.twilioSubaccountSid && (
+          <div className="resultRow">
+            <span className="resultLabel">Twilio subaccount</span>
+            <span className="resultValue">{result.twilioSubaccountSid}</span>
+          </div>
+        )}
+        {result.twilioError && (
+          <div className="errorText">
+            Twilio provisioning failed: {result.twilioError}. Retry from the
+            tenant detail screen.
+          </div>
+        )}
         <div className="fieldLabel">Sign-in link (give to the owner)</div>
         <div className="linkBox">
           <pre className="linkText">{result.signInLink}</pre>
@@ -283,6 +368,21 @@ export function CreateTenantForm() {
         >
           {copied ? "Copied" : "Copy link"}
         </button>
+        <button
+          type="button"
+          className="primaryButton"
+          onClick={handleSendEmail}
+          disabled={emailStatus === "sending" || emailStatus === "sent"}
+        >
+          {emailStatus === "sending"
+            ? "Sending..."
+            : emailStatus === "sent"
+              ? "Email sent"
+              : "Email link to owner"}
+        </button>
+        {emailStatus === "error" && (
+          <div className="errorText">{emailError}</div>
+        )}
         <button
           type="button"
           className="secondaryButton"

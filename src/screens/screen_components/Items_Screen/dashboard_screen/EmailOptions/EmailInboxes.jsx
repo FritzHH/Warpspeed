@@ -5,7 +5,7 @@ import {
   TextInput,
   TouchableOpacity,
 } from "../../../../../dom_components";
-import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../../styles";
+import { C, COLOR_GRADIENTS, Fonts, ICONS, Radius } from "../../../../../styles";
 import { generate36CharUUID, log } from "../../../../../utils";
 import {
   useAlertScreenStore,
@@ -46,7 +46,7 @@ function ScopePickerModal({ open, currentStoreID, onChoose, onCancel }) {
       <div
         style={{
           background: C.surfaceBase || "#fff",
-          borderRadius: 8,
+          borderRadius: Radius.row,
           padding: 24,
           width: 420,
           maxWidth: "90%",
@@ -68,7 +68,7 @@ function ScopePickerModal({ open, currentStoreID, onChoose, onCancel }) {
           onPress={() => onChoose(null)}
           style={{
             border: `1px solid ${C.buttonLightGreenOutline || "#cfd8dc"}`,
-            borderRadius: 6,
+            borderRadius: Radius.control,
             padding: 12,
             textAlign: "left",
             cursor: "pointer",
@@ -85,7 +85,7 @@ function ScopePickerModal({ open, currentStoreID, onChoose, onCancel }) {
           onPress={() => onChoose(currentStoreID)}
           style={{
             border: `1px solid ${C.buttonLightGreenOutline || "#cfd8dc"}`,
-            borderRadius: 6,
+            borderRadius: Radius.control,
             padding: 12,
             textAlign: "left",
             cursor: "pointer",
@@ -207,7 +207,7 @@ export const EmailInboxes = ({ zSettingsObj, handleSettingsFieldChange }) => {
           fontWeight: Fonts.weight.textHeavy,
           color: isShared ? C.green : (C.textMuted || "#666"),
           background: isShared ? "rgba(46,125,50,0.12)" : "rgba(0,0,0,0.06)",
-          borderRadius: 3,
+          borderRadius: Radius.control,
           padding: "2px 6px",
           marginLeft: 8,
           textTransform: "uppercase",
@@ -250,7 +250,7 @@ export const EmailInboxes = ({ zSettingsObj, handleSettingsFieldChange }) => {
                           color: C.text,
                           borderColor: C.buttonLightGreenOutline,
                           borderWidth: 1,
-                          borderRadius: 5,
+                          borderRadius: Radius.control,
                           paddingTop: 2,
                           paddingBottom: 2,
                           paddingLeft: 6,

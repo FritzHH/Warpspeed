@@ -24,7 +24,7 @@
   align-items: center;
   border: 1px solid var(--outline-color, var(--border-default));
   background-color: var(--list-item-white, var(--surface-alt));
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 15px;
   flex-shrink: 0;
 }

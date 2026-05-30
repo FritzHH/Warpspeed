@@ -7,10 +7,10 @@ import {
   Image,
   CheckBox,
   Dialog,
-  ModalFooter,
-  ModalFooterButton,
+  LargeModalHeader,
+  LargeModalHeaderButton,
 } from "../../../dom_components";
-import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../styles";
+import { C, COLOR_GRADIENTS, Fonts, ICONS, Radius } from "../../../styles";
 import { lightenRGBByPercent, localStorageWrapper } from "../../../utils";
 import { useSettingsStore, useAlertScreenStore } from "../../../stores";
 import { dbSavePrintObj } from "../../../db_calls_wrapper";
@@ -116,7 +116,7 @@ const HANDLE_STYLE_BASE = {
   width: HANDLE_SIZE,
   height: HANDLE_SIZE,
   backgroundColor: C.blue,
-  borderRadius: 1,
+  borderRadius: Radius.control,
   zIndex: 2,
 };
 
@@ -818,8 +818,7 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
   return (
     <Dialog
       visible={true}
-      onClose={handleExitPress}
-      title="Label Designer"
+      preventClose={true}
       contentStyle={{ backgroundColor: "transparent", padding: 0, boxShadow: "none", width: "92%", maxWidth: 1000, height: "88%" }}
     >
       <div
@@ -828,16 +827,25 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
         className={styles.modal}
         style={{ backgroundColor: C.backgroundWhite }}
       >
+        <LargeModalHeader
+          title="Label Designer"
+          actions={[
+            <LargeModalHeaderButton
+              key="testPrint"
+              variant="accent"
+              disabled={sFields.length === 0}
+              onClick={handleTestPrint}
+            >
+              Test Print Label Design
+            </LargeModalHeaderButton>,
+            <LargeModalHeaderButton key="close" variant="default" onClick={handleExitPress}>
+              CLOSE
+            </LargeModalHeaderButton>,
+          ]}
+        />
         <div className={styles.modalBody}>
         {/* ─── Top Bar ─── */}
         <div className={styles.topBar}>
-          <span
-            className={styles.title}
-            style={{ fontWeight: Fonts.weight.textSuperheavy, color: C.text }}
-          >
-            Label Designer
-          </span>
-
           <Button
             text="New"
             onPress={handleNewLayout}
@@ -984,18 +992,6 @@ export const LabelDesignerModalV2 = ({ handleExit, handleSettingsFieldChange }) 
             <span className={styles.printSuccessText} style={{ color: C.green }}>Sent to printer!</span>
           </div>
         )}
-        <ModalFooter>
-          <ModalFooterButton variant="danger" onClick={handleExitPress}>
-            Exit
-          </ModalFooterButton>
-          <ModalFooterButton
-            variant="accent"
-            disabled={sFields.length === 0}
-            onClick={handleTestPrint}
-          >
-            Test Print Label Design
-          </ModalFooterButton>
-        </ModalFooter>
       </div>
     </Dialog>
   );

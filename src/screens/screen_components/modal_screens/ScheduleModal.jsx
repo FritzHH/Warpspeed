@@ -3,7 +3,7 @@ import React, { useState, useRef, useCallback } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import debounce from "lodash/debounce";
 import dayjs from "dayjs";
-import { C, ICONS } from "../../../styles";
+import { C, ICONS, Radius } from "../../../styles";
 import { trimToTwoDecimals } from "../../../utils";
 import {
   Image,
@@ -11,8 +11,8 @@ import {
   Button,
   Dialog,
   TimePicker,
-  ModalFooter,
-  ModalFooterButton,
+  LargeModalHeader,
+  LargeModalHeaderButton,
 } from "../../../dom_components";
 import { useSettingsStore, useAlertScreenStore } from "../../../stores";
 import { getWeekStart, getStoreHoursForDayIndex, parseTime, formatTimeShort } from "./scheduleUtils";
@@ -392,14 +392,22 @@ export function ScheduleModal({ handleExit }) {
           width: "92%",
           height: "94%",
           backgroundColor: C.backgroundWhite,
-          borderRadius: 15,
+          borderRadius: Radius.container,
           overflow: "hidden",
           display: "flex",
           flexDirection: "column",
           boxSizing: "border-box",
         }}
       >
-        {/* ─── header ──────────────────────────────────────────────── */}
+        <LargeModalHeader
+          title="Schedule"
+          actions={
+            <LargeModalHeaderButton variant="default" onClick={handleExit}>
+              CLOSE
+            </LargeModalHeaderButton>
+          }
+        />
+        {/* ─── toolbar ─────────────────────────────────────────────── */}
         <div className={styles.header}>
           <div className={styles.headerLeft}>
             <button className={styles.navBtn} onClick={() => navigateWeek(-1)} style={{ color: C.text }}>
@@ -418,7 +426,7 @@ export function ScheduleModal({ handleExit }) {
                 buttonStyle={{
                   marginLeft: 16,
                   backgroundColor: C.blue,
-                  borderRadius: 8,
+                  borderRadius: Radius.row,
                   paddingTop: 8,
                   paddingBottom: 8,
                   paddingLeft: 16,
@@ -436,7 +444,7 @@ export function ScheduleModal({ handleExit }) {
               enabled={!isPastWeek}
               buttonStyle={{
                 backgroundColor: C.green,
-                borderRadius: 8,
+                borderRadius: Radius.row,
                 paddingTop: 10,
                 paddingBottom: 10,
                 paddingLeft: 18,
@@ -452,7 +460,7 @@ export function ScheduleModal({ handleExit }) {
               enabled={!isPastWeek}
               buttonStyle={{
                 backgroundColor: C.orange,
-                borderRadius: 8,
+                borderRadius: Radius.row,
                 paddingTop: 10,
                 paddingBottom: 10,
                 paddingLeft: 18,
@@ -569,7 +577,7 @@ export function ScheduleModal({ handleExit }) {
               onPress={() => _setShowPay(!sShowPay)}
               buttonStyle={{
                 backgroundColor: sShowPay ? "rgb(180,180,180)" : "rgb(103,124,231)",
-                borderRadius: 8,
+                borderRadius: Radius.row,
                 paddingTop: 8,
                 paddingBottom: 8,
                 paddingLeft: 14,
@@ -580,9 +588,6 @@ export function ScheduleModal({ handleExit }) {
             />
           </div>
         </div>
-        <ModalFooter>
-          <ModalFooterButton onClick={handleExit}>Close</ModalFooterButton>
-        </ModalFooter>
       </div>
     </Dialog>
   );

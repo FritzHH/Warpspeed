@@ -10,7 +10,7 @@
 .dropdown {
   /* z-index = backdrop z + 1, supplied inline */
   background-color: var(--surface-base);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border: 2px solid;
   box-shadow: 0 2px 4px var(--shadow-color-default);
   padding: 10px;
@@ -49,7 +49,7 @@
 }
 
 .chip {
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 5px 10px;
   border: none;
   cursor: pointer;

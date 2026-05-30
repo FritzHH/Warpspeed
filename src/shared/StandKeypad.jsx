@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { useRef, useState } from "react";
-import { C } from "../styles";
+import { C, Radius } from "../styles";
 import { useKeypadScaleStore } from "../stores";
 
 export const PHONE_KEYS = [
@@ -22,7 +22,7 @@ const KEY_STYLE = {
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
-  borderRadius: 6,
+  borderRadius: Radius.control,
   borderWidth: 1,
   borderStyle: "solid",
   borderColor: C.buttonLightGreenOutline,
@@ -154,7 +154,7 @@ export function StandKeypad({ mode, onKeyPress, showNumberRow, scale = 1, toggle
           <div
             onClick={(e) => e.stopPropagation()}
             onTouchStart={(e) => e.stopPropagation()}
-            style={{ display: "flex", flexDirection: "column", gap: 20, padding: 28, borderRadius: 12, backgroundColor: C.listItemWhite, boxShadow: "0 12px 40px rgba(0,0,0,0.35)", minWidth: 360 }}
+            style={{ display: "flex", flexDirection: "column", gap: 20, padding: 28, borderRadius: Radius.container, backgroundColor: C.listItemWhite, boxShadow: "0 12px 40px rgba(0,0,0,0.35)", minWidth: 360 }}
           >
             <span style={{ fontSize: 16, fontWeight: 700, color: C.textMuted, letterSpacing: 1, textAlign: "center" }}>KEYPAD SIZE</span>
             <div style={{ display: "flex", flexDirection: "row", gap: 16, justifyContent: "center", alignItems: "center" }}>

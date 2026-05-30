@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, forwardRef } from "react";
 import { createPortal } from "react-dom";
 import cloneDeep from "lodash/cloneDeep";
 import * as faceapi from "face-api.js";
-import { C, ICONS, COLOR_GRADIENTS } from "../styles";
+import { C, ICONS, COLOR_GRADIENTS, Radius } from "../styles";
 import { useZ } from "../hooks/useZ";
 import {
   useSettingsStore,
@@ -18,7 +18,7 @@ import {
   useKeypadScaleStore,
 } from "../stores";
 import { getWorkorderDeleteGuard } from "../shared/workorderDeleteGuard";
-import { resolveStatus, formatCurrencyDisp, lightenRGBByPercent, capitalizeFirstLetterOfString, applyDiscountToWorkorderItem, calculateRunningTotals, deepEqual, removeDashesFromPhone, formatPhoneWithDashes, checkInputForNumbersOnly, calculateWaitEstimateLabel, formatMillisForDisplay, compressImage, createNewWorkorder, scheduleAutoText, usdTypeMask, generateEAN13Barcode, log, printBuilder, localStorageWrapper, replaceOrAddToArr, findTemplateByType } from "../utils";
+import { resolveStatus, formatCurrencyDisp, lightenRGBByPercent, capitalizeFirstLetterOfString, applyDiscountToWorkorderItem, calculateRunningTotals, deepEqual, removeDashesFromPhone, formatPhoneWithDashes, checkInputForNumbersOnly, calculateWaitEstimateLabel, formatMillisForDisplay, compressImage, createNewWorkorder, scheduleAutoText, usdTypeMask, generateEAN13Barcode, log, printBuilder, localStorageWrapper, replaceOrAddToArr, findTemplateByType, verifyPin, verifyAlternatePin } from "../utils";
 import {
   WORKORDER_ITEM_PROTO,
   COLORS,
@@ -338,6 +338,7 @@ export function BikeStandScreen() {
   const countdownRef = useRef(null);
   const modelsLoadedRef = useRef(false);
   const pendingActionRef = useRef(null);
+  const standPinReqRef = useRef(0);
 
   const zStandSettings = useZ("modal", sShowStandSettings);
   const zFaceModal = useZ("modal", sShowFaceModal);
@@ -424,14 +425,26 @@ export function BikeStandScreen() {
     loadFaceModels();
   }, []);
 
-  // DEV: auto-login from saved pin
+  // DEV: auto-login from saved userID (or legacy plaintext PIN, migrated on first hit)
   useEffect(() => {
-    let savedPin = localStorageWrapper.getItem("standDevPin");
-    if (!savedPin) return;
-    let checkLogin = () => {
+    let savedUserID = localStorageWrapper.getItem("standDevUserID");
+    let legacyPin = localStorageWrapper.getItem("standDevPin");
+    if (!savedUserID && !legacyPin) return;
+    let checkLogin = async () => {
       let users = useSettingsStore.getState().settings?.users;
       if (!users) return false;
-      let userObj = users.find((u) => u.pin == savedPin) || users.find((u) => u.alternatePin == savedPin);
+      let userObj = null;
+      if (savedUserID) {
+        userObj = users.find((u) => u.id === savedUserID);
+      } else if (legacyPin) {
+        for (const u of users) {
+          if (await verifyPin(legacyPin, u) || await verifyAlternatePin(legacyPin, u)) { userObj = u; break; }
+        }
+        if (userObj) {
+          localStorageWrapper.setItem("standDevUserID", userObj.id);
+          localStorageWrapper.removeItem("standDevPin");
+        }
+      }
       if (userObj) {
         useLoginStore.getState().setCurrentUser(userObj);
         useLoginStore.setState({ lastActionMillis: Infinity });
@@ -439,10 +452,21 @@ export function BikeStandScreen() {
       }
       return false;
     };
-    if (!checkLogin()) {
-      let interval = setInterval(() => { if (checkLogin()) clearInterval(interval); }, 500);
-      return () => clearInterval(interval);
-    }
+    let cancelled = false;
+    let interval = null;
+    checkLogin().then((ok) => {
+      if (ok || cancelled) return;
+      interval = setInterval(async () => {
+        if (await checkLogin()) {
+          clearInterval(interval);
+          interval = null;
+        }
+      }, 500);
+    });
+    return () => {
+      cancelled = true;
+      if (interval) clearInterval(interval);
+    };
   }, []);
 
   let selectedWorkorder = (zWorkorders || []).find((o) => o.id === sSelectedWorkorderID);
@@ -1302,7 +1326,8 @@ export function BikeStandScreen() {
                     if (distance < threshold) {
                       stopFaceLogin();
                       _setShowFaceModal(false);
-                      localStorageWrapper.setItem("standDevPin", user.pin);
+                      localStorageWrapper.setItem("standDevUserID", user.id);
+                      localStorageWrapper.removeItem("standDevPin");
                       useLoginStore.getState().setCurrentUser(user);
                       useLoginStore.setState({ lastActionMillis: Infinity });
                       if (pendingActionRef.current) {
@@ -1335,20 +1360,31 @@ export function BikeStandScreen() {
     }
   }
 
-  function handleStandPinKeyPress(key) {
+  async function handleStandPinKeyPress(key) {
     if (key === "CLR") { _setPin(""); return; }
     if (key === "\u232B") { _setPin((prev) => prev.slice(0, -1)); return; }
     let newPin = sPin + key;
     _setPin(newPin);
     let users = zSettings?.users || [];
     let pinLength = zSettings?.userPinStrength || 4;
-    let userObj = users.find((u) => u.pin == newPin);
-    if (!userObj) userObj = users.find((u) => u.alternatePin == newPin);
+    const reqId = ++standPinReqRef.current;
+    let userObj = null;
+    const primaryMatches = await Promise.all(users.map((u) => verifyPin(newPin, u)));
+    if (reqId !== standPinReqRef.current) return;
+    const pIdx = primaryMatches.findIndex(Boolean);
+    if (pIdx >= 0) userObj = users[pIdx];
+    if (!userObj) {
+      const altMatches = await Promise.all(users.map((u) => verifyAlternatePin(newPin, u)));
+      if (reqId !== standPinReqRef.current) return;
+      const aIdx = altMatches.findIndex(Boolean);
+      if (aIdx >= 0) userObj = users[aIdx];
+    }
     if (!userObj) {
       if (newPin.length >= pinLength) setTimeout(() => _setPin(""), 400);
       return;
     }
-    localStorageWrapper.setItem("standDevPin", newPin);
+    localStorageWrapper.setItem("standDevUserID", userObj.id);
+    localStorageWrapper.removeItem("standDevPin");
     useLoginStore.getState().setCurrentUser(userObj);
     useLoginStore.setState({ lastActionMillis: Infinity });
     _setShowPinModal(false);
@@ -1438,7 +1474,7 @@ export function BikeStandScreen() {
                     paddingBottom: 15,
                     paddingLeft: 18,
                     paddingRight: 18,
-                    borderRadius: 12,
+                    borderRadius: Radius.container,
                     height: "auto",
                   }}
                   buttonTextStyle={{
@@ -1534,7 +1570,7 @@ export function BikeStandScreen() {
                             paddingHorizontal: 10,
                             fontSize: 32,
                             outlineStyle: "none",
-                            borderRadius: 8,
+                            borderRadius: Radius.row,
                             fontWeight: (sDetailField === "brand" ? sDetailForm.brand : selectedWorkorder?.brand) ? "500" : null,
                             backgroundColor: sDetailField === "brand" ? lightenRGBByPercent(C.blue, 85) : undefined,
                           }}
@@ -1633,7 +1669,7 @@ export function BikeStandScreen() {
                             paddingHorizontal: 10,
                             fontSize: 32,
                             outlineStyle: "none",
-                            borderRadius: 8,
+                            borderRadius: Radius.row,
                             fontWeight: (sDetailField === "description" ? sDetailForm.description : selectedWorkorder?.description) ? "500" : null,
                             backgroundColor: sDetailField === "description" ? lightenRGBByPercent(C.blue, 85) : undefined,
                           }}
@@ -1715,7 +1751,7 @@ export function BikeStandScreen() {
                               paddingHorizontal: 10,
                               fontSize: 32,
                               outlineStyle: "none",
-                              borderRadius: 8,
+                              borderRadius: Radius.row,
                               fontWeight: (sDetailField === "color1" ? sDetailForm.color1 : selectedWorkorder?.color1?.label) ? "500" : null,
                               backgroundColor: sDetailField === "color1" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color1?.backgroundColor,
                               color: selectedWorkorder?.color1?.textColor || C.text,
@@ -1766,7 +1802,7 @@ export function BikeStandScreen() {
                               paddingHorizontal: 10,
                               fontSize: 32,
                               outlineStyle: "none",
-                              borderRadius: 8,
+                              borderRadius: Radius.row,
                               fontWeight: (sDetailField === "color2" ? sDetailForm.color2 : selectedWorkorder?.color2?.label) ? "500" : null,
                               backgroundColor: sDetailField === "color2" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color2?.backgroundColor,
                               color: selectedWorkorder?.color2?.textColor || C.text,
@@ -1858,7 +1894,7 @@ export function BikeStandScreen() {
                             paddingHorizontal: 8,
                             fontSize: 32,
                             outlineStyle: "none",
-                            borderRadius: 8,
+                            borderRadius: Radius.row,
                             textAlign: "center",
                             fontWeight: (sDetailField === "waitDays" ? sDetailForm.waitDays : (selectedWorkorder?.waitTime?.maxWaitTimeDays != null && selectedWorkorder?.waitTime?.maxWaitTimeDays !== "")) ? "500" : null,
                             backgroundColor: sDetailField === "waitDays" ? lightenRGBByPercent(C.blue, 85) : undefined,
@@ -2266,7 +2302,7 @@ export function BikeStandScreen() {
                             paddingHorizontal: 4,
                             fontSize: 26,
                             outlineStyle: "none",
-                            borderRadius: 5,
+                            borderRadius: Radius.control,
                             fontWeight: (sDetailField === "brand" ? sDetailForm.brand : selectedWorkorder?.brand) ? "500" : null,
                             backgroundColor: sDetailField === "brand" ? lightenRGBByPercent(C.blue, 85) : undefined,
                           }}
@@ -2327,7 +2363,7 @@ export function BikeStandScreen() {
                             paddingHorizontal: 4,
                             fontSize: 26,
                             outlineStyle: "none",
-                            borderRadius: 5,
+                            borderRadius: Radius.control,
                             fontWeight: (sDetailField === "description" ? sDetailForm.description : selectedWorkorder?.description) ? "500" : null,
                             backgroundColor: sDetailField === "description" ? lightenRGBByPercent(C.blue, 85) : undefined,
                           }}
@@ -2371,7 +2407,7 @@ export function BikeStandScreen() {
                               paddingHorizontal: 4,
                               fontSize: 26,
                               outlineStyle: "none",
-                              borderRadius: 5,
+                              borderRadius: Radius.control,
                               fontWeight: (sDetailField === "color1" ? sDetailForm.color1 : selectedWorkorder?.color1?.label) ? "500" : null,
                               backgroundColor: sDetailField === "color1" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color1?.backgroundColor,
                               color: selectedWorkorder?.color1?.textColor || C.text,
@@ -2394,7 +2430,7 @@ export function BikeStandScreen() {
                               paddingHorizontal: 4,
                               fontSize: 26,
                               outlineStyle: "none",
-                              borderRadius: 5,
+                              borderRadius: Radius.control,
                               fontWeight: (sDetailField === "color2" ? sDetailForm.color2 : selectedWorkorder?.color2?.label) ? "500" : null,
                               backgroundColor: sDetailField === "color2" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color2?.backgroundColor,
                               color: selectedWorkorder?.color2?.textColor || C.text,
@@ -2468,7 +2504,7 @@ export function BikeStandScreen() {
                               paddingHorizontal: 4,
                               fontSize: 26,
                               outlineStyle: "none",
-                              borderRadius: 5,
+                              borderRadius: Radius.control,
                               textAlign: "center",
                               fontWeight: (sDetailField === "waitDays" ? sDetailForm.waitDays : (selectedWorkorder?.waitTime?.maxWaitTimeDays != null && selectedWorkorder?.waitTime?.maxWaitTimeDays !== "")) ? "500" : null,
                               backgroundColor: sDetailField === "waitDays" ? lightenRGBByPercent(C.blue, 85) : undefined,
@@ -2586,7 +2622,7 @@ export function BikeStandScreen() {
                           paddingLeft: 24,
                           paddingRight: 24,
                           height: "auto",
-                          borderRadius: 10,
+                          borderRadius: Radius.row,
                         }}
                         buttonTextStyle={{
                           color: rs.textColor,
@@ -2702,7 +2738,7 @@ export function BikeStandScreen() {
                     colorGradientArr={COLOR_GRADIENTS.purple}
                     buttonStyle={{
                       borderWidth: 1,
-                      borderRadius: 5,
+                      borderRadius: Radius.control,
                       borderColor: C.buttonLightGreenOutline,
                       paddingHorizontal: 4,
                       paddingVertical: 14 + sNavPaddingAdj,
@@ -2732,7 +2768,7 @@ export function BikeStandScreen() {
                         colorGradientArr={isActive ? ["rgb(245,166,35)", "rgb(245,166,35)"] : (item.id === "labor" || item.id === "item" || item.id === "common") ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.blue}
                         buttonStyle={{
                           borderWidth: 1,
-                          borderRadius: 5,
+                          borderRadius: Radius.control,
                           borderColor: C.buttonLightGreenOutline,
                           paddingHorizontal: 4,
                           paddingVertical: (item.id === "common" ? 19 : (splitButtonLabel(item.name).split("\n").length > 1 || item.name.length > 17) ? 10 : 20) + sNavPaddingAdj,
@@ -2867,7 +2903,7 @@ export function BikeStandScreen() {
                         colorGradientArr={isSelected ? ["rgb(240,200,40)", "rgb(240,200,40)"] : [C.green, C.green]}
                         buttonStyle={{
                           borderWidth: 1,
-                          borderRadius: 5,
+                          borderRadius: Radius.control,
                           borderColor: C.buttonLightGreenOutline,
                           marginRight: 6,
                           marginBottom: 6,
@@ -2972,7 +3008,7 @@ export function BikeStandScreen() {
                                 left: 0,
                                 zIndex: 100,
                                 backgroundColor: "white",
-                                borderRadius: 6,
+                                borderRadius: Radius.control,
                                 border: "1px solid " + C.borderSubtle,
                                 boxShadow: "0 2px 8px rgba(0,0,0,0.15)",
                                 minWidth: 140,
@@ -4325,8 +4361,8 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
     let newCustomer = cloneDeep(CUSTOMER_PROTO);
     newCustomer.id = crypto.randomUUID();
     newCustomer.millisCreated = Date.now();
-    newCustomer.first = (sCreateForm.first || "").trim();
-    newCustomer.last = (sCreateForm.last || "").trim();
+    newCustomer.first = capitalizeFirstLetterOfString((sCreateForm.first || "").trim());
+    newCustomer.last = capitalizeFirstLetterOfString((sCreateForm.last || "").trim());
     newCustomer.customerCell = (sCreateForm.phone || "").replace(/\D/g, "");
     newCustomer.email = (sCreateForm.email || "").trim();
     useCurrentCustomerStore.getState().setCustomer(newCustomer);
@@ -5106,7 +5142,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
     paddingHorizontal: 6,
     fontSize: 14,
     outlineWidth: 0,
-    borderRadius: 5,
+    borderRadius: Radius.control,
   };
 
   return (

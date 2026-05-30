@@ -2,11 +2,11 @@ import React, { forwardRef, useState, useRef, useEffect } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { C, Fonts, ICONS } from "../../styles";
 import { useZ } from "../../hooks/useZ";
-import { deepEqual, localStorageWrapper } from "../../utils";
+import { deepEqual, localStorageWrapper, verifyPin, verifyAlternatePin, hashPin, generatePinSalt } from "../../utils";
 import { permissionToLevel } from "../../data";
 import { useLoginStore, useSettingsStore, useAlertScreenStore } from "../../stores";
 import { LOCAL_DB_KEYS, PAUSE_USER_CLOCK_IN_CHECK_MILLIS } from "../../constants";
-import { ModalFooter, ModalFooterButton } from "../ModalFooter/ModalFooter";
+import { LargeModalHeader, LargeModalHeaderButton } from "../LargeModalHeader/LargeModalHeader";
 import styles from "./LoginModal.module.css";
 
 export const LoginModal = forwardRef(function LoginModal(
@@ -25,6 +25,7 @@ export const LoginModal = forwardRef(function LoginModal(
   const [sSuccess, _setSuccess] = useState(false);
   const [sExpandedTo4, _setExpandedTo4] = useState(false);
   const pinInputRef = useRef(null);
+  const pinReqRef = useRef(0);
   const z = useZ("modal", modalVisible);
 
   const requiredLevel = permissionToLevel(zAdminPrivilege);
@@ -60,12 +61,28 @@ export const LoginModal = forwardRef(function LoginModal(
     useLoginStore.getState().setShowLoginScreen(false);
   }
 
-  function handlePinChange(input) {
+  async function handlePinChange(input) {
     _setPin(input);
     _setError("");
+    if (!input) return;
 
-    let userObj = zUsers?.find((u) => u.pin == input);
-    if (!userObj) userObj = zUsers?.find((u) => u.alternatePin == input);
+    const reqId = ++pinReqRef.current;
+    const users = zUsers || [];
+
+    let userObj = null;
+    let matchType = null;
+    const primaryMatches = await Promise.all(users.map((u) => verifyPin(input, u)));
+    if (reqId !== pinReqRef.current) return;
+    const pIdx = primaryMatches.findIndex(Boolean);
+    if (pIdx >= 0) { userObj = users[pIdx]; matchType = "primary"; }
+
+    if (!userObj) {
+      const altMatches = await Promise.all(users.map((u) => verifyAlternatePin(input, u)));
+      if (reqId !== pinReqRef.current) return;
+      const aIdx = altMatches.findIndex(Boolean);
+      if (aIdx >= 0) { userObj = users[aIdx]; matchType = "alternate"; }
+    }
+
     if (!userObj) {
       if (input.length >= effectivePinLength) _setPin("");
       return;
@@ -79,6 +96,8 @@ export const LoginModal = forwardRef(function LoginModal(
       }
     }
 
+    maybeLazyMigratePin(userObj, input, matchType);
+
     useLoginStore.getState().setCurrentUser(userObj);
     useLoginStore.getState().setLastActionMillis();
     _setPin("");
@@ -86,6 +105,42 @@ export const LoginModal = forwardRef(function LoginModal(
     useLoginStore.getState().setShowLoginScreen(false);
     useLoginStore.getState().runPostLoginFunction();
     runPostLoginChain(userObj);
+  }
+
+  async function maybeLazyMigratePin(userObj) {
+    const claims = useLoginStore.getState().authClaims;
+    if (claims?.privilege) return;
+    const needsPrimary = !!userObj.pin && !userObj.pinHash;
+    const needsAlt = !!userObj.alternatePin && !userObj.alternatePinHash;
+    if (!needsPrimary && !needsAlt) return;
+    try {
+      let primaryHash, primarySalt, altHash, altSalt;
+      if (needsPrimary) {
+        primarySalt = generatePinSalt();
+        primaryHash = await hashPin(userObj.pin, primarySalt);
+      }
+      if (needsAlt) {
+        altSalt = generatePinSalt();
+        altHash = await hashPin(userObj.alternatePin, altSalt);
+      }
+      const liveUsers = useSettingsStore.getState().settings?.users || [];
+      const updated = liveUsers.map((u) => {
+        if (u.id !== userObj.id) return u;
+        const next = { ...u };
+        if (needsPrimary) {
+          next.pinHash = primaryHash;
+          next.pinSalt = primarySalt;
+          delete next.pin;
+        }
+        if (needsAlt) {
+          next.alternatePinHash = altHash;
+          next.alternatePinSalt = altSalt;
+          delete next.alternatePin;
+        }
+        return next;
+      });
+      useSettingsStore.getState().setField("users", updated);
+    } catch (e) {}
   }
 
   function runPostLoginChain(userObj) {
@@ -112,6 +167,7 @@ export const LoginModal = forwardRef(function LoginModal(
   }
 
   function promptClockInIfNeeded(userObj) {
+    if (permissionToLevel(userObj.permissions) >= 4) return;
     let punchClock = useLoginStore.getState().punchClock;
     if (punchClock[userObj.id]) return;
 
@@ -122,8 +178,6 @@ export const LoginModal = forwardRef(function LoginModal(
     }
 
     useAlertScreenStore.getState().setValues({
-      title: "PUNCH CLOCK",
-      severity: "info",
       message: "Hi " + userObj.first + ", you are not clocked in. Would you like to punch in now?",
       btn1Text: "CLOCK IN",
       btn2Text: "NOT NOW",
@@ -172,19 +226,17 @@ export const LoginModal = forwardRef(function LoginModal(
                 backgroundColor: sSuccess ? C.green : undefined,
               }}
             >
-              <div className={styles.body}>
-                {/* Header */}
-                <div className={styles.header}>
-                  <span
-                    className={styles.title}
-                    style={{ color: sSuccess ? "white" : C.text }}
-                  >
-                    {sSuccess ? "Welcome!" : zAdminPrivilege ? "Admin Login" : "Login"}
-                  </span>
-                  {!sSuccess && showLockToggle && (
-                    <button
-                      type="button"
-                      className={styles.lockToggle}
+              <LargeModalHeader
+                title={sSuccess ? "Welcome!" : zAdminPrivilege ? "Admin Login" : "User Login"}
+                actions={[
+                  !sSuccess && showLockToggle && (
+                    <LargeModalHeaderButton
+                      key="lock"
+                      variant="default"
+                      icon={sExpandedTo4 ? ICONS.unblock : ICONS.blocked}
+                      iconSize={22}
+                      iconPosition="only"
+                      tooltip={sExpandedTo4 ? "Use standard PIN length" : "Use 4-digit admin PIN"}
                       onClick={(e) => {
                         e.stopPropagation();
                         _setExpandedTo4((v) => !v);
@@ -192,17 +244,22 @@ export const LoginModal = forwardRef(function LoginModal(
                         _setError("");
                         pinInputRef.current?.focus();
                       }}
-                      aria-label={sExpandedTo4 ? "Use standard PIN length" : "Use 4-digit admin PIN"}
-                    >
-                      <img
-                        src={resolveIcon(sExpandedTo4 ? ICONS.unblock : ICONS.blocked)}
-                        alt=""
-                        style={{ width: 22, height: 22 }}
-                      />
-                    </button>
-                  )}
-                </div>
-
+                    />
+                  ),
+                  !sSuccess && (
+                    <LargeModalHeaderButton
+                      key="close"
+                      variant="default"
+                      icon={ICONS.close1}
+                      iconSize={22}
+                      iconPosition="only"
+                      tooltip="Close"
+                      onClick={(e) => { e.stopPropagation(); handleClose(); }}
+                    />
+                  ),
+                ]}
+              />
+              <div className={styles.body}>
                 {/* Privilege badge */}
                 {!!zAdminPrivilege && !sSuccess && (
                   <div className={styles.privilegeBadge} style={{ backgroundColor: C.surfaceAlt }}>
@@ -266,15 +323,6 @@ export const LoginModal = forwardRef(function LoginModal(
                 )}
               </div>
 
-              {!sSuccess && (
-                <ModalFooter size="small">
-                  <ModalFooterButton
-                    onClick={(e) => { e.stopPropagation(); handleClose(); }}
-                  >
-                    Close
-                  </ModalFooterButton>
-                </ModalFooter>
-              )}
             </div>
           </div>
         </DialogPrimitive.Content>

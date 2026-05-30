@@ -767,6 +767,32 @@ export const stripeConnectCreateTapToPayPaymentIntentCallable = httpsCallable(
   "stripeConnectCreateTapToPayPaymentIntentCallable"
 );
 
+// SaaS tenant user management — Auth + tenant identity doc + per-store entry
+// (deployed to cadence-pos project only)
+export const tenantCreateUserCallable = httpsCallable(
+  functions,
+  "tenantCreateUserCallable"
+);
+export const tenantUpdateUserCallable = httpsCallable(
+  functions,
+  "tenantUpdateUserCallable"
+);
+export const tenantDeleteUserCallable = httpsCallable(
+  functions,
+  "tenantDeleteUserCallable"
+);
+
+// SaaS passwordless sign-in — request a 6-digit code via email, verify back
+// to mint a custom sign-in token (deployed to cadence-pos project only)
+export const requestSignInCodeCallable = httpsCallable(
+  functions,
+  "requestSignInCodeCallable"
+);
+export const verifySignInCodeCallable = httpsCallable(
+  functions,
+  "verifySignInCodeCallable"
+);
+
 export function sendSMS(messageBody) {
   return sendSMSCallable(messageBody)
     .then((result) => {

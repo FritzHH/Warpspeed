@@ -200,6 +200,15 @@ export const FOCUS_NAMES = {
   notes: "notes",
 };
 
+// Merged user shape exposed in-memory in useSettingsStore.settings.users[].
+// Storage is split:
+//   - Identity fields live on tenants/{tenantID}/users/{userID} (canonical).
+//   - Per-store presence + ephemera live on settings.users[i] in each store.
+// The settings listener hydrates per-store entries with identity from the
+// tenant-level user docs so reader components see this merged shape.
+//
+// stores[]    = list of storeIDs this user is assigned to (tenant-level).
+// disabled    = per-store soft-disable; true forces auto-logout for this store.
 export const APP_USER = {
   first: "",
   last: "",
@@ -214,11 +223,14 @@ export const APP_USER = {
   preview: true,
   forwardSMS: false,
   hidden: false,
+  disabled: false,
+  stores: [],
   statuses: [/*status id's go in here*/],
   emailInboxes: [],
   pendingWorkorderIDs: [],
   loginMessageSuppressUntil: 0,
   personalNotes: [],
+  showNewUserHelp: true,
 };
 
 export const TIME_PUNCH_PROTO = {
@@ -381,7 +393,6 @@ export const WORKORDER_PROTO = {
   hasNewSMS: false,
   paymentComplete: false,
   activeSaleID: "",
-  endedOnMillis: "",
   paidOnMillis: "",
   saleID: "",
   id: "",

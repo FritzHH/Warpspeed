@@ -14,7 +14,7 @@
 
 .threadList::-webkit-scrollbar-thumb {
   background: var(--border-subtle);
-  border-radius: 4px;
+  border-radius: var(--radius-control);
 }
 
 .sentinel {
@@ -167,13 +167,25 @@
   gap: 12px;
 }
 
+.footerIconGroup > span > * {
+  transition: transform 120ms ease;
+}
+
+.footerIconGroup > span > *:hover {
+  transform: translateY(-3px);
+}
+
+.footerIconGroup *:hover {
+  opacity: 1 !important;
+}
+
 .inputRow {
   display: flex;
   flex-direction: row;
   align-items: center;
   border-width: 2px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background-color: var(--surface-base);
   flex-shrink: 0;
 }
@@ -233,7 +245,7 @@
 
 .customPhoneBackBtn {
   padding: 4px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
 }
 
 .customPhoneBackText {
@@ -262,7 +274,7 @@
   padding: 6px;
   margin-bottom: 4px;
   background-color: var(--surface-warning-muted);
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--border-subtle);
 }
 
@@ -281,7 +293,7 @@
   padding: 8px;
   margin-bottom: 4px;
   background-color: var(--surface-warning-muted);
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--border-subtle);
 }
 
@@ -299,7 +311,7 @@
   margin-bottom: 4px;
   border: 2px solid var(--warning);
   padding: 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   box-sizing: border-box;
 }
 
@@ -350,7 +362,7 @@
   padding: 4px 12px;
   background-color: transparent;
   border: 1px solid var(--danger);
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   color: var(--danger);
   font-weight: 600;
   font-size: 13px;
@@ -390,7 +402,7 @@
   padding: 8px 16px;
   margin-right: 8px;
   background-color: var(--accent);
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   color: var(--text-on-accent);
   font-weight: 600;
   font-size: 15px;
@@ -406,7 +418,7 @@
 .replyOptionsAudioDeleteBtn {
   padding: 8px 16px;
   background-color: var(--danger);
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   color: var(--text-on-accent);
   font-weight: 600;
   font-size: 15px;
@@ -440,7 +452,7 @@
 .replyOptionsForwardCheckbox {
   width: 22px;
   height: 22px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   border: 2px solid var(--border-subtle);
   background-color: transparent;
   display: flex;
@@ -487,7 +499,7 @@
   padding: 8px 18px;
   background-color: var(--accent);
   border: none;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   color: var(--text-on-accent);
   font-weight: 600;
   font-size: 15px;
@@ -525,7 +537,7 @@
   padding: 6px 12px;
   background-color: transparent;
   border: 1px solid var(--border-subtle);
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   color: var(--text-strong);
   font-size: 14px;
   font-weight: 500;
@@ -554,7 +566,7 @@
   overflow-y: auto;
   background-color: var(--surface-base);
   border: 1px solid var(--border-subtle);
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   box-shadow: var(--shadow-md, 0 4px 12px rgba(0, 0, 0, 0.15));
   z-index: 50;
   padding: 4px 0;
@@ -576,7 +588,7 @@
 .forwardUsersDropdownCheckbox {
   width: 18px;
   height: 18px;
-  border-radius: 3px;
+  border-radius: var(--radius-control);
   border: 2px solid var(--border-subtle);
   background-color: transparent;
   display: flex;
@@ -641,19 +653,19 @@
 
 .bubbleInner {
   width: 100%;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 5px;
   box-sizing: border-box;
 }
 
 .bubbleInner--incoming {
   background-color: var(--surface-alt);
-  border-bottom-left-radius: 2px;
+  border-bottom-left-radius: var(--radius-control);
 }
 
 .bubbleInner--outgoing {
   background-color: var(--info);
-  border-bottom-right-radius: 2px;
+  border-bottom-right-radius: var(--radius-control);
   display: flex;
   flex-direction: row;
   align-items: flex-start;
@@ -789,7 +801,7 @@
 .translateContextMenu {
   position: fixed;
   background-color: var(--surface-base);
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   box-shadow: 0 3px 16px var(--shadow-color-default);
   padding: 6px;
   min-width: 160px;
@@ -807,7 +819,7 @@
 .translateContextItem {
   padding: 9px 14px;
   cursor: pointer;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   font-size: 15px;
   font-weight: 500;
 }
@@ -824,7 +836,7 @@
 .mediaThumbBtn {
   width: 300px;
   height: 300px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   overflow: hidden;
   margin-bottom: 4px;
   margin-right: 4px;
@@ -882,7 +894,7 @@
 
 .mediaFullContent {
   position: relative;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
 }
 
 .mediaDownloadBtn {
@@ -891,7 +903,7 @@
   right: 8px;
   width: 36px;
   height: 36px;
-  border-radius: 18px;
+  border-radius: var(--radius-container);
   background-color: var(--accent);
   display: flex;
   justify-content: center;
@@ -1041,7 +1053,7 @@
 .phoneEntryBackBtn {
   margin-left: 12px;
   padding: 4px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -1093,7 +1105,7 @@
 
 .hubPanelNewThreadBadge {
   padding: 4px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
 }
 
 .hubPanelNewThreadText {
@@ -1104,7 +1116,7 @@
 
 .hubPanelHeaderBtn {
   padding: 4px 10px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1132,7 +1144,7 @@
 
 .woDropdownMenu {
   position: absolute;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border-width: 2px;
   border-style: solid;
   min-width: 240px;
@@ -1165,7 +1177,7 @@
 
 .woDropdownStatusBadge {
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   margin-left: 10px;
   flex-shrink: 0;
 }
@@ -1286,7 +1298,7 @@
   padding: 4px;
   margin-right: 15px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
 }
 
 .hubSearchResetBtn:disabled {
@@ -1372,4 +1384,9 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  transition: transform 120ms ease;
+}
+
+.hubPlaceholderBackBtn:hover {
+  transform: translateY(-3px);
 }

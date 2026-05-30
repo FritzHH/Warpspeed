@@ -19,6 +19,8 @@ import dayjs from "dayjs";
 import {
   Dialog,
   LoadingIndicator,
+  LargeModalHeader,
+  LargeModalHeaderButton,
 } from "../../../../dom_components";
 import { C } from "../../../../styles";
 import { capitalizeFirstLetterOfString, lightenRGBByPercent } from "../../../../utils";
@@ -177,51 +179,48 @@ export const AnalyticsModalScreen = ({ handleExit }) => {
       visible={true}
       onClose={handleExit}
       overlayColor={C.surfaceOverlay}
-      title="Cost Analytics"
     >
       <div className={styles.card}>
-        {/* ── HEADER ── */}
-        <div className={styles.header} style={{ backgroundColor: C.darkBlue }}>
-          <div className={styles.headerLeft}>
-            <span className={styles.title}>Cost Analytics</span>
-            <span className={styles.subtitle}>
-              {dayjs(sStartMs).format("MMM D")}
-              {"  →  "}
-              {dayjs(sEndMs).format("MMM D, YYYY")}
-              {"  ·  "}
-              {sEvents.length.toLocaleString()} events
-            </span>
-          </div>
-          <div className={styles.headerRight}>
-            {DATE_PRESETS.map((p) => {
-              const active = sPresetLabel === p.label;
-              return (
-                <button
-                  key={p.label}
-                  type="button"
-                  onClick={() => handlePreset(p)}
-                  className={styles.presetBtn}
-                  style={{
-                    backgroundColor: active ? C.orange : C.blue,
-                    border: "none",
-                    cursor: "pointer",
-                    font: "inherit",
-                    color: "white",
-                  }}
-                >
-                  {p.label}
-                </button>
-              );
-            })}
-            <button
-              type="button"
-              onClick={handleExit}
-              className={styles.closeBtn}
-              style={{ backgroundColor: C.red, border: "none", cursor: "pointer", font: "inherit", color: "white" }}
-            >
-              Close
-            </button>
-          </div>
+        <LargeModalHeader
+          title={
+            <div className={styles.headerLeft}>
+              <span className={styles.title}>Cost Analytics</span>
+              <span className={styles.subtitle}>
+                {dayjs(sStartMs).format("MMM D")}
+                {"  →  "}
+                {dayjs(sEndMs).format("MMM D, YYYY")}
+                {"  ·  "}
+                {sEvents.length.toLocaleString()} events
+              </span>
+            </div>
+          }
+          actions={
+            <LargeModalHeaderButton variant="default" onClick={handleExit}>
+              CLOSE
+            </LargeModalHeaderButton>
+          }
+        />
+        <div className={styles.presetsRow}>
+          {DATE_PRESETS.map((p) => {
+            const active = sPresetLabel === p.label;
+            return (
+              <button
+                key={p.label}
+                type="button"
+                onClick={() => handlePreset(p)}
+                className={styles.presetBtn}
+                style={{
+                  backgroundColor: active ? C.orange : C.blue,
+                  border: "none",
+                  cursor: "pointer",
+                  font: "inherit",
+                  color: "white",
+                }}
+              >
+                {p.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* ── TAB BAR ── */}

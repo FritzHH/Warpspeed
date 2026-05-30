@@ -4877,7 +4877,6 @@ exports.lightspeedImportData = onCall(
           amountPaid: 0,
           activeSaleID: "",
           sales: [],
-          endedOnMillis: "",
           saleID: "",
           id,
           customerID,

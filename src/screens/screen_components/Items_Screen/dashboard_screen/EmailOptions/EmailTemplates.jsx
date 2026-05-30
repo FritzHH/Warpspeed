@@ -7,7 +7,7 @@ import {
   Tooltip,
   TouchableOpacity,
 } from "../../../../../dom_components";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../../../../styles";
 import { useZ } from "../../../../../hooks/useZ";
 
 import { COLORS, SETTINGS_OBJ } from "../../../../../data";
@@ -170,7 +170,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: C.buttonLightGreenOutline,
-    borderRadius: 5,
+    borderRadius: Radius.control,
     paddingTop: 4,
     paddingBottom: 4,
     paddingLeft: 8,
@@ -183,7 +183,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
     borderColor: C.buttonLightGreenOutline,
     borderWidth: 1,
     borderStyle: "solid",
-    borderRadius: 5,
+    borderRadius: Radius.control,
     padding: 5,
     color: C.text,
     outlineWidth: 0,
@@ -196,7 +196,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
       paddingBottom: 5,
       paddingLeft: 12,
       paddingRight: 12,
-      borderRadius: 5,
+      borderRadius: Radius.control,
       borderWidth: 1,
       borderStyle: "solid",
     };
@@ -235,7 +235,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
               style={{
                 width: 26,
                 height: 26,
-                borderRadius: 13,
+                borderRadius: Radius.container,
                 backgroundColor: c.backgroundColor,
                 borderWidth: isActive ? 3 : 1,
                 borderStyle: "solid",
@@ -265,21 +265,21 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
         {/* ===== SHARED GREETING ===== */}
         <div style={{ width: "100%", marginBottom: 20, flexShrink: 0 }}>
           <span style={{ fontSize: 12, fontWeight: "600", color: "#2E7D32", marginBottom: 6, display: "block" }}>GREETING (shared)</span>
-          <div style={{ backgroundColor: greetingBg, borderRadius: 8, overflow: "hidden" }}>
+          <div style={{ backgroundColor: greetingBg, borderRadius: Radius.row, overflow: "hidden" }}>
             {greetingHasLogo && logoUrl ? (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 20, paddingBottom: 6 }}>
                 <DomImage src={logoUrl} resizeMode="contain" style={{ width: logoWidth, height: logoWidth * 0.5 }} />
                 <div style={{ display: "flex", flexDirection: "row", alignItems: "center", marginTop: 6 }}>
                   <TouchableOpacity
                     onPress={() => handleSettingsFieldChange("emailLogoWidth", Math.max(60, logoWidth - 20))}
-                    style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.25)", justifyContent: "center", alignItems: "center", marginRight: 6 }}
+                    style={{ width: 24, height: 24, borderRadius: Radius.container, backgroundColor: "rgba(255,255,255,0.25)", justifyContent: "center", alignItems: "center", marginRight: 6 }}
                   >
                     <span style={{ fontSize: 14, fontWeight: "700", color: greetingTextColor, lineHeight: "16px" }}>-</span>
                   </TouchableOpacity>
                   <span style={{ fontSize: 11, color: greetingTextColor, opacity: 0.7 }}>{logoWidth}px</span>
                   <TouchableOpacity
                     onPress={() => handleSettingsFieldChange("emailLogoWidth", Math.min(400, logoWidth + 20))}
-                    style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: "rgba(255,255,255,0.25)", justifyContent: "center", alignItems: "center", marginLeft: 6 }}
+                    style={{ width: 24, height: 24, borderRadius: Radius.container, backgroundColor: "rgba(255,255,255,0.25)", justifyContent: "center", alignItems: "center", marginLeft: 6 }}
                   >
                     <span style={{ fontSize: 14, fontWeight: "700", color: greetingTextColor, lineHeight: "16px" }}>+</span>
                   </TouchableOpacity>
@@ -318,7 +318,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   <TouchableOpacity
                     key={c.label}
                     onPress={() => handleSettingsFieldChange("emailGreetingColorObj", c)}
-                    style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: c.backgroundColor, borderWidth: isActive ? 3 : 1, borderStyle: "solid", borderColor: isActive ? C.green : C.borderStrong, marginRight: 4, marginBottom: 4 }}
+                    style={{ width: 26, height: 26, borderRadius: Radius.container, backgroundColor: c.backgroundColor, borderWidth: isActive ? 3 : 1, borderStyle: "solid", borderColor: isActive ? C.green : C.borderStrong, marginRight: 4, marginBottom: 4 }}
                   />
                 );
               })}
@@ -330,7 +330,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
         {/* ===== SHARED FOOTER ===== */}
         <div style={{ width: "100%", marginBottom: 20, flexShrink: 0 }}>
           <span style={{ fontSize: 12, fontWeight: "600", color: C.textMuted, marginBottom: 6, display: "block" }}>FOOTER (shared)</span>
-          <div style={{ backgroundColor: "#F5F5F5", borderRadius: 8, overflow: "hidden", borderWidth: 1, borderStyle: "solid", borderColor: "#E0E0E0" }}>
+          <div style={{ backgroundColor: "#F5F5F5", borderRadius: Radius.row, overflow: "hidden", borderWidth: 1, borderStyle: "solid", borderColor: "#E0E0E0" }}>
             {footerHasLogo && logoUrl ? (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 16, paddingBottom: 4 }}>
                 <DomImage src={logoUrl} resizeMode="contain" style={{ width: logoWidth, height: logoWidth * 0.5 }} />
@@ -405,7 +405,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   borderWidth: 1,
                   borderStyle: "solid",
                   borderColor: isSelected ? C.green : C.buttonLightGreenOutline,
-                  borderRadius: 10,
+                  borderRadius: Radius.row,
                   overflow: "hidden",
                   backgroundColor: C.backgroundListWhite,
                   boxSizing: "border-box",
@@ -516,7 +516,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   />
                   {!!actionVal.trim() && (
                     <div style={{ marginTop: 10, display: "flex", flexDirection: "column", alignItems: "center", width: "100%" }}>
-                      <div style={{ backgroundColor: actionColorObj.backgroundColor, borderRadius: 6, paddingTop: 14, paddingBottom: 14, paddingLeft: 36, paddingRight: 36 }}>
+                      <div style={{ backgroundColor: actionColorObj.backgroundColor, borderRadius: Radius.control, paddingTop: 14, paddingBottom: 14, paddingLeft: 36, paddingRight: 36 }}>
                         <span style={{ color: actionColorObj.textColor, fontSize: 15, fontWeight: "600", letterSpacing: 0.3 }}>{actionVal}</span>
                       </div>
                       {renderColorPicker(actionColorObj, (c) => handleFieldChange(templateObj, "actionColorObj", c))}
@@ -548,7 +548,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
               onClick={() => _setEmojiModalRefKey(null)}
               style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
             />
-            <div style={{ backgroundColor: C.backgroundWhite, borderRadius: 12, padding: 15, width: 320, zIndex: 1 }}>
+            <div style={{ backgroundColor: C.backgroundWhite, borderRadius: Radius.container, padding: 15, width: 320, zIndex: 1 }}>
               <span style={{ fontSize: 14, fontWeight: "600", color: C.text, marginBottom: 10, textAlign: "center", display: "block" }}>{"Insert Emoji"}</span>
               <div style={{ display: "flex", flexDirection: "row", flexWrap: "wrap", justifyContent: "center" }}>
                 {TEMPLATE_EMOJIS.map((e) => (
@@ -563,7 +563,7 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
                       }
                       _setEmojiModalRefKey(null);
                     }}
-                    style={{ width: 48, height: 48, display: "flex", justifyContent: "center", alignItems: "center", borderRadius: 8 }}
+                    style={{ width: 48, height: 48, display: "flex", justifyContent: "center", alignItems: "center", borderRadius: Radius.row }}
                   >
                     <span style={{ fontSize: 24 }}>{e.id}</span>
                   </TouchableOpacity>

@@ -8,7 +8,7 @@
   flex-direction: row;
   align-items: center;
   background-color: rgb(255, 245, 157);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border: 1px solid rgb(255, 224, 50);
   padding: 6px 10px;
   margin-bottom: 8px;
@@ -24,7 +24,7 @@
 
 .woCard {
   border: 1px solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 10px;
   margin-bottom: 7px;
   flex-shrink: 0;
@@ -89,14 +89,14 @@
 
 .colorPillLeft {
   padding: 5px 10px;
-  border-top-left-radius: 100px;
-  border-bottom-left-radius: 100px;
+  border-top-left-radius: var(--radius-pill);
+  border-bottom-left-radius: var(--radius-pill);
 }
 
 .colorPillRight {
   padding: 5px 10px;
-  border-top-right-radius: 100px;
-  border-bottom-right-radius: 100px;
+  border-top-right-radius: var(--radius-pill);
+  border-bottom-right-radius: var(--radius-pill);
 }
 
 .line {
@@ -113,7 +113,7 @@
   margin: 3px 0;
   border: 1px solid;
   border-left-width: 3px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   flex-shrink: 0;
   box-sizing: border-box;
 }
@@ -160,7 +160,7 @@
 }
 
 .typeTag {
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   padding: 3px 7px;
   margin-right: 5px;
   flex-shrink: 0;
@@ -208,7 +208,7 @@
 
 .qtyPill {
   margin-left: 2px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   width: 30px;
   height: 22px;
   display: flex;
@@ -218,7 +218,7 @@
 }
 
 .qtyPillLarge {
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   width: 31px;
   height: 23px;
   display: flex;
@@ -249,7 +249,7 @@
   min-width: 65px;
   margin: 0 3px;
   border: 1px solid;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   height: 100%;
   padding-right: 2px;
   flex-shrink: 0;
@@ -264,7 +264,7 @@
   min-width: 85px;
   margin: 0 5px;
   border: 1px solid;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   height: 100%;
   padding-right: 2px;
   flex-shrink: 0;
@@ -329,7 +329,7 @@
 .totalsTotalWrap {
   font-size: 13px;
   border: 1px solid;
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   padding: 3px 14px;
   flex-shrink: 0;
   box-sizing: border-box;

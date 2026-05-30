@@ -1,7 +1,7 @@
 // Smart database wrapper - handles path building, validation, and business logic
 // This file contains all business logic and calls the "dumb" db.js functions
 
-import { log, removeEmptyFields, stringifyAllObjectFields, compressImage, localStorageWrapper } from "./utils";
+import { log, removeEmptyFields, stringifyAllObjectFields, compressImage, localStorageWrapper, capitalizeFirstLetterOfString } from "./utils";
 import * as _storesModule from "./stores";
 import { takeId, getId } from "./idPool";
 import {
@@ -143,6 +143,20 @@ function buildDeletedWorkordersCollectionPath(tenantID, storeID) {
 
 function buildCompletedSalePath(tenantID, storeID, saleID) {
   return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.COMPLETED_SALES}/${saleID}`;
+}
+
+// Tenant-level user identity collection. Holds canonical identity (name,
+// phone, email, PIN, permissions, faceDescriptor, hourlyWage, stores[]).
+// Per-store presence + ephemera + the disabled flag live on
+// settings.users[i]; the settings listener hydrates per-store entries with
+// identity from these docs so readers see the merged APP_USER shape.
+// Keyed by the user's Firebase Auth UID.
+function buildTenantUserPath(tenantID, userID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.USERS}/${userID}`;
+}
+
+function buildTenantUsersCollectionPath(tenantID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.USERS}`;
 }
 
 /**
@@ -574,6 +588,106 @@ export async function dbSaveSettings(settings) {
       tenantID: null,
       storeID: null,
     };
+  }
+}
+
+// ============================================================================
+// TENANT-LEVEL USER IDENTITY
+// ============================================================================
+// Canonical identity for each user (name, phone, email, PIN, permissions,
+// faceDescriptor, hourlyWage, stores[]) lives at
+// tenants/{tenantID}/users/{userID}. Per-store presence + ephemera + the
+// disabled flag stay on settings.users[i] inside each store's settings doc.
+// The settings listener in BaseScreen hydrates per-store entries with
+// identity from these tenant-level docs, exposing the merged APP_USER shape
+// to readers via useSettingsStore.settings.users[]. Writes that mutate
+// identity (name/phone/email/PIN/permissions/stores) must go through
+// dbSaveTenantUser; writes that mutate per-store ephemera (disabled,
+// pendingWorkorderIDs, etc.) keep going through the settings path.
+
+export async function dbSaveTenantUser(user, userID = null) {
+  try {
+    const { tenantID } = getTenantAndStore();
+    if (!tenantID) {
+      log("Error: tenantID is not configured for dbSaveTenantUser");
+      return { success: false, error: "Missing tenantID", user: null };
+    }
+    const id = userID || user?.id;
+    if (!id) {
+      log("Error: userID is required for dbSaveTenantUser");
+      return { success: false, error: "Missing userID", user: null };
+    }
+    const userToSave = { ...user, id };
+    await firestoreWrite(buildTenantUserPath(tenantID, id), userToSave);
+    return { success: true, user: userToSave, tenantID };
+  } catch (error) {
+    log("Error saving tenant user:", error);
+    return {
+      success: false,
+      error: "Database Error",
+      message: error.message,
+      user: null,
+    };
+  }
+}
+
+export async function dbDeleteTenantUser(userID) {
+  try {
+    const { tenantID } = getTenantAndStore();
+    if (!tenantID) {
+      log("Error: tenantID is not configured for dbDeleteTenantUser");
+      return { success: false, error: "Missing tenantID" };
+    }
+    if (!userID) {
+      log("Error: userID is required for dbDeleteTenantUser");
+      return { success: false, error: "Missing userID" };
+    }
+    await firestoreDelete(buildTenantUserPath(tenantID, userID));
+    return { success: true, tenantID, userID };
+  } catch (error) {
+    log("Error deleting tenant user:", error);
+    return {
+      success: false,
+      error: "Database Error",
+      message: error.message,
+    };
+  }
+}
+
+export function dbListenToTenantUsers(onChange, onError) {
+  const name = "tenantUsers";
+  try {
+    const { tenantID } = getTenantAndStore();
+    if (!tenantID) {
+      log("Error: tenantID is not configured for dbListenToTenantUsers");
+      return null;
+    }
+    if (!onChange || typeof onChange !== "function") {
+      log("Error: onChange callback required for dbListenToTenantUsers");
+      return null;
+    }
+    const collectionPath = buildTenantUsersCollectionPath(tenantID);
+    __logListenerAttach(name);
+    const unsubscribe = firestoreSubscribeCollection(
+      collectionPath,
+      (usersData, error, meta) => {
+        if (error) {
+          log("Tenant users listener error", { tenantID, error });
+          if (onError) onError(error);
+          return;
+        }
+        __logListenerEmit(name, meta);
+        onChange(usersData);
+      }
+    );
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
+  } catch (error) {
+    log("Error setting up tenant users listener:", error);
+    if (onError) onError(error);
+    return null;
   }
 }
 
@@ -2060,8 +2174,8 @@ export async function dbListCompletedWorkordersSince(sinceMillis) {
     const path = `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.COMPLETED_WORKORDERS}`;
     const results = await firestoreQuery(
       path,
-      [{ field: "endedOnMillis", operator: ">=", value: sinceMillis }],
-      { orderBy: { field: "endedOnMillis", direction: "desc" }, limit: 500 }
+      [{ field: "paidOnMillis", operator: ">=", value: sinceMillis }],
+      { orderBy: { field: "paidOnMillis", direction: "desc" }, limit: 500 }
     );
     return { success: true, workorders: results || [] };
   } catch (error) {
@@ -2400,28 +2514,23 @@ export async function dbSearchCustomersByName(name) {
       return [];
     }
 
-    // Clean and validate name (trim whitespace, convert to lowercase)
-    const cleanName = name.trim().toLowerCase();
+    // Canonicalize to match storage form (capitalize-first; see CLAUDE.md customer-fields rule).
+    const cleanName = capitalizeFirstLetterOfString(name.trim());
 
     if (cleanName.length === 0) {
       log("Error: Name must contain at least one character for dbSearchCustomersByName");
       return [];
     }
 
-    // Build collection path for customers
     const collectionPath = buildCustomerCollectionPath(tenantID, storeID);
 
-    // Create queries for name search (partial match for real-time typing)
-    // Each field gets a range query to find partial matches
     const fieldQueries = [{ field: "first" }, { field: "last" }];
 
-    // Execute multiple queries and combine results
     const allResults = [];
     const seenIds = new Set();
 
     for (const fieldQuery of fieldQueries) {
       try {
-        // Use range query to find partial matches (starts-with behavior)
         const whereClauses = [
           { field: fieldQuery.field, operator: ">=", value: cleanName },
           {
@@ -2433,14 +2542,9 @@ export async function dbSearchCustomersByName(name) {
 
         const results = await firestoreQuery(collectionPath, whereClauses);
 
-        // Filter results to ensure they actually start with the name
-        // (Firestore range queries can return results that don't start with the value)
         const filteredResults = results.filter((customer) => {
           const nameValue = customer[fieldQuery.field];
-          return (
-            nameValue &&
-            nameValue.toString().toLowerCase().startsWith(cleanName)
-          );
+          return nameValue && nameValue.toString().startsWith(cleanName);
         });
 
         // Add unique results to the combined array
@@ -3115,11 +3219,33 @@ export async function dbLoginUser(email, password, options = {}) {
       throw new Error("Login failed - no user data returned");
     }
 
-    const callableResult = await loginAppUserCallable({ email, password });
-    const { tenantID, storeID, settings } = callableResult.data;
+    // SaaS users already carry {tenantID, privilege, stores[]} claims from
+    // bootstrap / invite redemption. The legacy loginAppUserCallable is a
+    // Bonita-only helper that (a) looks up the caller in the top-level
+    // `email_users` index that SaaS tenants don't populate, and (b) backfills
+    // legacy {tenantID, storeID} claims that would clobber the SaaS shape.
+    // Detect SaaS via the presence of the `privilege` claim and skip it.
+    const initialClaims =
+      (await user.getIdTokenResult()).claims || {};
+    const isSaasUser = Boolean(initialClaims.privilege);
 
-    await user.getIdToken(true);
-    log("Token claims after refresh:", (await user.getIdTokenResult()).claims);
+    let tenantID;
+    let storeID;
+    let settings = null;
+
+    if (isSaasUser) {
+      tenantID = initialClaims.tenantID || null;
+      const claimStores = Array.isArray(initialClaims.stores)
+        ? initialClaims.stores
+        : [];
+      storeID = claimStores[0] || null;
+      log("SaaS sign-in claims:", { tenantID, storeID, privilege: initialClaims.privilege });
+    } else {
+      const callableResult = await loginAppUserCallable({ email, password });
+      ({ tenantID, storeID, settings } = callableResult.data);
+      await user.getIdToken(true);
+      log("Token claims after refresh:", (await user.getIdTokenResult()).claims);
+    }
 
     return {
       success: true,
@@ -3169,6 +3295,41 @@ export async function sendPasswordReset(email) {
     log("Error sending password reset email:", error);
     throw error;
   }
+}
+
+/**
+ * Request a one-time 6-digit sign-in code for the given identifier
+ * (email or E.164 phone). Server looks up the matching Auth user,
+ * persists the code at tenants/{tenantID}/sign_in_codes/{uid}, and
+ * emails it to the user. Resolves to { success, delivery: { method, to } }.
+ */
+export async function dbRequestSignInCode(identifier) {
+  const { requestSignInCodeCallable } = await import("./db_calls");
+  const result = await requestSignInCodeCallable({ identifier });
+  return result.data;
+}
+
+/**
+ * Verify a sign-in code. On success the server mints a custom token
+ * scoped to the matched user and returns the per-store enabled/disabled
+ * split so the UI can show a picker for multi-store users.
+ * Resolves to { success, token, tenantID, stores, enabledStores, disabledStores }.
+ */
+export async function dbVerifySignInCode(identifier, code) {
+  const { verifySignInCodeCallable } = await import("./db_calls");
+  const result = await verifySignInCodeCallable({ identifier, code });
+  return result.data;
+}
+
+/**
+ * Sign in with a custom token minted by verifySignInCodeCallable.
+ * The auth state listener in App.jsx picks up the new user and runs
+ * loadTenantAndSettings + claim hydration.
+ */
+export async function dbSignInWithCustomToken(token) {
+  const { signInWithCustomToken } = await import("firebase/auth");
+  const userCredential = await signInWithCustomToken(AUTH, token);
+  return userCredential.user;
 }
 
 /**
@@ -3783,6 +3944,22 @@ export async function dbSaveMessageTranslation(phone, messageId, translated) {
     await firestoreUpdate(path, { translated });
   } catch (error) {
     log("Error saving message translation", { error: error.message, phone, messageId });
+  }
+}
+
+export async function dbMarkSmsThreadRead(phone, lastMillis) {
+  try {
+    const cleanPhone = (phone || "").replace(/\D/g, "");
+    if (cleanPhone.length !== 10) return { success: false, error: "Invalid phone" };
+    if (!lastMillis || typeof lastMillis !== "number") return { success: false, error: "Missing lastMillis" };
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return { success: false, error: "Missing tenant/store" };
+    const path = `tenants/${tenantID}/stores/${storeID}/sms-messages/${cleanPhone}`;
+    await firestoreUpdate(path, { lastReadMillis: lastMillis });
+    return { success: true };
+  } catch (error) {
+    log("Error marking SMS thread read", { error: error.message, phone });
+    return { success: false, error: error.message };
   }
 }
 

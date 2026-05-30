@@ -7,8 +7,8 @@ import {
   SmallLoadingIndicator,
   Dialog,
   TouchableOpacity,
-  ModalFooter,
-  ModalFooterButton,
+  LargeModalHeader,
+  LargeModalHeaderButton,
 } from "../../../dom_components";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
@@ -641,12 +641,18 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
         >
           <DialogPrimitive.Title className={styles.srOnly}>Payroll</DialogPrimitive.Title>
           <div className={styles.card} style={cardThemeVars}>
+        <LargeModalHeader
+          title="Payroll"
+          actions={
+            <LargeModalHeaderButton variant="default" onClick={handleExit}>
+              Close
+            </LargeModalHeaderButton>
+          }
+        />
         <div className={styles.cardContent}>
         {/* ═══ LEFT RAIL ═══ */}
         <div className={styles.leftRail}>
           <div className={styles.leftRailTop}>
-            {isAdmin && <span className={styles.blockTitle}>Payroll</span>}
-
             {isAdmin && (
               <>
                 <span className={styles.blockSection}>SELECT USER</span>
@@ -920,11 +926,6 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
         </div>
         </div>
 
-        <ModalFooter>
-          <ModalFooterButton onClick={handleExit}>
-            Close
-          </ModalFooterButton>
-        </ModalFooter>
           </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

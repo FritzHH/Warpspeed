@@ -8,7 +8,7 @@
 
 .innerBox {
   width: 100%;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 15px;
   box-sizing: border-box;
   display: flex;
@@ -20,7 +20,7 @@
 .cardButton {
   width: 300px;
   padding: 14px 0;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border-width: 2px;
   border-style: solid;
   background: none;
@@ -50,7 +50,7 @@
 .gridButton {
   width: 200px;
   height: 80px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border: 1px solid;
   cursor: pointer;
   display: flex;
@@ -123,14 +123,14 @@
 .progressTrack {
   width: 100%;
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   overflow: hidden;
   flex-shrink: 0;
 }
 
 .progressFill {
   height: 100%;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
 }
 
 .progressCount {
@@ -164,7 +164,7 @@
   width: 160px;
   border-width: 2px;
   border-style: solid;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 8px 10px;
   font-size: 13px;
   outline: none;
@@ -178,7 +178,7 @@
 
 .goButton {
   padding: 8px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border: none;
   cursor: pointer;
   flex-shrink: 0;
@@ -220,7 +220,7 @@
 
 .devButton {
   padding: 10px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border-width: 2px;
   border-style: solid;
   background: none;

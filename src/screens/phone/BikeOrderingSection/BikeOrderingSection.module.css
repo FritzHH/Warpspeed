@@ -1,6 +1,6 @@
 .card {
   background-color: var(--surface-raised);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border-width: 1px;
   border-style: solid;
   border-color: var(--border-default);
@@ -50,7 +50,7 @@
   padding-left: 8px;
   padding-right: 8px;
   outline: none;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   font-size: 14px;
   box-sizing: border-box;
   min-width: 0;
@@ -65,7 +65,7 @@
   padding-left: 8px;
   padding-right: 8px;
   outline: none;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   font-size: 14px;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -152,7 +152,7 @@
 .waitBtn {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -192,7 +192,7 @@
 .orderedDotOuter {
   width: 12px;
   height: 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border-width: 1.5px;
   border-style: solid;
   display: flex;
@@ -206,7 +206,7 @@
 .orderedDotInner {
   width: 6px;
   height: 6px;
-  border-radius: 3px;
+  border-radius: var(--radius-control);
   flex-shrink: 0;
 }
 
@@ -294,7 +294,7 @@
 .readColorDot {
   width: 14px;
   height: 14px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   border-width: 1px;
   border-style: solid;
   border-color: var(--text-strong);
@@ -318,7 +318,7 @@
 
 .itemNotHereBadge {
   background-color: var(--surface-warning-muted);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding-left: 8px;
   padding-right: 8px;
   padding-top: 1px;
@@ -376,7 +376,7 @@
 .readOrderedDotOuter {
   width: 10px;
   height: 10px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   border-width: 1.5px;
   border-style: solid;
   display: flex;
@@ -390,7 +390,7 @@
 .readOrderedDotInner {
   width: 5px;
   height: 5px;
-  border-radius: 2.5px;
+  border-radius: var(--radius-control);
   flex-shrink: 0;
 }
 

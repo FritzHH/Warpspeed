@@ -76,7 +76,7 @@ import { BUILD_VERSION } from "./buildVersion";
 export { ROUTES };
 
 // Auto-update: force reload when a newer version is deployed.
-// Checks on page load, tab refocus, and every day at 8 AM.
+// Checks on page load, tab refocus, and every 30 minutes.
 const checkForAppUpdate = async () => {
   try {
     const res = await fetch("/version.json?t=" + Date.now());
@@ -88,18 +88,8 @@ const checkForAppUpdate = async () => {
     // Network error — skip silently
   }
 };
-const scheduleNextUpdateCheck = () => {
-  const now = new Date();
-  const next8AM = new Date(now);
-  next8AM.setHours(8, 0, 0, 0);
-  if (now >= next8AM) next8AM.setDate(next8AM.getDate() + 1);
-  setTimeout(() => {
-    checkForAppUpdate();
-    scheduleNextUpdateCheck();
-  }, next8AM - now);
-};
 checkForAppUpdate();
-scheduleNextUpdateCheck();
+setInterval(checkForAppUpdate, 30 * 60 * 1000);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") checkForAppUpdate();
 });
@@ -251,6 +241,14 @@ function App() {
   useEffect(() => {
     let initialLoad = true;
     const unsubscribe = onAuthStateChange(async (firebaseUser) => {
+      // InviteAcceptScreen owns its own auth lifecycle (email-link sign-in,
+      // bootstrap submit, sign-out, redirect). loadTenantAndSettings would
+      // throw for a fresh tenant with no settings doc, hitting the catch
+      // below and signing the user out mid-form.
+      if (window.location.pathname.startsWith("/invite-accept")) {
+        setIsLoading(false);
+        return;
+      }
       if (firebaseUser && initialLoad) {
         try {
           const tokenResult = await firebaseUser.getIdTokenResult();
@@ -262,7 +260,20 @@ function App() {
           // both. Owners with multiple stores land on stores[0] until an
           // explicit switcher exists.
           const claimStores = Array.isArray(claims.stores) ? claims.stores : [];
-          const activeStoreID = claims.storeID || claimStores[0] || null;
+          // Passwordless sign-in stashes the user's picked store here so
+          // a multi-store account can land somewhere other than stores[0].
+          // Validate against claims.stores to refuse a forged value.
+          let pendingStoreID = null;
+          try {
+            pendingStoreID = sessionStorage.getItem("warpspeed_pending_store");
+            if (pendingStoreID) sessionStorage.removeItem("warpspeed_pending_store");
+          } catch {
+            pendingStoreID = null;
+          }
+          const activeStoreID =
+            pendingStoreID && claimStores.includes(pendingStoreID)
+              ? pendingStoreID
+              : claims.storeID || claimStores[0] || null;
           await loadTenantAndSettings(tenantID, activeStoreID);
           topUpPool();
 

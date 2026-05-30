@@ -15,6 +15,7 @@ import {
   dbListenToSettings,
 } from "../../db_calls_wrapper";
 import { authSignOut } from "../../db_calls";
+import { verifyPin, verifyAlternatePin } from "../../utils";
 import { PinEntry } from "./PinEntry/PinEntry";
 import { ListShell } from "./ListShell/ListShell";
 import { WorkorderDetailModal } from "./WorkorderDetailModal";
@@ -149,7 +150,9 @@ export function PhoneScreen() {
     authSignOut();
   }
 
-  function handlePinKeyPress(key) {
+  const pinReqRef = useRef(0);
+
+  async function handlePinKeyPress(key) {
     if (key === "CLR") {
       _setPin("");
       _setPinError("");
@@ -165,9 +168,19 @@ export function PhoneScreen() {
     _setPin(newPin);
     _setPinError("");
 
+    const reqId = ++pinReqRef.current;
     const users = zSettings?.users || [];
-    let userObj = users.find((u) => u.pin == newPin);
-    if (!userObj) userObj = users.find((u) => u.alternatePin == newPin);
+    let userObj = null;
+    const primaryMatches = await Promise.all(users.map((u) => verifyPin(newPin, u)));
+    if (reqId !== pinReqRef.current) return;
+    const pIdx = primaryMatches.findIndex(Boolean);
+    if (pIdx >= 0) userObj = users[pIdx];
+    if (!userObj) {
+      const altMatches = await Promise.all(users.map((u) => verifyAlternatePin(newPin, u)));
+      if (reqId !== pinReqRef.current) return;
+      const aIdx = altMatches.findIndex(Boolean);
+      if (aIdx >= 0) userObj = users[aIdx];
+    }
     if (!userObj) return;
 
     localStorage.setItem(LOCAL_STORAGE_KEY, userObj.id);

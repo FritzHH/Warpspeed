@@ -1,9 +1,9 @@
 /* eslint-disable */
 
 import { checkInternetConnection, convertMillisToHoursMins, dim, localStorageWrapper, log } from "../../utils";
-import { Button, Tooltip, LoadingIndicator, ModalFooter, ModalFooterButton } from "../../dom_components";
+import { Button, Tooltip, LoadingIndicator, ModalFooter, ModalFooterButton, LargeModalHeader, LargeModalHeaderButton } from "../../dom_components";
 import { TabMenuButton } from "../../dom_components/TabMenuButton/TabMenuButton";
-import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../styles";
+import { C, COLOR_GRADIENTS, Fonts, ICONS, Radius } from "../../styles";
 import { useZ } from "../../hooks/useZ";
 import { TAB_NAMES } from "../../data";
 import tabBarStyles from "./OptionsTabBar.module.css";
@@ -315,7 +315,7 @@ export const TabBar = ({
     <div className={tabBarStyles.tabBarRoot}>
       <div className={tabBarStyles.tabBarLeft}>
         <TabMenuButton
-          style={{ borderTopLeftRadius: 15 }}
+          style={{ borderTopLeftRadius: Radius.container }}
           onPress={() => useTabNamesStore.getState().setOptionsTabName(TAB_NAMES.optionsTab.inventory)}
           text={TAB_NAMES.optionsTab.inventory}
           isSelected={zOptionsTabName === TAB_NAMES.optionsTab.inventory}
@@ -467,6 +467,19 @@ function ScheduleWeekRow({ label, user, weekStart, schedules, storeHours, todayS
   );
 }
 
+function AppMessagingSlot({ _equalWidth, iconSize, onClick, unreadMsgCount }) {
+  return (
+    <button type="button" className={styles.notesBtn} onClick={onClick}>
+      APP MESSAGING
+      {unreadMsgCount > 0 && (
+        <span className={styles.notesBadge}>
+          {unreadMsgCount > 99 ? "99+" : unreadMsgCount}
+        </span>
+      )}
+    </button>
+  );
+}
+
 const UserClockModal = ({ user, handleExit, handleViewHistory, handleOpenMessages }) => {
   const zPunchClock = useLoginStore((state) => state.punchClock);
   const settings = useSettingsStore((state) => state.settings);
@@ -565,25 +578,26 @@ const UserClockModal = ({ user, handleExit, handleViewHistory, handleOpenMessage
         onClick={handleExit}
       />
       <div className={styles.modalCard}>
-        {/* ─── green header ───────────────────────────────────── */}
-        <div className={styles.modalHeader}>
-          <h2 className={styles.modalHeaderTitle}>{headerDisplayName}</h2>
-        </div>
-        {/* ─── top-right notes button row ─────────────────────── */}
-        <div className={styles.modalTopRow}>
-          <button
-            type="button"
-            className={styles.notesBtn}
-            onClick={handleOpenMessages}
-          >
-            APP MESSAGING
-            {unreadMsgCount > 0 && (
-              <span className={styles.notesBadge}>
-                {unreadMsgCount > 99 ? "99+" : unreadMsgCount}
-              </span>
-            )}
-          </button>
-        </div>
+        <LargeModalHeader
+          title={headerDisplayName}
+          iconSize={22}
+          style={{ width: "100%" }}
+          actions={[
+            <AppMessagingSlot
+              key="app-messaging"
+              onClick={handleOpenMessages}
+              unreadMsgCount={unreadMsgCount}
+            />,
+            <LargeModalHeaderButton
+              key="close"
+              variant="default"
+              icon={ICONS.close1}
+              iconPosition="only"
+              tooltip="Close"
+              onClick={handleExit}
+            />,
+          ]}
+        />
         {/* ─── clock status ───────────────────────────────────── */}
         <p className={styles.modalClockMessage} style={{ color: C.textDisabled }}>
           {clockMessage}
@@ -694,11 +708,6 @@ const UserClockModal = ({ user, handleExit, handleViewHistory, handleOpenMessage
             </span>
           </div>
         </div>
-        <ModalFooter style={{ width: "100%" }}>
-          <ModalFooterButton onClick={handleExit}>
-            Close
-          </ModalFooterButton>
-        </ModalFooter>
       </div>
     </div>,
     document.body
@@ -727,15 +736,20 @@ const CameraPreviewModal = ({ visible, onClose }) => {
         onClick={onClose}
       />
       <div className={styles.camCard}>
+        <LargeModalHeader
+          title="Camera Preview"
+          iconSize={22}
+          actions={
+            <LargeModalHeaderButton
+              variant="default"
+              icon={ICONS.close1}
+              iconPosition="only"
+              tooltip="Close"
+              onClick={onClose}
+            />
+          }
+        />
         <div className={styles.camBody}>
-          <div className={styles.camHeader}>
-            <span
-              className={styles.camTitle}
-              style={{ fontWeight: Fonts.weight.textHeavy }}
-            >
-              Camera Preview
-            </span>
-          </div>
           <div className={styles.camVideoWrap}>
             <video ref={videoRef} autoPlay muted className={styles.camVideo} />
           </div>
@@ -743,11 +757,6 @@ const CameraPreviewModal = ({ visible, onClose }) => {
             <p className={styles.camNoStream}>No camera stream available</p>
           )}
         </div>
-        <ModalFooter>
-          <ModalFooterButton variant="danger" onClick={onClose}>
-            Close
-          </ModalFooterButton>
-        </ModalFooter>
       </div>
     </div>,
     document.body

@@ -1,6 +1,6 @@
 /*eslint-disable*/
 import React, { useEffect, useState, useCallback, lazy, Suspense } from "react";
-import { Dialog } from "../../../../dom_components";
+import { Dialog, LargeModalHeader, LargeModalHeaderButton } from "../../../../dom_components";
 import { C } from "../../../../styles";
 import { formatCurrencyDisp, calculateRunningTotals, formatPhoneWithDashes } from "../../../../utils";
 import { useSettingsStore } from "../../../../stores";
@@ -163,7 +163,7 @@ export const TodaysHistoryComponent = () => {
         .filter((wo) => !!wo.customerID)
         .map((wo) => ({
           type: "completed",
-          millis: wo.endedOnMillis || wo.paidOnMillis || 0,
+          millis: wo.paidOnMillis || 0,
           data: wo,
         }));
       const deletedEvents = (deletedRes?.workorders || []).map((wo) => ({
@@ -450,7 +450,22 @@ const RestoreConfirmModal = ({ workorder, salesTaxPercent, restoring, onCancel, 
   return (
     <Dialog visible={true} onClose={onCancel} title="Restore Workorder">
       <div className={styles.confirmCard}>
-        <div className={styles.confirmHeader}>Restore Workorder {workorder.id || ""}?</div>
+        <LargeModalHeader
+          title={`Restore Workorder ${workorder.id || ""}?`}
+          actions={[
+            <LargeModalHeaderButton
+              key="restore"
+              variant="accent"
+              disabled={restoring}
+              onClick={onConfirm}
+            >
+              {restoring ? "Restoring…" : "Restore Workorder"}
+            </LargeModalHeaderButton>,
+            <LargeModalHeaderButton key="close" variant="default" onClick={onCancel}>
+              CLOSE
+            </LargeModalHeaderButton>,
+          ]}
+        />
         <div className={styles.confirmBody}>
           <div className={styles.confirmSection}>
             <div className={styles.confirmSectionTitle}>Details</div>
@@ -527,16 +542,6 @@ const RestoreConfirmModal = ({ workorder, salesTaxPercent, restoring, onCancel, 
               </div>
             </div>
           )}
-        </div>
-        <div className={styles.confirmFooter}>
-          <div className={styles.confirmBtn} onClick={onCancel}>Cancel</div>
-          <div
-            className={`${styles.confirmBtn} ${styles.confirmBtnPrimary}`}
-            onClick={restoring ? undefined : onConfirm}
-            style={{ opacity: restoring ? 0.5 : 1, cursor: restoring ? "wait" : "pointer" }}
-          >
-            {restoring ? "Restoring…" : "Restore Workorder"}
-          </div>
         </div>
       </div>
     </Dialog>

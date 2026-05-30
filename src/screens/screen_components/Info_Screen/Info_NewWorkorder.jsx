@@ -13,6 +13,7 @@ import {
   useOpenWorkordersStore,
   useLoginStore,
   useCheckoutStore,
+  useRecentCustomersStore,
 } from "../../../stores";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import {
@@ -356,6 +357,7 @@ export function NewWorkorderComponent({}) {
 
       _setCustomerInfo(newCustomer);
       useCurrentCustomerStore.getState().setCustomer(newCustomer);
+      useRecentCustomersStore.getState().addRecentCustomer(newCustomer);
       await startNewWorkorder(newCustomer);
       useTabNamesStore.getState().setItems({
         infoTabName: TAB_NAMES.infoTab.workorder,

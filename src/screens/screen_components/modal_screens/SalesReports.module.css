@@ -32,17 +32,28 @@
   border: 0;
 }
 
-/* The card that holds the three columns */
-.card {
+/* Shell — wraps header + card + footer */
+.shell {
   width: 92%;
   height: 94%;
   flex-shrink: 0;
   background-color: var(--reports-bg, var(--surface-base));
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* The card that holds the three columns */
+.card {
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  flex-shrink: 0;
   display: flex;
   flex-direction: row;
   position: relative;
+  overflow: hidden;
 }
 
 /* ════════════ LEFT RAIL ════════════ */
@@ -83,7 +94,7 @@
 .shortcutRow {
   width: 100%;
   flex-shrink: 0;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 8px 0;
   margin-bottom: 6px;
   display: flex;
@@ -114,7 +125,7 @@
   width: 100%;
   flex-shrink: 0;
   background-color: var(--surface-overlay-heavy);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 6px 4px;
   display: flex;
   flex-direction: column;
@@ -133,7 +144,7 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: row;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 6px 10px;
   margin-bottom: 8px;
   align-items: center;
@@ -242,13 +253,13 @@
 }
 
 .viewModeBtnLeft {
-  border-top-left-radius: 6px;
-  border-bottom-left-radius: 6px;
+  border-top-left-radius: var(--radius-control);
+  border-bottom-left-radius: var(--radius-control);
 }
 
 .viewModeBtnRight {
-  border-top-right-radius: 6px;
-  border-bottom-right-radius: 6px;
+  border-top-right-radius: var(--radius-control);
+  border-bottom-right-radius: var(--radius-control);
 }
 
 .viewModeText {
@@ -261,7 +272,7 @@
   flex-shrink: 0;
   border-width: 2px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 6px 10px;
   font-size: 13px;
   box-sizing: border-box;
@@ -270,7 +281,7 @@
 
 .clearBtn {
   margin-left: 8px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 6px 12px;
   flex-shrink: 0;
   display: inline-flex;
@@ -352,7 +363,7 @@
 
 .activeBadge {
   margin-left: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   padding: 2px 6px;
   display: inline-flex;
   align-items: center;
@@ -381,7 +392,7 @@
   width: 6px;
   height: 6px;
   flex-shrink: 0;
-  border-radius: 3px;
+  border-radius: var(--radius-control);
   margin-right: 4px;
 }
 
@@ -458,7 +469,7 @@
 
 .pagBtn {
   padding: 4px 12px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -527,7 +538,7 @@
   width: 400px;
   flex-shrink: 0;
   background-color: var(--reports-bg, var(--surface-base));
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -615,7 +626,7 @@
 .loadingCard {
   flex-shrink: 0;
   background-color: var(--reports-bg, var(--surface-base));
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   padding: 30px;
   display: flex;
   flex-direction: column;

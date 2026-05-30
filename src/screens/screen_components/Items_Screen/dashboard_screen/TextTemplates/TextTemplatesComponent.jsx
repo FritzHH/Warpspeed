@@ -1,6 +1,6 @@
 import React, { useRef, useState } from "react";
 import { Button, CheckBox } from "../../../../../dom_components";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../../../../styles";
 
 import { SETTINGS_OBJ } from "../../../../../data";
 import { TemplateRow } from "./TemplateRow";
@@ -205,7 +205,7 @@ export const TextTemplatesComponent = ({
             buttonStyle={{
               paddingHorizontal: 12,
               paddingVertical: 6,
-              borderRadius: 5,
+              borderRadius: Radius.control,
               backgroundColor: C.surfaceAlt,
             }}
           />

@@ -9,7 +9,7 @@ import {
   resolveStatus,
 } from "../../../../utils";
 import { Tooltip, WebPageModal, DropdownMenu } from "../../../../dom_components";
-import { C, ICONS } from "../../../../styles";
+import { C, ICONS, Radius } from "../../../../styles";
 import {
   useOpenWorkordersStore,
   useSettingsStore,
@@ -32,9 +32,18 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
     }
   }
 
+  const isCreatedToday = (() => {
+    if (!workorder.startedOnMillis) return false;
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+    return workorder.startedOnMillis >= startOfToday.getTime();
+  })();
+  const shouldBlinkRed = isCreatedToday && !workorder.waitTime?.label && !isFinished;
+
   let rowClassName = styles.row;
   if (isSelected) rowClassName += " " + styles.selected;
   if (isPreviewed) rowClassName += " " + styles.previewed;
+  if (shouldBlinkRed) rowClassName += " " + styles.blinkRed;
 
   return (
       <div
@@ -47,11 +56,13 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
           borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
           borderColor: C.buttonLightGreenOutline,
           borderLeftWidth: 4,
-          backgroundColor: isSelected
-            ? lightenRGBByPercent(C.lightred, 85)
-            : isFinished
-              ? lightenRGBByPercent(C.green, 85)
-              : C.listItemWhite,
+          backgroundColor: shouldBlinkRed
+            ? undefined
+            : isSelected
+              ? lightenRGBByPercent(C.lightred, 85)
+              : isFinished
+                ? lightenRGBByPercent(C.green, 85)
+                : C.listItemWhite,
         }}
       >
         {workorder.hasNewSMS && (
@@ -283,7 +294,7 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
                         title="Package Tracking"
                         subtitle={inputVal}
                         buttonLabel="Open Tracking"
-                        buttonStyle={{ paddingVertical: 1, paddingHorizontal: 8, borderRadius: 4, backgroundColor: lightenRGBByPercent(C.blue, 75) }}
+                        buttonStyle={{ paddingVertical: 1, paddingHorizontal: 8, borderRadius: Radius.control, backgroundColor: lightenRGBByPercent(C.blue, 75) }}
                         buttonTextStyle={{ fontSize: 11, color: C.blue, fontWeight: "500" }}
                       />
                     </Tooltip>

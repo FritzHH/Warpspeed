@@ -1,9 +1,9 @@
 /* eslint-disable */
 import React, { useState, useRef } from "react";
 import { createPortal } from "react-dom";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../../styles";
 import { useZ } from "../../../hooks/useZ";
-import { Button, Image, Tooltip, CheckBox, ModalFooter, ModalFooterButton } from "../../../dom_components";
+import { Button, Image, Tooltip, CheckBox, LargeModalHeader, LargeModalHeaderButton } from "../../../dom_components";
 import { log, compressImage } from "../../../utils";
 import {
   useOpenWorkordersStore,
@@ -57,6 +57,7 @@ export const WorkorderMediaModal = ({
   const storeName = zSettings?.storeInfo?.displayName || "Our store";
   const hasCell = !!zWorkorder.customerCell?.length;
   const hasEmail = !!zWorkorder.customerEmail?.length;
+  const hasSecondaryDisplay = localStorage.getItem("warpspeed_has_secondary_display") === "true";
 
   function toggleSelection(itemId) {
     _setSelectedIds((prev) => {
@@ -281,13 +282,21 @@ export const WorkorderMediaModal = ({
       >
         <div className={styles.fullContent} onClick={(e) => e.stopPropagation()}>
           {hasPrev && (
-            <button
-              type="button"
-              className={`${styles.navButton} ${styles.navPrev}`}
-              onClick={() => handleFullViewNav(-1)}
-            >
-              <Image src={ICONS.caretLeft} size={44} resizeMode="contain" />
-            </button>
+            <div className={`${styles.navButton} ${styles.navPrev}`}>
+              <Button
+                icon={ICONS.caretLeft}
+                iconSize={44}
+                onPress={() => handleFullViewNav(-1)}
+                buttonStyle={{
+                  paddingLeft: 0,
+                  paddingRight: 0,
+                  paddingTop: 0,
+                  paddingBottom: 0,
+                  backgroundColor: "transparent",
+                }}
+                iconStyle={{ marginRight: 0 }}
+              />
+            </div>
           )}
           {sFullView.type === "video" ? (
             <video
@@ -300,13 +309,21 @@ export const WorkorderMediaModal = ({
             <img src={sFullView.url} alt="" className={styles.fullImage} draggable={false} />
           )}
           {hasNext && (
-            <button
-              type="button"
-              className={`${styles.navButton} ${styles.navNext}`}
-              onClick={() => handleFullViewNav(1)}
-            >
-              <Image src={ICONS.caretRight} size={44} resizeMode="contain" />
-            </button>
+            <div className={`${styles.navButton} ${styles.navNext}`}>
+              <Button
+                icon={ICONS.caretRight}
+                iconSize={44}
+                onPress={() => handleFullViewNav(1)}
+                buttonStyle={{
+                  paddingLeft: 0,
+                  paddingRight: 0,
+                  paddingTop: 0,
+                  paddingBottom: 0,
+                  backgroundColor: "transparent",
+                }}
+                iconStyle={{ marginRight: 0 }}
+              />
+            </div>
           )}
         </div>
       </div>,
@@ -332,28 +349,74 @@ export const WorkorderMediaModal = ({
           borderColor: C.buttonLightGreenOutline,
         }}
       >
-        {/* Header */}
+        <LargeModalHeader
+          title="Workorder Media"
+          actions={[
+            !isDonePaid && (
+              <LargeModalHeaderButton
+                key="upload"
+                variant="default"
+                icon={ICONS.uploadCamera}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                Upload
+              </LargeModalHeaderButton>
+            ),
+            selectedCount > 0 && (
+              <LargeModalHeaderButton
+                key="delete"
+                variant="danger"
+                icon={ICONS.trash}
+                iconSize={14}
+                disabled={sDeleting || sSending}
+                onClick={handleDeleteSelected}
+              >
+                {sDeleting ? "Deleting..." : "Delete Media"}
+              </LargeModalHeaderButton>
+            ),
+            onSendMedia ? (
+              <LargeModalHeaderButton
+                key="send"
+                variant="accent"
+                icon={ICONS.paperPlane}
+                iconSize={16}
+                disabled={!(selectedCount > 0 && (sSendText || sSendEmail))}
+                onClick={handleSendAll}
+              >
+                Send Media
+              </LargeModalHeaderButton>
+            ) : hasEmail ? (
+              <LargeModalHeaderButton
+                key="email"
+                variant="accent"
+                icon={ICONS.paperPlane}
+                iconSize={16}
+                disabled={!(selectedCount > 0 && !sSending)}
+                onClick={handleSendMedia}
+              >
+                {sSending ? "Sending..." : "Send"}
+              </LargeModalHeaderButton>
+            ) : null,
+            <LargeModalHeaderButton
+              key="close"
+              variant="default"
+              icon={ICONS.close1}
+              iconPosition="only"
+              tooltip="Close"
+              onClick={onClose}
+            />,
+          ]}
+        />
+
+        {/* Toolbar */}
         <div className={styles.header} style={{ borderBottomColor: C.borderSubtle }}>
-          <span className={styles.headerTitle} style={{ color: C.text }}>
-            Workorder Media
-          </span>
           <div className={styles.headerRight}>
             <CheckBox
               text="Cast images to customer screen"
-              isChecked={sCastToDisplay}
+              isChecked={hasSecondaryDisplay && sCastToDisplay}
               onCheck={() => _setCastToDisplay(!sCastToDisplay)}
+              enabled={hasSecondaryDisplay}
             />
-            {!isDonePaid && (
-              <button
-                type="button"
-                className={styles.uploadBtn}
-                style={{ backgroundColor: C.orange }}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Image src={ICONS.uploadCamera} size={18} resizeMode="contain" />
-                UPLOAD
-              </button>
-            )}
           </div>
         </div>
 
@@ -441,27 +504,41 @@ export const WorkorderMediaModal = ({
                       </button>
 
                       {/* Selection checkbox */}
-                      <button
-                        type="button"
-                        className={`${styles.iconBtn} ${styles.selectBox}`}
-                        onClick={(e) => { e.stopPropagation(); toggleSelection(item.id); }}
-                      >
-                        <Image
+                      <div className={`${styles.iconBtn} ${styles.selectBox}`}>
+                        <Button
                           icon={isSelected ? ICONS.checkbox : ICONS.checkoxEmpty}
-                          size={16}
-                          resizeMode="contain"
+                          iconSize={16}
+                          onPress={(e) => { e.stopPropagation(); toggleSelection(item.id); }}
+                          buttonStyle={{
+                            paddingLeft: 0,
+                            paddingRight: 0,
+                            paddingTop: 0,
+                            paddingBottom: 0,
+                            backgroundColor: "transparent",
+                          }}
+                          iconStyle={{ marginRight: 0 }}
                         />
-                      </button>
+                      </div>
 
                       {/* Delete */}
-                      <button
-                        type="button"
+                      <div
                         className={`${styles.iconBtn} ${styles.deleteBtn}`}
                         style={{ backgroundColor: C.purple }}
-                        onClick={(e) => { e.stopPropagation(); handleDeleteSingle(item); }}
                       >
-                        <Image icon={ICONS.trash} size={13} resizeMode="contain" />
-                      </button>
+                        <Button
+                          icon={ICONS.trash}
+                          iconSize={13}
+                          onPress={(e) => { e.stopPropagation(); handleDeleteSingle(item); }}
+                          buttonStyle={{
+                            paddingLeft: 0,
+                            paddingRight: 0,
+                            paddingTop: 0,
+                            paddingBottom: 0,
+                            backgroundColor: "transparent",
+                          }}
+                          iconStyle={{ marginRight: 0 }}
+                        />
+                      </div>
 
                       {/* Sent badge */}
                       {wasSent && (
@@ -529,43 +606,6 @@ export const WorkorderMediaModal = ({
           </div>
         )}
 
-        <ModalFooter>
-          <ModalFooterButton onClick={onClose}>
-            Close
-          </ModalFooterButton>
-          {selectedCount > 0 ? (
-            <ModalFooterButton
-              variant="danger"
-              icon={ICONS.trash}
-              iconSize={14}
-              disabled={sDeleting || sSending}
-              onClick={handleDeleteSelected}
-            >
-              {sDeleting ? "Deleting..." : "Delete Media"}
-            </ModalFooterButton>
-          ) : null}
-          {onSendMedia ? (
-            <ModalFooterButton
-              variant="accent"
-              icon={ICONS.paperPlane}
-              iconSize={16}
-              disabled={!(selectedCount > 0 && (sSendText || sSendEmail))}
-              onClick={handleSendAll}
-            >
-              Send Media
-            </ModalFooterButton>
-          ) : hasEmail ? (
-            <ModalFooterButton
-              variant="accent"
-              icon={ICONS.paperPlane}
-              iconSize={16}
-              disabled={!(selectedCount > 0 && !sSending)}
-              onClick={handleSendMedia}
-            >
-              {sSending ? "Sending..." : "Email Media"}
-            </ModalFooterButton>
-          ) : null}
-        </ModalFooter>
       </div>
 
       {/* Upload compression confirmation overlay */}
@@ -603,14 +643,14 @@ export const WorkorderMediaModal = ({
                   text="Upload"
                   colorGradientArr={COLOR_GRADIENTS.green}
                   onPress={handleConfirmUpload}
-                  buttonStyle={{ paddingLeft: 20, paddingRight: 20, paddingTop: 10, paddingBottom: 10, borderRadius: 5 }}
+                  buttonStyle={{ paddingLeft: 20, paddingRight: 20, paddingTop: 10, paddingBottom: 10, borderRadius: Radius.control }}
                   textStyle={{ fontSize: 14 }}
                 />
                 <Button
                   text="Cancel"
                   colorGradientArr={COLOR_GRADIENTS.grey}
                   onPress={handleCancelUpload}
-                  buttonStyle={{ paddingLeft: 20, paddingRight: 20, paddingTop: 10, paddingBottom: 10, borderRadius: 5 }}
+                  buttonStyle={{ paddingLeft: 20, paddingRight: 20, paddingTop: 10, paddingBottom: 10, borderRadius: Radius.control }}
                   textStyle={{ fontSize: 14 }}
                 />
               </div>

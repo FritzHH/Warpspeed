@@ -1,9 +1,9 @@
 /* Outer shell — sized by parent modal overlay */
 .shell {
-  width: 95%;
-  height: 90%;
+  width: 60%;
+  height: 95%;
   background-color: var(--bg-white, var(--surface-base));
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   display: flex;
   flex-direction: column;
   box-shadow: 2px 2px 5px var(--shadow-color-default);
@@ -23,10 +23,10 @@
   overflow: hidden;
 }
 
-/* Form column (15%) */
+/* Form column (25%) */
 .formCol {
-  width: 15%;
-  padding: 10px;
+  width: 25%;
+  padding: 0 10px;
   box-sizing: border-box;
   flex-shrink: 0;
   display: flex;
@@ -38,9 +38,9 @@
 .fieldGroup {
   display: flex;
   flex-direction: column;
-  padding: 10px 12px;
+  padding: 4px 12px 2vh 12px;
   border: 1px solid var(--border-default);
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   background-color: var(--surface-success-muted);
   flex-shrink: 0;
 }
@@ -52,10 +52,10 @@
 .fieldGroupTitle {
   font-size: 11px;
   font-weight: 600;
-  color: var(--text-muted);
+  color: var(--info);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 8px;
+  margin-bottom: 2vh;
   text-align: center;
 }
 
@@ -96,22 +96,6 @@
   flex-shrink: 0;
 }
 
-.cellIconBtn {
-  margin-left: 8px;
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.cellIconBtnDisabled {
-  opacity: 0.3;
-  cursor: default;
-}
-
 /* Standard form input */
 .input {
   width: 100%;
@@ -122,7 +106,7 @@
   padding-left: 8px;
   padding-right: 8px;
   outline: none;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   box-sizing: border-box;
   font-family: inherit;
   font-size: 14px;
@@ -152,7 +136,7 @@
   margin-top: 15px;
   padding: 8px;
   outline: none;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   min-height: 70px;
   max-height: 70px;
   box-sizing: border-box;
@@ -194,20 +178,77 @@
   margin-right: 8px;
 }
 
-/* Workorders column (30%) */
+/* Tabs column (75%) — wraps tab bar + active tab panel */
+.tabsCol {
+  width: 75%;
+  height: 100%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tabBar {
+  display: flex;
+  flex-direction: row;
+  flex-shrink: 0;
+}
+
+.tabLabel {
+  display: inline-flex;
+  align-items: center;
+}
+
+.tabCountBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 18px;
+  padding: 0 6px;
+  margin-left: 13px;
+  background-color: var(--border-subtle);
+  color: var(--text-secondary);
+  border-radius: var(--radius-row);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  box-sizing: border-box;
+}
+
+.tabPanel {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.tabEmptyPanel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Workorders tab content */
 .workordersCol {
-  width: 30%;
+  width: 100%;
   height: 100%;
-  padding: 5px 15px;
+  padding: 5px 0;
   box-sizing: border-box;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
 }
 
-/* Sales column (30%) */
+/* Sales tab content */
 .salesCol {
-  width: 30%;
+  width: 100%;
   height: 100%;
   padding: 5px 15px;
   box-sizing: border-box;
@@ -216,34 +257,47 @@
   flex-direction: column;
 }
 
-/* Messages column (25%) */
+/* Messages tab content */
 .messagesCol {
-  width: 25%;
+  width: 100%;
   height: 100%;
   flex-shrink: 0;
 }
 
-.colHeader {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  margin-bottom: 8px;
-  flex-shrink: 0;
-}
-
-.salesHeader {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
+.salesTitle {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  text-align: center;
   margin-top: 12px;
-  margin-bottom: 8px;
-  flex-shrink: 0;
+  margin-bottom: 6px;
 }
 
 .emptyText {
   font-size: 12px;
   margin-top: 10px;
   text-align: center;
+}
+
+.tabLoadingCenter {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tabLoadingTop {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 0;
+  flex-shrink: 0;
+  gap: 8px;
+}
+
+.tabLoadingText {
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .scrollArea {
@@ -264,7 +318,7 @@
   justify-content: center;
   align-items: center;
   z-index: 10;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   flex-direction: column;
 }
 
@@ -276,12 +330,18 @@
 /* Workorder card */
 .woCard {
   margin-bottom: 6px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   border-left-width: 4px;
   border-left-style: solid;
   border-width: 1px;
   border-style: solid;
   box-sizing: border-box;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.woCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
 }
 
 .woClickable {
@@ -308,7 +368,7 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
 }
 
@@ -322,7 +382,7 @@
 
 .woItemBadge {
   background-color: gray;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 1px 6px;
   margin-left: 6px;
   color: white;
@@ -340,7 +400,7 @@
 
 .woStatusBadge {
   padding: 2px 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   font-size: 11px;
   font-weight: 600;
   flex-shrink: 0;
@@ -349,7 +409,7 @@
 .woDescRow {
   display: flex;
   flex-direction: row;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   margin-bottom: 4px;
 }
@@ -384,7 +444,7 @@
 .woColorBadge {
   font-size: 10px;
   padding: 2px 8px;
-  border-radius: 100px;
+  border-radius: var(--radius-pill);
 }
 
 .woColorBadgeSecond {
@@ -401,6 +461,28 @@
 .woFooterDate {
   color: dimgray;
   font-size: 12px;
+  display: inline-flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 10px;
+  row-gap: 2px;
+}
+
+.woFooterPair {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.woFooterLabel {
+  font-size: 10px;
+  font-style: italic;
+  color: var(--text-muted);
+}
+
+.woFooterValue {
+  font-size: 12px;
+  color: dimgray;
 }
 
 .woFooterWait {
@@ -411,6 +493,20 @@
 .woFooterTotal {
   font-size: 13px;
   font-weight: 600;
+}
+
+.woTotalsRow {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: baseline;
+  flex-wrap: wrap;
+  column-gap: 10px;
+  row-gap: 2px;
+  margin-top: 5px;
+  padding: 4px 10px;
+  background-color: var(--surface-alt, #f3f4f6);
+  border-radius: var(--radius-row);
+  align-self: flex-start;
 }
 
 .woItemsToggleWrap {
@@ -440,7 +536,6 @@
 
 .woItemName {
   font-size: 12px;
-  flex: 1;
   min-width: 0;
   white-space: nowrap;
   overflow: hidden;
@@ -448,17 +543,21 @@
 }
 
 .woItemQty {
-  font-size: 12px;
-  font-weight: 500;
-  width: 36px;
-  text-align: right;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background-color: lightgray;
+  border-radius: var(--radius-pill);
+  padding: 1px 7px;
+  margin-left: 6px;
   flex-shrink: 0;
+  line-height: 1.2;
 }
 
 /* Sales card */
 .saleCard {
   margin-bottom: 6px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   border-left-width: 4px;
   border-left-style: solid;
   border-width: 1px;
@@ -472,6 +571,12 @@
   display: block;
   box-sizing: border-box;
   color: inherit;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.saleCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
 }
 
 .saleRow1 {
@@ -480,6 +585,13 @@
   justify-content: space-between;
   align-items: center;
   margin-bottom: 4px;
+}
+
+.saleDateGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 20px;
 }
 
 .saleDate {
@@ -494,7 +606,7 @@
 
 .saleBadge {
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   font-size: 10px;
   font-weight: 600;
   margin-right: 6px;
@@ -503,7 +615,7 @@
 
 .saleBadgeSmall {
   padding: 1px 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   font-size: 10px;
   font-weight: 600;
   margin-right: 6px;
@@ -558,7 +670,7 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 2px 6px;
   margin-right: 6px;
   margin-bottom: 2px;
@@ -581,8 +693,8 @@
 }
 
 .saleLinkedWO {
-  font-size: 10px;
-  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 /* Credit edit modal */
@@ -597,7 +709,7 @@
   justify-content: center;
   align-items: center;
   z-index: 100;
-  border-radius: 15px;
+  border-radius: var(--radius-container);
 }
 
 .creditBackdropBtn {
@@ -614,7 +726,7 @@
 
 .creditCard {
   width: 320px;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   border-width: 2px;
   border-style: solid;
   padding: 20px;
@@ -639,7 +751,7 @@
   align-items: center;
   border-width: 1px;
   border-style: solid;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   margin-bottom: 16px;
   padding: 0 10px;
   height: 40px;
@@ -758,4 +870,9 @@
   display: flex;
   justify-content: center;
   align-items: center;
+}
+
+.msgComposeWrap {
+  padding: 10px 12px 12px 12px;
+  flex-shrink: 0;
 }

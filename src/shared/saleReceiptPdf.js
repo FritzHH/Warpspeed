@@ -1,5 +1,5 @@
 import { jsPDF } from "jspdf";
-import { DEFAULT_SALE_LABELS } from "../receiptLabels";
+import { DEFAULT_SALE_LABELS } from "./receiptLabels";
 
 const cap = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "";
 
@@ -293,7 +293,8 @@ export function buildSaleReceiptPDF(data, labels) {
     doc.setFontSize(7);
     doc.setFont("helvetica", "italic");
     doc.setTextColor(100, 100, 100);
-    let taxFreeText = "* This ticket contained only labor, no sale items were transferred to the customer *";
+    let taxFreeText = data.taxFreeReceiptNote
+      || "* This ticket contained only labor, no sale items were transferred to the customer *";
     let taxFreeLines = doc.splitTextToSize(taxFreeText, contentWidth);
     taxFreeLines.forEach((line) => {
       doc.text(line, centerX, y, { align: "center" });

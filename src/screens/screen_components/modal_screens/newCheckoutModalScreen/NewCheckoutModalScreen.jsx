@@ -8,8 +8,8 @@ import {
   Dialog,
   Image,
   LoadingIndicator,
-  ModalFooter,
-  ModalFooterButton,
+  LargeModalHeader,
+  LargeModalHeaderButton,
   ReceiptSentOverlay,
   StaleBanner,
   TextInput,
@@ -18,7 +18,7 @@ import {
   TouchableOpacity,
 } from "../../../../dom_components";
 import styles from "./NewCheckoutModalScreen.module.css";
-import { C, Fonts, COLOR_GRADIENTS, ICONS, SHADOW_RADIUS_PROTO } from "../../../../styles";
+import { C, Fonts, COLOR_GRADIENTS, ICONS, SHADOW_RADIUS_PROTO, Radius } from "../../../../styles";
 import { useZ } from "../../../../hooks/useZ";
 import {
   useCheckoutStore,
@@ -34,7 +34,7 @@ import {
   getChangeLogUser,
   diffWorkorderLines,
 } from "../../../../stores";
-import { lightenRGBByPercent, formatCurrencyDisp, log, printBuilder, replaceOrAddToArr, formatPhoneWithDashes, formatPhoneForDisplay, findTemplateByType, resolveStatus, usdTypeMask, generateEAN13Barcode, createNewWorkorder, localStorageWrapper } from "../../../../utils";
+import { lightenRGBByPercent, formatCurrencyDisp, log, printBuilder, replaceOrAddToArr, formatPhoneWithDashes, formatPhoneForDisplay, findTemplateByType, resolveStatus, usdTypeMask, generateEAN13Barcode, createNewWorkorder, localStorageWrapper, getPrinterStatus } from "../../../../utils";
 import { WORKORDER_ITEM_PROTO, WORKORDER_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, TRANSACTION_PROTO, CREDIT_APPLIED_PROTO, CUSTOMER_DEPOST_TYPES, CUSTOMER_DEPOSIT_PROTO, TAB_NAMES, CUSTOMER_PROTO } from "../../../../data";
 import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer, dbDeleteWorkorder } from "../../../../db_calls_wrapper";
 import { takeId, getId } from "../../../../idPool";
@@ -209,7 +209,7 @@ function SplitDepositModal({ payment, maxAvailable, onConfirm, onRemove, onClose
             iconSize={14}
             colorGradientArr={COLOR_GRADIENTS.red}
             textStyle={{ color: C.textWhite, fontSize: 12 }}
-            buttonStyle={{ height: 32, borderRadius: 5, paddingHorizontal: 10 }}
+            buttonStyle={{ height: 32, borderRadius: Radius.control, paddingHorizontal: 10 }}
             onPress={onRemove}
           />
           <div className={styles.splitButtonsRight}>
@@ -217,14 +217,14 @@ function SplitDepositModal({ payment, maxAvailable, onConfirm, onRemove, onClose
               text="Cancel"
               colorGradientArr={COLOR_GRADIENTS.grey}
               textStyle={{ color: C.textWhite, fontSize: 12 }}
-              buttonStyle={{ height: 32, borderRadius: 5, paddingHorizontal: 10, marginRight: 8 }}
+              buttonStyle={{ height: 32, borderRadius: Radius.control, paddingHorizontal: 10, marginRight: 8 }}
               onPress={onClose}
             />
             <Button
               text={isUnchanged ? "No Change" : "Apply"}
               colorGradientArr={isValid && !isUnchanged ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
               textStyle={{ color: C.textWhite, fontSize: 12 }}
-              buttonStyle={{ height: 32, borderRadius: 5, paddingHorizontal: 10, opacity: isValid && !isUnchanged ? 1 : 0.5 }}
+              buttonStyle={{ height: 32, borderRadius: Radius.control, paddingHorizontal: 10, opacity: isValid && !isUnchanged ? 1 : 0.5 }}
               onPress={() => { if (isValid && !isUnchanged) onConfirm(sAmountCents); }}
             />
           </div>
@@ -265,9 +265,7 @@ export function NewCheckoutModalScreen() {
   const [sDepositInputDisp, _setDepositInputDisp] = useState("");
   const [sDepositInputCents, _setDepositInputCents] = useState(0);
   const [sShowSendReceiptModal, _sSetShowSendReceiptModal] = useState(false);
-  const [sPickupKeepOpenExpanded, _setPickupKeepOpenExpanded] = useState(false);
-  const [sPickupKeepOpenReason, _setPickupKeepOpenReason] = useState("");
-  const [sKeepOpenToastDismissed, _setKeepOpenToastDismissed] = useState(false);
+  const [sKeptOpen, _setKeptOpen] = useState(false);
   const autoCloseTimerRef = useRef(null);
   // Holds the marked-paid WO objects after archive, so the "Keep Workorder Open" path
   // can un-archive them (write back to open-workorders) with all the completion fields intact.
@@ -1162,7 +1160,6 @@ export function NewCheckoutModalScreen() {
       }
       entries.push({ timestamp, user, field: "payment", action: "completed", from: "", to: "Sale completed — " + formatCurrencyDisp(sale.total, true) });
       woUpdated.changeLog = [...(woUpdated.changeLog || []), ...entries];
-      woUpdated.endedOnMillis = Date.now();
 
       await newCheckoutCompleteWorkorder(woUpdated);
       useOpenWorkordersStore.getState().removeWorkorder(woUpdated, false);
@@ -1284,9 +1281,7 @@ export function NewCheckoutModalScreen() {
 
     // 30-second auto-close timer — the ONLY auto-close path after payment complete.
     // Fires regardless of cash change owed. Cancelled by manual close, by the
-    // "Keep Workorder Open" save (which un-archives), or by modal unmount.
-    _setPickupKeepOpenExpanded(false);
-    _setPickupKeepOpenReason("");
+    // "Save Workorder" press (which un-archives), or by modal unmount.
     let wasStandaloneSale = wasStandaloneSaleRef.current;
     if (autoCloseTimerRef.current) clearTimeout(autoCloseTimerRef.current);
     autoCloseTimerRef.current = setTimeout(() => {
@@ -1319,53 +1314,24 @@ export function NewCheckoutModalScreen() {
     resetAndClose();
   }
 
-  // Called when user clicks "Keep Workorder Open" in the layered overlay — expand the reason input.
-  function handlePickupKeepOpen() {
-    dlog(DCAT.BUTTON, "pickup_keepOpen", "CheckoutModal", { saleID: sSale?.id, workorderCount: sCombinedWorkorders?.length });
-    _setPickupKeepOpenExpanded(true);
-  }
-
-  // Called when user submits the keep-alive reason (≥5 chars).
-  // Un-archives each WO (writes back to open-workorders, deletes from completed-workorders),
-  // adds the reason to internalNotes. Closes the modal only if no cash change is owed —
-  // when change is owed, stays open so the cashier can count it out.
-  async function handlePickupSaveKeepOpenReason() {
-    let reason = sPickupKeepOpenReason.trim();
-    if (reason.length < 5) return;
-    dlog(DCAT.BUTTON, "pickup_saveKeepOpenReason", "CheckoutModal", { saleID: sSale?.id, workorderCount: archivedWOsRef.current?.length, reasonLength: reason.length });
+  // Called when user clicks "Save Workorder" after sale completes. Un-archives each WO
+  // (writes back to open-workorders, deletes from completed-workorders), clears the 30s
+  // auto-close timer, and flips the button to its "Workorder Left Open" (green) state.
+  // No-op if already pressed.
+  async function handlePickupKeepOpen() {
+    if (sKeptOpen) return;
+    dlog(DCAT.BUTTON, "pickup_keepOpen", "CheckoutModal", { saleID: sSale?.id, workorderCount: archivedWOsRef.current?.length });
     if (autoCloseTimerRef.current) {
       clearTimeout(autoCloseTimerRef.current);
       autoCloseTimerRef.current = null;
     }
-    let currentUser = useLoginStore.getState().currentUser;
-    let userName = "(" + (currentUser?.first || "") + " " + ((currentUser?.last || "")[0] || "") + ")  ";
     let woStore = useOpenWorkordersStore.getState();
     for (let wo of (archivedWOsRef.current || [])) {
       let updated = cloneDeep(wo);
-      let notes = [...(updated.internalNotes || [])];
-      notes.unshift({
-        id: crypto.randomUUID(),
-        name: userName,
-        userID: currentUser?.id || "",
-        value: reason,
-        createdAt: Date.now(),
-      });
-      updated.internalNotes = notes;
       await newCheckoutUnarchiveWorkorder(updated);
       woStore.setWorkorder(updated, false);
     }
-    _setPickupKeepOpenExpanded(false);
-    _setPickupKeepOpenReason("");
-    _setKeepOpenToastDismissed(true);
-    let cashOwed = sTransactions.some((t) => t.method === "cash" && (t.amountTendered || 0) > (t.amountCaptured || 0));
-    if (!cashOwed) resetAndClose();
-  }
-
-  // Cancel button in expanded toast — collapse back to the default "Keep Workorder Open" button.
-  function handlePickupCancel() {
-    dlog(DCAT.BUTTON, "pickup_cancelKeepOpen", "CheckoutModal", {});
-    _setPickupKeepOpenExpanded(false);
-    _setPickupKeepOpenReason("");
+    _setKeptOpen(true);
   }
 
   function handleCashChange(change) {
@@ -1440,6 +1406,8 @@ export function NewCheckoutModalScreen() {
       }
     }
 
+    const { isPrinterOffline, offlineLabel } = getPrinterStatus();
+
     useAlertScreenStore.getState().setValues({
       showAlert: true,
       fullScreen: true,
@@ -1458,6 +1426,8 @@ export function NewCheckoutModalScreen() {
         handlePrintReceipts();
         resetAndClose();
       },
+      btn2Disabled: isPrinterOffline,
+      btn2Tooltip: isPrinterOffline ? offlineLabel : undefined,
       useCancelButton: true,
     });
   }
@@ -1542,9 +1512,7 @@ export function NewCheckoutModalScreen() {
     }
     archivedWOsRef.current = [];
     wasStandaloneSaleRef.current = false;
-    _setPickupKeepOpenExpanded(false);
-    _setPickupKeepOpenReason("");
-    _setKeepOpenToastDismissed(false);
+    _setKeptOpen(false);
     broadcastClear();
     _setSale(null);
     _setTransactions([]);
@@ -1767,7 +1735,6 @@ export function NewCheckoutModalScreen() {
       visible={zIsCheckingOut}
       onClose={closeModal}
       preventClose={cardIsProcessing}
-      title="Checkout"
       aria-label="Checkout"
     >
         <div
@@ -1778,6 +1745,62 @@ export function NewCheckoutModalScreen() {
             shadowColor: C.green,
           }}
         >
+          <LargeModalHeader
+            title="Checkout"
+            actions={[
+              isDepositMode && (
+                <LargeModalHeaderButton
+                  key="pop"
+                  icon={ICONS.openCashRegister}
+                  iconSize={18}
+                  onClick={handlePopRegister}
+                  tooltip="Pop register"
+                >
+                  Pop Register
+                </LargeModalHeaderButton>
+              ),
+              (isDepositMode && saleComplete) && (
+                <LargeModalHeaderButton
+                  key="reprint"
+                  icon={ICONS.print}
+                  iconSize={18}
+                  onClick={handleReprint}
+                  tooltip="Reprint receipt"
+                >
+                  Reprint
+                </LargeModalHeaderButton>
+              ),
+              (isDepositMode && saleComplete) && (
+                <LargeModalHeaderButton
+                  key="sendReceipt"
+                  icon={ICONS.paperPlane}
+                  iconSize={18}
+                  onClick={handleSendSaleReceipt}
+                  tooltip="Send receipt"
+                >
+                  Send Receipt
+                </LargeModalHeaderButton>
+              ),
+              <LargeModalHeaderButton
+                key="close"
+                variant={
+                  (hasRealPayments && !saleComplete) || (isStandalone && !saleComplete)
+                    ? "danger"
+                    : "default"
+                }
+                disabled={cardIsProcessing}
+                onClick={hasRealPayments && !saleComplete ? handlePartialPayment : closeModal}
+              >
+                {hasRealPayments && !saleComplete
+                  ? "Close with Partial Payment"
+                  : saleComplete
+                    ? "Close"
+                    : isStandalone
+                      ? "Cancel Sale"
+                      : "Close"}
+              </LargeModalHeaderButton>,
+            ]}
+          />
           {/* Loading overlay */}
           {!sSale && (
             <div
@@ -1825,7 +1848,7 @@ export function NewCheckoutModalScreen() {
                       backgroundColor: "transparent",
                       color: C.green,
                       border: `1px solid ${C.green}`,
-                      borderRadius: 6,
+                      borderRadius: Radius.control,
                       padding: "6px 14px",
                       fontSize: 12,
                       cursor: "pointer",
@@ -2210,43 +2233,20 @@ export function NewCheckoutModalScreen() {
 
               <div className={styles.flexSpacer} />
 
-              {/* Keep-Workorder-Open toast — sits in the middle column, above bottomButtonsRowMain.
+              {/* Save-Workorder toast — sits in the middle column, above bottomButtonsRowMain.
                   Width = container (middle column) width. Gated on (saleComplete && !isStandalone) in production;
-                  DEV flag forces full-time render for layout iteration. */}
-              {(DEV_ALWAYS_SHOW_KEEP_OPEN_TOAST || (saleComplete && !!sCombinedWorkorders[0]?.customerID)) && !sKeepOpenToastDismissed && (
+                  DEV flag forces full-time render for layout iteration.
+                  Default state: yellow "Save Workorder" button. Pressed state: green
+                  "Workorder Left Open" (non-interactive). */}
+              {(DEV_ALWAYS_SHOW_KEEP_OPEN_TOAST || (saleComplete && !!sCombinedWorkorders[0]?.customerID)) && (
                 <div className={styles.keepOpenToast}>
-                  {sPickupKeepOpenExpanded && (
-                    <textarea
-                      className={styles.keepOpenTextarea}
-                      placeholder="Reason (required)...."
-                      value={sPickupKeepOpenReason}
-                      onChange={(e) => {
-                        let v = e.target.value;
-                        if (v.length > 0) v = v.charAt(0).toUpperCase() + v.slice(1);
-                        _setPickupKeepOpenReason(v);
-                      }}
-                      autoCapitalize="sentences"
-                      rows={2}
-                      autoFocus
-                    />
-                  )}
                   <div className={styles.keepOpenButtonRow}>
-                    {sPickupKeepOpenExpanded && (
-                      <button
-                        type="button"
-                        className={styles.keepOpenCancelBtn}
-                        onClick={handlePickupCancel}
-                      >
-                        Cancel
-                      </button>
-                    )}
                     <button
                       type="button"
-                      className={styles.keepOpenMainBtn}
-                      onClick={sPickupKeepOpenExpanded ? handlePickupSaveKeepOpenReason : handlePickupKeepOpen}
-                      disabled={sPickupKeepOpenExpanded && sPickupKeepOpenReason.trim().length < 5}
+                      className={`${styles.keepOpenMainBtn} ${sKeptOpen ? styles.keepOpenMainBtnKept : ""}`}
+                      onClick={handlePickupKeepOpen}
                     >
-                      {sPickupKeepOpenExpanded ? "Save" : "Keep Workorder Open"}
+                      {sKeptOpen ? "Workorder Left Open" : "Save Workorder"}
                     </button>
                   </div>
                 </div>
@@ -2285,9 +2285,19 @@ export function NewCheckoutModalScreen() {
                 </div>
                 {(saleComplete || hasRealPayments) && (
                   <Tooltip text={saleComplete ? "Reprint receipt" : "Print partial payment receipt"} position="top">
-                    <button type="button" onClick={handleReprint} className={styles.iconButton}>
-                      <Image icon={ICONS.print} size={35} />
-                    </button>
+                    <Button
+                      icon={ICONS.print}
+                      iconSize={35}
+                      onPress={handleReprint}
+                      buttonStyle={{
+                        paddingLeft: 4,
+                        paddingRight: 4,
+                        paddingTop: 4,
+                        paddingBottom: 4,
+                        backgroundColor: "transparent",
+                      }}
+                      iconStyle={{ marginRight: 0 }}
+                    />
                   </Tooltip>
                 )}
                 {(saleComplete || hasRealPayments) && (() => {
@@ -2295,16 +2305,63 @@ export function NewCheckoutModalScreen() {
                   if (!hasContact) return null;
                   return (
                     <Tooltip text={saleComplete ? "Send receipt" : "Send partial payment receipt"} position="top">
-                      <button type="button" onClick={handleSendSaleReceipt} className={styles.iconButton}>
-                        <Image icon={ICONS.paperPlane} size={35} />
-                      </button>
+                      <Button
+                        icon={ICONS.paperPlane}
+                        iconSize={35}
+                        onPress={handleSendSaleReceipt}
+                        buttonStyle={{
+                          paddingLeft: 4,
+                          paddingRight: 4,
+                          paddingTop: 4,
+                          paddingBottom: 4,
+                          backgroundColor: "transparent",
+                        }}
+                        iconStyle={{ marginRight: 0 }}
+                      />
                     </Tooltip>
                   );
                 })()}
                 <Tooltip text="Pop register" position="top">
-                  <button type="button" onClick={handlePopRegister} className={styles.iconButton}>
-                    <Image icon={ICONS.openCashRegister} size={35} />
-                  </button>
+                  <Button
+                    icon={ICONS.openCashRegister}
+                    iconSize={35}
+                    onPress={handlePopRegister}
+                    buttonStyle={{
+                      paddingLeft: 4,
+                      paddingRight: 4,
+                      paddingTop: 4,
+                      paddingBottom: 4,
+                      backgroundColor: "transparent",
+                    }}
+                    iconStyle={{ marginRight: 0 }}
+                  />
+                </Tooltip>
+                <Tooltip
+                  text={
+                    hasRealPayments && !saleComplete
+                      ? "Close with Partial Payment"
+                      : saleComplete
+                        ? "Close"
+                        : isStandalone
+                          ? "Cancel Sale"
+                          : "Close"
+                  }
+                  position="top"
+                >
+                  <Button
+                    icon={ICONS.close1}
+                    iconSize={35}
+                    enabled={!cardIsProcessing}
+                    onPress={hasRealPayments && !saleComplete ? handlePartialPayment : closeModal}
+                    buttonStyle={{
+                      paddingLeft: 4,
+                      paddingRight: 4,
+                      paddingTop: 4,
+                      paddingBottom: 4,
+                      backgroundColor: "transparent",
+                    }}
+                    iconStyle={{ marginRight: 0 }}
+                  />
                 </Tooltip>
 
               </div>
@@ -2351,55 +2408,6 @@ export function NewCheckoutModalScreen() {
             )}
           </div>
 
-          <ModalFooter>
-            <ModalFooterButton
-              variant={
-                (hasRealPayments && !saleComplete) || (isStandalone && !saleComplete)
-                  ? "danger"
-                  : "default"
-              }
-              disabled={cardIsProcessing}
-              onClick={hasRealPayments && !saleComplete ? handlePartialPayment : closeModal}
-            >
-              {hasRealPayments && !saleComplete
-                ? "Close with Partial Payment"
-                : saleComplete
-                  ? "Close"
-                  : isStandalone
-                    ? "Cancel Sale"
-                    : "Close"}
-            </ModalFooterButton>
-            {isDepositMode && saleComplete && (
-              <ModalFooterButton
-                icon={ICONS.print}
-                iconSize={18}
-                onClick={handleReprint}
-                tooltip="Reprint receipt"
-              >
-                Reprint
-              </ModalFooterButton>
-            )}
-            {isDepositMode && saleComplete && (
-              <ModalFooterButton
-                icon={ICONS.paperPlane}
-                iconSize={18}
-                onClick={handleSendSaleReceipt}
-                tooltip="Send receipt"
-              >
-                Send Receipt
-              </ModalFooterButton>
-            )}
-            {isDepositMode && (
-              <ModalFooterButton
-                icon={ICONS.openCashRegister}
-                iconSize={18}
-                onClick={handlePopRegister}
-                tooltip="Pop register"
-              >
-                Pop Register
-              </ModalFooterButton>
-            )}
-          </ModalFooter>
 
           {/* Tax-Free Confirmation Overlay (inline to avoid z-index issues with global AlertBox_) */}
           {sShowTaxFreeConfirm && (

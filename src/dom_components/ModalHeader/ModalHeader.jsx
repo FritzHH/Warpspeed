@@ -5,6 +5,13 @@ import styles from "./ModalHeader.module.css";
 
 const MAX_ACTIONS = 5;
 
+/**
+ * ModalHeader — title row at the top of a modal card.
+ *
+ * Action buttons render right-aligned in source order. The close button
+ * MUST be the rightmost (last) entry in the `actions` array, matching the
+ * platform convention of a top-right close affordance.
+ */
 export const ModalHeader = ({
   title,
   severity = "default",
@@ -45,7 +52,7 @@ export const ModalHeader = ({
 export const ModalHeaderButton = ({
   label,
   icon,
-  iconSize = 16,
+  iconSize = 20,
   iconPosition = "left",
   tooltip,
   tooltipPosition = "top",

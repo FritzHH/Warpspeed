@@ -39,10 +39,12 @@
 // Invite docs live at the top level (not under tenants/{tenantID}/) so
 // redemption doesn't need a tenantID at lookup time — only the token.
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { defineSecret } = require("firebase-functions/params");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const crypto = require("crypto");
+const nodemailer = require("nodemailer");
 const {
   PRIVILEGES,
   PRIVILEGE_RANK,
@@ -54,8 +56,19 @@ const { SETTINGS_OBJ } = require("../shared/data");
 const { generateEAN13Barcode } = require("../shared/idGen");
 const { numberWebhooksAreCurrent } = require("./twilio-common");
 const { getTierDoc } = require("./billing-helpers");
+const {
+  _internals: stripeConnectInternals,
+} = require("./stripe-connect-callables");
+const {
+  _internals: twilioSubaccountInternals,
+} = require("./twilio-subaccounts");
+const stripeConnect = require("./stripe-connect");
 
 if (!admin.apps.length) admin.initializeApp();
+
+const PLATFORM_NOREPLY_EMAIL = defineSecret("PLATFORM_NOREPLY_EMAIL");
+const PLATFORM_NOREPLY_SMTP_USER = defineSecret("PLATFORM_NOREPLY_SMTP_USER");
+const PLATFORM_NOREPLY_APP_PASSWORD = defineSecret("PLATFORM_NOREPLY_APP_PASSWORD");
 
 const INVITE_LANDING_URL = "https://cadence-pos.web.app/invite-accept";
 const INVITE_TTL_DAYS = 7;
@@ -171,6 +184,55 @@ function formatUSPhoneForDisplay(e164) {
   return `(${m[1]}) ${m[2]}-${m[3]}`;
 }
 
+// Fields the owner will be asked for on the bootstrap form. Listed in the
+// welcome email so they can gather the info before clicking the link, since
+// the magic link is single-use and time-limited.
+const OWNER_BOOTSTRAP_FIELDS = [
+  "Store legal name",
+  "Store display name",
+  "Street address (and unit/suite, if any)",
+  "City, state, ZIP",
+  "Store phone number",
+  "Support email",
+  "Office email",
+  "Sales tax %",
+  "A 4-digit PIN for in-app login",
+];
+
+// Stripe-required KYC + payout fields. Called out separately in the welcome
+// email in a bordered block so owners don't gloss over them — without these,
+// the connected account stays in "Restricted" status and can't accept payments.
+const STRIPE_PAYMENTS_INFO_FIELDS = [
+  "Business website URL",
+  "Bank routing number (9 digits)",
+  "Bank account number",
+  "Owner / representative date of birth",
+  "Last 4 digits of owner / representative SSN",
+];
+
+function renderBootstrapFieldsListHtml() {
+  return (
+    "<ul>" +
+    OWNER_BOOTSTRAP_FIELDS.map((f) => `<li>${f}</li>`).join("") +
+    "</ul>"
+  );
+}
+
+function renderStripePaymentsInfoBlockHtml() {
+  const items = STRIPE_PAYMENTS_INFO_FIELDS.map((f) => `<li>${f}</li>`).join("");
+  return (
+    `<div style="margin:24px 0;padding:16px 20px;border:2px solid #c75100;` +
+    `background:#fff7ed;border-radius:6px;">` +
+    `<p style="margin:0 0 8px 0;font-weight:700;color:#7a2e00;">` +
+    `Payment Setup (Required by Stripe)</p>` +
+    `<p style="margin:0 0 8px 0;">` +
+    `These are required so your store can accept card payments. ` +
+    `Have them ready before you click the link below:</p>` +
+    `<ul style="margin:0;">${items}</ul>` +
+    `</div>`
+  );
+}
+
 function buildShopContactBlurb({ street, unit, city, state, zip, phone }) {
   const line1 = unit ? `${street}, ${unit}` : street;
   const line2 = `${city}, ${state} ${zip}`;
@@ -210,6 +272,7 @@ function applyStoreOverrides(settings, {
   tenantID,
   storeID,
   storeDisplayName,
+  storeLegalName,
   storeAddress,
   salesTaxPercent,
 }) {
@@ -221,6 +284,7 @@ function applyStoreOverrides(settings, {
   if (storeAddress) {
     settings.storeInfo = {
       ...settings.storeInfo,
+      legalName: storeLegalName || "",
       displayName: storeDisplayName || "",
       street: storeAddress.street,
       unit: storeAddress.unit,
@@ -228,11 +292,14 @@ function applyStoreOverrides(settings, {
       state: storeAddress.state,
       zip: storeAddress.zip,
       phone: storeAddress.phone,
+      supportEmail: storeAddress.supportEmail || "",
+      officeEmail: storeAddress.officeEmail || "",
     };
     settings.shopContactBlurb = buildShopContactBlurb(storeAddress);
   } else {
     settings.storeInfo = {
       ...settings.storeInfo,
+      legalName: "",
       displayName: "",
       street: "",
       unit: "",
@@ -240,6 +307,8 @@ function applyStoreOverrides(settings, {
       state: "",
       zip: "",
       phone: "",
+      supportEmail: "",
+      officeEmail: "",
     };
     settings.shopContactBlurb = "";
   }
@@ -311,7 +380,14 @@ function buildCopiedSettings({
 }
 
 exports.platformAdminCreateTenantCallable = onCall(
-  { region: "us-central1" },
+  {
+    region: "us-central1",
+    secrets: [
+      stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY,
+      twilioSubaccountInternals.TWILIO_MASTER_ACCOUNT_SID,
+      twilioSubaccountInternals.TWILIO_MASTER_AUTH_TOKEN,
+    ],
+  },
   async (request) => {
     const auth = requireAuth(request);
     assertPlatformAdmin(auth);
@@ -331,6 +407,7 @@ exports.platformAdminCreateTenantCallable = onCall(
       billingModel,
       platformFeePercent,
       subscriptionTierID,
+      fullBakeForTest,
     } = request.data || {};
 
     if (!tenantID || !TENANT_ID_PATTERN.test(tenantID)) {
@@ -455,12 +532,25 @@ exports.platformAdminCreateTenantCallable = onCall(
     // Reject if the user is already a member of any tenant — claim collision
     // means they'd need a separate Auth account (per the one-user-one-tenant
     // design). The platform-admin must use a different email.
+    // Exception: if the referenced tenant doc no longer exists, the claim is
+    // orphaned (e.g., tenant deleted during dev iteration or prod recovery) —
+    // clear it and proceed with the new association.
     const existingClaims = ownerUser.customClaims || {};
     if (existingClaims.tenantID) {
-      throw new HttpsError(
-        "already-exists",
-        `User ${normalizedEmail} is already a member of tenant ${existingClaims.tenantID}.`
-      );
+      const orphanedTenant = await db
+        .collection("tenants")
+        .doc(existingClaims.tenantID)
+        .get();
+      if (orphanedTenant.exists) {
+        throw new HttpsError(
+          "already-exists",
+          `User ${normalizedEmail} is already a member of tenant ${existingClaims.tenantID}.`
+        );
+      }
+      logger.info("platformAdminCreateTenantCallable: clearing orphaned claims", {
+        email: normalizedEmail,
+        orphanedTenantID: existingClaims.tenantID,
+      });
     }
 
     const storeID = generateEAN13Barcode();
@@ -497,25 +587,14 @@ exports.platformAdminCreateTenantCallable = onCall(
       createdByUID: auth.uid,
     });
 
-    // Store doc: operational unit. Stubbed with null ops fields — the owner
-    // fills these in via the cadence-pos /welcome onboarding flow. Tier is set
-    // by the platform admin at create time and is the one thing the tenant
-    // owner cannot self-serve. `isSetupComplete: false` gates the rest of the
-    // app until onboarding finishes.
+    // Store doc: billing wiring + setup gating + audit only. All operational
+    // store info (legalName, displayName, address, contact emails, sales tax)
+    // lives in settings.storeInfo — read from there. Tier is set by the
+    // platform admin at create time and is the one thing the tenant owner
+    // cannot self-serve. `isSetupComplete: false` gates the rest of the app
+    // until onboarding finishes.
     const storeRef = tenantRef.collection("stores").doc(storeID);
     await storeRef.set({
-      displayName: null,
-      legalName: null,
-      street: null,
-      unit: null,
-      city: null,
-      state: null,
-      zip: null,
-      phone: null,
-      supportEmail: null,
-      officeEmail: null,
-      salesTaxPercent: null,
-      logoURL: null,
       subscriptionTierID: normalizedTierID,
       stripeSubscriptionItemID: null,
       stripeSubscriptionPriceID: null,
@@ -543,11 +622,86 @@ exports.platformAdminCreateTenantCallable = onCall(
         handleCodeInApp: true,
       });
 
+    // Best-effort Connect Account provisioning. If Stripe fails (outage, rate
+    // limit, etc.) we leave the tenant fully created and let the admin retry
+    // via the existing "Create Connect Account" button on TenantDetailScreen.
+    //
+    // Prefill: business_type=company (POS tenants are registered businesses;
+    // owner can flip in Stripe onboarding if sole prop), MCC 5940 (Bicycle
+    // Shops), and the representative person from tenant form data. DOB / SSN
+    // / bank account / TOS / business URL are left to the owner.
+    const stripeAddress = {
+      line1: normalizedStreet,
+      line2: normalizedUnit || undefined,
+      city: normalizedCity,
+      state: normalizedState,
+      postal_code: normalizedZip,
+      country: "US",
+    };
+    let stripeAccountID = null;
+    let connectAccountError = null;
+    let representativeError = null;
+    try {
+      const result = await stripeConnectInternals.createAccountInternal({
+        secret: stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY,
+        db,
+        tenantID,
+        email: normalizedEmail,
+        businessName: tenantName,
+        byUID: auth.uid,
+        businessType: "company",
+        mcc: "5940",
+        companyPhone: normalizedPhone,
+        companyAddress: stripeAddress,
+        representative: {
+          firstName: normalizedFirstName,
+          lastName: normalizedLastName,
+          email: normalizedEmail,
+          phone: normalizedPhone,
+          address: stripeAddress,
+        },
+        fullBakeForTest: fullBakeForTest === true,
+      });
+      stripeAccountID = result.stripeAccountID;
+      representativeError = result.representativeError || null;
+    } catch (err) {
+      connectAccountError = err && err.message ? err.message : String(err);
+      logger.error("platformAdminCreateTenantCallable: Connect create failed", {
+        tenantID,
+        error: connectAccountError,
+      });
+    }
+
+    // Best-effort Twilio subaccount provisioning. Until LLC clears + TWILIO_
+    // MASTER_* secrets are set, this will fail and surface twilioError — the
+    // admin can retry via the existing "Provision Twilio" button.
+    let twilioSubaccountSid = null;
+    let twilioError = null;
+    try {
+      const result = await twilioSubaccountInternals.provisionSubaccountInternal({
+        tenantID,
+        actorUID: auth.uid,
+        actorKind: "platform-admin",
+      });
+      twilioSubaccountSid = result.subaccountSid;
+    } catch (err) {
+      twilioError = err && err.message ? err.message : String(err);
+      logger.error("platformAdminCreateTenantCallable: Twilio provision failed", {
+        tenantID,
+        error: twilioError,
+      });
+    }
+
     logger.info("platformAdminCreateTenantCallable: tenant created", {
       tenantID,
       storeID,
       ownerUID: ownerUser.uid,
       createdByUID: auth.uid,
+      stripeAccountID,
+      connectAccountError,
+      representativeError,
+      twilioSubaccountSid,
+      twilioError,
     });
 
     return {
@@ -557,6 +711,11 @@ exports.platformAdminCreateTenantCallable = onCall(
       ownerUID: ownerUser.uid,
       ownerEmail: normalizedEmail,
       signInLink,
+      stripeAccountID,
+      connectAccountError,
+      representativeError,
+      twilioSubaccountSid,
+      twilioError,
     };
   }
 );
@@ -691,16 +850,13 @@ exports.platformAdminCreateStoreCallable = onCall(
     // Batch the two Firestore writes so a partial store can't exist if the
     // settings write fails. The owner-claims update below is best-effort and
     // not part of this batch (Auth ≠ Firestore).
+    //
+    // Store doc holds only audit fields here. All operational fields
+    // (displayName, address, sales tax, etc.) are written into the settings
+    // doc by buildBootstrapSettings/buildCopiedSettings — single source of
+    // truth.
     const storeRef = tenantRef.collection("stores").doc(storeID);
     const storeMeta = {
-      displayName: normalizedDisplayName,
-      street: storeAddress.street,
-      unit: storeAddress.unit,
-      city: storeAddress.city,
-      state: storeAddress.state,
-      zip: storeAddress.zip,
-      phone: storeAddress.phone,
-      salesTaxPercent: normalizedTax,
       createdAt: FieldValue.serverTimestamp(),
       createdByUID: auth.uid,
     };
@@ -1059,9 +1215,12 @@ exports.getTenantCallable = onCall(
       storesSnap.docs.map(async (sDoc) => {
         const sData = sDoc.data() || {};
         // Read per-number docs (not just count) so we can compute webhook
-        // drift inline. Tenants are <20 numbers per store in practice — the
-        // read cost is fine for detail view.
-        const numbersSnap = await sDoc.ref.collection("twilio").get();
+        // drift inline. Settings is read in parallel so displayName/city/state
+        // come from settings.storeInfo — store doc no longer mirrors them.
+        const [numbersSnap, settingsSnap] = await Promise.all([
+          sDoc.ref.collection("twilio").get(),
+          sDoc.ref.collection("settings").doc("settings").get(),
+        ]);
         let webhooksDriftedCount = 0;
         numbersSnap.docs.forEach((n) => {
           const data = n.data() || {};
@@ -1075,11 +1234,13 @@ exports.getTenantCallable = onCall(
           sData.createdAt && typeof sData.createdAt.toMillis === "function"
             ? sData.createdAt.toMillis()
             : null;
+        const storeInfo =
+          (settingsSnap.exists ? settingsSnap.data() : null)?.storeInfo || {};
         return {
           storeID: sDoc.id,
-          name: sData.displayName || sData.name || "",
-          city: sData.city || "",
-          state: sData.state || "",
+          name: storeInfo.displayName || "",
+          city: storeInfo.city || "",
+          state: storeInfo.state || "",
           createdAt: sCreatedAt,
           numberCount: numbersSnap.size,
           webhooksDriftedCount,
@@ -1257,5 +1418,1678 @@ exports.redeemInviteCallable = onCall(
       privilege: invite.privilege,
       stores: invite.stores || [],
     };
+  }
+);
+
+// Maps the client-side PERMISSION_LEVELS shape (name + numeric level + id) to
+// the server-side custom-claim privilege string. Levels are stable across
+// client + server: 1=user, 2=editor, 3=manager, 4=admin (superUser on the
+// client), 5=owner. Anything else is rejected so a corrupt or spoofed
+// permissions object can't escalate via the level field.
+const PERMISSION_LEVEL_TO_PRIVILEGE = {
+  1: "user",
+  2: "editor",
+  3: "manager",
+  4: "admin",
+  5: "owner",
+};
+
+function privilegeFromPermissions(permissions) {
+  if (!permissions || typeof permissions !== "object") return null;
+  const lvl = Number(permissions.level);
+  if (!Number.isInteger(lvl)) return null;
+  return PERMISSION_LEVEL_TO_PRIVILEGE[lvl] || null;
+}
+
+function normalizePin(pin) {
+  if (typeof pin !== "string") return null;
+  const trimmed = pin.trim();
+  if (!/^\d{1,12}$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+function normalizeOptionalPin(pin) {
+  if (pin === undefined || pin === null || pin === "") return "";
+  return normalizePin(pin);
+}
+
+// Reads the per-store settings doc and appends or replaces the user's
+// per-store entry inside a transaction. Idempotent — calling with the same
+// userID twice produces the same array (one entry). Skipped silently if the
+// settings doc doesn't exist yet (store is mid-bootstrap; the bootstrap
+// callable seeds it).
+async function upsertPerStoreUserEntry(db, tenantID, storeID, perStoreEntry) {
+  const settingsRef = db
+    .collection("tenants")
+    .doc(tenantID)
+    .collection("stores")
+    .doc(storeID)
+    .collection("settings")
+    .doc("settings");
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(settingsRef);
+    if (!snap.exists) return;
+    const data = snap.data() || {};
+    const existing = Array.isArray(data.users) ? data.users : [];
+    const idx = existing.findIndex((u) => u && u.id === perStoreEntry.id);
+    let next;
+    if (idx === -1) {
+      next = [...existing, perStoreEntry];
+    } else {
+      next = existing.map((u, i) => (i === idx ? { ...u, ...perStoreEntry } : u));
+    }
+    tx.update(settingsRef, { users: next });
+  });
+}
+
+async function removePerStoreUserEntry(db, tenantID, storeID, userID) {
+  const settingsRef = db
+    .collection("tenants")
+    .doc(tenantID)
+    .collection("stores")
+    .doc(storeID)
+    .collection("settings")
+    .doc("settings");
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(settingsRef);
+    if (!snap.exists) return;
+    const data = snap.data() || {};
+    const existing = Array.isArray(data.users) ? data.users : [];
+    const next = existing.filter((u) => !u || u.id !== userID);
+    if (next.length === existing.length) return;
+    tx.update(settingsRef, { users: next });
+  });
+}
+
+// Admin creates a new POS user directly (Dashboard_Admin "Add New User"
+// flow). Provisions an Auth record with email + phone (no password), stamps
+// {tenantID, privilege, stores[]} claims, writes the canonical identity to
+// tenants/{tenantID}/users/{userID}, and appends a per-store entry to each
+// store's settings.users[]. Caller must be manager or higher; cannot grant a
+// privilege above their own; non-owners cannot assign users to stores they
+// themselves don't have access to. Idempotent on the per-store array (same
+// userID won't be appended twice) but the Auth user lookup is by email — if
+// the email is already linked to a different tenant, the call is refused.
+exports.tenantCreateUserCallable = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const auth = requireAuth(request);
+    assertPrivilege(auth, "manager");
+
+    const tenantID = auth.token && auth.token.tenantID;
+    if (!tenantID) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Caller's token is missing tenantID."
+      );
+    }
+
+    const {
+      first,
+      last,
+      email,
+      phone,
+      pin,
+      alternatePin,
+      permissions,
+      stores,
+      hourlyWage,
+      faceDescriptor,
+      linkedUserID,
+      forwardSMS,
+      hidden,
+      preview,
+    } = request.data || {};
+
+    const normalizedFirst = normalizeName(first);
+    if (!normalizedFirst) {
+      throw new HttpsError("invalid-argument", "first is required (≤100 chars).");
+    }
+    const normalizedLast = normalizeName(last);
+    if (!normalizedLast) {
+      throw new HttpsError("invalid-argument", "last is required (≤100 chars).");
+    }
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      throw new HttpsError("invalid-argument", "email is required.");
+    }
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone) {
+      throw new HttpsError(
+        "invalid-argument",
+        "phone is required (10-digit US or E.164)."
+      );
+    }
+    const normalizedPin = normalizePin(pin);
+    if (!normalizedPin) {
+      throw new HttpsError(
+        "invalid-argument",
+        "pin is required and must be 1-12 digits."
+      );
+    }
+    const normalizedAltPin = normalizeOptionalPin(alternatePin);
+    if (normalizedAltPin === null) {
+      throw new HttpsError(
+        "invalid-argument",
+        "alternatePin must be 1-12 digits or empty."
+      );
+    }
+    const privilege = privilegeFromPermissions(permissions);
+    if (!privilege) {
+      throw new HttpsError(
+        "invalid-argument",
+        "permissions must include a valid level (1-5)."
+      );
+    }
+    if (!Array.isArray(stores) || stores.length === 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "stores[] must include at least one storeID."
+      );
+    }
+    const dedupedStores = Array.from(new Set(stores.filter(Boolean)));
+    if (dedupedStores.length === 0) {
+      throw new HttpsError("invalid-argument", "stores[] is empty after filtering.");
+    }
+
+    const callerPrivilege = auth.token.privilege;
+    if (PRIVILEGE_RANK[privilege] > PRIVILEGE_RANK[callerPrivilege]) {
+      throw new HttpsError(
+        "permission-denied",
+        "Cannot grant a privilege higher than your own."
+      );
+    }
+    if (callerPrivilege !== "owner") {
+      const callerStores = Array.isArray(auth.token.stores)
+        ? auth.token.stores
+        : [];
+      for (const sid of dedupedStores) {
+        if (!callerStores.includes(sid)) {
+          throw new HttpsError(
+            "permission-denied",
+            `You cannot assign users to store ${sid}.`
+          );
+        }
+      }
+    }
+
+    const displayName = `${normalizedFirst} ${normalizedLast}`;
+    let user;
+    try {
+      user = await admin.auth().getUserByEmail(normalizedEmail);
+    } catch (err) {
+      if (err && err.code === "auth/user-not-found") {
+        try {
+          user = await admin.auth().createUser({
+            email: normalizedEmail,
+            phoneNumber: normalizedPhone,
+            displayName,
+            emailVerified: false,
+          });
+        } catch (createErr) {
+          if (createErr && createErr.code === "auth/phone-number-already-exists") {
+            throw new HttpsError(
+              "already-exists",
+              "That phone number is already linked to another account. Use a different number or update the existing user."
+            );
+          }
+          throw createErr;
+        }
+      } else {
+        throw err;
+      }
+    }
+
+    const existingClaims = user.customClaims || {};
+    if (existingClaims.tenantID && existingClaims.tenantID !== tenantID) {
+      throw new HttpsError(
+        "already-exists",
+        "That email is already linked to a different tenant. Use a different email."
+      );
+    }
+
+    const authUpdates = {};
+    if (!user.email) authUpdates.email = normalizedEmail;
+    if (!user.phoneNumber) authUpdates.phoneNumber = normalizedPhone;
+    if (!user.displayName) authUpdates.displayName = displayName;
+    if (Object.keys(authUpdates).length > 0) {
+      try {
+        await admin.auth().updateUser(user.uid, authUpdates);
+      } catch (err) {
+        logger.warn("tenantCreateUserCallable: Auth update partial", {
+          uid: user.uid,
+          error: err.message,
+        });
+      }
+    }
+
+    await setUserClaims(user.uid, {
+      tenantID,
+      privilege,
+      stores: dedupedStores,
+    });
+
+    const userID = user.uid;
+    const db = getFirestore();
+    const tenantRef = db.collection("tenants").doc(tenantID);
+
+    const tenantUserDoc = {
+      first: normalizedFirst,
+      last: normalizedLast,
+      id: userID,
+      permissions: {
+        name: permissions.name || "",
+        level: Number(permissions.level),
+        id: permissions.id || "",
+      },
+      phone: normalizedPhone,
+      email: normalizedEmail,
+      pin: normalizedPin,
+      alternatePin: normalizedAltPin,
+      faceDescriptor: Array.isArray(faceDescriptor) ? faceDescriptor : "",
+      linkedUserID:
+        typeof linkedUserID === "string" && linkedUserID
+          ? linkedUserID
+          : userID,
+      hourlyWage: typeof hourlyWage === "string" ? hourlyWage : "",
+      stores: dedupedStores,
+    };
+    await tenantRef.collection("users").doc(userID).set(tenantUserDoc);
+
+    const perStoreUserEntry = {
+      id: userID,
+      disabled: false,
+      preview: typeof preview === "boolean" ? preview : true,
+      forwardSMS: typeof forwardSMS === "boolean" ? forwardSMS : false,
+      hidden: typeof hidden === "boolean" ? hidden : false,
+      statuses: [],
+      emailInboxes: [],
+      pendingWorkorderIDs: [],
+      loginMessageSuppressUntil: 0,
+      personalNotes: [],
+      showNewUserHelp: true,
+    };
+    for (const storeID of dedupedStores) {
+      await upsertPerStoreUserEntry(db, tenantID, storeID, perStoreUserEntry);
+    }
+
+    logger.info("tenantCreateUserCallable: user created", {
+      tenantID,
+      userID,
+      privilege,
+      stores: dedupedStores,
+      callerUID: auth.uid,
+    });
+
+    return { success: true, userID, tenantID, stores: dedupedStores };
+  }
+);
+
+// Admin updates identity fields on an existing user. Writes to the tenant
+// user doc (canonical); per-store ephemera (disabled, preview, forwardSMS,
+// hidden, etc.) stays untouched. If privilege or stores[] changes, claims are
+// re-stamped and per-store entries are added/removed to keep settings.users[]
+// in sync with the new store assignment. Caller must be manager or higher;
+// same privilege-cap rule as create.
+exports.tenantUpdateUserCallable = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const auth = requireAuth(request);
+    assertPrivilege(auth, "manager");
+
+    const tenantID = auth.token && auth.token.tenantID;
+    if (!tenantID) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Caller's token is missing tenantID."
+      );
+    }
+
+    const {
+      userID,
+      first,
+      last,
+      email,
+      phone,
+      pin,
+      alternatePin,
+      permissions,
+      stores,
+      hourlyWage,
+      faceDescriptor,
+      linkedUserID,
+    } = request.data || {};
+
+    if (!userID || typeof userID !== "string") {
+      throw new HttpsError("invalid-argument", "userID is required.");
+    }
+
+    const db = getFirestore();
+    const tenantRef = db.collection("tenants").doc(tenantID);
+    const userRef = tenantRef.collection("users").doc(userID);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) {
+      throw new HttpsError("not-found", `User ${userID} not found in this tenant.`);
+    }
+    const existing = userSnap.data() || {};
+
+    const normalizedFirst = normalizeName(first);
+    if (!normalizedFirst) {
+      throw new HttpsError("invalid-argument", "first is required.");
+    }
+    const normalizedLast = normalizeName(last);
+    if (!normalizedLast) {
+      throw new HttpsError("invalid-argument", "last is required.");
+    }
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      throw new HttpsError("invalid-argument", "email is required.");
+    }
+    const normalizedPhone = normalizePhone(phone);
+    if (!normalizedPhone) {
+      throw new HttpsError("invalid-argument", "phone is required.");
+    }
+    const normalizedPin = normalizePin(pin);
+    if (!normalizedPin) {
+      throw new HttpsError(
+        "invalid-argument",
+        "pin is required and must be 1-12 digits."
+      );
+    }
+    const normalizedAltPin = normalizeOptionalPin(alternatePin);
+    if (normalizedAltPin === null) {
+      throw new HttpsError(
+        "invalid-argument",
+        "alternatePin must be 1-12 digits or empty."
+      );
+    }
+    const privilege = privilegeFromPermissions(permissions);
+    if (!privilege) {
+      throw new HttpsError(
+        "invalid-argument",
+        "permissions must include a valid level (1-5)."
+      );
+    }
+    if (!Array.isArray(stores) || stores.length === 0) {
+      throw new HttpsError(
+        "invalid-argument",
+        "stores[] must include at least one storeID."
+      );
+    }
+    const dedupedStores = Array.from(new Set(stores.filter(Boolean)));
+    if (dedupedStores.length === 0) {
+      throw new HttpsError("invalid-argument", "stores[] is empty after filtering.");
+    }
+
+    const callerPrivilege = auth.token.privilege;
+    if (PRIVILEGE_RANK[privilege] > PRIVILEGE_RANK[callerPrivilege]) {
+      throw new HttpsError(
+        "permission-denied",
+        "Cannot grant a privilege higher than your own."
+      );
+    }
+    if (callerPrivilege !== "owner") {
+      const callerStores = Array.isArray(auth.token.stores)
+        ? auth.token.stores
+        : [];
+      for (const sid of dedupedStores) {
+        if (!callerStores.includes(sid)) {
+          throw new HttpsError(
+            "permission-denied",
+            `You cannot assign users to store ${sid}.`
+          );
+        }
+      }
+    }
+
+    const authUpdates = {};
+    try {
+      const authUser = await admin.auth().getUser(userID);
+      if (authUser.email !== normalizedEmail) authUpdates.email = normalizedEmail;
+      if (authUser.phoneNumber !== normalizedPhone) {
+        authUpdates.phoneNumber = normalizedPhone;
+      }
+      const displayName = `${normalizedFirst} ${normalizedLast}`;
+      if (authUser.displayName !== displayName) {
+        authUpdates.displayName = displayName;
+      }
+      if (Object.keys(authUpdates).length > 0) {
+        await admin.auth().updateUser(userID, authUpdates);
+      }
+    } catch (err) {
+      logger.warn("tenantUpdateUserCallable: Auth sync skipped", {
+        uid: userID,
+        error: err.message,
+      });
+    }
+
+    await setUserClaims(userID, {
+      tenantID,
+      privilege,
+      stores: dedupedStores,
+    });
+
+    const updatedDoc = {
+      ...existing,
+      first: normalizedFirst,
+      last: normalizedLast,
+      id: userID,
+      permissions: {
+        name: permissions.name || "",
+        level: Number(permissions.level),
+        id: permissions.id || "",
+      },
+      phone: normalizedPhone,
+      email: normalizedEmail,
+      pin: normalizedPin,
+      alternatePin: normalizedAltPin,
+      faceDescriptor:
+        faceDescriptor === undefined
+          ? existing.faceDescriptor || ""
+          : Array.isArray(faceDescriptor)
+          ? faceDescriptor
+          : "",
+      linkedUserID:
+        typeof linkedUserID === "string" && linkedUserID
+          ? linkedUserID
+          : userID,
+      hourlyWage: typeof hourlyWage === "string" ? hourlyWage : existing.hourlyWage || "",
+      stores: dedupedStores,
+    };
+    await userRef.set(updatedDoc);
+
+    // Sync per-store membership: add to newly-assigned stores, remove from
+    // dropped stores. Existing per-store entries in retained stores keep
+    // their ephemera (disabled, statuses, etc.).
+    const previousStores = Array.isArray(existing.stores) ? existing.stores : [];
+    const toAdd = dedupedStores.filter((s) => !previousStores.includes(s));
+    const toRemove = previousStores.filter((s) => !dedupedStores.includes(s));
+
+    const newEntryTemplate = {
+      id: userID,
+      disabled: false,
+      preview: true,
+      forwardSMS: false,
+      hidden: false,
+      statuses: [],
+      emailInboxes: [],
+      pendingWorkorderIDs: [],
+      loginMessageSuppressUntil: 0,
+      personalNotes: [],
+      showNewUserHelp: true,
+    };
+    for (const storeID of toAdd) {
+      await upsertPerStoreUserEntry(db, tenantID, storeID, newEntryTemplate);
+    }
+    for (const storeID of toRemove) {
+      await removePerStoreUserEntry(db, tenantID, storeID, userID);
+    }
+
+    logger.info("tenantUpdateUserCallable: user updated", {
+      tenantID,
+      userID,
+      privilege,
+      stores: dedupedStores,
+      callerUID: auth.uid,
+    });
+
+    return { success: true, userID, tenantID, stores: dedupedStores };
+  }
+);
+
+// Admin removes a user from the tenant. Deletes the tenant user doc, strips
+// per-store entries from every store's settings.users[], and clears the
+// custom claims on the Auth record. The Auth record itself is NOT deleted
+// (it may be tied to other services or the user may rejoin later); revoking
+// claims is sufficient to lock them out of this tenant. Caller must be
+// manager or higher and cannot delete a user with higher privilege than
+// their own.
+exports.tenantDeleteUserCallable = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const auth = requireAuth(request);
+    assertPrivilege(auth, "manager");
+
+    const tenantID = auth.token && auth.token.tenantID;
+    if (!tenantID) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Caller's token is missing tenantID."
+      );
+    }
+
+    const { userID } = request.data || {};
+    if (!userID || typeof userID !== "string") {
+      throw new HttpsError("invalid-argument", "userID is required.");
+    }
+    if (userID === auth.uid) {
+      throw new HttpsError(
+        "failed-precondition",
+        "You cannot delete your own user."
+      );
+    }
+
+    const db = getFirestore();
+    const tenantRef = db.collection("tenants").doc(tenantID);
+    const userRef = tenantRef.collection("users").doc(userID);
+    const userSnap = await userRef.get();
+
+    let targetStores = [];
+    if (userSnap.exists) {
+      const targetUser = userSnap.data() || {};
+      const targetPriv = privilegeFromPermissions(targetUser.permissions);
+      const callerPrivilege = auth.token.privilege;
+      if (
+        targetPriv &&
+        PRIVILEGE_RANK[targetPriv] > PRIVILEGE_RANK[callerPrivilege]
+      ) {
+        throw new HttpsError(
+          "permission-denied",
+          "Cannot delete a user with higher privilege than your own."
+        );
+      }
+      targetStores = Array.isArray(targetUser.stores) ? targetUser.stores : [];
+    }
+
+    for (const storeID of targetStores) {
+      await removePerStoreUserEntry(db, tenantID, storeID, userID);
+    }
+
+    if (userSnap.exists) {
+      await userRef.delete();
+    }
+
+    try {
+      await admin.auth().setCustomUserClaims(userID, {});
+    } catch (err) {
+      logger.warn("tenantDeleteUserCallable: claim clear skipped", {
+        uid: userID,
+        error: err.message,
+      });
+    }
+
+    logger.info("tenantDeleteUserCallable: user removed", {
+      tenantID,
+      userID,
+      callerUID: auth.uid,
+    });
+
+    return { success: true, userID, tenantID };
+  }
+);
+
+// ===========================================================================
+// Passwordless sign-in (Phase 3): request a 6-digit code via email, verify
+// it back to mint a custom-token sign-in. Persistent claims (set by tenant
+// create/update/bootstrap) carry {tenantID, privilege, stores[]} and flow
+// through the resulting ID token automatically, so the client doesn't need
+// developer claims on the custom token.
+//
+// SMS delivery is not yet wired — platform Twilio isn't configured. Phone
+// identifiers are accepted at lookup time (the Auth record may be indexed by
+// phone), but the code itself is delivered to the user's email on file.
+// ===========================================================================
+
+const SIGN_IN_CODE_TTL_MS = 10 * 60 * 1000;
+const SIGN_IN_CODE_MAX_ATTEMPTS = 5;
+
+async function lookupAuthUserByIdentifier(identifier) {
+  if (!identifier || typeof identifier !== "string") {
+    throw new HttpsError("invalid-argument", "identifier is required.");
+  }
+  const trimmed = identifier.trim();
+  if (trimmed.includes("@")) {
+    const normalized = normalizeEmail(trimmed);
+    if (!normalized) {
+      throw new HttpsError("invalid-argument", "Invalid email address.");
+    }
+    try {
+      return await admin.auth().getUserByEmail(normalized);
+    } catch (err) {
+      if (err && err.code === "auth/user-not-found") {
+        throw new HttpsError("not-found", "No account matches that email.");
+      }
+      throw err;
+    }
+  }
+  const normalized = normalizePhone(trimmed);
+  if (!normalized) {
+    throw new HttpsError("invalid-argument", "Invalid phone number.");
+  }
+  try {
+    return await admin.auth().getUserByPhoneNumber(normalized);
+  } catch (err) {
+    if (err && err.code === "auth/user-not-found") {
+      throw new HttpsError("not-found", "No account matches that phone number.");
+    }
+    throw err;
+  }
+}
+
+// 6-digit numeric code (100000-999999). crypto-random, no leading-zero
+// truncation when rendered as a decimal string.
+function generateSignInCode() {
+  const buf = crypto.randomBytes(4);
+  const n = (buf.readUInt32BE(0) % 900000) + 100000;
+  return String(n);
+}
+
+function maskEmail(email) {
+  if (!email || typeof email !== "string") return "";
+  const at = email.indexOf("@");
+  if (at < 2) return email;
+  return `${email.slice(0, 2)}***${email.slice(at)}`;
+}
+
+// Anyone can call (no auth required) — this IS the pre-sign-in step. Looks
+// up the Auth user by email or phone, generates a code, stores it at
+// tenants/{tenantID}/sign_in_codes/{uid} with a 10-minute TTL, and emails
+// the code to the user's address on file. Returning a not-found error here
+// leaks identifier existence; a future hardening pass should return a
+// generic "if it matches, we sent a code" response.
+exports.requestSignInCodeCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [
+      PLATFORM_NOREPLY_EMAIL,
+      PLATFORM_NOREPLY_SMTP_USER,
+      PLATFORM_NOREPLY_APP_PASSWORD,
+    ],
+  },
+  async (request) => {
+    const { identifier } = request.data || {};
+    const authUser = await lookupAuthUserByIdentifier(identifier);
+    const claims = authUser.customClaims || {};
+    const tenantID = claims.tenantID;
+    if (!tenantID) {
+      throw new HttpsError(
+        "failed-precondition",
+        "This account is not assigned to a tenant."
+      );
+    }
+    const targetEmail = authUser.email;
+    if (!targetEmail) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Account has no email on file. Contact your admin."
+      );
+    }
+
+    const code = generateSignInCode();
+    const db = getFirestore();
+    const codeRef = db
+      .collection("tenants")
+      .doc(tenantID)
+      .collection("sign_in_codes")
+      .doc(authUser.uid);
+    await codeRef.set({
+      code,
+      createdAt: Date.now(),
+      attempts: 0,
+      method: "email",
+    });
+
+    const fromEmail = PLATFORM_NOREPLY_EMAIL.value();
+    const smtpUser = PLATFORM_NOREPLY_SMTP_USER.value();
+    const fromPassword = PLATFORM_NOREPLY_APP_PASSWORD.value();
+    if (!fromEmail || !smtpUser || !fromPassword) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Platform email is not configured."
+      );
+    }
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: smtpUser, pass: fromPassword },
+    });
+    const subject = "Your Cadence sign-in code";
+    const html = `<p>Your Cadence sign-in code is:</p>
+<p style="font-size:28px;font-weight:bold;letter-spacing:4px;">${code}</p>
+<p>This code expires in 10 minutes.</p>
+<p>If you didn't request this, you can ignore this email.</p>`;
+
+    try {
+      await transporter.sendMail({
+        from: `"Cadence POS" <${fromEmail}>`,
+        to: targetEmail,
+        subject,
+        html,
+      });
+    } catch (err) {
+      logger.error("requestSignInCodeCallable: email send failed", {
+        uid: authUser.uid,
+        tenantID,
+        error: err.message,
+      });
+      throw new HttpsError("internal", "Failed to send sign-in code.");
+    }
+
+    logger.info("requestSignInCodeCallable: code sent", {
+      tenantID,
+      uid: authUser.uid,
+    });
+
+    return {
+      success: true,
+      delivery: "email",
+      to: maskEmail(targetEmail),
+    };
+  }
+);
+
+// Anyone can call. Validates the code, confirms the user still has at least
+// one non-disabled store, and mints a custom token the client uses with
+// signInWithCustomToken(). Returns the user's stores plus a filtered
+// enabledStores list so the client store-picker can grey out disabled
+// options without an extra round trip.
+exports.verifySignInCodeCallable = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const { identifier, code } = request.data || {};
+    if (!code || typeof code !== "string") {
+      throw new HttpsError("invalid-argument", "code is required.");
+    }
+    const authUser = await lookupAuthUserByIdentifier(identifier);
+    const claims = authUser.customClaims || {};
+    const tenantID = claims.tenantID;
+    if (!tenantID) {
+      throw new HttpsError(
+        "failed-precondition",
+        "This account is not assigned to a tenant."
+      );
+    }
+
+    const db = getFirestore();
+    const codeRef = db
+      .collection("tenants")
+      .doc(tenantID)
+      .collection("sign_in_codes")
+      .doc(authUser.uid);
+    const codeSnap = await codeRef.get();
+    if (!codeSnap.exists) {
+      throw new HttpsError(
+        "not-found",
+        "No pending sign-in code. Request a new one."
+      );
+    }
+    const codeDoc = codeSnap.data() || {};
+    const now = Date.now();
+    if (now - (codeDoc.createdAt || 0) > SIGN_IN_CODE_TTL_MS) {
+      await codeRef.delete();
+      throw new HttpsError(
+        "deadline-exceeded",
+        "Sign-in code expired. Request a new one."
+      );
+    }
+    const attempts = Number(codeDoc.attempts) || 0;
+    if (attempts >= SIGN_IN_CODE_MAX_ATTEMPTS) {
+      await codeRef.delete();
+      throw new HttpsError(
+        "resource-exhausted",
+        "Too many attempts. Request a new code."
+      );
+    }
+    if (String(codeDoc.code) !== String(code).trim()) {
+      await codeRef.update({ attempts: attempts + 1 });
+      throw new HttpsError("permission-denied", "Incorrect code. Try again.");
+    }
+
+    const userDocSnap = await db
+      .collection("tenants")
+      .doc(tenantID)
+      .collection("users")
+      .doc(authUser.uid)
+      .get();
+    if (!userDocSnap.exists) {
+      throw new HttpsError(
+        "failed-precondition",
+        "User has no tenant identity record. Contact your admin."
+      );
+    }
+
+    const userStores = Array.isArray(claims.stores) ? claims.stores : [];
+    const storeResults = await Promise.all(
+      userStores.map(async (storeID) => {
+        try {
+          const settingsSnap = await db
+            .collection("tenants")
+            .doc(tenantID)
+            .collection("stores")
+            .doc(storeID)
+            .collection("settings")
+            .doc("settings")
+            .get();
+          if (!settingsSnap.exists) return { storeID, enabled: false, displayName: "" };
+          const data = settingsSnap.data() || {};
+          const displayName =
+            (data.storeInfo && typeof data.storeInfo.displayName === "string"
+              ? data.storeInfo.displayName
+              : "") || "";
+          const usersArr = Array.isArray(data.users) ? data.users : [];
+          const entry = usersArr.find((u) => u && u.id === authUser.uid);
+          if (!entry) return { storeID, enabled: false, displayName };
+          return {
+            storeID,
+            enabled: entry.disabled !== true,
+            displayName,
+          };
+        } catch (err) {
+          logger.warn("verifySignInCodeCallable: store check failed", {
+            tenantID,
+            storeID,
+            uid: authUser.uid,
+            error: err.message,
+          });
+          return { storeID, enabled: false, displayName: "" };
+        }
+      })
+    );
+    const enabledStores = storeResults
+      .filter((r) => r.enabled)
+      .map((r) => ({ storeID: r.storeID, displayName: r.displayName || "" }));
+    const disabledStores = storeResults
+      .filter((r) => !r.enabled)
+      .map((r) => ({ storeID: r.storeID, displayName: r.displayName || "" }));
+
+    if (enabledStores.length === 0) {
+      throw new HttpsError(
+        "permission-denied",
+        "Your account is disabled in all stores. Contact your admin."
+      );
+    }
+
+    await codeRef.delete();
+
+    const token = await admin.auth().createCustomToken(authUser.uid);
+    logger.info("verifySignInCodeCallable: token minted", {
+      tenantID,
+      uid: authUser.uid,
+      enabledStores,
+    });
+
+    return {
+      success: true,
+      token,
+      tenantID,
+      stores: userStores,
+      enabledStores,
+      disabledStores,
+    };
+  }
+);
+
+// Sends the owner a fresh sign-in link via the platform's noreply@ Gmail
+// account. Each call regenerates the magic link (Firebase links are single-
+// use), so re-clicking "Email link" mid-flow is safe.
+//
+// Gmail SMTP auth must use the PARENT Workspace account; noreply@ is a
+// free Workspace alias and has no password of its own. PLATFORM_NOREPLY_SMTP_USER
+// is the parent address used for AUTH; PLATFORM_NOREPLY_EMAIL is the alias used
+// in the From header. The alias must be registered in the parent account's
+// Gmail → Settings → Accounts → "Send mail as" list (Workspace aliases are
+// usually auto-added).
+exports.platformAdminSendOwnerWelcomeEmailCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [
+      PLATFORM_NOREPLY_EMAIL,
+      PLATFORM_NOREPLY_SMTP_USER,
+      PLATFORM_NOREPLY_APP_PASSWORD,
+    ],
+  },
+  async (request) => {
+    const auth = requireAuth(request);
+    assertPlatformAdmin(auth);
+
+    const { tenantID } = request.data || {};
+    if (!tenantID || typeof tenantID !== "string") {
+      throw new HttpsError("invalid-argument", "tenantID is required.");
+    }
+
+    const db = getFirestore();
+    const tenantSnap = await db.collection("tenants").doc(tenantID).get();
+    if (!tenantSnap.exists) {
+      throw new HttpsError("not-found", `Tenant ${tenantID} not found.`);
+    }
+    const tenant = tenantSnap.data() || {};
+    const ownerEmail = tenant.ownerEmail;
+    const tenantName = tenant.name || tenantID;
+    if (!ownerEmail) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Tenant ${tenantID} has no ownerEmail.`
+      );
+    }
+
+    const signInLink = await admin
+      .auth()
+      .generateSignInWithEmailLink(ownerEmail, {
+        url: `${INVITE_LANDING_URL}?bootstrap=1`,
+        handleCodeInApp: true,
+      });
+
+    const fromEmail = PLATFORM_NOREPLY_EMAIL.value();
+    const smtpUser = PLATFORM_NOREPLY_SMTP_USER.value();
+    const fromPassword = PLATFORM_NOREPLY_APP_PASSWORD.value();
+    if (!fromEmail || !smtpUser || !fromPassword) {
+      throw new HttpsError(
+        "failed-precondition",
+        "PLATFORM_NOREPLY_EMAIL, PLATFORM_NOREPLY_SMTP_USER, and PLATFORM_NOREPLY_APP_PASSWORD must be set."
+      );
+    }
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: smtpUser, pass: fromPassword },
+    });
+
+    const subject = `Welcome to Cadence — set up ${tenantName}`;
+    const html = `<p>Welcome to Cadence.</p>
+<p>When you click the link below you'll be asked to fill in your store's setup details, so please have the following ready:</p>
+${renderBootstrapFieldsListHtml()}
+${renderStripePaymentsInfoBlockHtml()}
+<p>Click the link to set up your store:</p>
+<p><a href="${signInLink}">${signInLink}</a></p>
+<p>This link is single-use and expires after a short time.</p>`;
+
+    try {
+      const info = await transporter.sendMail({
+        from: `"Cadence POS" <${fromEmail}>`,
+        to: ownerEmail,
+        subject,
+        html,
+      });
+      logger.info("platformAdminSendOwnerWelcomeEmailCallable: sent", {
+        tenantID,
+        ownerEmail,
+        messageId: info.messageId,
+        byUID: auth.uid,
+      });
+      return {
+        success: true,
+        ownerEmail,
+        messageId: info.messageId,
+      };
+    } catch (err) {
+      logger.error("platformAdminSendOwnerWelcomeEmailCallable: send failed", {
+        tenantID,
+        ownerEmail,
+        error: err.message,
+        byUID: auth.uid,
+      });
+      throw new HttpsError(
+        "internal",
+        `Failed to send welcome email: ${err.message}`
+      );
+    }
+  }
+);
+
+// Public callable invoked from InviteAcceptScreen's error stage when the
+// owner clicks an expired (or already-consumed) welcome magic link. Takes
+// just an email, looks up the matching tenant, regenerates the sign-in link,
+// and re-sends the welcome email. Returns success regardless of whether the
+// email matches a tenant (no enumeration leak). Includes a 60-second
+// per-tenant throttle so the endpoint can't be hammered.
+const WELCOME_RESEND_THROTTLE_MS = 60 * 1000;
+
+exports.requestOwnerWelcomeResendCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [
+      PLATFORM_NOREPLY_EMAIL,
+      PLATFORM_NOREPLY_SMTP_USER,
+      PLATFORM_NOREPLY_APP_PASSWORD,
+    ],
+  },
+  async (request) => {
+    const { email } = request.data || {};
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      throw new HttpsError("invalid-argument", "email is required.");
+    }
+
+    const db = getFirestore();
+    const tenantsSnap = await db
+      .collection("tenants")
+      .where("ownerEmail", "==", normalizedEmail)
+      .limit(1)
+      .get();
+
+    if (tenantsSnap.empty) {
+      logger.info("requestOwnerWelcomeResendCallable: no tenant for email", {
+        email: normalizedEmail,
+      });
+      return { success: true };
+    }
+
+    const tenantDoc = tenantsSnap.docs[0];
+    const tenantID = tenantDoc.id;
+    const tenant = tenantDoc.data() || {};
+
+    const lastSent = tenant.lastWelcomeEmailSentAt;
+    if (lastSent && typeof lastSent.toMillis === "function") {
+      const elapsed = Date.now() - lastSent.toMillis();
+      if (elapsed < WELCOME_RESEND_THROTTLE_MS) {
+        logger.info("requestOwnerWelcomeResendCallable: throttled", {
+          tenantID,
+          elapsedMs: elapsed,
+        });
+        return { success: true };
+      }
+    }
+
+    const fromEmail = PLATFORM_NOREPLY_EMAIL.value();
+    const smtpUser = PLATFORM_NOREPLY_SMTP_USER.value();
+    const fromPassword = PLATFORM_NOREPLY_APP_PASSWORD.value();
+    if (!fromEmail || !smtpUser || !fromPassword) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Welcome-email secrets are not configured."
+      );
+    }
+
+    const signInLink = await admin
+      .auth()
+      .generateSignInWithEmailLink(normalizedEmail, {
+        url: `${INVITE_LANDING_URL}?bootstrap=1`,
+        handleCodeInApp: true,
+      });
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: smtpUser, pass: fromPassword },
+    });
+
+    const tenantName = tenant.name || tenantID;
+    const subject = `Your new sign-in link for ${tenantName}`;
+    const html = `<p>Here's a fresh sign-in link for Cadence.</p>
+<p>When you click the link you'll be asked to fill in your store's setup details, so please have the following ready:</p>
+${renderBootstrapFieldsListHtml()}
+<p><a href="${signInLink}">${signInLink}</a></p>
+<p>This link is single-use and expires after a short time.</p>`;
+
+    try {
+      const info = await transporter.sendMail({
+        from: `"Cadence POS" <${fromEmail}>`,
+        to: normalizedEmail,
+        subject,
+        html,
+      });
+      await tenantDoc.ref.update({
+        lastWelcomeEmailSentAt: FieldValue.serverTimestamp(),
+      });
+      logger.info("requestOwnerWelcomeResendCallable: sent", {
+        tenantID,
+        ownerEmail: normalizedEmail,
+        messageId: info.messageId,
+      });
+    } catch (err) {
+      logger.error("requestOwnerWelcomeResendCallable: send failed", {
+        tenantID,
+        ownerEmail: normalizedEmail,
+        error: err.message,
+      });
+      // Don't surface send failures to the caller (no enumeration leak); the
+      // logs are enough to debug.
+    }
+
+    return { success: true };
+  }
+);
+
+// Owner-side bootstrap completion. Called from InviteAcceptScreen after the
+// owner clicks the welcome magic link and confirms their email. Takes the
+// store form (display name + address + phone + sales tax) and the chosen
+// 4-digit PIN, populates the stub store created at tenant time, and marks
+// isSetupComplete=true. The owner's Firebase Auth record stays passwordless;
+// future sign-ins go through the passwordless email/SMS code flow.
+// Also accepts the Stripe Payments Info collected on the same form
+// (business URL, bank account, DOB, SSN last 4) and pushes those to the
+// tenant's existing Connect account via applyOwnerKYCInternal. Each Stripe
+// step is best-effort — the store gets created either way; KYC errors are
+// surfaced in the return value so the UI can prompt for retry.
+// Idempotency: refuses to run if the store is already marked setup-complete.
+exports.ownerCompleteBootstrapCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY],
+  },
+  async (request) => {
+    const auth = requireAuth(request);
+    const claims = auth.token || {};
+    const tenantID = claims.tenantID;
+    const privilege = claims.privilege;
+    const storeIDs = Array.isArray(claims.stores) ? claims.stores : [];
+
+    if (!tenantID || privilege !== "owner" || storeIDs.length === 0) {
+      throw new HttpsError(
+        "permission-denied",
+        "Caller is not a tenant owner with a provisioned store."
+      );
+    }
+    const storeID = storeIDs[0];
+
+    const {
+      storeLegalName,
+      storeDisplayName,
+      storeStreet,
+      storeUnit,
+      storeCity,
+      storeState,
+      storeZip,
+      storePhone,
+      storeSupportEmail,
+      storeOfficeEmail,
+      salesTaxPercent,
+      userPin,
+      stripePaymentsInfo,
+    } = request.data || {};
+
+    const normalizedLegalName = normalizeStoreString(storeLegalName, 200);
+    if (!normalizedLegalName) {
+      throw new HttpsError(
+        "invalid-argument",
+        "storeLegalName is required (≤200 chars)."
+      );
+    }
+    const normalizedDisplayName = normalizeStoreString(storeDisplayName, 100);
+    if (!normalizedDisplayName) {
+      throw new HttpsError(
+        "invalid-argument",
+        "storeDisplayName is required (≤100 chars)."
+      );
+    }
+    const normalizedStreet = normalizeStoreString(storeStreet, 200);
+    if (!normalizedStreet) {
+      throw new HttpsError("invalid-argument", "storeStreet is required (≤200 chars).");
+    }
+    const normalizedUnit = normalizeOptionalStoreString(storeUnit, 50);
+    if (normalizedUnit === null) {
+      throw new HttpsError("invalid-argument", "storeUnit must be a string ≤50 chars.");
+    }
+    const normalizedCity = normalizeStoreString(storeCity, 100);
+    if (!normalizedCity) {
+      throw new HttpsError("invalid-argument", "storeCity is required (≤100 chars).");
+    }
+    const normalizedState = normalizeStoreString(storeState, 2);
+    if (!normalizedState || !/^[A-Za-z]{2}$/.test(normalizedState)) {
+      throw new HttpsError("invalid-argument", "storeState must be a 2-letter code.");
+    }
+    const normalizedZip = normalizeZip(storeZip);
+    if (!normalizedZip) {
+      throw new HttpsError("invalid-argument", "storeZip must be 5 digits or ZIP+4.");
+    }
+    const normalizedStorePhone = normalizePhone(storePhone);
+    if (!normalizedStorePhone) {
+      throw new HttpsError(
+        "invalid-argument",
+        "storePhone is required and must be a valid 10-digit US number or E.164 international format."
+      );
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    const normalizedSupportEmail = normalizeEmail(storeSupportEmail);
+    if (!normalizedSupportEmail || !emailRegex.test(normalizedSupportEmail)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "storeSupportEmail is required and must be a valid email."
+      );
+    }
+    const normalizedOfficeEmail = normalizeEmail(storeOfficeEmail);
+    if (!normalizedOfficeEmail || !emailRegex.test(normalizedOfficeEmail)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "storeOfficeEmail is required and must be a valid email."
+      );
+    }
+    const normalizedTax = normalizeSalesTaxPercent(salesTaxPercent);
+    if (normalizedTax === null) {
+      throw new HttpsError(
+        "invalid-argument",
+        "salesTaxPercent is required and must be a number between 0 and 100."
+      );
+    }
+    if (typeof userPin !== "string" || !/^\d{4}$/.test(userPin)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "userPin must be exactly 4 digits."
+      );
+    }
+
+    // Stripe Payments Info validation. All fields required — owner can't
+    // bypass card payments setup at bootstrap; this is the only flow that
+    // collects them before Stripe's hosted onboarding kicks in.
+    if (!stripePaymentsInfo || typeof stripePaymentsInfo !== "object") {
+      throw new HttpsError(
+        "invalid-argument",
+        "stripePaymentsInfo is required."
+      );
+    }
+    const businessUrlRaw =
+      typeof stripePaymentsInfo.businessUrl === "string"
+        ? stripePaymentsInfo.businessUrl.trim()
+        : "";
+    if (!/^https?:\/\/\S+\.\S+/.test(businessUrlRaw)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "stripePaymentsInfo.businessUrl must be a full http(s) URL."
+      );
+    }
+    const bankRoutingRaw =
+      typeof stripePaymentsInfo.bankRouting === "string"
+        ? stripePaymentsInfo.bankRouting.replace(/\D/g, "")
+        : "";
+    if (!/^\d{9}$/.test(bankRoutingRaw)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "stripePaymentsInfo.bankRouting must be exactly 9 digits."
+      );
+    }
+    const bankAccountRaw =
+      typeof stripePaymentsInfo.bankAccount === "string"
+        ? stripePaymentsInfo.bankAccount.replace(/\D/g, "")
+        : "";
+    if (!/^\d{4,17}$/.test(bankAccountRaw)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "stripePaymentsInfo.bankAccount must be 4-17 digits."
+      );
+    }
+    const dobRaw = stripePaymentsInfo.dob || {};
+    const dobMonthNum = Number(dobRaw.month);
+    const dobDayNum = Number(dobRaw.day);
+    const dobYearNum = Number(dobRaw.year);
+    const currentYear = new Date().getFullYear();
+    if (
+      !Number.isInteger(dobMonthNum) ||
+      dobMonthNum < 1 ||
+      dobMonthNum > 12 ||
+      !Number.isInteger(dobDayNum) ||
+      dobDayNum < 1 ||
+      dobDayNum > 31 ||
+      !Number.isInteger(dobYearNum) ||
+      dobYearNum < 1900 ||
+      dobYearNum > currentYear - 13
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "stripePaymentsInfo.dob must be a valid date (owner at least 13 years old)."
+      );
+    }
+    const ssnLast4Raw =
+      typeof stripePaymentsInfo.ssnLast4 === "string"
+        ? stripePaymentsInfo.ssnLast4
+        : "";
+    if (!/^\d{4}$/.test(ssnLast4Raw)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "stripePaymentsInfo.ssnLast4 must be exactly 4 digits."
+      );
+    }
+
+    const db = getFirestore();
+    const tenantRef = db.collection("tenants").doc(tenantID);
+    const tenantSnap = await tenantRef.get();
+    if (!tenantSnap.exists) {
+      throw new HttpsError("not-found", `Tenant ${tenantID} not found.`);
+    }
+    const tenantData = tenantSnap.data() || {};
+    if (tenantData.ownerUID !== auth.uid) {
+      throw new HttpsError(
+        "permission-denied",
+        "Caller is not the owner of this tenant."
+      );
+    }
+
+    const storeRef = tenantRef.collection("stores").doc(storeID);
+    const storeSnap = await storeRef.get();
+    if (!storeSnap.exists) {
+      throw new HttpsError("not-found", `Store ${storeID} not found.`);
+    }
+    if (storeSnap.data()?.isSetupComplete === true) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Store setup is already complete."
+      );
+    }
+
+    const storeAddress = {
+      street: normalizedStreet,
+      unit: normalizedUnit,
+      city: normalizedCity,
+      state: normalizedState.toUpperCase(),
+      zip: normalizedZip,
+      phone: normalizedStorePhone,
+      supportEmail: normalizedSupportEmail,
+      officeEmail: normalizedOfficeEmail,
+    };
+
+    // Flip the setup-complete gate on the store doc. All operational fields
+    // (legalName, displayName, address, emails, sales tax) are written into
+    // the settings doc below — store doc holds only billing wiring + gating
+    // + audit.
+    await storeRef.update({
+      isSetupComplete: true,
+      setupCompletedAt: FieldValue.serverTimestamp(),
+    });
+
+    // Settings doc was created at tenant time with null/empty storeInfo. Now
+    // we apply the real overrides so the running app reads the right values.
+    // We also seed the users array with an Owner-privilege APP_USER record
+    // built from the tenant signup data + the PIN the owner just chose, so
+    // they can immediately log into the in-app POS from the login screen.
+    const settingsRef = storeRef.collection("settings").doc("settings");
+    const settingsSnap = await settingsRef.get();
+    if (settingsSnap.exists) {
+      const existingSettings = settingsSnap.data();
+      const updatedSettings = applyStoreOverrides(existingSettings, {
+        tenantID,
+        storeID,
+        storeDisplayName: normalizedDisplayName,
+        storeLegalName: normalizedLegalName,
+        storeAddress,
+        salesTaxPercent: normalizedTax,
+      });
+
+      // Storage split: identity lives on tenants/{tenantID}/users/{userID}
+      // (canonical). Per-store presence + ephemera + the disabled flag live
+      // on settings.users[i]. The in-app settings listener hydrates per-store
+      // entries with identity from the tenant-level docs so readers see the
+      // merged APP_USER shape via useSettingsStore.settings.users[]. Keyed by
+      // Firebase Auth UID so the passwordless sign-in flow can address the
+      // tenant user doc directly.
+      const userID = auth.uid;
+
+      const tenantUserDoc = {
+        first: tenantData.ownerFirstName || "",
+        last: tenantData.ownerLastName || "",
+        id: userID,
+        permissions: { name: "Owner", level: 5, id: "ownr_lvl" },
+        phone: tenantData.ownerPhone || "",
+        email: tenantData.ownerEmail || "",
+        pin: userPin,
+        faceDescriptor: "",
+        linkedUserID: userID,
+        hourlyWage: "",
+        stores: [storeID],
+      };
+
+      const perStoreUserEntry = {
+        id: userID,
+        disabled: false,
+        preview: true,
+        forwardSMS: false,
+        hidden: false,
+        statuses: [],
+        emailInboxes: [],
+        pendingWorkorderIDs: [],
+        loginMessageSuppressUntil: 0,
+        personalNotes: [],
+        showNewUserHelp: true,
+      };
+
+      const tenantUserRef = tenantRef.collection("users").doc(userID);
+      await tenantUserRef.set(tenantUserDoc);
+
+      updatedSettings.users = Array.isArray(updatedSettings.users)
+        ? [...updatedSettings.users, perStoreUserEntry]
+        : [perStoreUserEntry];
+
+      await settingsRef.set(updatedSettings);
+    }
+
+    // Push Stripe Payments Info to the existing Connect account. Each step
+    // is best-effort inside applyOwnerKYCInternal — failures don't abort
+    // bootstrap, they're surfaced in the return value so the dashboard /
+    // owner UI can prompt for retry against Stripe's hosted onboarding.
+    let stripeKYCResult = {
+      businessUrlError: null,
+      bankAccountError: null,
+      representativeKYCError: null,
+      noConnectAccount: false,
+    };
+    try {
+      const stripeAccountID =
+        await stripeConnectInternals.findTenantConnectAccountID(db, tenantID);
+      if (!stripeAccountID) {
+        stripeKYCResult.noConnectAccount = true;
+        logger.warn("ownerCompleteBootstrapCallable: no Connect account for tenant", {
+          tenantID,
+          storeID,
+        });
+      } else {
+        const accountHolderName =
+          [tenantData.ownerFirstName || "", tenantData.ownerLastName || ""]
+            .filter(Boolean)
+            .join(" ") || tenantData.name || "";
+        const tosIp =
+          (request.rawRequest &&
+            (request.rawRequest.ip ||
+              (request.rawRequest.headers &&
+                request.rawRequest.headers["x-forwarded-for"]))) ||
+          "127.0.0.1";
+        const applyErrs = await stripeConnectInternals.applyOwnerKYCInternal({
+          secret: stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY,
+          stripeAccountID,
+          businessUrl: businessUrlRaw,
+          bankRouting: bankRoutingRaw,
+          bankAccount: bankAccountRaw,
+          accountHolderName,
+          accountHolderType: "individual",
+          dob: { day: dobDayNum, month: dobMonthNum, year: dobYearNum },
+          ssnLast4: ssnLast4Raw,
+          tosIp:
+            typeof tosIp === "string" ? tosIp.split(",")[0].trim() : "127.0.0.1",
+        });
+        stripeKYCResult = { ...stripeKYCResult, ...applyErrs };
+      }
+    } catch (err) {
+      // Should be unreachable — applyOwnerKYCInternal catches internally.
+      logger.error("ownerCompleteBootstrapCallable: Stripe KYC push unexpected failure", {
+        tenantID,
+        storeID,
+        error: err && err.message,
+      });
+      stripeKYCResult.representativeKYCError =
+        err && err.message ? err.message : String(err);
+    }
+
+    // Mark the owner's Auth record as email-verified so subsequent flows
+    // don't treat them as unverified. The account stays passwordless; future
+    // sign-ins go through the passwordless email/SMS code flow.
+    try {
+      await admin.auth().updateUser(auth.uid, { emailVerified: true });
+    } catch (err) {
+      logger.error("ownerCompleteBootstrapCallable: emailVerified set failed", {
+        tenantID,
+        storeID,
+        uid: auth.uid,
+        error: err.message,
+      });
+      throw new HttpsError(
+        "internal",
+        `Failed to mark email verified: ${err.message}`
+      );
+    }
+
+    logger.info("ownerCompleteBootstrapCallable: bootstrap complete", {
+      tenantID,
+      storeID,
+      uid: auth.uid,
+      stripeKYCResult,
+    });
+
+    return { success: true, tenantID, storeID, stripeKYCResult };
+  }
+);
+
+// Permanently deletes a tenant's Firestore footprint (tenant doc + all
+// subcollections) and clears the owner's auth claims so the email can be
+// reused. Requires the caller to send `confirmTenantName` matching the
+// tenant's `name` field — guards against fat-finger deletes from the
+// dashboard. External resources (Stripe Connect account, Twilio subaccount,
+// Stripe subscription) are NOT torn down here; the dashboard surfaces those
+// as separate lifecycle actions per-vendor.
+exports.platformAdminDeleteTenantCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [
+      stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY,
+      twilioSubaccountInternals.TWILIO_MASTER_ACCOUNT_SID,
+      twilioSubaccountInternals.TWILIO_MASTER_AUTH_TOKEN,
+    ],
+  },
+  async (request) => {
+    const auth = requireAuth(request);
+    assertPlatformAdmin(auth);
+
+    const {
+      tenantID,
+      confirmTenantName,
+      nukeExternal = false,
+      skipConfirmation = false,
+    } = request.data || {};
+    if (!tenantID || typeof tenantID !== "string") {
+      throw new HttpsError("invalid-argument", "tenantID is required.");
+    }
+
+    const db = getFirestore();
+    const tenantRef = db.collection("tenants").doc(tenantID);
+    const tenantSnap = await tenantRef.get();
+    if (!tenantSnap.exists) {
+      throw new HttpsError("not-found", `Tenant ${tenantID} not found.`);
+    }
+    const tenant = tenantSnap.data() || {};
+
+    if (!skipConfirmation) {
+      const expected = tenant.name || tenantID;
+      if (!confirmTenantName || confirmTenantName.trim() !== expected) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Confirmation text does not match tenant name."
+        );
+      }
+    }
+
+    const externalResults = {
+      stripeConnect: { attempted: false, success: false, error: null, accountID: null },
+      twilio: { attempted: false, success: false, error: null, subaccountSid: null },
+      authUser: { attempted: false, success: false, error: null, ownerUID: null },
+    };
+
+    if (nukeExternal) {
+      // Stripe Connect account teardown.
+      try {
+        const accountID =
+          await stripeConnectInternals.findTenantConnectAccountID(db, tenantID);
+        if (accountID) {
+          externalResults.stripeConnect.attempted = true;
+          externalResults.stripeConnect.accountID = accountID;
+          await stripeConnect.deleteConnectedAccount(
+            stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY,
+            accountID
+          );
+          // Top-level index entry isn't under the tenant doc, recursiveDelete
+          // won't catch it. Clean it explicitly so reuse of the accountID
+          // (impossible in practice) wouldn't hit a stale row.
+          try {
+            await db
+              .collection("connect-accounts-index")
+              .doc(accountID)
+              .delete();
+          } catch (idxErr) {
+            logger.warn(
+              "platformAdminDeleteTenantCallable: connect-accounts-index delete failed",
+              { tenantID, accountID, error: idxErr.message }
+            );
+          }
+          externalResults.stripeConnect.success = true;
+        }
+      } catch (err) {
+        externalResults.stripeConnect.error =
+          err && err.message ? err.message : String(err);
+        logger.error("platformAdminDeleteTenantCallable: Stripe teardown failed", {
+          tenantID,
+          error: externalResults.stripeConnect.error,
+        });
+      }
+
+      // Twilio subaccount teardown (force=true so the suspended-precondition
+      // is skipped — dev cleanup is allowed to nuke active subaccounts).
+      try {
+        const twilioRef = db
+          .collection("tenants")
+          .doc(tenantID)
+          .collection("twilio")
+          .doc("subaccount");
+        const twilioSnap = await twilioRef.get();
+        if (twilioSnap.exists) {
+          const twilioData = twilioSnap.data() || {};
+          if (twilioData.status !== "closed") {
+            externalResults.twilio.attempted = true;
+            externalResults.twilio.subaccountSid = twilioData.subaccountSid || null;
+            await twilioSubaccountInternals.closeSubaccountInternal({
+              tenantID,
+              actorUID: auth.uid,
+              actorKind: "platform-admin",
+              force: true,
+            });
+            externalResults.twilio.success = true;
+          }
+        }
+      } catch (err) {
+        externalResults.twilio.error =
+          err && err.message ? err.message : String(err);
+        logger.error("platformAdminDeleteTenantCallable: Twilio teardown failed", {
+          tenantID,
+          error: externalResults.twilio.error,
+        });
+      }
+
+      // Auth user teardown so the email is reusable.
+      if (tenant.ownerUID) {
+        externalResults.authUser.attempted = true;
+        externalResults.authUser.ownerUID = tenant.ownerUID;
+        try {
+          await admin.auth().deleteUser(tenant.ownerUID);
+          externalResults.authUser.success = true;
+        } catch (err) {
+          externalResults.authUser.error =
+            err && err.message ? err.message : String(err);
+          logger.error(
+            "platformAdminDeleteTenantCallable: Auth user delete failed",
+            { tenantID, ownerUID: tenant.ownerUID, error: externalResults.authUser.error }
+          );
+        }
+      }
+    }
+
+    // recursiveDelete walks all subcollections under the tenant doc and
+    // deletes them along with the tenant doc itself.
+    await db.recursiveDelete(tenantRef);
+
+    // If we didn't nuke the Auth user, at minimum clear its claims so the
+    // email can be reused under a fresh tenant.
+    if (!nukeExternal && tenant.ownerUID) {
+      try {
+        await admin.auth().setCustomUserClaims(tenant.ownerUID, null);
+      } catch (err) {
+        logger.warn("platformAdminDeleteTenantCallable: clear claims failed", {
+          tenantID,
+          ownerUID: tenant.ownerUID,
+          error: err.message,
+        });
+      }
+    }
+
+    logger.info("platformAdminDeleteTenantCallable: tenant deleted", {
+      tenantID,
+      ownerUID: tenant.ownerUID || null,
+      byUID: auth.uid,
+      nukeExternal,
+      externalResults,
+    });
+
+    return { success: true, tenantID, externalResults };
   }
 );

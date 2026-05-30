@@ -1,4 +1,4 @@
-import { ICONS, C } from "../../../styles";
+import { ICONS, C, Radius } from "../../../styles";
 import { Image, DropdownMenu, TouchableOpacity, AlertBox } from "../../../dom_components";
 import { useAlertScreenStore } from "../../../stores";
 import { WorkorderCard } from "../WorkorderCard/WorkorderCard";
@@ -11,7 +11,7 @@ const USER_DROPDOWN_BUTTON_STYLE = {
   borderWidth: 1,
   borderColor: C.borderDefault,
   backgroundColor: C.surfaceAccentMuted,
-  borderRadius: 5,
+  borderRadius: Radius.control,
 };
 
 const USER_DROPDOWN_TEXT_STYLE = {

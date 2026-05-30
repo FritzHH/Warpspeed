@@ -50,7 +50,7 @@
 
 .swdBackButton {
   padding: 6px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   font-size: 14px;
   font-weight: 600;
 }
@@ -66,13 +66,13 @@
   padding: 8px;
   border-width: 1px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
 }
 
 .swdSectionParts {
   margin-top: 8px;
   padding: 8px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
 }
 
 .swdRow {
@@ -144,7 +144,7 @@
   border-style: solid;
   padding: 4px 6px;
   font-size: 14px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   outline: none;
   box-sizing: border-box;
 }
@@ -163,7 +163,7 @@
 .swdAdjustBtn {
   width: 24px;
   height: 24px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   display: flex;
   justify-content: center;
   align-items: center;
@@ -214,7 +214,7 @@
   position: absolute;
   top: -1px;
   right: -5px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   min-width: 16px;
   height: 16px;
   display: flex;
@@ -245,13 +245,13 @@
 .swdProgressTrack {
   flex: 1;
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   overflow: hidden;
 }
 
 .swdProgressFill {
   height: 100%;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
 }
 
 .swdGrayLabel {
@@ -286,7 +286,7 @@
   width: 70%;
   max-width: 420px;
   background-color: var(--surface-base);
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   overflow: hidden;
 }
 
@@ -359,7 +359,7 @@
   width: 95%;
   height: 95%;
   background-color: var(--surface-base);
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -412,7 +412,7 @@
 
 .nwmSearchBox {
   flex: 1;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border-width: 2px;
   border-style: solid;
   display: flex;
@@ -430,7 +430,7 @@
 
 .nwmModeToggle {
   padding: 0 34px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -462,7 +462,7 @@
   align-items: center;
   padding: 17px 12px;
   margin-bottom: 4px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border-width: 1px;
   border-style: solid;
   gap: 16px;
@@ -507,7 +507,7 @@
 
 .nwmCreateBtn {
   padding: 14px 0;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   width: 100%;
   border: none;
   cursor: pointer;
@@ -530,7 +530,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border-width: 2px;
   border-style: solid;
   cursor: pointer;
@@ -573,7 +573,7 @@
   width: 95%;
   height: 95%;
   background-color: rgba(255, 255, 255, 0.95);
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -629,7 +629,7 @@
   justify-content: center;
   gap: 8px;
   padding: 22px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border-width: 2px;
   border-style: solid;
   cursor: pointer;
@@ -668,7 +668,7 @@
   gap: 10px;
   padding: 10px;
   margin-bottom: 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border-width: 2px;
   border-style: solid;
   cursor: pointer;
@@ -698,7 +698,7 @@
 
 .scimQuickNotesBtn {
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border: none;
   cursor: pointer;
   font-size: 16px;
@@ -726,7 +726,7 @@
 
 .scimDiscountChip {
   padding: 8px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border-width: 1px;
   border-style: solid;
   cursor: pointer;
@@ -769,7 +769,7 @@
 
 .scimSaveBtn {
   padding: 32px 0;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   width: 100%;
   border: none;
   cursor: pointer;
@@ -796,7 +796,7 @@
   max-width: 500px;
   max-height: 80%;
   background-color: var(--surface-base);
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -849,7 +849,7 @@
   align-items: center;
   padding: 10px 8px;
   margin-bottom: 4px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border-width: 1px;
   border-style: solid;
   cursor: pointer;
@@ -973,7 +973,7 @@
 
 .standFooterMenuContent {
   background-color: var(--surface-base);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border-width: 2px;
   border-style: solid;
   box-shadow: 0 -2px 8px var(--shadow-color-default);
@@ -1044,14 +1044,14 @@
   width: 70%;
   max-width: 500px;
   background-color: var(--surface-base);
-  border-radius: 14px;
+  border-radius: var(--radius-container);
   overflow: hidden;
   flex-shrink: 0;
 }
 
 .standSettingsKeypadPreview {
   background-color: var(--surface-base);
-  border-radius: 14px;
+  border-radius: var(--radius-container);
   padding: 14px;
   flex-shrink: 0;
 }
@@ -1063,7 +1063,7 @@
   justify-content: space-between;
   gap: 12px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border-width: 2px;
   border-style: solid;
   margin-top: 10px;
@@ -1079,7 +1079,7 @@
 .standSettingsScaleBtn {
   width: 56px;
   height: 56px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border-width: 2px;
   border-style: solid;
   display: flex;
@@ -1142,7 +1142,7 @@
   align-items: center;
   gap: 12px;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border-width: 2px;
   border-style: solid;
 }
@@ -1170,7 +1170,7 @@
   align-items: center;
   padding: 30px 40px;
   background-color: var(--surface-base);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
 }
 
 .standFaceTitle {
@@ -1188,7 +1188,7 @@
 .standFacePinBtn {
   margin-top: 20px;
   padding: 12px 28px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
 }
 
 .standFacePinBtnText {
@@ -1202,7 +1202,7 @@
   align-items: center;
   padding: 30px 40px;
   background-color: var(--surface-base);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   min-width: 280px;
 }
 
@@ -1224,7 +1224,7 @@
   height: 52px;
   border-width: 2px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   margin: 0 4px;
   display: flex;
   justify-content: center;
@@ -1235,7 +1235,7 @@
 .standPinDotFilled {
   width: 14px;
   height: 14px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
 }
 
 .standPinCancel {
@@ -1462,7 +1462,7 @@
   justify-content: center;
   padding: 15px 0;
   background-color: rgb(255, 220, 220);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   cursor: pointer;
 }
 
@@ -1495,7 +1495,7 @@
   align-items: center;
   justify-content: center;
   padding: 60px;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   gap: 12px;
 }
 
@@ -1510,7 +1510,7 @@
   align-items: center;
   justify-content: center;
   padding: 120px;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   gap: 24px;
 }
 
@@ -1536,7 +1536,7 @@
   width: 95%;
   height: 95%;
   background-color: rgba(255, 255, 255, 0.97);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1572,7 +1572,7 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 10px 18px;
   gap: 8px;
 }
@@ -1642,7 +1642,7 @@
   right: 0;
   border-width: 1px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   max-height: 600px;
   overflow: auto;
   /* z-allow: local autocomplete suggestion list, position: absolute */
@@ -1735,7 +1735,7 @@
   flex-direction: row;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   padding: 20px 0;
   gap: 12px;
 }
@@ -1801,7 +1801,7 @@
   position: relative;
   width: 100%;
   overflow: hidden;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 5px;
   box-sizing: border-box;
 }
@@ -1814,7 +1814,7 @@
   justify-content: center;
   border-width: 1px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   overflow: visible;
   padding: 2px 4px;
   transition-property: transform;
@@ -1836,7 +1836,7 @@
   position: absolute;
   top: -8px;
   left: -8px;
-  border-radius: 18px;
+  border-radius: var(--radius-container);
   min-width: 36px;
   height: 36px;
   display: flex;
@@ -1896,7 +1896,7 @@
 
 .standItemsOverlayInner {
   background-color: rgba(240, 240, 240, 0.9);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   padding: 10px;
   align-self: flex-start;
 }
@@ -1910,7 +1910,7 @@
 }
 
 .standItemSideBtn {
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 5px 8px;
   display: flex;
   align-items: center;
@@ -1929,7 +1929,7 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   border-width: 1px;
   border-style: solid;
   border-left-width: 6px;
@@ -1938,7 +1938,7 @@
 }
 
 .standItemKindBadge {
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   padding: 4px 10px;
   margin-right: 8px;
   display: inline-flex;
@@ -1976,7 +1976,7 @@
 }
 
 .standItemQtyPill {
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   min-width: 28px;
   height: 28px;
   display: flex;
@@ -1992,7 +1992,7 @@
 }
 
 .standItemPricePill {
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 2px 7px;
   margin-left: 12px;
   display: inline-flex;
@@ -2033,7 +2033,7 @@
 .standCanvasFooterEditStep {
   width: 40px;
   height: 40px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2114,7 +2114,7 @@
 }
 
 .standCanvasFooterCountPill {
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   min-width: 32px;
   height: 32px;
   display: flex;
@@ -2141,7 +2141,7 @@
 }
 
 .printerDialog {
-  border-radius: 14px;
+  border-radius: var(--radius-container);
   width: 75%;
   max-height: 85%;
   overflow: hidden;
@@ -2166,7 +2166,7 @@
 }
 
 .printerIntakeCard {
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border-width: 1px;
   border-style: solid;
   padding: 14px;
@@ -2206,7 +2206,7 @@
 }
 
 .printerCard {
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border-width: 1px;
   border-style: solid;
   padding: 12px;
@@ -2220,7 +2220,7 @@
   font-size: 12px;
   font-weight: 700;
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   display: inline-block;
 }
 
@@ -2272,7 +2272,7 @@
   width: 95%;
   height: 98%;
   background-color: rgba(255, 255, 255, 0.97);
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2361,7 +2361,7 @@
   margin-bottom: 10px;
   border-width: 1px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 12px;
 }
 
@@ -2380,7 +2380,7 @@
 }
 
 .notesChip {
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 12px;
   border-width: 1px;
   border-style: solid;
@@ -2407,7 +2407,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 24px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
 }
 
 .notesTargetText {
@@ -2433,7 +2433,7 @@
   align-items: center;
   gap: 8px;
   padding: 10px 24px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
 }
 
 .notesActionBtnText {
@@ -2447,7 +2447,7 @@
   right: 0;
   z-index: 100;
   background-color: var(--surface-base);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border: 1px solid;
   box-shadow: 0 2px 8px var(--shadow-color-default);
   min-width: 160px;
@@ -2488,7 +2488,7 @@
   flex: 1;
   border-width: 2px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 6px 10px;
   min-height: 88px;
   cursor: text;
@@ -2542,7 +2542,7 @@
 
 .notesCloseBtn {
   flex: 1;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2566,7 +2566,7 @@
   width: 135px;
   padding-right: 2px;
   border: 1px solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   margin-left: 5px;
   flex-shrink: 0;
 }
@@ -2615,7 +2615,7 @@
   width: 95%;
   height: 90%;
   background-color: var(--surface-base);
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -2643,7 +2643,7 @@
   flex-direction: row;
   align-items: center;
   border: 1px solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 0 10px;
   height: 40px;
 }
@@ -2666,7 +2666,7 @@
 
 .wlmNewBtn {
   flex-shrink: 0;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 10px 18px;
   display: flex;
   align-items: center;
@@ -2681,7 +2681,7 @@
 .wlmCloseBtn {
   flex-shrink: 0;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2707,7 +2707,7 @@
 
 .wlmItem {
   margin-bottom: 4px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   border: 1px solid;
   border-left-width: 4px;
   display: flex;
@@ -2744,7 +2744,7 @@
 .wlmItemSmsDot {
   width: 8px;
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   margin-right: 5px;
   flex-shrink: 0;
 }
@@ -2765,7 +2765,7 @@
 .wlmItemColorDot {
   width: 10px;
   height: 10px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   margin-right: 4px;
   flex-shrink: 0;
 }
@@ -2789,7 +2789,7 @@
 
 .wlmItemLineCount {
   background-color: var(--text-muted);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 1px 6px;
   margin-left: 8px;
   flex-shrink: 0;
@@ -2834,7 +2834,7 @@
   flex-direction: row;
   padding: 2px 11px;
   align-items: center;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border: 1px solid transparent;
 }
 

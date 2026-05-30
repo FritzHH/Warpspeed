@@ -57,6 +57,24 @@ export function releaseZ(bandName, z) {
   if (used) used.delete(z);
 }
 
+// Radius registry. MUST match the --radius-* tokens in
+// src/styles/tokens.css. Four buckets by role:
+//
+//   container  modals, panels, large cards            (4px)
+//   row        list rows, smaller cards               (8px)
+//   control    buttons, inputs, dropdowns, chips      (4px)
+//   pill       fully rounded badges/toggles/avatars   (9999px)
+//
+// Usage in JSX inline styles: { borderRadius: Radius.row }
+// CSS modules should prefer var(--radius-*) directly.
+// See docs/design-tokens.md "Radius Registry" for the full design.
+export const Radius = {
+  container: "var(--radius-container)",
+  row:       "var(--radius-row)",
+  control:   "var(--radius-control)",
+  pill:      "var(--radius-pill)",
+};
+
 export const Colors = {
   // mainBackground: "white",
   mainBackground: "rgb(61, 180, 231)",

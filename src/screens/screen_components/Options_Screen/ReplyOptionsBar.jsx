@@ -5,6 +5,7 @@ import { Image as ImageDom, TouchableOpacity as TouchableOpacityDom, Tooltip } f
 import { C, ICONS } from "../../../styles";
 import { useLoginStore, useSettingsStore } from "../../../stores";
 import s from "./Messages.module.css";
+import { capitalizeFirstLetterOfString } from "../../../utils";
 
 const AUTO_SEND_SECONDS = 10;
 
@@ -77,17 +78,17 @@ function ForwardUsersDropdown({ selectedForwardIDs, onChangeSelectedForwardIDs }
   }
 
   let selectedCount = selectedForwardIDs?.length || 0;
-  let currentUserID = useLoginStore.getState().getCurrentUser()?.id;
+  let currentUser = useLoginStore.getState().getCurrentUser();
+  let currentUserID = currentUser?.id;
   let buttonLabel;
   if (selectedCount === 0) {
     buttonLabel = "No one";
   } else {
     let names = selectedForwardIDs
       .map((id) => {
-        if (id === currentUserID) return "You";
-        let u = users.find((x) => x.id === id);
+        let u = id === currentUserID ? currentUser : users.find((x) => x.id === id);
         if (!u) return null;
-        return (u.first || "") + (u.last ? " " + u.last.charAt(0) + "." : "");
+        return capitalizeFirstLetterOfString(u.first || "") + (u.last ? " " + u.last.charAt(0).toUpperCase() + "." : "");
       })
       .filter(Boolean);
     buttonLabel = names.join(", ");

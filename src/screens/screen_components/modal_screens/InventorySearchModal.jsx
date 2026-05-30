@@ -163,8 +163,8 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
         </div>
 
         <ModalFooter>
-          <ModalFooterButton onClick={onClose}>
-            Close
+          <ModalFooterButton variant="default" onClick={onClose}>
+            CLOSE
           </ModalFooterButton>
           <ModalFooterButton
             variant="accent"

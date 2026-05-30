@@ -57,7 +57,7 @@
   border-style: solid;
   border-color: var(--border-default);
   background-color: var(--surface-raised);
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 0 8px;
   height: 36px;
   box-sizing: border-box;

@@ -8,7 +8,7 @@
 
 import { translateText } from "../db_calls";
 import { printBuilder } from "./printBuilder";
-import { DEFAULT_SALE_LABELS } from "../receiptLabels";
+import { DEFAULT_SALE_LABELS } from "./receiptLabels";
 
 // ── Helpers ──
 

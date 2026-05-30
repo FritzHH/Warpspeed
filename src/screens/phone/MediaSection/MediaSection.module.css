@@ -1,6 +1,6 @@
 .card {
   background-color: var(--surface-raised);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border-width: 1px;
   border-style: solid;
   border-color: var(--border-default);
@@ -35,7 +35,7 @@
 
 .countBadge {
   background-color: var(--info);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding-left: 6px;
   padding-right: 6px;
   padding-top: 1px;
@@ -62,7 +62,7 @@
   flex-direction: row;
   align-items: center;
   background-color: var(--danger);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding-left: 12px;
   padding-right: 12px;
   padding-top: 6px;
@@ -76,7 +76,7 @@
   flex-direction: row;
   align-items: center;
   background-color: var(--info);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding-left: 12px;
   padding-right: 12px;
   padding-top: 6px;
@@ -110,14 +110,14 @@
 
 .progressTrack {
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background-color: var(--border-subtle);
   overflow: hidden;
 }
 
 .progressFill {
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
   background-color: var(--info);
 }
 
@@ -146,7 +146,7 @@
 .thumb {
   width: 31%;
   aspect-ratio: 1;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   overflow: hidden;
   background-color: var(--surface-alt);
   position: relative;
@@ -204,7 +204,7 @@
   z-index: 2;
   width: 36px;
   height: 36px;
-  border-radius: 18px;
+  border-radius: var(--radius-container);
   background-color: rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;

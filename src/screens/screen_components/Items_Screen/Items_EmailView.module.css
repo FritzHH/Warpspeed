@@ -129,7 +129,7 @@
   flex-direction: column;
   border-width: 1px;
   border-style: solid;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   overflow: hidden;
   margin-bottom: 12px;
   flex-shrink: 0;
@@ -192,7 +192,7 @@
   flex-direction: row;
   align-self: flex-start;
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   margin-bottom: 8px;
 }
 
@@ -219,7 +219,7 @@
   flex-direction: row;
   align-items: center;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   margin-bottom: 4px;
   flex-shrink: 0;
 }
@@ -295,7 +295,7 @@
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
-  border-radius: 14px;
+  border-radius: var(--radius-container);
   border-width: 1px;
   border-style: solid;
   background: transparent;
@@ -369,7 +369,7 @@
   flex-direction: column;
   border-width: 1px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   overflow: hidden;
   min-height: 250px;
   margin-bottom: 12px;
@@ -388,7 +388,7 @@
   flex-direction: row;
   align-items: center;
   padding: 6px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   margin-right: 8px;
   flex-shrink: 0;
 }
@@ -413,7 +413,7 @@
   flex-direction: row;
   align-items: center;
   padding: 6px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   margin-bottom: 4px;
   flex-shrink: 0;
 }
@@ -503,7 +503,7 @@
   flex-direction: column;
   border-width: 1px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   max-height: 220px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -533,7 +533,7 @@
 .actionButton {
   display: flex;
   padding: 4px 10px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   margin-left: 6px;
   flex-shrink: 0;
 }

@@ -14,7 +14,7 @@
 .modal {
   width: 420px;
   background-color: var(--surface-raised);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -25,20 +25,6 @@
   display: flex;
   flex-direction: column;
   padding: 20px;
-}
-
-.header {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 15px;
-}
-
-.headerTitle {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--text-default);
 }
 
 .fieldLabel {
@@ -54,7 +40,7 @@
 
 .input {
   border: 1px solid var(--border-default);
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 6px 8px;
   font-size: 15px;
   color: var(--text-default);
@@ -73,9 +59,29 @@
   text-align: center;
 }
 
-.inputPrice {
+.priceInputWrap {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
   width: 120px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  background-color: var(--surface-raised);
+  padding: 6px 8px;
+  box-sizing: border-box;
+}
+
+.inputPriceBare {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  padding: 0;
   text-align: right;
+  outline: none;
+  font-size: 15px;
+  color: var(--text-default);
+  font-family: inherit;
 }
 
 .inputArea {
@@ -113,7 +119,7 @@
 .discountTrigger {
   width: 100%;
   border: 1px solid var(--border-default);
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background-color: var(--surface-raised);
   padding: 8px 10px;
   display: flex;
@@ -180,7 +186,7 @@
 .dropdown {
   position: fixed;
   background-color: var(--surface-base);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border: 2px solid var(--border-subtle);
   box-shadow: 0 4px 16px var(--shadow-color-default);
   max-height: 340px;
@@ -235,7 +241,7 @@
 .customInput {
   height: 28px;
   border: 1px solid var(--border-default);
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   padding: 0 6px;
   font-size: 13px;
   color: var(--text-default);
@@ -254,20 +260,3 @@
   width: 70px;
 }
 
-.customSubmit {
-  margin-left: 4px;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  background-color: var(--accent);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
-
-.customSubmit:hover {
-  opacity: 0.85;
-}

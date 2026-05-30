@@ -33,7 +33,7 @@ import {
   useAlertScreenStore,
   broadcastFullWorkorderToDisplay,
 } from "../../stores";
-import { C, ICONS } from "../../styles";
+import { C, ICONS, Radius } from "../../styles";
 import { ROUTES } from "../../routes";
 import { EmptyItemsComponent } from "../screen_components/Items_Screen/Items_Empty";
 const Items_ChangeLog = lazy(() =>
@@ -64,6 +64,9 @@ import {
 const DevNotesModal = lazy(() =>
   import("../screen_components/modal_screens/DevNotesModal").then((m) => ({ default: m.DevNotesModal }))
 );
+const NewUserHelpModal = lazy(() =>
+  import("../screen_components/modal_screens/NewUserHelpModal/NewUserHelpModal").then((m) => ({ default: m.NewUserHelpModal }))
+);
 
 const IS_DEV = import.meta.env.DEV;
 
@@ -71,6 +74,7 @@ export const Items_Section = React.memo(({}) => {
   // setters ///////////////////////////////////////////////////////////////////
   const [sShowTranslateModal, _sSetShowTranslateModal] = useState(false);
   const [sShowDevNotes, _sSetShowDevNotes] = useState(false);
+  const [sShowNewUserHelp, _sSetShowNewUserHelp] = useState(false);
 
   // getters ///////////////////////////////////////////////////////////////////
   const zItemsTabName = useTabNamesStore((state) => state.itemsTabName);
@@ -81,8 +85,6 @@ export const Items_Section = React.memo(({}) => {
     let user = useLoginStore.getState().currentUser;
     let firstName = user?.first || "there";
     useAlertScreenStore.getState().setValues({
-      title: "PUNCH CLOCK",
-      severity: "info",
       message: "Hi " + firstName + ", you are not clocked in. Would you like to punch in now?",
       btn1Text: "CLOCK IN",
       btn2Text: "NOT NOW",
@@ -141,7 +143,7 @@ export const Items_Section = React.memo(({}) => {
       <TabBar
         onTranslatePress={() => _sSetShowTranslateModal(true)}
         onDevNotesPress={() => _sSetShowDevNotes(true)}
-        onTestModalPress={fireTestPunchClockAlert}
+        onTestModalPress={() => fireTestPunchClockAlert()}
       />
       {ScreenComponent()}
       <TranslateModal
@@ -153,6 +155,14 @@ export const Items_Section = React.memo(({}) => {
           <DevNotesModal
             visible={sShowDevNotes}
             onClose={() => _sSetShowDevNotes(false)}
+          />
+        </Suspense>
+      )}
+      {sShowNewUserHelp && (
+        <Suspense fallback={null}>
+          <NewUserHelpModal
+            visible={sShowNewUserHelp}
+            onClose={() => _sSetShowNewUserHelp(false)}
           />
         </Suspense>
       )}
@@ -250,14 +260,20 @@ const TranslateModal = ({ visible, onClose }) => {
           <span className={sectionStyles.translateTitle} style={{ color: C.text }}>
             Translate
           </span>
-          <button
-            type="button"
-            className={sectionStyles.closeButton}
-            onClick={handleClose}
+          <Button
+            icon={ICONS.close1}
+            iconSize={18}
+            onPress={handleClose}
             aria-label="Close"
-          >
-            <Image icon={ICONS.close1} width={18} height={18} />
-          </button>
+            buttonStyle={{
+              paddingLeft: 4,
+              paddingRight: 4,
+              paddingTop: 4,
+              paddingBottom: 4,
+              backgroundColor: "transparent",
+            }}
+            iconStyle={{ marginRight: 0 }}
+          />
         </div>
 
         <div className={sectionStyles.langRow}>
@@ -313,7 +329,7 @@ const TranslateModal = ({ visible, onClose }) => {
             style={{
               flex: 1,
               borderColor: C.buttonLightGreenOutline,
-              borderRadius: 10,
+              borderRadius: Radius.row,
               borderWidth: 2,
               backgroundColor: C.listItemWhite,
               paddingTop: 10,
@@ -324,18 +340,24 @@ const TranslateModal = ({ visible, onClose }) => {
             }}
           />
           {(sInputText.length > 0 || translatedText) && (
-            <button
-              type="button"
-              className={sectionStyles.resetButton}
-              onClick={() => {
+            <Button
+              icon={ICONS.reset1}
+              iconSize={22}
+              onPress={() => {
                 _sSetInputText("");
                 clearTranslation();
                 resetInactivityTimer();
               }}
               aria-label="Reset"
-            >
-              <Image icon={ICONS.reset1} size={22} />
-            </button>
+              buttonStyle={{
+                paddingLeft: 4,
+                paddingRight: 4,
+                paddingTop: 4,
+                paddingBottom: 4,
+                backgroundColor: "transparent",
+              }}
+              iconStyle={{ marginRight: 0 }}
+            />
           )}
         </div>
 
@@ -375,7 +397,7 @@ const TabBar = ({ onTranslatePress, onDevNotesPress, onTestModalPress }) => {
       <div className={sectionStyles.leftGroup}>
         {!!zOpenWorkorderID && (
           <TabMenuButton
-            style={{ borderTopLeftRadius: 15 }}
+            style={{ borderTopLeftRadius: Radius.container }}
             onPress={() =>
               useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.workorderItems)
             }
@@ -403,27 +425,55 @@ const TabBar = ({ onTranslatePress, onDevNotesPress, onTestModalPress }) => {
           </Tooltip>
         )}
         <Tooltip text="Notes for the app dev" position="bottom">
-          <button type="button" className={sectionStyles.iconButton} onClick={onDevNotesPress}>
-            <Image icon={ICONS.thoughtBubble} size={22} />
-          </button>
+          <Button
+            icon={ICONS.thoughtBubble}
+            iconSize={22}
+            onPress={onDevNotesPress}
+            buttonStyle={{
+              paddingLeft: 4,
+              paddingRight: 4,
+              paddingTop: 4,
+              paddingBottom: 4,
+              backgroundColor: "transparent",
+            }}
+            iconStyle={{ marginRight: 0 }}
+          />
         </Tooltip>
         {hasSecondaryDisplay && (
           <Tooltip text="Send translated text to customer display" position="bottom">
-            <button type="button" className={sectionStyles.iconButton} onClick={onTranslatePress}>
-              <Image icon={ICONS.paperPlane} size={22} />
-            </button>
+            <Button
+              icon={ICONS.paperPlane}
+              iconSize={22}
+              onPress={onTranslatePress}
+              buttonStyle={{
+                paddingLeft: 4,
+                paddingRight: 4,
+                paddingTop: 4,
+                paddingBottom: 4,
+                backgroundColor: "transparent",
+              }}
+              iconStyle={{ marginRight: 0 }}
+            />
           </Tooltip>
         )}
         {!!zOpenWorkorderID && hasSecondaryDisplay && <CastButton />}
-        <button
-          type="button"
-          className={`${sectionStyles.iconButton} ${sectionStyles.homeButton}`}
-          onClick={() => (window.location.href = ROUTES.home)}
-        >
-          <Image icon={ICONS.home} size={24} />
-        </button>
+        <div className={sectionStyles.homeButton}>
+          <Button
+            icon={ICONS.home}
+            iconSize={24}
+            onPress={() => (window.location.href = ROUTES.home)}
+            buttonStyle={{
+              paddingLeft: 4,
+              paddingRight: 4,
+              paddingTop: 4,
+              paddingBottom: 4,
+              backgroundColor: "transparent",
+            }}
+            iconStyle={{ marginRight: 0 }}
+          />
+        </div>
         <TabMenuButton
-          style={{ borderTopRightRadius: 15 }}
+          style={{ borderTopRightRadius: Radius.container }}
           onPress={() => {
             let current = useTabNamesStore.getState().itemsTabName;
             if (current === TAB_NAMES.itemsTab.dashboard && !useOpenWorkordersStore.getState().openWorkorderID) {
@@ -447,11 +497,10 @@ const CastButton = () => {
   const zOpenWorkorderID = useOpenWorkordersStore((s) => s.openWorkorderID);
   return (
     <Tooltip text={zCasting ? "Stop casting to customer screen" : "Cast workorder to customer screen"} position="bottom">
-      <button
-        type="button"
-        className={sectionStyles.iconButton}
-        style={{ opacity: zCasting ? 1 : 0.4 }}
-        onClick={() => {
+      <Button
+        icon={ICONS.display}
+        iconSize={22}
+        onPress={() => {
           if (zCasting) {
             broadcastClear();
             useOpenWorkordersStore.setState({ castingToDisplay: false });
@@ -463,9 +512,16 @@ const CastButton = () => {
             }
           }
         }}
-      >
-        <Image icon={ICONS.display} size={22} />
-      </button>
+        buttonStyle={{
+          paddingLeft: 4,
+          paddingRight: 4,
+          paddingTop: 4,
+          paddingBottom: 4,
+          backgroundColor: "transparent",
+          opacity: zCasting ? 1 : 0.4,
+        }}
+        iconStyle={{ marginRight: 0 }}
+      />
     </Tooltip>
   );
 };

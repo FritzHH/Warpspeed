@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { useState, useRef, memo } from "react";
 import { Button, Tooltip } from "../../../../dom_components";
-import { C, COLOR_GRADIENTS, Fonts } from "../../../../styles";
+import { C, COLOR_GRADIENTS, Fonts, Radius } from "../../../../styles";
 import { usdTypeMask, formatCurrencyDisp } from "../../../../utils";
 import { dlog, DCAT } from "./checkoutDebugLog";
 import styles from "./CashRefund.module.css";
@@ -72,7 +72,7 @@ export const CashRefund = memo(function CashRefund({
   let buttonStyle = {
     paddingTop: 8,
     paddingBottom: 8,
-    borderRadius: 6,
+    borderRadius: Radius.control,
     alignItems: "center",
     justifyContent: "center",
   };

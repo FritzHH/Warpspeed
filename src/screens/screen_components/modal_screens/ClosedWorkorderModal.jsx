@@ -1,13 +1,13 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { calculateRunningTotals, capitalizeFirstLetterOfString, formatCurrencyDisp, formatMillisForDisplay, formatPhoneWithDashes, lightenRGBByPercent, resolveStatus, formatWorkorderNumber, localStorageWrapper, findTemplateByType, log } from "../../../utils";
+import { calculateRunningTotals, capitalizeFirstLetterOfString, formatCurrencyDisp, formatMillisForDisplay, formatPhoneWithDashes, lightenRGBByPercent, resolveStatus, formatWorkorderNumber, localStorageWrapper, findTemplateByType, getPrinterStatus, log } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import { useSettingsStore, useLoginStore, useAlertScreenStore, useOpenWorkordersStore } from "../../../stores";
-import { Button, Dialog, DropdownMenu, ModalFooter, ModalFooterButton, SHADOW_PROTO, SmallLoadingIndicator, Tooltip } from "../../../dom_components";
+import { Button, Dialog, DropdownMenu, LargeModalHeader, LargeModalHeaderButton, SHADOW_PROTO, SmallLoadingIndicator, Tooltip } from "../../../dom_components";
 import { dbGetCompletedSale, dbSavePrintObj, dbSendReceipt } from "../../../db_calls_wrapper";
 import { build_db_path } from "../../../constants";
 import { printBuilder } from "../../../utils";
 import { saveIntakeReceiptPDF } from "../../../shared/intakeReceiptPdf";
-import { readTransactions } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
+import { readTransactions, newCheckoutUnarchiveWorkorder } from "./newCheckoutModalScreen/newCheckoutFirebaseCalls";
 const FullSaleModal = lazy(() =>
   import("../../../dom_components/FullSaleModal/FullSaleModal").then((m) => ({ default: m.FullSaleModal }))
 );
@@ -186,6 +186,12 @@ const NoteItem = ({ note, color, index }) => {
 
 // ─── Change Log Entry ───────────────────────────────────────────
 
+function formatDateMaybeYear(millis) {
+  if (!millis) return null;
+  const includeYear = new Date(millis).getFullYear() !== new Date().getFullYear();
+  return formatMillisForDisplay(millis, includeYear);
+}
+
 function formatShortDate(millis) {
   const d = new Date(millis);
   const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -199,9 +205,42 @@ function formatShortDate(millis) {
   return days[d.getDay()] + ", " + months[d.getMonth()] + " " + day + suffix + ", '" + String(d.getFullYear()).slice(2) + " -- " + hours + ":" + mins + " " + ampm;
 }
 
+function humanizeFieldName(field) {
+  if (!field) return "";
+  return field
+    .replace(/([A-Z])/g, " $1")
+    .replace(/[_-]+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+function prettyVal(v) {
+  if (v === "" || v == null) return "(empty)";
+  return String(v);
+}
+
+function formatChangeLogMessage(entry) {
+  if (entry.message) return entry.message;
+  if (entry.text) return entry.text;
+  if (!entry.field && !entry.action) return JSON.stringify(entry);
+  const target = humanizeFieldName(entry.field);
+  const action = entry.action || "(unknown)";
+  let value;
+  if (action === "changed") {
+    value = `${prettyVal(entry.from)} \u2192 ${prettyVal(entry.to)}`;
+  } else if (action === "added") {
+    value = prettyVal(entry.itemName ?? entry.to ?? entry.value);
+  } else if (action === "removed") {
+    value = prettyVal(entry.itemName ?? entry.from ?? entry.value);
+  } else {
+    value = prettyVal(entry.itemName ?? entry.to ?? entry.from ?? entry.value);
+  }
+  return `Action: ${action} -> to -> ${target}: ${value}`;
+}
+
 const ChangeLogEntry = ({ entry, index }) => {
   if (!entry) return null;
-  const message = entry.message || entry.text || JSON.stringify(entry);
+  const message = formatChangeLogMessage(entry);
   const millis = entry.millis || entry.timestamp || null;
   const user = entry.user || entry.userName || "";
   const isAlt = index % 2 === 1;
@@ -225,20 +264,22 @@ const ChangeLogEntry = ({ entry, index }) => {
 
 // ─── Main Modal ─────────────────────────────────────────────────
 
-export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRefund, onArchive }) => {
+export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRefund, onArchive, preloadedSales, preloadedTransactionsMap, nested }) => {
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
   const taxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
+  const printers = useSettingsStore((s) => s.settings?.printers);
+  const printerStatus = getPrinterStatus({ printers });
   const sIsInOpenList = useOpenWorkordersStore((s) => !!s.workorders.find((w) => w.id === workorder?.id));
 
-  const [sSales, _sSetSales] = useState([]);
-  const [sTransactionsMap, _sSetTransactionsMap] = useState({});
+  const [sSales, _sSetSales] = useState(preloadedSales || []);
+  const [sTransactionsMap, _sSetTransactionsMap] = useState(preloadedTransactionsMap || {});
   const [sLoadingSales, _sSetLoadingSales] = useState(false);
   const [sShowChangeLog, _sSetShowChangeLog] = useState(false);
   const [sShowInternalNotes, _sSetShowInternalNotes] = useState(false);
   const [sShowCustomerNotes, _sSetShowCustomerNotes] = useState(false);
   const [sSaleForModal, _sSetSaleForModal] = useState(null);
 
-  // Fetch associated sales when workorder opens
+  // Fetch associated sales when workorder opens (skip IDs we already have preloaded)
   useEffect(() => {
     if (!workorder) { _sSetSales([]); _sSetTransactionsMap({}); return; }
     const saleIDs = [];
@@ -246,13 +287,19 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
     if (workorder.saleID && !saleIDs.includes(workorder.saleID)) saleIDs.push(workorder.saleID);
     if (saleIDs.length === 0) { _sSetSales([]); _sSetTransactionsMap({}); return; }
 
+    const preloadedMap = preloadedTransactionsMap || {};
+    const preloadedSaleIDs = new Set((preloadedSales || []).map((s) => s.id));
+    const missingIDs = saleIDs.filter((id) => !preloadedSaleIDs.has(id));
+    if (missingIDs.length === 0) return;
+
     _sSetLoadingSales(true);
-    Promise.all(saleIDs.map((id) => dbGetCompletedSale(id)))
+    Promise.all(missingIDs.map((id) => dbGetCompletedSale(id)))
       .then(async (results) => {
-        let sales = results.filter(Boolean);
-        _sSetSales(sales);
-        let txnMap = {};
-        await Promise.all(sales.map(async (sale) => {
+        const fetchedSales = results.filter(Boolean);
+        const mergedSales = [...(preloadedSales || []), ...fetchedSales];
+        _sSetSales(mergedSales);
+        const txnMap = { ...preloadedMap };
+        await Promise.all(fetchedSales.map(async (sale) => {
           if (sale.transactionIDs?.length > 0) {
             txnMap[sale.id] = (await readTransactions(sale.transactionIDs)).filter(Boolean);
           } else {
@@ -293,6 +340,22 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
       first: workorder.customerFirst || "",
       last: workorder.customerLast || "",
     };
+  }
+
+  async function handleRevive() {
+    const result = await newCheckoutUnarchiveWorkorder(workorder);
+    if (!result?.success) {
+      useAlertScreenStore.getState().setValues({
+        title: "Revive Failed",
+        message: "Could not move the workorder back into the open list. Please try again.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+    useOpenWorkordersStore.getState().setWorkorder(workorder, false);
+    onClose && onClose();
   }
 
   function handlePrintWorkorder() {
@@ -415,16 +478,27 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
   function handleSendEstimate() { _sendReceiptForType("intake"); }
   function handleSendFinalized() { _sendReceiptForType("workorder"); }
 
+  const hasCellForSend = !!workorder.customerCell;
+  const hasEmailForSend = !!workorder.customerEmail;
+  const channelSuffix = hasCellForSend && hasEmailForSend
+    ? "Text and Email"
+    : hasCellForSend
+      ? "Text"
+      : hasEmailForSend
+        ? "Email"
+        : "Send";
+  const sendEstimateLabel = channelSuffix + " Estimate";
+  const sendFinalizedLabel = channelSuffix + " PDF";
   const pdfMenuItems = isClosed
     ? [
-        { id: "downloadFinalized", label: "Download Finalized Ticket" },
-        { id: "sendFinalized", label: "Send Finalized Ticket" },
+        { id: "downloadFinalized", label: "Download PDF" },
+        { id: "sendFinalized", label: sendFinalizedLabel },
       ]
     : [
         { id: "downloadEstimate", label: "Download Estimate" },
-        { id: "downloadFinalized", label: "Download Finalized Ticket" },
-        { id: "sendEstimate", label: "Send Estimate" },
-        { id: "sendFinalized", label: "Send Finalized Ticket" },
+        { id: "downloadFinalized", label: "Download PDF" },
+        { id: "sendEstimate", label: sendEstimateLabel },
+        { id: "sendFinalized", label: sendFinalizedLabel },
       ];
 
   function handlePdfMenuSelect(item) {
@@ -443,65 +517,81 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
         style={{
           backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35),
           ...SHADOW_PROTO,
+          ...(nested ? { transform: "translate(1vw, 1vh)" } : null),
         }}
       >
-        {/* ── Header ── */}
-        <div className={styles.header} style={{ backgroundColor: C.backgroundWhite }}>
-          <div className={styles.headerLeft}>
-            {!!workorder.workorderNumber && (
-              <span className={styles.woNumber} style={{ color: C.text }}>
-                {"#" + formatWorkorderNumber(workorder.workorderNumber)}
+        <LargeModalHeader
+          title={
+            <div className={styles.headerLeft}>
+              {!!workorder.workorderNumber && (
+                <span className={styles.woNumber} style={{ color: C.text }}>
+                  {"#" + formatWorkorderNumber(workorder.workorderNumber)}
+                </span>
+              )}
+              <span className={styles.idText} style={{ color: C.textDisabled }}>
+                {"ID: " + workorder.id}
               </span>
-            )}
-            <span className={styles.idText} style={{ color: C.textDisabled }}>
-              {"ID: " + workorder.id}
-            </span>
-            {!!workorder._importSource && (
-              <span
-                className={styles.importBadge}
-                style={{
-                  backgroundColor: lightenRGBByPercent(C.blue, 60),
-                  color: C.blue,
-                }}
-              >
-                {workorder._importSource}
-              </span>
-            )}
-            {!!workorder.taxFree && (
-              <span
-                className={styles.taxFreeBadge}
-                style={{
-                  backgroundColor: lightenRGBByPercent(C.orange, 60),
-                  color: C.orange,
-                }}
-              >
-                TAX FREE
-              </span>
-            )}
-          </div>
-          <div className={styles.headerRight}>
-            <Button
-              text="Print Workorder"
-              icon={ICONS.receipt}
-              iconSize={16}
-              onPress={handlePrintWorkorder}
-              buttonStyle={{ paddingHorizontal: 14, height: 32, marginRight: 8, outlineStyle: "none" }}
-              textStyle={{ fontSize: 12, color: C.text }}
-            />
-            <div style={{ marginRight: 8 }}>
-              <DropdownMenu
-                buttonText="PDF Options"
-                dataArr={pdfMenuItems}
-                onSelect={handlePdfMenuSelect}
-                buttonStyle={{ paddingHorizontal: 14, height: 32 }}
-                buttonTextStyle={{ fontSize: 12, color: C.text }}
-                itemStyle={{ paddingVertical: 8, paddingHorizontal: 12 }}
-                itemTextStyle={{ fontSize: 12 }}
-                itemTextAlign="left"
-              />
+              {!!workorder._importSource && (
+                <span
+                  className={styles.importBadge}
+                  style={{
+                    backgroundColor: lightenRGBByPercent(C.blue, 60),
+                    color: C.blue,
+                  }}
+                >
+                  {workorder._importSource}
+                </span>
+              )}
+              {!!workorder.taxFree && (
+                <span
+                  className={styles.taxFreeBadge}
+                  style={{
+                    backgroundColor: lightenRGBByPercent(C.orange, 60),
+                    color: C.orange,
+                  }}
+                >
+                  TAX FREE
+                </span>
+              )}
             </div>
-          </div>
-        </div>
+          }
+          actions={[
+            <LargeModalHeaderButton
+              key="print"
+              variant="default"
+              icon={ICONS.receipt}
+              disabled={printerStatus.isPrinterOffline}
+              tooltip={printerStatus.isPrinterOffline ? printerStatus.offlineLabel : undefined}
+              onClick={handlePrintWorkorder}
+            >
+              Print Workorder
+            </LargeModalHeaderButton>,
+            <DropdownMenu
+              key="pdf"
+              buttonText="PDF Options"
+              dataArr={pdfMenuItems}
+              onSelect={handlePdfMenuSelect}
+              buttonStyle={{
+                backgroundColor: "transparent",
+                borderColor: C.borderDefault,
+                height: 36,
+                paddingHorizontal: 22,
+              }}
+              buttonTextStyle={{ fontSize: 13, fontWeight: 600, color: C.text }}
+              itemStyle={{ paddingVertical: 8, paddingHorizontal: 12 }}
+              itemTextStyle={{ fontSize: 12 }}
+              itemTextAlign="center"
+            />,
+            <LargeModalHeaderButton
+              key="close"
+              variant="default"
+              icon={ICONS.close1}
+              onClick={handleClose}
+            >
+              CLOSE
+            </LargeModalHeaderButton>,
+          ]}
+        />
 
         {/* ── Active / Closed Banner ── */}
         <div
@@ -533,6 +623,17 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
               textStyle={{ color: C.textWhite, fontSize: 12 }}
             />
           )}
+          {isClosed && !sIsInOpenList && (
+            <Tooltip text="Move workorder back into the open list" position="bottom">
+              <Button
+                text="Revive Workorder"
+                colorGradientArr={COLOR_GRADIENTS.green}
+                onPress={handleRevive}
+                buttonStyle={{ paddingHorizontal: 16, height: 32, marginRight: 8 }}
+                textStyle={{ color: C.textWhite, fontSize: 12 }}
+              />
+            </Tooltip>
+          )}
           {onArchive && sIsInOpenList && (
             <Tooltip text="Move workorder out of open list" position="bottom">
               <Button
@@ -543,19 +644,6 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
                 textStyle={{ color: C.textWhite, fontSize: 12 }}
               />
             </Tooltip>
-          )}
-          {sSales.length > 0 && (
-            <button
-              type="button"
-              className={styles.viewSaleBtn}
-              onClick={() => {
-                let sale = sSales[0];
-                let enriched = { ...sale, _transactions: sTransactionsMap[sale.id] || [] };
-                _sSetSaleForModal(enriched);
-              }}
-            >
-              View Sale
-            </button>
           )}
         </div>
 
@@ -632,19 +720,19 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
               label="Started"
               labelSize={13}
               valueSize={14}
-              value={workorder.startedOnMillis ? formatMillisForDisplay(workorder.startedOnMillis, true) : null}
+              value={formatDateMaybeYear(workorder.startedOnMillis)}
             />
             <DetailRow
               label="Finished"
               labelSize={13}
               valueSize={14}
-              value={workorder.finishedOnMillis ? formatMillisForDisplay(workorder.finishedOnMillis, true) : null}
+              value={formatDateMaybeYear(workorder.finishedOnMillis || workorder.paidOnMillis)}
             />
             <DetailRow
-              label="Ended"
+              label="Paid"
               labelSize={13}
               valueSize={14}
-              value={workorder.endedOnMillis ? formatMillisForDisplay(workorder.endedOnMillis, true) : null}
+              value={formatDateMaybeYear(workorder.paidOnMillis)}
             />
             <DetailRow label="Started By" value={workorder.startedBy} labelSize={13} valueSize={14} />
 
@@ -881,9 +969,6 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
           </div>
         </div>
 
-        <ModalFooter>
-          <ModalFooterButton onClick={handleClose}>Close</ModalFooterButton>
-        </ModalFooter>
       </div>
     </Dialog>
     {!!sSaleForModal && (

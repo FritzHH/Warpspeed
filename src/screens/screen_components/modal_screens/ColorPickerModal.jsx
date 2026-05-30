@@ -126,8 +126,8 @@ export const ColorPickerModal = ({
           </div>
           </div>
           <ModalFooter>
-            <ModalFooterButton variant="danger" onClick={onClose}>
-              {exitButtonText || "Exit (discard any changes)"}
+            <ModalFooterButton variant="default" onClick={onClose}>
+              {exitButtonText || "CLOSE"}
             </ModalFooterButton>
             <ModalFooterButton
               variant="accent"

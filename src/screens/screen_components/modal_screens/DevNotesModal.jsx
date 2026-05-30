@@ -1,7 +1,7 @@
 /* eslint-disable */
 import React, { useState, useEffect } from "react";
-import { C, ICONS, COLOR_GRADIENTS } from "../../../styles";
-import { Button, TextInput, Dialog, ModalFooter, ModalFooterButton } from "../../../dom_components";
+import { C, ICONS, COLOR_GRADIENTS, Radius } from "../../../styles";
+import { Button, TextInput, Dialog, LargeModalHeader, LargeModalHeaderButton } from "../../../dom_components";
 import { useLoginStore, useSettingsStore } from "../../../stores";
 import { permissionToLevel } from "../../../data";
 import { PERMISSION_LEVELS } from "../../../constants";
@@ -87,14 +87,20 @@ export const DevNotesModal = ({ visible, onClose }) => {
   return (
     <Dialog visible={visible} onClose={onClose} title="Dev Notes" aria-label="Dev Notes">
       <div className={styles.card}>
+        <LargeModalHeader
+          title="Dev Notes"
+          iconSize={22}
+          actions={
+            <LargeModalHeaderButton
+              variant="default"
+              icon={ICONS.close1}
+              iconPosition="only"
+              tooltip="Close"
+              onClick={onClose}
+            />
+          }
+        />
         <div className={styles.cardInner}>
-        {/* Header */}
-        <div className={styles.header}>
-          <span className={styles.title} style={{ color: C.text }}>
-            Dev Notes
-          </span>
-        </div>
-
         {/* Input area */}
         <div className={styles.inputRow}>
           <div className={styles.inputWrap}>
@@ -111,7 +117,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
               style={{
                 width: "100%",
                 borderColor: C.buttonLightGreenOutline,
-                borderRadius: 10,
+                borderRadius: Radius.row,
                 borderWidth: 2,
                 backgroundColor: C.listItemWhite,
                 paddingTop: 10,
@@ -131,7 +137,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
             buttonStyle={{
               width: 70,
               height: 38,
-              borderRadius: 5,
+              borderRadius: Radius.control,
               marginTop: 2,
             }}
             onPress={handlePost}
@@ -171,7 +177,7 @@ export const DevNotesModal = ({ visible, onClose }) => {
                       style={{
                         width: "100%",
                         borderColor: C.buttonLightGreenOutline,
-                        borderRadius: 8,
+                        borderRadius: Radius.row,
                         borderWidth: 2,
                         backgroundColor: C.backgroundWhite,
                         paddingTop: 8,
@@ -189,14 +195,14 @@ export const DevNotesModal = ({ visible, onClose }) => {
                         text="Cancel"
                         colorGradientArr={COLOR_GRADIENTS.grey}
                         textStyle={{ color: C.textWhite, fontSize: 12 }}
-                        buttonStyle={{ width: 70, height: 30, borderRadius: 5 }}
+                        buttonStyle={{ width: 70, height: 30, borderRadius: Radius.control }}
                         onPress={handleCancelEdit}
                       />
                       <Button
                         text="Save"
                         colorGradientArr={COLOR_GRADIENTS.green}
                         textStyle={{ color: C.textWhite, fontSize: 12 }}
-                        buttonStyle={{ width: 70, height: 30, borderRadius: 5 }}
+                        buttonStyle={{ width: 70, height: 30, borderRadius: Radius.control }}
                         onPress={() => handleSaveEdit(note)}
                       />
                     </div>
@@ -245,9 +251,6 @@ export const DevNotesModal = ({ visible, onClose }) => {
           })}
         </div>
         </div>
-        <ModalFooter>
-          <ModalFooterButton onClick={onClose}>Close</ModalFooterButton>
-        </ModalFooter>
       </div>
     </Dialog>
   );

@@ -36,9 +36,19 @@ function PrinterCard({
         ) : (
           <div className={styles.spacer} />
         )}
-        <button type="button" className={styles.trashButton} onClick={onDelete}>
-          <Image icon={ICONS.trash} size={14} />
-        </button>
+        <Button
+          icon={ICONS.trash}
+          iconSize={14}
+          onPress={onDelete}
+          buttonStyle={{
+            paddingLeft: 4,
+            paddingRight: 4,
+            paddingTop: 4,
+            paddingBottom: 4,
+            backgroundColor: "transparent",
+          }}
+          iconStyle={{ marginRight: 0 }}
+        />
       </div>
       <div className={styles.printerInfoRow}>
         <div className={styles.printerInfoLabel}>

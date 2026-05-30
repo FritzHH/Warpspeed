@@ -5,10 +5,10 @@ import {
   DropdownMenu,
   Image,
   ScreenModal,
-  ModalFooter,
-  ModalFooterButton,
+  LargeModalHeader,
+  LargeModalHeaderButton,
 } from "../../../dom_components";
-import { C, COLOR_GRADIENTS, ICONS, SHADOW_RADIUS_PROTO } from "../../../styles";
+import { C, COLOR_GRADIENTS, ICONS, SHADOW_RADIUS_PROTO, Radius } from "../../../styles";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { convertMillisToHoursMins, formatMillisForDisplay, getPreviousMondayDayJS, log, trimToTwoDecimals } from "../../../utils";
 import dayjs from "dayjs";
@@ -294,13 +294,19 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
     const iconSize = 30;
 
     const renderChevron = (icon, onClick) => (
-      <button
-        type="button"
-        className={styles.chevronBtn}
-        onClick={onClick}
-      >
-        <Image icon={icon} size={iconSize} />
-      </button>
+      <Button
+        icon={icon}
+        iconSize={iconSize}
+        onPress={onClick}
+        buttonStyle={{
+          paddingLeft: 4,
+          paddingRight: 4,
+          paddingTop: 4,
+          paddingBottom: 4,
+          backgroundColor: "transparent",
+        }}
+        iconStyle={{ marginRight: 0 }}
+      />
     );
 
     return (
@@ -309,6 +315,19 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
         style={{ "--card-bg": C.backgroundWhite }}
         onClick={(e) => e.stopPropagation()}
       >
+        <LargeModalHeader
+          title={((sUserObj?.first || "") + " " + (sUserObj?.last || "")).trim() || "Punch History"}
+          iconSize={22}
+          actions={
+            <LargeModalHeaderButton
+              variant="default"
+              icon={ICONS.close1}
+              iconPosition="only"
+              tooltip="Close"
+              onClick={handleExit}
+            />
+          }
+        />
         <div className={styles.modalCardBody}>
         <div className={styles.leftCol}>
           {!!zCurrentUserObj?.permissions?.level >= 3 && (
@@ -320,7 +339,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                   borderStyle: "solid",
                   borderColor: C.buttonLightGreenOutline,
                   alignSelf: "center",
-                  borderRadius: 5,
+                  borderRadius: Radius.control,
                 }}
                 ref={userDropdownRef}
                 matchValue={sUserObj?.id}
@@ -335,7 +354,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                 icon={ICONS.tools1}
                 buttonStyle={{
                   alignSelf: "center",
-                  borderRadius: 5,
+                  borderRadius: Radius.control,
                 }}
               />
             </div>
@@ -478,7 +497,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                               backgroundColor: "transparent",
                               paddingLeft: 4,
                               paddingRight: 4,
-                              borderRadius: 5,
+                              borderRadius: Radius.control,
                             }}
                             buttonTextStyle={{
                               color: C.textSecondary,
@@ -576,7 +595,7 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
                               backgroundColor: "transparent",
                               paddingLeft: 4,
                               paddingRight: 4,
-                              borderRadius: 5,
+                              borderRadius: Radius.control,
                             }}
                             buttonTextStyle={{
                               color: C.textSecondary,
@@ -640,9 +659,6 @@ export const UserClockHistoryModal = ({ userObj, handleExit }) => {
           )}
         </div>
         </div>
-        <ModalFooter>
-          <ModalFooterButton onClick={handleExit}>Close</ModalFooterButton>
-        </ModalFooter>
       </div>
     );
   }, [

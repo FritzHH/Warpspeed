@@ -4,11 +4,13 @@ import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
 import { Button } from "../Button/Button";
 import { SmallLoadingIndicator } from "../LoadingIndicator/LoadingIndicator";
 import { Dialog } from "../Dialog/Dialog";
-import { ModalFooter, ModalFooterButton } from "../ModalFooter/ModalFooter";
-import { useSettingsStore, useCheckoutStore, useLoginStore } from "../../stores";
-import { formatCurrencyDisp, formatMillisForDisplay, capitalizeFirstLetterOfString, formatPhoneWithDashes, lightenRGBByPercent, calculateRunningTotals, resolveStatus, log, printBuilder, localStorageWrapper } from "../../utils";
-import { dbSavePrintObj } from "../../db_calls_wrapper";
+import { LargeModalHeader, LargeModalHeaderButton } from "../LargeModalHeader/LargeModalHeader";
+import { DropdownMenu } from "../DropdownMenu/DropdownMenu";
+import { useSettingsStore, useCheckoutStore, useLoginStore, useAlertScreenStore, useCurrentCustomerStore } from "../../stores";
+import { formatCurrencyDisp, formatMillisForDisplay, capitalizeFirstLetterOfString, formatPhoneWithDashes, lightenRGBByPercent, calculateRunningTotals, resolveStatus, log, printBuilder, localStorageWrapper, getPrinterStatus, findTemplateByType } from "../../utils";
+import { dbSavePrintObj, dbSendReceipt, dbGetCustomer } from "../../db_calls_wrapper";
 import { saveSaleReceiptPDF } from "../../shared/saleReceiptPdf";
+import { build_db_path } from "../../constants";
 import {
   readActiveSale,
   readCompletedSale,
@@ -17,6 +19,9 @@ import {
 } from "../../screens/screen_components/modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 const ClosedWorkorderModal = lazy(() =>
   import("../../screens/screen_components/modal_screens/ClosedWorkorderModal").then((m) => ({ default: m.ClosedWorkorderModal }))
+);
+const TransactionModal = lazy(() =>
+  import("../../screens/screen_components/modal_screens/TransactionModal").then((m) => ({ default: m.TransactionModal }))
 );
 import styles from "./FullSaleModal.module.css";
 
@@ -55,6 +60,9 @@ const DetailRow = ({ label, value }) => {
 export const FullSaleModal = ({ item, onClose, onRefund }) => {
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
   const salesTaxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
+  const printers = useSettingsStore((s) => s.settings?.printers);
+  const printerStatus = getPrinterStatus({ printers });
+  const currentCustomer = useCurrentCustomerStore((s) => s.getCustomer());
 
   const [sSale, _setSale] = useState(null);
   const [sTransactions, _setTransactions] = useState([]);
@@ -64,6 +72,7 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
   const [sError, _setError] = useState("");
   const [sCreditDetail, _sCreditDetail] = useState(null);
   const [sSelectedWorkorder, _sSetSelectedWorkorder] = useState(null);
+  const [sSelectedTxn, _sSetSelectedTxn] = useState(null);
 
   useEffect(() => {
     if (!item?.saleID) {
@@ -85,6 +94,16 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
           return;
         }
         _setSale(sale);
+
+        if (sale.customerID) {
+          const storeCustomer = useCurrentCustomerStore.getState().getCustomer();
+          if (!storeCustomer?.id || storeCustomer.id !== sale.customerID) {
+            const fetched = await dbGetCustomer(sale.customerID);
+            if (!cancelled && fetched) {
+              useCurrentCustomerStore.getState().setCustomer(fetched, false);
+            }
+          }
+        }
 
         if (sale.transactionIDs?.length > 0) {
           let txns = (await readTransactions(sale.transactionIDs)).filter(Boolean);
@@ -152,6 +171,118 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
     saveSaleReceiptPDF(receiptData, null, "sale-" + sSale.id + ".pdf");
   }
 
+  function handleSendSale() {
+    const _settings = useSettingsStore.getState().getSettings();
+    const customer = {
+      first: item.customerFirst || "",
+      last: item.customerLast || "",
+      customerCell: item.customerCell || "",
+      email: item.customerEmail || "",
+    };
+
+    const smsTemplate = findTemplateByType(_settings?.smsTemplates || _settings?.textTemplates, "saleReceipt");
+    const emailTemplate = findTemplateByType(_settings?.emailTemplates, "saleReceipt");
+
+    const shouldSMS = !!customer.customerCell;
+    const shouldEmail = !!customer.email;
+
+    const smsContent = smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "";
+    const emailContent = emailTemplate?.message || emailTemplate?.content || emailTemplate?.body || "";
+
+    const emptyParts = [];
+    if (shouldSMS && !smsContent.trim()) emptyParts.push("SMS");
+    if (shouldEmail && !emailContent.trim()) emptyParts.push("email");
+    if (emptyParts.length > 0) {
+      useAlertScreenStore.getState().setValues({
+        title: "Empty Template",
+        message: "The sale receipt " + emptyParts.join(" and ") + " template is empty. Fill in the template content in Dashboard > " + (emptyParts.includes("SMS") ? "Text Templates" : "Email Templates") + ".",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+    }
+
+    const canSMS = shouldSMS && smsContent.trim();
+    const canEmail = shouldEmail && emailContent.trim();
+    if (!canSMS && !canEmail) {
+      useAlertScreenStore.getState().setValues({
+        title: "No Contact Info",
+        message: "This customer has no phone or email on file.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+
+    const sendingMessage = (
+      <>
+        {canSMS && !!customer.customerCell && (
+          <span style={{ display: "block" }}>
+            <span style={{ color: C.blue, fontWeight: 600 }}>TEXT</span>
+            {" sending to " + formatPhoneWithDashes(customer.customerCell)}
+          </span>
+        )}
+        {canEmail && !!customer.email && (
+          <span style={{ display: "block" }}>
+            <span style={{ color: C.green, fontWeight: 600 }}>EMAIL</span>
+            {" sending to " + customer.email}
+          </span>
+        )}
+      </>
+    );
+    useAlertScreenStore.getState().setValues({ title: "Sending", message: sendingMessage, canExitOnOuterClick: true, autoDismiss: true, autoDismissMs: 1300 });
+
+    const { tenantID, storeID } = _settings;
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    const wo = sWorkorders[0] || {};
+    const creds = [...(sSale.creditsApplied || []), ...(sSale.depositsApplied || [])];
+    const receiptData = printBuilder.sale(sSale, sTransactions, customer, wo, _settings?.salesTaxPercent, _ctx, creds);
+    const storagePath = build_db_path.cloudStorage.saleReceiptPDF(sSale.id, tenantID, storeID);
+
+    dbSendReceipt({
+      receiptType: "sale",
+      receiptData,
+      storagePath,
+      sendSMS: !!(canSMS && customer.customerCell),
+      sendEmail: !!(canEmail && customer.email),
+      customerEmail: customer.email || "",
+      customerCell: customer.customerCell || "",
+      customerID: sSale?.customerID || "",
+      saleID: sSale.id || "",
+      workorderID: wo?.id || "",
+      templateVars: {
+        firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
+        storeName: _settings?.storeInfo?.displayName || "our store",
+        total: formatCurrencyDisp(sSale.total, true),
+      },
+      smsMessageID: crypto.randomUUID(),
+    }).catch((e) => {
+      log("sendSaleReceipt error:", e?.message || String(e));
+    });
+  }
+
+  const hasCellForSend = !!currentCustomer?.customerCell;
+  const hasEmailForSend = !!currentCustomer?.email;
+  const channelSuffix = hasCellForSend && hasEmailForSend
+    ? "Text and Email"
+    : hasCellForSend
+      ? "Text"
+      : hasEmailForSend
+        ? "Email"
+        : "Send";
+  const sendSaleLabel = channelSuffix + " PDF";
+  const pdfMenuItems = [
+    { id: "downloadSale", label: "Download PDF" },
+    { id: "sendSale", label: sendSaleLabel },
+  ];
+
+  function handlePdfMenuSelect(item) {
+    if (!item) return;
+    if (item.id === "downloadSale") handleDownloadPDF();
+    else if (item.id === "sendSale") handleSendSale();
+  }
+
   function handleRefund() {
     if (onRefund) {
       onRefund(sSale.id);
@@ -171,24 +302,23 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
           className={styles.loadingCard}
           style={{ "--card-bg": C.backgroundWhite }}
         >
+          <LargeModalHeader
+            title={sLoadingSale ? "Loading sale..." : "Error"}
+            actions={
+              <LargeModalHeaderButton variant="default" onClick={onClose}>
+                CLOSE
+              </LargeModalHeaderButton>
+            }
+          />
           {sLoadingSale ? (
             <>
               <SmallLoadingIndicator />
               <span className={styles.loadingText}>Loading sale...</span>
             </>
           ) : (
-            <>
-              <span className={styles.errorText} style={{ "--error-color": C.lightred }}>
-                {sError}
-              </span>
-              <Button
-                text="Close"
-                colorGradientArr={COLOR_GRADIENTS.grey}
-                onPress={onClose}
-                buttonStyle={{ paddingHorizontal: 30, paddingVertical: 8 }}
-                textStyle={{ fontSize: 13 }}
-              />
-            </>
+            <span className={styles.errorText} style={{ "--error-color": C.lightred }}>
+              {sError}
+            </span>
           )}
         </div>
       </Dialog>
@@ -202,6 +332,8 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
         <ClosedWorkorderModal
           workorder={sSelectedWorkorder}
           onClose={() => _sSetSelectedWorkorder(null)}
+          preloadedSales={sSale ? [sSale] : []}
+          preloadedTransactionsMap={sSale ? { [sSale.id]: sTransactions } : {}}
         />
       </Suspense>
     );
@@ -221,48 +353,71 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
           }}
         >
           {/* ── Header ── */}
-          <div className={styles.header}>
-            <div className={styles.headerLeft}>
-              <span className={styles.saleIdText}>
-                {"Sale ID: " + sSale.id}
-              </span>
-              {!!sSale._importSource && (
-                <div
-                  className={styles.importBadge}
-                  style={{
-                    "--import-bg": lightenRGBByPercent(C.blue, 60),
-                    "--import-color": C.blue,
-                  }}
-                >
-                  <span className={styles.importBadgeText}>{sSale._importSource}</span>
-                </div>
-              )}
-            </div>
-            <div className={styles.headerRight}>
-              <Button
-                text="Refund"
-                colorGradientArr={COLOR_GRADIENTS.red}
-                onPress={handleRefund}
-                enabled={totalRefunded < sSale?.total}
-                buttonStyle={{ paddingHorizontal: 20, height: 32, marginRight: 8 }}
-                textStyle={{ color: C.textWhite, fontSize: 12 }}
-              />
-              <Button
-                text="Print Sale"
+          <LargeModalHeader
+            title={
+              <div className={styles.headerLeft}>
+                <span className={styles.saleIdText}>
+                  {"Sale ID: " + sSale.id}
+                </span>
+                {!!sSale._importSource && (
+                  <div
+                    className={styles.importBadge}
+                    style={{
+                      "--import-bg": lightenRGBByPercent(C.blue, 60),
+                      "--import-color": C.blue,
+                    }}
+                  >
+                    <span className={styles.importBadgeText}>{sSale._importSource}</span>
+                  </div>
+                )}
+              </div>
+            }
+            actions={[
+              <LargeModalHeaderButton
+                key="refund"
+                variant="default"
+                icon={ICONS.dollarYellow}
+                disabled={!(totalRefunded < sSale?.total)}
+                onClick={handleRefund}
+              >
+                Refund
+              </LargeModalHeaderButton>,
+              <LargeModalHeaderButton
+                key="print"
+                variant="default"
                 icon={ICONS.receipt}
-                iconSize={16}
-                onPress={handlePrintSale}
-                buttonStyle={{ paddingHorizontal: 14, height: 32, borderWidth: 1, borderColor: C.buttonLightGreenOutline, marginRight: 8 }}
-                textStyle={{ fontSize: 12, color: C.text }}
-              />
-              <Button
-                text="Download PDF"
-                onPress={handleDownloadPDF}
-                buttonStyle={{ paddingHorizontal: 14, height: 32, borderWidth: 1, borderColor: C.buttonLightGreenOutline }}
-                textStyle={{ fontSize: 12, color: C.text }}
-              />
-            </div>
-          </div>
+                disabled={printerStatus.isPrinterOffline}
+                tooltip={printerStatus.isPrinterOffline ? printerStatus.offlineLabel : undefined}
+                onClick={handlePrintSale}
+              >
+                Print Sale
+              </LargeModalHeaderButton>,
+              <DropdownMenu
+                key="pdf"
+                buttonText="PDF Options"
+                dataArr={pdfMenuItems}
+                onSelect={handlePdfMenuSelect}
+                buttonStyle={{
+                  backgroundColor: "transparent",
+                  borderColor: C.borderDefault,
+                  height: 36,
+                  paddingHorizontal: 22,
+                }}
+                buttonTextStyle={{ fontSize: 13, fontWeight: 600, color: C.text }}
+                itemStyle={{ paddingVertical: 8, paddingHorizontal: 12 }}
+                itemTextStyle={{ fontSize: 12 }}
+                itemTextAlign="center"
+              />,
+              <LargeModalHeaderButton
+                key="close"
+                variant="default"
+                icon={ICONS.close1}
+                iconPosition="only"
+                tooltip="Close"
+                onClick={onClose}
+              />,
+            ]}
+          />
 
           {/* ── Sale View Banner ── */}
           <div
@@ -272,7 +427,7 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
               "--banner-color": C.blue,
             }}
           >
-            <span className={styles.bannerTitle}>Sale View</span>
+            <span className={styles.bannerTitle}>Sale Viewer</span>
             {(item.customerFirst || item.customerLast) && (
               <span className={styles.bannerSubtitle}>
                 {(capitalizeFirstLetterOfString(item.customerFirst || "") + " " + capitalizeFirstLetterOfString(item.customerLast || "")).trim()
@@ -380,7 +535,12 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
             <div className={styles.colRight}>
               <SectionHeader text={"PAYMENTS (" + payments.length + ")"} />
               {payments.map((p, idx) => (
-                <div key={p.id || idx} className={styles.paymentCard}>
+                <button
+                  type="button"
+                  key={p.id || idx}
+                  className={styles.paymentCard}
+                  onClick={() => _sSetSelectedTxn(p)}
+                >
                   <div className={styles.paymentTopRow}>
                     <span className={styles.paymentMethod} style={{ color: C.text }}>
                       {(p.method || "card").toUpperCase()}
@@ -423,7 +583,7 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                       {"Refunded: $" + formatCurrencyDisp((p.refunds || []).reduce((s, r) => s + (r.amount || 0), 0))}
                     </span>
                   )}
-                </div>
+                </button>
               ))}
 
               {payments.length === 0 && (
@@ -489,15 +649,19 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
               )}
             </div>
           </div>
-
-          <ModalFooter>
-            <ModalFooterButton onClick={onClose}>Close</ModalFooterButton>
-          </ModalFooter>
         </div>
       </Dialog>
 
       {!!sCreditDetail && (
         <CreditDetailModal credit={sCreditDetail} onClose={() => _sCreditDetail(null)} />
+      )}
+      {!!sSelectedTxn && (
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <TransactionModal
+            transaction={sSelectedTxn}
+            onClose={() => _sSetSelectedTxn(null)}
+          />
+        </Suspense>
       )}
     </>
   );
@@ -522,25 +686,24 @@ const CreditDetailModal = ({ credit, onClose }) => {
           "--totals-border": C.buttonLightGreenOutline,
         }}
       >
-        <div className={styles.creditDetailHeader}>
-          <div
-            className={styles.creditDetailBadge}
-            style={{
-              "--badge-bg": lightenRGBByPercent(badgeColor, 60),
-              "--badge-color": badgeColor,
-            }}
-          >
-            <span className={styles.creditDetailBadgeText}>{typeLabel.toUpperCase()}</span>
-          </div>
-          <Button
-            text="Close"
-            icon={ICONS.close1}
-            iconSize={14}
-            onPress={onClose}
-            buttonStyle={{ paddingHorizontal: 16, height: 32 }}
-            textStyle={{ color: C.textMuted, fontSize: 12 }}
-          />
-        </div>
+        <LargeModalHeader
+          title={
+            <div
+              className={styles.creditDetailBadge}
+              style={{
+                "--badge-bg": lightenRGBByPercent(badgeColor, 60),
+                "--badge-color": badgeColor,
+              }}
+            >
+              <span className={styles.creditDetailBadgeText}>{typeLabel.toUpperCase()}</span>
+            </div>
+          }
+          actions={
+            <LargeModalHeaderButton variant="default" onClick={onClose}>
+              CLOSE
+            </LargeModalHeaderButton>
+          }
+        />
 
         <div className={styles.creditDetailBody}>
           <SectionHeader text="DETAILS" />
@@ -577,7 +740,7 @@ const WorkorderCard = ({ workorder, statuses, salesTaxPercent }) => {
     >
       <div className={styles.workorderHeader}>
         <span className={styles.workorderTitle} style={{ color: C.text }}>
-          {(wo.brand || "") + (wo.description ? " — " + wo.description : "")}
+          {(capitalizeFirstLetterOfString(wo.brand) || "") + (wo.description ? " — " + capitalizeFirstLetterOfString(wo.description) : "")}
         </span>
         <div
           className={styles.statusBadge}

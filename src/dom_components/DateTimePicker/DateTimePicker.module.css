@@ -3,12 +3,12 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 15px;
+  border-radius: var(--radius-container);
 }
 
 .inner {
   padding: 50px;
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   display: flex;
   align-items: center;
 }

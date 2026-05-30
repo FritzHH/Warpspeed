@@ -1,7 +1,7 @@
 /*eslint-disable*/
 import { formatCurrencyDisp, formatMillisForDisplay, lightenRGBByPercent, localStorageWrapper } from "../../../utils";
 import { C, ICONS, COLOR_GRADIENTS } from "../../../styles";
-import { Button, Dialog, ModalFooter, ModalFooterButton, SHADOW_PROTO } from "../../../dom_components";
+import { Button, Dialog, LargeModalHeader, LargeModalHeaderButton, SHADOW_PROTO } from "../../../dom_components";
 import { useSettingsStore, useLoginStore } from "../../../stores";
 import { printBuilder, log } from "../../../utils";
 import { dbSavePrintObj } from "../../../db_calls_wrapper";
@@ -162,7 +162,7 @@ export const TransactionModal = ({ transaction, onClose, onRefund }) => {
   }
 
   return (
-    <Dialog visible={true} onClose={onClose} overlayColor={C.surfaceOverlayHeavy} title="Transaction">
+    <Dialog visible={true} onClose={onClose} overlayColor={C.surfaceOverlayHeavy}>
       <div
         className={styles.container}
         style={{
@@ -170,44 +170,47 @@ export const TransactionModal = ({ transaction, onClose, onRefund }) => {
           ...SHADOW_PROTO,
         }}
       >
-        {/* ── Header ── */}
-        <div
-          className={styles.header}
-          style={{ borderBottomColor: C.borderSubtle, backgroundColor: C.backgroundWhite }}
-        >
-          <div className={styles.headerLeft}>
-            <span
-              className={styles.methodBadge}
-              style={{
-                backgroundColor: isCard
-                  ? lightenRGBByPercent(C.blue, 60)
-                  : lightenRGBByPercent(C.green, 60),
-                color: isCard ? C.blue : C.green,
-              }}
-            >
-              {(txn.method || "unknown").toUpperCase()}
-            </span>
-            <span className={styles.txnIdLabel} style={{ color: C.textDisabled }}>
-              {"Txn ID: " + txn.id}
-            </span>
-          </div>
-          <div className={styles.headerRight}>
-            <Button
-              text="Refund"
-              colorGradientArr={COLOR_GRADIENTS.red}
-              onPress={handleRefund}
-              buttonStyle={{ paddingHorizontal: 16, height: 32 }}
-              textStyle={{ fontSize: 12, color: C.textOnAccent }}
-            />
-            <Button
-              text="Print Transaction"
-              icon={ICONS.receipt}
-              iconSize={16}
-              onPress={handlePrintTransaction}
-              buttonStyle={{ paddingHorizontal: 14, height: 32, borderWidth: 1, borderColor: C.buttonLightGreenOutline }}
-              textStyle={{ fontSize: 12, color: C.text }}
-            />
-          </div>
+        <LargeModalHeader
+          title={
+            <div className={styles.headerLeft}>
+              <span
+                className={styles.methodBadge}
+                style={{
+                  backgroundColor: isCard
+                    ? lightenRGBByPercent(C.blue, 60)
+                    : lightenRGBByPercent(C.green, 60),
+                  color: isCard ? C.blue : C.green,
+                }}
+              >
+                {(txn.method || "unknown").toUpperCase()}
+              </span>
+              <span className={styles.txnIdLabel} style={{ color: C.textDisabled }}>
+                {"Txn ID: " + txn.id}
+              </span>
+            </div>
+          }
+          actions={
+            <LargeModalHeaderButton variant="default" onClick={handleClose}>
+              CLOSE
+            </LargeModalHeaderButton>
+          }
+        />
+        <div className={styles.toolbar}>
+          <Button
+            text="Refund"
+            colorGradientArr={COLOR_GRADIENTS.red}
+            onPress={handleRefund}
+            buttonStyle={{ paddingHorizontal: 16, height: 32 }}
+            textStyle={{ fontSize: 12, color: C.textOnAccent }}
+          />
+          <Button
+            text="Print Transaction"
+            icon={ICONS.receipt}
+            iconSize={16}
+            onPress={handlePrintTransaction}
+            buttonStyle={{ paddingHorizontal: 14, height: 32, borderWidth: 1, borderColor: C.buttonLightGreenOutline }}
+            textStyle={{ fontSize: 12, color: C.text }}
+          />
         </div>
 
         {/* ── Transaction Viewer Banner ── */}
@@ -323,10 +326,6 @@ export const TransactionModal = ({ transaction, onClose, onRefund }) => {
           {/* Bottom spacer */}
           <div className={styles.bottomSpacer} />
         </div>
-
-        <ModalFooter>
-          <ModalFooterButton onClick={handleClose}>Close</ModalFooterButton>
-        </ModalFooter>
       </div>
     </Dialog>
   );

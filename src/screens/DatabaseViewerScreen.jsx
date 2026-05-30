@@ -229,7 +229,6 @@ export function DatabaseViewerScreen() {
     cleaned.paidOnMillis = "";
     cleaned.saleID = "";
     cleaned.activeSaleID = "";
-    cleaned.endedOnMillis = "";
     cleaned.status = "newly_created";
     cleaned.changeLog = (cleaned.changeLog || []).filter(
       (e) => !(e.field === "payment") &&

@@ -148,6 +148,28 @@
   --z-toast:         9800;
   --z-alert:         9900;
   --z-debug:       100000;
+
+  /* ============================================================
+   * RADIUS REGISTRY
+   *
+   * Four buckets, role-based. Use these everywhere; no raw px
+   * values for border-radius in src/screens or src/dom_components.
+   *
+   *   container  modals, panels, large cards         (4px)
+   *   row        list rows, smaller cards            (8px)
+   *   control    buttons, inputs, dropdowns, chips   (6px)
+   *   pill       fully rounded badges/toggles/avatar (9999px)
+   *
+   * Asymmetric corners (top-only, bottom-only) use individual
+   * border-{top|bottom}-{left|right}-radius properties referencing
+   * the same tokens.
+   *
+   * JS consumes mirrors on Radius.* in src/styles.js.
+   * ============================================================ */
+  --radius-container: 4px;
+  --radius-row:       8px;
+  --radius-control:   4px;
+  --radius-pill:      9999px;
 }
 
 /* ============================================================

@@ -1,9 +1,9 @@
 /*eslint-disable*/
 
 import { useLoginStore } from "../../../stores";
-import { Button, Dialog } from "../../../dom_components";
+import { Button, Dialog, LargeModalHeader, LargeModalHeaderButton } from "../../../dom_components";
 import { log } from "../../../utils";
-import { COLOR_GRADIENTS, C } from "../../../styles";
+import { COLOR_GRADIENTS, C, Radius } from "../../../styles";
 import { useEffect, Suspense, lazy } from "react";
 
 const FaceDetectionClientComponent = lazy(() =>
@@ -37,21 +37,34 @@ export function FaceEnrollModalScreen({
         style={{
           display: "flex",
           flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
+          overflow: "hidden",
+          backgroundColor: C.surfaceBase,
+          borderRadius: Radius.container,
         }}
       >
-        <Suspense fallback={null}>
-          <FaceDetectionClientComponent
-            __handleEnrollDescriptor={handleDescriptor}
-          />
-        </Suspense>
-        <Button
-          text={"Exit"}
-          colorGradientArr={COLOR_GRADIENTS.green}
-          buttonStyle={{ paddingLeft: 20, paddingRight: 20 }}
-          onPress={handleExitPress}
+        <LargeModalHeader
+          title="Face Enrollment"
+          actions={
+            <LargeModalHeaderButton variant="default" onClick={handleExitPress}>
+              CLOSE
+            </LargeModalHeaderButton>
+          }
         />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+          }}
+        >
+          <Suspense fallback={null}>
+            <FaceDetectionClientComponent
+              __handleEnrollDescriptor={handleDescriptor}
+            />
+          </Suspense>
+        </div>
       </div>
     </Dialog>
   );

@@ -1,7 +1,7 @@
 import React, { forwardRef, useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import ReactDOM from "react-dom";
 import { C, Fonts } from "../../styles";
-import { lightenRGBByPercent } from "../../utils";
+import { lightenRGBByPercent, capitalizeFirstLetterOfString } from "../../utils";
 import styles from "./NoteHelper.module.css";
 import { useZ } from "../../hooks/useZ";
 import { ModalFooter, ModalFooterButton } from "../ModalFooter/ModalFooter";
@@ -254,7 +254,7 @@ export const NoteHelper = forwardRef(function NoteHelper(
               className={styles.noteTextarea}
               disabled={readOnly}
               value={workorderLine.intakeNotes || ""}
-              onChange={(e) => onUpdateLine({ ...workorderLine, intakeNotes: e.target.value })}
+              onChange={(e) => onUpdateLine({ ...workorderLine, intakeNotes: capitalizeFirstLetterOfString(e.target.value) })}
               placeholder="Intake notes"
               style={{ fontSize: 15 + fontSizeAdj, color: "orange", borderColor: C.borderStrong, minHeight: 32 + fontSizeAdj, cursor: readOnly ? "default" : "text" }}
             />
@@ -265,7 +265,7 @@ export const NoteHelper = forwardRef(function NoteHelper(
               className={styles.noteTextarea}
               disabled={readOnly}
               value={workorderLine.receiptNotes || ""}
-              onChange={(e) => onUpdateLine({ ...workorderLine, receiptNotes: e.target.value })}
+              onChange={(e) => onUpdateLine({ ...workorderLine, receiptNotes: capitalizeFirstLetterOfString(e.target.value) })}
               placeholder="Receipt notes"
               style={{ fontSize: 15 + fontSizeAdj, color: "green", borderColor: C.borderStrong, minHeight: 32 + fontSizeAdj, cursor: readOnly ? "default" : "text" }}
             />

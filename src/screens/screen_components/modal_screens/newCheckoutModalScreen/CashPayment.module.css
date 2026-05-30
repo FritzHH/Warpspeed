@@ -6,7 +6,7 @@
   padding: 20px 0;
   width: 100%;
   height: 48%;
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   box-shadow: 2px 2px 15px rgba(60, 179, 113, 0.25);
   flex-shrink: 0;
   box-sizing: border-box;
@@ -20,7 +20,7 @@
   padding: 0 15px;
   width: 100%;
   height: 48%;
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   box-shadow: 2px 2px 15px rgba(60, 179, 113, 0.25);
   flex-shrink: 0;
   box-sizing: border-box;
@@ -70,7 +70,7 @@
   align-items: center;
   margin-top: 5px;
   padding: 10px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border: 1px solid;
   width: 70%;
   flex-shrink: 0;
@@ -116,7 +116,7 @@
   justify-content: space-between;
   margin-left: 10px;
   border: 2px solid;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 10px 7px 6px 10px;
   flex-shrink: 0;
   box-sizing: border-box;
@@ -161,7 +161,7 @@
   align-items: center;
   justify-content: space-between;
   border: 2px solid;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 10px 10px 6px 10px;
   width: 35%;
   flex-shrink: 0;

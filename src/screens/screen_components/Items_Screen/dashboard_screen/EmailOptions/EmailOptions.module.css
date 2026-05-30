@@ -39,7 +39,7 @@
 .inboxStatusDot {
   width: 8px;
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   flex-shrink: 0;
 }
 
@@ -68,7 +68,7 @@
   justify-content: center;
   border-width: 1px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 4px 8px;
   margin-right: 5px;
   margin-bottom: 5px;
@@ -80,7 +80,7 @@
 .colorSwatch {
   width: 26px;
   height: 26px;
-  border-radius: 13px;
+  border-radius: var(--radius-container);
   border-style: solid;
   margin-right: 4px;
   margin-bottom: 4px;
@@ -97,7 +97,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   cursor: pointer;
   user-select: none;
   background: none;
@@ -113,7 +113,7 @@
   margin-bottom: 20px;
   border-width: 1px;
   border-style: solid;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   overflow: hidden;
   box-sizing: border-box;
 }
@@ -182,7 +182,7 @@
 
 .alignBtn {
   padding: 5px 12px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   border-width: 1px;
   border-style: solid;
   cursor: pointer;
@@ -207,7 +207,7 @@
   align-items: center;
   border-width: 1px;
   border-style: solid;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   overflow: hidden;
 }
 
@@ -224,7 +224,7 @@
 
 .italicToggle {
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border-width: 1px;
   border-style: solid;
   cursor: pointer;
@@ -237,7 +237,7 @@
   min-height: 80px;
   border-width: 2px;
   border-style: solid;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 10px;
   outline: none;
   white-space: pre-wrap;
@@ -265,7 +265,7 @@
 
 .imageScaleBtn {
   padding: 4px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border-width: 1px;
   border-style: solid;
   display: flex;
@@ -297,7 +297,7 @@
 }
 
 .emojiModalCard {
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   padding: 15px;
   width: 320px;
   z-index: 1;
@@ -306,7 +306,7 @@
 .logoSizeBtn {
   width: 24px;
   height: 24px;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   display: flex;
   justify-content: center;
   align-items: center;

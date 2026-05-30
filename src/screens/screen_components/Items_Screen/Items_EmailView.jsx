@@ -89,6 +89,7 @@ const ThreadView = React.memo(() => {
   const zSelectedThreadId = useEmailStore((state) => state.selectedThreadId);
   const zEmails = useEmailStore((state) => state.emails);
   const zActiveAccountKey = useEmailStore((state) => state.activeAccountKey);
+  const zThreadInspectorState = useEmailStore((state) => state.threadInspectorState);
   const [sExpandedMessages, _sSetExpandedMessages] = useState({});
 
   const zThreadMessages = useMemo(() => {
@@ -195,6 +196,24 @@ const ThreadView = React.memo(() => {
           </span>
         </div>
         <div className={styles.threadHeaderActions}>
+          <button
+            type="button"
+            className={styles.viewThreadPill}
+            onClick={() => {
+              const current = useEmailStore.getState().threadInspectorState;
+              useEmailStore.getState().setThreadInspectorState(
+                current === "open" ? "hidden" : "open"
+              );
+            }}
+            style={{
+              borderColor: C.borderSubtle,
+              color: C.text,
+              background: zThreadInspectorState === "open" ? C.surfaceSuccessMuted : "transparent",
+            }}
+          >
+            <img src={ICONS.eyeballs} alt="" className={styles.viewThreadIcon} />
+            <span>View Thread</span>
+          </button>
           <ActionButton label={isUnread ? "Mark Read" : "Mark Unread"} onPress={() => handleMarkRead(!isUnread)} />
           {isInbox && <ActionButton label="Archive" onPress={handleArchive} />}
           <ActionButton label="Trash" onPress={handleTrash} color={C.red} />
@@ -654,6 +673,7 @@ const ComposeView = React.memo(() => {
 
     if (result.success) {
       useEmailStore.getState().clearComposeDraft();
+      useEmailStore.getState().setThreadInspectorState("hidden");
     } else {
       _sSetError(result.error || "Failed to send email");
     }

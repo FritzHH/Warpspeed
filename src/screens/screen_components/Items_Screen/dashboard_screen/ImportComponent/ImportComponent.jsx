@@ -2587,7 +2587,7 @@ const ImportComponent = () => {
                   wo.paymentComplete = false;
                   wo.activeSaleID = "";
                   wo.saleID = "";
-                  wo.endedOnMillis = "";
+                  wo.paidOnMillis = "";
                   wo.status = "finished";
                   wo.changeLog = (wo.changeLog || []).filter((e) => e.field !== "payment");
 

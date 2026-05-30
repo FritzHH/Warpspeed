@@ -1,6 +1,6 @@
 /* eslint-disable */
 
-import { capitalizeFirstLetterOfString, checkInputForNumbersOnly, formatCurrencyDisp, formatMillisForDisplay, formatPhoneWithDashes, formatPhoneWithParens, createNewWorkorder, generateEAN13Barcode, generate36CharUUID, lightenRGBByPercent, log, deepEqual, printBuilder, removeUnusedFields, resolveStatus, calculateWaitEstimateLabel, findTemplateByType, scheduleAutoText, localStorageWrapper } from "../../../utils";
+import { capitalizeFirstLetterOfString, checkInputForNumbersOnly, formatCurrencyDisp, formatMillisForDisplay, formatPhoneWithDashes, formatPhoneWithParens, createNewWorkorder, generateEAN13Barcode, generate36CharUUID, lightenRGBByPercent, log, deepEqual, printBuilder, removeUnusedFields, resolveStatus, calculateWaitEstimateLabel, findTemplateByType, scheduleAutoText, localStorageWrapper, getPrinterStatus } from "../../../utils";
 import {
   Button as Button_,
   CheckBox,
@@ -8,7 +8,6 @@ import {
   DropdownMenu,
   Image as Image_,
   Pressable as Pressable_,
-  PrinterAlert,
   ScreenModal,
   TextInput as TextInput_,
   TimePicker as TimePicker_,
@@ -16,7 +15,7 @@ import {
   Tooltip,
 } from "../../../dom_components";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
-import { C, COLOR_GRADIENTS, Colors, ICONS } from "../../../styles";
+import { C, COLOR_GRADIENTS, Colors, ICONS, Radius } from "../../../styles";
 import { useZ } from "../../../hooks/useZ";
 import {
   SETTINGS_OBJ,
@@ -72,7 +71,7 @@ const PickupDeliveryInputs = ({ pd, isDonePaid, dateLabel, formatTime12, parse12
 
   const pillStyle = {
     padding: "4px 8px",
-    borderRadius: 5,
+    borderRadius: Radius.control,
     backgroundColor: C.blue,
     border: "none",
     cursor: "pointer",
@@ -201,7 +200,6 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sShowMediaModal, _setShowMediaModal] = useState(false);
   const [sWaitTimeBlink, _setWaitTimeBlink] = useState(false);
   const sUploadProgress = useUploadProgressStore((s) => s.progress);
-  const [sPrinterAlert, _setPrinterAlert] = useState(null); // { x, y }
   const [sTrackingModalVisible, _setTrackingModalVisible] = useState(false);
   const [sToastText, _sSetToastText] = useState("");
   const [sToastVisible, _sSetToastVisible] = useState(false);
@@ -466,10 +464,7 @@ export const ActiveWorkorderComponent = ({}) => {
 
   const isDonePaid = resolveStatus(zOpenWorkorder?.status, zSettings?.statuses)?.label?.toLowerCase() === "done & paid";
 
-  const selectedPrinterID = localStorageWrapper.getItem("selectedPrinterID");
-  const selectedPrinter = selectedPrinterID && zSettings?.printers?.[selectedPrinterID];
-  const isPrinterOffline = !!(selectedPrinter && selectedPrinter.active !== true);
-  const printerOfflineLabel = selectedPrinter?.name ? `Printer "${selectedPrinter.name}" is offline` : "Selected printer is offline";
+  const { isPrinterOffline, offlineLabel: printerOfflineLabel } = getPrinterStatus(zSettings);
 
 
   // Stable reference so ScreenModal doesn't remount the modal content on parent re-renders
@@ -551,11 +546,8 @@ export const ActiveWorkorderComponent = ({}) => {
     });
   }
 
-  function handleWorkorderPrintPress(e) {
-    let px = e?.nativeEvent?.pageX || e?.pageX;
-    let py = e?.nativeEvent?.pageY || e?.pageY;
-    if (px && py) _setPrinterAlert({ x: px, y: py });
-  // log("WORKORDER OBJ:", JSON.stringify(zOpenWorkorder, null, 2));
+  function handleWorkorderPrintPress() {
+    showToast("Receipt printed");
     const _settings = useSettingsStore.getState().getSettings();
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
     let toPrint = printBuilder.workorder(
@@ -567,10 +559,8 @@ export const ActiveWorkorderComponent = ({}) => {
     dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
   }
 
-  function handleIntakePrintPress(e) {
-    let px = e?.nativeEvent?.pageX || e?.pageX;
-    let py = e?.nativeEvent?.pageY || e?.pageY;
-    if (px && py) _setPrinterAlert({ x: px, y: py });
+  function handleIntakePrintPress() {
+    showToast("Receipt printed");
     const settings = useSettingsStore.getState().getSettings();
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
     let toPrint = printBuilder.intake(
@@ -716,7 +706,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 alignItems: "center",
                 justifyContent: "center",
                 paddingVertical: 2,
-                borderRadius: 5,
+                borderRadius: Radius.control,
                 paddingHorizontal: 20,
                 backgroundColor: "transparent",
               }}
@@ -783,7 +773,7 @@ export const ActiveWorkorderComponent = ({}) => {
               marginTop: 10,
               padding: "8px 8px",
               backgroundColor: C.surfaceAlt,
-              borderRadius: 5,
+              borderRadius: Radius.control,
               zIndex: 10,
               overflow: "visible",
               boxSizing: "border-box",
@@ -814,7 +804,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     paddingHorizontal: 4,
                     fontSize: 15,
                     outlineStyle: "none",
-                    borderRadius: 5,
+                    borderRadius: Radius.control,
                     fontWeight: zOpenWorkorder?.brand ? "500" : null,
                   }}
                   value={capitalizeFirstLetterOfString(zOpenWorkorder?.brand)}
@@ -853,7 +843,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       borderWidth: 1,
                       borderStyle: "solid",
                       borderColor: C.buttonLightGreenOutline,
-                      borderRadius: 5,
+                      borderRadius: Radius.control,
                       maxHeight: window.innerHeight * 0.5,
                       overflow: "auto",
                       zIndex: 999, /* z-allow: local autocomplete dropdown */
@@ -980,7 +970,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     paddingHorizontal: 4,
                     fontSize: 15,
                     outlineStyle: "none",
-                    borderRadius: 5,
+                    borderRadius: Radius.control,
                     fontWeight: zOpenWorkorder?.description ? "500" : null,
                   }}
                   value={capitalizeFirstLetterOfString(zOpenWorkorder?.description)}
@@ -1019,7 +1009,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       borderWidth: 1,
                       borderStyle: "solid",
                       borderColor: C.buttonLightGreenOutline,
-                      borderRadius: 5,
+                      borderRadius: Radius.control,
                       maxHeight: window.innerHeight * 0.5,
                       overflow: "auto",
                       zIndex: 999, /* z-allow: local autocomplete dropdown */
@@ -1124,7 +1114,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       paddingHorizontal: 4,
                       fontSize: 15,
                       outlineStyle: "none",
-                      borderRadius: 5,
+                      borderRadius: Radius.control,
                       fontWeight: zOpenWorkorder?.color1.label ? "500" : null,
                       backgroundColor: zOpenWorkorder?.color1.backgroundColor,
                       color: zOpenWorkorder?.color1.textColor,
@@ -1163,7 +1153,7 @@ export const ActiveWorkorderComponent = ({}) => {
                         borderWidth: 1,
                         borderStyle: "solid",
                         borderColor: C.buttonLightGreenOutline,
-                        borderRadius: 5,
+                        borderRadius: Radius.control,
                         maxHeight: 200,
                         overflow: "auto",
                         zIndex: 999, /* z-allow: local autocomplete dropdown */
@@ -1207,7 +1197,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       paddingHorizontal: 4,
                       fontSize: 15,
                       outlineStyle: "none",
-                      borderRadius: 5,
+                      borderRadius: Radius.control,
                       fontWeight: zOpenWorkorder?.color2.label ? "500" : null,
                       backgroundColor: zOpenWorkorder?.color2.backgroundColor,
                       color: zOpenWorkorder?.color2.textColor,
@@ -1245,7 +1235,7 @@ export const ActiveWorkorderComponent = ({}) => {
                         borderWidth: 1,
                         borderStyle: "solid",
                         borderColor: C.buttonLightGreenOutline,
-                        borderRadius: 5,
+                        borderRadius: Radius.control,
                         maxHeight: 200,
                         overflow: "auto",
                         zIndex: 999, /* z-allow: local autocomplete dropdown */
@@ -1557,7 +1547,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   paddingHorizontal: 4,
                   fontSize: 15,
                   outlineStyle: "none",
-                  borderRadius: 5,
+                  borderRadius: Radius.control,
                   textAlign: "center",
                   fontWeight: (zOpenWorkorder?.waitTime?.maxWaitTimeDays != null && zOpenWorkorder?.waitTime?.maxWaitTimeDays !== "") ? "500" : null,
                   backgroundColor: sWaitTimeBlink ? "rgba(255, 255, 0, 0.35)" : "transparent",
@@ -1624,7 +1614,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       fontStyle: "italic",
                       backgroundColor: sWaitTimeBlink && isMissing ? "rgba(255, 255, 0, 0.35)" : "transparent",
                       transition: "background-color 300ms ease",
-                      borderRadius: 3,
+                      borderRadius: Radius.control,
                       padding: "2px 4px",
                       opacity: (zOpenWorkorder?.status === "pickup" || zOpenWorkorder?.status === "delivery") ? 0.35 : 1,
                     }}
@@ -1652,12 +1642,12 @@ export const ActiveWorkorderComponent = ({}) => {
               width: "100%",
               padding: "8px 8px",
               backgroundColor: C.surfaceAlt,
-              borderRadius: 5,
+              borderRadius: Radius.control,
               boxSizing: "border-box",
             }}
           >
             <div style={{ width: '100%', display: 'flex', flexDirection: 'row', alignItems: 'center', marginBottom: (sShowItemOrdering || hasItemOrderingData) ? 7 : 0, opacity: .5 }}>
-              <div style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: C.surfaceAlt }} />
+              <div style={{ flex: 1, height: 3, borderRadius: Radius.control, backgroundColor: C.surfaceAlt }} />
               <button
                 type="button"
                 disabled={hasItemOrderingData}
@@ -1669,7 +1659,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 <span style={{ fontSize: 12, fontWeight: '600', fontStyle: 'italic', color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : C.textMuted, marginRight: 5 }}>Ordering Info</span>
                 <span style={{ fontSize: 10, color: (sShowItemOrdering || hasItemOrderingData) ? C.orange : C.textMuted, display: 'inline-block', transform: (sShowItemOrdering || hasItemOrderingData) ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
               </button>
-              <div style={{ flex: 1, height: 3, borderRadius: 5, backgroundColor: C.surfaceAlt }} />
+              <div style={{ flex: 1, height: 3, borderRadius: Radius.control, backgroundColor: C.surfaceAlt }} />
             </div>
             {(sShowItemOrdering || hasItemOrderingData) && (
               <div style={{ display: "flex", flexDirection: "row", width: "100%", marginTop: 5, boxSizing: "border-box" }}>
@@ -1701,7 +1691,7 @@ export const ActiveWorkorderComponent = ({}) => {
                         paddingHorizontal: 4,
                         fontSize: 15,
                         outlineStyle: "none",
-                        borderRadius: 5,
+                        borderRadius: Radius.control,
                         fontWeight: sActiveOrderedItem?.partOrdered ? "500" : null,
                         backgroundColor: C.backgroundWhite,
                       }}
@@ -1740,7 +1730,7 @@ export const ActiveWorkorderComponent = ({}) => {
                           paddingHorizontal: 4,
                           fontSize: 15,
                           outlineStyle: "none",
-                          borderRadius: 5,
+                          borderRadius: Radius.control,
                           fontWeight: sActiveOrderedItem?.partSource ? "500" : null,
                           backgroundColor: C.backgroundWhite,
                         }}
@@ -1766,7 +1756,7 @@ export const ActiveWorkorderComponent = ({}) => {
                             borderWidth: 1,
                             borderStyle: "solid",
                             borderColor: C.buttonLightGreenOutline,
-                            borderRadius: 5,
+                            borderRadius: Radius.control,
                             maxHeight: 200,
                             overflow: "auto",
                             zIndex: 999, /* z-allow: local autocomplete dropdown */
@@ -1864,7 +1854,7 @@ export const ActiveWorkorderComponent = ({}) => {
                         style={{
                           width: 20,
                           height: 20,
-                          borderRadius: 4,
+                          borderRadius: Radius.control,
                           backgroundColor: (isDonePaid || !hasActiveItem) ? C.surfaceAlt : C.buttonLightGreen,
                           display: "flex",
                           justifyContent: "center",
@@ -1894,7 +1884,7 @@ export const ActiveWorkorderComponent = ({}) => {
                         style={{
                           width: 20,
                           height: 20,
-                          borderRadius: 4,
+                          borderRadius: Radius.control,
                           backgroundColor: (isDonePaid || !hasActiveItem) ? C.surfaceAlt : C.buttonLightGreen,
                           display: "flex",
                           justifyContent: "center",
@@ -1940,10 +1930,9 @@ export const ActiveWorkorderComponent = ({}) => {
                               btn1Text: "Continue",
                               btn2Text: "Cancel",
                               handleBtn1Press: () => {
-                                useAlertScreenStore.getState().setValues({ showAlert: false });
                                 applyToggle();
                               },
-                              handleBtn2Press: () => useAlertScreenStore.getState().setValues({ showAlert: false }),
+                              handleBtn2Press: () => {},
                             });
                           } else {
                             applyToggle();
@@ -1951,8 +1940,8 @@ export const ActiveWorkorderComponent = ({}) => {
                         }}
                         style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', background: 'none', border: 'none', padding: 0, font: 'inherit', cursor: (isDonePaid || !hasActiveItem) ? 'default' : 'pointer' }}
                       >
-                        <span style={{ display: 'flex', width: 12, height: 12, borderRadius: 6, borderWidth: 1.5, borderStyle: 'solid', borderColor: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green, justifyContent: 'center', alignItems: 'center', marginRight: 4, boxSizing: 'border-box' }}>
-                          <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: 3, backgroundColor: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green }} />
+                        <span style={{ display: 'flex', width: 12, height: 12, borderRadius: Radius.control, borderWidth: 1.5, borderStyle: 'solid', borderColor: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green, justifyContent: 'center', alignItems: 'center', marginRight: 4, boxSizing: 'border-box' }}>
+                          <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: Radius.control, backgroundColor: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green }} />
                         </span>
                         <span style={{ fontSize: 11, fontWeight: '600', color: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green }}>{sActiveOrderedItem?.partToBeOrdered ? "Not ordered" : "Ordered"}</span>
                       </button>
@@ -1979,7 +1968,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       }}
                       multiline={false}
                       numberOfLines={1}
-                      style={{ height: '100%', boxSizing: 'border-box', fontSize: 11, flex: 1, padding: "0 5px", border: `1px solid ${C.borderSubtle}`, borderRadius: 6, resize: "none", overflow: "hidden", color: C.text, outline: "none" }}
+                      style={{ height: '100%', boxSizing: 'border-box', fontSize: 11, flex: 1, padding: "0 5px", border: `1px solid ${C.borderSubtle}`, borderRadius: Radius.control, resize: "none", overflow: "hidden", color: C.text, outline: "none" }}
                     />
                     {sActiveOrderedItem?.trackingNumber ? (() => {
                       const inputVal = sActiveOrderedItem.trackingNumber.trim();
@@ -1993,7 +1982,7 @@ export const ActiveWorkorderComponent = ({}) => {
                             title="Press to open, right-click to copy"
                             onClick={() => window.open(openUrl, "_blank", "noopener,noreferrer")}
                             onContextMenu={copyOnRightClick}
-                            style={{ height: '100%', boxSizing: 'border-box', marginLeft: 5, backgroundColor: C.buttonLightGreen, borderColor: C.buttonLightGreenOutline, borderWidth: 1, borderStyle: 'solid', borderRadius: 5, paddingTop: 0, paddingBottom: 0, paddingLeft: 8, paddingRight: 8, fontSize: 12, color: C.textMuted, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                            style={{ height: '100%', boxSizing: 'border-box', marginLeft: 5, backgroundColor: C.buttonLightGreen, borderColor: C.buttonLightGreenOutline, borderWidth: 1, borderStyle: 'solid', borderRadius: Radius.control, paddingTop: 0, paddingBottom: 0, paddingLeft: 8, paddingRight: 8, fontSize: 12, color: C.textMuted, fontWeight: 500, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
                           >
                             Open
                           </button>
@@ -2005,7 +1994,7 @@ export const ActiveWorkorderComponent = ({}) => {
                           title="Press to track, right-click to copy"
                           onClick={() => _sSetShowTracker(true)}
                           onContextMenu={copyOnRightClick}
-                          style={{ height: '100%', boxSizing: 'border-box', marginLeft: 5, backgroundColor: C.green, borderWidth: 0, borderRadius: 5, paddingTop: 0, paddingBottom: 0, paddingLeft: 8, paddingRight: 8, fontSize: 12, color: 'white', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
+                          style={{ height: '100%', boxSizing: 'border-box', marginLeft: 5, backgroundColor: C.green, borderWidth: 0, borderRadius: Radius.control, paddingTop: 0, paddingBottom: 0, paddingLeft: 8, paddingRight: 8, fontSize: 12, color: 'white', fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1 }}
                         >
                           Track
                         </button>
@@ -2019,11 +2008,11 @@ export const ActiveWorkorderComponent = ({}) => {
                       buttonVisible={false}
                       handleOuterClick={() => _sSetShowTracker(false)}
                       Component={() => (
-                        <div style={{ width: "80vw", height: "85vh", backgroundColor: C.backgroundWhite, borderRadius: 12, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+                        <div style={{ width: "80vw", height: "85vh", backgroundColor: C.backgroundWhite, borderRadius: Radius.container, overflow: "hidden", display: "flex", flexDirection: "column" }}>
                           <div style={{ flex: 1, padding: 10 }}>
                             <iframe
                               src={"https://www.17track.net/en/track?nums=" + encodeURIComponent(sActiveOrderedItem.trackingNumber.trim())}
-                              style={{ width: "100%", height: "100%", border: "none", borderRadius: 6 }}
+                              style={{ width: "100%", height: "100%", border: "none", borderRadius: Radius.control }}
                               title="Package Tracking"
                             />
                           </div>
@@ -2054,34 +2043,76 @@ export const ActiveWorkorderComponent = ({}) => {
                       {/* Plus button */}
                       <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
                         <Tooltip text={addTooltip} position="left">
-                          <button type="button" disabled={isDonePaid} onClick={handleAddOrderedItem} style={{ background: "none", border: "none", padding: 0, cursor: isDonePaid ? "default" : "pointer" }}>
-                            <Image_ icon={ICONS.add} size={32} />
-                          </button>
+                          <Button_
+                            icon={ICONS.add}
+                            iconSize={32}
+                            enabled={!isDonePaid}
+                            onPress={handleAddOrderedItem}
+                            buttonStyle={{
+                              paddingLeft: 4,
+                              paddingRight: 4,
+                              paddingTop: 4,
+                              paddingBottom: 4,
+                              backgroundColor: "transparent",
+                            }}
+                            iconStyle={{ marginRight: 0 }}
+                          />
                         </Tooltip>
                       </div>
                       {/* Caret navigation */}
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
                         {canGoRight && (
                           <Tooltip text={rightTooltip} position="left">
-                            <button type="button" onClick={handleNavigateRight} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                              <Image_ icon={ICONS.caretRight} size={22} />
-                            </button>
+                            <Button_
+                              icon={ICONS.caretRight}
+                              iconSize={22}
+                              onPress={handleNavigateRight}
+                              buttonStyle={{
+                                paddingLeft: 4,
+                                paddingRight: 4,
+                                paddingTop: 4,
+                                paddingBottom: 4,
+                                backgroundColor: "transparent",
+                              }}
+                              iconStyle={{ marginRight: 0 }}
+                            />
                           </Tooltip>
                         )}
                         {canGoLeft && (
                           <Tooltip text={leftTooltip} position="left">
-                            <button type="button" onClick={handleNavigateLeft} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
-                              <Image_ icon={ICONS.caretLeft} size={22} />
-                            </button>
+                            <Button_
+                              icon={ICONS.caretLeft}
+                              iconSize={22}
+                              onPress={handleNavigateLeft}
+                              buttonStyle={{
+                                paddingLeft: 4,
+                                paddingRight: 4,
+                                paddingTop: 4,
+                                paddingBottom: 4,
+                                backgroundColor: "transparent",
+                              }}
+                              iconStyle={{ marginRight: 0 }}
+                            />
                           </Tooltip>
                         )}
                       </div>
                       {/* Delete button */}
                       <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", opacity: canDelete ? 1 : 0.2 }}>
                         <Tooltip text={deleteTooltip} position="left">
-                          <button type="button" disabled={!canDelete} onClick={handleDeleteActiveOrderedItem} style={{ background: "none", border: "none", padding: 0, cursor: canDelete ? "pointer" : "default", lineHeight: 1 }}>
-                            <Image_ icon={ICONS.redx} size={14} />
-                          </button>
+                          <Button_
+                            icon={ICONS.redx}
+                            iconSize={14}
+                            enabled={canDelete}
+                            onPress={handleDeleteActiveOrderedItem}
+                            buttonStyle={{
+                              paddingLeft: 4,
+                              paddingRight: 4,
+                              paddingTop: 4,
+                              paddingBottom: 4,
+                              backgroundColor: "transparent",
+                            }}
+                            iconStyle={{ marginRight: 0 }}
+                          />
                         </Tooltip>
                       </div>
                     </div>
@@ -2150,7 +2181,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 position: "absolute",
                 top: -3,
                 right: -10,
-                borderRadius: 8,
+                borderRadius: Radius.row,
                 minWidth: 16,
                 height: 16,
                 display: "flex",
@@ -2170,14 +2201,14 @@ export const ActiveWorkorderComponent = ({}) => {
               </span>
             </div>
             {sUploadProgress && (
-              <div style={{ position: "absolute", bottom: -2, left: 0, right: 0, height: 4, backgroundColor: C.surfaceAlt, borderRadius: 2, overflow: "hidden" }}>
+              <div style={{ position: "absolute", bottom: -2, left: 0, right: 0, height: 4, backgroundColor: C.surfaceAlt, borderRadius: Radius.control, overflow: "hidden" }}>
                 {!sUploadProgress.done ? (
                   <div
                     style={{
                       width: "40%",
                       height: "100%",
                       backgroundColor: C.blue,
-                      borderRadius: 2,
+                      borderRadius: Radius.control,
                       animation: "uploadBarCycle 1.2s ease-in-out infinite",
                     }}
                   />
@@ -2187,7 +2218,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       width: "100%",
                       height: "100%",
                       backgroundColor: sUploadProgress.failed > 0 ? C.red : C.green,
-                      borderRadius: 2,
+                      borderRadius: Radius.control,
                     }}
                   />
                 )}
@@ -2219,12 +2250,6 @@ export const ActiveWorkorderComponent = ({}) => {
           />
         </Suspense>
       )}
-      <PrinterAlert
-        visible={!!sPrinterAlert}
-        x={sPrinterAlert?.x}
-        y={sPrinterAlert?.y}
-        onDone={() => _setPrinterAlert(null)}
-      />
       <Toast
         visible={sToastVisible}
         text={sToastText}

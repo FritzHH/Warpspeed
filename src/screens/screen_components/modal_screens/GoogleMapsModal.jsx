@@ -1,7 +1,7 @@
 /* eslint-disable */
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
-import { Button, ModalFooter, ModalFooterButton } from "../../../dom_components";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../../styles";
+import { Button, LargeModalHeader, LargeModalHeaderButton } from "../../../dom_components";
 import { useZ } from "../../../hooks/useZ";
 
 import { useLayoutStore } from "../../../stores";
@@ -179,37 +179,40 @@ export const GoogleMapsModal = ({
             borderColor: C.buttonLightGreenOutline,
           }}
         >
-          <div
-            className={styles.header}
-            style={{ borderBottomColor: C.buttonLightGreenOutline }}
-          >
-            <div className={styles.headerLeft}>
-              {!sLoading && !sError && sDuration ? (
-                <>
-                  <span className={styles.routeLabel} style={{ color: C.textMuted }}>
-                    Time:
+          <LargeModalHeader
+            title={
+              <div className={styles.headerLeft}>
+                {!sLoading && !sError && sDuration ? (
+                  <>
+                    <span className={styles.routeLabel} style={{ color: C.textMuted }}>
+                      Time:
+                    </span>
+                    <span className={styles.routeValueGreen} style={{ color: C.green }}>
+                      {sDuration}
+                    </span>
+                    <span className={styles.routeSep} style={{ color: C.textMuted }}>
+                      |
+                    </span>
+                    <span className={styles.routeLabel} style={{ color: C.textMuted }}>
+                      Distance:
+                    </span>
+                    <span className={styles.routeValueBlue} style={{ color: C.blue }}>
+                      {sDistance}
+                    </span>
+                  </>
+                ) : (
+                  <span className={styles.routeFallback} style={{ color: C.text }}>
+                    {sLoading && !sError ? "Loading route..." : sError ? "Route error" : "Route"}
                   </span>
-                  <span className={styles.routeValueGreen} style={{ color: C.green }}>
-                    {sDuration}
-                  </span>
-                  <span className={styles.routeSep} style={{ color: C.textMuted }}>
-                    |
-                  </span>
-                  <span className={styles.routeLabel} style={{ color: C.textMuted }}>
-                    Distance:
-                  </span>
-                  <span className={styles.routeValueBlue} style={{ color: C.blue }}>
-                    {sDistance}
-                  </span>
-                </>
-              ) : (
-                <span className={styles.routeFallback} style={{ color: C.text }}>
-                  {sLoading && !sError ? "Loading route..." : sError ? "Route error" : "Route"}
-                </span>
-              )}
-            </div>
-
-          </div>
+                )}
+              </div>
+            }
+            actions={
+              <LargeModalHeaderButton variant="default" onClick={onClose}>
+                CLOSE
+              </LargeModalHeaderButton>
+            }
+          />
 
           <div className={styles.mapContainer}>
             <div ref={mapContainerRef} className={styles.mapHost} />
@@ -233,7 +236,7 @@ export const GoogleMapsModal = ({
                     onPress={initMap}
                     colorGradientArr={COLOR_GRADIENTS.blue}
                     buttonStyle={{
-                      borderRadius: 5,
+                      borderRadius: Radius.control,
                       paddingHorizontal: 20,
                       paddingVertical: 8,
                     }}
@@ -243,10 +246,6 @@ export const GoogleMapsModal = ({
               </div>
             )}
           </div>
-
-          <ModalFooter>
-            <ModalFooterButton onClick={onClose}>Close</ModalFooterButton>
-          </ModalFooter>
         </div>
       </div>
     </div>

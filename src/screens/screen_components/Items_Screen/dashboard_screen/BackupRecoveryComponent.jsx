@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import styles from "./BackupRecoveryComponent.module.css";
 import { Button } from "../../../../dom_components";
 import { useSettingsStore } from "../../../../stores";
-import { C, COLOR_GRADIENTS } from "../../../../styles";
+import { C, COLOR_GRADIENTS, Radius } from "../../../../styles";
 import { formatMillisForDisplay, log } from "../../../../utils";
 import { firestoreQuery } from "../../../../db_calls";
 import {
@@ -115,7 +115,7 @@ export function BackupRecoveryComponent() {
           text={sArchiving ? "Archiving..." : "Run Full Backup"}
           onPress={handleManualArchive}
           colorGradientArr={COLOR_GRADIENTS.green}
-          buttonStyle={{ borderRadius: 5, paddingHorizontal: 20 }}
+          buttonStyle={{ borderRadius: Radius.control, paddingHorizontal: 20 }}
           disabled={sArchiving}
           loading={sArchiving}
         />
@@ -186,7 +186,7 @@ export function BackupRecoveryComponent() {
             text="Restore from Backup"
             onPress={() => _setConfirmStep(1)}
             colorGradientArr={COLOR_GRADIENTS.red}
-            buttonStyle={{ borderRadius: 5, paddingHorizontal: 20 }}
+            buttonStyle={{ borderRadius: Radius.control, paddingHorizontal: 20 }}
             disabled={sRehydrating}
           />
         )}
@@ -202,13 +202,13 @@ export function BackupRecoveryComponent() {
                 text="Yes, Continue"
                 onPress={() => _setConfirmStep(2)}
                 colorGradientArr={COLOR_GRADIENTS.red}
-                buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
+                buttonStyle={{ borderRadius: Radius.control, paddingHorizontal: 15 }}
               />
               <Button
                 text="Cancel"
                 onPress={() => _setConfirmStep(0)}
                 colorGradientArr={COLOR_GRADIENTS.grey}
-                buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
+                buttonStyle={{ borderRadius: Radius.control, paddingHorizontal: 15 }}
               />
             </div>
           </div>
@@ -225,7 +225,7 @@ export function BackupRecoveryComponent() {
                 text={sRehydrating ? "Restoring..." : "CONFIRM RESTORE"}
                 onPress={handleRehydrate}
                 colorGradientArr={COLOR_GRADIENTS.red}
-                buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
+                buttonStyle={{ borderRadius: Radius.control, paddingHorizontal: 15 }}
                 disabled={sRehydrating}
                 loading={sRehydrating}
               />
@@ -233,7 +233,7 @@ export function BackupRecoveryComponent() {
                 text="Cancel"
                 onPress={() => _setConfirmStep(0)}
                 colorGradientArr={COLOR_GRADIENTS.grey}
-                buttonStyle={{ borderRadius: 5, paddingHorizontal: 15 }}
+                buttonStyle={{ borderRadius: Radius.control, paddingHorizontal: 15 }}
                 disabled={sRehydrating}
               />
             </div>
@@ -290,7 +290,7 @@ export function BackupRecoveryComponent() {
             text="Load Logs"
             onPress={handleLoadInitial}
             colorGradientArr={COLOR_GRADIENTS.blue}
-            buttonStyle={{ borderRadius: 5, paddingHorizontal: 20 }}
+            buttonStyle={{ borderRadius: Radius.control, paddingHorizontal: 20 }}
           />
         )}
 
@@ -384,7 +384,7 @@ export function BackupRecoveryComponent() {
             onPress={handleLoadMore}
             colorGradientArr={COLOR_GRADIENTS.blue}
             buttonStyle={{
-              borderRadius: 5,
+              borderRadius: Radius.control,
               paddingHorizontal: 20,
               marginTop: 5,
             }}

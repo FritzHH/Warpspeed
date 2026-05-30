@@ -2,12 +2,12 @@
   display: flex;
   flex-direction: column;
   width: 420px;
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   overflow: hidden;
   flex-shrink: 0;
 }
 
-.header {
+.subHeader {
   display: flex;
   flex-direction: row;
   justify-content: space-between;
@@ -64,7 +64,7 @@
   flex-direction: row;
   align-items: center;
   margin-top: 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 5px 10px;
 }
 
@@ -85,7 +85,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   width: 100%;
   box-sizing: border-box;
 }
@@ -107,7 +107,7 @@
 .txnCard {
   border-width: 1px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 10px;
   margin-bottom: 12px;
   background-color: white;
@@ -141,7 +141,7 @@
 
 .methodPill {
   padding: 1px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   margin-right: 6px;
 }
 
@@ -156,7 +156,7 @@
 
 .importPill {
   padding: 1px 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   margin-left: 6px;
 }
 
@@ -178,7 +178,7 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 5px 8px;
   margin-top: 8px;
 }
@@ -197,7 +197,7 @@
 }
 
 .refundAmountBox {
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 12px;
   margin-bottom: 12px;
   display: flex;
@@ -263,7 +263,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   margin-top: 8px;
 }
 
@@ -290,7 +290,7 @@
 }
 
 .confirmCard {
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   display: flex;
   flex-direction: column;
   align-items: center;

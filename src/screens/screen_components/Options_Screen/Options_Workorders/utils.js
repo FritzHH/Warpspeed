@@ -140,6 +140,12 @@ export function scoreWorkorder(wo, query) {
 }
 
 export function sortWorkorders(inputArr, statuses, currentUser) {
+  const settings = useSettingsStore.getState().getSettings();
+  const labelByWo = new Map();
+  (inputArr || []).forEach((wo) => {
+    labelByWo.set(wo, calculateWaitEstimateLabel(wo, settings));
+  });
+
   let finalArr = [];
   (statuses || []).forEach((status) => {
     let arr = [];
@@ -152,7 +158,12 @@ export function sortWorkorders(inputArr, statuses, currentUser) {
       let bHasWait = !!(b.waitTime?.maxWaitTimeDays != null && b.startedOnMillis);
       if (!aHasWait && bHasWait) return -1;
       if (aHasWait && !bHasWait) return 1;
-      if (!aHasWait && !bHasWait) return 0;
+      if (!aHasWait && !bHasWait) {
+        return (a.startedOnMillis || 0) - (b.startedOnMillis || 0);
+      }
+      if (labelByWo.get(a) === labelByWo.get(b)) {
+        return (a.startedOnMillis || 0) - (b.startedOnMillis || 0);
+      }
       let aDue = a.startedOnMillis + a.waitTime.maxWaitTimeDays * NUM_MILLIS_IN_DAY;
       let bDue = b.startedOnMillis + b.waitTime.maxWaitTimeDays * NUM_MILLIS_IN_DAY;
       return aDue - bDue;

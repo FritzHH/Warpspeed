@@ -8,6 +8,7 @@ import {
   useLoginStore,
 } from "../../../stores";
 import {
+  Button,
   CheckBox,
   CurrencyInput,
   CustomerQuickNotes,
@@ -17,10 +18,10 @@ import {
   LoginModal,
   TextInput,
   Tooltip,
-  ModalFooter,
-  ModalFooterButton,
+  LargeModalHeader,
+  LargeModalHeaderButton,
 } from "../../../dom_components";
-import { C, ICONS } from "../../../styles";
+import { C, ICONS, Radius } from "../../../styles";
 import styles from "./InventoryItemModalScreen.module.css";
 import { formatCurrencyDisp, showAlert, deepEqual, localStorageWrapper } from "../../../utils";
 import {
@@ -35,6 +36,11 @@ const QuickButtonPickerModal = lazy(() =>
 
 const CATEGORIES = ["Item", "Labor"];
 
+// Wrapper to consume LargeModalHeader's _equalWidth/iconSize props and forward only valid DOM attrs
+function PrintActionSlot({ _equalWidth, iconSize, children, ...rest }) {
+  return <div {...rest}>{children}</div>;
+}
+
 function QtyStepper({ value, onChange }) {
   const inputRef = useRef(null);
   const display = value > 0 ? String(value) : "";
@@ -42,7 +48,7 @@ function QtyStepper({ value, onChange }) {
     width: 26,
     height: 26,
     border: `1px solid ${C.borderSubtle}`,
-    borderRadius: 4,
+    borderRadius: Radius.control,
     backgroundColor: C.surfaceBase,
     color: C.text,
     fontSize: 16,
@@ -91,7 +97,7 @@ function QtyStepper({ value, onChange }) {
           color: C.text,
           fontWeight: 600,
           border: `1px solid ${C.borderSubtle}`,
-          borderRadius: 4,
+          borderRadius: Radius.control,
           padding: "2px 4px",
           backgroundColor: C.surfaceBase,
         }}
@@ -447,45 +453,104 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
       <div className={styles.card}>
           {zShowLoginScreen && <LoginModal modalVisible={true} />}
 
-          <div className={styles.cardInner}>
-          {/* HEADER */}
-          <div className={styles.header}>
-            <span className={styles.headerTitle} style={{ color: C.text }}>
-              {isNew ? "New Inventory Item" : "Inventory Item"}
-            </span>
-            <div className={styles.headerRight}>
-              {/* Print Label */}
-              {!isNew && templateEntries.length > 0 && (
-                <div className={styles.printWrap}>
-                  <DropdownMenu
-                    portal={false}
-                    dataArr={[
-                      {
-                        component: (
-                          <QtyStepper value={sPrintQty} onChange={_setPrintQty} />
-                        ),
-                      },
-                      { _isDivider: true },
-                      ...templateEntries.map(([slug, t]) => ({ label: t.name, slug })),
-                    ]}
-                    onOpenChange={(open) => { if (open) _setPrintQty(1); }}
-                    onSelect={(item) => handleQuickPrint(item.slug)}
-                    buttonText=""
-                    buttonIcon={ICONS.print}
-                    buttonIconSize={26}
-                    buttonStyle={{
-                      backgroundColor: "transparent",
-                      borderWidth: 0,
-                      padding: 6,
-                    }}
-                  />
+          <LargeModalHeader
+            title={isNew ? "New Inventory Item" : "Inventory Item"}
+            iconSize={22}
+            actions={[
+              !isNew && (
+                <LargeModalHeaderButton
+                  key="delete"
+                  variant="danger"
+                  icon={ICONS.trash}
+                  iconPosition="only"
+                  tooltip="Delete this item"
+                  onClick={handleDeleteItem}
+                />
+              ),
+              !isNew && templateEntries.length > 0 && (
+                <PrintActionSlot
+                  key="print"
+                  style={{ width: 44, height: 44, position: "relative", flexShrink: 0 }}
+                >
+                  <Tooltip text="Printing options" position="bottom">
+                    <DropdownMenu
+                      portal
+                      dataArr={[
+                        {
+                          component: (
+                            <QtyStepper value={sPrintQty} onChange={_setPrintQty} />
+                          ),
+                        },
+                        { _isDivider: true },
+                        ...templateEntries.map(([slug, t]) => ({ label: t.name, slug })),
+                      ]}
+                      onOpenChange={(open) => { if (open) _setPrintQty(1); }}
+                      onSelect={(item) => handleQuickPrint(item.slug)}
+                      buttonText=""
+                      buttonIcon={ICONS.print}
+                      buttonIconSize={22}
+                      buttonClassName={styles.printHeaderBtn}
+                      buttonStyle={{
+                        backgroundColor: "transparent",
+                        borderColor: "transparent",
+                        borderRadius: Radius.control,
+                        width: 44,
+                        height: 44,
+                        padding: 8,
+                      }}
+                      aria-label="Print label"
+                    />
+                  </Tooltip>
                   {sPrintSuccess && (
-                    <span className={styles.printSent} style={{ color: C.green }}>Sent!</span>
+                    <span
+                      style={{
+                        position: "absolute",
+                        top: "calc(100% + 4px)",
+                        right: 0,
+                        fontSize: 11,
+                        color: C.green,
+                        whiteSpace: "nowrap",
+                        pointerEvents: "none",
+                      }}
+                    >
+                      Sent!
+                    </span>
                   )}
-                </div>
-              )}
-            </div>
-          </div>
+                </PrintActionSlot>
+              ),
+              (isNew && !!sItem.formalName?.trim()) && (
+                <LargeModalHeaderButton
+                  key="saveNew"
+                  variant="accent"
+                  icon={ICONS.check1}
+                  tooltip="Save new item"
+                  onClick={handleSaveNewItem}
+                >
+                  Save
+                </LargeModalHeaderButton>
+              ),
+              (!isNew && sDirty) && (
+                <LargeModalHeaderButton
+                  key="saveEdit"
+                  variant="accent"
+                  icon={ICONS.check1}
+                  tooltip="Save changes"
+                  onClick={handleExit}
+                >
+                  Save
+                </LargeModalHeaderButton>
+              ),
+              <LargeModalHeaderButton
+                key="close"
+                variant="default"
+                icon={ICONS.close1}
+                iconPosition="only"
+                tooltip="Close"
+                onClick={handleExit}
+              />,
+            ]}
+          />
+          <div className={styles.cardInner}>
 
           <div className={styles.scrollBody}>
             <div className={styles.scrollBodyInner}>
@@ -562,16 +627,23 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                       <span className={`${styles.fieldValue} ${styles.barcodeInputFlex}`} style={{ color: C.text }}>{code}</span>
                     )}
                     {sEditing && (
-                      <button
-                        type="button"
-                        className={styles.barcodeDeleteBtn}
-                        onClick={() => {
+                      <Button
+                        icon={ICONS.trash}
+                        iconSize={16}
+                        onPress={() => {
                           let updated = (sItem.barcodes || []).filter((_, idx) => idx !== i);
                           handleFieldChange("barcodes", updated);
                         }}
-                      >
-                        <Image icon={ICONS.trash} size={16} />
-                      </button>
+                        buttonStyle={{
+                          paddingLeft: 4,
+                          paddingRight: 4,
+                          paddingTop: 4,
+                          paddingBottom: 4,
+                          backgroundColor: "transparent",
+                          marginLeft: 6,
+                        }}
+                        iconStyle={{ marginRight: 0 }}
+                      />
                     )}
                   </div>
                 ))}
@@ -594,7 +666,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
               </div>
             </div>
 
-            <div className={styles.receiptNoteRow}>
+            <div className={styles.sectionCard} style={sectionCardInline}>
               <CheckBox
                 text="Receipt Note Required"
                 isChecked={!!sItem.receiptNoteRequired}
@@ -615,13 +687,19 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                       <Image icon={ICONS.info} size={16} className={styles.sectionInfoIcon} />
                     </Tooltip>
                   </div>
-                  <button
-                    type="button"
-                    className={styles.sectionAddBtn}
-                    onClick={() => _setShowQBPicker(true)}
-                  >
-                    <Image icon={ICONS.add} size={30} />
-                  </button>
+                  <Button
+                    icon={ICONS.add}
+                    iconSize={30}
+                    onPress={() => _setShowQBPicker(true)}
+                    buttonStyle={{
+                      paddingLeft: 4,
+                      paddingRight: 4,
+                      paddingTop: 4,
+                      paddingBottom: 4,
+                      backgroundColor: "transparent",
+                    }}
+                    iconStyle={{ marginRight: 0 }}
+                  />
                 </div>
                 {placements.length === 0 ? (
                   <span className={styles.placementsEmpty} style={{ color: C.textMuted }}>
@@ -632,13 +710,20 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                     {placements.map((p) => (
                       <div key={p.buttonID} className={styles.placementChip}>
                         <span className={styles.placementChipText} style={{ color: C.text }}>{p.path}</span>
-                        <button
-                          type="button"
-                          className={styles.placementChipDelete}
-                          onClick={() => handleRemoveFromButton(p.buttonID)}
-                        >
-                          <Image icon={ICONS.trash} size={18} />
-                        </button>
+                        <Button
+                          icon={ICONS.trash}
+                          iconSize={18}
+                          onPress={() => handleRemoveFromButton(p.buttonID)}
+                          buttonStyle={{
+                            paddingLeft: 4,
+                            paddingRight: 4,
+                            paddingTop: 4,
+                            paddingBottom: 4,
+                            backgroundColor: "transparent",
+                            marginLeft: 4,
+                          }}
+                          iconStyle={{ marginRight: 0 }}
+                        />
                       </div>
                     ))}
                   </div>
@@ -656,22 +741,6 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                       <Image icon={ICONS.info} size={16} className={styles.sectionInfoIcon} />
                     </Tooltip>
                   </div>
-                  <Tooltip text="Select from pre-configured customer quick notes to auto-add when this item is used" position="bottom">
-                    <button
-                      type="button"
-                      className={styles.autoNoteAddBtn}
-                      onClick={(e) => {
-                        _setShowQuickNotePicker({ x: e.pageX, y: e.pageY });
-                      }}
-                      style={{
-                        backgroundColor: C.buttonLightGreen,
-                        borderColor: C.buttonLightGreenOutline,
-                      }}
-                    >
-                      <Image icon={ICONS.add} size={16} />
-                      <span className={styles.autoNoteAddText} style={{ color: C.text }}>Quick Notes</span>
-                    </button>
-                  </Tooltip>
                 </div>
                 {sAutoQuickNoteIDs.length > 0 && (
                   <div className={styles.autoNoteChipsRow}>
@@ -729,44 +798,6 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
           </div>
           </div>
 
-          <ModalFooter>
-            <ModalFooterButton onClick={handleExit}>
-              Close
-            </ModalFooterButton>
-            {!isNew ? (
-              <ModalFooterButton
-                variant="danger"
-                icon={ICONS.trash}
-                iconSize={18}
-                tooltip="Delete this item"
-                onClick={handleDeleteItem}
-              >
-                Delete
-              </ModalFooterButton>
-            ) : null}
-            {isNew && !!sItem.formalName?.trim() ? (
-              <ModalFooterButton
-                variant="accent"
-                icon={ICONS.check1}
-                iconSize={18}
-                tooltip="Save new item"
-                onClick={handleSaveNewItem}
-              >
-                Save
-              </ModalFooterButton>
-            ) : null}
-            {!isNew && sDirty ? (
-              <ModalFooterButton
-                variant="accent"
-                icon={ICONS.check1}
-                iconSize={18}
-                tooltip="Save changes"
-                onClick={handleExit}
-              >
-                Save
-              </ModalFooterButton>
-            ) : null}
-          </ModalFooter>
       </div>
   );
 

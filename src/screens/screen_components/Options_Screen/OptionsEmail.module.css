@@ -20,7 +20,7 @@
   right: 4%;
   bottom: 4%;
   background: var(--surface-base, #ffffff);
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
@@ -40,8 +40,28 @@
 }
 
 .threadModalTitle {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex: 1 1 0;
+  min-width: 0;
+  margin-right: 8px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.threadModalTitleMain {
   font-size: 15px;
   font-weight: 700;
+  flex-shrink: 0;
+}
+
+.threadModalParticipants {
+  font-size: 12px;
+  font-weight: 400;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .threadModalActions {
@@ -56,7 +76,7 @@
   border: none;
   background: transparent;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   font-size: 18px;
   line-height: 1;
   display: inline-flex;
@@ -108,7 +128,7 @@
   border: none;
   padding: 4px;
   cursor: pointer;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
 }
 
 .searchIconBtn:disabled {
@@ -186,7 +206,7 @@
   align-items: center;
   padding: 6px 14px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   cursor: pointer;
   font-family: inherit;
   transition: opacity 120ms ease;
@@ -209,7 +229,7 @@
   padding: 6px 14px;
   margin-right: 8px;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   cursor: pointer;
   font-family: inherit;
   transition: opacity 120ms ease;
@@ -275,7 +295,7 @@
   justify-content: center;
   min-width: 18px;
   height: 18px;
-  border-radius: 9px;
+  border-radius: var(--radius-row);
   background: var(--surface-base);
   padding: 0 5px;
   margin-left: 6px;
@@ -301,7 +321,7 @@
   display: inline-flex;
   align-items: center;
   padding: 2px 8px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   font-size: 10px;
   font-weight: 800;
   margin-right: 8px;
@@ -374,7 +394,7 @@
 .unreadDot {
   width: 8px;
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   margin-right: 6px;
   flex-shrink: 0;
   display: inline-block;
@@ -398,7 +418,7 @@
   align-items: center;
   justify-content: center;
   background: var(--border-subtle);
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 1px 5px;
   margin-left: 6px;
   flex-shrink: 0;
@@ -497,7 +517,7 @@
 }
 
 .spinner {
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   border-style: solid;
   border-color: var(--surface-overlay-light);
   border-top-color: currentColor;

@@ -5,7 +5,7 @@ import {
   Tooltip,
   TouchableOpacity,
 } from "../../../../../dom_components";
-import { C, ICONS } from "../../../../../styles";
+import { C, ICONS, Radius } from "../../../../../styles";
 import { log } from "../../../../../utils";
 import {
   useAlertScreenStore,
@@ -411,7 +411,7 @@ export const SignatureEditor = ({ accountKey }) => {
             matchValue={sActiveFontFamily}
             buttonStyle={{
               borderColor: C.buttonLightGreenOutline,
-              borderRadius: 6,
+              borderRadius: Radius.control,
               borderWidth: 1,
               backgroundColor: C.listItemWhite,
               paddingTop: 4,
@@ -427,7 +427,7 @@ export const SignatureEditor = ({ accountKey }) => {
         {/* Font Size */}
         <div style={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
           <span style={{ fontSize: 11, color: C.textMuted, fontWeight: "500", marginRight: 5 }}>{"Size"}</span>
-          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", borderColor: C.buttonLightGreenOutline, borderRadius: 6, borderWidth: 1, borderStyle: "solid", backgroundColor: C.listItemWhite, overflow: "hidden" }}>
+          <div style={{ display: "flex", flexDirection: "row", alignItems: "center", borderColor: C.buttonLightGreenOutline, borderRadius: Radius.control, borderWidth: 1, borderStyle: "solid", backgroundColor: C.listItemWhite, overflow: "hidden" }}>
             <TouchableOpacity
               onPress={() => { let newSize = sActiveFontSize - 1; if (newSize < 10) return; if (!applyStyleToSelection("fontSize", newSize)) _sSetActiveFontSize(newSize); }}
               style={{ paddingTop: 3, paddingBottom: 3, paddingLeft: 7, paddingRight: 7, justifyContent: "center", alignItems: "center" }}
@@ -461,7 +461,7 @@ export const SignatureEditor = ({ accountKey }) => {
             matchValue={sActiveFontWeight}
             buttonStyle={{
               borderColor: C.buttonLightGreenOutline,
-              borderRadius: 6,
+              borderRadius: Radius.control,
               borderWidth: 1,
               backgroundColor: C.listItemWhite,
               paddingTop: 4,
@@ -485,7 +485,7 @@ export const SignatureEditor = ({ accountKey }) => {
             paddingBottom: 4,
             paddingLeft: 8,
             paddingRight: 8,
-            borderRadius: 6,
+            borderRadius: Radius.control,
             borderWidth: 1,
             borderStyle: "solid",
             borderColor: sActiveItalic ? C.green : C.buttonLightGreenOutline,
@@ -521,7 +521,7 @@ export const SignatureEditor = ({ accountKey }) => {
             width: "100%",
             minHeight: 80,
             borderColor: C.buttonLightGreenOutline,
-            borderRadius: 10,
+            borderRadius: Radius.row,
             borderWidth: 2,
             borderStyle: "solid",
             backgroundColor: C.listItemWhite,
@@ -588,7 +588,7 @@ export const SignatureEditor = ({ accountKey }) => {
                 insertTextAt(cursorOffset, "{logo}");
                 cursorPosRef.current = cursorOffset + 6;
               }}
-              style={{ paddingTop: 4, paddingBottom: 4, paddingLeft: 8, paddingRight: 8, borderRadius: 6, borderWidth: 1, borderStyle: "solid", borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
+              style={{ paddingTop: 4, paddingBottom: 4, paddingLeft: 8, paddingRight: 8, borderRadius: Radius.control, borderWidth: 1, borderStyle: "solid", borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
             >
               <span style={{ fontSize: 11, color: C.green, fontWeight: "500" }}>{"{logo}"}</span>
             </TouchableOpacity>
@@ -602,7 +602,7 @@ export const SignatureEditor = ({ accountKey }) => {
               insertTextAt(cursorOffset, "{username}");
               cursorPosRef.current = cursorOffset + 10;
             }}
-            style={{ paddingTop: 4, paddingBottom: 4, paddingLeft: 8, paddingRight: 8, borderRadius: 6, borderWidth: 1, borderStyle: "solid", borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
+            style={{ paddingTop: 4, paddingBottom: 4, paddingLeft: 8, paddingRight: 8, borderRadius: Radius.control, borderWidth: 1, borderStyle: "solid", borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite }}
           >
             <span style={{ fontSize: 11, color: C.green, fontWeight: "500" }}>{"{username}"}</span>
           </TouchableOpacity>
@@ -615,13 +615,13 @@ export const SignatureEditor = ({ accountKey }) => {
           <img
             src={sigImageUrl}
             alt="Signature"
-            style={{ maxWidth: MAX_SIG_IMAGE_WIDTH * ((sig.imageScale || 100) / 100), maxHeight: MAX_SIG_IMAGE_HEIGHT * ((sig.imageScale || 100) / 100), objectFit: "contain", borderRadius: 4 }}
+            style={{ maxWidth: MAX_SIG_IMAGE_WIDTH * ((sig.imageScale || 100) / 100), maxHeight: MAX_SIG_IMAGE_HEIGHT * ((sig.imageScale || 100) / 100), objectFit: "contain", borderRadius: Radius.control }}
           />
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {(sig.imageScale || 100) < 100 && (
               <TouchableOpacity
                 onPress={() => updateSignature("imageScale", Math.min(100, (sig.imageScale || 100) + 10))}
-                style={{ paddingTop: 4, paddingBottom: 4, paddingLeft: 8, paddingRight: 8, borderRadius: 6, borderWidth: 1, borderStyle: "solid", borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite, alignItems: "center", justifyContent: "center" }}
+                style={{ paddingTop: 4, paddingBottom: 4, paddingLeft: 8, paddingRight: 8, borderRadius: Radius.control, borderWidth: 1, borderStyle: "solid", borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite, alignItems: "center", justifyContent: "center" }}
               >
                 <span style={{ fontSize: 14, color: C.text, fontWeight: "600" }}>{"+"}</span>
               </TouchableOpacity>
@@ -629,7 +629,7 @@ export const SignatureEditor = ({ accountKey }) => {
             <TouchableOpacity
               onPress={() => updateSignature("imageScale", Math.max(10, (sig.imageScale || 100) - 10))}
               disabled={(sig.imageScale || 100) <= 10}
-              style={{ paddingTop: 4, paddingBottom: 4, paddingLeft: 8, paddingRight: 8, borderRadius: 6, borderWidth: 1, borderStyle: "solid", borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite, alignItems: "center", justifyContent: "center", opacity: (sig.imageScale || 100) <= 10 ? 0.3 : 1 }}
+              style={{ paddingTop: 4, paddingBottom: 4, paddingLeft: 8, paddingRight: 8, borderRadius: Radius.control, borderWidth: 1, borderStyle: "solid", borderColor: C.buttonLightGreenOutline, backgroundColor: C.listItemWhite, alignItems: "center", justifyContent: "center", opacity: (sig.imageScale || 100) <= 10 ? 0.3 : 1 }}
             >
               <span style={{ fontSize: 14, color: C.text, fontWeight: "600" }}>{"-"}</span>
             </TouchableOpacity>
@@ -645,7 +645,7 @@ export const SignatureEditor = ({ accountKey }) => {
         borderWidth: 1,
         borderStyle: "solid",
         borderColor: C.buttonLightGreenOutline,
-        borderRadius: 10,
+        borderRadius: Radius.row,
         backgroundColor: C.backgroundWhite,
         padding: 15,
         boxSizing: "border-box",

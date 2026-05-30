@@ -1,7 +1,7 @@
 .panel {
   display: flex;
   flex-direction: column;
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   width: 360px;
   overflow: hidden;
   box-sizing: border-box;
@@ -43,7 +43,7 @@
   font-size: 16px;
   outline: none;
   border: 2px solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 8px 10px;
   width: 100%;
   box-sizing: border-box;
@@ -52,7 +52,7 @@
 
 .statusOk {
   background-color: rgba(0, 160, 0, 0.1);
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 5px 14px;
   margin-bottom: 6px;
   flex-shrink: 0;
@@ -61,7 +61,7 @@
 
 .statusErr {
   background-color: rgba(220, 50, 50, 0.1);
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 5px 14px;
   margin-bottom: 6px;
   flex-shrink: 0;

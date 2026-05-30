@@ -346,7 +346,7 @@ const QuickItemCanvasCard = ({
         isSelected && styles.canvasCardSelected,
         sEditMode && styles.canvasCardEdit,
         !sEditMode && sShowActions && styles.canvasCardWithActions,
-        !sEditMode && styles.canvasCardLift,
+        !sEditMode && !sShowActions && styles.canvasCardLift,
       ].filter(Boolean).join(" ")}
       style={{
         left: (itemObj.x || 0) + "%",
@@ -947,6 +947,7 @@ export function InventoryComponent({}) {
   const [sListPrintSuccessID, _setListPrintSuccessID] = useState(null);
   const barcodeModalTimerRef = useRef(null);
   const _searchTermRef = useRef("");
+  const _scanNotFoundRef = useRef(false);
 
   // Note Helper dropdown state
   const zNoteHelpers = useSettingsStore((state) => state.settings?.noteHelpers);
@@ -1028,6 +1029,7 @@ export function InventoryComponent({}) {
             let barcode = searchTerm || generateEAN13Barcode();
             newItem.id = barcode;
             newItem.primaryBarcode = barcode;
+            _scanNotFoundRef.current = true;
             _setModalItem(newItem);
           }
           _setSearchTerm("");
@@ -1758,7 +1760,7 @@ export function InventoryComponent({}) {
                             >
                               {"$ "}
                               <span style={{ fontSize: 12, color: C.red }}>
-                                {/* {formatCurrencyDisp(item.salePrice)} */}
+                                {formatCurrencyDisp(item.salePrice)}
                               </span>
                             </div>
                           )}
@@ -1777,7 +1779,18 @@ export function InventoryComponent({}) {
               key={sModalItem.id}
               item={sModalItem}
               isNew={!!(sModalItem.id && !sModalItem.formalName)}
-              handleExit={() => _setModalItem(null)}
+              handleExit={() => {
+                const wasScanNotFound = _scanNotFoundRef.current;
+                const itemID = sModalItem?.id;
+                _scanNotFoundRef.current = false;
+                _setModalItem(null);
+                if (wasScanNotFound && itemID) {
+                  const savedItem = useInventoryStore.getState().getInventoryItem(itemID);
+                  if (savedItem?.formalName?.trim() && useOpenWorkordersStore.getState().getOpenWorkorder()) {
+                    inventoryItemSelected(savedItem);
+                  }
+                }
+              }}
             />
           </Suspense>
         )}

@@ -24,7 +24,7 @@
 .modalContent {
   width: 400px;
   max-height: 500px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 20px;
   display: flex;
   flex-direction: column;
@@ -51,7 +51,7 @@
 .saleRow {
   border-width: 1px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 12px;
   margin-bottom: 8px;
   cursor: pointer;

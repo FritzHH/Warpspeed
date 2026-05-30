@@ -22,6 +22,8 @@ import {
   Dialog,
   LoadingIndicator,
   TextInput,
+  LargeModalHeader,
+  LargeModalHeaderButton,
 } from "../../../../dom_components";
 import { C } from "../../../../styles";
 import {
@@ -167,54 +169,51 @@ export const DLQAdminModalScreen = ({ handleExit }) => {
       visible={true}
       onClose={handleExit}
       overlayColor={C.surfaceOverlay}
-      title="DLQ Admin"
     >
       <div className={styles.card}>
-        {/* ── HEADER ── */}
-        <div className={styles.header} style={{ backgroundColor: C.darkBlue }}>
-          <div className={styles.headerLeft}>
-            <span className={styles.title}>Dead Letter Queue</span>
-            <span className={styles.subtitle}>
-              {activeTabDef.label} · {sRows.length} loaded
-              {newCount > 0 && (
-                <>
-                  {"  ·  "}
-                  <span style={{ color: STATUS_COLOR.new, fontWeight: 700 }}>
-                    {newCount} new
-                  </span>
-                </>
-              )}
-              {escalatedCount > 0 && (
-                <>
-                  {"  ·  "}
-                  <span style={{ color: "#facc15", fontWeight: 700 }}>
-                    {escalatedCount} escalated
-                  </span>
-                </>
-              )}
-            </span>
-          </div>
-          <div className={styles.headerRight}>
-            <select
-              value={sStatusFilter}
-              onChange={(e) => _setStatusFilter(e.target.value)}
-              className={styles.filterSelect}
-            >
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s.key} value={s.key}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              onClick={handleExit}
-              className={styles.closeBtn}
-              style={{ backgroundColor: C.red, border: "none", cursor: "pointer", font: "inherit", color: "white" }}
-            >
-              Close
-            </button>
-          </div>
+        <LargeModalHeader
+          title={
+            <div className={styles.headerLeft}>
+              <span className={styles.title}>Dead Letter Queue</span>
+              <span className={styles.subtitle}>
+                {activeTabDef.label} · {sRows.length} loaded
+                {newCount > 0 && (
+                  <>
+                    {"  ·  "}
+                    <span style={{ color: STATUS_COLOR.new, fontWeight: 700 }}>
+                      {newCount} new
+                    </span>
+                  </>
+                )}
+                {escalatedCount > 0 && (
+                  <>
+                    {"  ·  "}
+                    <span style={{ color: "#facc15", fontWeight: 700 }}>
+                      {escalatedCount} escalated
+                    </span>
+                  </>
+                )}
+              </span>
+            </div>
+          }
+          actions={
+            <LargeModalHeaderButton variant="default" onClick={handleExit}>
+              CLOSE
+            </LargeModalHeaderButton>
+          }
+        />
+        <div className={styles.toolbar}>
+          <select
+            value={sStatusFilter}
+            onChange={(e) => _setStatusFilter(e.target.value)}
+            className={styles.filterSelect}
+          >
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s.key} value={s.key}>
+                {s.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* ── TAB BAR ── */}

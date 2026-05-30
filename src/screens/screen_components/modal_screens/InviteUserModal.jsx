@@ -7,7 +7,7 @@
 import React, { useState } from "react";
 import { httpsCallable } from "firebase/functions";
 import { FUNCTIONS } from "../../../db_calls";
-import { Dialog, ModalFooter, ModalFooterButton } from "../../../dom_components";
+import { Dialog, LargeModalHeader, LargeModalHeaderButton } from "../../../dom_components";
 import { C } from "../../../styles";
 import styles from "./InviteUserModal.module.css";
 
@@ -82,13 +82,37 @@ export const InviteUserModal = ({ visible, onClose }) => {
   return (
     <Dialog visible={visible} onClose={handleClose} title="Invite user" aria-label="Invite user">
       <div className={styles.card}>
+        <LargeModalHeader
+          title="Invite user"
+          actions={[
+            !sResult && (
+              <LargeModalHeaderButton
+                key="send"
+                variant="accent"
+                onClick={handleSubmit}
+                disabled={sSubmitting}
+              >
+                {sSubmitting ? "Sending..." : "Send invite"}
+              </LargeModalHeaderButton>
+            ),
+            sResult && (
+              <LargeModalHeaderButton key="another" variant="default" onClick={resetForm}>
+                Invite another
+              </LargeModalHeaderButton>
+            ),
+            sResult && (
+              <LargeModalHeaderButton key="done" variant="accent" onClick={handleClose}>
+                Done
+              </LargeModalHeaderButton>
+            ),
+            !sResult && (
+              <LargeModalHeaderButton key="close" variant="default" onClick={handleClose}>
+                CLOSE
+              </LargeModalHeaderButton>
+            ),
+          ]}
+        />
         <div className={styles.cardInner}>
-          <div className={styles.header}>
-            <span className={styles.title} style={{ color: C.text }}>
-              Invite user
-            </span>
-          </div>
-
           {!sResult && (
             <>
               <div className={styles.fieldGroup}>
@@ -163,7 +187,7 @@ export const InviteUserModal = ({ visible, onClose }) => {
           {!sResult && (
             <>
               <ModalFooterButton variant="default" onClick={handleClose}>
-                Cancel
+                CLOSE
               </ModalFooterButton>
               <ModalFooterButton
                 variant="accent"

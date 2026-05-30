@@ -18,7 +18,7 @@
 .container {
   width: 92%;
   height: 94%;
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -52,7 +52,7 @@
   justify-content: center;
   align-items: center;
   background-color: var(--surface-alt);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border: none;
   cursor: pointer;
   font-size: 20px;
@@ -111,7 +111,7 @@
   align-items: center;
   padding: 8px 0;
   margin: 2px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
 }
 
 .dayHeaderCellClosed {
@@ -196,7 +196,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   margin: 2px;
   position: relative;
 }
@@ -235,7 +235,7 @@
 }
 
 .timeBox {
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 4px 6px;
   margin-bottom: 3px;
   width: 90%;
@@ -266,7 +266,7 @@
   right: 2px;
   width: 18px;
   height: 18px;
-  border-radius: 9px;
+  border-radius: var(--radius-row);
   background-color: var(--border-strong);
   display: flex;
   justify-content: center;

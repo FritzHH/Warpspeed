@@ -15,7 +15,7 @@
   width: 92%;
   max-width: 1000px;
   height: 88%;
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   display: flex;
   flex-direction: column;
   outline: none;
@@ -111,7 +111,7 @@
 .fieldPaletteItem {
   padding: 6px 8px;
   margin-bottom: 4px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   border-width: 1px;
   border-style: solid;
   display: flex;
@@ -151,7 +151,7 @@
   background-color: white;
   border-width: 2px;
   border-style: solid;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   position: relative;
   overflow: hidden;
   box-shadow: 0 2px 8px var(--shadow-color-default);
@@ -279,7 +279,7 @@
 .stepperBtn {
   width: 28px;
   height: 28px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   border-width: 1px;
   border-style: solid;
   display: flex;
@@ -328,7 +328,7 @@
   flex: 1;
   padding-top: 5px;
   padding-bottom: 5px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   border-width: 1px;
   border-style: solid;
   display: flex;
@@ -376,7 +376,7 @@
 .searchModal {
   width: 450px;
   max-height: 70%;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   padding: 20px;
   display: flex;
   flex-direction: column;

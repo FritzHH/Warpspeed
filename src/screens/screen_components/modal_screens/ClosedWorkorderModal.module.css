@@ -1,8 +1,8 @@
 /* ── Shell ─────────────────────────────────────────────────────── */
 .shell {
-  width: 85vw;
-  height: 90vh;
-  border-radius: 8px;
+  width: 60%;
+  height: 95%;
+  border-radius: var(--radius-container);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -10,31 +10,24 @@
 }
 
 /* ── Header ────────────────────────────────────────────────────── */
-.header {
-  display: flex;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 20px;
-  border-bottom: 1px solid var(--border-subtle);
-  flex-shrink: 0;
-}
-
 .headerLeft {
   display: flex;
   flex-direction: row;
   align-items: center;
 }
 
-.headerRight {
+.toolbar {
   display: flex;
   flex-direction: row;
   align-items: center;
+  justify-content: flex-end;
+  padding: 8px 20px;
+  flex-shrink: 0;
 }
 
 .statusBadge {
   padding: 4px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   font-size: 12px;
   font-weight: 600;
   display: inline-block;
@@ -54,7 +47,7 @@
 .importBadge,
 .taxFreeBadge {
   padding: 1px 6px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   margin-left: 8px;
   font-size: 9px;
   font-weight: 600;
@@ -72,7 +65,7 @@
 
 .bannerStatusBadge {
   padding: 5px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   margin-right: 12px;
   font-size: 13px;
   font-weight: 600;
@@ -89,7 +82,7 @@
 .viewSaleBtn {
   background-color: black;
   padding: 5px 16px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border: none;
   cursor: pointer;
   color: gold;
@@ -114,7 +107,7 @@
 }
 
 .col2 {
-  width: 40%;
+  width: 45%;
   padding: 0 15px;
   display: flex;
   flex-direction: column;
@@ -123,7 +116,7 @@
 }
 
 .col3 {
-  width: 35%;
+  width: calc(30% - 22px);
   padding-left: 15px;
   display: flex;
   flex-direction: column;
@@ -193,7 +186,7 @@
 /* ── Line item card ────────────────────────────────────────────── */
 .lineCard {
   margin-bottom: 6px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--border-subtle);
   padding: 6px 10px;
   width: 100%;
@@ -273,7 +266,7 @@
 
 /* ── Sale card ─────────────────────────────────────────────────── */
 .saleCard {
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   border: 1px solid;
   padding: 10px;
   margin-bottom: 8px;
@@ -282,6 +275,12 @@
   cursor: pointer;
   display: block;
   font-family: inherit;
+  transition: transform 120ms ease-out, box-shadow 120ms ease-out;
+}
+
+.saleCard:not(.saleCardStatic):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px var(--shadow-color-default);
 }
 
 .saleCardStatic {
@@ -376,7 +375,7 @@
 }
 
 .noteItemAlt {
-  border-radius: 4px;
+  border-radius: var(--radius-control);
 }
 
 .noteText {
@@ -422,7 +421,7 @@
 }
 
 .changeLogEntryAlt {
-  border-radius: 4px;
+  border-radius: var(--radius-control);
 }
 
 .changeLogMessage {
@@ -481,7 +480,7 @@
 .colorChip {
   font-size: 12px;
   padding: 2px 8px;
-  border-radius: 100px;
+  border-radius: var(--radius-pill);
   display: inline-block;
 }
 
@@ -491,7 +490,7 @@
 
 /* ── Items header ──────────────────────────────────────────────── */
 .itemsList {
-  flex: 1;
+  flex: 0 1 auto;
   overflow-y: auto;
   min-height: 0;
 }

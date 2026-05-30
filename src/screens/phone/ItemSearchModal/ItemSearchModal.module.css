@@ -44,7 +44,7 @@
   border-width: 1px;
   border-style: solid;
   border-color: var(--border-default);
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding-top: 10px;
   padding-bottom: 10px;
   padding-left: 12px;

@@ -14,7 +14,7 @@
   width: 100%;
   border: 1px solid var(--printers-border, var(--border-default));
   background-color: var(--printers-bg, var(--surface-success-muted));
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 15px;
   box-sizing: border-box;
   display: flex;
@@ -39,7 +39,7 @@
 }
 
 .printerCard {
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border: 1px solid;
   padding: 10px;
   width: 100%;
@@ -68,22 +68,8 @@
   font-weight: 700;
   background-color: yellow;
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   overflow: hidden;
-}
-
-.trashButton {
-  padding: 4px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.trashButton:hover {
-  opacity: 0.6;
 }
 
 .printerInfoRow {

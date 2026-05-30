@@ -2,7 +2,7 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 6px 10px;
   border: 1px solid;
   width: 100%;
@@ -13,7 +13,7 @@
 .statusDot {
   width: 10px;
   height: 10px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   margin-right: 10px;
   flex-shrink: 0;
 }
@@ -42,18 +42,3 @@
   font-weight: 500;
 }
 
-.deleteButton {
-  padding: 6px;
-  margin-left: 4px;
-  background: transparent;
-  border: none;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.deleteButton:hover {
-  opacity: 0.6;
-}

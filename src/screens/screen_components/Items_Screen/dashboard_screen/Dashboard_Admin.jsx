@@ -1,6 +1,6 @@
 /*eslint-disable*/
 import { formatPhoneWithDashes, bestForegroundHex, checkInputForNumbersOnly, clog, formatCurrencyDisp, formatMillisForDisplay, // searchInventory moved to Web Worker
-  generateTimesForListDisplay, generateEAN13Barcode, normalizeBarcode, getDayOfWeekFrom0To7Input, log, moveItemInArr, NUMS, removeDashesFromPhone, dollarsToCents, capitalizeFirstLetterOfString, printBuilder, calculateRunningTotals, localStorageWrapper, createNewWorkorder, formatWorkorderNumber, intakeButtonsToRows, intakeRowsToFlat, generate36CharUUID, lightenRGBByPercent } from "../../../../utils";
+  generateTimesForListDisplay, generateEAN13Barcode, normalizeBarcode, getDayOfWeekFrom0To7Input, log, moveItemInArr, NUMS, removeDashesFromPhone, dollarsToCents, capitalizeFirstLetterOfString, printBuilder, calculateRunningTotals, localStorageWrapper, createNewWorkorder, formatWorkorderNumber, intakeButtonsToRows, intakeRowsToFlat, generate36CharUUID, lightenRGBByPercent, hashPin, generatePinSalt, verifyPin, verifyAlternatePin, userHasPin } from "../../../../utils";
 import { workerSearchInventory } from "../../../../inventorySearchManager";
 import {
   // useDatabaseStore,
@@ -32,7 +32,7 @@ import cloneDeep from "lodash/cloneDeep";
 import React, { Children, useEffect, useRef, useState, Suspense, lazy } from "react";
 import { createPortal } from "react-dom";
 import { FaceEnrollModalScreen } from "../../modal_screens/FaceEnrollModalScreen";
-import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
+import { C, COLOR_GRADIENTS, Fonts, ICONS, Radius } from "../../../../styles";
 import { useZ } from "../../../../hooks/useZ";
 import defaultLogo from "../../../../resources/default_app_logo_large.png";
 import { DISCOUNT_TYPES, PERMISSION_LEVELS, build_db_path } from "../../../../constants";
@@ -80,7 +80,7 @@ const BillingModalScreen = lazy(() =>
 import { TodaysHistoryComponent } from "./TodaysHistoryComponent";
 import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection, dbSaveInventoryItem, dbGmailDisconnect, dbGmailInitiateAuth } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses, mapEmployees, mapPunchHistory, parseCSV } from "../../../../lightspeed_import";
-import { lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead, firestoreQuery, firestoreDelete, firestoreWrite, firestoreBatchWrite } from "../../../../db_calls";
+import { AUTH, lightspeedInitiateAuthCallable, lightspeedImportDataCallable, firestoreRead, firestoreQuery, firestoreDelete, firestoreWrite, firestoreBatchWrite, tenantCreateUserCallable, tenantUpdateUserCallable, tenantDeleteUserCallable } from "../../../../db_calls";
 import { DB_NODES } from "../../../../constants";
 import { newCheckoutGetStripeReaders } from "../../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 import { ListOptionsComponent } from "./ListsOptions";
@@ -139,6 +139,43 @@ const TAB_GATES = {
   [TAB_NAMES.backup]: 4,
 };
 
+async function applyPinHashing(userObj, prevUser) {
+  const next = { ...userObj };
+  const pinText = (userObj.pin || "").trim();
+  if (pinText) {
+    const salt = generatePinSalt();
+    next.pinHash = await hashPin(pinText, salt);
+    next.pinSalt = salt;
+    delete next.pin;
+  } else if (prevUser?.pinHash && prevUser?.pinSalt) {
+    next.pinHash = prevUser.pinHash;
+    next.pinSalt = prevUser.pinSalt;
+    delete next.pin;
+  } else if (prevUser?.pin) {
+    const salt = generatePinSalt();
+    next.pinHash = await hashPin(prevUser.pin, salt);
+    next.pinSalt = salt;
+    delete next.pin;
+  }
+  const altText = (userObj.alternatePin || "").trim();
+  if (altText) {
+    const salt = generatePinSalt();
+    next.alternatePinHash = await hashPin(altText, salt);
+    next.alternatePinSalt = salt;
+    delete next.alternatePin;
+  } else if (prevUser?.alternatePinHash && prevUser?.alternatePinSalt) {
+    next.alternatePinHash = prevUser.alternatePinHash;
+    next.alternatePinSalt = prevUser.alternatePinSalt;
+    delete next.alternatePin;
+  } else if (prevUser?.alternatePin) {
+    const salt = generatePinSalt();
+    next.alternatePinHash = await hashPin(prevUser.alternatePin, salt);
+    next.alternatePinSalt = salt;
+    delete next.alternatePin;
+  }
+  return next;
+}
+
 export function Dashboard_Admin({}) {
   // store getters ///////////////////////////////////////////////////////////
   const zSettingsObj = useSettingsStore((state) => state.settings);
@@ -166,41 +203,141 @@ export function Dashboard_Admin({}) {
 
   //////////////////////////////////////////////////////////////////////////
 
-  function commitUserInfoChange(userObj, isNewUser) {
-    const liveUsers = useSettingsStore.getState().settings.users;
+  function buildCallablePayload(userObj) {
+    return {
+      first: userObj.first || "",
+      last: userObj.last || "",
+      email: userObj.email || "",
+      phone: userObj.phone || "",
+      pin: userObj.pin || "",
+      alternatePin: userObj.alternatePin || "",
+      permissions: userObj.permissions || {},
+      stores: Array.isArray(userObj.stores) ? userObj.stores : [],
+      hourlyWage: typeof userObj.hourlyWage === "string" ? userObj.hourlyWage : "",
+      faceDescriptor: Array.isArray(userObj.faceDescriptor)
+        ? userObj.faceDescriptor
+        : "",
+      linkedUserID: userObj.linkedUserID || "",
+    };
+  }
+
+  async function patchOtherUserLinkedID(liveUsers, targetID, newLinkedUserID) {
+    const target = liveUsers.find((u) => u.id === targetID);
+    if (!target) return;
+    const payload = buildCallablePayload(target);
+    delete payload.faceDescriptor;
+    await tenantUpdateUserCallable({
+      ...payload,
+      userID: target.id,
+      linkedUserID: newLinkedUserID,
+    });
+  }
+
+  function showCallableError(title, err) {
+    const message =
+      (err && (err.message || err.details)) || "An unexpected error occurred.";
+    useAlertScreenStore.getState().setValues({
+      title,
+      message,
+      btn1Text: "OK",
+      handleBtn1Press: () => null,
+      showAlert: true,
+    });
+  }
+
+  async function commitUserInfoChange(userObj, isNewUser) {
+    const claims = useLoginStore.getState().authClaims;
+    const isSaas = !!claims?.privilege;
+    const liveUsers = useSettingsStore.getState().settings.users || [];
     const prevUser = isNewUser ? null : liveUsers.find((o) => o.id === userObj.id);
     const prevLinkedID = prevUser?.linkedUserID || "";
     const newLinkedID = userObj.linkedUserID || "";
 
-    let userArr;
-    if (isNewUser) {
-      userArr = [userObj, ...liveUsers];
-    } else {
-      userArr = liveUsers.map((o) => (o.id === userObj.id ? { ...userObj } : o));
+    // Bonita (legacy, no privilege claim) — direct settings.users[] write.
+    // SaaS-only tenant callables aren't deployed on Bonita.
+    if (!isSaas) {
+      const hashedUser = await applyPinHashing(userObj, prevUser);
+      let userArr;
+      if (isNewUser) {
+        userArr = [hashedUser, ...liveUsers];
+      } else {
+        userArr = liveUsers.map((o) =>
+          o.id === hashedUser.id ? { ...hashedUser } : o
+        );
+      }
+      if (prevLinkedID !== newLinkedID) {
+        userArr = userArr.map((o) => {
+          if (o.id === prevLinkedID && o.linkedUserID === userObj.id) {
+            return { ...o, linkedUserID: "" };
+          }
+          if (o.id === newLinkedID) {
+            return { ...o, linkedUserID: userObj.id };
+          }
+          return o;
+        });
+      }
+      useSettingsStore.getState().setField("users", userArr);
+      if (isNewUser) {
+        useLoginStore.getState().setSendWelcomeMessageToUser(userObj);
+      }
+      return true;
     }
 
-    if (prevLinkedID !== newLinkedID) {
-      userArr = userArr.map((o) => {
-        if (o.id === prevLinkedID && o.linkedUserID === userObj.id) {
-          return { ...o, linkedUserID: "" };
-        }
-        if (o.id === newLinkedID) {
-          return { ...o, linkedUserID: userObj.id };
-        }
-        return o;
-      });
-    }
+    try {
+      let savedUserID = userObj.id;
+      if (isNewUser) {
+        const result = await tenantCreateUserCallable({
+          ...buildCallablePayload(userObj),
+          forwardSMS: !!userObj.forwardSMS,
+          hidden: !!userObj.hidden,
+          preview: userObj.preview !== false,
+        });
+        savedUserID = result?.data?.userID || savedUserID;
+        useLoginStore.getState().setSendWelcomeMessageToUser({
+          ...userObj,
+          id: savedUserID,
+        });
+      } else {
+        await tenantUpdateUserCallable({
+          ...buildCallablePayload(userObj),
+          userID: userObj.id,
+        });
+      }
 
-    useSettingsStore.getState().setField("users", userArr);
-    if (isNewUser) {
-      useLoginStore.getState().setSendWelcomeMessageToUser(userObj);
+      if (prevLinkedID !== newLinkedID) {
+        const prev = liveUsers.find((u) => u.id === prevLinkedID);
+        if (prev && prev.linkedUserID === userObj.id) {
+          await patchOtherUserLinkedID(liveUsers, prevLinkedID, "");
+        }
+        if (newLinkedID) {
+          await patchOtherUserLinkedID(liveUsers, newLinkedID, savedUserID);
+        }
+      }
+      return true;
+    } catch (err) {
+      showCallableError("SAVE FAILED", err);
+      return false;
     }
   }
 
-  function handleRemoveUserPress(userObj) {
-    const liveUsers = useSettingsStore.getState().settings.users;
-    let userArr = liveUsers.filter((o) => o.id != userObj.id);
-    useSettingsStore.getState().setField("users", userArr);
+  async function handleRemoveUserPress(userObj) {
+    const claims = useLoginStore.getState().authClaims;
+    const isSaas = !!claims?.privilege;
+
+    if (!isSaas) {
+      const liveUsers = useSettingsStore.getState().settings.users || [];
+      const userArr = liveUsers.filter((o) => o.id !== userObj.id);
+      useSettingsStore.getState().setField("users", userArr);
+      return true;
+    }
+
+    try {
+      await tenantDeleteUserCallable({ userID: userObj.id });
+      return true;
+    } catch (err) {
+      showCallableError("DELETE FAILED", err);
+      return false;
+    }
   }
 
   function handleDescriptorCapture(userObj, desc) {
@@ -619,7 +756,7 @@ function BoxButton1({
         paddingRight: 0,
         paddingTop: 0,
         paddingBottom: 0,
-        borderRadius: 5,
+        borderRadius: Radius.control,
         backgroundColor: C.surfaceAlt,
         marginBottom: 0,
         ...style,
@@ -632,36 +769,59 @@ function BoxButton1({
 function MoveArrows({ index, listLength, onMove }) {
   const atTop = index === 0;
   const atBottom = index === listLength - 1;
-  const btnStyle = (dimmed) => ({
-    padding: 4,
-    opacity: dimmed ? 0.25 : 1,
-    background: "none",
-    border: "none",
-    cursor: dimmed ? "not-allowed" : "pointer",
-  });
   return (
     <div style={{ display: "flex", flexDirection: "row", alignItems: "center", marginLeft: 5, flexShrink: 0 }}>
-      <button
-        type="button"
-        disabled={atTop}
-        onClick={() => onMove(index, "up")}
-        style={btnStyle(atTop)}
-      >
-        <Image icon={ICONS.upChevron} size={13} />
-      </button>
-      <button
-        type="button"
-        disabled={atBottom}
-        onClick={() => onMove(index, "down")}
-        style={btnStyle(atBottom)}
-      >
-        <Image icon={ICONS.downChevron} size={13} />
-      </button>
+      <DomButton
+        icon={ICONS.upChevron}
+        iconSize={13}
+        enabled={!atTop}
+        onPress={() => onMove(index, "up")}
+        buttonStyle={{
+          paddingLeft: 4,
+          paddingRight: 4,
+          paddingTop: 4,
+          paddingBottom: 4,
+          backgroundColor: "transparent",
+        }}
+        iconStyle={{ marginRight: 0 }}
+      />
+      <DomButton
+        icon={ICONS.downChevron}
+        iconSize={13}
+        enabled={!atBottom}
+        onPress={() => onMove(index, "down")}
+        buttonStyle={{
+          paddingLeft: 4,
+          paddingRight: 4,
+          paddingTop: 4,
+          paddingBottom: 4,
+          backgroundColor: "transparent",
+        }}
+        iconStyle={{ marginRight: 0 }}
+      />
     </div>
   );
 }
 
 ////////////////////////////////////////////////////////////////////////////////////
+
+// Per-section dirty tracking: each user-editor section's Save button enables
+// only when a field that belongs to THAT section was edited. Keep this map in
+// sync with the field keys passed to updateDraft() in AppUserListComponent.
+const USER_SECTION_FIELDS = {
+  identity: ["first", "last", "phone", "email", "hidden"],
+  credentials: ["pin", "hourlyWage", "permissions", "linkedUserID"],
+  face: ["faceDescriptor"],
+  statuses: ["statuses"],
+  emails: ["emailInboxes"],
+};
+const USER_FIELD_TO_SECTION = Object.entries(USER_SECTION_FIELDS).reduce(
+  (acc, [section, fields]) => {
+    fields.forEach((f) => { acc[f] = section; });
+    return acc;
+  },
+  {}
+);
 
 const AppUserListComponent = ({
   zSettingsObj,
@@ -674,17 +834,20 @@ const AppUserListComponent = ({
   const [sDraftUser, _setDraftUser] = useState(null);
   const [sOriginalUser, _setOriginalUser] = useState(null);
   const [sIsNewUser, _setIsNewUser] = useState(false);
-  const [sIsDirty, _setIsDirty] = useState(false);
+  const [sDirtySections, _setDirtySections] = useState(() => new Set());
   const [sShowPin, _setShowPin] = useState(false);
   const [sShowWage, _setShowWage] = useState(false);
   const [sPinError, _setPinError] = useState("");
+  const pinConflictReqRef = useRef(0);
   const [sFaceModalDraftActive, _setFaceModalDraftActive] = useState(false);
   const [sShowInviteSaasModal, _setShowInviteSaasModal] = useState(false);
   const [sLoginTimeout, _setLoginTimeout] = useState(zSettingsObj?.activeLoginTimeoutSeconds || "");
+  const [sAdminAuthLogout, _setAdminAuthLogout] = useState(zSettingsObj?.adminAuthLogout ?? SETTINGS_OBJ.adminAuthLogout);
   const [sLockHours, _setLockHours] = useState(zSettingsObj?.idleLoginTimeoutHours ? String(Math.round(zSettingsObj.idleLoginTimeoutHours)) : "");
   const [sPinLength, _setPinLength] = useState(zSettingsObj?.userPinStrength || "");
   const [sClockTick, _setClockTick] = useState(0);
   const zCurrentUserLevel = useLoginStore((state) => state.currentUser?.permissions?.level || 0);
+  const zCurrentUserId = useLoginStore((state) => state.currentUser?.id || "");
   const zPunchClock = useLoginStore((state) => state.punchClock);
   const zAuthClaims = useLoginStore((state) => state.authClaims);
   const zEmailAccountsAll = useEmailStore((state) => state.emailAccounts) || [];
@@ -732,14 +895,14 @@ const AppUserListComponent = ({
     _setDraftUser(cloneDeep(userObj));
     _setOriginalUser(cloneDeep(userObj));
     _setIsNewUser(false);
-    _setIsDirty(false);
+    _setDirtySections(new Set());
     _setShowPin(false);
     _setShowWage(false);
     _setPinError("");
   }
 
   function tryChangeSelection(action) {
-    if (sIsDirty) {
+    if (sDirtySections.size > 0) {
       useAlertScreenStore.getState().setValues({
         title: "UNSAVED CHANGES",
         message: "Discard your unsaved changes?",
@@ -763,14 +926,14 @@ const AppUserListComponent = ({
       _setDraftUser(cloneDeep(userObj));
       _setOriginalUser(cloneDeep(userObj));
       _setIsNewUser(true);
-      _setIsDirty(false);
+      _setDirtySections(new Set());
       _setShowPin(false);
       _setShowWage(false);
       _setPinError("");
     });
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!sDraftUser) return;
 
     const first = (sDraftUser.first || "").trim();
@@ -779,21 +942,25 @@ const AppUserListComponent = ({
     const isHighPriv = (sDraftUser.permissions?.level || 0) >= PERMISSION_LEVELS.superUser.level;
     const configuredLen = Number(zSettingsObj?.userPinStrength) || 4;
     const requiredPinLen = isHighPriv ? 4 : configuredLen;
+    const liveUsers = useSettingsStore.getState().settings?.users || [];
+    const prevUser = sIsNewUser ? null : liveUsers.find((u) => u.id === sDraftUser.id);
+    const hasExistingPin = userHasPin(prevUser);
+    const isPinBeingSet = pin.length > 0;
 
     let error = null;
     if (!first) error = "First name is required";
     else if (!last) error = "Last name is required";
-    else if (!pin) error = "PIN is required";
-    else if (pin.length !== requiredPinLen) {
+    else if (sIsNewUser && !isPinBeingSet) error = "PIN is required";
+    else if (!sIsNewUser && !hasExistingPin && !isPinBeingSet) error = "PIN is required";
+    else if (isPinBeingSet && pin.length !== requiredPinLen) {
       error = "PIN must be exactly " + requiredPinLen + " digit" + (requiredPinLen === 1 ? "" : "s");
-    } else {
-      const liveUsers = useSettingsStore.getState().settings?.users || [];
+    } else if (isPinBeingSet) {
       const otherUsers = liveUsers.filter((u) => u.id !== sDraftUser.id);
       for (const u of otherUsers) {
-        if (u.pin && u.pin === pin) { error = "PIN matches another user's PIN"; break; }
-        if (u.alternatePin && u.alternatePin === pin) { error = "PIN matches another user's alternate PIN"; break; }
+        if (await verifyPin(pin, u)) { error = "PIN matches another user's PIN"; break; }
+        if (await verifyAlternatePin(pin, u)) { error = "PIN matches another user's alternate PIN"; break; }
       }
-      if (!error && sDraftUser.alternatePin && sDraftUser.alternatePin === pin) {
+      if (!error && await verifyAlternatePin(pin, sDraftUser)) {
         error = "PIN cannot match this user's own alternate PIN";
       }
     }
@@ -809,10 +976,11 @@ const AppUserListComponent = ({
       return;
     }
 
-    commitUserInfoChange(sDraftUser, sIsNewUser);
+    const success = await commitUserInfoChange(sDraftUser, sIsNewUser);
+    if (!success) return;
     _setOriginalUser(cloneDeep(sDraftUser));
     _setIsNewUser(false);
-    _setIsDirty(false);
+    _setDirtySections(new Set());
     _setPinError("");
   }
 
@@ -825,7 +993,7 @@ const AppUserListComponent = ({
     } else {
       _setDraftUser(cloneDeep(sOriginalUser));
     }
-    _setIsDirty(false);
+    _setDirtySections(new Set());
     _setShowPin(false);
     _setShowWage(false);
     _setPinError("");
@@ -865,13 +1033,16 @@ const AppUserListComponent = ({
       message: "Are you sure you want to delete " + capitalizeFirstLetterOfString(sDraftUser.first) + " " + capitalizeFirstLetterOfString(sDraftUser.last) + "?",
       btn1Text: "DELETE",
       btn2Text: "CANCEL",
-      handleBtn1Press: () => {
-        if (!sIsNewUser) handleRemoveUserPress(sDraftUser);
+      handleBtn1Press: async () => {
+        if (!sIsNewUser) {
+          const success = await handleRemoveUserPress(sDraftUser);
+          if (!success) return;
+        }
         _setSelectedUserId(null);
         _setDraftUser(null);
         _setOriginalUser(null);
         _setIsNewUser(false);
-        _setIsDirty(false);
+        _setDirtySections(new Set());
       },
       handleBtn2Press: () => null,
       showAlert: true,
@@ -880,7 +1051,68 @@ const AppUserListComponent = ({
 
   function updateDraft(patch) {
     _setDraftUser((prev) => (prev ? { ...prev, ...patch } : prev));
-    _setIsDirty(true);
+    _setDirtySections((prev) => {
+      const next = new Set(prev);
+      for (const key of Object.keys(patch)) {
+        const section = USER_FIELD_TO_SECTION[key];
+        if (section) next.add(section);
+      }
+      return next;
+    });
+  }
+
+  function handleToggleDisabled() {
+    if (!sDraftUser) return;
+    const nextDisabled = !sDraftUser.disabled;
+
+    // Refuse self-disable for the Auth-signed-in user. They'd be logged
+    // out immediately and unable to undo it.
+    if (nextDisabled && AUTH.currentUser?.uid === sDraftUser.id) {
+      useAlertScreenStore.getState().setValues({
+        title: "CANNOT DISABLE",
+        message: "You cannot disable the account you are signed in with.",
+        btn1Text: "OK",
+        handleBtn1Press: () => null,
+        showAlert: true,
+      });
+      return;
+    }
+
+    const apply = () => {
+      const liveUsers = useSettingsStore.getState().settings?.users || [];
+      const updated = liveUsers.map((u) =>
+        u && u.id === sDraftUser.id ? { ...u, disabled: nextDisabled } : u
+      );
+      handleSettingsFieldChange("users", updated);
+      _setDraftUser((prev) =>
+        prev ? { ...prev, disabled: nextDisabled } : prev
+      );
+      _setOriginalUser((prev) =>
+        prev ? { ...prev, disabled: nextDisabled } : prev
+      );
+    };
+
+    if (nextDisabled) {
+      const fullName =
+        (capitalizeFirstLetterOfString(sDraftUser.first || "") +
+          " " +
+          capitalizeFirstLetterOfString(sDraftUser.last || "")).trim() ||
+        "this user";
+      useAlertScreenStore.getState().setValues({
+        title: "DISABLE USER",
+        message:
+          "Disable " +
+          fullName +
+          "? They will be signed out immediately and unable to sign in to this store until re-enabled.",
+        btn1Text: "DISABLE",
+        btn2Text: "CANCEL",
+        handleBtn1Press: apply,
+        handleBtn2Press: () => null,
+        showAlert: true,
+      });
+    } else {
+      apply();
+    }
   }
 
   function handleFaceCaptureToDraft(desc) {
@@ -911,8 +1143,20 @@ const AppUserListComponent = ({
               _setLoginTimeout(val);
               handleSettingsFieldChange("activeLoginTimeoutSeconds", val);
             }}
-            style={{ width: 50, marginLeft: 10, border: "1px solid " + C.green, borderRadius: 5, paddingLeft: 3, outline: "none", color: C.text, boxSizing: "border-box" }}
+            style={{ width: 50, marginLeft: 10, border: "1px solid " + C.green, borderRadius: Radius.control, paddingLeft: 3, paddingRight: 5, outline: "none", color: C.text, boxSizing: "border-box", textAlign: "right" }}
             value={String(sLoginTimeout)}
+          />
+        </div>
+        <div className={adminStyles.ucSettingRow}>
+          <span className={adminStyles.ucSettingLabel}>Seconds to log Admin/Owner out: </span>
+          <DomTextInput
+            debounceMs={500}
+            onChangeText={(val) => {
+              _setAdminAuthLogout(val);
+              handleSettingsFieldChange("adminAuthLogout", val);
+            }}
+            style={{ width: 50, marginLeft: 10, border: "1px solid " + C.green, borderRadius: Radius.control, paddingLeft: 3, paddingRight: 5, outline: "none", color: C.text, boxSizing: "border-box", textAlign: "right" }}
+            value={String(sAdminAuthLogout)}
           />
         </div>
         <div className={adminStyles.ucSettingRow}>
@@ -923,7 +1167,7 @@ const AppUserListComponent = ({
               _setLockHours(val);
               handleSettingsFieldChange("idleLoginTimeoutHours", val);
             }}
-            style={{ width: 50, marginLeft: 10, border: "1px solid " + C.green, borderRadius: 5, paddingLeft: 3, outline: "none", color: C.text, boxSizing: "border-box" }}
+            style={{ width: 50, marginLeft: 10, border: "1px solid " + C.green, borderRadius: Radius.control, paddingLeft: 3, paddingRight: 5, outline: "none", color: C.text, boxSizing: "border-box", textAlign: "right" }}
             value={String(sLockHours)}
           />
         </div>
@@ -935,10 +1179,11 @@ const AppUserListComponent = ({
               _setPinLength(val);
               handleSettingsFieldChange("userPinStrength", val);
             }}
-            style={{ width: 50, marginLeft: 10, border: "1px solid " + C.green, borderRadius: 5, paddingLeft: 3, outline: "none", color: C.text, boxSizing: "border-box" }}
+            style={{ width: 50, marginLeft: 10, border: "1px solid " + C.green, borderRadius: Radius.control, paddingLeft: 3, paddingRight: 5, outline: "none", color: C.text, boxSizing: "border-box", textAlign: "right" }}
             value={String(sPinLength)}
           />
         </div>
+        <hr style={{ width: "100%", border: "none", borderTop: "1px solid " + C.borderDefault, margin: "3px 0" }} />
         <div className={adminStyles.ucCheckRow}>
           <CheckBox
             buttonStyle={{ justifyContent: "flex-end" }}
@@ -1006,11 +1251,10 @@ const AppUserListComponent = ({
         }}
       >
         <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0.6, color: C.textMuted, marginBottom: 10 }}>
-          Punch Clock
+          App Users
         </div>
         {(() => {
           let visibleUsers = (zSettingsObj?.users || [])
-            .filter((u) => !u.hidden)
             .sort((a, b) => {
               let an = ((a.first || "") + " " + (a.last || "")).trim().toLowerCase();
               let bn = ((b.first || "") + " " + (b.last || "")).trim().toLowerCase();
@@ -1030,27 +1274,29 @@ const AppUserListComponent = ({
                 let isClockedIn = !!punch;
                 let fullName = (capitalizeFirstLetterOfString(u.first || "") + " " + capitalizeFirstLetterOfString(u.last || "")).trim() || "(no name)";
                 let elapsedText = isClockedIn ? formatElapsedSince(punch.millis) : "";
+                let isSelected = u.id === sSelectedUserId && !sIsNewUser;
+                let rowUserLevel = u.permissions?.level || 0;
+                let isHighPrivRow = rowUserLevel >= PERMISSION_LEVELS.superUser.level;
+                let isLockedToSelf = isHighPrivRow && u.id !== zCurrentUserId;
+                let rowDisabled = !canEditUsers || isLockedToSelf;
                 return (
-                  <div
+                  <button
                     key={u.id}
-                    style={{
-                      display: "flex",
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      padding: "6px 10px",
-                      borderRadius: 6,
-                      border: "1px solid " + C.surfaceAlt,
-                      backgroundColor: "transparent",
-                      gap: 10,
+                    type="button"
+                    disabled={rowDisabled}
+                    className={`${adminStyles.appUserCard} ${isSelected ? adminStyles.appUserCardSelected : ""}`}
+                    onClick={() => {
+                      if (u.id === sSelectedUserId && !sIsNewUser) return;
+                      tryChangeSelection(() => selectUser(u.id));
                     }}
+                    style={{ borderColor: C.surfaceAlt, opacity: isLockedToSelf ? 0.5 : undefined, cursor: rowDisabled ? "not-allowed" : undefined }}
                   >
                     <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 8, flex: 1, minWidth: 0 }}>
                       <div
                         style={{
                           width: 8,
                           height: 8,
-                          borderRadius: 4,
+                          borderRadius: Radius.control,
                           backgroundColor: isClockedIn ? C.green : C.surfaceAlt,
                           flexShrink: 0,
                         }}
@@ -1058,43 +1304,51 @@ const AppUserListComponent = ({
                       <span style={{ color: C.text, fontSize: 14, fontWeight: 500, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {fullName}
                       </span>
+                      <span style={{ color: C.textMuted, fontSize: 12, fontStyle: "italic", flexShrink: 0 }}>
+                        {levelToPrivilegeName(rowUserLevel || 1)}
+                      </span>
                     </div>
                     <span style={{ color: isClockedIn ? C.text : C.textMuted, fontSize: 12, minWidth: 60, textAlign: "right" }}>
                       {isClockedIn ? elapsedText : "Clocked out"}
                     </span>
-                    <DomTooltip text="Edit punch history" position="top">
-                      <DomTouchableOpacity
-                        onPress={() => onOpenPayrollForUser && onOpenPayrollForUser(u)}
-                        style={{
-                          padding: 5,
-                          borderRadius: 4,
-                          border: "1px solid " + C.surfaceAlt,
-                          backgroundColor: "transparent",
-                          alignItems: "center",
-                          justifyContent: "center",
+                    <div
+                      className={adminStyles.appUserCardActions}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <DomTooltip text="Edit punch history" position="top">
+                        <DomTouchableOpacity
+                          onPress={() => onOpenPayrollForUser && onOpenPayrollForUser(u)}
+                          style={{
+                            padding: 5,
+                            borderRadius: Radius.control,
+                            border: "1px solid " + C.surfaceAlt,
+                            backgroundColor: "transparent",
+                            alignItems: "center",
+                            justifyContent: "center",
+                          }}
+                        >
+                          <Image icon={ICONS.editPencil} size={14} />
+                        </DomTouchableOpacity>
+                      </DomTooltip>
+                      <DomButton
+                        text={isClockedIn ? "Clock Out" : "Clock In"}
+                        onPress={() => handleTogglePunch(u)}
+                        buttonStyle={{
+                          paddingLeft: 10,
+                          paddingRight: 10,
+                          paddingTop: 4,
+                          paddingBottom: 4,
+                          borderWidth: 1,
+                          borderStyle: "solid",
+                          borderColor: isClockedIn ? C.buttonLightGreenOutline : C.surfaceAlt,
+                          backgroundColor: isClockedIn ? C.buttonLightGreen : "transparent",
+                          borderRadius: Radius.control,
+                          minWidth: 90,
                         }}
-                      >
-                        <Image icon={ICONS.editPencil} size={14} />
-                      </DomTouchableOpacity>
-                    </DomTooltip>
-                    <DomButton
-                      text={isClockedIn ? "Clock Out" : "Clock In"}
-                      onPress={() => handleTogglePunch(u)}
-                      buttonStyle={{
-                        paddingLeft: 10,
-                        paddingRight: 10,
-                        paddingTop: 4,
-                        paddingBottom: 4,
-                        borderWidth: 1,
-                        borderStyle: "solid",
-                        borderColor: isClockedIn ? C.buttonLightGreenOutline : C.surfaceAlt,
-                        backgroundColor: isClockedIn ? C.buttonLightGreen : "transparent",
-                        borderRadius: 5,
-                        minWidth: 90,
-                      }}
-                      textStyle={{ fontSize: 12, color: C.text, fontWeight: 600 }}
-                    />
-                  </div>
+                        textStyle={{ fontSize: 12, color: C.text, fontWeight: 600 }}
+                      />
+                    </div>
+                  </button>
                 );
               })}
             </div>
@@ -1113,130 +1367,11 @@ const AppUserListComponent = ({
         }}
       >
         {(() => {
-          let users = zSettingsObj?.users || [];
-          let sortedUsers = [...users].sort((a, b) => {
-            let an = ((a.first || "") + " " + (a.last || "")).trim().toLowerCase();
-            let bn = ((b.first || "") + " " + (b.last || "")).trim().toLowerCase();
-            return an.localeCompare(bn);
-          });
-          let pickerItems = sortedUsers.map((u) => {
-            let level = u.permissions?.level || 1;
-            let roleName = levelToPrivilegeName(level);
-            let badge = roleBadgeColors(level);
-            let fullName = (capitalizeFirstLetterOfString(u.first || "") + " " + capitalizeFirstLetterOfString(u.last || "")).trim() || "(no name)";
-            return {
-              id: u.id,
-              value: u.id,
-              label: (
-                <div style={{ display: "flex", flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%", gap: 8 }}>
-                  <span style={{ color: C.text, fontSize: 14 }}>{fullName}</span>
-                  <span
-                    style={{
-                      backgroundColor: badge.bg,
-                      color: badge.fg,
-                      fontSize: 11,
-                      fontWeight: 700,
-                      padding: "2px 6px",
-                      borderRadius: 4,
-                    }}
-                  >
-                    {roleName}
-                  </span>
-                </div>
-              ),
-            };
-          });
-
           let selectedRoleLevel = sDraftUser?.permissions?.level || 1;
           let selectedRoleBadge = roleBadgeColors(selectedRoleLevel);
-          let pickerButtonText = (() => {
-            if (!sDraftUser) return "Select a user...";
-            let fn = capitalizeFirstLetterOfString(sDraftUser.first || "");
-            let ln = capitalizeFirstLetterOfString(sDraftUser.last || "");
-            let name = (fn + " " + ln).trim();
-            if (sIsNewUser && !name) return "New User";
-            return name || "(no name)";
-          })();
 
           return (
             <>
-              {/* Picker row: dropdown + New User button */}
-              <div className={adminStyles.ucPickerRow}>
-                <div className={adminStyles.ucPickerDropdownWrap}>
-                  <DomDropdownMenu
-                    enabled={canEditUsers}
-                    dataArr={pickerItems}
-                    onSelect={(item) => {
-                      if (!item || !item.value) return;
-                      if (item.value === sSelectedUserId && !sIsNewUser) return;
-                      tryChangeSelection(() => selectUser(item.value));
-                    }}
-                    buttonText={pickerButtonText}
-                    buttonStyle={{
-                      paddingLeft: 8,
-                      paddingRight: 8,
-                      paddingTop: 4,
-                      paddingBottom: 4,
-                      borderColor: C.buttonLightGreenOutline,
-                      borderStyle: "solid",
-                      borderWidth: 1,
-                      borderRadius: 5,
-                      height: 32,
-                      width: "100%",
-                      alignItems: "center",
-                      backgroundColor: C.buttonLightGreen,
-                    }}
-                    buttonTextStyle={{
-                      color: C.text,
-                      fontSize: 14,
-                      fontWeight: 600,
-                    }}
-                  />
-                </div>
-                <DomButton
-                  text="+ New User"
-                  onPress={() => {
-                    if (!canEditUsers) return;
-                    handleNewUserPress();
-                  }}
-                  buttonStyle={{
-                    borderWidth: 1,
-                    borderStyle: "solid",
-                    borderColor: C.buttonLightGreenOutline,
-                    backgroundColor: C.buttonLightGreen,
-                    paddingTop: 4,
-                    paddingBottom: 4,
-                    paddingLeft: 10,
-                    paddingRight: 10,
-                    borderRadius: 5,
-                    opacity: canEditUsers ? 1 : 0.4,
-                  }}
-                  textStyle={{ fontSize: 13, color: C.text, fontWeight: 600 }}
-                />
-                {isSaasOwner && (
-                  <DomButton
-                    text="Invite SaaS User"
-                    onPress={() => {
-                      if (!canEditUsers) return;
-                      _setShowInviteSaasModal(true);
-                    }}
-                    buttonStyle={{
-                      borderWidth: 1,
-                      borderStyle: "solid",
-                      borderColor: C.buttonLightGreenOutline,
-                      backgroundColor: C.buttonLightGreen,
-                      paddingTop: 4,
-                      paddingBottom: 4,
-                      paddingLeft: 10,
-                      paddingRight: 10,
-                      borderRadius: 5,
-                      opacity: canEditUsers ? 1 : 0.4,
-                    }}
-                    textStyle={{ fontSize: 13, color: C.text, fontWeight: 600 }}
-                  />
-                )}
-              </div>
-
               {isSaasOwner && sShowInviteSaasModal && (
                 <Suspense fallback={null}>
                   <InviteUserModal
@@ -1257,33 +1392,35 @@ const AppUserListComponent = ({
               {sDraftUser && (() => {
                 let editable = canEditUsers;
                 let borderColor = editable ? C.buttonLightGreenOutline : "transparent";
-                const canSave = sIsDirty && editable && !sPinError;
-                const sectionSaveButton = (
-                  <DomButton
-                    text="Save"
-                    onPress={() => canSave && handleSave()}
-                    buttonStyle={{
-                      borderWidth: 1,
-                      borderStyle: "solid",
-                      borderColor: canSave ? C.green : C.borderSubtle || C.buttonLightGreenOutline,
-                      backgroundColor: canSave ? C.green : C.surfaceAlt,
-                      paddingTop: 2,
-                      paddingBottom: 2,
-                      paddingLeft: 10,
-                      paddingRight: 10,
-                      borderRadius: 4,
-                      opacity: canSave ? 1 : 0.5,
-                      cursor: canSave ? "pointer" : "default",
-                    }}
-                    textStyle={{
-                      fontSize: 11,
-                      color: canSave ? C.textWhite : C.textMuted,
-                      fontWeight: 700,
-                      textTransform: "none",
-                      letterSpacing: 0,
-                    }}
-                  />
-                );
+                const renderSectionSaveButton = (sectionId) => {
+                  const canSave = sDirtySections.has(sectionId) && editable && !sPinError;
+                  return (
+                    <DomButton
+                      text="Save"
+                      onPress={() => canSave && handleSave()}
+                      buttonStyle={{
+                        borderWidth: 1,
+                        borderStyle: "solid",
+                        borderColor: canSave ? C.green : C.borderSubtle || C.buttonLightGreenOutline,
+                        backgroundColor: canSave ? C.green : C.surfaceAlt,
+                        paddingTop: 2,
+                        paddingBottom: 2,
+                        paddingLeft: 10,
+                        paddingRight: 10,
+                        borderRadius: Radius.control,
+                        opacity: canSave ? 1 : 0.5,
+                        cursor: canSave ? "pointer" : "default",
+                      }}
+                      textStyle={{
+                        fontSize: 11,
+                        color: canSave ? C.textWhite : C.textMuted,
+                        fontWeight: 700,
+                        textTransform: "none",
+                        letterSpacing: 0,
+                      }}
+                    />
+                  );
+                };
                 return (
                   <div
                     className={adminStyles.ucEditor}
@@ -1303,11 +1440,36 @@ const AppUserListComponent = ({
                           paddingBottom: 6,
                           paddingLeft: 14,
                           paddingRight: 14,
-                          borderRadius: 5,
+                          borderRadius: Radius.control,
                         }}
                         textStyle={{ fontSize: 13, color: C.text, fontWeight: 600 }}
                       />
                       <div style={{ flex: 1 }} />
+                      {!sIsNewUser && editable && (
+                        <DomButton
+                          text={sDraftUser.disabled ? "Enable" : "Disable"}
+                          onPress={handleToggleDisabled}
+                          buttonStyle={{
+                            borderWidth: 1,
+                            borderStyle: "solid",
+                            borderColor: sDraftUser.disabled
+                              ? C.green
+                              : C.borderSubtle || C.buttonLightGreenOutline,
+                            backgroundColor: "transparent",
+                            paddingTop: 6,
+                            paddingBottom: 6,
+                            paddingLeft: 14,
+                            paddingRight: 14,
+                            borderRadius: Radius.control,
+                            marginRight: 8,
+                          }}
+                          textStyle={{
+                            fontSize: 13,
+                            color: sDraftUser.disabled ? C.green : C.text,
+                            fontWeight: 600,
+                          }}
+                        />
+                      )}
                       {!sIsNewUser && editable && (
                         <DomButton
                           text="Delete"
@@ -1321,7 +1483,7 @@ const AppUserListComponent = ({
                             paddingBottom: 6,
                             paddingLeft: 14,
                             paddingRight: 14,
-                            borderRadius: 5,
+                            borderRadius: Radius.control,
                           }}
                           textStyle={{ fontSize: 13, color: C.lightred, fontWeight: 600 }}
                         />
@@ -1332,7 +1494,7 @@ const AppUserListComponent = ({
                     <div className={adminStyles.ucEditorSection}>
                       <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>
                         <span className={adminStyles.ucEditorSectionTitleText}>Identity</span>
-                        {sectionSaveButton}
+                        {renderSectionSaveButton("identity")}
                       </div>
                       <div className={adminStyles.ucEditorRow}>
                         <DomTextInput
@@ -1398,7 +1560,7 @@ const AppUserListComponent = ({
                     <div className={adminStyles.ucEditorSection}>
                       <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>
                         <span className={adminStyles.ucEditorSectionTitleText}>Credentials & Role</span>
-                        {sectionSaveButton}
+                        {renderSectionSaveButton("credentials")}
                       </div>
                       <div className={adminStyles.ucEditorRow}>
                         <div className={adminStyles.ucCredField} style={{ borderColor: borderColor }}>
@@ -1413,21 +1575,24 @@ const AppUserListComponent = ({
                                 focused={sShowPin}
                                 value={sShowPin ? (sDraftUser.pin || "") : ""}
                                 maxLength={maxPinLen}
-                                onChangeText={(value) => {
+                                onChangeText={async (value) => {
                                   if (value && value.length > maxPinLen) value = value.slice(0, maxPinLen);
-                                  const otherUsers = (zSettingsObj?.users || []).filter((u) => u.id !== sDraftUser.id);
-                                  const conflictKeys = [];
-                                  for (const u of otherUsers) {
-                                    if (u.pin) conflictKeys.push(u.pin);
-                                    if (u.alternatePin) conflictKeys.push(u.alternatePin);
-                                  }
-                                  if (sDraftUser.alternatePin) conflictKeys.push(sDraftUser.alternatePin);
-                                  if (value && conflictKeys.includes(value)) {
-                                    _setPinError("PIN already in use");
-                                  } else {
-                                    _setPinError("");
-                                  }
                                   updateDraft({ pin: value });
+                                  if (!value) { _setPinError(""); return; }
+                                  const reqId = ++pinConflictReqRef.current;
+                                  const otherUsers = (zSettingsObj?.users || []).filter((u) => u.id !== sDraftUser.id);
+                                  let conflict = false;
+                                  for (const u of otherUsers) {
+                                    if (await verifyPin(value, u) || await verifyAlternatePin(value, u)) {
+                                      conflict = true;
+                                      break;
+                                    }
+                                  }
+                                  if (!conflict && await verifyAlternatePin(value, sDraftUser)) {
+                                    conflict = true;
+                                  }
+                                  if (reqId !== pinConflictReqRef.current) return;
+                                  _setPinError(conflict ? "PIN already in use" : "");
                                 }}
                                 placeholder={sShowPin ? "pin..." : "PIN (hidden)"}
                                 placeholderTextColor={"lightgray"}
@@ -1499,7 +1664,7 @@ const AppUserListComponent = ({
                               borderColor: selectedRoleBadge.bg,
                               borderStyle: "solid",
                               borderWidth: 1,
-                              borderRadius: 4,
+                              borderRadius: Radius.control,
                               minWidth: 120,
                               height: 28,
                               alignItems: "center",
@@ -1526,38 +1691,45 @@ const AppUserListComponent = ({
                         const linkedUser = linkedId ? otherUsers.find((u) => u.id === linkedId) : null;
                         const buttonText = linkedUser
                           ? ((capitalizeFirstLetterOfString(linkedUser.first || "") + " " + capitalizeFirstLetterOfString(linkedUser.last || "")).trim() || "(no name)")
-                          : "Link to user...";
+                          : "None";
                         return (
                           <div className={adminStyles.ucEditorRow}>
-                            <DomDropdownMenu
-                              enabled={editable}
-                              dataArr={linkItems}
-                              onSelect={(item) => {
-                                if (!editable) return;
-                                const newId = item.id === "__none__" ? "" : item.id;
-                                updateDraft({ linkedUserID: newId });
-                              }}
-                              buttonText={buttonText}
-                              buttonStyle={{
-                                paddingLeft: 10,
-                                paddingRight: 10,
-                                paddingTop: 4,
-                                paddingBottom: 4,
-                                borderColor: C.borderDefault,
-                                borderStyle: "solid",
-                                borderWidth: 1,
-                                borderRadius: 4,
-                                minWidth: 200,
-                                height: 28,
-                                alignItems: "center",
-                                backgroundColor: C.surfaceBase,
-                              }}
-                              buttonTextStyle={{
-                                color: linkedUser ? C.text : C.textMuted,
-                                fontSize: 13,
-                                fontWeight: 600,
-                              }}
-                            />
+                            <span style={{ fontSize: 13, color: C.textMuted, marginRight: 10 }}>Link to user</span>
+                            <DomTooltip
+                              text="Pair this admin with their own lower-privilege user account. While this admin is signed in, face recognition won't switch the login down to the linked account."
+                              position="top"
+                              darkMode
+                            >
+                              <DomDropdownMenu
+                                enabled={editable}
+                                dataArr={linkItems}
+                                onSelect={(item) => {
+                                  if (!editable) return;
+                                  const newId = item.id === "__none__" ? "" : item.id;
+                                  updateDraft({ linkedUserID: newId });
+                                }}
+                                buttonText={buttonText}
+                                buttonStyle={{
+                                  paddingLeft: 10,
+                                  paddingRight: 10,
+                                  paddingTop: 4,
+                                  paddingBottom: 4,
+                                  borderColor: C.borderDefault,
+                                  borderStyle: "solid",
+                                  borderWidth: 1,
+                                  borderRadius: Radius.control,
+                                  minWidth: 150,
+                                  height: 28,
+                                  alignItems: "center",
+                                  backgroundColor: C.surfaceBase,
+                                }}
+                                buttonTextStyle={{
+                                  color: linkedUser ? C.text : C.textMuted,
+                                  fontSize: 13,
+                                  fontWeight: 600,
+                                }}
+                              />
+                            </DomTooltip>
                           </div>
                         );
                       })()}
@@ -1568,7 +1740,7 @@ const AppUserListComponent = ({
                       <div className={adminStyles.ucEditorSection}>
                         <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>
                           <span className={adminStyles.ucEditorSectionTitleText}>Face Enrollment</span>
-                          {sectionSaveButton}
+                          {renderSectionSaveButton("face")}
                         </div>
                         <div className={adminStyles.ucEditorRow}>
                           <div
@@ -1604,7 +1776,7 @@ const AppUserListComponent = ({
                                 paddingBottom: 4,
                                 paddingLeft: 10,
                                 paddingRight: 10,
-                                borderRadius: 5,
+                                borderRadius: Radius.control,
                               }}
                               textStyle={{ fontSize: 11, color: C.textWhite, fontWeight: 600 }}
                             />
@@ -1617,7 +1789,7 @@ const AppUserListComponent = ({
                     <div className={adminStyles.ucEditorSection}>
                       <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>
                         <span className={adminStyles.ucEditorSectionTitleText}>Connected Statuses</span>
-                        {sectionSaveButton}
+                        {renderSectionSaveButton("statuses")}
                       </div>
                       <div className={adminStyles.ucChipRow}>
                         {editable && (
@@ -1640,7 +1812,7 @@ const AppUserListComponent = ({
                               borderColor: C.buttonLightGreenOutline,
                               borderStyle: "solid",
                               borderWidth: 1,
-                              borderRadius: 5,
+                              borderRadius: Radius.control,
                               height: 25,
                               alignItems: "center",
                               backgroundColor: C.buttonLightGreen,
@@ -1682,7 +1854,7 @@ const AppUserListComponent = ({
                     <div className={adminStyles.ucEditorSection}>
                       <div className={adminStyles.ucEditorSectionTitle} style={{ color: C.textMuted }}>
                         <span className={adminStyles.ucEditorSectionTitleText}>Visible Email Accounts</span>
-                        {sectionSaveButton}
+                        {renderSectionSaveButton("emails")}
                       </div>
                       <div className={adminStyles.ucChipRow}>
                         {(() => {
@@ -1707,7 +1879,7 @@ const AppUserListComponent = ({
                               borderColor: C.buttonLightGreenOutline,
                               borderStyle: "solid",
                               borderWidth: 1,
-                              borderRadius: 5,
+                              borderRadius: Radius.control,
                               height: 25,
                               alignItems: "center",
                               backgroundColor: C.buttonLightGreen,
@@ -1876,7 +2048,7 @@ const WorkorderStatusesComponent = ({
             paddingRight: 10,
             borderColor: C.buttonLightGreenOutline,
             backgroundColor: C.backgroundListWhite,
-            borderRadius: 10,
+            borderRadius: Radius.row,
             boxSizing: "border-box",
           }}
         >
@@ -1970,7 +2142,7 @@ const WorkorderStatusesComponent = ({
                       sDragOverIdx === idx
                         ? C.blue
                         : C.buttonLightGreenOutline,
-                    borderRadius: 8,
+                    borderRadius: Radius.row,
                     backgroundColor: C.listItemWhite,
                     padding: 6,
                     marginBottom: 4,
@@ -1989,7 +2161,7 @@ const WorkorderStatusesComponent = ({
                       flexDirection: "row",
                       flex: 1,
                       minHeight: 35,
-                      borderRadius: 5,
+                      borderRadius: Radius.control,
                     }}
                   >
                     {!item.removable && (
@@ -2208,7 +2380,7 @@ const WorkorderStatusesComponent = ({
             style={{
               display: "flex",
               backgroundColor: C.backgroundListWhite,
-              borderRadius: 10,
+              borderRadius: Radius.row,
               padding: 30,
               maxWidth: 900,
               width: "90%",
@@ -2240,7 +2412,7 @@ const WorkorderStatusesComponent = ({
                       width: "100%",
                       textAlign: "left",
                       backgroundColor: status.backgroundColor,
-                      borderRadius: 6,
+                      borderRadius: Radius.control,
                       paddingTop: 8,
                       paddingBottom: 8,
                       paddingLeft: 10,
@@ -2272,7 +2444,7 @@ const WorkorderStatusesComponent = ({
                 style={{
                   display: "flex",
                   backgroundColor: sModalBgColor,
-                  borderRadius: 5,
+                  borderRadius: Radius.control,
                   paddingTop: 10,
                   paddingBottom: 10,
                   paddingLeft: 30,
@@ -2384,7 +2556,7 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
     borderWidth: 1,
     borderStyle: "solid",
     borderColor: C.borderSubtle,
-    borderRadius: 6,
+    borderRadius: Radius.control,
     paddingLeft: 6,
     paddingRight: 6,
     textAlign: "center",
@@ -2414,7 +2586,7 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
               borderWidth: 1,
               borderStyle: "solid",
               borderColor: C.buttonLightGreenOutline,
-              borderRadius: 8,
+              borderRadius: Radius.row,
               backgroundColor: C.listItemWhite,
               padding: 10,
               marginBottom: 8,
@@ -2433,7 +2605,7 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   backgroundColor: statusObj?.backgroundColor || C.surfaceAlt,
                   paddingTop: 6,
                   paddingBottom: 6,
-                  borderRadius: 6,
+                  borderRadius: Radius.control,
                 }}
                 buttonTextStyle={{
                   color: statusObj?.textColor || C.text,
@@ -2454,7 +2626,7 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   flex: 1,
                   paddingTop: 6,
                   paddingBottom: 6,
-                  borderRadius: 6,
+                  borderRadius: Radius.control,
                   borderWidth: 1,
                   borderColor: C.borderSubtle,
                 }}
@@ -2473,7 +2645,7 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
                   flex: 1,
                   paddingTop: 6,
                   paddingBottom: 6,
-                  borderRadius: 6,
+                  borderRadius: Radius.control,
                   borderWidth: 1,
                   borderColor: C.borderSubtle,
                 }}
@@ -2769,7 +2941,7 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
           width: 500,
           height: "70vh",
           backgroundColor: "white",
-          borderRadius: 12,
+          borderRadius: Radius.container,
           display: "flex",
           flexDirection: "column",
           overflow: "hidden",
@@ -2856,7 +3028,7 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
               paddingLeft: 10,
               paddingRight: 10,
               backgroundColor: "rgb(230, 240, 252)",
-              borderRadius: 4,
+              borderRadius: Radius.control,
               borderLeft: "3px solid " + C.blue,
               boxSizing: "border-box",
               flexShrink: 0,
@@ -2883,7 +3055,7 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
                 paddingTop: 4,
                 paddingBottom: 4,
                 backgroundColor: C.surfaceAlt,
-                borderRadius: 4,
+                borderRadius: Radius.control,
               }}
             >
               <span style={{ fontSize: 10, color: C.lightred }}>Remove</span>
@@ -2941,7 +3113,7 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
             marginRight: 16,
             marginBottom: 8,
             border: sSearchResults.length > 0 ? "1px solid " + C.borderSubtle : "none",
-            borderRadius: 4,
+            borderRadius: Radius.control,
             backgroundColor: "white",
             boxSizing: "border-box",
           }}

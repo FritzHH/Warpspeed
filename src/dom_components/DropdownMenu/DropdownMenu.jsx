@@ -1,6 +1,6 @@
 import React, { forwardRef, useState, useRef, useCallback, useEffect, useImperativeHandle } from "react";
 import ReactDOM from "react-dom";
-import { C, ICONS } from "../../styles";
+import { C, ICONS, Radius } from "../../styles";
 import { lightenRGBByPercent, ifNumIsOdd, usdTypeMask } from "../../utils";
 import { DISCOUNT_TYPES } from "../../constants";
 import styles from "./DropdownMenu.module.css";
@@ -72,7 +72,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
     buttonStyle = {},
     buttonTextStyle = {},
     buttonText,
-    menuButtonStyle = { borderRadius: 5 },
+    menuButtonStyle = { borderRadius: Radius.control },
     matchValue,
     preserveItemBackground = false,
     selectedItemOpacity = 0.55,
@@ -247,7 +247,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
   const triggerStyle = {
     backgroundColor: C.buttonLightGreen,
     borderColor: C.buttonLightGreenOutline,
-    borderRadius: 5,
+    borderRadius: Radius.control,
     ...buttonStyle,
     ...(buttonStyle.paddingVertical != null ? { paddingTop: buttonStyle.paddingVertical, paddingBottom: buttonStyle.paddingVertical } : {}),
     ...(buttonStyle.paddingHorizontal != null ? { paddingLeft: buttonStyle.paddingHorizontal, paddingRight: buttonStyle.paddingHorizontal } : {}),

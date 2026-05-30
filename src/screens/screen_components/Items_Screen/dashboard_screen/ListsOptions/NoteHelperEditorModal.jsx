@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import cloneDeep from "lodash/cloneDeep";
-import { Dialog, TextInput, TouchableOpacity, Image, ModalFooter, ModalFooterButton } from "../../../../../dom_components";
+import { Dialog, TextInput, TouchableOpacity, Image, LargeModalHeader, LargeModalHeaderButton } from "../../../../../dom_components";
 import { C, ICONS } from "../../../../../styles";
 
 import { NOTE_HELPER_ITEM_PROTO } from "../../../../../data";
@@ -62,60 +62,72 @@ export const NoteHelperEditorModal = ({
         style={{ borderColor: C.buttonLightGreenOutline }}
       >
         {/* Header */}
-        <div
-          className={styles.modalHeader}
-          style={{
-            borderBottomColor: C.buttonLightGreenOutline,
-            backgroundColor: C.buttonLightGreen,
-          }}
-        >
-          {sEditingName ? (
-            <TextInput
-              value={sCategory.label}
-              autoFocus
-              capitalize
-              placeholder="Category name"
-              placeholderTextColor={C.textMuted}
-              onChangeText={(val) =>
-                _setCategory({ ...sCategory, label: val })
-              }
-              onBlur={() => {
-                if (nameValid) _setEditingName(false);
-              }}
-              onSubmitEditing={() => {
-                if (nameValid) _setEditingName(false);
-              }}
-              className={styles.modalHeaderInput}
-              style={{
-                borderColor: nameValid ? C.buttonLightGreenOutline : C.lightred,
-                color: C.text,
-              }}
-            />
-          ) : (
-            <div className={styles.modalHeaderTitleRow}>
-              <span className={styles.modalHeaderTitle} style={{ color: C.text }}>
-                {sCategory.label}
-              </span>
-              <TouchableOpacity
-                onPress={() => _setEditingName(true)}
-                style={{ marginLeft: 8, padding: 2 }}
-              >
-                <Image icon={ICONS.editPencil} size={14} />
-              </TouchableOpacity>
-            </div>
-          )}
-          {!isNew && (
-            <TouchableOpacity
-              onPress={() => {
-                onDelete(sCategory.id);
-                onClose();
-              }}
-              style={{ marginLeft: 10, padding: 4 }}
+        <LargeModalHeader
+          title={
+            sEditingName ? (
+              <TextInput
+                value={sCategory.label}
+                autoFocus
+                capitalize
+                placeholder="Category name"
+                placeholderTextColor={C.textMuted}
+                onChangeText={(val) =>
+                  _setCategory({ ...sCategory, label: val })
+                }
+                onBlur={() => {
+                  if (nameValid) _setEditingName(false);
+                }}
+                onSubmitEditing={() => {
+                  if (nameValid) _setEditingName(false);
+                }}
+                className={styles.modalHeaderInput}
+                style={{
+                  borderColor: nameValid ? C.buttonLightGreenOutline : C.lightred,
+                  color: C.text,
+                }}
+              />
+            ) : (
+              <div className={styles.modalHeaderTitleRow}>
+                <span className={styles.modalHeaderTitle} style={{ color: C.text }}>
+                  {sCategory.label}
+                </span>
+                <TouchableOpacity
+                  onPress={() => _setEditingName(true)}
+                  style={{ marginLeft: 8, padding: 2 }}
+                >
+                  <Image icon={ICONS.editPencil} size={14} />
+                </TouchableOpacity>
+              </div>
+            )
+          }
+          actions={[
+            !isNew && (
+              <LargeModalHeaderButton
+                key="delete"
+                variant="danger"
+                icon={ICONS.trash}
+                iconSize={16}
+                iconPosition="only"
+                tooltip="Delete category"
+                onClick={() => {
+                  onDelete(sCategory.id);
+                  onClose();
+                }}
+              />
+            ),
+            <LargeModalHeaderButton
+              key="save"
+              variant="accent"
+              disabled={!nameValid}
+              onClick={handleSave}
             >
-              <Image icon={ICONS.trash} size={16} />
-            </TouchableOpacity>
-          )}
-        </div>
+              Save
+            </LargeModalHeaderButton>,
+            <LargeModalHeaderButton key="close" variant="default" onClick={onClose}>
+              Cancel
+            </LargeModalHeaderButton>,
+          ]}
+        />
 
         {/* Target checkboxes */}
         <div
@@ -246,14 +258,6 @@ export const NoteHelperEditorModal = ({
             </span>
           </div>
         )}
-        <ModalFooter>
-          <ModalFooterButton variant="danger" onClick={onClose}>
-            Cancel
-          </ModalFooterButton>
-          <ModalFooterButton variant="accent" disabled={!nameValid} onClick={handleSave}>
-            Save
-          </ModalFooterButton>
-        </ModalFooter>
       </div>
     </Dialog>
   );

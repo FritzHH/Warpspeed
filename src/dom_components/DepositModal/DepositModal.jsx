@@ -1,9 +1,9 @@
 import React, { useState, useCallback } from "react";
-import { C } from "../../styles";
+import { C, ICONS } from "../../styles";
 import { usdTypeMask } from "../../utils";
 import { CUSTOMER_DEPOST_TYPES } from "../../data";
 import { Dialog } from "../Dialog/Dialog";
-import { ModalFooter, ModalFooterButton } from "../ModalFooter/ModalFooter";
+import { LargeModalHeader, LargeModalHeaderButton } from "../LargeModalHeader/LargeModalHeader";
 import styles from "./DepositModal.module.css";
 
 export const DepositModal = function DepositModal({
@@ -24,6 +24,7 @@ export const DepositModal = function DepositModal({
 
   let isCredit = sDepositType === CUSTOMER_DEPOST_TYPES.credit;
   let isGiftCard = false;
+  let modalTitle = isCredit ? "Credit" : isGiftCard ? "Gift Card" : "Deposit";
   let creditReady = isCredit && sDepositAmountCents >= 100 && sDepositNote.trim().length > 3;
   let depositReady = (!isCredit && !isGiftCard) && sDepositAmountCents > 0;
   let giftCardReady = false;
@@ -66,11 +67,41 @@ export const DepositModal = function DepositModal({
       className={`${styles.card} ${className}`}
       data-testid={testId}
     >
+      <LargeModalHeader
+        title={modalTitle}
+        actions={[
+          <LargeModalHeaderButton
+            key="confirm"
+            variant="accent"
+            disabled={!confirmReady}
+            onClick={() => {
+              if (isCredit) {
+                if (!creditReady) return;
+                handleCreditConfirm();
+              } else {
+                if (!depositReady) return;
+                onPay({
+                  type: sDepositType,
+                  amountCents: sDepositAmountCents,
+                  note: sDepositNote,
+                });
+                resetAndClose();
+              }
+            }}
+          >
+            {isCredit ? "Apply Credit" : "Pay Amount"}
+          </LargeModalHeaderButton>,
+          <LargeModalHeaderButton
+            key="close"
+            variant="default"
+            icon={ICONS.close1}
+            iconPosition="only"
+            tooltip="Close"
+            onClick={resetAndClose}
+          />,
+        ]}
+      />
       <div className={styles.cardInner}>
-      <span className={styles.title} style={{ color: C.text }}>
-        Add Deposit / Credit / Gift Card
-      </span>
-
       {/* Type selection */}
       <div className={styles.typeRow}>
         <button
@@ -156,31 +187,6 @@ export const DepositModal = function DepositModal({
       )}
 
       </div>
-      <ModalFooter>
-        <ModalFooterButton variant="danger" onClick={resetAndClose}>
-          Cancel
-        </ModalFooterButton>
-        <ModalFooterButton
-          variant="accent"
-          disabled={!confirmReady}
-          onClick={() => {
-            if (isCredit) {
-              if (!creditReady) return;
-              handleCreditConfirm();
-            } else {
-              if (!depositReady) return;
-              onPay({
-                type: sDepositType,
-                amountCents: sDepositAmountCents,
-                note: sDepositNote,
-              });
-              resetAndClose();
-            }
-          }}
-        >
-          {isCredit ? "Apply Credit" : "Pay Amount"}
-        </ModalFooterButton>
-      </ModalFooter>
     </div>
     </Dialog>
   );

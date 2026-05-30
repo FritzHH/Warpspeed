@@ -52,11 +52,11 @@
 }
 
 .userBtn {
-  border-radius: 5px;
+  border-radius: var(--radius-control);
 }
 
 .loginBtn {
-  border-radius: 15px;
+  border-radius: var(--radius-container);
 }
 
 .userBtn:hover,
@@ -79,7 +79,7 @@
 .spinner {
   width: 12px;
   height: 12px;
-  border-radius: 50%;
+  border-radius: var(--radius-pill);
   border: 2px solid var(--surface-overlay-light);
   border-top-color: currentColor;
   animation: spin 0.75s linear infinite;
@@ -128,7 +128,7 @@
   align-items: center;
   background: yellow;
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   margin-right: 5px;
   border: none;
   cursor: pointer;
@@ -159,15 +159,17 @@
 .emailTabWrap {
   position: relative;
   display: inline-flex;
+  --email-badge-top: -4px;
+  --email-badge-right: -5px;
 }
 
 .emailBadge {
   position: absolute;
-  top: -4px;
-  right: -4px;
+  top: var(--email-badge-top);
+  right: var(--email-badge-right);
   min-width: 18px;
   height: 18px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   background: var(--danger);
   display: flex;
   align-items: center;
@@ -192,7 +194,7 @@
   height: 18px;
   padding: 0 5px;
   margin-left: 4px;
-  border-radius: 9px;
+  border-radius: var(--radius-row);
   background-color: var(--danger);
   color: var(--text-on-accent);
   font-size: 11px;

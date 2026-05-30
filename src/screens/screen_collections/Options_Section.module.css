@@ -42,22 +42,12 @@
   flex-direction: column;
   align-items: center;
   background-color: var(--surface-base);
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   min-width: 700px;
   max-width: 800px;
   width: 50%;
   overflow: hidden;
   position: relative;
-}
-
-.modalTopRow {
-  display: flex;
-  flex-direction: row;
-  justify-content: flex-end;
-  align-items: center;
-  width: 100%;
-  padding: 10px 14px 0 14px;
-  box-sizing: border-box;
 }
 
 .notesBtn {
@@ -67,7 +57,7 @@
   font-weight: 700;
   letter-spacing: 0.5px;
   padding: 6px 14px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--accent);
   color: var(--accent);
   background: transparent;
@@ -82,32 +72,12 @@
   height: 18px;
   padding: 0 5px;
   margin-left: 8px;
-  border-radius: 9px;
+  border-radius: var(--radius-row);
   background-color: var(--danger);
   color: var(--text-on-accent, #fff);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
-}
-
-.modalHeader {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 10px 20px;
-  background-color: var(--surface-success-muted);
-  box-sizing: border-box;
-}
-
-.modalHeaderTitle {
-  margin: 0;
-  font-weight: 600;
-  font-size: 22px;
-  color: var(--text-muted);
-  text-align: center;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 }
 
 .modalClockMessage {
@@ -168,7 +138,7 @@
   width: 100%;
   border-width: 1px;
   border-style: solid;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   box-sizing: border-box;
   flex-shrink: 0;
 }
@@ -260,7 +230,7 @@
   align-items: center;
   justify-content: center;
   margin: 0 3px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 10px 0;
   min-height: 70px;
   box-sizing: border-box;
@@ -319,7 +289,7 @@
   flex-direction: column;
   width: 520px;
   background-color: var(--surface-base);
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   overflow: hidden;
   box-sizing: border-box;
   position: relative;
@@ -329,22 +299,8 @@
   padding: 20px;
 }
 
-.camHeader {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  margin-bottom: 16px;
-}
-
-.camTitle {
-  font-size: 18px;
-  color: var(--text-default);
-  margin: 0;
-}
-
 .camVideoWrap {
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   overflow: hidden;
   border: 2px solid var(--border-default);
   background-color: black;
@@ -353,7 +309,7 @@
 .camVideo {
   width: 100%;
   display: block;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
 }
 
 .camNoStream {

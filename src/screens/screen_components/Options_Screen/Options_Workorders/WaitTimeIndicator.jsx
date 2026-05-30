@@ -115,7 +115,12 @@ const WaitTimeIndicator = React.memo(function WaitTimeIndicator({ workorder, day
       }}
     >
       <div className={styles.content} style={{ alignItems: "flex-end" }}>
-        {info.isMissing ? null : !!info.waitEndDay && info.waitEndDay.includes("\n") ? (
+        {info.isMissing ? (
+          <>
+            <span className={styles.prefixText} style={{ color: "red" }}>Needs</span>
+            <span className={styles.dayText} style={{ color: "red" }}>Estimate</span>
+          </>
+        ) : !!info.waitEndDay && info.waitEndDay.includes("\n") ? (
           <>
             <span className={styles.prefixText} style={{ color: info.textColor }}>
               {capitalizeFirstLetterOfString(info.waitEndDay.split("\n")[0])}

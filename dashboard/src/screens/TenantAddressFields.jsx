@@ -54,12 +54,12 @@ const US_STATES = [
   { code: "WY", name: "Wyoming" },
 ];
 
-export function useTenantAddressFields() {
-  const [tenantStreet, setTenantStreet] = useState("");
-  const [tenantUnit, setTenantUnit] = useState("");
-  const [tenantCity, setTenantCity] = useState("");
-  const [tenantState, setTenantState] = useState("");
-  const [tenantZip, setTenantZip] = useState("");
+export function useTenantAddressFields(initial = {}) {
+  const [tenantStreet, setTenantStreet] = useState(initial.tenantStreet || "");
+  const [tenantUnit, setTenantUnit] = useState(initial.tenantUnit || "");
+  const [tenantCity, setTenantCity] = useState(initial.tenantCity || "");
+  const [tenantState, setTenantState] = useState(initial.tenantState || "");
+  const [tenantZip, setTenantZip] = useState(initial.tenantZip || "");
 
   const trimmedStreet = tenantStreet.trim();
   const trimmedCity = tenantCity.trim();
@@ -75,12 +75,12 @@ export function useTenantAddressFields() {
   const allValid =
     streetIsValid && unitIsValid && cityIsValid && stateIsValid && zipIsValid;
 
-  function reset() {
-    setTenantStreet("");
-    setTenantUnit("");
-    setTenantCity("");
-    setTenantState("");
-    setTenantZip("");
+  function reset(next = {}) {
+    setTenantStreet(next.tenantStreet || "");
+    setTenantUnit(next.tenantUnit || "");
+    setTenantCity(next.tenantCity || "");
+    setTenantState(next.tenantState || "");
+    setTenantZip(next.tenantZip || "");
   }
 
   const payload = {

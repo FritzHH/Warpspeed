@@ -12,8 +12,8 @@ import {
 } from "../../../stores";
 import { Button, ScreenModal, Tooltip } from "../../../dom_components";
 import { TicketSearchInput } from "../../../shared/TicketSearchInput";
-import { generateEAN13Barcode, formatCurrencyDisp, formatMillisForDisplay, localStorageWrapper } from "../../../utils";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
+import { generateEAN13Barcode, formatCurrencyDisp, formatMillisForDisplay, localStorageWrapper, getPrinterStatus } from "../../../utils";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../../styles";
 import { dbSavePrintObj } from "../../../db_calls_wrapper";
 import styles from "./Info_StandaloneSale.module.css";
 
@@ -24,10 +24,7 @@ export const StandaloneSaleComponent = ({}) => {
   const standaloneSales = zActiveSales.filter((s) => !s.customerID && !s.paymentComplete);
   const [sShowActiveSalesModal, _setShowActiveSalesModal] = useState(false);
 
-  const selectedPrinterID = localStorageWrapper.getItem("selectedPrinterID");
-  const selectedPrinter = selectedPrinterID && zSettings?.printers?.[selectedPrinterID];
-  const isPrinterOffline = !!(selectedPrinter && selectedPrinter.active !== true);
-  const printerOfflineLabel = selectedPrinter?.name ? `Printer "${selectedPrinter.name}" is offline` : "Selected printer is offline";
+  const { isPrinterOffline, offlineLabel: printerOfflineLabel } = getPrinterStatus(zSettings);
 
   const clearDisabled =
     !zOpenWorkorder ||
@@ -85,7 +82,7 @@ export const StandaloneSaleComponent = ({}) => {
           onPress={() => _setShowActiveSalesModal(true)}
           colorGradientArr={standaloneSales.length > 0 ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey}
           buttonStyle={{
-            borderRadius: 5,
+            borderRadius: Radius.control,
             paddingHorizontal: 20,
             paddingVertical: 8,
             marginTop: 20,
@@ -161,7 +158,7 @@ export const StandaloneSaleComponent = ({}) => {
           onPress={handleClearSale}
           colorGradientArr={COLOR_GRADIENTS.red}
           buttonStyle={{
-            borderRadius: 5,
+            borderRadius: Radius.control,
             paddingHorizontal: 30,
             paddingVertical: 10,
             marginBottom: 30,

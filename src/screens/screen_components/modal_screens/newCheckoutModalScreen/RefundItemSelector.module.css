@@ -47,7 +47,7 @@
   padding: 6px 4px;
   border-bottom-width: 1px;
   border-bottom-style: solid;
-  border-radius: 3px;
+  border-radius: var(--radius-control);
   flex-shrink: 0;
 }
 
@@ -73,7 +73,7 @@
 }
 
 .refundedBadge {
-  border-radius: 3px;
+  border-radius: var(--radius-control);
   padding: 1px 4px;
   flex-shrink: 0;
 }
@@ -108,7 +108,7 @@
 }
 
 .partialBox {
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 20px;
   max-width: 340px;
   display: flex;

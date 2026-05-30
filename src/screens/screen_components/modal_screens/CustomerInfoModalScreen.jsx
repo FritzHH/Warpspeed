@@ -1,7 +1,7 @@
 /*eslint-disable*/
 import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { calculateRunningTotals, capitalizeFirstLetterOfString, checkInputForNumbersOnly, formatCurrencyDisp, formatMillisForDisplay, formatPhoneForDisplay, formatPhoneWithDashes, generateEAN13Barcode, lightenRGBByPercent, formatWorkorderNumber, localStorageWrapper, printBuilder, removeDashesFromPhone, resolveStatus, usdTypeMask } from "../../../utils";
-import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../../styles";
 import {
   useCheckoutStore,
   useCurrentCustomerStore,
@@ -29,9 +29,10 @@ import {
   DepositsList,
   DropdownMenu,
   Image,
-  ModalFooter,
-  ModalFooterButton,
+  LargeModalHeader,
+  LargeModalHeaderButton,
   SmallLoadingIndicator,
+  TabMenuButton,
   TextInput,
   Tooltip,
 } from "../../../dom_components";
@@ -125,13 +126,15 @@ export const CustomerInfoScreenModalComponent = ({
   const [sCellEditing, _sCellEditing] = useState(false);
   const [sCellEditValue, _sCellEditValue] = useState("");
   const [sCellMigrating, _sCellMigrating] = useState(false);
+  const [sActiveTab, _sSetActiveTab] = useState("workorders");
   const mountedRef = useRef(true);
   const initialCellRef = useRef(initialCustomer?.customerCell || "");
+  const salesFetchedRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
 
-    if (hasCachedCustomer) autoLoadWorkordersAndSales(initialCustomer);
+    if (hasCachedCustomer) loadWorkorders(initialCustomer);
 
     if (incomingCustomer || !customerID || isNewCustomer) return;
 
@@ -143,7 +146,7 @@ export const CustomerInfoScreenModalComponent = ({
         _setCustomerInfo(customer);
         useCurrentCustomerStore.getState().setCustomer(customer, false);
         _setCustomerLoading(false);
-        if (!hasCachedCustomer) autoLoadWorkordersAndSales(customer);
+        if (!hasCachedCustomer) loadWorkorders(customer);
       } else {
         _setCustomerLoadError(true);
         _setCustomerLoading(false);
@@ -281,9 +284,12 @@ export const CustomerInfoScreenModalComponent = ({
     }
   }
 
-  async function autoLoadWorkordersAndSales(customer) {
-    let loadedWOs = await loadWorkorders(customer);
-    await loadSales(customer, loadedWOs);
+  function handleClickSalesTab() {
+    _sSetActiveTab("sales");
+    if (!salesFetchedRef.current) {
+      salesFetchedRef.current = true;
+      loadSales(sCustomerInfo, sWorkorders);
+    }
   }
 
   const CUSTOMER_TO_WORKORDER_FIELDS = {
@@ -416,8 +422,92 @@ export const CustomerInfoScreenModalComponent = ({
 
   return (
     <div className={styles.shell} onClick={(e) => e.stopPropagation()}>
+      <LargeModalHeader
+        title={
+          isNewCustomer ? (
+            "New Customer"
+          ) : (
+            <>
+              Customer Info
+              {(sCustomerInfo.first || sCustomerInfo.last) && (
+                <>
+                  {" - "}
+                  <span style={{ color: C.blue, marginLeft: 10 }}>
+                    {[sCustomerInfo.first, sCustomerInfo.last]
+                      .filter(Boolean)
+                      .map((s) => capitalizeFirstLetterOfString(s))
+                      .join(" ")}
+                  </span>
+                </>
+              )}
+            </>
+          )
+        }
+        actions={[
+          !!primaryHandler && (
+            <LargeModalHeaderButton
+              key="primary"
+              variant="primary"
+              icon={ICONS.gears1}
+              disabled={!primaryEnabled}
+              onClick={() => primaryHandler(sCustomerInfo)}
+            >
+              {primaryText}
+            </LargeModalHeaderButton>
+          ),
+          !isNewCustomer && (
+            <LargeModalHeaderButton
+              key="addMoney"
+              variant="accent"
+              icon={ICONS.greenDollar}
+              tooltip="Deposits, gift cards and credits"
+              onClick={() => _sSetShowDepositModal(true)}
+            >
+              Add Money
+            </LargeModalHeaderButton>
+          ),
+          <LargeModalHeaderButton
+            key="close"
+            variant="default"
+            icon={ICONS.close1}
+            tooltip="All edits auto-saved"
+            onClick={onClose}
+          >
+            {dismissText}
+          </LargeModalHeaderButton>,
+        ]}
+      />
       <div className={styles.body}>
       <div className={styles.formCol}>
+        <div className={styles.fieldGroup}>
+          <div className={styles.fieldGroupTitle}>Info</div>
+          <TextInput
+            onChangeText={(val) => saveField("first", capitalizeFirstLetterOfString(val))}
+            placeholder="First name"
+            className={styles.input}
+            style={INPUT_BASE_STYLE}
+            value={capitalizeFirstLetterOfString(sCustomerInfo.first)}
+            capitalize={true}
+          />
+          <TextInput
+            onChangeText={(val) => saveField("last", capitalizeFirstLetterOfString(val))}
+            placeholder="Last name"
+            className={styles.input}
+            style={INPUT_BASE_STYLE}
+            value={capitalizeFirstLetterOfString(sCustomerInfo.last)}
+            capitalize={true}
+          />
+          <div className={styles.langRow}>
+            <span className={styles.langLabel} style={{ color: C.textMuted }}>Language</span>
+            <DropdownMenu
+              dataArr={Object.values(CUSTOMER_LANGUAGES).map((lang) => ({ label: lang, value: lang }))}
+              buttonText={sCustomerInfo.language || CUSTOMER_LANGUAGES.english}
+              onSelect={(item) => saveField("language", item.value)}
+              useSelectedAsButtonTitle={false}
+            />
+          </div>
+        </div>
+
         <div className={styles.fieldGroup}>
           <div className={styles.fieldGroupTitle}>Contact</div>
           <div className={styles.contactRow}>
@@ -480,20 +570,22 @@ export const CustomerInfoScreenModalComponent = ({
                     <SmallLoadingIndicator />
                   </span>
                 ) : (
-                  <button
-                    type="button"
-                    disabled={(sCustomerInfo.customerCell || "").replace(/\D/g, "").length !== 10}
-                    onClick={handleCellEditStart}
-                    className={
-                      styles.cellIconBtn +
-                      ((sCustomerInfo.customerCell || "").replace(/\D/g, "").length !== 10
-                        ? " " + styles.cellIconBtnDisabled
-                        : "")
-                    }
-                    title="Edit customer cell phone number"
-                  >
-                    <Image icon={ICONS.editPencil} style={{ width: 18, height: 18 }} />
-                  </button>
+                  <Tooltip text="Edit customer cell phone number" position="top">
+                    <Button
+                      icon={ICONS.editPencil}
+                      iconSize={18}
+                      enabled={(sCustomerInfo.customerCell || "").replace(/\D/g, "").length === 10}
+                      onPress={handleCellEditStart}
+                      buttonStyle={{
+                        paddingLeft: 4,
+                        paddingRight: 4,
+                        paddingTop: 4,
+                        paddingBottom: 4,
+                        backgroundColor: "transparent",
+                      }}
+                      iconStyle={{ marginRight: 0 }}
+                    />
+                  </Tooltip>
                 )}
               </div>
             ) : sCellEditing ? (
@@ -516,24 +608,38 @@ export const CustomerInfoScreenModalComponent = ({
                   value={formatPhoneWithDashes(sCellEditValue)}
                 />
                 {sCellEditValue.replace(/\D/g, "").length === 10 && sCellDuplicateStatus !== "duplicate" ? (
-                  <button
-                    type="button"
-                    onClick={handleCellSavePress}
-                    className={styles.cellIconBtn}
-                    title="Save new phone number"
-                  >
-                    <Image icon={ICONS.check1} style={{ width: 18, height: 18 }} />
-                  </button>
+                  <Tooltip text="Save new phone number" position="top">
+                    <Button
+                      icon={ICONS.check1}
+                      iconSize={18}
+                      onPress={handleCellSavePress}
+                      buttonStyle={{
+                        paddingLeft: 4,
+                        paddingRight: 4,
+                        paddingTop: 4,
+                        paddingBottom: 4,
+                        backgroundColor: "transparent",
+                      }}
+                      iconStyle={{ marginRight: 0 }}
+                    />
+                  </Tooltip>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={handleCellEditCancel}
-                  className={styles.cellIconBtn}
-                  style={{ marginLeft: 6 }}
-                  title="Cancel"
-                >
-                  <Image icon={ICONS.close1} style={{ width: 16, height: 16 }} />
-                </button>
+                <Tooltip text="Cancel" position="top">
+                  <Button
+                    icon={ICONS.close1}
+                    iconSize={16}
+                    onPress={handleCellEditCancel}
+                    buttonStyle={{
+                      paddingLeft: 4,
+                      paddingRight: 4,
+                      paddingTop: 4,
+                      paddingBottom: 4,
+                      marginLeft: 6,
+                      backgroundColor: "transparent",
+                    }}
+                    iconStyle={{ marginRight: 0 }}
+                  />
+                </Tooltip>
               </div>
             ) : (
               <TextInput
@@ -573,35 +679,6 @@ export const CustomerInfoScreenModalComponent = ({
             style={INPUT_BASE_STYLE}
             value={sCustomerInfo.email}
           />
-        </div>
-
-        <div className={styles.fieldGroup}>
-          <div className={styles.fieldGroupTitle}>Info</div>
-          <TextInput
-            onChangeText={(val) => saveField("first", capitalizeFirstLetterOfString(val))}
-            placeholder="First name"
-            className={styles.input}
-            style={INPUT_BASE_STYLE}
-            value={capitalizeFirstLetterOfString(sCustomerInfo.first)}
-            capitalize={true}
-          />
-          <TextInput
-            onChangeText={(val) => saveField("last", capitalizeFirstLetterOfString(val))}
-            placeholder="Last name"
-            className={styles.input}
-            style={INPUT_BASE_STYLE}
-            value={capitalizeFirstLetterOfString(sCustomerInfo.last)}
-            capitalize={true}
-          />
-          <div className={styles.langRow}>
-            <span className={styles.langLabel} style={{ color: C.textMuted }}>Language</span>
-            <DropdownMenu
-              dataArr={Object.values(CUSTOMER_LANGUAGES).map((lang) => ({ label: lang, value: lang }))}
-              buttonText={sCustomerInfo.language || CUSTOMER_LANGUAGES.english}
-              onSelect={(item) => saveField("language", item.value)}
-              useSelectedAsButtonTitle={false}
-            />
-          </div>
         </div>
 
         <div className={styles.fieldGroup}>
@@ -661,7 +738,7 @@ export const CustomerInfoScreenModalComponent = ({
                   paddingTop: 2,
                   paddingBottom: 2,
                   height: "100%",
-                  borderRadius: 7,
+                  borderRadius: Radius.control,
                   marginLeft: 10,
                   justifyContent: "center",
                 }}
@@ -691,128 +768,131 @@ export const CustomerInfoScreenModalComponent = ({
         </div>
       </div>
 
-      {!isNewCustomer && (
-        <div className={styles.workordersCol}>
-          <div className={styles.colHeader}>
-            <Button
-              icon={ICONS.workorder}
-              iconSize={18}
-              textStyle={{ color: C.textMuted, fontSize: 13 }}
-              text={"REFRESH WORKORDERS"}
-              buttonStyle={{ paddingLeft: 20, paddingRight: 20 }}
-              onPress={() => loadWorkorders()}
-              enabled={!sWoLoading}
-            />
-            {sWoLoading && (
-              <span style={{ marginLeft: 8, display: "flex", alignItems: "center" }}>
-                <SmallLoadingIndicator />
-              </span>
-            )}
+      {isNewCustomer ? (
+        <div className={styles.tabsCol}>
+          <div className={styles.tabEmptyPanel}>
+            Save customer first to see workorders, sales, and messages.
           </div>
-          {sWorkorders.length > 0 && (
-            <WorkordersList
-              workorders={sWorkorders}
-              onSelect={(wo) => { _sSetClosedWorkorder(wo); }}
-            />
-          )}
-          {sWorkorders.length === 0 &&
-            !sWoLoading &&
-            (sCustomerInfo.workorders || []).length === 0 && (
-              <span className={styles.emptyText} style={{ color: C.textMuted }}>
-                No workorders on file
-              </span>
-            )}
         </div>
-      )}
-
-      {!isNewCustomer && (
-        <div className={styles.salesCol}>
-          <DepositsList
-            deposits={sCustomerInfo.deposits || []}
-            credits={sCustomerInfo.credits || []}
-            onDepositPress={(deposit) => {
-              if (!deposit.id) return;
-              _sSetRefundDeposit(deposit);
-            }}
-            onCreditPress={(credit) => _sSetEditingCredit(credit)}
-          />
-          <div className={styles.salesHeader}>
-            <Button
-              icon={ICONS.dollarYellow}
-              iconSize={20}
-              text={"REFRESH SALES"}
-              textStyle={{ color: C.textMuted, fontSize: 13 }}
-              buttonStyle={{ paddingLeft: 20, paddingRight: 20 }}
-              onPress={() => loadSales()}
-              enabled={!sSalesLoading}
+      ) : (
+        <div className={styles.tabsCol}>
+          <div className={styles.tabBar}>
+            <TabMenuButton
+              text={
+                <span className={styles.tabLabel}>
+                  WORKORDERS
+                  <span className={styles.tabCountBadge}>
+                    {sCustomerLoading ? "" : (sCustomerInfo.workorders || []).length}
+                  </span>
+                </span>
+              }
+              isSelected={sActiveTab === "workorders"}
+              onPress={() => _sSetActiveTab("workorders")}
             />
-            {sSalesLoading && (
-              <span style={{ marginLeft: 8, display: "flex", alignItems: "center" }}>
-                <SmallLoadingIndicator />
-              </span>
-            )}
-          </div>
-          {sSales.length > 0 ? (
-            <div className={styles.scrollArea}>
-              <SalesList
-                sales={sSales}
-                transactionsMap={sSaleTransactionsMap}
-                onSelect={(sale) => {
-                  if (sale._isActiveSale) {
-                    if (onClose) onClose();
-                    useCheckoutStore.getState().setViewOnlySale(sale);
-                    useCheckoutStore.getState().setIsCheckingOut(true);
-                  } else {
-                    _sSetSaleModalItem({ saleID: sale.id });
-                  }
-                }}
+            <TabMenuButton
+              text={
+                <span className={styles.tabLabel}>
+                  SALES
+                  <span className={styles.tabCountBadge}>
+                    {sCustomerLoading ? "" : (sCustomerInfo.sales || []).length}
+                  </span>
+                </span>
+              }
+              isSelected={sActiveTab === "sales"}
+              onPress={handleClickSalesTab}
+            />
+            {!!sCustomerInfo?.customerCell && (
+              <TabMenuButton
+                text="MESSAGES"
+                isSelected={sActiveTab === "messages"}
+                onPress={() => _sSetActiveTab("messages")}
               />
-            </div>
-          ) : !sSalesLoading && (sCustomerInfo.sales || []).length === 0 ? (
-            <span className={styles.emptyText} style={{ color: C.textMuted }}>
-              No sales on file
-            </span>
-          ) : null}
-        </div>
-      )}
+            )}
+          </div>
+          <div className={styles.tabPanel}>
+            {sActiveTab === "workorders" && (
+              <div className={styles.workordersCol}>
+                {sWoLoading && (
+                  <div className={styles.tabLoadingTop}>
+                    <SmallLoadingIndicator style={{ padding: 0 }} />
+                    <span className={styles.tabLoadingText}>Loading closed workorders</span>
+                  </div>
+                )}
+                {sWorkorders.length > 0 && (
+                  <WorkordersList
+                    workorders={sWorkorders}
+                    onSelect={(wo) => { _sSetClosedWorkorder(wo); }}
+                  />
+                )}
+                {sWorkorders.length === 0 &&
+                  !sWoLoading &&
+                  (sCustomerInfo.workorders || []).length === 0 && (
+                    <span className={styles.emptyText} style={{ color: C.textMuted }}>
+                      No workorders on file
+                    </span>
+                  )}
+              </div>
+            )}
 
-      {!isNewCustomer && !!sCustomerInfo?.customerCell && (
-        <div className={styles.messagesCol}>
-          <CustomerMessagesPanel
-            customerPhone={sCustomerInfo.customerCell}
-            customerID={sCustomerInfo.id}
-            customerFirst={sCustomerInfo.first}
-            customerLast={sCustomerInfo.last}
-          />
+            {sActiveTab === "sales" && (
+              <div className={styles.salesCol}>
+                {sSalesLoading && (
+                  <div className={styles.tabLoadingTop}>
+                    <SmallLoadingIndicator style={{ padding: 0 }} />
+                    <span className={styles.tabLoadingText}>Loading customer sales</span>
+                  </div>
+                )}
+                <DepositsList
+                  deposits={sCustomerInfo.deposits || []}
+                  credits={sCustomerInfo.credits || []}
+                  onDepositPress={(deposit) => {
+                    if (!deposit.id) return;
+                    _sSetRefundDeposit(deposit);
+                  }}
+                  onCreditPress={(credit) => _sSetEditingCredit(credit)}
+                />
+                <span className={styles.salesTitle} style={{ color: C.green }}>
+                  Sales
+                </span>
+                {sSales.length > 0 ? (
+                  <div className={styles.scrollArea}>
+                    <SalesList
+                      sales={sSales}
+                      transactionsMap={sSaleTransactionsMap}
+                      onSelect={(sale) => {
+                        if (sale._isActiveSale) {
+                          if (onClose) onClose();
+                          useCheckoutStore.getState().setViewOnlySale(sale);
+                          useCheckoutStore.getState().setIsCheckingOut(true);
+                        } else {
+                          _sSetSaleModalItem({ saleID: sale.id });
+                        }
+                      }}
+                    />
+                  </div>
+                ) : !sSalesLoading && (sCustomerInfo.sales || []).length === 0 ? (
+                  <span className={styles.emptyText} style={{ color: C.textMuted }}>
+                    No sales on file
+                  </span>
+                ) : null}
+              </div>
+            )}
+
+            {sActiveTab === "messages" && !!sCustomerInfo?.customerCell && (
+              <div className={styles.messagesCol}>
+                <CustomerMessagesPanel
+                  customerPhone={sCustomerInfo.customerCell}
+                  customerID={sCustomerInfo.id}
+                  customerFirst={sCustomerInfo.first}
+                  customerLast={sCustomerInfo.last}
+                />
+              </div>
+            )}
+          </div>
         </div>
       )}
       </div>
 
-      <ModalFooter>
-        <ModalFooterButton tooltip="All edits auto-saved" onClick={onClose}>
-          {dismissText}
-        </ModalFooterButton>
-        {!!primaryHandler && (
-          <ModalFooterButton
-            variant="primary"
-            icon={ICONS.gears1}
-            disabled={!primaryEnabled}
-            onClick={() => primaryHandler(sCustomerInfo)}
-          >
-            {primaryText}
-          </ModalFooterButton>
-        )}
-        {!isNewCustomer && (
-          <ModalFooterButton
-            variant="accent"
-            icon={ICONS.greenDollar}
-            tooltip="Deposits, gift cards and credits"
-            onClick={() => _sSetShowDepositModal(true)}
-          >
-            Add Money
-          </ModalFooterButton>
-        )}
-      </ModalFooter>
 
       <DepositModal
         visible={sShowDepositModal}
@@ -862,6 +942,7 @@ export const CustomerInfoScreenModalComponent = ({
         <Suspense fallback={<SmallLoadingIndicator />}>
           <ClosedWorkorderModal
             workorder={sClosedWorkorder}
+            nested
             onClose={() => _sSetClosedWorkorder(null)}
             onRefund={(saleID) => {
               _sSetClosedWorkorder(null);
@@ -963,34 +1044,17 @@ const LoadingOverlay = ({ text }) => (
   </div>
 );
 
-const WorkorderCard = ({ workorder, statuses, taxPercent, zActiveSales, onSelect }) => {
+function formatWorkorderDate(millis) {
+  if (!millis) return "";
+  const isCurrentYear = new Date(millis).getFullYear() === new Date().getFullYear();
+  return formatMillisForDisplay(millis, !isCurrentYear);
+}
+
+const WorkorderCard = ({ workorder, statuses, taxPercent, onSelect }) => {
   const [sShowItems, _sSetShowItems] = useState(false);
   const rs = resolveStatus(workorder.status, statuses);
   const totals = calculateRunningTotals(workorder, taxPercent, [], false, !!workorder.taxFree);
   const itemCount = workorder.workorderLines?.length || 0;
-
-  let totalNode;
-  let sale = workorder.activeSaleID ? zActiveSales.find((s) => s.id === workorder.activeSaleID) : null;
-  let paid = sale ? (sale.amountCaptured || 0) - (sale.amountRefunded || 0) : 0;
-  if (workorder.paymentComplete) {
-    totalNode = (
-      <span className={styles.woFooterTotal} style={{ color: C.green }}>
-        {"$" + formatCurrencyDisp(totals.finalTotal)}
-      </span>
-    );
-  } else if (paid > 0) {
-    totalNode = (
-      <span className={styles.woFooterTotal} style={{ color: C.orange }}>
-        {"$" + formatCurrencyDisp(paid) + " paid"}
-      </span>
-    );
-  } else {
-    totalNode = (
-      <span className={styles.woFooterTotal} style={{ color: C.text }}>
-        {"$" + formatCurrencyDisp(totals.finalTotal)}
-      </span>
-    );
-  }
 
   return (
     <div
@@ -1068,14 +1132,50 @@ const WorkorderCard = ({ workorder, statuses, taxPercent, zActiveSales, onSelect
 
         <div className={styles.woFooter}>
           <span className={styles.woFooterDate}>
-            {formatMillisForDisplay(workorder.startedOnMillis, true)}
+            <span className={styles.woFooterPair}>
+              <span className={styles.woFooterLabel}>started:</span>
+              <span className={styles.woFooterValue}>{formatWorkorderDate(workorder.startedOnMillis)}</span>
+            </span>
+            <span className={styles.woFooterPair}>
+              <span className={styles.woFooterLabel}>finished:</span>
+              <span className={styles.woFooterValue}>
+                {workorder.finishedOnMillis
+                  ? formatWorkorderDate(workorder.finishedOnMillis)
+                  : workorder.paidOnMillis
+                  ? formatWorkorderDate(workorder.paidOnMillis)
+                  : "OPEN"}
+              </span>
+            </span>
+            {!!workorder.paidOnMillis && (
+              <span className={styles.woFooterPair}>
+                <span className={styles.woFooterLabel}>paid:</span>
+                <span className={styles.woFooterValue}>{formatWorkorderDate(workorder.paidOnMillis)}</span>
+              </span>
+            )}
           </span>
-          {!!workorder.waitTime?.label && (
-            <span className={styles.woFooterWait} style={{ color: C.textMuted }}>
-              {"est: " + workorder.waitTime.label}
+        </div>
+
+        <div className={styles.woTotalsRow}>
+          <span className={styles.woFooterPair}>
+            <span className={styles.woFooterLabel}>subtotal:</span>
+            <span className={styles.woFooterValue}>{"$" + formatCurrencyDisp(totals.runningSubtotal)}</span>
+          </span>
+          {totals.runningDiscount > 0 && (
+            <span className={styles.woFooterPair}>
+              <span className={styles.woFooterLabel}>discounts:</span>
+              <span className={styles.woFooterValue}>{"$" + formatCurrencyDisp(totals.runningDiscount)}</span>
             </span>
           )}
-          {totalNode}
+          {totals.runningTax > 0 && (
+            <span className={styles.woFooterPair}>
+              <span className={styles.woFooterLabel}>tax:</span>
+              <span className={styles.woFooterValue}>{"$" + formatCurrencyDisp(totals.runningTax)}</span>
+            </span>
+          )}
+          <span className={styles.woFooterPair}>
+            <span className={styles.woFooterLabel} style={{ color: C.green }}>total:</span>
+            <span className={styles.woFooterValue} style={{ color: C.green }}>{"$" + formatCurrencyDisp(totals.finalTotal)}</span>
+          </span>
         </div>
       </button>
 
@@ -1096,9 +1196,7 @@ const WorkorderCard = ({ workorder, statuses, taxPercent, zActiveSales, onSelect
                   <span className={styles.woItemName} style={{ color: C.text }}>
                     {line.inventoryItem?.formalName || "Unnamed item"}
                   </span>
-                  <span className={styles.woItemQty} style={{ color: C.blue }}>
-                    {line.qty}
-                  </span>
+                  {line.qty > 1 && <span className={styles.woItemQty}>{line.qty}</span>}
                 </div>
               ))}
             </div>
@@ -1112,7 +1210,6 @@ const WorkorderCard = ({ workorder, statuses, taxPercent, zActiveSales, onSelect
 const WorkordersList = ({ workorders, onSelect }) => {
   const statuses = useSettingsStore((s) => s.settings?.statuses) || [];
   const taxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
-  const zActiveSales = useActiveSalesStore((state) => state.activeSales);
 
   const sorted = [...workorders].sort((a, b) => (b.startedOnMillis || 0) - (a.startedOnMillis || 0));
 
@@ -1124,7 +1221,6 @@ const WorkordersList = ({ workorders, onSelect }) => {
           workorder={wo}
           statuses={statuses}
           taxPercent={taxPercent}
-          zActiveSales={zActiveSales}
           onSelect={onSelect}
         />
       ))}
@@ -1262,13 +1358,13 @@ const CreditEditModal = ({ credit, customer, onClose, onSave, onDelete }) => {
             iconSize={14}
             colorGradientArr={COLOR_GRADIENTS.red}
             textStyle={{ color: C.textWhite, fontSize: 13 }}
-            buttonStyle={{ height: 34, borderRadius: 5, paddingLeft: 14, paddingRight: 14 }}
+            buttonStyle={{ height: 34, borderRadius: Radius.control, paddingLeft: 14, paddingRight: 14 }}
             onPress={() => onDelete(credit)}
           />
           <div className={styles.creditActionGroup}>
             <Button
               text="Cancel"
-              buttonStyle={{ height: 34, borderRadius: 5, paddingLeft: 14, paddingRight: 14, marginRight: 8 }}
+              buttonStyle={{ height: 34, borderRadius: Radius.control, paddingLeft: 14, paddingRight: 14, marginRight: 8 }}
               textStyle={{ color: C.textMuted, fontSize: 13 }}
               onPress={onClose}
             />
@@ -1276,7 +1372,7 @@ const CreditEditModal = ({ credit, customer, onClose, onSave, onDelete }) => {
               text="Save & Print"
               colorGradientArr={COLOR_GRADIENTS.green}
               textStyle={{ color: C.textWhite, fontSize: 13 }}
-              buttonStyle={{ height: 34, borderRadius: 5, paddingLeft: 20, paddingRight: 20 }}
+              buttonStyle={{ height: 34, borderRadius: Radius.control, paddingLeft: 20, paddingRight: 20 }}
               onPress={handleConfirm}
             />
           </div>
@@ -1537,25 +1633,27 @@ const CustomerMessagesPanel = ({ customerPhone, customerID, customerFirst, custo
         </div>
       )}
 
-      <ComposeArea
-        mode="customer"
-        value={sNewMessage}
-        onChange={(val) => _sSetNewMessage(autoCapitalize(val))}
-        onSend={handlePressSend}
-        sendDisabled={sSending || !sNewMessage.trim()}
-        placeholder="Type a message..."
-        showReplyOptions={sShowReplyModal}
-        hasActivePhone={hasActivePhone}
-        onSelectCanRespond={(canRespond) => {
-          clearAutoSend();
-          _sSetCanRespond(canRespond);
-          _sSetShowReplyModal(false);
-          sendMessage(canRespond);
-        }}
-        selectedForwardIDs={sSelectedForwardIDs}
-        onChangeSelectedForwardIDs={_sSetSelectedForwardIDs}
-        onFire={handleFire}
-      />
+      <div className={styles.msgComposeWrap}>
+        <ComposeArea
+          mode="customer"
+          value={sNewMessage}
+          onChange={(val) => _sSetNewMessage(autoCapitalize(val))}
+          onSend={handlePressSend}
+          sendDisabled={sSending || !sNewMessage.trim()}
+          placeholder="Type a message..."
+          showReplyOptions={sShowReplyModal}
+          hasActivePhone={hasActivePhone}
+          onSelectCanRespond={(canRespond) => {
+            clearAutoSend();
+            _sSetCanRespond(canRespond);
+            _sSetShowReplyModal(false);
+            sendMessage(canRespond);
+          }}
+          selectedForwardIDs={sSelectedForwardIDs}
+          onChangeSelectedForwardIDs={_sSetSelectedForwardIDs}
+          onFire={handleFire}
+        />
+      </div>
     </div>
   );
 };
@@ -1589,9 +1687,16 @@ const SalesList = ({ sales, transactionsMap = {}, onSelect }) => {
             }}
           >
             <div className={styles.saleRow1}>
-              <span className={styles.saleDate} style={{ color: "dimgray" }}>
-                {formatMillisForDisplay(sale.millis, true)}
-              </span>
+              <div className={styles.saleDateGroup}>
+                <span className={styles.saleDate} style={{ color: "dimgray" }}>
+                  {formatWorkorderDate(sale.millis)}
+                </span>
+                {sale.workorderIDs?.length > 0 && (
+                  <span className={styles.saleLinkedWO} style={{ color: C.blue }}>
+                    {"WO: " + sale.workorderIDs.join(", ")}
+                  </span>
+                )}
+              </div>
               <div className={styles.saleBadgesWrap}>
                 {sale._isActiveSale && (
                   <span
@@ -1632,28 +1737,38 @@ const SalesList = ({ sales, transactionsMap = {}, onSelect }) => {
               </div>
             </div>
 
-            <div className={styles.saleTotalsRow}>
-              {!sale.isDepositSale && (
-                <div className={styles.saleTotalsLeft}>
-                  <span className={styles.saleLabel} style={{ color: C.textMuted }}>Sub: </span>
-                  <span className={styles.saleValue} style={{ color: C.text }}>
-                    {"$" + formatCurrencyDisp(sale.subtotal)}
+            {!sale.isDepositSale && (
+              <div className={styles.woTotalsRow}>
+                <span className={styles.woFooterPair}>
+                  <span className={styles.woFooterLabel}>subtotal:</span>
+                  <span className={styles.woFooterValue}>{"$" + formatCurrencyDisp(sale.subtotal)}</span>
+                </span>
+                {sale.discount > 0 && (
+                  <span className={styles.woFooterPair}>
+                    <span className={styles.woFooterLabel}>discounts:</span>
+                    <span className={styles.woFooterValue}>{"$" + formatCurrencyDisp(sale.discount)}</span>
                   </span>
-                  {sale.discount > 0 && (
-                    <span className={styles.saleDiscount} style={{ color: C.lightred }}>
-                      {"-$" + formatCurrencyDisp(sale.discount)}
-                    </span>
-                  )}
-                  <span className={styles.saleLabelInline} style={{ color: C.textMuted }}>Tax: </span>
-                  <span className={styles.saleValue} style={{ color: C.text }}>
-                    {"$" + formatCurrencyDisp(sale.salesTax || sale.tax || 0)}
+                )}
+                {(sale.salesTax || sale.tax || 0) > 0 && (
+                  <span className={styles.woFooterPair}>
+                    <span className={styles.woFooterLabel}>tax:</span>
+                    <span className={styles.woFooterValue}>{"$" + formatCurrencyDisp(sale.salesTax || sale.tax || 0)}</span>
                   </span>
-                </div>
-              )}
-              <span className={styles.saleGrandTotal} style={{ color: C.text }}>
-                {"$" + formatCurrencyDisp(sale.total)}
-              </span>
-            </div>
+                )}
+                <span className={styles.woFooterPair}>
+                  <span className={styles.woFooterLabel} style={{ color: C.green }}>total:</span>
+                  <span className={styles.woFooterValue} style={{ color: C.green }}>{"$" + formatCurrencyDisp(sale.total)}</span>
+                </span>
+              </div>
+            )}
+            {sale.isDepositSale && (
+              <div className={styles.woTotalsRow}>
+                <span className={styles.woFooterPair}>
+                  <span className={styles.woFooterLabel} style={{ color: C.green }}>total:</span>
+                  <span className={styles.woFooterValue} style={{ color: C.green }}>{"$" + formatCurrencyDisp(sale.total)}</span>
+                </span>
+              </div>
+            )}
 
             <div className={styles.salePaymentRow}>
               {txns.map((p, idx) => (
@@ -1683,12 +1798,6 @@ const SalesList = ({ sales, transactionsMap = {}, onSelect }) => {
                 </span>
               )}
             </div>
-
-            {sale.workorderIDs?.length > 0 && (
-              <span className={styles.saleLinkedWO} style={{ color: C.textMuted }}>
-                {"WO: " + sale.workorderIDs.join(", ")}
-              </span>
-            )}
           </button>
         );
       })}

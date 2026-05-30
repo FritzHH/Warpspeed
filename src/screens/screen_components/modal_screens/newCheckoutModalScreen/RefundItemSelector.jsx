@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { memo } from "react";
-import { C, Fonts, COLOR_GRADIENTS } from "../../../../styles";
+import { C, Fonts, COLOR_GRADIENTS, Radius } from "../../../../styles";
 import { Button, CheckBox } from "../../../../dom_components";
 import { formatCurrencyDisp, formatWorkorderNumber } from "../../../../utils";
 import { dlog, DCAT } from "./checkoutDebugLog";
@@ -186,7 +186,7 @@ export const RefundItemSelector = memo(function RefundItemSelector({
             paddingBottom: 3,
             paddingLeft: 10,
             paddingRight: 10,
-            borderRadius: 4,
+            borderRadius: Radius.control,
             opacity: selectedItems.length > 0 ? 1 : 0.3,
           }}
         />

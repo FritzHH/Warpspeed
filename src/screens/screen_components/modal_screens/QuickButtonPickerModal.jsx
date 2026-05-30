@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { Dialog, Image } from "../../../dom_components";
-import { C, ICONS } from "../../../styles";
+import { Dialog, LargeModalHeader, LargeModalHeaderButton } from "../../../dom_components";
+import { C } from "../../../styles";
 
 import styles from "./QuickButtonPickerModal.module.css";
 
@@ -89,17 +89,17 @@ export const QuickButtonPickerModal = ({ visible, itemID, quickButtons, onToggle
   return (
     <Dialog visible={visible} onClose={onClose} aria-label="Add to Quick Button Menu">
       <div className={styles.card}>
-        <div className={styles.header}>
-          <span className={styles.title} style={{ color: C.text }}>
-            Add to Quick Button Menu
-          </span>
-          <button type="button" className={styles.closeBtn} onClick={onClose}>
-            <Image icon={ICONS.close1} size={16} />
-          </button>
-        </div>
-
-        <div className={styles.list}>
-          {rootButtons.length === 0 ? (
+        <LargeModalHeader
+          title="Add to Quick Button Menu"
+          actions={
+            <LargeModalHeaderButton variant="default" onClick={onClose}>
+              CLOSE
+            </LargeModalHeaderButton>
+          }
+        />
+        <div className={styles.body}>
+          <div className={styles.list}>
+            {rootButtons.length === 0 ? (
             <span className={styles.empty} style={{ color: C.textMuted }}>
               No quick buttons configured
             </span>
@@ -164,6 +164,7 @@ export const QuickButtonPickerModal = ({ visible, itemID, quickButtons, onToggle
               );
             })
           )}
+          </div>
         </div>
       </div>
     </Dialog>

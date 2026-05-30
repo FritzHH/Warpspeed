@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { DropdownMenu, TextInput } from "../../../../../dom_components";
-import { C, ICONS } from "../../../../../styles";
+import { C, ICONS, Radius } from "../../../../../styles";
 import { useAlertScreenStore } from "../../../../../stores";
 import styles from "./CardReaderManager.module.css";
 
@@ -148,7 +148,7 @@ export function CardReaderManager({
                           padding: "3px 6px",
                           backgroundColor: C.backgroundWhite,
                           border: `1px solid ${C.buttonLightGreenOutline}`,
-                          borderRadius: 5,
+                          borderRadius: Radius.control,
                           minWidth: 140,
                         }}
                         onFocus={() => {
@@ -191,7 +191,7 @@ export function CardReaderManager({
           buttonText={selectedLabel || "None"}
           buttonTextStyle={{ fontSize: 14 }}
           buttonStyle={{
-            borderRadius: 5,
+            borderRadius: Radius.control,
             borderWidth: 1,
             borderColor: C.buttonLightGreenOutline,
             paddingHorizontal: 7,

@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { useState, useEffect, useRef } from "react";
 import cloneDeep from "lodash/cloneDeep";
-import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../styles";
+import { C, COLOR_GRADIENTS, Fonts, ICONS, Radius } from "../styles";
 import {
   useSettingsStore,
   useOpenWorkordersStore,
@@ -414,7 +414,7 @@ const WorkorderDetailFields = ({
             paddingHorizontal: 4,
             fontSize: 14,
             outlineWidth: 0,
-            borderRadius: 5,
+            borderRadius: Radius.control,
             fontWeight: workorder?.brand ? "500" : null,
           }}
           value={workorder?.brand || ""}
@@ -457,7 +457,7 @@ const WorkorderDetailFields = ({
             paddingHorizontal: 4,
             fontSize: 14,
             outlineWidth: 0,
-            borderRadius: 5,
+            borderRadius: Radius.control,
             fontWeight: workorder?.description ? "500" : null,
           }}
           value={workorder?.description || ""}
@@ -488,7 +488,7 @@ const WorkorderDetailFields = ({
             paddingHorizontal: 4,
             fontSize: 14,
             outlineWidth: 0,
-            borderRadius: 5,
+            borderRadius: Radius.control,
             fontWeight: workorder?.color1?.label ? "500" : null,
             backgroundColor: workorder?.color1?.backgroundColor,
             color: workorder?.color1?.textColor || C.text,
@@ -507,7 +507,7 @@ const WorkorderDetailFields = ({
             paddingHorizontal: 4,
             fontSize: 14,
             outlineWidth: 0,
-            borderRadius: 5,
+            borderRadius: Radius.control,
             fontWeight: workorder?.color2?.label ? "500" : null,
             backgroundColor: workorder?.color2?.backgroundColor,
             color: workorder?.color2?.textColor || C.text,
@@ -571,13 +571,19 @@ const LineItemRow = ({ line, onDelete }) => {
           Qty: {line.qty || 1} | ${formatCurrencyDisp(price)}
         </span>
       </div>
-      <button
-        type="button"
-        onClick={onDelete}
-        className={styles.lineItemDeleteBtn}
-      >
-        <Image icon={ICONS.trash} size={14} />
-      </button>
+      <Button
+        icon={ICONS.trash}
+        iconSize={14}
+        onPress={onDelete}
+        buttonStyle={{
+          paddingLeft: 4,
+          paddingRight: 4,
+          paddingTop: 4,
+          paddingBottom: 4,
+          backgroundColor: "transparent",
+        }}
+        iconStyle={{ marginRight: 0 }}
+      />
     </div>
   );
 };

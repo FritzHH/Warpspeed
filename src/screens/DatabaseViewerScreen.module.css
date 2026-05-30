@@ -20,7 +20,7 @@
   align-items: center;
   justify-content: center;
   padding: 6px 14px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   border: none;
   margin-right: 8px;
   cursor: pointer;
@@ -39,7 +39,7 @@
   align-items: center;
   justify-content: center;
   padding: 6px 14px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--border-default);
   margin-right: 16px;
   background-color: transparent;
@@ -80,7 +80,7 @@
   flex: 1;
   margin: 4px;
   border: 1px solid var(--border-default);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   overflow: hidden;
   min-width: 0;
   min-height: 0;
@@ -113,7 +113,7 @@
   align-items: center;
   justify-content: center;
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   border: none;
   cursor: pointer;
   font-size: 11px;

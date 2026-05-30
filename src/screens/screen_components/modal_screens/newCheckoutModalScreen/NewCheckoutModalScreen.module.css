@@ -21,7 +21,7 @@
   display: flex;
   flex-direction: column;
   width: 360px;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   border-width: 2px;
   border-style: solid;
   padding: 16px;
@@ -53,7 +53,7 @@
   align-items: center;
   border-width: 1px;
   border-style: solid;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   margin-top: 8px;
   margin-bottom: 6px;
   padding: 0 10px;
@@ -86,40 +86,20 @@
   flex-shrink: 0;
 }
 
-/* ─── Keep-Workorder-Open toast ──────────────────────────────
+/* ─── Save-Workorder toast ───────────────────────────────────
    Translucent panel between mainRow and ModalFooter. Full-width, rounded.
-   Default state: single "Keep Workorder Open" button.
-   Expanded state: 2-line textarea above, Cancel + Save buttons below (Save replaces the original label). */
+   Default state: single yellow "Save Workorder" button.
+   Pressed state: green "Workorder Left Open" (non-interactive). */
 .keepOpenToast {
   display: flex;
   flex-direction: column;
   width: 100%;
   background-color: var(--surface-overlay-medium);
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 8px 12px;
   gap: 6px;
   flex-shrink: 0;
   box-sizing: border-box;
-}
-
-.keepOpenTextarea {
-  width: 100%;
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border-default);
-  border-radius: 4px;
-  padding: 6px 8px;
-  font-size: 13px;
-  font-family: inherit;
-  resize: none;
-  outline: none;
-  box-sizing: border-box;
-  background-color: var(--surface-base);
-  color: var(--text);
-}
-
-.keepOpenTextarea::placeholder {
-  color: var(--text-disabled);
 }
 
 .keepOpenButtonRow {
@@ -130,28 +110,12 @@
   flex-shrink: 0;
 }
 
-.keepOpenCancelBtn {
-  padding: 0 14px;
-  height: 30px;
-  border-width: 1px;
-  border-style: solid;
-  border-color: var(--border-default);
-  border-radius: 5px;
-  background-color: transparent;
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 500;
-  font-family: inherit;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
 .keepOpenMainBtn {
   padding: 0 16px;
   height: 30px;
   border: none;
-  border-radius: 5px;
-  background-color: var(--success);
+  border-radius: var(--radius-control);
+  background-color: var(--warning);
   color: var(--text-on-accent);
   font-size: 12px;
   font-weight: 600;
@@ -160,9 +124,9 @@
   flex-shrink: 0;
 }
 
-.keepOpenMainBtn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.keepOpenMainBtnKept {
+  background-color: var(--success);
+  cursor: default;
 }
 
 /* ─── Main checkout modal ────────────────────────────────────── */
@@ -172,7 +136,7 @@
   width: 85%;
   height: 90%;
   align-self: center;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   overflow: hidden;
   flex-shrink: 0;
 }
@@ -214,7 +178,7 @@
   height: 48%;
   justify-content: center;
   align-items: center;
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   padding: 20px;
   flex-shrink: 0;
 }
@@ -230,7 +194,7 @@
   flex-direction: column;
   width: 80%;
   height: 50px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   justify-content: center;
   align-items: center;
   border: none;
@@ -279,7 +243,7 @@
   flex-direction: column;
   border-width: 2px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 14px;
   flex-shrink: 0;
 }
@@ -296,7 +260,7 @@
   display: flex;
   flex-direction: column;
   padding: 2px 8px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   margin-right: 10px;
   flex-shrink: 0;
 }
@@ -329,7 +293,7 @@
   align-items: center;
   border-width: 1px;
   border-style: solid;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 6px 10px;
   margin-top: 8px;
   flex-shrink: 0;
@@ -362,7 +326,7 @@
   width: 100%;
   border-width: 1px;
   border-style: solid;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 2px 3px;
   margin-top: 5px;
   flex-shrink: 0;
@@ -376,26 +340,10 @@
   width: 100%;
   border-width: 1px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 4px 3px;
   margin-top: 5px;
   flex-shrink: 0;
-}
-
-.iconButton {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 6px;
-  background: none;
-  border: none;
-  cursor: pointer;
-  flex-shrink: 0;
-}
-
-.iconButton:active {
-  opacity: 0.7;
 }
 
 /* ── Middle column (main mode) ── */
@@ -413,7 +361,7 @@
   flex-direction: column;
   border-width: 1px;
   border-style: solid;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 5px 10px;
   flex-shrink: 0;
 }
@@ -455,7 +403,7 @@
   flex-direction: column;
   border-width: 1px;
   border-style: solid;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background-color: var(--surface-warning-muted);
   margin-top: 5px;
   padding: 5px 8px;
@@ -465,7 +413,7 @@
 .depositsListHeader {
   display: flex;
   flex-direction: column;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   padding: 4px 8px;
   margin-bottom: 5px;
   flex-shrink: 0;
@@ -494,7 +442,7 @@
   display: flex;
   flex-direction: column;
   padding: 2px 7px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   margin-right: 8px;
   flex-shrink: 0;
 }
@@ -553,7 +501,7 @@
   padding: 3px 8px 4px;
   border-width: 1px;
   border-style: solid;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   background: transparent;
   flex-shrink: 0;
 }
@@ -586,7 +534,7 @@
   height: 30px;
   padding: 0 14px;
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -602,20 +550,21 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  flex-shrink: 1;
+  flex: 1 1 0;
+  min-height: 0;
 }
 
 .paymentsScroll {
   width: 100%;
   display: flex;
   flex-direction: column;
-  flex-shrink: 1;
+  flex: 1 1 0;
   overflow-y: auto;
   min-height: 0;
 }
 
 .flexSpacer {
-  flex: 1 1 0;
+  flex: 0 0 0;
   min-height: 0;
 }
 
@@ -663,7 +612,7 @@
   flex-direction: column;
   justify-content: center;
   align-items: center;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   z-index: 100;
 }
 
@@ -678,7 +627,7 @@
 .confirmBoxTaxFree {
   display: flex;
   flex-direction: column;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   align-items: center;
   justify-content: space-around;
   min-width: 32%;
@@ -690,7 +639,7 @@
 .confirmBoxPop {
   display: flex;
   flex-direction: column;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   align-items: center;
   justify-content: center;
   padding: 30px 40px;

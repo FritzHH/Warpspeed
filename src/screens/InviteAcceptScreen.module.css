@@ -5,8 +5,10 @@
   flex-direction: column;
   width: 100%;
   height: 100vh;
-  justify-content: center;
+  overflow-y: auto;
   align-items: center;
+  padding: 40px 0;
+  box-sizing: border-box;
   background-color: var(--surface-alt);
 }
 
@@ -16,10 +18,12 @@
   width: 90%;
   max-width: 420px;
   background-color: var(--surface-base);
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   align-items: center;
   padding: 40px 30px 30px 30px;
   box-shadow: 0px 8px 24px var(--shadow-color-default);
+  margin-block: auto;
+  flex-shrink: 0;
 }
 
 .logo {
@@ -77,7 +81,7 @@
 
 .textInput {
   width: 100%;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 11px 14px;
   font-size: 15px;
   background-color: var(--surface-alt);
@@ -91,7 +95,7 @@
 .primaryButton {
   width: 100%;
   padding: 12px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   background-color: var(--accent);
   color: var(--text-inverse);
   font-size: 15px;
@@ -112,7 +116,7 @@
 
 .secondaryButton {
   padding: 10px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   background-color: transparent;
   color: var(--text-muted);
   font-size: 14px;
@@ -140,5 +144,189 @@
   color: var(--danger);
   margin-bottom: 8px;
   text-align: center;
+  line-height: 1.4;
+}
+
+.sectionHeading {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-default);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 18px 0 4px 0;
+  width: 100%;
+  text-align: left;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-default);
+}
+
+.paymentsSection {
+  width: 100%;
+  margin: 18px 0 8px 0;
+  padding: 14px 16px;
+  border: 2px solid #c75100;
+  background-color: #fff7ed;
+  border-radius: 6px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.paymentsSectionHeading {
+  font-size: 14px;
+  font-weight: 700;
+  color: #7a2e00;
+  margin-bottom: 4px;
+  text-align: left;
+}
+
+.paymentsSectionSubheading {
+  font-size: 12px;
+  color: #7a2e00;
+  margin-bottom: 12px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.storeInfoSection {
+  width: 100%;
+  margin: 18px 0 8px 0;
+  padding: 14px 16px;
+  border: 2px solid #1d4ed8;
+  background-color: #eff6ff;
+  border-radius: 6px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.storeInfoSectionHeading {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1e3a8a;
+  margin-bottom: 4px;
+  text-align: left;
+}
+
+.storeInfoSectionSubheading {
+  font-size: 12px;
+  color: #1e3a8a;
+  margin-bottom: 12px;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.dobRow {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+
+.dobRow > div {
+  flex: 1 1 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.pinSection {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.pinLabel {
+  font-size: 12px;
+  margin-bottom: 6px;
+  margin-left: 2px;
+  color: var(--text-muted);
+}
+
+.pinBoxes {
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  cursor: text;
+}
+
+.pinBox {
+  width: 44px;
+  height: 52px;
+  border: 2px solid;
+  border-radius: var(--radius-row);
+  margin: 0 4px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  box-sizing: border-box;
+}
+
+.pinDot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background-color: var(--text-default);
+}
+
+.pinHiddenInput {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  caret-color: transparent;
+  background-color: transparent;
+  color: transparent;
+  border: none;
+  outline: none;
+  width: 100%;
+}
+
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.55);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+.spinner {
+  width: 56px;
+  height: 56px;
+  border: 4px solid var(--surface-base);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: invite-accept-spin 0.8s linear infinite;
+  margin-bottom: 18px;
+}
+
+@keyframes invite-accept-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.overlayText {
+  color: var(--surface-base);
+  font-size: 17px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  text-align: center;
+}
+
+.overlaySubText {
+  color: var(--surface-base);
+  font-size: 14px;
+  opacity: 0.85;
+  text-align: center;
+  max-width: 280px;
   line-height: 1.4;
 }

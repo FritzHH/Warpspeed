@@ -52,7 +52,7 @@
 
 .controlBtn {
   padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border: 1px solid var(--border-default);
   background-color: var(--surface-alt);
   color: var(--text-default);
@@ -80,7 +80,7 @@
 
 .tenantSelect {
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border: 1px solid var(--border-default);
   background-color: var(--surface-alt);
   color: var(--text-default);
@@ -123,7 +123,7 @@
 .card {
   display: flex;
   flex-direction: column;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   overflow: hidden;
   border: 1px solid var(--border-subtle);
   background-color: var(--surface-raised);
@@ -153,7 +153,7 @@
   inset: 12px;
   border-width: 4px;
   border-style: solid;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background-color: var(--surface-base);
 }
 
@@ -172,7 +172,7 @@
   position: absolute;
   inset: 16px;
   background-color: var(--surface-raised);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
 }
 
 .meta {
@@ -218,7 +218,7 @@
   text-align: center;
   padding: 32px 40px;
   border: 1px solid var(--border-subtle);
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   background-color: var(--surface-raised);
   box-shadow: 0 4px 12px var(--shadow-color-default);
 }

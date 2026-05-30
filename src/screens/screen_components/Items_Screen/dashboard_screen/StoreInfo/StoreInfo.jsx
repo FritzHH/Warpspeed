@@ -7,7 +7,7 @@ import {
   TextInput,
   TimePicker,
 } from "../../../../../dom_components";
-import { COLOR_GRADIENTS, ICONS, C } from "../../../../../styles";
+import { COLOR_GRADIENTS, ICONS, C, Radius } from "../../../../../styles";
 import {
   checkInputForNumbersOnly,
   formatPhoneWithDashes,
@@ -126,7 +126,7 @@ export const StoreInfoComponent = ({
                   width: 150,
                   height: 150,
                   marginBottom: 10,
-                  borderRadius: 10,
+                  borderRadius: Radius.row,
                   objectFit: "contain",
                 }}
               />
@@ -399,7 +399,7 @@ export const StoreInfoComponent = ({
               debounceMs={500}
               style={{
                 outline: "none",
-                borderRadius: 5,
+                borderRadius: Radius.control,
                 textAlign: "right",
                 border: `1px solid ${C.borderDefault}`,
                 padding: "3px 5px",

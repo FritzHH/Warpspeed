@@ -1,4 +1,4 @@
-import { buildLightspeedEAN13, buildWorkorderNumberFromId, bestForegroundHex, hexToRgb, normalizeBarcode, generateEAN13Barcode } from "./utils";
+import { buildLightspeedEAN13, buildWorkorderNumberFromId, bestForegroundHex, hexToRgb, normalizeBarcode, generateEAN13Barcode, capitalizeFirstLetterOfString } from "./utils";
 import { COLORS, NONREMOVABLE_STATUSES, CUSTOMER_LANGUAGES, APP_USER, TIME_PUNCH_PROTO } from "./data";
 
 // ============================================================================
@@ -274,8 +274,8 @@ export function mapCustomers(customerCSVText) {
     const cell = formatPhone(row.phone1);
     const customer = {
       id: row.customerID ? buildLightspeedEAN13("20", row.customerID) : "",
-      first: (row.firstName || "").toLowerCase().trim(),
-      last: (row.lastName || "").toLowerCase().trim(),
+      first: capitalizeFirstLetterOfString((row.firstName || "").trim()),
+      last: capitalizeFirstLetterOfString((row.lastName || "").trim()),
       customerCell: cell,
       customerLandline: formatPhone(row.phone2),
       contactRestriction: "",
@@ -609,7 +609,6 @@ export function mapWorkorders(
       paymentComplete: false,
       amountPaid: 0,
       activeSaleID: "",
-      endedOnMillis: "",
       saleID: "",
       media: [],
       _lsSaleID: (wo.saleID && wo.saleID !== "0") ? wo.saleID : "",

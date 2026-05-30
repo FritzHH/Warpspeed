@@ -2,7 +2,7 @@ import React, { forwardRef, useState } from "react";
 import ReactDOM from "react-dom";
 import { C } from "../../styles";
 import { useZ } from "../../hooks/useZ";
-import { ModalFooter, ModalFooterButton } from "../ModalFooter/ModalFooter";
+import { LargeModalHeader, LargeModalHeaderButton } from "../LargeModalHeader/LargeModalHeader";
 import styles from "./WebPageModal.module.css";
 
 export const WebPageModal = forwardRef(function WebPageModal(
@@ -47,12 +47,21 @@ export const WebPageModal = forwardRef(function WebPageModal(
           aria-label={title}
         >
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
-            <div className={styles.header} style={{ backgroundColor: C.green }}>
-              <span className={styles.title}>{title}</span>
-              {subtitle && (
-                <span className={styles.subtitle}>{subtitle}</span>
-              )}
-            </div>
+            <LargeModalHeader
+              title={
+                <div className={styles.titleRow}>
+                  <span>{title}</span>
+                  {subtitle && (
+                    <span className={styles.subtitle}>{subtitle}</span>
+                  )}
+                </div>
+              }
+              actions={
+                <LargeModalHeaderButton variant="default" onClick={() => _setVisible(false)}>
+                  CLOSE
+                </LargeModalHeaderButton>
+              }
+            />
             <div className={styles.body}>
               <iframe
                 src={url}
@@ -60,9 +69,6 @@ export const WebPageModal = forwardRef(function WebPageModal(
                 title={title}
               />
             </div>
-            <ModalFooter>
-              <ModalFooterButton onClick={() => _setVisible(false)}>Close</ModalFooterButton>
-            </ModalFooter>
           </div>
         </div>,
         document.body

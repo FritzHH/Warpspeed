@@ -131,7 +131,7 @@
   align-items: center;
   border-width: 1px;
   border-style: solid;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 6px 10px;
   background-color: white;
   cursor: pointer;
@@ -163,7 +163,7 @@
   background-color: white;
   border-width: 1px;
   border-style: solid;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   z-index: 100;
 }
 
@@ -187,7 +187,7 @@
 .selectorRowDot {
   width: 8px;
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   margin-right: 8px;
   flex-shrink: 0;
 }
@@ -267,7 +267,7 @@
   padding: 6px 8px;
   margin-bottom: 3px;
   background-color: var(--surface-accent-muted);
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   border-left-width: 3px;
   border-left-style: solid;
 }
@@ -286,20 +286,6 @@
   font-size: 11px;
 }
 
-.lineItemDeleteBtn {
-  background: none;
-  border: none;
-  padding: 6px 8px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.lineItemDeleteBtn:active {
-  opacity: 0.7;
-}
-
 /* ----- Intake Button Card ----- */
 
 .intakeCard {
@@ -311,7 +297,7 @@
   padding: 8px;
   border-width: 1px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   align-items: center;
   justify-content: center;
   cursor: pointer;
@@ -337,7 +323,7 @@
 .intakeCardBadge {
   display: flex;
   flex-direction: column;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   min-width: 16px;
   height: 16px;
   align-items: center;

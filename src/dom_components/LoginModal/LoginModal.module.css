@@ -33,7 +33,7 @@
 .card {
   width: 360px;
   background-color: var(--surface-base);
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -57,7 +57,7 @@
 }
 
 .privilegeBadge {
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 8px;
   margin-bottom: 14px;
 }
@@ -89,7 +89,7 @@
   width: 44px;
   height: 52px;
   border: 2px solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   margin: 0 4px;
   display: flex;
   justify-content: center;
@@ -99,7 +99,7 @@
 .pinDot {
   width: 14px;
   height: 14px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
 }
 
 .hiddenInput {

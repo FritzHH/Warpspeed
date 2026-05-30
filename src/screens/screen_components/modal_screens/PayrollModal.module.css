@@ -44,7 +44,7 @@
   height: 94%;
   flex-shrink: 0;
   background-color: var(--payroll-bg, var(--surface-base));
-  border-radius: 15px;
+  border-radius: var(--radius-container);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -105,7 +105,7 @@
 .userRow {
   width: 100%;
   flex-shrink: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   padding: 5px 0;
   margin-bottom: 3px;
   display: flex;
@@ -128,7 +128,7 @@
 .shortcutRow {
   width: 100%;
   flex-shrink: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   padding: 5px 0;
   margin-bottom: 3px;
   display: flex;
@@ -218,7 +218,7 @@
   width: 100%;
   flex-shrink: 0;
   background-color: var(--surface-overlay-heavy);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 6px 4px;
   display: flex;
   flex-direction: column;
@@ -237,7 +237,7 @@
   flex-shrink: 0;
   display: flex;
   flex-direction: row;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   padding: 6px 10px;
   margin-bottom: 8px;
   align-items: center;
@@ -312,7 +312,7 @@
   width: 8px;
   height: 8px;
   flex-shrink: 0;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   margin-right: 5px;
 }
 
@@ -413,7 +413,7 @@
 }
 
 .addPill {
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   padding: 3px 8px;
   display: inline-flex;
   align-items: center;
@@ -457,7 +457,7 @@
 
 .editableTimeChip {
   padding: 4px 6px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -606,19 +606,19 @@
 
 .btnAddPunch {
   padding: 4px 10px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   margin-right: 8px;
 }
 
 .btnClock {
   padding: 3px 10px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
 }
 
 /* ════════════ DropdownMenu — payroll variant ════════════ */
 .payrollDropdown {
   border: 1px solid var(--c-button-light-green-outline);
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   padding: 4px 6px;
   background-color: var(--c-list-item-white);
 }

@@ -25,7 +25,7 @@
 .closeBtn {
   width: 36px;
   height: 36px;
-  border-radius: 18px;
+  border-radius: var(--radius-container);
   background-color: rgba(255, 255, 255, 0.2);
   display: flex;
   align-items: center;
@@ -50,7 +50,7 @@
 .timerDot {
   width: 10px;
   height: 10px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   margin-right: 6px;
   flex-shrink: 0;
   background-color: var(--danger);
@@ -136,7 +136,7 @@
 .captureRing {
   width: 70px;
   height: 70px;
-  border-radius: 35px;
+  border-radius: var(--radius-pill);
   border-width: 4px;
   border-style: solid;
   border-color: var(--text-on-accent);
@@ -149,7 +149,7 @@
 .captureDot {
   width: 54px;
   height: 54px;
-  border-radius: 27px;
+  border-radius: var(--radius-container);
   flex-shrink: 0;
   background-color: var(--danger);
 }
@@ -157,7 +157,7 @@
 .stopSquare {
   width: 28px;
   height: 28px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   flex-shrink: 0;
   background-color: var(--danger);
 }
@@ -170,7 +170,7 @@
 
 .reRecordBtn {
   padding: 12px 20px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   background-color: rgba(255, 255, 255, 0.2);
   margin-right: 16px;
   border: none;
@@ -180,7 +180,7 @@
 
 .useBtn {
   padding: 12px 20px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   border: none;
   cursor: pointer;
   flex-shrink: 0;
@@ -195,7 +195,7 @@
 
 .errorBtn {
   padding: 12px 20px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   background-color: rgba(255, 255, 255, 0.2);
   border: none;
   cursor: pointer;

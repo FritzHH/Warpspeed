@@ -10,7 +10,7 @@
   width: 100%;
   border: 1px solid var(--backup-border, var(--border-default));
   background-color: var(--backup-bg, var(--surface-success-muted));
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 15px;
   box-sizing: border-box;
   display: flex;
@@ -40,7 +40,7 @@
 .resultBox {
   margin-top: 15px;
   padding: 10px;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   width: 100%;
   box-sizing: border-box;
   flex-shrink: 0;
@@ -101,7 +101,7 @@
 .logCard {
   width: 100%;
   border: 1px solid var(--backup-border, var(--border-default));
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   padding: 10px;
   margin-bottom: 8px;
   box-sizing: border-box;

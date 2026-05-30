@@ -34,7 +34,7 @@
   justify-content: center;
   padding: 0;
   border: none;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   background-color: var(--border-subtle);
   cursor: pointer;
   margin-bottom: 0;
@@ -69,7 +69,7 @@
   width: 100%;
   flex: 1;
   border: 1px solid;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 10px;
   box-sizing: border-box;
   display: flex;
@@ -103,7 +103,7 @@
 
 .navButton {
   padding: 4px 8px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   border: 1px solid;
   margin-right: 8px;
   background: transparent;
@@ -190,7 +190,7 @@
   padding: 8px;
   border-width: 1px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   position: relative;
   cursor: pointer;
   box-sizing: border-box;
@@ -301,7 +301,7 @@
 }
 
 .childCountBadge {
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   min-width: 16px;
   height: 16px;
   display: flex;
@@ -355,7 +355,7 @@
 
 .dividerBar {
   height: 4px;
-  border-radius: 2px;
+  border-radius: var(--radius-control);
 }
 
 .dividerLabelInput {
@@ -373,7 +373,7 @@
   flex-direction: row;
   align-items: center;
   padding: 6px 8px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border-style: solid;
   margin-bottom: 2px;
   cursor: grab;
@@ -416,15 +416,6 @@
   margin-right: 10px;
 }
 
-.itemRowDeleteBtn {
-  background: transparent;
-  border: none;
-  padding: 0;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-}
-
 /* ───────────── Inventory search modal ───────────── */
 
 .modalOverlay {
@@ -438,7 +429,7 @@
 
 .modalPanel {
   width: 550px;
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   border: 1px solid;
   overflow: hidden;
   display: flex;
@@ -498,7 +489,7 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border-style: solid;
   border-width: 1px;
   margin-bottom: 2px;

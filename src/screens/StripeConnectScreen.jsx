@@ -19,7 +19,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button, LoadingIndicator, TextInput } from "../dom_components";
-import { C, COLOR_GRADIENTS, ICONS } from "../styles";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../styles";
 import { useSettingsStore, useLoginStore } from "../stores";
 import {
   firestoreSubscribe,
@@ -441,7 +441,7 @@ export function StripeConnectScreen({ mode = "default" }) {
                 width: "100%",
                 padding: "8px 10px",
                 border: `1px solid ${C.borderDefault}`,
-                borderRadius: 6,
+                borderRadius: Radius.control,
                 outline: "none",
                 marginBottom: 12,
               }}
@@ -456,7 +456,7 @@ export function StripeConnectScreen({ mode = "default" }) {
                 width: "100%",
                 padding: "8px 10px",
                 border: `1px solid ${C.borderDefault}`,
-                borderRadius: 6,
+                borderRadius: Radius.control,
                 outline: "none",
                 marginBottom: 20,
               }}
@@ -647,7 +647,7 @@ function ReaderSections({
     width: "100%",
     padding: "8px 10px",
     border: `1px solid ${C.borderDefault}`,
-    borderRadius: 6,
+    borderRadius: Radius.control,
     outline: "none",
   };
 

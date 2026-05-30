@@ -2,7 +2,7 @@
   width: 600px;
   height: 80vh;
   background-color: var(--surface-base);
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -57,7 +57,7 @@
 .note {
   border-width: 1px;
   border-style: solid;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   margin-bottom: 8px;
   padding: 12px;
 }

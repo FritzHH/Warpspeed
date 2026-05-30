@@ -36,7 +36,7 @@
 
 .chip {
   padding: 6px 12px;
-  border-radius: 16px;
+  border-radius: var(--radius-container);
   background-color: var(--surface-elevated);
   border: 1px solid var(--border-default);
   color: var(--text-secondary);
@@ -54,7 +54,7 @@
 
 .refreshBtn {
   padding: 6px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   background-color: var(--surface-elevated);
   border: 1px solid var(--border-default);
   color: var(--text-secondary);
@@ -87,7 +87,7 @@
   flex-shrink: 0;
   background-color: var(--surface-elevated);
   border: 1px solid var(--border-default);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 14px 16px;
   display: flex;
   flex-direction: column;
@@ -134,7 +134,7 @@
 
 .cardAction {
   padding: 6px 12px;
-  border-radius: 6px;
+  border-radius: var(--radius-control);
   border: 1px solid var(--border-default);
   background-color: var(--surface-base);
   color: var(--text);
@@ -205,7 +205,7 @@
   max-width: 720px;
   max-height: 85%;
   background-color: var(--surface-base);
-  border-radius: 12px;
+  border-radius: var(--radius-container);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -277,30 +277,3 @@
   flex-shrink: 0;
 }
 
-.confirmFooter {
-  padding: 16px 20px;
-  border-top: 1px solid var(--border-default);
-  display: flex;
-  flex-direction: row;
-  justify-content: flex-end;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-.confirmBtn {
-  padding: 10px 20px;
-  border-radius: 6px;
-  border: 1px solid var(--border-default);
-  background-color: var(--surface-elevated);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  user-select: none;
-}
-
-.confirmBtnPrimary {
-  background-color: var(--accent);
-  color: var(--text-on-accent);
-  border-color: var(--accent);
-}

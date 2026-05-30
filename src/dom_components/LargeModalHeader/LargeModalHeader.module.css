@@ -1,0 +1,166 @@
+/* Large modal header — title + action buttons row at top of large/medium modal card */
+.header {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  height: 56px;
+  background-color: var(--surface-base);
+}
+
+.headerWithBorder {
+  border-bottom: 1px solid var(--border-default);
+}
+
+/* Layout: standard — title flex-grows, actions sit natural-width on the right */
+.layoutStandard {
+  padding: 0 10px 0 20px;
+  gap: 10px;
+}
+
+.layoutStandard .title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-left: 0;
+}
+
+.layoutStandard .actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Layout: split — title flex-grows, actions confined to fixed-width pane on right */
+.layoutSplit .title {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 20px;
+}
+
+.layoutSplit .actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  border-left: 1px solid var(--border-default);
+}
+
+/* Layout: actionsOnly — no title; actions fill full header width with equal-width buttons */
+.layoutActionsOnly .actions {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+}
+
+/* Button base */
+.btn {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: opacity 0.1s, background-color 0.1s;
+  white-space: nowrap;
+}
+
+.btn:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+/* Width modes */
+.btnNatural {
+  padding: 8px 22px;
+  height: 36px;
+  border-radius: var(--radius-control);
+}
+
+.btnEqualWidth {
+  flex: 1;
+  height: 100%;
+  border-radius: 0;
+  border-left-width: 0;
+  border-right-width: 0;
+  border-top-width: 0;
+  border-bottom-width: 0;
+}
+
+.btnEqualWidth + .btnEqualWidth {
+  border-left: 1px solid var(--border-default);
+}
+
+.btnIconOnly {
+  padding: 8px;
+  width: 44px;
+}
+
+.btnNatural.btnIconOnly {
+  height: 44px;
+  background-color: transparent;
+  border-color: transparent;
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+.btnNatural.btnIconOnly:hover:not(:disabled) {
+  opacity: 1;
+  transform: translateY(-2px);
+  filter: drop-shadow(0 3px 3px var(--shadow-color-default));
+}
+
+.btnNatural.btnIconOnly:active:not(:disabled) {
+  transform: translateY(0);
+  filter: drop-shadow(0 1px 1px var(--shadow-color-default));
+}
+
+/* Color variants */
+.variantDefault {
+  border-color: var(--border-default);
+  background-color: transparent;
+  color: var(--text);
+}
+
+.variantPrimary {
+  background-color: var(--orange-300);
+  border-color: var(--orange-300);
+  color: var(--text-on-accent);
+}
+
+.variantAccent {
+  background-color: var(--success);
+  border-color: var(--success);
+  color: var(--text-on-accent);
+}
+
+.variantDanger {
+  background-color: var(--danger);
+  border-color: var(--danger);
+  color: var(--text-on-accent);
+}

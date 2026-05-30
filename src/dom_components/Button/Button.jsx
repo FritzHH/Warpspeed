@@ -1,5 +1,5 @@
 import React, { forwardRef, useState, useCallback, useRef } from "react";
-import { C, COLOR_GRADIENTS, ICONS } from "../../styles";
+import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../styles";
 import { SHADOW_PROTO, SHADOW_NONE } from "../shadows";
 import styles from "./Button.module.css";
 
@@ -101,7 +101,7 @@ export const Button = forwardRef(function Button(
     alignItems: "center",
     justifyContent: "center",
     flexDirection: "row",
-    borderRadius: 5,
+    borderRadius: Radius.control,
     ...(hasInnerClass ? {} : {
       paddingLeft: icon ? 10 : (paddingH != null ? paddingH : 15),
       paddingRight: paddingH != null ? paddingH : 15,

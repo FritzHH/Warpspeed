@@ -173,7 +173,7 @@ export function buildIntakeReceiptPDF(data) {
   y += 10;
   doc.setFontSize(13);
   doc.setFont("helvetica", "bold");
-  let isIntake = data.receiptType !== "Workorder";
+  let isIntake = data.receiptType === "Intake";
   let ticketTitle = isIntake ? "INTAKE/ESTIMATE TICKET" : "FINALIZED WORKORDER TICKET";
   doc.text(ticketTitle, centerX, y, { align: "center" });
   y += 18;
@@ -261,6 +261,22 @@ export function buildIntakeReceiptPDF(data) {
     y = addDivider(doc, y, leftX, rightX);
   }
 
+  if (data.taxFree) {
+    y = checkPageBreak(doc, y, 24, margin);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "italic");
+    doc.setTextColor(100, 100, 100);
+    let taxFreeText = data.taxFreeReceiptNote
+      || "* This ticket contained only labor, no sale items were transferred to the customer *";
+    let taxFreeLines = doc.splitTextToSize(taxFreeText, contentWidth);
+    taxFreeLines.forEach((line) => {
+      doc.text(line, centerX, y, { align: "center" });
+      y += 10;
+    });
+    doc.setTextColor(0);
+    y += 6;
+  }
+
   if (isIntake && data.intakeBlurb) {
     y = checkPageBreak(doc, y, 40, margin);
     doc.setFontSize(10);
@@ -280,7 +296,7 @@ export function buildIntakeReceiptPDF(data) {
 
 export function saveIntakeReceiptPDF(data, filename) {
   let doc = buildIntakeReceiptPDF(data);
-  let isIntake = data.receiptType !== "Workorder";
+  let isIntake = data.receiptType === "Intake";
   let prefix = isIntake ? "intake-" : "workorder-";
   let name = filename || (prefix + (data.workorderNumber || data.barcode || Date.now()) + ".pdf");
   doc.save(name);

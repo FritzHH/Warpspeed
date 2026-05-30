@@ -342,6 +342,7 @@ export const SETTINGS_OBJ = {
     ],
   },
   storeInfo: {
+    legalName: "Bonita Bikes LLC",
     displayName: "Bonita Bikes LLC",
     street: "9102 Bonita Beach Rd SE",
     unit: "",
@@ -380,6 +381,7 @@ export const SETTINGS_OBJ = {
   allPartSources: ["JBI", "QBP", "Amazon", "Ebay", "Customer"],
   smsConversationLockTimeout: 2, //days
   activeLoginTimeoutSeconds: 7,
+  adminAuthLogout: 60,
   userInactivityTimeout: 120,
   idleLoginTimeoutHours: 24,
   salesTaxPercent: 6.5,
@@ -391,7 +393,7 @@ export const SETTINGS_OBJ = {
   cardFeeRefund: false,
   allowStaffPhoneReply: true,
   lockScreenWhenUserLogsOut: false,
-  useFacialRecognition: true,
+  useFacialRecognition: false,
   faceRecognitionThreshold: 0.55,
   tenantID: "1234",
   storeID: "999",

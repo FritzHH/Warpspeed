@@ -14,7 +14,7 @@ import {
   SmallLoadingIndicator as SmallLoadingIndicatorDom,
   PhoneNumberInput,
 } from "../../../dom_components";
-import { C, COLOR_GRADIENTS, Colors, ICONS, Fonts } from "../../../styles";
+import { C, COLOR_GRADIENTS, Colors, ICONS, Fonts, Radius } from "../../../styles";
 import { useZ } from "../../../hooks/useZ";
 import hubStyles from "./Messages.module.css";
 import { useTranslation } from "../../../useTranslation";
@@ -44,7 +44,7 @@ import {
 } from "../../../stores";
 import { smsService } from "../../../data_service_modules";
 import { DEBOUNCE_DELAY, build_db_path } from "../../../constants";
-import { dbSendReceipt, dbCreateTextToPayInvoice, dbUpdateMessageCanRespond, dbToggleSMSForwarding, dbSetSMSForwardTo, dbGetCustomer, dbSaveMessageTranslation } from "../../../db_calls_wrapper";
+import { dbSendReceipt, dbCreateTextToPayInvoice, dbUpdateMessageCanRespond, dbToggleSMSForwarding, dbSetSMSForwardTo, dbGetCustomer, dbSaveMessageTranslation, dbMarkSmsThreadRead } from "../../../db_calls_wrapper";
 import { translateText } from "../../../db_calls";
 import { WorkorderMediaModal } from "../modal_screens/WorkorderMediaModal";
 import { scheduleAutoSend, clearAutoSend, buildForwardToArray, initialSelectedForwardIDs } from "./ReplyOptionsBar";
@@ -121,7 +121,9 @@ export function MessagesComponent({}) {
     }
     if (zWorkorderObj?.customerCell) {
       let thread = zSmsThreads.find(t => t.phone === zWorkorderObj.customerCell);
-      if (thread) _setReadThreadPhones(prev => ({ ...prev, [thread.phone]: thread.lastMillis }));
+      if (thread && thread.lastMillis && (thread.lastReadMillis || 0) < thread.lastMillis) {
+        dbMarkSmsThreadRead(thread.phone, thread.lastMillis);
+      }
     }
   }, [zWorkorderObj?.hasNewSMS, zWorkorderObj?.id]);
 
@@ -179,7 +181,6 @@ export function MessagesComponent({}) {
     });
   }, []);
   const [sHubNewPhone, _setHubNewPhone] = useState("");
-  const [sReadThreadPhones, _setReadThreadPhones] = useState({});
   const [sHubSidebarCollapsed, _setHubSidebarCollapsed] = useState(false);
   const [sHubSidebarFullWidth, _setHubSidebarFullWidth] = useState(false);
   const [sHubHoverPhone, _setHubHoverPhone] = useState("");
@@ -201,6 +202,18 @@ export function MessagesComponent({}) {
     }, { rootMargin: "200px 0px" });
     hubLoadObserverRef.current.observe(node);
   }, []);
+
+  // Keep lastReadMillis fresh on the currently-selected hub thread.
+  // Why: if a new SMS arrives while the user is viewing the thread, the captured
+  // read marker from click-time goes stale and the thread re-blues on click-away.
+  useEffect(() => {
+    if (!sHubSelectedPhone) return;
+    let thread = zSmsThreads.find(t => t.phone === sHubSelectedPhone);
+    if (!thread || !thread.lastMillis) return;
+    if ((thread.lastReadMillis || 0) < thread.lastMillis) {
+      dbMarkSmsThreadRead(thread.phone, thread.lastMillis);
+    }
+  }, [sHubSelectedPhone, zSmsThreads]);
 
   const {
     translatedText, isLoading: sTranslateLoading,
@@ -938,7 +951,9 @@ export function MessagesComponent({}) {
   }
 
   function handleHubThreadClick(thread) {
-    _setReadThreadPhones(prev => ({ ...prev, [thread.phone]: thread.lastMillis }));
+    if (thread.lastMillis && (thread.lastReadMillis || 0) < thread.lastMillis) {
+      dbMarkSmsThreadRead(thread.phone, thread.lastMillis);
+    }
     let woStore = useOpenWorkordersStore.getState();
     zAllWorkorders.forEach((wo) => {
       if (wo.customerCell === thread.phone && wo.hasNewSMS) {
@@ -1269,7 +1284,7 @@ export function MessagesComponent({}) {
               <div className={hubStyles.threadList}>
                 {filteredHubThreads.slice(0, sHubVisibleCount).map((item) => {
                   let activeWO = zAllWorkorders.find(wo => wo.customerCell === item.phone);
-                  let isUnread = item.lastType === "incoming" && sHubSelectedPhone !== item.phone && (!sReadThreadPhones[item.phone] || sReadThreadPhones[item.phone] < item.lastMillis);
+                  let isUnread = item.lastType === "incoming" && sHubSelectedPhone !== item.phone && (item.lastReadMillis || 0) < item.lastMillis;
                   return (
                     <ThreadCard
                       key={item.phone}
@@ -1306,10 +1321,15 @@ export function MessagesComponent({}) {
                 onShowPhoneEntry={() => { _setHubSelectedPhone(""); _setHubNewPhone(""); }}
                 onOpenWorkorder={handleHubOpenWorkorder}
                 onOpenWorkorderKeepHub={handleHubOpenWorkorderKeepHub}
-                onSendPaymentLink={!hasCustomer ? handleSendSMSPayment : null}
                 hasMatchingWorkorder={!hasCustomer && !!zAllWorkorders.find(w => w.customerCell === (sHubHoverPhone || sHubSelectedPhone))}
                 matchingWorkorders={zAllWorkorders.filter(w => w.customerCell === (sHubHoverPhone || sHubSelectedPhone))}
-                exitHubButton={null}
+                exitHubButton={hasCustomer ? (
+                  <TooltipDom text="Back to customer" position="top" offsetX={-20}>
+                    <TouchableOpacityDom onPress={handleExitHubMode} className={hubStyles.hubPlaceholderBackBtn} hoverOpacity={1}>
+                      <ImageDom icon={ICONS.person} size={28} />
+                    </TouchableOpacityDom>
+                  </TooltipDom>
+                ) : null}
               />
             ) : (
               <div className={hubStyles.hubPlaceholderCol}>
@@ -1339,7 +1359,7 @@ export function MessagesComponent({}) {
                   />
                   {hasCustomer && (
                     <TooltipDom text="Back to customer" position="top" offsetX={-20}>
-                      <TouchableOpacityDom onPress={handleExitHubMode} className={hubStyles.hubPlaceholderBackBtn}>
+                      <TouchableOpacityDom onPress={handleExitHubMode} className={hubStyles.hubPlaceholderBackBtn} hoverOpacity={1}>
                         <ImageDom icon={ICONS.person} size={28} />
                       </TouchableOpacityDom>
                     </TooltipDom>
@@ -1592,6 +1612,7 @@ export function MessagesComponent({}) {
                   <TouchableOpacityDom
                     onPress={handleEnterHubMode}
                     className={hubStyles.iconBtn}
+                    hoverOpacity={1}
                   >
                     <ImageDom icon={ICONS.cellPhone} size={35} />
                   </TouchableOpacityDom>
@@ -1638,7 +1659,7 @@ export function MessagesComponent({}) {
               flexDirection: "column",
               padding: 24,
               backgroundColor: C.surfaceBase,
-              borderRadius: 8,
+              borderRadius: Radius.row,
               minWidth: 360,
               gap: 16,
             }}
@@ -1657,7 +1678,7 @@ export function MessagesComponent({}) {
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: "10px 12px",
-                borderRadius: 6,
+                borderRadius: Radius.control,
                 backgroundColor: C.listItemWhite,
                 border: "1px solid " + C.borderSubtle,
               }}
@@ -1676,7 +1697,7 @@ export function MessagesComponent({}) {
                   flexDirection: "row",
                   alignItems: "center",
                   border: "1px solid " + C.buttonLightGreenOutline,
-                  borderRadius: 6,
+                  borderRadius: Radius.control,
                   backgroundColor: C.listItemWhite,
                   padding: "8px 12px",
                 }}
@@ -1710,7 +1731,7 @@ export function MessagesComponent({}) {
               <ButtonDom
                 text="Cancel"
                 onPress={_closePayLinkModal}
-                buttonStyle={{ flex: 1, backgroundColor: C.buttonLightGray, borderRadius: 6 }}
+                buttonStyle={{ flex: 1, backgroundColor: C.buttonLightGray, borderRadius: Radius.control }}
                 textStyle={{ color: C.text }}
               />
               <ButtonDom
@@ -1718,7 +1739,7 @@ export function MessagesComponent({}) {
                 onPress={_handleSendPayLink}
                 enabled={sPayLinkAmountCents >= 50 && sPayLinkAmountCents <= sPayLinkModal.remainingCents}
                 colorGradientArr={COLOR_GRADIENTS.green}
-                buttonStyle={{ flex: 1, borderRadius: 6 }}
+                buttonStyle={{ flex: 1, borderRadius: Radius.control }}
                 textStyle={{ color: C.textWhite }}
               />
             </div>
@@ -1806,7 +1827,7 @@ function ThreadCard({ thread, isSelected, isHovered, isUnread, activeWO, onPress
   );
 }
 
-function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, onOpenWorkorder, onOpenWorkorderKeepHub, onSendPaymentLink, hasMatchingWorkorder, matchingWorkorders = [], exitHubButton }) {
+function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, onOpenWorkorder, onOpenWorkorderKeepHub, hasMatchingWorkorder, matchingWorkorders = [], exitHubButton }) {
   const [sWoDropdown, _setWoDropdown] = useState(null);
   const zWo = useZ("dropdown", !!sWoDropdown);
   // Initialize from cache synchronously to avoid layout flash on hover
@@ -2524,16 +2545,6 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
                       ? <LoadingIndicatorDom />
                       : <ImageDom icon={ICONS.uploadCamera} size={35} />
                     }
-                  </TouchableOpacityDom>
-                </TooltipDom>
-              )}
-              {onSendPaymentLink && (
-                <TooltipDom text="Send Payment Link" position="top" hideOnPress>
-                  <TouchableOpacityDom
-                    onPress={() => useLoginStore.getState().requireLogin(() => onSendPaymentLink(phone))}
-                    className={hubStyles.iconBtn}
-                  >
-                    <ImageDom icon={ICONS.paperPlane} size={35} />
                   </TouchableOpacityDom>
                 </TooltipDom>
               )}

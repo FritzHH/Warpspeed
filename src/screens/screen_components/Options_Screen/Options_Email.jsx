@@ -557,6 +557,17 @@ const ThreadInspectorModal = React.memo(() => {
   const newestId = messages.length > 0 ? messages[messages.length - 1].id : null;
   const [sExpanded, _sSetExpanded] = useState({});
 
+  const participantEmails = useMemo(() => {
+    const set = new Set();
+    messages.forEach((m) => {
+      [m.from, ...(m.to || []), ...(m.cc || []), ...(m.bcc || [])].forEach((v) => {
+        const addr = extractEmailAddr(v);
+        if (addr) set.add(addr);
+      });
+    });
+    return Array.from(set);
+  }, [messages]);
+
   if (zState !== "open") return null;
 
   function toggleExpand(id) {
@@ -580,9 +591,20 @@ const ThreadInspectorModal = React.memo(() => {
         className={styles.threadModalHeader}
         style={{ borderBottomColor: C.borderSubtle }}
       >
-        <span className={styles.threadModalTitle} style={{ color: C.text }}>
-          Thread
-        </span>
+        <div className={styles.threadModalTitle}>
+          <span className={styles.threadModalTitleMain} style={{ color: C.text }}>
+            Thread
+          </span>
+          {participantEmails.length > 0 && (
+            <span
+              className={styles.threadModalParticipants}
+              style={{ color: C.textMuted }}
+            >
+              {" - "}
+              {participantEmails.join(", ")}
+            </span>
+          )}
+        </div>
         <div className={styles.threadModalActions}>
           <Tooltip text="Minimize" position="left">
             <button

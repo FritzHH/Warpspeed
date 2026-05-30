@@ -33,7 +33,7 @@
 /* White card surface used by payment rows, totals boxes, etc. */
 .card {
   width: 100%;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   margin-bottom: 5px;
   padding: 5px;
   flex-shrink: 0;
@@ -52,7 +52,7 @@
 
 /* Small pill badge (e.g. "Fully Refunded", "REFUND" tag). */
 .pill {
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 2px 8px;
   flex-shrink: 0;
 }

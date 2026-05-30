@@ -10,8 +10,8 @@ import {
   Dialog,
   LoadingIndicator,
   ReceiptSentOverlay,
-  ModalFooter,
-  ModalFooterButton,
+  LargeModalHeader,
+  LargeModalHeaderButton,
 } from "../../../../dom_components";
 import { C, Fonts, ICONS } from "../../../../styles";
 import styles from "./NewRefundModalScreen.module.css";
@@ -860,15 +860,21 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       visible={visible}
       onClose={handleClose}
       preventClose={formLocked}
-      title="Refund"
       aria-label="Refund"
     >
       <div
         className={styles.modalBox}
         style={{ backgroundColor: lightenRGBByPercent(C.backgroundWhite, 35) }}
       >
-        {/* ── Header ──────────────────────────────────── */}
-        <div className={styles.header} style={{ borderBottomColor: C.borderSubtle }}>
+        <LargeModalHeader
+          title="Refund"
+          actions={
+            <LargeModalHeaderButton variant="default" disabled={formLocked} onClick={handleClose}>
+              CLOSE
+            </LargeModalHeaderButton>
+          }
+        />
+        <div className={styles.subHeader} style={{ borderBottomColor: C.borderSubtle }}>
           <div className={styles.headerLeft}>
             <span
               className={styles.headerSaleID}
@@ -910,7 +916,6 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
             })()}
           </div>
 
-          {/* Center: REFUND SCREEN label */}
           <div className={styles.headerCenter}>
             <div className={styles.headerCenterPill} style={{ backgroundColor: C.lightred }}>
               <span className={styles.headerCenterText} style={{ fontWeight: Fonts.weight.textHeavy }}>
@@ -1231,15 +1236,6 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
           </div>
         )}
 
-        <ModalFooter>
-          <ModalFooterButton
-            variant="danger"
-            disabled={formLocked}
-            onClick={handleClose}
-          >
-            Close
-          </ModalFooterButton>
-        </ModalFooter>
 
         {/* ── Send Receipt Modal ───────────────────── */}
         {sShowSendReceiptModal && (

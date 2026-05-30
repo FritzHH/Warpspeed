@@ -1,5 +1,7 @@
 /* eslint-disable */
 const { jsPDF } = require("jspdf");
+const { buildSaleReceiptPDF } = require("./shared/saleReceiptPdf");
+const { buildIntakeReceiptPDF } = require("./shared/intakeReceiptPdf");
 
 const cap = (s) => s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "";
 
@@ -186,177 +188,14 @@ function addLineItems(doc, lines, y, leftX, rightX, margin, includeReceiptNotes,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Sale Receipt PDF
+// Sale Receipt PDF — delegates to shared builder (src/shared/saleReceiptPdf.js)
 ////////////////////////////////////////////////////////////////////////////////
 
 function generateSaleReceiptPDF(data, labels) {
-  let L = { ...DEFAULT_SALE_LABELS, ...(labels || {}) };
-  let pageWidth = 226;
-  let margin = 10;
-  let contentWidth = pageWidth - margin * 2;
-  let centerX = pageWidth / 2;
-  let leftX = margin;
-  let rightX = pageWidth - margin;
-
-  let doc = new jsPDF({ unit: "pt", format: [pageWidth, 800] });
-  let y = margin + 10;
-
-  y = addShopHeader(doc, y, data, centerX);
-
-  if (data.barcode) {
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.text(data.barcode, centerX, y, { align: "center" });
-    y += 10;
-  }
-
-  y = addDivider(doc, y, leftX, rightX);
-
-  y += 10;
-  doc.setFontSize(12);
-  doc.setFont("helvetica", "bold");
-  doc.text(L.title, centerX, y, { align: "center" });
-  y += 14;
-
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  if (data.transactionDateTime) {
-    doc.text(data.transactionDateTime, centerX, y, { align: "center" });
-    y += 10;
-  } else if (data.millis || data.startedOnMillis) {
-    let d = new Date(Number(data.millis || data.startedOnMillis));
-    let dateStr = d.toLocaleDateString() + "  " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-    doc.text(dateStr, centerX, y, { align: "center" });
-    y += 10;
-  }
-  y += 6;
-
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  let custName = [cap(data.first), cap(data.last)].filter(Boolean).join(" ");
-  if (custName) {
-    doc.text(L.customer + ": " + custName, leftX, y);
-    y += 11;
-  }
-  if (data.customerCell) {
-    doc.text("Account Phone: " + (data.customerContact || data.customerCell), leftX, y);
-    y += 11;
-  } else if (data.customerContact) {
-    doc.text(L.contact + ": " + data.customerContact, leftX, y);
-    y += 11;
-  }
-
-  if (data.workorderNumber) {
-    doc.text(L.woNumber + ": " + formatWorkorderNumber(data.workorderNumber), leftX, y);
-    y += 11;
-  }
-
-  y += 4;
-  y = addDivider(doc, y, leftX, rightX);
-
-  y = addLineItems(doc, data.workorderLines, y, leftX, rightX, margin, true, L);
-  y = addDivider(doc, y, leftX, rightX);
-
-  y = addTotals(doc, y, data, leftX, rightX, L);
-  y += 4;
-  y = addDivider(doc, y, leftX, rightX);
-
-  let payments = data.payments || [];
-  if (payments.length > 0) {
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text(L.payments, leftX, y);
-    y += 13;
-
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
-    payments.forEach((p) => {
-      y = checkPageBreak(doc, y, 20, margin);
-      let type = p.method === "cash" ? L.cash : p.method === "check" ? "Check" : p.cardType || L.card;
-      let amount = "$" + formatCents(p.amountCaptured || 0);
-      let detail = p.last4 ? " (..." + p.last4 + ")" : "";
-      doc.text(type + detail + "  " + amount, leftX + 4, y);
-      y += 11;
-
-      if (p.method === "card" && p.authorizationCode) {
-        doc.text("  " + L.auth + ": " + p.authorizationCode, leftX + 4, y);
-        y += 11;
-      }
-
-      if (p.method === "cash" && p.amountTendered > p.amountCaptured) {
-        let change = p.amountTendered - p.amountCaptured;
-        doc.text("  " + L.tendered + ": $" + formatCents(p.amountTendered) + "  " + L.change + ": $" + formatCents(change), leftX + 4, y);
-        y += 11;
-      }
-    });
-    y += 4;
-
-    if (data.amountCaptured > 0) {
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.text(L.amountPaid + ": $" + formatCents(data.amountCaptured), leftX, y);
-      y += 14;
-    }
-
-    y = addDivider(doc, y, leftX, rightX);
-  }
-
-  let customerNotes = data.customerNotes || [];
-  if (customerNotes.length > 0) {
-    y = checkPageBreak(doc, y, 30, margin);
-    doc.setFontSize(9);
-    doc.setFont("helvetica", "bold");
-    doc.text(L.notesHeader, leftX, y);
-    y += 13;
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    customerNotes.forEach((note) => {
-      y = checkPageBreak(doc, y, 12, margin);
-      let noteText = typeof note === "string" ? note : note.value || note.text || note.note || "";
-      if (noteText) {
-        let noteLines = doc.splitTextToSize("• " + noteText, contentWidth - 6);
-        noteLines.forEach((nl) => {
-          doc.text(nl, leftX + 2, y);
-          y += 9;
-        });
-        y += 2;
-      }
-    });
-
-    y += 2;
-    y = addDivider(doc, y, leftX, rightX);
-  }
-
-  if (data.taxFree) {
-    y = checkPageBreak(doc, y, 20, margin);
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "italic");
-    doc.setTextColor(100, 100, 100);
-    let taxFreeText = "* This ticket contained only labor, no sale items were transferred to the customer *";
-    let taxFreeLines = doc.splitTextToSize(taxFreeText, contentWidth);
-    taxFreeLines.forEach((line) => {
-      doc.text(line, centerX, y, { align: "center" });
-      y += 9;
-    });
-    doc.setTextColor(0);
-    y += 6;
-  }
-
-  if (data.thankYouBlurb) {
-    y = checkPageBreak(doc, y, 40, margin);
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "italic");
-    let thankLines = doc.splitTextToSize(data.thankYouBlurb, contentWidth);
-    thankLines.forEach((line) => {
-      doc.text(line, centerX, y, { align: "center" });
-      y += 9;
-    });
-    y += 6;
-  }
-
+  let doc = buildSaleReceiptPDF(data, labels);
   return doc.output("datauristring").split(",")[1];
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Refund Receipt PDF
@@ -680,138 +519,14 @@ function generateGiftCardReceiptPDF(data) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// Workorder Ticket PDF
+// Workorder Ticket PDF — delegates to shared builder (src/shared/intakeReceiptPdf.js)
 ////////////////////////////////////////////////////////////////////////////////
 
 function generateWorkorderTicketPDF(data) {
-  let pageWidth = 340;
-  let margin = 14;
-  let leftX = margin;
-  let rightX = pageWidth - margin;
-  let centerX = pageWidth / 2;
-  let contentWidth = rightX - leftX;
-
-  let doc = new jsPDF({ unit: "pt", format: [pageWidth, 900] });
-  let y = margin + 10;
-
-  y = addShopHeader(doc, y, data, centerX);
-
-  if (data.barcode) {
-    doc.setFontSize(7);
-    doc.setFont("helvetica", "normal");
-    doc.text(data.barcode, centerX, y, { align: "center" });
-    y += 10;
-  }
-
-  y = addDivider(doc, y, leftX, rightX);
-
-  y += 10;
-  doc.setFontSize(13);
-  doc.setFont("helvetica", "bold");
-  let isIntake = data.receiptType === "Intake";
-  let ticketTitle = isIntake ? "INTAKE/ESTIMATE TICKET" : "FINALIZED WORKORDER TICKET";
-  doc.text(ticketTitle, centerX, y, { align: "center" });
-  y += 18;
-
-  doc.setFontSize(9);
-  doc.setFont("helvetica", "normal");
-  if (data.workorderNumber) { doc.text("WO #: " + formatWorkorderNumber(data.workorderNumber), leftX, y); y += 12; }
-  if (data.startedOnMillis) { doc.text("Date: " + new Date(Number(data.startedOnMillis)).toLocaleDateString(), leftX, y); y += 12; }
-  if (data.status) { doc.text("Status: " + data.status, leftX, y); y += 12; }
-  if (data.startedBy) { doc.text("By: " + data.startedBy, leftX, y); y += 12; }
-
-  y += 4;
-
-  let custName = [cap(data.first), cap(data.last)].filter(Boolean).join(" ");
-  if (custName) {
-    doc.setFont("helvetica", "bold");
-    doc.text("Customer: ", leftX, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(custName, leftX + 55, y);
-    y += 12;
-  }
-  if (data.customerContact) {
-    doc.text("Contact: " + data.customerContact, leftX, y);
-    y += 12;
-  }
-
-  y += 4;
-
-  let bikeInfo = [data.brand, data.description].filter(Boolean).join(" ");
-  if (bikeInfo) {
-    doc.setFont("helvetica", "bold");
-    doc.text("Bike: ", leftX, y);
-    doc.setFont("helvetica", "normal");
-    doc.text(bikeInfo, leftX + 28, y);
-    y += 12;
-  }
-  if (data.description) {
-    doc.text("Description: " + data.description, leftX, y);
-    y += 12;
-  }
-  let colors = [data.color1, data.color2].filter(Boolean).join(", ");
-  if (colors) {
-    doc.text("Colors: " + colors, leftX, y);
-    y += 12;
-  }
-  if (isIntake && (data.waitTimeEstimateLabel || data.waitTime)) {
-    doc.text("Estimate: " + (data.waitTimeEstimateLabel || data.waitTime), leftX, y);
-    y += 12;
-  }
-
-  y += 4;
-  y = addDivider(doc, y, leftX, rightX);
-
-  y = addLineItems(doc, data.workorderLines, y, leftX, rightX, margin, true);
-  y = addDivider(doc, y, leftX, rightX);
-
-  y = addTotals(doc, y, data, leftX, rightX);
-
-  y += 6;
-  y = addDivider(doc, y, leftX, rightX);
-
-  let customerNotes = data.customerNotes;
-  if (customerNotes && customerNotes.length > 0) {
-    y = checkPageBreak(doc, y, 30, margin);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "bold");
-    doc.text("Notes", leftX, y);
-    y += 14;
-
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "normal");
-    customerNotes.forEach((note) => {
-      y = checkPageBreak(doc, y, 15, margin);
-      let noteText = typeof note === "string" ? note : note.value || note.text || note.note || "";
-      if (noteText) {
-        let noteLines = doc.splitTextToSize("• " + noteText, contentWidth - 10);
-        noteLines.forEach((nl) => {
-          doc.text(nl, leftX + 4, y);
-          y += 10;
-        });
-        y += 4;
-      }
-    });
-    y += 4;
-    y = addDivider(doc, y, leftX, rightX);
-  }
-
-  if (isIntake && data.intakeBlurb) {
-    y = checkPageBreak(doc, y, 40, margin);
-    doc.setFontSize(10);
-    doc.setFont("helvetica", "italic");
-    doc.setTextColor(100, 100, 100);
-    let blurbLines = doc.splitTextToSize(data.intakeBlurb, contentWidth);
-    blurbLines.forEach((line) => {
-      doc.text(line, centerX, y, { align: "center" });
-      y += 9;
-    });
-    doc.setTextColor(0);
-    y += 8;
-  }
-
+  let doc = buildIntakeReceiptPDF(data);
   return doc.output("datauristring").split(",")[1];
 }
+
 
 ////////////////////////////////////////////////////////////////////////////////
 // Transaction Receipt PDF (deposits, gift card purchases, standalone txns)

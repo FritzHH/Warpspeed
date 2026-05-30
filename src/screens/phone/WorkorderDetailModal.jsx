@@ -1,6 +1,6 @@
 /* eslint-disable */
 import { useState } from "react";
-import { ICONS } from "../../styles";
+import { ICONS, Radius } from "../../styles";
 import { useOpenWorkordersStore, useAlertScreenStore } from "../../stores";
 import {
   resolveStatus,
@@ -24,7 +24,7 @@ const STATUS_BUTTON_BASE_STYLE = {
   alignSelf: "flex-start",
   paddingHorizontal: 12,
   paddingVertical: 8,
-  borderRadius: 8,
+  borderRadius: Radius.row,
 };
 const STATUS_BUTTON_TEXT_BASE_STYLE = {
   fontWeight: "500",

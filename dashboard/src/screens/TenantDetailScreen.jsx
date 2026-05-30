@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../firebase";
 
@@ -83,6 +83,10 @@ const reconnectEmailWatchCallable = httpsCallable(
 const forceEmailSyncCallable = httpsCallable(
   functions,
   "platformAdminForceEmailSync"
+);
+const deleteTenantCallable = httpsCallable(
+  functions,
+  "platformAdminDeleteTenantCallable"
 );
 
 const ENTITY_TYPES = [
@@ -278,9 +282,16 @@ const EMAIL_STATUS_LABELS = {
 
 export function TenantDetailScreen() {
   const { tenantID } = useParams();
+  const navigate = useNavigate();
   const [tenant, setTenant] = useState(null);
   const [loadError, setLoadError] = useState("");
   const [loading, setLoading] = useState(true);
+  // Danger-zone delete state. Opens inline confirm; requires typing the tenant
+  // name to enable the destructive button.
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState("");
+  const [deleteBusy, setDeleteBusy] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const [provisioning, setProvisioning] = useState(false);
   const [provisionError, setProvisionError] = useState("");
   // Lifecycle = deactivate / reactivate / close. One action open at a time;
@@ -385,12 +396,6 @@ export function TenantDetailScreen() {
         setLoading(false);
       });
   }, [tenantID]);
-
-  useEffect(() => {
-    loadTenant();
-    refreshA2PStatus();
-    loadEmailStatus();
-  }, [loadTenant, refreshA2PStatus, loadEmailStatus]);
 
   const openLifecycle = (action) => {
     setLifecycleAction(action);
@@ -784,6 +789,12 @@ export function TenantDetailScreen() {
     }
   }, [tenantID]);
 
+  useEffect(() => {
+    loadTenant();
+    refreshA2PStatus();
+    loadEmailStatus();
+  }, [loadTenant, refreshA2PStatus, loadEmailStatus]);
+
   const reconnectEmailWatch = async (accountKey) => {
     setEmailRowBusy((b) => ({ ...b, [accountKey]: "reconnect" }));
     setEmailRowResult((r) => ({ ...r, [accountKey]: null }));
@@ -918,6 +929,40 @@ export function TenantDetailScreen() {
 
   const confirmTone =
     lifecycleAction === "reactivate" ? "primaryButton" : "dangerButton";
+
+  const expectedDeleteText = tenant?.name || tenantID;
+  const deleteConfirmMatches =
+    deleteConfirmText.trim() === expectedDeleteText;
+
+  function openDelete() {
+    setDeleteOpen(true);
+    setDeleteConfirmText("");
+    setDeleteError("");
+  }
+
+  function cancelDelete() {
+    setDeleteOpen(false);
+    setDeleteConfirmText("");
+    setDeleteError("");
+  }
+
+  async function runDelete() {
+    if ((!deleteConfirmMatches && !import.meta.env.DEV) || deleteBusy) return;
+    setDeleteBusy(true);
+    setDeleteError("");
+    try {
+      await deleteTenantCallable({
+        tenantID,
+        confirmTenantName: expectedDeleteText,
+      });
+      navigate("/");
+    } catch (err) {
+      const code = err?.code || "";
+      const msg = err?.message || "Failed to delete tenant.";
+      setDeleteError(code ? `${code}: ${msg}` : msg);
+      setDeleteBusy(false);
+    }
+  }
 
   return (
     <div className="pageScreen">
@@ -2568,6 +2613,63 @@ export function TenantDetailScreen() {
               })}
             </div>
           </>
+        )}
+
+        <div className="sectionTitle">Danger zone</div>
+        {!deleteOpen && (
+          <div className="buttonRow">
+            <button
+              type="button"
+              className="dangerButton"
+              onClick={import.meta.env.DEV ? runDelete : openDelete}
+              disabled={deleteBusy}
+            >
+              {deleteBusy ? "Deleting…" : "Delete tenant"}
+            </button>
+            {import.meta.env.DEV && deleteError && (
+              <span className="errorText">{deleteError}</span>
+            )}
+          </div>
+        )}
+        {deleteOpen && (
+          <div className="inlineConfirm">
+            <p className="helperText">
+              Permanently deletes the tenant doc, all stores, settings, and
+              subcollections. Clears the owner's auth claims so the email can
+              be reused. Stripe Connect / Twilio subaccount resources are NOT
+              torn down — close those separately above before deleting.
+            </p>
+            <label className="fieldLabel">
+              Type <strong>{expectedDeleteText}</strong> to confirm
+            </label>
+            <input
+              type="text"
+              className="textInput"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              disabled={deleteBusy}
+              autoComplete="off"
+            />
+            <div className="buttonRow">
+              <button
+                type="button"
+                className="secondaryButton"
+                onClick={cancelDelete}
+                disabled={deleteBusy}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="dangerButton"
+                onClick={runDelete}
+                disabled={!deleteConfirmMatches || deleteBusy}
+              >
+                {deleteBusy ? "Deleting…" : "Permanently delete tenant"}
+              </button>
+            </div>
+            {deleteError && <div className="errorText">{deleteError}</div>}
+          </div>
         )}
       </div>
     </div>

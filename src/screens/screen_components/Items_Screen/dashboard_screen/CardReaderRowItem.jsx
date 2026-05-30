@@ -1,7 +1,7 @@
 import React from "react";
 import styles from "./CardReaderRowItem.module.css";
 import { Button, Image, TextInput } from "../../../../dom_components";
-import { C, ICONS } from "../../../../styles";
+import { C, ICONS, Radius } from "../../../../styles";
 
 
 export function CardReaderRowItem({
@@ -67,7 +67,7 @@ export function CardReaderRowItem({
                 borderWidth: 1,
                 borderStyle: "solid",
                 borderColor: C.buttonLightGreenOutline,
-                borderRadius: 5,
+                borderRadius: Radius.control,
                 minWidth: 140,
               }}
               onFocus={() => {
@@ -78,9 +78,19 @@ export function CardReaderRowItem({
           </div>
         )}
       </div>
-      <button type="button" className={styles.deleteButton} onClick={onDelete}>
-        <Image icon={ICONS.trash} size={14} />
-      </button>
+      <Button
+        icon={ICONS.trash}
+        iconSize={14}
+        onPress={onDelete}
+        buttonStyle={{
+          paddingLeft: 4,
+          paddingRight: 4,
+          paddingTop: 4,
+          paddingBottom: 4,
+          backgroundColor: "transparent",
+        }}
+        iconStyle={{ marginRight: 0 }}
+      />
     </div>
   );
 }

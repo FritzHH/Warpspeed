@@ -1,7 +1,7 @@
 /* eslint-disable */
 import { useState, useRef, memo } from "react";
 import { Button, SmallLoadingIndicator, Tooltip } from "../../../../dom_components";
-import { C, COLOR_GRADIENTS, Fonts, ICONS } from "../../../../styles";
+import { C, COLOR_GRADIENTS, Fonts, ICONS, Radius } from "../../../../styles";
 import { usdTypeMask, formatCurrencyDisp, log, generateEAN13Barcode } from "../../../../utils";
 import { useSettingsStore } from "../../../../stores";
 import { newCheckoutProcessStripeRefund } from "./newCheckoutFirebaseCalls";
@@ -184,7 +184,7 @@ export const CardRefund = memo(function CardRefund({
   let buttonStyle = {
     paddingTop: 8,
     paddingBottom: 8,
-    borderRadius: 6,
+    borderRadius: Radius.control,
     alignItems: "center",
     justifyContent: "center",
   };

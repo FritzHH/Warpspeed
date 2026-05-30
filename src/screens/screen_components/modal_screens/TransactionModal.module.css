@@ -2,19 +2,19 @@
   width: 45vw;
   max-width: 600px;
   height: 70vh;
-  border-radius: 8px;
+  border-radius: var(--radius-row);
   overflow: hidden;
   display: flex;
   flex-direction: column;
 }
 
-.header {
+.toolbar {
   display: flex;
   flex-direction: row;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  padding: 12px 20px;
-  border-bottom: 1px solid;
+  gap: 8px;
+  padding: 8px 20px;
   flex-shrink: 0;
 }
 
@@ -24,16 +24,9 @@
   align-items: center;
 }
 
-.headerRight {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
-}
-
 .methodBadge {
   padding: 4px 14px;
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   font-size: 12px;
   font-weight: 600;
 }
@@ -83,7 +76,7 @@
 }
 
 .amountCard {
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   border-width: 1px;
   border-style: solid;
   padding: 12px;
@@ -116,7 +109,7 @@
 }
 
 .refundInfoCard {
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   border-width: 1px;
   border-style: solid;
   padding: 12px;
@@ -153,13 +146,13 @@
 
 .refundBar {
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   overflow: hidden;
 }
 
 .refundBarFill {
   height: 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
 }
 
 .refundInfoPercent {
@@ -170,7 +163,7 @@
 
 .refundCard {
   margin-bottom: 6px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   border-width: 1px;
   border-style: solid;
   padding: 10px;
@@ -191,7 +184,7 @@
 
 .refundBadge {
   padding: 2px 8px;
-  border-radius: 4px;
+  border-radius: var(--radius-control);
   margin-right: 8px;
   font-size: 10px;
   font-weight: 600;

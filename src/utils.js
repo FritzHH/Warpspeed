@@ -1292,6 +1292,66 @@ export function generate36CharUUID() {
 }
 
 /**
+ * Generate a random hex salt for PIN hashing (128 bits of entropy).
+ * @returns {string} 32-char hex string
+ */
+export function generatePinSalt() {
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Hash a PIN with a salt using SHA-256.
+ * @param {string} pin - Plaintext PIN
+ * @param {string} salt - Hex salt from generatePinSalt
+ * @returns {Promise<string>} 64-char hex hash, or "" if inputs missing
+ */
+export async function hashPin(pin, salt) {
+  if (!pin || !salt) return "";
+  const data = new TextEncoder().encode(salt + ":" + pin);
+  const buf = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(buf)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
+ * Verify a candidate PIN against a user's stored hash + salt.
+ * Falls back to legacy plaintext `pin` field for backward compat during migration.
+ * @returns {Promise<boolean>}
+ */
+export async function verifyPin(candidate, user) {
+  if (!candidate || !user) return false;
+  if (user.pinHash && user.pinSalt) {
+    const hash = await hashPin(candidate, user.pinSalt);
+    return hash === user.pinHash;
+  }
+  if (user.pin) return user.pin == candidate;
+  return false;
+}
+
+/**
+ * Verify a candidate PIN against a user's alternate PIN hash + salt (or legacy plaintext).
+ * @returns {Promise<boolean>}
+ */
+export async function verifyAlternatePin(candidate, user) {
+  if (!candidate || !user) return false;
+  if (user.alternatePinHash && user.alternatePinSalt) {
+    const hash = await hashPin(candidate, user.alternatePinSalt);
+    return hash === user.alternatePinHash;
+  }
+  if (user.alternatePin) return user.alternatePin == candidate;
+  return false;
+}
+
+/**
+ * True if user has a PIN set, either as new hashed form or legacy plaintext.
+ */
+export function userHasPin(user) {
+  if (!user) return false;
+  return !!(user.pinHash && user.pinSalt) || !!user.pin;
+}
+
+/**
  * Decode a Lightspeed barcode into type and original LS ID.
  * LS uses prefix 22 for sales, 25 for workorders.
  * @param {string} barcode - 12-digit barcode string
@@ -1881,8 +1941,13 @@ export function showAlert({
   canExitOnOuterClick,
   alertBoxStyle,
   showAlert = true,
+  ...rest
 }) {
-  useAlertScreenStore.setState({
+  if (!showAlert) {
+    useAlertScreenStore.getState().dismissTop();
+    return;
+  }
+  useAlertScreenStore.getState().setValues({
     title,
     severity,
     message,
@@ -1901,8 +1966,28 @@ export function showAlert({
     handleBtn3Press,
     canExitOnOuterClick,
     alertBoxStyle,
-    showAlert,
+    ...rest,
   });
+}
+
+export function getPrinterStatus(zSettings) {
+  const settings = zSettings ?? useSettingsStore.getState().getSettings();
+  const selectedPrinterID = localStorageWrapper.getItem("selectedPrinterID") || null;
+  const selectedPrinter = selectedPrinterID ? settings?.printers?.[selectedPrinterID] : null;
+  const isPrinterOnline = !!(selectedPrinter && selectedPrinter.active === true);
+  const isPrinterOffline = !!(selectedPrinter && selectedPrinter.active !== true);
+  const printerName = selectedPrinter?.name || null;
+  const offlineLabel = printerName
+    ? `Printer "${printerName}" is offline`
+    : "Selected printer is offline";
+  return {
+    selectedPrinterID,
+    selectedPrinter: selectedPrinter || null,
+    printerName,
+    isPrinterOnline,
+    isPrinterOffline,
+    offlineLabel,
+  };
 }
 
 export function showPrinterOfflineAlert({ printerName, onContinue } = {}) {

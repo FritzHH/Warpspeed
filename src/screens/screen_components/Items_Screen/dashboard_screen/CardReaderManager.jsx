@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import styles from "./CardReaderManager.module.css";
 import { DropdownMenu } from "../../../../dom_components";
 import { useAlertScreenStore } from "../../../../stores";
-import { C } from "../../../../styles";
+import { C, Radius } from "../../../../styles";
 import { localStorageWrapper } from "../../../../utils";
 import { CardReaderRowItem } from "./CardReaderRowItem";
 
@@ -136,7 +136,7 @@ export function CardReaderManager({
           buttonText={selectedLabel || "None"}
           buttonTextStyle={{ fontSize: 14 }}
           buttonStyle={{
-            borderRadius: 5,
+            borderRadius: Radius.control,
             borderWidth: 1,
             borderColor: C.buttonLightGreenOutline,
             paddingHorizontal: 7,

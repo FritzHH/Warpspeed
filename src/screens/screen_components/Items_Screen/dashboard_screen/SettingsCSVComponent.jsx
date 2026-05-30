@@ -2,7 +2,7 @@ import React, { useRef, useState } from "react";
 import styles from "./SettingsCSVComponent.module.css";
 import { Button } from "../../../../dom_components";
 import { useSettingsStore } from "../../../../stores";
-import { C, COLOR_GRADIENTS } from "../../../../styles";
+import { C, COLOR_GRADIENTS, Radius } from "../../../../styles";
 
 
 export function SettingsCSVComponent() {
@@ -84,13 +84,13 @@ export function SettingsCSVComponent() {
           text="Download Settings CSV"
           onPress={handleDownloadCSV}
           colorGradientArr={COLOR_GRADIENTS.blue}
-          buttonStyle={{ borderRadius: 5, paddingHorizontal: 20 }}
+          buttonStyle={{ borderRadius: Radius.control, paddingHorizontal: 20 }}
         />
         <Button
           text={sUploading ? "Importing..." : "Rehydrate from CSV"}
           onPress={() => fileInputRef.current?.click()}
           colorGradientArr={COLOR_GRADIENTS.green}
-          buttonStyle={{ borderRadius: 5, paddingHorizontal: 20 }}
+          buttonStyle={{ borderRadius: Radius.control, paddingHorizontal: 20 }}
           disabled={sUploading}
           loading={sUploading}
         />

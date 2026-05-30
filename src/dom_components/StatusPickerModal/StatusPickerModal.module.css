@@ -1,7 +1,7 @@
 .trigger {
   border-width: 1px;
   border-style: solid;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   padding: 2px 8px;
   height: 25px;
   display: flex;
@@ -33,7 +33,7 @@
   position: fixed;
   top: 10px;
   bottom: 10px;
-  border-radius: 5px;
+  border-radius: var(--radius-control);
   overflow: hidden;
   background-color: var(--surface-base);
   box-shadow: 0 4px 20px var(--shadow-color-default);
@@ -54,7 +54,7 @@
 
 .scrollArea::-webkit-scrollbar-thumb {
   background: var(--border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-control);
 }
 
 .scrollArea::-webkit-scrollbar-thumb:hover {

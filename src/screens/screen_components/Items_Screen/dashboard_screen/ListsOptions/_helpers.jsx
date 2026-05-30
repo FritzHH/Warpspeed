@@ -1,6 +1,6 @@
 import React from "react";
 import { Button, TouchableOpacity, Image } from "../../../../../dom_components";
-import { C, ICONS } from "../../../../../styles";
+import { C, ICONS, Radius } from "../../../../../styles";
 
 
 export function BoxButton1({
@@ -22,7 +22,7 @@ export function BoxButton1({
       buttonStyle={{
         paddingHorizontal: 0,
         paddingVertical: 0,
-        borderRadius: 5,
+        borderRadius: Radius.control,
         backgroundColor: C.surfaceAlt,
         marginBottom: 0,
         ...style,
@@ -82,7 +82,7 @@ export function BoxContainerInner({ style = {}, children, borderless = false }) 
         borderStyle: "solid",
         borderColor: C.buttonLightGreenOutline,
         backgroundColor: C.listItemWhite,
-        borderRadius: 10,
+        borderRadius: Radius.row,
         padding: 15,
         boxSizing: "border-box",
         flexShrink: 0,

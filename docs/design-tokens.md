@@ -17,7 +17,7 @@ These 8 decisions are locked. Any change requires a new ADR-style entry below.
 | 1 | **Brand color = per-tenant in Firestore** at `settings.branding.primaryColor`, injected via inline `<style>` tag at boot | Tenants self-serve from their dashboard; no code deploy per tenant |
 | 2 | **Dark mode = per-user**, stored in `localStorage` (`warpspeed.theme`) | Personal preference, not brand mandate |
 | 3 | **Designer ownership = dev team (solo)** for now | Pragmatic naming; no blocker on a designer hire |
-| 4 | **v1 scope = colors only.** No typography, spacing, radius tokens in this project | Hold the line; one system at a time |
+| 4 | **v1 scope = colors only.** Z-index and radius added as separate registries; typography and spacing still out of scope. | Hold the line; one system at a time. Radius added 2026-05-28 (four role-based buckets, see "Radius Registry" below). |
 | 5 | **`/tokens` swatch page = admin-only**, gated by `PRIVILEDGE_LEVELS.Admin` | Quick to ship; no new auth work |
 | 6 | **Dead `C.*` refs cleaned up in Phase 4**: remove `C.purple=""`, `C.textMain`, `C.darkText` | Silent bugs; one-line fixes |
 | 7 | **`C.backgroundWhite` + `C.backgroundListWhite` collapse to one `--surface-base`** | Functionally identical today |
@@ -337,6 +337,67 @@ Rare. Pick a value with breathing room (e.g. 6000 for a hypothetical "above-moda
 
 ---
 
+## Radius Registry
+
+Border radii are tokenized into four role-based buckets. The values cluster well: an audit of ~976 `border-radius` / `borderRadius` call sites across 179 files showed real usage falling into four groups (small controls, list rows, large containers, fully rounded). Pinning the buckets at four prevents the "increment by 1px until it looks right" drift that produced the original spread.
+
+CSS modules consume `var(--radius-*)`. Inline-style JSX consumes the `Radius.*` mirrors from `src/styles.js`.
+
+### Buckets
+
+| Token | Value | Use for |
+|---|---|---|
+| `--radius-container` / `Radius.container` | `4px` | Modal cards, large panels, dashboard sections, big content cards |
+| `--radius-row`       / `Radius.row`       | `8px`  | List rows, workorder cards, table cells, smaller cards |
+| `--radius-control`   / `Radius.control`   | `4px`  | Buttons, inputs, dropdowns, chips, tags |
+| `--radius-pill`      / `Radius.pill`      | `9999px` | Fully rounded - badges, toggles, avatars, status dots |
+
+### Bucketing rule of thumb
+
+When in doubt, classify by **what the element is**, not by what radius it happens to have today:
+
+- A button is a `control` even if it's currently set to 10px.
+- A modal card is a `container` even if it's currently set to 8px.
+- A list row is a `row` even if it's currently set to 6px.
+
+The migration may shift a few elements visually (e.g. controls at 8px become 6px). That is the intent of standardization. If a single element strongly resists the new bucket value, the right answer is *almost never* "add a fifth bucket" - it's either to re-classify the element or accept the new value.
+
+### Asymmetric corners
+
+For top-only / bottom-only / left-only rounding, use individual corner properties referencing the same tokens:
+
+```css
+.cardTopOnly {
+  border-top-left-radius: var(--radius-row);
+  border-top-right-radius: var(--radius-row);
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+```
+
+Shorthand with mixed corners (`border-radius: 8px 8px 0 0`) is also valid:
+
+```css
+border-radius: var(--radius-row) var(--radius-row) 0 0;
+```
+
+### Adding a new bucket
+
+Almost never. Before adding a fifth, verify:
+
+1. There is a real, recurring use case (3+ distinct components want the same out-of-bucket value).
+2. The use case can't be solved by re-classifying the components (e.g. a "card" that's neither row nor container is probably one or the other).
+3. The new bucket name is role-based, not value-based (e.g. `tile`, not `radius-10`).
+
+If all three hold, add to all three places (this doc, `tokens.css`, `styles.js`) in the same PR.
+
+### Outside scope
+
+- Non-rectangular shapes (clip-path, custom SVG outlines) are not radius - they're geometry. Keep as-is.
+- jsPDF / canvas radius arguments (`pdf.roundedRect(x, y, w, h, r1, r2)`) take numeric pixel values, not CSS tokens. Use `resolveToken("radius-row")` to read the px value into JS, then strip the `px` suffix. Sites are rare; leave as raw px until a pattern emerges.
+
+---
+
 ## Open Questions Resolved by Defaults
 
 | Question | Resolution (default chosen) |
@@ -364,3 +425,4 @@ Approximate size: ~100 lines for Layer 1, ~25 lines for Layer 2, ~30 lines for d
 
 - **2026-05-19** - Phase 2 vocabulary v1 (this doc). 22 semantic tokens, 10-stop gray scale, decisions locked.
 - **2026-05-20** - Added Z-index registry: 8 stacking tokens (`--z-modal-inner-overlay`, `--z-modal-loading`, `--z-modal`, `--z-modal-content`, `--z-dropdown`, `--z-tooltip`, `--z-toast`, `--z-alert`). Mirrored on `Z` in `src/styles.js`. Tooltip/toast/alert raised above modals so they can sit on top of any open modal.
+- **2026-05-28** - Added Radius Registry: 4 role-based tokens (`--radius-container` 12px, `--radius-row` 8px, `--radius-control` 6px, `--radius-pill` 9999px). Mirrored on `Radius` in `src/styles.js`. Full sweep across `src/screens` and `src/dom_components` replaces raw `border-radius` / `borderRadius` px values.

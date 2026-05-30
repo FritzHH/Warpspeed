@@ -1,6 +1,6 @@
 .card {
   background-color: var(--surface-raised);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border-width: 1px;
   border-style: solid;
   border-color: var(--border-default);

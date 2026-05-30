@@ -1,6 +1,6 @@
 import React, { forwardRef } from "react";
 import { DayPicker } from "react-day-picker";
-import { C } from "../../styles";
+import { C, Radius } from "../../styles";
 import styles from "./DateTimePicker.module.css";
 import "react-day-picker/style.css";
 
@@ -9,10 +9,10 @@ const DEFAULT_MODIFIERS_STYLES = {
     borderColor: C.lightred,
     borderWidth: 2,
     borderStyle: "solid",
-    borderRadius: "50%",
+    borderRadius: Radius.pill,
   },
   selected: {
-    borderRadius: "50%",
+    borderRadius: Radius.pill,
     backgroundColor: C.blue,
     color: "white",
   },

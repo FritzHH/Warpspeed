@@ -59,7 +59,7 @@
 .dot {
   width: 14px;
   height: 14px;
-  border-radius: 7px;
+  border-radius: var(--radius-control);
   margin: 0 6px;
   flex-shrink: 0;
   background-color: var(--text-default);

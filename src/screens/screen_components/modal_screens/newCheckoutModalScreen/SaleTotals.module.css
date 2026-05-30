@@ -61,7 +61,7 @@
 }
 
 .successPill {
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   padding: 8px 20px;
   flex-shrink: 0;
   box-sizing: border-box;
@@ -85,7 +85,7 @@
 
 .totalsBox {
   background-color: var(--surface-warning-muted);
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border-width: 1px;
   border-style: solid;
   padding: 7px 10px;
@@ -95,7 +95,7 @@
 
 /* CashChangeNeeded */
 .changeBox {
-  border-radius: 10px;
+  border-radius: var(--radius-row);
   border-width: 2px;
   border-style: solid;
   padding: 10px;

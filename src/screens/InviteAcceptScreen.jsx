@@ -16,7 +16,7 @@
 // On either path, after sign-in we force a fresh ID token so the new custom
 // claims are visible immediately (Firebase otherwise caches the token for up
 // to 1 hour before picking them up).
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   isSignInWithEmailLink,
@@ -25,6 +25,7 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { AUTH, FUNCTIONS } from "../db_calls";
 import { ROUTES } from "../routes";
+import { C } from "../styles";
 import logo from "../resources/default_app_logo_large.png";
 import styles from "./InviteAcceptScreen.module.css";
 
@@ -130,6 +131,9 @@ export function InviteAcceptScreen() {
   const [dobDay, setDobDay] = useState("");
   const [dobYear, setDobYear] = useState("");
   const [ssnLast4, setSsnLast4] = useState("");
+
+  const userPinInputRef = useRef(null);
+  const confirmPinInputRef = useRef(null);
 
   useEffect(() => {
     if (!isSignInWithEmailLink(AUTH, window.location.href)) {
@@ -363,7 +367,16 @@ export function InviteAcceptScreen() {
               Fill in your store details and choose a 4-digit in-app PIN.
             </div>
 
-            <div className={styles.fieldGroup}>
+            <div className={styles.storeInfoSection}>
+              <div className={styles.storeInfoSectionHeading}>
+                Store Info
+              </div>
+              <div className={styles.storeInfoSectionSubheading}>
+                Basic info about the store and where customer receipts and
+                support emails should be addressed.
+              </div>
+
+              <div className={styles.fieldGroup}>
               <label className={styles.fieldLabel}>Store legal name</label>
               <input
                 type="text"
@@ -546,6 +559,7 @@ export function InviteAcceptScreen() {
                 </div>
               )}
             </div>
+            </div>
 
             <div className={styles.paymentsSection}>
               <div className={styles.paymentsSectionHeading}>
@@ -708,43 +722,115 @@ export function InviteAcceptScreen() {
               </div>
             </div>
 
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>4-digit in-app PIN</label>
-              <input
-                type="password"
-                inputMode="numeric"
-                pattern="\d{4}"
-                className={styles.textInput}
-                value={userPin}
-                onChange={(e) =>
-                  setUserPin(e.target.value.replace(/\D/g, "").slice(0, 4))
-                }
-                maxLength={4}
-                disabled={stage === STAGE.SUBMITTING_BOOTSTRAP}
-                autoComplete="off"
-                required
-              />
+            <div className={styles.pinSection}>
+              <span className={styles.pinLabel}>4-digit in-app PIN</span>
+              <div
+                className={styles.pinBoxes}
+                onClick={() => userPinInputRef.current?.focus()}
+              >
+                {Array.from({ length: 4 }).map((_, i) => {
+                  const isFilled = i < userPin.length;
+                  const isCursor = i === userPin.length;
+                  return (
+                    <div
+                      key={i}
+                      className={styles.pinBox}
+                      style={{
+                        borderColor: isCursor
+                          ? C.dangerStrong
+                          : isFilled
+                          ? C.borderFocus
+                          : C.borderSubtle,
+                        backgroundColor: isCursor
+                          ? C.dangerStrong
+                          : isFilled
+                          ? C.surfaceBase
+                          : C.surfaceAlt,
+                        boxShadow: isCursor
+                          ? `0 0 10px ${C.dangerStrong}`
+                          : "none",
+                      }}
+                    >
+                      {isFilled && (
+                        <div
+                          className={styles.pinDot}
+                          style={{ backgroundColor: C.text }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+                <input
+                  ref={userPinInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={userPin}
+                  onChange={(e) =>
+                    setUserPin(e.target.value.replace(/\D/g, "").slice(0, 4))
+                  }
+                  maxLength={4}
+                  disabled={stage === STAGE.SUBMITTING_BOOTSTRAP}
+                  className={styles.pinHiddenInput}
+                />
+              </div>
               {userPin && !pinValid && (
                 <div className={styles.errorText}>PIN must be exactly 4 digits.</div>
               )}
             </div>
 
-            <div className={styles.fieldGroup}>
-              <label className={styles.fieldLabel}>Confirm PIN</label>
-              <input
-                type="password"
-                inputMode="numeric"
-                pattern="\d{4}"
-                className={styles.textInput}
-                value={confirmUserPin}
-                onChange={(e) =>
-                  setConfirmUserPin(e.target.value.replace(/\D/g, "").slice(0, 4))
-                }
-                maxLength={4}
-                disabled={stage === STAGE.SUBMITTING_BOOTSTRAP}
-                autoComplete="off"
-                required
-              />
+            <div className={styles.pinSection}>
+              <span className={styles.pinLabel}>Confirm PIN</span>
+              <div
+                className={styles.pinBoxes}
+                onClick={() => confirmPinInputRef.current?.focus()}
+              >
+                {Array.from({ length: 4 }).map((_, i) => {
+                  const isFilled = i < confirmUserPin.length;
+                  const isCursor = i === confirmUserPin.length;
+                  return (
+                    <div
+                      key={i}
+                      className={styles.pinBox}
+                      style={{
+                        borderColor: isCursor
+                          ? C.dangerStrong
+                          : isFilled
+                          ? C.borderFocus
+                          : C.borderSubtle,
+                        backgroundColor: isCursor
+                          ? C.dangerStrong
+                          : isFilled
+                          ? C.surfaceBase
+                          : C.surfaceAlt,
+                        boxShadow: isCursor
+                          ? `0 0 10px ${C.dangerStrong}`
+                          : "none",
+                      }}
+                    >
+                      {isFilled && (
+                        <div
+                          className={styles.pinDot}
+                          style={{ backgroundColor: C.text }}
+                        />
+                      )}
+                    </div>
+                  );
+                })}
+                <input
+                  ref={confirmPinInputRef}
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={confirmUserPin}
+                  onChange={(e) =>
+                    setConfirmUserPin(e.target.value.replace(/\D/g, "").slice(0, 4))
+                  }
+                  maxLength={4}
+                  disabled={stage === STAGE.SUBMITTING_BOOTSTRAP}
+                  className={styles.pinHiddenInput}
+                />
+              </div>
               {confirmUserPin && !pinsMatch && (
                 <div className={styles.errorText}>PINs don't match.</div>
               )}

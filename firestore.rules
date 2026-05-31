@@ -139,6 +139,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Vendor catalogs (JBI, etc.) — public read so Bonita's cross-project
+    // secondary-app can read without auth ceremony. Data is non-sensitive
+    // (sourced from each vendor's public FTP). Writes are blocked entirely;
+    // the Cloud Run sync jobs use the Admin SDK which bypasses rules.
+    match /vendor_catalogs/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // DLQ entries — platform-admin can read for the admin UI. Writes only
     // happen via the ingestor + admin callables (Cloud Functions).
     match /saas-dlq/{dlqEntryID} {

@@ -85,6 +85,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
     itemSeparatorStyle = {},
     disabled = false,
     portal = true,
+    openUpward = false,
     className = "",
     buttonClassName = "",
     buttonTextClassName = "",
@@ -97,7 +98,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
   const isControlled = openProp !== undefined;
   const isOpen = isControlled ? openProp : internalOpen;
   const z = useZ("dropdown", isOpen);
-  const [menuPos, setMenuPos] = useState({ anchorCenterX: 0, anchorBottom: 10, anchorWidth: 0 });
+  const [menuPos, setMenuPos] = useState({ anchorCenterX: 0, anchorTop: 10, anchorBottom: 10, anchorWidth: 0 });
   const [focusedIdx, setFocusedIdx] = useState(-1);
   const anchorRef = useRef(null);
   const menuRef = useRef(null);
@@ -121,6 +122,7 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
     const rect = anchorRef.current.getBoundingClientRect();
     setMenuPos({
       anchorCenterX: rect.left + rect.width / 2,
+      anchorTop: rect.top - 4,
       anchorBottom: rect.bottom + 4,
       anchorWidth: rect.width,
     });
@@ -305,8 +307,14 @@ export const DropdownMenu = forwardRef(function DropdownMenu(
               const h = el.scrollHeight;
               const w = el.offsetWidth;
               const vp = window.innerHeight;
-              let top = menuPos.anchorBottom || VIEWPORT_PAD;
-              if (top + h > vp - VIEWPORT_PAD) top = Math.max(VIEWPORT_PAD, vp - VIEWPORT_PAD - Math.min(h, vp - VIEWPORT_PAD * 2));
+              let top;
+              if (openUpward) {
+                top = (menuPos.anchorTop || VIEWPORT_PAD) - h;
+                if (top < VIEWPORT_PAD) top = VIEWPORT_PAD;
+              } else {
+                top = menuPos.anchorBottom || VIEWPORT_PAD;
+                if (top + h > vp - VIEWPORT_PAD) top = Math.max(VIEWPORT_PAD, vp - VIEWPORT_PAD - Math.min(h, vp - VIEWPORT_PAD * 2));
+              }
               let left = (menuPos.anchorCenterX || 0) - w / 2;
               if (left + w > window.innerWidth - VIEWPORT_PAD) left = window.innerWidth - VIEWPORT_PAD - w;
               if (left < VIEWPORT_PAD) left = VIEWPORT_PAD;

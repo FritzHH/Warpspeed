@@ -8,8 +8,22 @@ import { TenantDetailScreen } from "./screens/TenantDetailScreen";
 import { AddStoreScreen } from "./screens/AddStoreScreen";
 import { BillingTiersScreen } from "./screens/BillingTiersScreen";
 import { DeniedScreen } from "./screens/DeniedScreen";
+import { TenantSetupLandingScreen } from "./screens/TenantSetupLandingScreen";
 
 export function App() {
+  return (
+    <Routes>
+      {/* Tenant signup landing — gated by Firebase email-link auth. Sits
+          outside the platform-admin gate so prospects (who get auto-signed
+          in via the email-link, with no custom claims) don't get bounced to
+          the DeniedScreen. */}
+      <Route path="/welcome" element={<TenantSetupLandingScreen />} />
+      <Route path="/*" element={<AuthGatedApp />} />
+    </Routes>
+  );
+}
+
+function AuthGatedApp() {
   const [authState, setAuthState] = useState({ status: "loading", user: null, claims: null });
 
   useEffect(() => {

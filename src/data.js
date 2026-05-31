@@ -521,10 +521,42 @@ export const CUSTOMER_PREVIEW_PROTO = {
   id: "",
 };
 
+// VENDOR ORDERING ///////////////////////////////////////////////////
+// IDs are stored on inventory items (`vendorId`) and on vendor-order items
+// (`vendorCatalogID`). `catalogPath` points at the Firestore root for that
+// vendor's catalog (`vendor_catalogs/{id}/items/{item_id}`); `null` = logical
+// bucket with no catalog (Other / Unmatched). `accountNumber` TODO — not yet
+// needed; will surface on desktop split-view next to the vendor header.
+export const VENDOR_CATALOGS = [
+  {
+    id: "jbi",
+    displayName: "J&B Importers",
+    catalogPath: "vendor_catalogs/jbi",
+    color: "blue",
+    accountNumber: "", // TODO: surface on desktop split-view; not necessary yet
+  },
+  {
+    id: "qbp",
+    displayName: "QBP",
+    catalogPath: "vendor_catalogs/qbp",
+    color: "green",
+    accountNumber: "", // TODO: surface on desktop split-view; not necessary yet
+  },
+  {
+    id: "other",
+    displayName: "Other / Unmatched",
+    catalogPath: null,
+    color: "orange",
+    accountNumber: "", // TODO: surface on desktop split-view; not necessary yet
+  },
+];
+
 export const INVENTORY_ITEM_PROTO = {
   formalName: "",
   informalName: "",
   brand: "",
+  vendorId: "",
+  catalogName: "",
   price: 0,
   salePrice: 0,
   category: "Item",
@@ -536,6 +568,40 @@ export const INVENTORY_ITEM_PROTO = {
   customPart: false,
   customLabor: false,
   receiptNoteRequired: false,
+};
+
+// Vendor order = a purchase order being built (phone scanner + desktop polish).
+// Order doc carries only metadata; scanned items live in the `items`
+// sub-collection so per-scan writes don't rewrite the parent.
+export const VENDOR_ORDER_PROTO = {
+  id: "",
+  createdMillis: 0,
+  createdByUserID: "",
+  lastModifiedMillis: 0,
+  lastModifiedByUserID: "",
+  status: "open", // "open" | "submitted" | "received"
+  notes: "",
+  finalizedMillis: 0,
+  finalizedByUserID: "",
+};
+
+// One scanned item inside a vendor order. lookupStatus drives the desktop's
+// split-view bucketing (matched → vendor section; ambiguous → picker;
+// no_match → Other). catalogSnapshot is a verbatim copy of the matched
+// catalog doc, so the order item is self-contained for description / cost /
+// any other vendor-specific fields the desktop wants to render.
+export const VENDOR_ORDER_ITEM_PROTO = {
+  id: "",
+  scannedBarcode: "",
+  qty: 0,
+  addedMillis: 0,
+  addedByUserID: "",
+  lookupStatus: "pending", // "pending" | "matched" | "no_match" | "ambiguous"
+  vendorCatalogID: "",
+  candidateVendorIDs: [],
+  vendorItemID: "",
+  catalogSnapshot: null,
+  notes: "",
 };
 
 

@@ -263,6 +263,63 @@ body {
   line-height: 1.5;
 }
 
+.emailBanner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background-color: var(--surface-alt);
+  margin-top: 4px;
+}
+
+.emailBannerInfo {
+  background-color: #1e293b;
+  border-color: #334155;
+}
+
+.emailBannerSuccess {
+  background-color: #052e16;
+  border-color: var(--accent);
+}
+
+.emailBannerError {
+  background-color: #450a0a;
+  border-color: var(--danger);
+}
+
+.emailBannerIcon {
+  font-size: 20px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+.emailBannerInfo .emailBannerIcon {
+  color: #93c5fd;
+}
+
+.emailBannerSuccess .emailBannerIcon {
+  color: var(--accent);
+}
+
+.emailBannerError .emailBannerIcon {
+  color: var(--danger);
+}
+
+.emailBannerText {
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.4;
+}
+
+.emailBannerBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+}
+
 .cardFooter {
   display: flex;
   flex-direction: column;
@@ -459,6 +516,14 @@ body {
   justify-content: center;
   align-items: flex-start;
   padding: 32px 24px;
+}
+
+.pageStack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
 }
 
 .cardList {
@@ -892,4 +957,382 @@ body {
 
 .emailAccountMeta .metaValue {
   color: var(--text);
+}
+
+/* Tenant signup landing — single-vs-multi choice */
+.choiceGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin: 8px 0 4px;
+}
+
+.choiceCard {
+  background-color: var(--surface-alt);
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 20px;
+  text-align: left;
+  cursor: pointer;
+  color: var(--text);
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.choiceCard:hover:not(:disabled) {
+  border-color: var(--accent);
+  background-color: #3a4a64;
+}
+
+.choiceCard:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.choiceCardTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.choiceCardBody {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
+.choiceFooterNote {
+  margin-top: 8px;
+}
+
+@media (max-width: 640px) {
+  .choiceGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Tenant signup wizard — shared form chrome (multi + single shop forms) */
+.switchTypeRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.saveStatus {
+  font-size: 12px;
+  color: var(--text-muted);
+  min-height: 16px;
+}
+
+.saveStatus-saving {
+  color: var(--text-muted);
+}
+
+.saveStatus-saved {
+  color: var(--accent);
+}
+
+.saveStatus-error {
+  color: var(--danger);
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+}
+
+.setupSectionPlaceholder {
+  min-height: 80px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 13px;
+  padding: 16px;
+  margin-top: 8px;
+}
+
+.tierSummary {
+  background-color: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 8px;
+}
+
+.tierSummaryLabel {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.tierSummaryDetail {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Prominent tier banner at top of payment-phone form so the prospect is
+   always reminded which plan they were enrolled in before entering card
+   details. Uses accent color to stand out from neutral form surfaces. */
+.tierBanner {
+  background-color: var(--accent-soft, var(--surface-alt));
+  border: 1px solid var(--accent, var(--border));
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.tierBannerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.tierBannerEyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.tierBannerBadge {
+  background-color: var(--accent, var(--text));
+  color: var(--accent-fg, #fff);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.tierBannerLabel {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tierBannerDetail {
+  font-size: 13px;
+  color: var(--text);
+  margin-top: 4px;
+}
+
+/* Active variant of the placeholder, used when the prospect hasn't started
+   card setup yet — gives them a CTA button and a brief reassurance line. */
+.setupSectionPlaceholderActive {
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.placeholderHint {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.setupSectionSuccess {
+  border: 1px solid var(--success, var(--border));
+  background-color: var(--success-soft, var(--surface-alt));
+  color: var(--success-fg, var(--text));
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.cardSetupForm {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* Back/Continue row at the bottom of multi-step setup cards. Separated from
+   the in-card switchTypeRow at the top so back-button is reachable while a
+   long form is scrolled. */
+.cardFooterRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* Textarea variant of textInput — same border/padding, just resizable. */
+.textAreaInput {
+  resize: vertical;
+  min-height: 88px;
+  font-family: inherit;
+}
+
+/* "Buy new" vs "Port existing" mode picker. Two large button-cards side by
+   side with a clear active state. Click to switch modes; selected mode
+   gets the accent border. */
+.phoneModeRow {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  margin-bottom: 16px;
+}
+
+.phoneModeButton {
+  flex: 1;
+  text-align: left;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.phoneModeButton:hover {
+  border-color: var(--accent, var(--text));
+}
+
+.phoneModeButtonActive {
+  border-color: var(--accent, var(--text));
+  background-color: var(--accent-soft, var(--surface-alt));
+}
+
+.phoneModeTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.phoneModeBody {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* Number search form: area-code + locality inputs and a Search button in
+   one row. On narrow screens the button wraps below. */
+.phoneSearchForm {
+  margin-top: 4px;
+  margin-bottom: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.phoneSearchFields {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.phoneSearchField {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 140px;
+}
+
+.phoneSearchField .fieldLabel {
+  margin-bottom: 4px;
+}
+
+/* Results list — one row per candidate. Number + locality + caps on the
+   left, Select button on the right. */
+.phoneResultsList {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.phoneResultRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.phoneResultRow:last-child {
+  border-bottom: none;
+}
+
+.phoneResultMain {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.phoneResultNumber {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.phoneResultLocality {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.phoneResultCaps {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Card-style display of the purchased phone number, with a "pick a
+   different number" button below. */
+.phoneOwnedCard {
+  border: 1px solid var(--success, var(--border));
+  background-color: var(--success-soft, var(--surface-alt));
+  border-radius: 10px;
+  padding: 18px 20px;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.phoneOwnedHeader {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.phoneOwnedNumber {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.phoneOwnedDetail {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
 }

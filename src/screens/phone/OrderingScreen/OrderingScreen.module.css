@@ -1,0 +1,234 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: var(--surface-base);
+  position: relative;
+}
+
+.header {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 8%;
+  flex-shrink: 0;
+  padding: 0 4%;
+  background-color: var(--surface-alt);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.backButton {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  border: none;
+  background-color: transparent;
+  font-size: 22px;
+  color: var(--text-default);
+  cursor: pointer;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-default);
+  flex: 1;
+}
+
+.count {
+  font-size: 14px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  height: 92%;
+  flex-shrink: 0;
+  padding: 4%;
+}
+
+.video {
+  width: 100%;
+  height: 80%;
+  flex-shrink: 0;
+  background-color: rgb(0, 0, 0);
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.hint {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.errorBanner {
+  font-size: 13px;
+  color: var(--danger);
+  text-align: center;
+  padding: 0 8%;
+}
+
+/* ---- Qty modal ---- */
+
+.modalOverlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: var(--surface-overlay);
+}
+
+.modalCard {
+  display: flex;
+  flex-direction: column;
+  width: 88%;
+  max-width: 420px;
+  background-color: var(--surface-raised);
+  border-radius: 16px;
+  padding: 20px;
+  gap: 14px;
+  box-shadow: 0 12px 32px var(--shadow-color-default);
+}
+
+.modalHeader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  text-align: center;
+}
+
+.itemName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-default);
+  line-height: 1.3;
+}
+
+.itemPending {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.qtyLabel {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.keypadGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.numButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background-color: var(--surface-alt);
+  color: var(--text-default);
+  font-size: 28px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s, border-color 0.12s;
+}
+
+.numButton:active {
+  background-color: var(--gray-100);
+}
+
+.numButtonGreen {
+  background-color: var(--success);
+  border-color: var(--accent-hover);
+  color: var(--text-on-accent);
+}
+
+.numButtonGreen:active {
+  background-color: var(--accent-hover);
+}
+
+.spinnerRow {
+  display: grid;
+  grid-template-columns: 48px 1fr 1fr 48px;
+  gap: 10px;
+  width: 100%;
+  align-items: center;
+}
+
+.arrowButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64px;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  padding: 0;
+}
+
+.arrowIcon {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  opacity: 0.7;
+}
+
+.customInput {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background-color: var(--surface-base);
+  color: var(--text-default);
+  font-size: 28px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.customInputFocused {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 2px var(--surface-success-muted);
+}
+
+.submitButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 52px;
+  border: none;
+  border-radius: 12px;
+  background-color: var(--accent);
+  color: var(--text-on-accent);
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.submitButton:active {
+  background-color: var(--accent-hover);
+}

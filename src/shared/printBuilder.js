@@ -140,6 +140,38 @@ function arrHasItem(arr, item, fieldName) {
 
 // ── Core calculation ──
 
+var DISCOUNT_TYPES = {
+  percent: "%",
+  dollar: "$",
+};
+
+function applyDiscountToWorkorderItem(workorderLineObj, returnAsDiscountObj) {
+  var discountObj = workorderLineObj.discountObj;
+  if (!discountObj || !discountObj.value) return workorderLineObj;
+
+  var newPrice;
+  var savings;
+
+  if (discountObj.type === DISCOUNT_TYPES.percent) {
+    var multiplier = 1 - Number(discountObj.value) / 100;
+    newPrice = workorderLineObj.inventoryItem.price * workorderLineObj.qty * multiplier;
+    savings = workorderLineObj.inventoryItem.price * workorderLineObj.qty - newPrice;
+  } else {
+    newPrice = workorderLineObj.inventoryItem.price * workorderLineObj.qty - Number(discountObj.value);
+    savings = workorderLineObj.inventoryItem.price * workorderLineObj.qty - newPrice;
+  }
+  var newDiscountObj = Object.assign({}, discountObj, {
+    newPrice: Math.round(newPrice),
+    savings: Math.round(savings),
+  });
+
+  if (returnAsDiscountObj) {
+    return newDiscountObj;
+  }
+  workorderLineObj.discountObj = newDiscountObj;
+  return workorderLineObj;
+}
+
 function calculateRunningTotals(workorders, salesTaxRatePercent, workorderlinesArr, isRefund, taxFree) {
   if (!workorderlinesArr) workorderlinesArr = [];
   if (!taxFree) taxFree = false;
@@ -160,13 +192,12 @@ function calculateRunningTotals(workorders, salesTaxRatePercent, workorderlinesA
           line.inventoryItem
         )
       ) return;
-      var qty = line.qty;
-      var discountPrice = line.discountObj?.newPrice;
-      var discountSavings = line.discountObj?.savings;
+      var qty = Number(line.qty) || 0;
       runningSubtotal = runningSubtotal + line.inventoryItem.price * qty;
-      if (discountPrice) {
-        runningTotal = runningTotal + Number(discountPrice);
-        runningDiscount = runningDiscount + Number(discountSavings);
+      if (line.discountObj && line.discountObj.value) {
+        var recalc = applyDiscountToWorkorderItem(line, true);
+        runningTotal = runningTotal + Number(recalc.newPrice);
+        runningDiscount = runningDiscount + Number(recalc.savings);
       } else {
         runningTotal = runningTotal + line.inventoryItem.price * qty;
       }
@@ -835,6 +866,8 @@ export {
   calculateWaitEstimateLabel,
   parseWorkorderLines,
   calculateRunningTotals,
+  applyDiscountToWorkorderItem,
+  DISCOUNT_TYPES,
   resolveStatus,
   formatPhoneForDisplay,
   capitalizeFirstLetterOfString,

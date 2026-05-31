@@ -216,6 +216,34 @@
   text-align: left;
 }
 
+.pinInfoSection {
+  width: 100%;
+  margin: 18px 0 8px 0;
+  padding: 14px 16px;
+  border: 2px solid #7c3aed;
+  background-color: #f5f3ff;
+  border-radius: 6px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.pinInfoSectionHeading {
+  font-size: 14px;
+  font-weight: 700;
+  color: #5b21b6;
+  margin-bottom: 4px;
+  text-align: left;
+}
+
+.pinInfoSectionSubheading {
+  font-size: 12px;
+  color: #5b21b6;
+  margin-bottom: 12px;
+  line-height: 1.4;
+  text-align: left;
+}
+
 .dobRow {
   display: flex;
   gap: 8px;

@@ -581,8 +581,10 @@ export function MessagesComponent({}) {
       : null;
     let paymentState = getWorkorderPaymentState(zWorkorderObj, activeSale, settings);
     if (paymentState.netPaid > 0) {
-      receiptData.amountPaid = paymentState.netPaid;
-      receiptData.finalTotal = Math.max(0, (receiptData.finalTotal || 0) - paymentState.netPaid);
+      receiptData.amountPaid = paymentState.woCount > 1
+        ? Math.round(paymentState.netPaid / paymentState.woCount)
+        : paymentState.netPaid;
+      receiptData.finalTotal = paymentState.remainingForThisWO;
     }
     let storagePath = `${tenantID}/${storeID}/workorder-tickets/${zWorkorderObj.id}.pdf`;
     let messageID = crypto.randomUUID();
@@ -1567,6 +1569,7 @@ export function MessagesComponent({}) {
             <>
               <TooltipDom text="Variables" position="top">
                 <DropdownMenuDom
+                  openUpward
                   dataArr={TEXT_TEMPLATE_VARIABLES.map((v) => ({ label: v.label, variable: v.variable }))}
                   onSelect={(item) => handleInsertVariable(resolveTemplate(item.variable))}
                   buttonIcon={ICONS.variable}
@@ -1576,6 +1579,7 @@ export function MessagesComponent({}) {
               </TooltipDom>
               <TooltipDom text="Send Info" position="top">
                 <DropdownMenuDom
+                  openUpward
                   dataArr={(() => {
                     let items = [
                       { label: "Send intake/estimate ticket", key: "workorder" },

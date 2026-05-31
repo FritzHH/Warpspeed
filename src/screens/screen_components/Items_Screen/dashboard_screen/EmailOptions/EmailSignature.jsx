@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { TouchableOpacity } from "../../../../../dom_components";
-import { C, Fonts } from "../../../../../styles";
+import { C, Fonts, Radius } from "../../../../../styles";
 import { lightenRGBByPercent } from "../../../../../utils";
 import { useEmailStore, useSettingsStore } from "../../../../../stores";
 import { BoxContainerInner, BoxContainerOuter } from "./_helpers";
@@ -18,9 +18,11 @@ export const EmailSignature = () => {
     return (
       <BoxContainerOuter style={{ marginTop: 20, marginBottom: 20 }}>
         <BoxContainerInner style={{ width: "100%", alignItems: "flex-start", paddingTop: 20, paddingBottom: 20 }}>
-          <span style={{ fontWeight: Fonts.weight.textHeavy, color: C.text, fontSize: 16, marginBottom: 10, alignSelf: "center" }}>
-            {"Email Signature"}
-          </span>
+          <div style={{ width: "100%", marginBottom: 10, padding: "10px 16px", background: `linear-gradient(135deg, ${C.darkBlue} 0%, ${C.blue} 100%)`, borderRadius: Radius.control, boxSizing: "border-box", boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}>
+            <span style={{ fontSize: 18, fontWeight: "700", color: "white", textAlign: "center", display: "block", letterSpacing: 0.5, textShadow: "0 1px 2px rgba(0,0,0,0.2)" }}>
+              {"Email Signature"}
+            </span>
+          </div>
           <span style={{ fontSize: 13, color: C.textMuted, textAlign: "center", alignSelf: "center" }}>
             {"Add email accounts above to configure per-account signatures."}
           </span>
@@ -32,9 +34,11 @@ export const EmailSignature = () => {
   return (
     <BoxContainerOuter style={{ marginTop: 20, marginBottom: 20 }}>
       <BoxContainerInner style={{ width: "100%", alignItems: "flex-start", paddingTop: 20, paddingBottom: 20 }}>
-        <span style={{ fontWeight: Fonts.weight.textHeavy, color: C.text, fontSize: 16, marginBottom: 15, alignSelf: "center" }}>
-          {"Email Signature"}
-        </span>
+        <div style={{ width: "100%", marginBottom: 15, padding: "10px 16px", background: `linear-gradient(135deg, ${C.darkBlue} 0%, ${C.blue} 100%)`, borderRadius: Radius.control, boxSizing: "border-box", boxShadow: "0 2px 4px rgba(0,0,0,0.15)" }}>
+          <span style={{ fontSize: 18, fontWeight: "700", color: "white", textAlign: "center", display: "block", letterSpacing: 0.5, textShadow: "0 1px 2px rgba(0,0,0,0.2)" }}>
+            {"Email Signature"}
+          </span>
+        </div>
         <div style={{ display: "flex", flexDirection: "row", width: "100%", marginBottom: 15, flexShrink: 0 }}>
           {emailAccounts.map((acct) => (
             <TouchableOpacity

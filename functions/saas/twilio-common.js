@@ -12,6 +12,7 @@ const { defineSecret } = require("firebase-functions/params");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { SecretManagerServiceClient } = require("@google-cloud/secret-manager");
 const twilio = require("twilio");
+const crypto = require("crypto");
 
 // IMPORTANT — deploy-time workaround for Stage 1/2.
 // Firebase deploys validate that every defineSecret() reference exists in
@@ -250,6 +251,100 @@ async function destroySubaccountSecret(tenantID) {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+// Pre-tenant (setup-doc-keyed) Secret Manager helpers. Mirror the tenant-
+// keyed helpers above; used during the signup flow before a tenant doc
+// exists. Subaccount is provisioned at card-save time and the auth token
+// is parked here, keyed by the prospect's normalized email. On successful
+// tenant provisioning the setup-keyed secret is destroyed and the value
+// is re-stored under the tenant key (or, more simply, a fresh secret is
+// created and the old one is destroyed in the same step).
+// ─────────────────────────────────────────────────────────────────────────
+
+// Secret Manager IDs allow [a-zA-Z0-9_-] only. Emails contain `@` and `.`
+// (and sometimes `+`); collapse runs of non-alphanumeric to `-`, then
+// append a short SHA-1 hash of the original normalized email for
+// collision-resistance against weird domain edge cases.
+function sanitizeEmailForSecretId(normalizedEmail) {
+  const lower = (normalizedEmail || "").toLowerCase();
+  const safe = lower.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  const prefix = safe.length > 60 ? safe.slice(0, 60) : safe;
+  const hash = crypto.createHash("sha1").update(lower).digest("hex").slice(0, 8);
+  return `${prefix}-${hash}`;
+}
+
+function secretNameForSetup(normalizedEmail) {
+  return `twilio-setup-${sanitizeEmailForSecretId(normalizedEmail)}`;
+}
+
+function secretManagerRefForSetup(normalizedEmail) {
+  return `projects/${GCP_PROJECT_ID}/secrets/${secretNameForSetup(normalizedEmail)}`;
+}
+
+async function storeSetupSubaccountAuthToken(normalizedEmail, authToken) {
+  const client = secretsClient();
+  const parent = `projects/${GCP_PROJECT_ID}`;
+  const secretId = secretNameForSetup(normalizedEmail);
+
+  try {
+    await client.createSecret({
+      parent,
+      secretId,
+      secret: {
+        replication: { automatic: {} },
+        labels: { service: "twilio-subaccount-setup" },
+      },
+    });
+  } catch (err) {
+    if (err.code !== 6) throw err;
+  }
+
+  await client.addSecretVersion({
+    parent: `${parent}/secrets/${secretId}`,
+    payload: { data: Buffer.from(authToken, "utf8") },
+  });
+}
+
+async function loadSetupSubaccountAuthToken(normalizedEmail) {
+  const client = secretsClient();
+  const name = `${secretManagerRefForSetup(normalizedEmail)}/versions/latest`;
+  const [version] = await client.accessSecretVersion({ name });
+  if (!version || !version.payload || !version.payload.data) {
+    throw new HttpsError(
+      "internal",
+      `No secret version for setup email ${normalizedEmail}.`
+    );
+  }
+  return version.payload.data.toString("utf8");
+}
+
+async function destroySetupSubaccountSecret(normalizedEmail) {
+  const client = secretsClient();
+  try {
+    await client.deleteSecret({ name: secretManagerRefForSetup(normalizedEmail) });
+  } catch (err) {
+    // gRPC NOT_FOUND code is 5. Treat as already-gone.
+    if (err && err.code === 5) return;
+    throw err;
+  }
+}
+
+// Loads a Twilio client scoped to the pre-tenant subaccount stored on the
+// setup doc. Mirrors getTenantTwilioClient but reads SID + auth token from
+// the prospect's setup doc + setup-keyed secret. No allowSuspended branch —
+// pre-tenant subaccounts should always be active during signup; if they're
+// not, the signup is broken anyway.
+async function getSetupTwilioClient(normalizedEmail, { subaccountSid } = {}) {
+  if (!subaccountSid) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Subaccount SID missing for setup doc."
+    );
+  }
+  const authToken = await loadSetupSubaccountAuthToken(normalizedEmail);
+  return twilio(subaccountSid, authToken);
+}
+
 function masterTwilioClient() {
   return twilio(
     TWILIO_MASTER_ACCOUNT_SID.value(),
@@ -344,6 +439,13 @@ module.exports = {
   storeSubaccountAuthToken,
   loadSubaccountAuthToken,
   destroySubaccountSecret,
+  sanitizeEmailForSecretId,
+  secretNameForSetup,
+  secretManagerRefForSetup,
+  storeSetupSubaccountAuthToken,
+  loadSetupSubaccountAuthToken,
+  destroySetupSubaccountSecret,
+  getSetupTwilioClient,
   masterTwilioClient,
   getTenantTwilioClient,
   flipTenantRoutingDocs,

@@ -1,0 +1,194 @@
+/* OrderingModalScreen — 70% × 95% card with left rail (orders) + right pane (items table). */
+
+.card {
+  width: 70%;
+  height: 95%;
+  flex-shrink: 0;
+  background-color: var(--surface-base);
+  border-radius: var(--radius-container);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-default);
+  letter-spacing: 0.4px;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+/* ══════════ BODY: left rail + right pane ══════════ */
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.leftRail {
+  width: 28%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--border-default);
+  background-color: var(--surface-alt);
+  min-height: 0;
+}
+
+.railHeader {
+  flex-shrink: 0;
+  padding: 12px 16px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.orderList {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.orderRow {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px 12px;
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-row);
+  cursor: pointer;
+  text-align: left;
+  gap: 2px;
+}
+
+.orderRowActive {
+  background-color: var(--surface-accent-muted);
+  border-color: var(--accent);
+}
+
+.orderDate {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-default);
+}
+
+.orderMeta {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-family: ui-monospace, monospace;
+}
+
+.rightPane {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.emptyState,
+.emptyDetail {
+  padding: 24px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ══════════ ITEMS TABLE ══════════ */
+.tableWrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 2.5fr 1fr 1fr 1.1fr 1.1fr 1.1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  box-sizing: border-box;
+}
+
+.headerRow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  background-color: var(--surface-alt);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.colName {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.itemName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-default);
+}
+
+.catalogSubName {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.colVendor,
+.colCost,
+.colQty,
+.colPrice {
+  font-size: 14px;
+  color: var(--text-default);
+}
+
+.editInput {
+  width: 100%;
+  box-sizing: border-box;
+  height: 32px;
+  padding: 0 8px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-default);
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  outline: none;
+}
+
+.editInput:focus {
+  border-color: var(--border-focus);
+}

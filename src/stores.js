@@ -474,6 +474,19 @@ export const useAlertScreenStore = create((set, get) => ({
         `useAlertScreenStore: alert stack at hard cap of ${_MAX_ALERTS}; cannot push another`
       );
     }
+    if (!config.title && !config.message && !config.subMessage) {
+      console.warn(
+        "[AlertBox] EMPTY ALERT pushed",
+        JSON.stringify(
+          {
+            config,
+            stack: new Error().stack,
+          },
+          null,
+          2
+        )
+      );
+    }
     _alertIdCounter += 1;
     const id = `alert-${_alertIdCounter}`;
     const alert = {

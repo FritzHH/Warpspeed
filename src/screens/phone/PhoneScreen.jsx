@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useOutlet } from "react-router-dom";
+import { ROUTES } from "../../routes";
 import throttle from "lodash/throttle";
 import {
   useSettingsStore,
@@ -38,6 +39,7 @@ export function PhoneScreen() {
   const deepLinkHandledRef = useRef(false);
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const subRouteOutlet = useOutlet();
 
   const [sLoginPhase, _setLoginPhase] = useState(() => {
     const storedUserID = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -207,6 +209,10 @@ export function PhoneScreen() {
     );
   }
 
+  // Sub-route (e.g. /phone/ordering) — render the matched child once PIN +
+  // modal gates are clear.
+  if (subRouteOutlet) return subRouteOutlet;
+
   return (
     <ListShell
       workorders={zWorkorders}
@@ -220,6 +226,7 @@ export function PhoneScreen() {
       onSwitchUser={handleSwitchUser}
       onLogoutApp={handleLogoutApp}
       onOpenWorkorder={openWorkorder}
+      onOpenOrdering={() => navigate(ROUTES.phoneOrdering)}
       onActivity={throttledSetLastAction}
     />
   );

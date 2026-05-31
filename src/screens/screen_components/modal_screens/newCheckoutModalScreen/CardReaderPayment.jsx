@@ -167,21 +167,24 @@ export const CardReaderPayment = memo(function CardReaderPayment({
   const _zResetCardTransaction = useStripePaymentStore((s) => s.resetCardTransaction);
 
   function getInitialReader() {
-    if (sCardReader) return sCardReader;
+    if (sCardReader) {
+      let live = stripeReaders.find((r) => r.id === sCardReader.id);
+      return live || sCardReader;
+    }
     let saved = useSettingsStore.getState().getSettings()?.selectedCardReaderObj;
     if (saved?.id) {
-      let match = stripeReaders.find((r) => r.id === saved.id);
-      // Only auto-select if reader is currently viable. TTPi auto-pairs on
-      // demand, so accept it regardless of reported status; everything else
-      // must be online or the dropdown won't surface it and Start would hang.
-      if (match && (match.status === "online" || isTTPiReader(match))) {
-        return match;
-      }
+      let live = stripeReaders.find((r) => r.id === saved.id);
+      if (live) return live;
+      // Saved reader missing from live list (deleted or temporarily absent).
+      // Surface as offline stub so the saved selection stays visible.
+      return { id: saved.id, label: saved.label, status: "offline" };
     }
     return null;
   }
 
   let activeReader = getInitialReader();
+  let activeReaderOffline =
+    !!activeReader && activeReader.status !== "online" && !isTTPiReader(activeReader);
 
   function setupListeners(readerID, piID) {
     cleanupStoreListeners();
@@ -331,6 +334,11 @@ export const CardReaderPayment = memo(function CardReaderPayment({
     if (zCardStatus !== "idle") return;
     if (!activeReader) {
       _zSetCardError("No card reader selected");
+      return;
+    }
+    if (activeReaderOffline) {
+      let lbl = (settings?.cardReaders || []).find((s) => s.id === activeReader.id)?.label || activeReader.id;
+      _zSetCardError(`Reader "${lbl}" is offline - check power and network`);
       return;
     }
     if (!sRequestedAmount || sRequestedAmount < 50) {
@@ -676,7 +684,8 @@ export const CardReaderPayment = memo(function CardReaderPayment({
             matchValue={activeReader?.id}
             buttonText={
               activeReader
-                ? (savedCardReaders.find((s) => s.id === activeReader.id)?.label || activeReader.id)
+                ? (savedCardReaders.find((s) => s.id === activeReader.id)?.label || activeReader.label || activeReader.id)
+                  + (activeReaderOffline ? " (offline)" : "")
                 : "Select Reader"
             }
             enabled={!isProcessing && zCardStatus !== "waitingForCard"}

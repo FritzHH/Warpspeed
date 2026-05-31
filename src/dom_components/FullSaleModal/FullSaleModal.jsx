@@ -552,7 +552,10 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
 
                   {!!p.millis && (
                     <span className={styles.paymentTimestamp}>
-                      {formatMillisForDisplay(p.millis, true)}
+                      {formatMillisForDisplay(
+                        p.millis,
+                        new Date(p.millis).getFullYear() !== new Date().getFullYear()
+                      )}
                     </span>
                   )}
 
@@ -572,13 +575,22 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                     </div>
                   )}
 
-                  {p.method === "cash" && !!p.amountTendered && (
-                    <span className={styles.paymentCashTendered}>
-                      {"Tendered: $" + formatCurrencyDisp(p.amountTendered)}
-                    </span>
+                  {p.method === "cash" && (!!p.amountTendered || (p.refunds || []).length > 0) && (
+                    <div className={styles.paymentCashRow}>
+                      {!!p.amountTendered && (
+                        <span className={styles.paymentCashTendered}>
+                          {"Tendered: $" + formatCurrencyDisp(p.amountTendered)}
+                        </span>
+                      )}
+                      {(p.refunds || []).length > 0 && (
+                        <span className={styles.paymentRefundedLine} style={{ "--refund-color": C.lightred }}>
+                          {"Refunded: $" + formatCurrencyDisp((p.refunds || []).reduce((s, r) => s + (r.amount || 0), 0))}
+                        </span>
+                      )}
+                    </div>
                   )}
 
-                  {(p.refunds || []).length > 0 && (
+                  {p.method !== "cash" && (p.refunds || []).length > 0 && (
                     <span className={styles.paymentRefundedLine} style={{ "--refund-color": C.lightred }}>
                       {"Refunded: $" + formatCurrencyDisp((p.refunds || []).reduce((s, r) => s + (r.amount || 0), 0))}
                     </span>

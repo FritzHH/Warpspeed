@@ -1,0 +1,21 @@
+{
+  "name": "vendor-catalog-jbi",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloud Run Job: sync JBI FTP catalog into /vendor_catalogs/jbi on cadence-pos Firestore",
+  "main": "index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "master": "JBI_MODE=master node index.js",
+    "inventory": "JBI_MODE=inventory node index.js"
+  },
+  "dependencies": {
+    "basic-ftp": "^5.0.5",
+    "csv-parse": "^6.1.0",
+    "firebase-admin": "^12.6.0"
+  }
+}

@@ -51,7 +51,8 @@ import {
   gmailReconnectWatch,
 } from "./db_calls";
 import { removeUnusedFields, createNewWorkorder, buildWorkorderNumberFromId } from "./utils";
-import { useSettingsStore, useLoginStore, useOpenWorkordersStore, clearPersistedStores } from "./stores";
+import { useSettingsStore, useLoginStore, useOpenWorkordersStore, useInventoryStore, clearPersistedStores } from "./stores";
+import { VENDOR_CATALOGS } from "./data";
 import {
   onAuthStateChanged,
   sendPasswordResetEmail,
@@ -4871,3 +4872,305 @@ export async function dbSaveSubscriptionField(fieldName, fieldVal) {
   }
 }
 
+// ============================================================================
+// VENDOR ORDERS — purchase orders built by phone scanner, polished on desktop
+// ============================================================================
+// Data layout:
+//   tenants/{tenantID}/stores/{storeID}/vendor-orders/{orderID}      ← order doc
+//   tenants/{tenantID}/stores/{storeID}/vendor-orders/{orderID}/items/{itemID}
+//     └── one doc per scan, written granularly (no full-order rewrite per scan)
+//
+// Catalogs live at the GLOBAL root (not tenant-scoped) and are public-read:
+//   vendor_catalogs/{vendorID}/items/{item_id}      ← keyed by vendor's item_id
+//   vendor_catalogs/{vendorID}/inventory/{item_id}  ← warehouse stock (hourly)
+//
+// Resolver flow (dbResolveOrderItem): local inventory first (Zustand);
+// on miss, parallel query across VENDOR_CATALOGS by upc_ean. Result writes
+// back to the item doc; the desktop's items listener picks it up live.
+// ----------------------------------------------------------------------------
+
+function buildVendorOrderPath(tenantID, storeID, orderID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.VENDOR_ORDERS}/${orderID}`;
+}
+
+function buildVendorOrdersCollectionPath(tenantID, storeID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.VENDOR_ORDERS}`;
+}
+
+function buildVendorOrderItemPath(tenantID, storeID, orderID, itemID) {
+  return `${buildVendorOrderPath(tenantID, storeID, orderID)}/items/${itemID}`;
+}
+
+function buildVendorOrderItemsCollectionPath(tenantID, storeID, orderID) {
+  return `${buildVendorOrderPath(tenantID, storeID, orderID)}/items`;
+}
+
+// Full write of the parent order doc. Use for create + status / notes /
+// finalize updates that touch most of the document. For one-field patches
+// (e.g. flipping status), prefer dbUpdateVendorOrderFields.
+export async function dbSaveVendorOrder(order) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: tenantID/storeID not configured for dbSaveVendorOrder");
+      return { success: false };
+    }
+    if (!order || !order.id) {
+      log("Error: order with id is required for dbSaveVendorOrder");
+      return { success: false };
+    }
+    await firestoreWrite(buildVendorOrderPath(tenantID, storeID, order.id), order);
+    return { success: true };
+  } catch (error) {
+    log("Error saving vendor order:", error);
+    return { success: false, error };
+  }
+}
+
+// Partial patch of the parent order doc (status flips, notes edits, finalize).
+export async function dbUpdateVendorOrderFields(orderID, fields) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return { success: false };
+    if (!orderID || !fields) return { success: false };
+    await firestoreUpdate(buildVendorOrderPath(tenantID, storeID, orderID), fields);
+    return { success: true };
+  } catch (error) {
+    log("Error updating vendor order fields:", error);
+    return { success: false, error };
+  }
+}
+
+// GRANULAR PER-SCAN WRITE PATH. Writes one item doc into the order's
+// `items` sub-collection. Parent order is untouched, so concurrent scans
+// don't race on the same document.
+export async function dbSaveVendorOrderItem(orderID, item) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return { success: false };
+    if (!orderID || !item || !item.id) return { success: false };
+    await firestoreWrite(
+      buildVendorOrderItemPath(tenantID, storeID, orderID, item.id),
+      item
+    );
+    return { success: true };
+  } catch (error) {
+    log("Error saving vendor order item:", error);
+    return { success: false, error };
+  }
+}
+
+// Partial item patch — used by the resolver to write lookupStatus +
+// resolution fields, and by the desktop to update qty / pick a vendor on
+// ambiguous items.
+export async function dbUpdateVendorOrderItemFields(orderID, itemID, fields) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return { success: false };
+    if (!orderID || !itemID || !fields) return { success: false };
+    await firestoreUpdate(
+      buildVendorOrderItemPath(tenantID, storeID, orderID, itemID),
+      fields
+    );
+    return { success: true };
+  } catch (error) {
+    log("Error updating vendor order item fields:", error);
+    return { success: false, error };
+  }
+}
+
+export async function dbDeleteVendorOrderItem(orderID, itemID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return { success: false };
+    if (!orderID || !itemID) return { success: false };
+    await firestoreDelete(buildVendorOrderItemPath(tenantID, storeID, orderID, itemID));
+    return { success: true };
+  } catch (error) {
+    log("Error deleting vendor order item:", error);
+    return { success: false, error };
+  }
+}
+
+export async function dbGetVendorOrder(orderID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return null;
+    if (!orderID) return null;
+    return await firestoreRead(buildVendorOrderPath(tenantID, storeID, orderID));
+  } catch (error) {
+    log("Error reading vendor order:", error);
+    return null;
+  }
+}
+
+export function dbListenToVendorOrders(onChange, onError) {
+  const name = "vendorOrders";
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: tenantID/storeID not configured for dbListenToVendorOrders");
+      return null;
+    }
+    if (typeof onChange !== "function") return null;
+    const path = buildVendorOrdersCollectionPath(tenantID, storeID);
+    __logListenerAttach(name);
+    const unsubscribe = firestoreSubscribeCollection(path, (data, error, meta) => {
+      if (error) {
+        log("Vendor orders listener error", { error });
+        if (onError) onError(error);
+        return;
+      }
+      __logListenerEmit(name, meta);
+      onChange(data);
+    });
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
+  } catch (error) {
+    log("Error setting up vendor orders listener:", error);
+    if (onError) onError(error);
+    return null;
+  }
+}
+
+export function dbListenToVendorOrderItems(orderID, onChange, onError) {
+  const name = "vendorOrderItems:" + orderID;
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID || !orderID) return null;
+    if (typeof onChange !== "function") return null;
+    const path = buildVendorOrderItemsCollectionPath(tenantID, storeID, orderID);
+    __logListenerAttach(name);
+    const unsubscribe = firestoreSubscribeCollection(path, (data, error, meta) => {
+      if (error) {
+        log("Vendor order items listener error", { orderID, error });
+        if (onError) onError(error);
+        return;
+      }
+      __logListenerEmit(name, meta);
+      onChange(data);
+    });
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
+  } catch (error) {
+    log("Error setting up vendor order items listener:", error);
+    if (onError) onError(error);
+    return null;
+  }
+}
+
+// Async resolver. Caller writes the item with lookupStatus: "pending" then
+// fires this (don't await on the UI thread — the resolver writes back to
+// the item doc, the listener delivers the update).
+//
+// Order of attempts:
+//   1. Local inventory match (Zustand). If hit and the local item has
+//      vendorId set, short-circuit — write matched + local description.
+//   2. Parallel Firestore queries across every VENDOR_CATALOGS entry with
+//      a catalogPath, filtered by upc_ean == scannedBarcode.
+//   3. Resolve:
+//        0 hits → no_match
+//        1 hit  → matched; snapshot the catalog doc
+//        2+     → ambiguous; record candidateVendorIDs for desktop picker
+export async function dbResolveOrderItem(orderID, item) {
+  try {
+    if (!orderID || !item || !item.id || !item.scannedBarcode) {
+      return { success: false, error: "missing args" };
+    }
+    const scanned = String(item.scannedBarcode);
+
+    // 1. Local inventory short-circuit
+    const inventory = useInventoryStore.getState().getInventoryArr?.() || [];
+    const localMatch = inventory.find((inv) => {
+      if (!inv) return false;
+      if (inv.primaryBarcode === scanned) return true;
+      const codes = Array.isArray(inv.barcodes) ? inv.barcodes : [];
+      return codes.includes(scanned);
+    });
+    if (localMatch && localMatch.vendorId) {
+      const localDisplay = localMatch.formalName || localMatch.informalName || "";
+      await dbUpdateVendorOrderItemFields(orderID, item.id, {
+        lookupStatus: "matched",
+        vendorCatalogID: localMatch.vendorId,
+        vendorItemID: localMatch.id || "",
+        catalogSnapshot: {
+          source: "local-inventory",
+          description: localDisplay,
+          cost: localMatch.cost || "",
+          brand: localMatch.brand || "",
+          catalogName: localMatch.catalogName || "",
+        },
+      });
+      return { success: true, via: "local", displayName: localDisplay };
+    }
+
+    // 2. Parallel catalog queries. If local had a vendorId hint (even
+    // without a complete match), narrow the search to that vendor.
+    const queryable = VENDOR_CATALOGS.filter((v) => v.catalogPath);
+    const hint = localMatch?.vendorId;
+    const targets = hint ? queryable.filter((v) => v.id === hint) : queryable;
+    if (targets.length === 0) {
+      await dbUpdateVendorOrderItemFields(orderID, item.id, { lookupStatus: "no_match" });
+      return { success: true, via: "no-catalogs" };
+    }
+
+    const results = await Promise.all(
+      targets.map(async (vendor) => {
+        try {
+          const matches = await firestoreQuery(
+            `${vendor.catalogPath}/items`,
+            [{ field: "upc_ean", operator: "==", value: scanned }],
+            { limit: 1 }
+          );
+          return { vendor, match: matches[0] || null };
+        } catch (e) {
+          log("Catalog query failed for vendor " + vendor.id, e?.message);
+          return { vendor, match: null };
+        }
+      })
+    );
+
+    const hits = results.filter((r) => r.match);
+
+    const pickName = (m) =>
+      m?.description ||
+      m?.item_description ||
+      m?.short_description ||
+      m?.product_name ||
+      m?.name ||
+      m?.desc ||
+      "";
+
+    // 3. Resolve
+    let update;
+    let displayName = "";
+    if (hits.length === 0) {
+      update = { lookupStatus: "no_match" };
+    } else if (hits.length === 1) {
+      const { vendor, match } = hits[0];
+      displayName = pickName(match);
+      update = {
+        lookupStatus: "matched",
+        vendorCatalogID: vendor.id,
+        vendorItemID: match.item_id || match.id || "",
+        catalogSnapshot: { ...match, source: vendor.id },
+      };
+    } else {
+      displayName = pickName(hits[0].match);
+      update = {
+        lookupStatus: "ambiguous",
+        candidateVendorIDs: hits.map((h) => h.vendor.id),
+      };
+    }
+
+    await dbUpdateVendorOrderItemFields(orderID, item.id, update);
+    return { success: true, via: "catalog", hits: hits.length, displayName };
+  } catch (error) {
+    log("Error resolving order item:", error);
+    return { success: false, error };
+  }
+}

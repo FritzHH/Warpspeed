@@ -45,6 +45,7 @@ const admin = require("firebase-admin");
 const { getFirestore, FieldValue, Timestamp } = require("firebase-admin/firestore");
 const crypto = require("crypto");
 const nodemailer = require("nodemailer");
+const Stripe = require("stripe");
 const {
   PRIVILEGES,
   PRIVILEGE_RANK,
@@ -54,7 +55,11 @@ const {
 } = require("./auth-guards");
 const { SETTINGS_OBJ } = require("../shared/data");
 const { generateEAN13Barcode } = require("../shared/idGen");
-const { numberWebhooksAreCurrent } = require("./twilio-common");
+const {
+  numberWebhooksAreCurrent,
+  tenantTwilioDocRef,
+  getSetupTwilioClient,
+} = require("./twilio-common");
 const { getTierDoc } = require("./billing-helpers");
 const {
   _internals: stripeConnectInternals,
@@ -124,6 +129,21 @@ function buildActionCodeSettings(inviteToken) {
     url: `${INVITE_LANDING_URL}?token=${encodeURIComponent(inviteToken)}`,
     handleCodeInApp: true,
   };
+}
+
+// Self-serve "send me a new sign-in link" URL embedded in every welcome
+// email so an owner whose primary link expired (or was consumed before they
+// were ready to finish bootstrap) can request a fresh one without contacting
+// support. Lands on InviteAcceptScreen which auto-fires
+// requestOwnerWelcomeResendCallable. The callable is public + per-tenant
+// throttled, so the URL is safe to embed in plaintext email.
+function buildResendLinkUrl(email) {
+  return `${INVITE_LANDING_URL}?resend=1&email=${encodeURIComponent(email)}`;
+}
+
+function renderResendLinkFooterHtml(email) {
+  const url = buildResendLinkUrl(email);
+  return `<p style="margin-top:24px;color:#666;font-size:13px">Need a fresh link? <a href="${url}">Click here to email yourself a new one</a>. (Limited to one new link per minute.)</p>`;
 }
 
 function normalizeStoreString(value, maxLen) {
@@ -230,6 +250,103 @@ function renderStripePaymentsInfoBlockHtml() {
     `Have them ready before you click the link below:</p>` +
     `<ul style="margin:0;">${items}</ul>` +
     `</div>`
+  );
+}
+
+// Confirmation email body sent to the owner after they finish bootstrap.
+// Recaps everything they entered (including the PIN) so they have a record
+// for safekeeping. Bank account and SSN are partially masked.
+function renderOwnerSetupSummaryHtml({
+  tenantData,
+  normalizedLegalName,
+  normalizedDisplayName,
+  storeAddress,
+  normalizedTax,
+  userPin,
+  businessUrlRaw,
+  bankRoutingRaw,
+  bankAccountRaw,
+  dobMonthNum,
+  dobDayNum,
+  dobYearNum,
+  ssnLast4Raw,
+}) {
+  const ownerName =
+    [tenantData.ownerFirstName || "", tenantData.ownerLastName || ""]
+      .filter(Boolean)
+      .join(" ") || "Owner";
+  const addrLine1 = storeAddress.unit
+    ? `${storeAddress.street}, ${storeAddress.unit}`
+    : storeAddress.street;
+  const addrLine2 = `${storeAddress.city}, ${storeAddress.state} ${storeAddress.zip}`;
+  const dobStr = `${String(dobMonthNum).padStart(2, "0")}/${String(
+    dobDayNum
+  ).padStart(2, "0")}/${dobYearNum}`;
+  const maskedAccount =
+    bankAccountRaw.length > 4
+      ? `${"•".repeat(bankAccountRaw.length - 4)}${bankAccountRaw.slice(-4)}`
+      : bankAccountRaw;
+
+  const row = (label, value) =>
+    `<tr><td style="padding:6px 12px 6px 0;color:#555;vertical-align:top;` +
+    `white-space:nowrap;">${label}</td>` +
+    `<td style="padding:6px 0;color:#111;">${value}</td></tr>`;
+
+  const storeTable =
+    `<table style="border-collapse:collapse;width:100%;font-size:14px;">` +
+    row("Legal name", normalizedLegalName) +
+    row("Display name", normalizedDisplayName) +
+    row("Address", `${addrLine1}<br>${addrLine2}`) +
+    row("Phone", storeAddress.phone) +
+    row("Support email", storeAddress.supportEmail) +
+    row("Office email", storeAddress.officeEmail) +
+    row("Sales tax", `${normalizedTax}%`) +
+    `</table>`;
+
+  const stripeTable =
+    `<table style="border-collapse:collapse;width:100%;font-size:14px;">` +
+    row("Business website", businessUrlRaw) +
+    row("Bank routing", bankRoutingRaw) +
+    row("Bank account", maskedAccount) +
+    row("Date of birth", dobStr) +
+    row("SSN (last 4)", ssnLast4Raw) +
+    `</table>`;
+
+  const pinBlock =
+    `<div style="margin:24px 0;padding:16px 20px;border:2px solid #7c3aed;` +
+    `background:#f5f3ff;border-radius:6px;">` +
+    `<p style="margin:0 0 8px 0;font-weight:700;color:#5b21b6;">` +
+    `Your Owner PIN</p>` +
+    `<p style="margin:0 0 8px 0;color:#5b21b6;">` +
+    `Use this PIN to log in to the Cadence POS app. Keep this email safe.` +
+    `</p>` +
+    `<div style="font-family:ui-monospace,Menlo,monospace;font-size:32px;` +
+    `font-weight:700;letter-spacing:8px;color:#5b21b6;text-align:center;` +
+    `padding:12px 0;background:#ede9fe;border-radius:4px;">${userPin}</div>` +
+    `</div>`;
+
+  const storeBlock =
+    `<div style="margin:24px 0;padding:16px 20px;border:2px solid #1d4ed8;` +
+    `background:#eff6ff;border-radius:6px;">` +
+    `<p style="margin:0 0 8px 0;font-weight:700;color:#1e3a8a;">` +
+    `Store Info</p>${storeTable}</div>`;
+
+  const stripeBlock =
+    `<div style="margin:24px 0;padding:16px 20px;border:2px solid #c75100;` +
+    `background:#fff7ed;border-radius:6px;">` +
+    `<p style="margin:0 0 8px 0;font-weight:700;color:#7a2e00;">` +
+    `Stripe Payments Info</p>${stripeTable}</div>`;
+
+  return (
+    `<p>Hi ${ownerName},</p>` +
+    `<p>Your <strong>${normalizedDisplayName}</strong> setup is complete. ` +
+    `Below is a copy of everything you submitted — keep this email for your ` +
+    `records.</p>` +
+    pinBlock +
+    storeBlock +
+    stripeBlock +
+    `<p style="color:#666;font-size:12px;">Bank account and SSN are partially ` +
+    `masked for safety. If anything looks wrong, contact your platform admin.</p>`
   );
 }
 
@@ -2390,7 +2507,8 @@ ${renderBootstrapFieldsListHtml()}
 ${renderStripePaymentsInfoBlockHtml()}
 <p>Click the link to set up your store:</p>
 <p><a href="${signInLink}">${signInLink}</a></p>
-<p>This link is single-use and expires after a short time.</p>`;
+<p>This link is single-use and expires after a short time.</p>
+${renderResendLinkFooterHtml(ownerEmail)}`;
 
     try {
       const info = await transporter.sendMail({
@@ -2507,7 +2625,8 @@ exports.requestOwnerWelcomeResendCallable = onCall(
 <p>When you click the link you'll be asked to fill in your store's setup details, so please have the following ready:</p>
 ${renderBootstrapFieldsListHtml()}
 <p><a href="${signInLink}">${signInLink}</a></p>
-<p>This link is single-use and expires after a short time.</p>`;
+<p>This link is single-use and expires after a short time.</p>
+${renderResendLinkFooterHtml(normalizedEmail)}`;
 
     try {
       const info = await transporter.sendMail({
@@ -2553,7 +2672,12 @@ ${renderBootstrapFieldsListHtml()}
 exports.ownerCompleteBootstrapCallable = onCall(
   {
     region: "us-central1",
-    secrets: [stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY],
+    secrets: [
+      stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY,
+      PLATFORM_NOREPLY_EMAIL,
+      PLATFORM_NOREPLY_SMTP_USER,
+      PLATFORM_NOREPLY_APP_PASSWORD,
+    ],
   },
   async (request) => {
     const auth = requireAuth(request);
@@ -2919,7 +3043,72 @@ exports.ownerCompleteBootstrapCallable = onCall(
       stripeKYCResult,
     });
 
-    return { success: true, tenantID, storeID, stripeKYCResult };
+    // Owner setup summary email — sends a recap of everything they just
+    // entered (including the PIN) to the owner's email for safekeeping.
+    // Best-effort: a failed send doesn't abort the bootstrap since all data
+    // is already persisted; the failure is logged for follow-up.
+    let setupSummaryEmailSent = false;
+    let setupSummaryEmailError = null;
+    try {
+      const fromEmail = PLATFORM_NOREPLY_EMAIL.value();
+      const smtpUser = PLATFORM_NOREPLY_SMTP_USER.value();
+      const fromPassword = PLATFORM_NOREPLY_APP_PASSWORD.value();
+      if (!fromEmail || !smtpUser || !fromPassword) {
+        throw new Error(
+          "PLATFORM_NOREPLY_EMAIL, PLATFORM_NOREPLY_SMTP_USER, and PLATFORM_NOREPLY_APP_PASSWORD must be set."
+        );
+      }
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: { user: smtpUser, pass: fromPassword },
+      });
+      const summaryHtml = renderOwnerSetupSummaryHtml({
+        tenantData,
+        normalizedLegalName,
+        normalizedDisplayName,
+        storeAddress,
+        normalizedTax,
+        userPin,
+        businessUrlRaw,
+        bankRoutingRaw,
+        bankAccountRaw,
+        dobMonthNum,
+        dobDayNum,
+        dobYearNum,
+        ssnLast4Raw,
+      });
+      const subject = `Your ${normalizedDisplayName} setup details — keep this for your records`;
+      const info = await transporter.sendMail({
+        from: `"Cadence POS" <${fromEmail}>`,
+        to: tenantData.ownerEmail,
+        subject,
+        html: summaryHtml,
+      });
+      setupSummaryEmailSent = true;
+      logger.info("ownerCompleteBootstrapCallable: setup summary email sent", {
+        tenantID,
+        storeID,
+        ownerEmail: tenantData.ownerEmail,
+        messageId: info.messageId,
+      });
+    } catch (err) {
+      setupSummaryEmailError = err && err.message ? err.message : String(err);
+      logger.error("ownerCompleteBootstrapCallable: setup summary email failed", {
+        tenantID,
+        storeID,
+        ownerEmail: tenantData.ownerEmail,
+        error: setupSummaryEmailError,
+      });
+    }
+
+    return {
+      success: true,
+      tenantID,
+      storeID,
+      stripeKYCResult,
+      setupSummaryEmailSent,
+      setupSummaryEmailError,
+    };
   }
 );
 
@@ -3016,18 +3205,32 @@ exports.platformAdminDeleteTenantCallable = onCall(
 
       // Twilio subaccount teardown (force=true so the suspended-precondition
       // is skipped — dev cleanup is allowed to nuke active subaccounts).
+      logger.info("platformAdminDeleteTenantCallable: Twilio teardown START", {
+        tenantID,
+      });
       try {
-        const twilioRef = db
-          .collection("tenants")
-          .doc(tenantID)
-          .collection("twilio")
-          .doc("subaccount");
+        const twilioRef = tenantTwilioDocRef(db, tenantID);
         const twilioSnap = await twilioRef.get();
+        logger.info("platformAdminDeleteTenantCallable: Twilio subdoc read", {
+          tenantID,
+          subdocExists: twilioSnap.exists,
+          subdocPath: twilioRef.path,
+        });
         if (twilioSnap.exists) {
           const twilioData = twilioSnap.data() || {};
+          logger.info("platformAdminDeleteTenantCallable: Twilio subdoc data", {
+            tenantID,
+            subaccountSid: twilioData.subaccountSid || null,
+            status: twilioData.status || null,
+            hasSecretRef: Boolean(twilioData.secretManagerRef),
+          });
           if (twilioData.status !== "closed") {
             externalResults.twilio.attempted = true;
             externalResults.twilio.subaccountSid = twilioData.subaccountSid || null;
+            logger.info(
+              "platformAdminDeleteTenantCallable: invoking closeSubaccountInternal",
+              { tenantID, subaccountSid: twilioData.subaccountSid }
+            );
             await twilioSubaccountInternals.closeSubaccountInternal({
               tenantID,
               actorUID: auth.uid,
@@ -3035,7 +3238,21 @@ exports.platformAdminDeleteTenantCallable = onCall(
               force: true,
             });
             externalResults.twilio.success = true;
+            logger.info(
+              "platformAdminDeleteTenantCallable: closeSubaccountInternal returned OK",
+              { tenantID, subaccountSid: twilioData.subaccountSid }
+            );
+          } else {
+            logger.info(
+              "platformAdminDeleteTenantCallable: skipping close (already closed)",
+              { tenantID, subaccountSid: twilioData.subaccountSid }
+            );
           }
+        } else {
+          logger.warn(
+            "platformAdminDeleteTenantCallable: Twilio subdoc MISSING - cannot close",
+            { tenantID, expectedPath: twilioRef.path }
+          );
         }
       } catch (err) {
         externalResults.twilio.error =
@@ -3043,8 +3260,20 @@ exports.platformAdminDeleteTenantCallable = onCall(
         logger.error("platformAdminDeleteTenantCallable: Twilio teardown failed", {
           tenantID,
           error: externalResults.twilio.error,
+          errorCode: err && err.code,
+          errorStatus: err && err.status,
+          errorMoreInfo: err && err.moreInfo,
+          errorDetails: err && err.details ? JSON.stringify(err.details) : null,
+          errorStack: err && err.stack,
         });
       }
+      logger.info("platformAdminDeleteTenantCallable: Twilio teardown END", {
+        tenantID,
+        attempted: externalResults.twilio.attempted,
+        success: externalResults.twilio.success,
+        error: externalResults.twilio.error,
+        subaccountSid: externalResults.twilio.subaccountSid,
+      });
 
       // Auth user teardown so the email is reusable.
       if (tenant.ownerUID) {
@@ -3091,5 +3320,841 @@ exports.platformAdminDeleteTenantCallable = onCall(
     });
 
     return { success: true, tenantID, externalResults };
+  }
+);
+
+// =============================================================================
+// Tenant self-serve signup auth (sales-gated, Firebase email-link).
+//
+// Flow:
+//   1. Prospect emails tech support asking to become a tenant.
+//   2. Tech support enters their email in the dashboard's "Send Authorization"
+//      container and clicks Send.
+//   3. platformAdminSendTenantSetupAuthCallable creates (or refreshes) a doc
+//      at /tenant_account_setup/{lowercased-email} with a 30-day expiry, and
+//      emails the prospect a Firebase Auth email-link pointing at the
+//      dashboard's /welcome route.
+//   4. Prospect clicks the link, lands on TenantSetupLandingScreen, which
+//      uses signInWithEmailLink to sign them into Firebase Auth (auto-
+//      creating the Auth user if needed). They're now authenticated as the
+//      prospect email with NO custom claims (not a tenant yet).
+//   5. Once signed in the page calls getTenantAccountSetupCallable to load
+//      whatever formData has been accumulated, and re-saves on each step so
+//      they can resume across sessions for the full 30 days.
+//
+// Same email-link pattern as the existing platformAdminSendOwnerWelcomeEmail
+// flow, so prospects and owners get the same UX. Re-sends mint a fresh email-
+// link (Firebase links are single-use); the doc on the server is the source
+// of truth for the 30-day window.
+// =============================================================================
+
+const TENANT_SETUP_LANDING_URL = "https://cadence-dashboard.web.app/welcome";
+const TENANT_SETUP_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+function tenantAccountSetupDocRef(db, normalizedEmail) {
+  return db.collection("tenant_account_setup").doc(normalizedEmail);
+}
+
+exports.platformAdminSendTenantSetupAuthCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [
+      PLATFORM_NOREPLY_EMAIL,
+      PLATFORM_NOREPLY_SMTP_USER,
+      PLATFORM_NOREPLY_APP_PASSWORD,
+    ],
+  },
+  async (request) => {
+    const auth = requireAuth(request);
+    assertPlatformAdmin(auth);
+
+    const { email, billingTier } = request.data || {};
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      throw new HttpsError("invalid-argument", "A valid email is required.");
+    }
+
+    const fromEmail = PLATFORM_NOREPLY_EMAIL.value();
+    const smtpUser = PLATFORM_NOREPLY_SMTP_USER.value();
+    const fromPassword = PLATFORM_NOREPLY_APP_PASSWORD.value();
+    if (!fromEmail || !smtpUser || !fromPassword) {
+      throw new HttpsError(
+        "failed-precondition",
+        "PLATFORM_NOREPLY_EMAIL, PLATFORM_NOREPLY_SMTP_USER, and PLATFORM_NOREPLY_APP_PASSWORD must be set."
+      );
+    }
+
+    const db = getFirestore();
+    const docRef = tenantAccountSetupDocRef(db, normalizedEmail);
+    const expiresAt = Timestamp.fromMillis(
+      Date.now() + TENANT_SETUP_TOKEN_TTL_MS
+    );
+
+    const snap = await docRef.get();
+    const isFirstTime = !snap.exists;
+
+    // Tier is admin-selected at email-send time and locked on first creation.
+    // Prospect never picks it. Resends ignore the field so a typo on a later
+    // send can't change a tenant's plan mid-signup; tier changes require
+    // letting the doc expire and starting over.
+    if (isFirstTime) {
+      if (billingTier !== "per_sale" && billingTier !== "monthly_sub") {
+        throw new HttpsError(
+          "invalid-argument",
+          "billingTier must be 'per_sale' or 'monthly_sub'."
+        );
+      }
+      await docRef.set({
+        email: normalizedEmail,
+        expiresAt,
+        status: "pending",
+        billingTier,
+        formData: {},
+        createdAt: FieldValue.serverTimestamp(),
+        createdBy: auth.uid,
+        lastEmailSentAt: FieldValue.serverTimestamp(),
+        emailSendCount: 1,
+      });
+    } else {
+      await docRef.update({
+        expiresAt,
+        lastEmailSentAt: FieldValue.serverTimestamp(),
+        emailSendCount: FieldValue.increment(1),
+      });
+    }
+
+    const signInLink = await admin
+      .auth()
+      .generateSignInWithEmailLink(normalizedEmail, {
+        url: TENANT_SETUP_LANDING_URL,
+        handleCodeInApp: true,
+      });
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: smtpUser, pass: fromPassword },
+    });
+
+    const subject = isFirstTime
+      ? "Your Cadence POS signup link"
+      : "Your Cadence POS signup link (refreshed)";
+    const html = `<p>Hi,</p>
+<p>Click the link below to ${
+      isFirstTime ? "start" : "continue"
+    } your Cadence POS account setup. The link is single-use; once you click it you'll stay signed in and can return to finish later. Your progress is saved for 30 days.</p>
+<p><a href="${signInLink}">${signInLink}</a></p>
+<p>If you didn't request this, you can ignore the email.</p>
+<p>— The Cadence POS team</p>`;
+
+    try {
+      const info = await transporter.sendMail({
+        from: `"Cadence POS" <${fromEmail}>`,
+        to: normalizedEmail,
+        subject,
+        html,
+      });
+      logger.info("platformAdminSendTenantSetupAuthCallable: sent", {
+        email: normalizedEmail,
+        isFirstTime,
+        messageId: info.messageId,
+        byUID: auth.uid,
+      });
+      return {
+        success: true,
+        email: normalizedEmail,
+        isFirstTime,
+        messageId: info.messageId,
+      };
+    } catch (err) {
+      logger.error("platformAdminSendTenantSetupAuthCallable: send failed", {
+        email: normalizedEmail,
+        error: err.message,
+        byUID: auth.uid,
+      });
+      throw new HttpsError(
+        "internal",
+        `Failed to send authorization email: ${err.message}`
+      );
+    }
+  }
+);
+
+// Invoked from the tenant setup landing page after the prospect has been
+// signed in via email-link. Caller is authenticated as the prospect email but
+// has no custom claims (not a tenant yet). Looks up the setup doc, verifies
+// the caller's email matches the doc ID, checks the 30-day expiry, and
+// returns whatever formData the prospect has saved so far.
+exports.getTenantAccountSetupCallable = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const auth = requireAuth(request);
+    const callerEmail = normalizeEmail(auth.token && auth.token.email);
+    if (!callerEmail) {
+      throw new HttpsError(
+        "permission-denied",
+        "Signed-in user has no email."
+      );
+    }
+
+    const db = getFirestore();
+    const docRef = tenantAccountSetupDocRef(db, callerEmail);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      throw new HttpsError(
+        "permission-denied",
+        "No tenant signup is open for this email. Ask support for a link."
+      );
+    }
+    const data = snap.data() || {};
+    const expiresAt = data.expiresAt;
+    if (
+      expiresAt &&
+      typeof expiresAt.toMillis === "function" &&
+      expiresAt.toMillis() < Date.now()
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "This setup link has expired. Ask support to send a new one."
+      );
+    }
+
+    return {
+      success: true,
+      email: callerEmail,
+      formData: data.formData || {},
+      status: data.status || "pending",
+      signupType: data.signupType || null,
+      billingTier: data.billingTier || null,
+      paymentMethodCollected: !!data.paymentMethodCollected,
+      stripeBillingCustomerID: data.stripeBillingCustomerID || null,
+      purchasedPhoneNumber: data.purchasedPhoneNumber || null,
+    };
+  }
+);
+
+// Invoked from the tenant setup landing page as the prospect makes choices
+// (single vs multi shop) and fills in wizard fields. Caller is authenticated
+// as the prospect email; we use that as the doc key. Accepts a partial
+// payload {signupType?, formData?}; formData is shallow-merged into the
+// existing doc so wizard steps can save just the fields they own.
+exports.updateTenantAccountSetupCallable = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const auth = requireAuth(request);
+    const callerEmail = normalizeEmail(auth.token && auth.token.email);
+    if (!callerEmail) {
+      throw new HttpsError(
+        "permission-denied",
+        "Signed-in user has no email."
+      );
+    }
+
+    const db = getFirestore();
+    const docRef = tenantAccountSetupDocRef(db, callerEmail);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      throw new HttpsError(
+        "permission-denied",
+        "No tenant signup is open for this email. Ask support for a link."
+      );
+    }
+    const data = snap.data() || {};
+    const expiresAt = data.expiresAt;
+    if (
+      expiresAt &&
+      typeof expiresAt.toMillis === "function" &&
+      expiresAt.toMillis() < Date.now()
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "This setup link has expired. Ask support to send a new one."
+      );
+    }
+
+    const payload = request.data || {};
+    const updates = { lastUpdatedAt: FieldValue.serverTimestamp() };
+
+    if (payload.signupType !== undefined) {
+      if (payload.signupType !== "single" && payload.signupType !== "multi") {
+        throw new HttpsError(
+          "invalid-argument",
+          "signupType must be 'single' or 'multi'."
+        );
+      }
+      updates.signupType = payload.signupType;
+    }
+
+    if (payload.formData !== undefined) {
+      if (
+        payload.formData === null ||
+        typeof payload.formData !== "object" ||
+        Array.isArray(payload.formData)
+      ) {
+        throw new HttpsError(
+          "invalid-argument",
+          "formData must be a plain object."
+        );
+      }
+      const existing = data.formData || {};
+      updates.formData = { ...existing, ...payload.formData };
+    }
+
+    await docRef.update(updates);
+
+    return {
+      success: true,
+      email: callerEmail,
+      formData: updates.formData || data.formData || {},
+      signupType: updates.signupType || data.signupType || null,
+      billingTier: data.billingTier || null,
+    };
+  }
+);
+
+// Prospect-side SetupIntent creation for the tenant signup wizard. Distinct
+// from stripeBillingCreateSetupIntentCallable in stripe-billing.js — that one
+// auths against an existing tenant doc (owner-only); this one auths against
+// the tenant_account_setup doc keyed by the prospect's email, because no
+// tenant exists yet. Idempotently creates a platform Stripe Customer for the
+// prospect, then a SetupIntent (usage: "off_session") so the saved card can
+// be charged by the subscription invoice when the tenant is provisioned.
+//
+// monthly_sub only. per_sale prospects don't collect a card at signup — that
+// flow is deferred until the period-billed accumulation invoicing is built.
+exports.tenantSetupCreateSetupIntentCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY],
+  },
+  async (request) => {
+    const auth = requireAuth(request);
+    const callerEmail = normalizeEmail(auth.token && auth.token.email);
+    if (!callerEmail) {
+      throw new HttpsError(
+        "permission-denied",
+        "Signed-in user has no email."
+      );
+    }
+
+    const db = getFirestore();
+    const docRef = tenantAccountSetupDocRef(db, callerEmail);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      throw new HttpsError(
+        "permission-denied",
+        "No tenant signup is open for this email. Ask support for a link."
+      );
+    }
+    const data = snap.data() || {};
+    const expiresAt = data.expiresAt;
+    if (
+      expiresAt &&
+      typeof expiresAt.toMillis === "function" &&
+      expiresAt.toMillis() < Date.now()
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "This setup link has expired. Ask support to send a new one."
+      );
+    }
+    if (data.billingTier !== "monthly_sub") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Card collection at signup only applies to monthly subscription plans."
+      );
+    }
+
+    const stripe = new Stripe(
+      stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY.value()
+    );
+
+    // Idempotent customer creation. Re-using a stored customer ID across
+    // SetupIntent retries avoids dangling Stripe Customers if the user
+    // refreshes mid-flow.
+    let customerID = data.stripeBillingCustomerID;
+    if (!customerID) {
+      const customer = await stripe.customers.create({
+        email: callerEmail,
+        metadata: {
+          source: "tenant_account_setup",
+          setupDocEmail: callerEmail,
+        },
+      });
+      customerID = customer.id;
+      await docRef.update({
+        stripeBillingCustomerID: customerID,
+        stripeBillingCustomerCreatedAt: FieldValue.serverTimestamp(),
+      });
+      logger.info("tenantSetupCreateSetupIntentCallable: created customer", {
+        email: callerEmail,
+        stripeBillingCustomerID: customerID,
+      });
+    }
+
+    const setupIntent = await stripe.setupIntents.create({
+      customer: customerID,
+      payment_method_types: ["card"],
+      usage: "off_session",
+      metadata: {
+        source: "tenant_account_setup",
+        setupDocEmail: callerEmail,
+      },
+    });
+
+    await docRef.update({
+      stripeSetupIntentID: setupIntent.id,
+      stripeSetupIntentCreatedAt: FieldValue.serverTimestamp(),
+    });
+
+    logger.info("tenantSetupCreateSetupIntentCallable: created SI", {
+      email: callerEmail,
+      setupIntentID: setupIntent.id,
+    });
+
+    return {
+      success: true,
+      clientSecret: setupIntent.client_secret,
+      setupIntentID: setupIntent.id,
+      stripeBillingCustomerID: customerID,
+    };
+  }
+);
+
+// After Elements confirms the SetupIntent client-side, the resulting
+// paymentMethodID comes back here. Attach to the customer, set default, mark
+// the setup doc as collected so the wizard can advance and so the eventual
+// tenant provisioner has a default PM to point the Subscription at.
+exports.tenantSetupConfirmPaymentMethodCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [
+      stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY,
+      twilioSubaccountInternals.TWILIO_MASTER_ACCOUNT_SID,
+      twilioSubaccountInternals.TWILIO_MASTER_AUTH_TOKEN,
+    ],
+  },
+  async (request) => {
+    const auth = requireAuth(request);
+    const callerEmail = normalizeEmail(auth.token && auth.token.email);
+    if (!callerEmail) {
+      throw new HttpsError(
+        "permission-denied",
+        "Signed-in user has no email."
+      );
+    }
+
+    const { paymentMethodID } = request.data || {};
+    if (!paymentMethodID || typeof paymentMethodID !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "paymentMethodID is required."
+      );
+    }
+
+    const db = getFirestore();
+    const docRef = tenantAccountSetupDocRef(db, callerEmail);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      throw new HttpsError(
+        "permission-denied",
+        "No tenant signup is open for this email. Ask support for a link."
+      );
+    }
+    const data = snap.data() || {};
+    const expiresAt = data.expiresAt;
+    if (
+      expiresAt &&
+      typeof expiresAt.toMillis === "function" &&
+      expiresAt.toMillis() < Date.now()
+    ) {
+      throw new HttpsError(
+        "permission-denied",
+        "This setup link has expired. Ask support to send a new one."
+      );
+    }
+    if (data.billingTier !== "monthly_sub") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Card collection at signup only applies to monthly subscription plans."
+      );
+    }
+    if (!data.stripeBillingCustomerID) {
+      throw new HttpsError(
+        "failed-precondition",
+        "No Stripe customer is associated with this signup. Reload and try again."
+      );
+    }
+
+    const stripe = new Stripe(
+      stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY.value()
+    );
+
+    // Attach is idempotent for the same customer; rejects if the PM is
+    // already attached to a different customer (would imply a cross-prospect
+    // copy/paste, which shouldn't happen here).
+    try {
+      await stripe.paymentMethods.attach(paymentMethodID, {
+        customer: data.stripeBillingCustomerID,
+      });
+    } catch (err) {
+      if (!err || err.code !== "resource_already_exists") {
+        logger.error(
+          "tenantSetupConfirmPaymentMethodCallable: PM attach failed",
+          {
+            email: callerEmail,
+            paymentMethodID,
+            error: err && err.message,
+          }
+        );
+        throw new HttpsError(
+          "failed-precondition",
+          (err && err.message) || "Payment method attach failed."
+        );
+      }
+    }
+
+    await stripe.customers.update(data.stripeBillingCustomerID, {
+      invoice_settings: { default_payment_method: paymentMethodID },
+    });
+
+    await docRef.update({
+      stripeDefaultPaymentMethodID: paymentMethodID,
+      paymentMethodCollected: true,
+      paymentMethodCollectedAt: FieldValue.serverTimestamp(),
+    });
+
+    logger.info("tenantSetupConfirmPaymentMethodCallable: PM attached", {
+      email: callerEmail,
+      paymentMethodID,
+    });
+
+    // Best-effort: provision the prospect's Twilio subaccount now that
+    // payment is on file. Idempotent — re-runs (refresh during retry) are
+    // no-ops. Failure here doesn't roll back the card-save; the phone-step
+    // search callable provisions on demand as a retry path.
+    try {
+      await twilioSubaccountInternals.provisionPreTenantSubaccountInternal({
+        normalizedEmail: callerEmail,
+        setupDocRef: docRef,
+        actorUID: auth.uid,
+        actorKind: "tenant-setup",
+      });
+    } catch (err) {
+      logger.warn(
+        "tenantSetupConfirmPaymentMethodCallable: subaccount provision failed (will retry on phone step)",
+        {
+          email: callerEmail,
+          error: (err && err.message) || String(err),
+        }
+      );
+    }
+
+    return {
+      success: true,
+      paymentMethodID,
+      paymentMethodCollected: true,
+    };
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────
+// Pre-tenant Twilio number lifecycle. Mirrors the platform-admin variants in
+// twilio-numbers.js, but auth'd against the setup doc + pre-tenant
+// subaccount instead of a tenant + tenant subaccount. Number is purchased
+// WITHOUT webhook configuration — webhooks are applied at tenant
+// provisioning time when the number is adopted into the real tenant. During
+// signup the number sits dormant; inbound texts hit Twilio's default 404.
+// ─────────────────────────────────────────────────────────────────────────
+
+const SETUP_NUMBER_SEARCH_DEFAULT_LIMIT = 20;
+const SETUP_NUMBER_SEARCH_MAX_LIMIT = 30;
+
+// Shared loader for the setup doc inside the setup-flow callables. Returns
+// {docRef, data, callerEmail} on success; throws HttpsError on auth/expiry
+// failure. All setup-flow callables hit this first.
+async function loadSetupDocForCaller(request) {
+  const auth = requireAuth(request);
+  const callerEmail = normalizeEmail(auth.token && auth.token.email);
+  if (!callerEmail) {
+    throw new HttpsError("permission-denied", "Signed-in user has no email.");
+  }
+  const db = getFirestore();
+  const docRef = tenantAccountSetupDocRef(db, callerEmail);
+  const snap = await docRef.get();
+  if (!snap.exists) {
+    throw new HttpsError(
+      "permission-denied",
+      "No tenant signup is open for this email. Ask support for a link."
+    );
+  }
+  const data = snap.data() || {};
+  const expiresAt = data.expiresAt;
+  if (
+    expiresAt &&
+    typeof expiresAt.toMillis === "function" &&
+    expiresAt.toMillis() < Date.now()
+  ) {
+    throw new HttpsError(
+      "permission-denied",
+      "This setup link has expired. Ask support to send a new one."
+    );
+  }
+  return { auth, callerEmail, docRef, data };
+}
+
+// Idempotently ensure the prospect has a Twilio subaccount provisioned.
+// Mirrors the inline call in confirm-PM but as a recovery path for search
+// when the inline provision failed silently. Returns the subaccountSid.
+async function ensureSetupSubaccount({ callerEmail, docRef, data, auth }) {
+  if (data.twilioSubaccountSid && data.twilioSubaccountStatus === "active") {
+    return data.twilioSubaccountSid;
+  }
+  const res = await twilioSubaccountInternals.provisionPreTenantSubaccountInternal(
+    {
+      normalizedEmail: callerEmail,
+      setupDocRef: docRef,
+      actorUID: auth.uid,
+      actorKind: "tenant-setup",
+    }
+  );
+  return res.subaccountSid;
+}
+
+exports.tenantSetupSearchTwilioNumbersCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [
+      twilioSubaccountInternals.TWILIO_MASTER_ACCOUNT_SID,
+      twilioSubaccountInternals.TWILIO_MASTER_AUTH_TOKEN,
+    ],
+  },
+  async (request) => {
+    const { auth, callerEmail, docRef, data } = await loadSetupDocForCaller(
+      request
+    );
+
+    const { state, locality, areaCode, contains, limit } = request.data || {};
+    if (!state && !locality && !areaCode && !contains) {
+      throw new HttpsError(
+        "invalid-argument",
+        "At least one of state, locality, areaCode, or contains is required."
+      );
+    }
+
+    const subaccountSid = await ensureSetupSubaccount({
+      callerEmail,
+      docRef,
+      data,
+      auth,
+    });
+
+    const cappedLimit = Math.min(
+      Math.max(
+        parseInt(limit, 10) || SETUP_NUMBER_SEARCH_DEFAULT_LIMIT,
+        1
+      ),
+      SETUP_NUMBER_SEARCH_MAX_LIMIT
+    );
+
+    const client = await getSetupTwilioClient(callerEmail, { subaccountSid });
+
+    const searchOpts = {
+      smsEnabled: true,
+      mmsEnabled: true,
+      limit: cappedLimit,
+    };
+    if (state) searchOpts.inRegion = state;
+    if (locality) searchOpts.inLocality = locality;
+    if (areaCode) searchOpts.areaCode = parseInt(areaCode, 10);
+    if (contains) searchOpts.contains = contains;
+
+    logger.info("tenantSetupSearchTwilioNumbersCallable: searching", {
+      email: callerEmail,
+      state,
+      locality,
+      areaCode,
+      contains,
+      limit: cappedLimit,
+    });
+
+    const available = await client
+      .availablePhoneNumbers("US")
+      .local.list(searchOpts);
+
+    const candidates = available.map((n) => ({
+      phoneNumber: n.phoneNumber,
+      friendlyName: n.friendlyName,
+      locality: n.locality || null,
+      region: n.region || null,
+      rateCenter: n.rateCenter || null,
+      postalCode: n.postalCode || null,
+      lata: n.lata || null,
+      capabilities: {
+        sms: n.capabilities && n.capabilities.SMS === true,
+        mms: n.capabilities && n.capabilities.MMS === true,
+        voice: n.capabilities && n.capabilities.voice === true,
+      },
+    }));
+
+    logger.info("tenantSetupSearchTwilioNumbersCallable: results", {
+      email: callerEmail,
+      count: candidates.length,
+    });
+
+    return { success: true, candidates };
+  }
+);
+
+exports.tenantSetupPurchaseTwilioNumberCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [
+      twilioSubaccountInternals.TWILIO_MASTER_ACCOUNT_SID,
+      twilioSubaccountInternals.TWILIO_MASTER_AUTH_TOKEN,
+    ],
+  },
+  async (request) => {
+    const { auth, callerEmail, docRef, data } = await loadSetupDocForCaller(
+      request
+    );
+
+    const { phoneNumber } = request.data || {};
+    if (!phoneNumber || typeof phoneNumber !== "string") {
+      throw new HttpsError(
+        "invalid-argument",
+        "phoneNumber is required."
+      );
+    }
+
+    // One purchased number per setup doc. If they already have one and want
+    // a different one, they release first.
+    if (data.purchasedPhoneNumber && data.purchasedPhoneNumber.phoneNumber) {
+      throw new HttpsError(
+        "failed-precondition",
+        "A phone number is already on this signup. Release it first to pick a different one."
+      );
+    }
+
+    const subaccountSid = await ensureSetupSubaccount({
+      callerEmail,
+      docRef,
+      data,
+      auth,
+    });
+
+    const client = await getSetupTwilioClient(callerEmail, { subaccountSid });
+
+    logger.info("tenantSetupPurchaseTwilioNumberCallable: purchasing", {
+      email: callerEmail,
+      phoneNumber,
+    });
+
+    // No webhook config at purchase time. The number sits dormant during
+    // signup; webhooks are applied at tenant provisioning when the number is
+    // adopted into the real tenant + store.
+    const purchase = await client.incomingPhoneNumbers.create({
+      phoneNumber,
+      friendlyName: `setup-${callerEmail}`.slice(0, 64),
+    });
+
+    const purchased = {
+      phoneNumber: purchase.phoneNumber,
+      phoneNumberSid: purchase.sid,
+      capabilities: {
+        sms: purchase.capabilities && purchase.capabilities.sms === true,
+        mms: purchase.capabilities && purchase.capabilities.mms === true,
+        voice: purchase.capabilities && purchase.capabilities.voice === true,
+      },
+      friendlyName: purchase.friendlyName,
+      source: "purchased",
+      purchasedAt: FieldValue.serverTimestamp(),
+    };
+
+    await docRef.update({
+      purchasedPhoneNumber: purchased,
+    });
+
+    logger.info("tenantSetupPurchaseTwilioNumberCallable: purchased", {
+      email: callerEmail,
+      phoneNumber: purchase.phoneNumber,
+      phoneNumberSid: purchase.sid,
+    });
+
+    return {
+      success: true,
+      phoneNumber: purchase.phoneNumber,
+      phoneNumberSid: purchase.sid,
+      capabilities: purchased.capabilities,
+    };
+  }
+);
+
+exports.tenantSetupReleaseTwilioNumberCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [
+      twilioSubaccountInternals.TWILIO_MASTER_ACCOUNT_SID,
+      twilioSubaccountInternals.TWILIO_MASTER_AUTH_TOKEN,
+    ],
+  },
+  async (request) => {
+    const { callerEmail, docRef, data } = await loadSetupDocForCaller(request);
+
+    const purchased = data.purchasedPhoneNumber;
+    if (!purchased || !purchased.phoneNumberSid) {
+      // Nothing to release — treat as success so the UI can clear local state.
+      return { success: true, released: false };
+    }
+    if (!data.twilioSubaccountSid) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Subaccount is missing for this signup; cannot release."
+      );
+    }
+
+    const client = await getSetupTwilioClient(callerEmail, {
+      subaccountSid: data.twilioSubaccountSid,
+    });
+
+    try {
+      await client.incomingPhoneNumbers(purchased.phoneNumberSid).remove();
+    } catch (err) {
+      // 20404 = number not found on subaccount (already released externally).
+      // Treat as success and proceed to clean up the setup doc.
+      if (err && err.status !== 404 && err.code !== 20404) {
+        logger.error("tenantSetupReleaseTwilioNumberCallable: remove failed", {
+          email: callerEmail,
+          phoneNumberSid: purchased.phoneNumberSid,
+          error: (err && err.message) || String(err),
+        });
+        throw new HttpsError(
+          "internal",
+          (err && err.message) || "Failed to release phone number."
+        );
+      }
+      logger.warn(
+        "tenantSetupReleaseTwilioNumberCallable: number not found on Twilio, clearing setup doc anyway",
+        {
+          email: callerEmail,
+          phoneNumberSid: purchased.phoneNumberSid,
+        }
+      );
+    }
+
+    await docRef.update({
+      purchasedPhoneNumber: FieldValue.delete(),
+    });
+
+    logger.info("tenantSetupReleaseTwilioNumberCallable: released", {
+      email: callerEmail,
+      phoneNumber: purchased.phoneNumber,
+      phoneNumberSid: purchased.phoneNumberSid,
+    });
+
+    return {
+      success: true,
+      released: true,
+      phoneNumber: purchased.phoneNumber,
+    };
   }
 );

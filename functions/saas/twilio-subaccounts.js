@@ -42,6 +42,9 @@ const {
   secretManagerRef,
   storeSubaccountAuthToken,
   destroySubaccountSecret,
+  secretManagerRefForSetup,
+  storeSetupSubaccountAuthToken,
+  destroySetupSubaccountSecret,
   masterTwilioClient,
   flipTenantRoutingDocs,
 } = common;
@@ -116,6 +119,137 @@ async function provisionSubaccountInternal({ tenantID, actorUID, actorKind }) {
   };
 }
 
+// Pre-tenant variant: provisions a Twilio subaccount during the signup
+// wizard (after card-save, before a tenant doc exists). Stores subaccount
+// SID and Secret Manager ref on the prospect's setup doc instead of a
+// tenant doc. Adopted at tenant provisioning time — the SID is copied to
+// the new tenant doc and the setup-keyed secret is destroyed (auth token
+// is re-stored under the tenant key in the adoption step).
+//
+// Idempotent: if `data.twilioSubaccountSid` is already on the setup doc,
+// we treat the subaccount as already provisioned and return early. This
+// lets us call from both the confirm-PM callable AND on prospect resume.
+async function provisionPreTenantSubaccountInternal({
+  normalizedEmail,
+  setupDocRef,
+  actorUID,
+  actorKind,
+}) {
+  if (!normalizedEmail) {
+    throw new HttpsError(
+      "invalid-argument",
+      "normalizedEmail is required for pre-tenant subaccount provisioning."
+    );
+  }
+  if (!setupDocRef) {
+    throw new HttpsError(
+      "invalid-argument",
+      "setupDocRef is required for pre-tenant subaccount provisioning."
+    );
+  }
+
+  const existing = await setupDocRef.get();
+  if (!existing.exists) {
+    throw new HttpsError(
+      "failed-precondition",
+      `Setup doc for ${normalizedEmail} does not exist.`
+    );
+  }
+  const data = existing.data() || {};
+
+  if (data.twilioSubaccountSid && data.twilioSubaccountStatus === "active") {
+    logger.info("provisionPreTenantSubaccountInternal: already active", {
+      normalizedEmail,
+      subaccountSid: data.twilioSubaccountSid,
+      actorKind,
+    });
+    return {
+      subaccountSid: data.twilioSubaccountSid,
+      status: "active",
+      alreadyProvisioned: true,
+    };
+  }
+
+  const client = masterTwilioClient();
+  // Twilio friendlyName cap is 64 chars; emails over ~58 chars get truncated.
+  const friendlyName = `setup-${normalizedEmail}`.slice(0, 64);
+  const subaccount = await client.api.v2010.accounts.create({ friendlyName });
+
+  await storeSetupSubaccountAuthToken(normalizedEmail, subaccount.authToken);
+
+  await setupDocRef.update({
+    twilioSubaccountSid: subaccount.sid,
+    twilioSecretManagerRef: secretManagerRefForSetup(normalizedEmail),
+    twilioSubaccountStatus: "active",
+    twilioSubaccountCreatedAt: FieldValue.serverTimestamp(),
+    twilioSubaccountCreatedByUID: actorUID || null,
+    twilioSubaccountCreatedByKind: actorKind || null,
+  });
+
+  logger.info("provisionPreTenantSubaccountInternal: provisioned", {
+    normalizedEmail,
+    subaccountSid: subaccount.sid,
+    actorKind,
+  });
+
+  return {
+    subaccountSid: subaccount.sid,
+    status: "active",
+    alreadyProvisioned: false,
+  };
+}
+
+// Tear-down for the pre-tenant subaccount + secret. Called from the
+// orphan-cleanup Firestore trigger when a setup doc is deleted without
+// being adopted into a tenant, AND from the adoption step (after the
+// SID is copied to the tenant doc and the auth token is re-stored under
+// the tenant key). Closes the subaccount on Twilio + destroys the secret.
+// Idempotent: missing SID or already-closed subaccount returns ok.
+async function destroyPreTenantSubaccountInternal({ normalizedEmail, subaccountSid }) {
+  if (!normalizedEmail) return { ok: true, skipped: true };
+  if (!subaccountSid) {
+    // Nothing to close on Twilio, but still try to destroy the secret in
+    // case it leaked.
+    try {
+      await destroySetupSubaccountSecret(normalizedEmail);
+    } catch (err) {
+      logger.warn("destroyPreTenantSubaccountInternal: secret destroy failed", {
+        normalizedEmail,
+        error: err && err.message,
+      });
+    }
+    return { ok: true, skipped: true };
+  }
+
+  const master = masterTwilioClient();
+  try {
+    await master.api.v2010.accounts(subaccountSid).update({ status: "closed" });
+    logger.info("destroyPreTenantSubaccountInternal: closed subaccount", {
+      normalizedEmail,
+      subaccountSid,
+    });
+  } catch (err) {
+    // 20404 = already closed/missing. Anything else logs but doesn't throw —
+    // we still want to destroy the secret regardless.
+    logger.warn("destroyPreTenantSubaccountInternal: close failed", {
+      normalizedEmail,
+      subaccountSid,
+      error: err && err.message,
+    });
+  }
+
+  try {
+    await destroySetupSubaccountSecret(normalizedEmail);
+  } catch (err) {
+    logger.warn("destroyPreTenantSubaccountInternal: secret destroy failed", {
+      normalizedEmail,
+      error: err && err.message,
+    });
+  }
+
+  return { ok: true };
+}
+
 // Default grace window between suspend and final closure. The window exists
 // so consumers can still text opt-out (STOP) to a number after a tenant has
 // churned — required for TCPA compliance. 30 days matches industry practice
@@ -128,6 +262,8 @@ const DEFAULT_GRACE_WINDOW_DAYS = 30;
 exports._internals = {
   provisionSubaccountInternal,
   closeSubaccountInternal,
+  provisionPreTenantSubaccountInternal,
+  destroyPreTenantSubaccountInternal,
   TWILIO_MASTER_ACCOUNT_SID,
   TWILIO_MASTER_AUTH_TOKEN,
 };
@@ -441,14 +577,32 @@ exports.platformAdminReactivateTwilioSubaccount = onCall(
 // gating. Precondition status === "suspended" — close from active is rejected
 // to force the TCPA grace window.
 async function closeSubaccountInternal({ tenantID, actorUID, actorKind, force = false }) {
+  logger.info("closeSubaccountInternal: ENTER", { tenantID, actorKind, force });
   const db = getFirestore();
   const twilioRef = tenantTwilioDocRef(db, tenantID);
   const snap = await twilioRef.get();
+  logger.info("closeSubaccountInternal: doc read", {
+    tenantID,
+    exists: snap.exists,
+    path: twilioRef.path,
+  });
   if (!snap.exists) {
+    logger.warn("closeSubaccountInternal: no subdoc - throwing not-found", {
+      tenantID,
+    });
     throw new HttpsError("not-found", "No Twilio subaccount for tenant.");
   }
   const { subaccountSid, status } = snap.data() || {};
+  logger.info("closeSubaccountInternal: doc data", {
+    tenantID,
+    subaccountSid,
+    status,
+  });
   if (status !== "suspended" && !force) {
+    logger.warn("closeSubaccountInternal: precondition failed - not suspended", {
+      tenantID,
+      status,
+    });
     throw new HttpsError(
       "failed-precondition",
       "Subaccount must be suspended before closure (grace window must complete first)."
@@ -459,15 +613,66 @@ async function closeSubaccountInternal({ tenantID, actorUID, actorKind, force = 
   // Phase 2; scheduledTwilioChurnCleanup, Phase 7). Twilio rejects the
   // close if any numbers remain attached.
 
-  const client = masterTwilioClient();
-  if (force && status === "active") {
-    await client.api.v2010
-      .accounts(subaccountSid)
-      .update({ status: "suspended" });
+  let client;
+  try {
+    client = masterTwilioClient();
+  } catch (err) {
+    logger.error("closeSubaccountInternal: masterTwilioClient init failed", {
+      tenantID,
+      error: err && err.message,
+      code: err && err.code,
+    });
+    throw err;
   }
-  await client.api.v2010
-    .accounts(subaccountSid)
-    .update({ status: "closed" });
+  if (force && status === "active") {
+    logger.info("closeSubaccountInternal: suspending (force path)", {
+      tenantID,
+      subaccountSid,
+    });
+    try {
+      const suspended = await client.api.v2010
+        .accounts(subaccountSid)
+        .update({ status: "suspended" });
+      logger.info("closeSubaccountInternal: suspend OK", {
+        tenantID,
+        subaccountSid,
+        newStatus: suspended.status,
+      });
+    } catch (err) {
+      logger.error("closeSubaccountInternal: suspend failed", {
+        tenantID,
+        subaccountSid,
+        error: err && err.message,
+        code: err && err.code,
+        twilioStatus: err && err.status,
+        moreInfo: err && err.moreInfo,
+        details: err && err.details ? JSON.stringify(err.details) : null,
+      });
+      throw err;
+    }
+  }
+  logger.info("closeSubaccountInternal: closing", { tenantID, subaccountSid });
+  try {
+    const closed = await client.api.v2010
+      .accounts(subaccountSid)
+      .update({ status: "closed" });
+    logger.info("closeSubaccountInternal: close OK", {
+      tenantID,
+      subaccountSid,
+      newStatus: closed.status,
+    });
+  } catch (err) {
+    logger.error("closeSubaccountInternal: close failed", {
+      tenantID,
+      subaccountSid,
+      error: err && err.message,
+      code: err && err.code,
+      twilioStatus: err && err.status,
+      moreInfo: err && err.moreInfo,
+      details: err && err.details ? JSON.stringify(err.details) : null,
+    });
+    throw err;
+  }
 
   // Secret Manager cleanup. The auth token is useless after closure and
   // keeping it around is needless attack surface. destroySubaccountSecret

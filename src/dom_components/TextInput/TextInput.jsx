@@ -37,7 +37,22 @@ export const TextInput = forwardRef(function TextInput(
   const debounceRef = useRef(null);
   const latestValueRef = useRef(value || "");
   const internalRef = useRef(null);
-  const inputRef = externalInputRef || ref || internalRef;
+
+  // Combined ref: always populates internalRef (for adjustHeight) AND forwards
+  // to any external ref/callback so the caller still gets the node.
+  const setRef = useCallback(
+    (node) => {
+      internalRef.current = node;
+      const assign = (target) => {
+        if (!target) return;
+        if (typeof target === "function") target(node);
+        else target.current = node;
+      };
+      assign(externalInputRef);
+      assign(ref);
+    },
+    [externalInputRef, ref]
+  );
 
   const baseLineHeight = (style && parseInt(style.lineHeight)) || 20;
   const minHeight = multiline ? baseLineHeight : undefined;
@@ -56,8 +71,7 @@ export const TextInput = forwardRef(function TextInput(
   // Auto-height on mount and when value changes externally
   useLayoutEffect(() => {
     if (!multiline) return;
-    const node = typeof inputRef === "object" ? inputRef.current : null;
-    if (node) adjustHeight(node);
+    if (internalRef.current) adjustHeight(internalRef.current);
   }, [localValue, multiline]);
 
   // Cleanup timeout on unmount
@@ -155,7 +169,7 @@ export const TextInput = forwardRef(function TextInput(
         </label>
       )}
       <Component
-        ref={inputRef}
+        ref={setRef}
         id={inputId}
         className={classNames}
         style={computedStyle}

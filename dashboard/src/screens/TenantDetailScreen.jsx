@@ -954,6 +954,7 @@ export function TenantDetailScreen() {
       await deleteTenantCallable({
         tenantID,
         confirmTenantName: expectedDeleteText,
+        nukeExternal: true,
       });
       navigate("/");
     } catch (err) {

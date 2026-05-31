@@ -713,10 +713,10 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
       id: customerInfo.id,
     };
     const smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
-    const emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
+    const emailTemplate = findTemplateByType(settings?.emailTemplates, "refundReceipt");
 
     const smsContent = smsTemplate?.content || smsTemplate?.message || "";
-    const emailContent = emailTemplate?.content || emailTemplate?.body || "";
+    const emailContent = emailTemplate?.message || emailTemplate?.content || emailTemplate?.body || "";
     let emptyParts = [];
     if (settings?.autoSMSSalesReceipt && customerForReceipt.customerCell && !smsContent.trim()) emptyParts.push("SMS");
     if (settings?.autoEmailSalesReceipt && customerForReceipt.email && !emailContent.trim()) emptyParts.push("email");
@@ -770,7 +770,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     if (!sLastRefundReceipt) return;
     let settings = useSettingsStore.getState().getSettings();
     let smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
-    let emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
+    let emailTemplate = findTemplateByType(settings?.emailTemplates, "refundReceipt");
 
     let primaryWO = sWorkordersInSale[0];
     let customerForReceipt = {
@@ -783,7 +783,7 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
 
     if (customerForReceipt.customerCell || customerForReceipt.email) {
       let smsContent = smsTemplate?.content || smsTemplate?.message || "";
-      let emailContent = emailTemplate?.content || emailTemplate?.body || "";
+      let emailContent = emailTemplate?.message || emailTemplate?.content || emailTemplate?.body || "";
       let canSMS = customerForReceipt.customerCell && smsContent.trim();
       let canEmail = customerForReceipt.email && emailContent.trim();
       if (canSMS || canEmail) {
@@ -800,9 +800,9 @@ export const NewRefundModalScreen = memo(function NewRefundModalScreen({ visible
     if (!sLastRefundReceipt) return;
     let settings = useSettingsStore.getState().getSettings();
     let smsTemplate = findTemplateByType(settings?.smsTemplates || settings?.textTemplates, "saleReceipt");
-    let emailTemplate = findTemplateByType(settings?.emailTemplates, "saleReceipt");
+    let emailTemplate = findTemplateByType(settings?.emailTemplates, "refundReceipt");
     let smsContent = smsTemplate?.content || smsTemplate?.message || "";
-    let emailContent = emailTemplate?.content || emailTemplate?.body || "";
+    let emailContent = emailTemplate?.message || emailTemplate?.content || emailTemplate?.body || "";
 
     let primaryWO = sWorkordersInSale[0];
     let customerForReceipt = {

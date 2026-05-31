@@ -7,8 +7,10 @@
     "migrate": "node lightspeed-import.js"
   },
   "dependencies": {
+    "@google-cloud/secret-manager": "^5.6.0",
     "dotenv": "^16.4.7",
     "firebase-admin": "^12.6.0",
-    "lodash": "^4.17.21"
+    "lodash": "^4.17.21",
+    "twilio": "^5.6.1"
   }
 }

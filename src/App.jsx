@@ -32,6 +32,16 @@ const PhoneScreen = lazy(() =>
     default: m.PhoneScreen,
   }))
 );
+const OrderingScreen = lazy(() =>
+  import("./screens/phone/OrderingScreen/OrderingScreen").then((m) => ({
+    default: m.OrderingScreen,
+  }))
+);
+const OrderSelectScreen = lazy(() =>
+  import("./screens/phone/OrderSelectScreen/OrderSelectScreen").then((m) => ({
+    default: m.OrderSelectScreen,
+  }))
+);
 import { HomeScreen } from "./screens/HomeScreen";
 const DatabaseViewerScreen = lazy(() =>
   import("./screens/DatabaseViewerScreen").then((m) => ({
@@ -522,7 +532,7 @@ function App() {
           }
         />
 
-        {/* Protected route - Phone Simulator */}
+        {/* Protected route - Phone Simulator (with nested sub-routes) */}
         <Route
           path={ROUTES.phone}
           element={
@@ -532,7 +542,28 @@ function App() {
               </Suspense>
             </ProtectedRoute>
           }
-        />
+        >
+          {/* Nested: /phone/ordering picks an open vendor order (or starts
+              a new one); /phone/ordering/:orderID runs the scanner against
+              that order. Both render inside PhoneScreen via <Outlet>, so
+              the PIN gate + listeners cover them. */}
+          <Route
+            path="ordering"
+            element={
+              <Suspense fallback={<LoadingIndicator />}>
+                <OrderSelectScreen />
+              </Suspense>
+            }
+          />
+          <Route
+            path="ordering/:orderID"
+            element={
+              <Suspense fallback={<LoadingIndicator />}>
+                <OrderingScreen />
+              </Suspense>
+            }
+          />
+        </Route>
 
         {/* Catch-all redirect */}
         <Route

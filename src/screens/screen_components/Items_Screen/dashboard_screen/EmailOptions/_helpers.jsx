@@ -30,23 +30,34 @@ export const FONT_WEIGHTS = [
 ];
 
 export const GREETING_VARIABLES = [
-  { label: "Store Logo", variable: "{storeLogo}" },
+  { label: "Store Logo  \u2192  {storeLogo}", variable: "{storeLogo}" },
 ];
 
 export const FOOTER_VARIABLES = [
-  { label: "Store Logo", variable: "{storeLogo}" },
-  { label: "Hours", variable: "{storeHours}" },
-  { label: "Support Email", variable: "{supportEmail}" },
-  { label: "Phone", variable: "{storePhone}" },
+  { label: "Store Logo  \u2192  {storeLogo}", variable: "{storeLogo}" },
+  { label: "Hours  \u2192  {storeHours}", variable: "{storeHours}" },
+  { label: "Support Email  \u2192  {supportEmail}", variable: "{supportEmail}" },
+  { label: "Phone  \u2192  {storePhone}", variable: "{storePhone}" },
 ];
 
 export const MESSAGE_VARIABLES = [
-  { label: "First Name", variable: "{firstName}" },
-  { label: "Last Name", variable: "{lastName}" },
-  { label: "Brand", variable: "{brand}" },
-  { label: "Brands", variable: "{brands}" },
-  { label: "Total Amount", variable: "{totalAmount}" },
+  { label: "First Name  \u2192  {firstName}", variable: "{firstName}" },
+  { label: "Last Name  \u2192  {lastName}", variable: "{lastName}" },
+  { label: "Brand  \u2192  {brand}", variable: "{brand}" },
+  { label: "Brands  \u2192  {brands}", variable: "{brands}" },
+  { label: "Total Amount  \u2192  {totalAmount}", variable: "{totalAmount}" },
 ];
+
+export const MESSAGE_TYPE_VARIABLES = {
+  saleReceipt: [
+    { label: "Receipt PDF Link  \u2192  {salesReceipt}", variable: "{salesReceipt}" },
+    { label: "Payment Link  \u2192  {paymentLink}", variable: "{paymentLink}" },
+  ],
+  refundReceipt: [
+    { label: "Refund PDF Link  \u2192  {refundReceipt}", variable: "{refundReceipt}" },
+    { label: "Payment Link  \u2192  {paymentLink}", variable: "{paymentLink}" },
+  ],
+};
 
 export const TEMPLATE_EMOJIS = [
   { id: "🎉", label: "🎉  Party" },

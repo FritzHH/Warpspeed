@@ -113,63 +113,7 @@ export function applyLineItemDiscounts(wo, zInventoryArr) {
   return wo;
 }
 
-export function calculateRunningTotals(
-  workorders,
-  salesTaxRatePercent,
-  workorderlinesArr = [],
-  isRefund,
-  taxFree = false
-) {
-  let runningTotal = 0;
-  let runningDiscount = 0;
-  let runningSubtotal = 0;
-  let runningQty = 0;
-  // log("input", workorders);
-
-  // log(workorderlinesArr);
-
-  if (!Array.isArray(workorders)) workorders = [workorders];
-  workorders.forEach((workorderObj) => {
-    // log(workorderObj)
-    let arrToIterate = isRefund
-      ? workorderlinesArr
-      : workorderObj.workorderLines;
-    arrToIterate.forEach((line, idx) => {
-      if (
-        isRefund &&
-        !arrHasItem(
-          workorderObj.workorderLines.map((o) => o.inventoryItem),
-          line.inventoryItem
-        )
-      )
-        return;
-      let qty = Number(line.qty) || 0;
-      // clog("line", line.discountObj);
-      runningSubtotal = runningSubtotal + line.inventoryItem.price * qty;
-      if (line.discountObj?.value) {
-        let recalc = applyDiscountToWorkorderItem(line, true);
-        runningTotal = runningTotal + Number(recalc.newPrice);
-        runningDiscount = runningDiscount + Number(recalc.savings);
-      } else {
-        runningTotal = runningTotal + line.inventoryItem.price * qty;
-      }
-      runningQty += qty;
-    });
-  });
-  // log(salesTaxRatePercent);
-  // log("run", runningDiscount);
-  let runningTax = taxFree ? 0 : runningTotal * (salesTaxRatePercent / 100);
-  let obj = {
-    finalTotal: runningTotal + runningTax,
-    runningTotal,
-    runningSubtotal, // total before discounts, so can be more than running total
-    runningDiscount,
-    runningTax,
-    runningQty,
-  };
-  // clog(obj);
-  return obj;
-}
+export const calculateRunningTotals = _shared.calculateRunningTotals;
 
 // Single source of truth for "what does this customer owe right now" on a workorder.
 // Pure: takes workorder + activeSale + settings, returns every facet callers need.
@@ -1137,44 +1081,7 @@ export function deepEqual(obj1, obj2) {
   return true;
 }
 
-export function applyDiscountToWorkorderItem(
-  workorderLineObj,
-  returnAsDiscountObj
-) {
-  let discountObj = workorderLineObj.discountObj;
-  if (!discountObj || !discountObj.value) return workorderLineObj;
-
-  let newPrice;
-  let savings;
-
-  if (discountObj.type === DISCOUNT_TYPES.percent) {
-    let multiplier = 1 - Number(discountObj.value) / 100;
-    newPrice =
-      workorderLineObj.inventoryItem.price * workorderLineObj.qty * multiplier;
-    savings =
-      workorderLineObj.inventoryItem.price * workorderLineObj.qty - newPrice;
-    // log("newprice", trimToTwoDecimals(newPrice));
-    // log("savings", savings);
-  } else {
-    newPrice =
-      workorderLineObj.inventoryItem.price * workorderLineObj.qty -
-      Number(discountObj.value);
-    savings =
-      workorderLineObj.inventoryItem.price * workorderLineObj.qty - newPrice;
-  }
-  // log("newprice", newPrice);
-  let newDiscountObj = {
-    ...discountObj,
-    newPrice: Math.round(newPrice),
-    savings: Math.round(savings),
-  };
-
-  if (returnAsDiscountObj) {
-    return newDiscountObj;
-  }
-  workorderLineObj.discountObj = newDiscountObj;
-  return workorderLineObj;
-}
+export const applyDiscountToWorkorderItem = _shared.applyDiscountToWorkorderItem;
 
 export function insertOpacityIntoRGBString(rgbString, opacity) {
   const match = rgbString.match(/^rgb\((\d{1,3}),\s*(\d{1,3}),\s*(\d{1,3})\)$/);

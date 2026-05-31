@@ -77,6 +77,11 @@ const BillingModalScreen = lazy(() =>
     default: m.BillingModalScreen,
   }))
 );
+const OrderingModalScreen = lazy(() =>
+  import("../../modal_screens/OrderingModalScreen/OrderingModalScreen").then((m) => ({
+    default: m.OrderingModalScreen,
+  }))
+);
 import { TodaysHistoryComponent } from "./TodaysHistoryComponent";
 import { dbSaveSettingsField, dbSaveSettings, dbListenToDevLogs, dbSaveOpenWorkorder, dbSaveCompletedWorkorder, dbSaveCompletedSale, dbSaveActiveSale, dbSaveCustomer, dbRehydrateFromArchive, dbManualArchiveAndCleanup, dbSavePunchObject, dbSavePrintObj, dbBatchWrite, dbClearCollection, dbSaveInventoryItem, dbGmailDisconnect, dbGmailInitiateAuth } from "../../../../db_calls_wrapper";
 import { mapCustomers, mapWorkorders, mapSales, mapStatuses, mapEmployees, mapPunchHistory, parseCSV } from "../../../../lightspeed_import";
@@ -200,6 +205,7 @@ export function Dashboard_Admin({}) {
   const [sShowAnalyticsModal, _setShowAnalyticsModal] = useState(false);
   const [sShowDLQAdminModal, _setShowDLQAdminModal] = useState(false);
   const [sShowBillingModal, _setShowBillingModal] = useState(false);
+  const [sShowOrderingModal, _setShowOrderingModal] = useState(false);
 
   //////////////////////////////////////////////////////////////////////////
 
@@ -412,6 +418,11 @@ export function Dashboard_Admin({}) {
           <BillingModalScreen handleExit={() => _setShowBillingModal(false)} />
         </Suspense>
       )}
+      {!!sShowOrderingModal && (
+        <Suspense fallback={null}>
+          <OrderingModalScreen handleExit={() => _setShowOrderingModal(false)} />
+        </Suspense>
+      )}
       {!!sShowLabelDesigner && zCurrentUserLevel >= TAB_GATES[TAB_NAMES.labelDesigner] && (
         <LabelDesignerModal
           handleExit={() => _setShowLabelDesigner(false)}
@@ -591,7 +602,7 @@ export function Dashboard_Admin({}) {
                     <QuickItemButtonsComponent />
                   )}
                   {sExpand === TAB_NAMES.ordering && (
-                    <OrderingComponent />
+                    <OrderingComponent onOpenModal={() => _setShowOrderingModal(true)} />
                   )}
                   {sExpand === TAB_NAMES.textTemplates && (
                     <TextTemplatesComponent
@@ -2708,11 +2719,26 @@ const StatusAutoTextSection = ({ zSettingsObj, handleSettingsFieldChange }) => {
 };
 
 
-const OrderingComponent = () => {
+const OrderingComponent = ({ onOpenModal }) => {
   return (
     <BoxContainerOuterComponent>
-      <BoxContainerInnerComponent style={{ width: "100%", alignItems: "center", justifyContent: "center", minHeight: 200 }}>
-        <span style={{ color: C.textDisabled, fontSize: 28, fontWeight: "600" }}>Ordering system not ready</span>
+      <BoxContainerInnerComponent style={{ width: "100%", alignItems: "center", justifyContent: "center", minHeight: 200, gap: 16 }}>
+        <button
+          type="button"
+          onClick={onOpenModal}
+          style={{
+            padding: "14px 28px",
+            fontSize: 18,
+            fontWeight: 600,
+            color: C.textOnAccent,
+            backgroundColor: C.accent,
+            border: "none",
+            borderRadius: 8,
+            cursor: "pointer",
+          }}
+        >
+          Open Ordering
+        </button>
       </BoxContainerInnerComponent>
     </BoxContainerOuterComponent>
   );

@@ -1,10 +1,11 @@
 /*eslint-disable*/
-import { formatCurrencyDisp, formatMillisForDisplay, lightenRGBByPercent, localStorageWrapper } from "../../../utils";
-import { C, ICONS, COLOR_GRADIENTS } from "../../../styles";
-import { Button, Dialog, LargeModalHeader, LargeModalHeaderButton, SHADOW_PROTO } from "../../../dom_components";
-import { useSettingsStore, useLoginStore } from "../../../stores";
-import { printBuilder, log } from "../../../utils";
-import { dbSavePrintObj } from "../../../db_calls_wrapper";
+import { formatCurrencyDisp, formatMillisForDisplay, lightenRGBByPercent, localStorageWrapper, printBuilder, log, getPrinterStatus, findTemplateByType, capitalizeFirstLetterOfString, formatPhoneWithDashes } from "../../../utils";
+import { C, ICONS } from "../../../styles";
+import { Dialog, LargeModalHeader, LargeModalHeaderButton, DropdownMenu, SHADOW_PROTO } from "../../../dom_components";
+import { useSettingsStore, useLoginStore, useAlertScreenStore, useCurrentCustomerStore } from "../../../stores";
+import { dbSavePrintObj, dbSendReceipt } from "../../../db_calls_wrapper";
+import { saveTransactionReceiptPDF } from "../../../shared/transactionReceiptPdf";
+import { build_db_path } from "../../../constants";
 import styles from "./TransactionModal.module.css";
 
 // ─── Helper components ──────────────────────────────────
@@ -141,24 +142,147 @@ export const TransactionModal = ({ transaction, onClose, onRefund }) => {
   const refunds = txn.refunds || [];
   const totalRefunded = refunds.reduce((s, r) => s + (r.amount || 0), 0);
   const hasRefunds = totalRefunded > 0;
+  const fullyRefunded = totalRefunded >= (txn.amountCaptured || 0);
   const changeGiven = isCash && txn.amountTendered > txn.amountCaptured
     ? txn.amountTendered - txn.amountCaptured
     : 0;
+
+  const printers = useSettingsStore((s) => s.settings?.printers);
+  const printerStatus = getPrinterStatus({ printers });
+  const currentCustomer = useCurrentCustomerStore((s) => s.getCustomer());
+
+  function buildReceiptData() {
+    const _settings = useSettingsStore.getState().getSettings();
+    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    const receipt = printBuilder.transaction(txn, _ctx);
+    receipt.customerFirstName = currentCustomer?.first || "";
+    receipt.customerLastName = currentCustomer?.last || "";
+    receipt.customerCell = currentCustomer?.customerCell || currentCustomer?.phone || "";
+    receipt.customerEmail = currentCustomer?.email || "";
+    return { receipt, settings: _settings };
+  }
 
   function handleClose() {
     onClose && onClose();
   }
 
   function handlePrintTransaction() {
-    const _settings = useSettingsStore.getState().getSettings();
-    const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
-    let toPrint = printBuilder.transaction(txn, _ctx);
-    log("DEV — transaction receipt:", toPrint);
-    dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
+    const { receipt } = buildReceiptData();
+    log("DEV — transaction receipt:", receipt);
+    dbSavePrintObj(receipt, localStorageWrapper.getItem("selectedPrinterID") || "");
+  }
+
+  function handleDownloadPDF() {
+    const { receipt } = buildReceiptData();
+    saveTransactionReceiptPDF(receipt, "transaction-" + txn.id + ".pdf");
+  }
+
+  function handleSendTransaction() {
+    const { receipt, settings: _settings } = buildReceiptData();
+    const customerCell = currentCustomer?.customerCell || currentCustomer?.phone || "";
+    const customerEmail = currentCustomer?.email || "";
+
+    const smsTemplate = findTemplateByType(_settings?.smsTemplates || _settings?.textTemplates, "saleReceipt");
+    const emailTemplate = findTemplateByType(_settings?.emailTemplates, "saleReceipt");
+
+    const shouldSMS = !!customerCell;
+    const shouldEmail = !!customerEmail;
+
+    const smsContent = smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "";
+    const emailContent = emailTemplate?.message || emailTemplate?.content || emailTemplate?.body || "";
+
+    const emptyParts = [];
+    if (shouldSMS && !smsContent.trim()) emptyParts.push("SMS");
+    if (shouldEmail && !emailContent.trim()) emptyParts.push("email");
+    if (emptyParts.length > 0) {
+      useAlertScreenStore.getState().setValues({
+        title: "Empty Template",
+        message: "The sale receipt " + emptyParts.join(" and ") + " template is empty. Fill in the template content in Dashboard > " + (emptyParts.includes("SMS") ? "Text Templates" : "Email Templates") + ".",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+    }
+
+    const canSMS = shouldSMS && smsContent.trim();
+    const canEmail = shouldEmail && emailContent.trim();
+    if (!canSMS && !canEmail) {
+      useAlertScreenStore.getState().setValues({
+        title: "No Contact Info",
+        message: "This customer has no phone or email on file.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
+
+    const sendingMessage = (
+      <>
+        {canSMS && !!customerCell && (
+          <span style={{ display: "block" }}>
+            <span style={{ color: C.blue, fontWeight: 600 }}>TEXT</span>
+            {" sending to " + formatPhoneWithDashes(customerCell)}
+          </span>
+        )}
+        {canEmail && !!customerEmail && (
+          <span style={{ display: "block" }}>
+            <span style={{ color: C.green, fontWeight: 600 }}>EMAIL</span>
+            {" sending to " + customerEmail}
+          </span>
+        )}
+      </>
+    );
+    useAlertScreenStore.getState().setValues({ title: "Sending", message: sendingMessage, canExitOnOuterClick: true, autoDismiss: true, autoDismissMs: 1300 });
+
+    const { tenantID, storeID } = _settings;
+    const storagePath = build_db_path.cloudStorage.saleReceiptPDF(txn.id, tenantID, storeID);
+
+    dbSendReceipt({
+      receiptType: "transaction",
+      receiptData: receipt,
+      storagePath,
+      sendSMS: !!(canSMS && customerCell),
+      sendEmail: !!(canEmail && customerEmail),
+      customerEmail: customerEmail || "",
+      customerCell: customerCell || "",
+      customerID: currentCustomer?.id || "",
+      saleID: txn?.saleID || "",
+      workorderID: txn?.workorderID || "",
+      templateVars: {
+        firstName: capitalizeFirstLetterOfString((currentCustomer?.first || "Customer").trim()),
+        storeName: _settings?.storeInfo?.displayName || "our store",
+        total: formatCurrencyDisp(txn.amountCaptured, true),
+      },
+      smsMessageID: crypto.randomUUID(),
+    }).catch((e) => {
+      log("sendTransactionReceipt error:", e?.message || String(e));
+    });
   }
 
   function handleRefund() {
     onRefund && onRefund(txn);
+  }
+
+  const hasCellForSend = !!(currentCustomer?.customerCell || currentCustomer?.phone);
+  const hasEmailForSend = !!currentCustomer?.email;
+  const channelSuffix = hasCellForSend && hasEmailForSend
+    ? "Text and Email"
+    : hasCellForSend
+      ? "Text"
+      : hasEmailForSend
+        ? "Email"
+        : "Send";
+  const sendTxnLabel = channelSuffix + " PDF";
+  const pdfMenuItems = [
+    { id: "downloadTxn", label: "Download PDF" },
+    { id: "sendTxn", label: sendTxnLabel },
+  ];
+
+  function handlePdfMenuSelect(item) {
+    if (!item) return;
+    if (item.id === "downloadTxn") handleDownloadPDF();
+    else if (item.id === "sendTxn") handleSendTransaction();
   }
 
   return (
@@ -173,45 +297,57 @@ export const TransactionModal = ({ transaction, onClose, onRefund }) => {
         <LargeModalHeader
           title={
             <div className={styles.headerLeft}>
-              <span
-                className={styles.methodBadge}
-                style={{
-                  backgroundColor: isCard
-                    ? lightenRGBByPercent(C.blue, 60)
-                    : lightenRGBByPercent(C.green, 60),
-                  color: isCard ? C.blue : C.green,
-                }}
-              >
-                {(txn.method || "unknown").toUpperCase()}
-              </span>
               <span className={styles.txnIdLabel} style={{ color: C.textDisabled }}>
                 {"Txn ID: " + txn.id}
               </span>
             </div>
           }
-          actions={
-            <LargeModalHeaderButton variant="default" onClick={handleClose}>
-              CLOSE
-            </LargeModalHeaderButton>
-          }
+          actions={[
+            <LargeModalHeaderButton
+              key="refund"
+              variant="default"
+              icon={ICONS.dollarYellow}
+              disabled={fullyRefunded}
+              onClick={handleRefund}
+            >
+              Refund
+            </LargeModalHeaderButton>,
+            <LargeModalHeaderButton
+              key="print"
+              variant="default"
+              icon={ICONS.receipt}
+              disabled={printerStatus.isPrinterOffline}
+              tooltip={printerStatus.isPrinterOffline ? printerStatus.offlineLabel : undefined}
+              onClick={handlePrintTransaction}
+            >
+              Print Transaction
+            </LargeModalHeaderButton>,
+            <DropdownMenu
+              key="pdf"
+              buttonText="PDF Options"
+              dataArr={pdfMenuItems}
+              onSelect={handlePdfMenuSelect}
+              buttonStyle={{
+                backgroundColor: "transparent",
+                borderColor: C.borderDefault,
+                height: 36,
+                paddingHorizontal: 22,
+              }}
+              buttonTextStyle={{ fontSize: 13, fontWeight: 600, color: C.text }}
+              itemStyle={{ paddingVertical: 8, paddingHorizontal: 12 }}
+              itemTextStyle={{ fontSize: 12 }}
+              itemTextAlign="center"
+            />,
+            <LargeModalHeaderButton
+              key="close"
+              variant="default"
+              icon={ICONS.close1}
+              iconPosition="only"
+              tooltip="Close"
+              onClick={handleClose}
+            />,
+          ]}
         />
-        <div className={styles.toolbar}>
-          <Button
-            text="Refund"
-            colorGradientArr={COLOR_GRADIENTS.red}
-            onPress={handleRefund}
-            buttonStyle={{ paddingHorizontal: 16, height: 32 }}
-            textStyle={{ fontSize: 12, color: C.textOnAccent }}
-          />
-          <Button
-            text="Print Transaction"
-            icon={ICONS.receipt}
-            iconSize={16}
-            onPress={handlePrintTransaction}
-            buttonStyle={{ paddingHorizontal: 14, height: 32, borderWidth: 1, borderColor: C.buttonLightGreenOutline }}
-            textStyle={{ fontSize: 12, color: C.text }}
-          />
-        </div>
 
         {/* ── Transaction Viewer Banner ── */}
         <div className={styles.banner} style={{ backgroundColor: lightenRGBByPercent(C.green, 55) }}>

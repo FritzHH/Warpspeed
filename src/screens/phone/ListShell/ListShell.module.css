@@ -28,6 +28,12 @@
   min-width: 0;
 }
 
+.headerSlot {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .headerIcon {
   margin-right: 8px;
   flex-shrink: 0;

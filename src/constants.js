@@ -239,6 +239,8 @@ export const DB_NODES = {
     EMAILS: "emails",
     SUBSCRIPTION: "subscription",
     USERS: "users",
+    VENDOR_ORDERS: "vendor-orders",
+    VENDOR_CATALOGS: "vendor_catalogs",
   },
 
   // Realtime Database nodes

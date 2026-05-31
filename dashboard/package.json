@@ -12,6 +12,8 @@
     "auth": "firebase login --reauth"
   },
   "dependencies": {
+    "@stripe/react-stripe-js": "^6.5.0",
+    "@stripe/stripe-js": "^9.7.0",
     "firebase": "^11.6.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

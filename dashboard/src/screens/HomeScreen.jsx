@@ -17,6 +17,14 @@ const deleteTenantCallable = httpsCallable(
   functions,
   "platformAdminDeleteTenantCallable"
 );
+const sendTenantSetupAuthCallable = httpsCallable(
+  functions,
+  "platformAdminSendTenantSetupAuthCallable"
+);
+
+function isValidEmailShape(s) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((s || "").trim());
+}
 
 function formatDateForTenantID(date) {
   const months = [
@@ -119,6 +127,11 @@ export function HomeScreen({ user, claims }) {
   const [emailError, setEmailError] = useState("");
   const [deletingTenantID, setDeletingTenantID] = useState("");
   const [deleteError, setDeleteError] = useState("");
+  const [signupEmail, setSignupEmail] = useState("");
+  const [signupBillingTier, setSignupBillingTier] = useState("per_sale");
+  const [signupSending, setSignupSending] = useState(false);
+  const [signupResult, setSignupResult] = useState(null);
+  const [signupError, setSignupError] = useState("");
   const fetchID = useRef(0);
 
   async function refreshTenants() {
@@ -175,6 +188,40 @@ export function HomeScreen({ user, claims }) {
       setDeleteError(`${tenant.tenantID}: ${full}`);
     } finally {
       setDeletingTenantID("");
+    }
+  }
+
+  async function handleSendSignupAuth() {
+    const normalized = signupEmail.trim().toLowerCase();
+    if (!isValidEmailShape(normalized)) {
+      setSignupError("Enter a valid email.");
+      return;
+    }
+    setSignupSending(true);
+    setSignupResult(null);
+    setSignupError("");
+    const payload = { email: normalized, billingTier: signupBillingTier };
+    console.log(
+      "SendSignupAuth: firing platformAdminSendTenantSetupAuthCallable",
+      JSON.stringify(payload, null, 2)
+    );
+    try {
+      const res = await sendTenantSetupAuthCallable(payload);
+      console.log(
+        "SendSignupAuth: result",
+        JSON.stringify(res.data, null, 2)
+      );
+      setSignupResult(res.data);
+      setSignupEmail("");
+      setSignupBillingTier("per_sale");
+    } catch (err) {
+      const code = err?.code || "";
+      const msg = err?.message || "Send failed.";
+      const full = code ? `${code}: ${msg}` : msg;
+      console.error("SendSignupAuth: error", full, err);
+      setSignupError(full);
+    } finally {
+      setSignupSending(false);
     }
   }
 
@@ -258,7 +305,54 @@ export function HomeScreen({ user, claims }) {
 
   return (
     <div className="pageScreen">
-      <div className="card cardList">
+      <div className="pageStack">
+        <div className="card">
+          <h2 className="cardTitle">Authorize new tenant</h2>
+          <p className="cardSubtitle">
+            Sales-gated signup. Prospect gets a setup link valid for 30 days
+            that resumes their progress across sessions.
+          </p>
+          <input
+            type="email"
+            className="textInput"
+            placeholder="prospect@bikeshop.com"
+            value={signupEmail}
+            onChange={(e) => setSignupEmail(e.target.value)}
+            disabled={signupSending}
+            autoComplete="off"
+          />
+          <div className="fieldLabel">Billing tier</div>
+          <select
+            className="textInput"
+            value={signupBillingTier}
+            onChange={(e) => setSignupBillingTier(e.target.value)}
+            disabled={signupSending}
+          >
+            <option value="per_sale">
+              Per-sale (0.5% per sale, billed monthly)
+            </option>
+            <option value="monthly_sub">
+              Monthly subscription ($50/mo)
+            </option>
+          </select>
+          <button
+            type="button"
+            className="primaryButton"
+            onClick={handleSendSignupAuth}
+            disabled={signupSending || !isValidEmailShape(signupEmail)}
+          >
+            {signupSending ? "Sending…" : "Send Authorization"}
+          </button>
+          {signupError && <div className="errorText">{signupError}</div>}
+          {signupResult && (
+            <div className="successText">
+              ✓ Authorization sent to {signupResult.email}
+              {signupResult.isFirstTime ? "" : " (re-sent, new token)"}
+            </div>
+          )}
+        </div>
+
+        <div className="card cardList">
         <div className="listHeader">
           <div>
             <h1 className="cardTitle">Cadence Dashboard</h1>
@@ -406,6 +500,7 @@ export function HomeScreen({ user, claims }) {
           >
             Sign out
           </button>
+        </div>
         </div>
       </div>
     </div>

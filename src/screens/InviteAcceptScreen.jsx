@@ -107,49 +107,129 @@ export function InviteAcceptScreen() {
   const [successInfo, setSuccessInfo] = useState(null);
 
   // Bootstrap form state — only used when ?bootstrap=1.
-  const [storeLegalName, setStoreLegalName] = useState("");
-  const [storeDisplayName, setStoreDisplayName] = useState("");
-  const [storeStreet, setStoreStreet] = useState("");
+  // DEV: pre-populated with Stripe-accepted test values for fast iteration.
+  // !!! REMOVE / FLIP TO FALSE BEFORE SHIPPING TO PROD !!!
+  const DEV_PREFILL = true;
+  const [storeLegalName, setStoreLegalName] = useState(
+    DEV_PREFILL ? "Test Store LLC" : ""
+  );
+  const [storeDisplayName, setStoreDisplayName] = useState(
+    DEV_PREFILL ? "Test Store" : ""
+  );
+  const [storeStreet, setStoreStreet] = useState(
+    DEV_PREFILL ? "354 Oyster Point Blvd" : ""
+  );
   const [storeUnit, setStoreUnit] = useState("");
-  const [storeCity, setStoreCity] = useState("");
-  const [storeState, setStoreState] = useState("");
-  const [storeZip, setStoreZip] = useState("");
-  const [storePhone, setStorePhone] = useState("");
-  const [storeSupportEmail, setStoreSupportEmail] = useState("");
-  const [storeOfficeEmail, setStoreOfficeEmail] = useState("");
-  const [salesTaxPercent, setSalesTaxPercent] = useState("");
-  const [userPin, setUserPin] = useState("");
-  const [confirmUserPin, setConfirmUserPin] = useState("");
+  const [storeCity, setStoreCity] = useState(
+    DEV_PREFILL ? "South San Francisco" : ""
+  );
+  const [storeState, setStoreState] = useState(DEV_PREFILL ? "CA" : "");
+  const [storeZip, setStoreZip] = useState(DEV_PREFILL ? "94080" : "");
+  const [storePhone, setStorePhone] = useState(
+    DEV_PREFILL ? "(415) 555-0123" : ""
+  );
+  const [storeSupportEmail, setStoreSupportEmail] = useState(
+    DEV_PREFILL ? "support@teststore.example.com" : ""
+  );
+  const [storeOfficeEmail, setStoreOfficeEmail] = useState(
+    DEV_PREFILL ? "office@teststore.example.com" : ""
+  );
+  const [salesTaxPercent, setSalesTaxPercent] = useState(
+    DEV_PREFILL ? "8.625" : ""
+  );
+  const [userPin, setUserPin] = useState(DEV_PREFILL ? "1234" : "");
+  const [confirmUserPin, setConfirmUserPin] = useState(
+    DEV_PREFILL ? "1234" : ""
+  );
 
   // Stripe Payments Info — required by Stripe for the connected account to
   // leave Restricted status. Posted server-side via ownerCompleteBootstrapCallable
   // and pushed straight to the Stripe API.
-  const [businessUrl, setBusinessUrl] = useState("");
-  const [bankRouting, setBankRouting] = useState("");
-  const [bankAccount, setBankAccount] = useState("");
-  const [dobMonth, setDobMonth] = useState("");
-  const [dobDay, setDobDay] = useState("");
-  const [dobYear, setDobYear] = useState("");
-  const [ssnLast4, setSsnLast4] = useState("");
+  // Test values per https://docs.stripe.com/connect/testing
+  //   routing 110000000  → Stripe test ABA
+  //   account 000123456789 → triggers successful bank verification
+  //   ssnLast4 0000 → instant identity verification pass
+  const [businessUrl, setBusinessUrl] = useState(
+    DEV_PREFILL ? "https://teststore.example.com" : ""
+  );
+  const [bankRouting, setBankRouting] = useState(
+    DEV_PREFILL ? "110000000" : ""
+  );
+  const [bankAccount, setBankAccount] = useState(
+    DEV_PREFILL ? "000123456789" : ""
+  );
+  const [dobMonth, setDobMonth] = useState(DEV_PREFILL ? "01" : "");
+  const [dobDay, setDobDay] = useState(DEV_PREFILL ? "01" : "");
+  const [dobYear, setDobYear] = useState(DEV_PREFILL ? "1990" : "");
+  const [ssnLast4, setSsnLast4] = useState(DEV_PREFILL ? "0000" : "");
 
   const userPinInputRef = useRef(null);
   const confirmPinInputRef = useRef(null);
 
   useEffect(() => {
-    if (!isSignInWithEmailLink(AUTH, window.location.href)) {
+    let cancelled = false;
+    (async () => {
+      // ?resend=1&email=... = self-serve fresh-link request from the welcome
+      // email body. Callable is public + per-tenant throttled server-side.
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("resend") === "1") {
+        const resendEmail = (params.get("email") || "").trim();
+        if (resendEmail) {
+          setEmail(resendEmail);
+          setStage(STAGE.REQUESTING_RESEND);
+          try {
+            await requestResend(resendEmail);
+            if (cancelled) return;
+            setStage(STAGE.RESEND_SENT);
+          } catch (err) {
+            if (cancelled) return;
+            const msg = err && err.message;
+            setErrorMsg(msg || "Couldn't send a new link. Please try again.");
+            setStage(STAGE.ERROR);
+          }
+          return;
+        }
+      }
+
+      // Wait for Firebase to rehydrate persisted Auth state before deciding
+      // whether to fall back to the already-signed-in resume path.
+      try {
+        await AUTH.authStateReady();
+      } catch {
+        /* fall through to the checks below */
+      }
+      if (cancelled) return;
+
+      if (isSignInWithEmailLink(AUTH, window.location.href)) {
+        const stored = window.localStorage.getItem(EMAIL_LOCALSTORAGE_KEY);
+        if (stored) {
+          setEmail(stored);
+          void run(stored);
+        } else {
+          setStage(STAGE.PROMPT_EMAIL);
+        }
+        return;
+      }
+
+      // Link is invalid or already used. If the owner is still signed in from
+      // a previous successful click, resume bootstrap instead of forcing them
+      // through the request-a-new-link loop.
+      if (AUTH.currentUser && isBootstrap()) {
+        setEmail(AUTH.currentUser.email || "");
+        await forceClaimRefresh();
+        if (cancelled) return;
+        setStage(STAGE.BOOTSTRAP_FORM);
+        return;
+      }
+
       setErrorMsg(
         "This link isn't a valid sign-in link. Please request a new invite."
       );
       setStage(STAGE.ERROR);
-      return;
-    }
-    const stored = window.localStorage.getItem(EMAIL_LOCALSTORAGE_KEY);
-    if (stored) {
-      setEmail(stored);
-      void run(stored);
-    } else {
-      setStage(STAGE.PROMPT_EMAIL);
-    }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   async function run(emailToUse) {
@@ -722,7 +802,16 @@ export function InviteAcceptScreen() {
               </div>
             </div>
 
-            <div className={styles.pinSection}>
+            <div className={styles.pinInfoSection}>
+              <div className={styles.pinInfoSectionHeading}>
+                Owner PIN
+              </div>
+              <div className={styles.pinInfoSectionSubheading}>
+                This PIN will grant you owner-level privileges inside the app.
+                We'll email you a copy for safekeeping.
+              </div>
+
+              <div className={styles.pinSection}>
               <span className={styles.pinLabel}>4-digit in-app PIN</span>
               <div
                 className={styles.pinBoxes}
@@ -834,6 +923,7 @@ export function InviteAcceptScreen() {
               {confirmUserPin && !pinsMatch && (
                 <div className={styles.errorText}>PINs don't match.</div>
               )}
+            </div>
             </div>
 
             {errorMsg && <div className={styles.errorText}>{errorMsg}</div>}

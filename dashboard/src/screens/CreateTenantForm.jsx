@@ -249,6 +249,24 @@ export function CreateTenantForm() {
       });
       setResult(res.data);
       setStatus("success");
+
+      // Auto-send the welcome email so the admin doesn't have to click a
+      // second button. Tenant is already created at this point, so a failed
+      // email is recoverable via the Retry button rendered in the success view.
+      setEmailStatus("sending");
+      try {
+        const sendFn = httpsCallable(
+          functions,
+          "platformAdminSendOwnerWelcomeEmailCallable"
+        );
+        await sendFn({ tenantID: res.data.tenantID });
+        setEmailStatus("sent");
+      } catch (err) {
+        const code = err?.code || "";
+        const msg = err?.message || "Failed to send email.";
+        setEmailError(code ? `${code}: ${msg}` : msg);
+        setEmailStatus("error");
+      }
     } catch (err) {
       const code = err?.code || "";
       const msg = err?.message || "Failed to create tenant.";
@@ -368,20 +386,40 @@ export function CreateTenantForm() {
         >
           {copied ? "Copied" : "Copy link"}
         </button>
-        <button
-          type="button"
-          className="primaryButton"
-          onClick={handleSendEmail}
-          disabled={emailStatus === "sending" || emailStatus === "sent"}
-        >
-          {emailStatus === "sending"
-            ? "Sending..."
-            : emailStatus === "sent"
-              ? "Email sent"
-              : "Email link to owner"}
-        </button>
+
+        {emailStatus === "sending" && (
+          <div className="emailBanner emailBannerInfo">
+            <span className="emailBannerIcon">✉</span>
+            <span className="emailBannerText">
+              Sending welcome email to {result.ownerEmail}…
+            </span>
+          </div>
+        )}
+        {emailStatus === "sent" && (
+          <div className="emailBanner emailBannerSuccess">
+            <span className="emailBannerIcon">✓</span>
+            <span className="emailBannerText">
+              Welcome email sent to <strong>{result.ownerEmail}</strong>
+            </span>
+          </div>
+        )}
         {emailStatus === "error" && (
-          <div className="errorText">{emailError}</div>
+          <div className="emailBanner emailBannerError">
+            <span className="emailBannerIcon">⚠</span>
+            <div className="emailBannerBody">
+              <span className="emailBannerText">
+                Failed to email {result.ownerEmail}: {emailError}
+              </span>
+              <button
+                type="button"
+                className="primaryButtonSmall"
+                onClick={handleSendEmail}
+                disabled={emailStatus === "sending"}
+              >
+                Retry email
+              </button>
+            </div>
+          </div>
         )}
         <button
           type="button"

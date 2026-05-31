@@ -7737,6 +7737,7 @@ if (DEPLOY_TARGET === "saas") {
   const twilioA2P = require("./saas/twilio-a2p");
   const twilioChurn = require("./saas/twilio-churn");
   const twilioAlerts = require("./saas/twilio-alerts");
+  const tenantSetupCleanup = require("./saas/tenant-setup-cleanup");
   const emailAdmin = require("./saas/email-admin-callables");
 
   // Phase 1 auth-claims — tenant provisioning + invite flow.
@@ -7759,6 +7760,27 @@ if (DEPLOY_TARGET === "saas") {
     authClaims.platformAdminDeleteTenantCallable;
   exports.ownerCompleteBootstrapCallable =
     authClaims.ownerCompleteBootstrapCallable;
+  exports.platformAdminSendTenantSetupAuthCallable =
+    authClaims.platformAdminSendTenantSetupAuthCallable;
+  exports.getTenantAccountSetupCallable =
+    authClaims.getTenantAccountSetupCallable;
+  exports.updateTenantAccountSetupCallable =
+    authClaims.updateTenantAccountSetupCallable;
+  exports.tenantSetupCreateSetupIntentCallable =
+    authClaims.tenantSetupCreateSetupIntentCallable;
+  exports.tenantSetupConfirmPaymentMethodCallable =
+    authClaims.tenantSetupConfirmPaymentMethodCallable;
+  exports.tenantSetupSearchTwilioNumbersCallable =
+    authClaims.tenantSetupSearchTwilioNumbersCallable;
+  exports.tenantSetupPurchaseTwilioNumberCallable =
+    authClaims.tenantSetupPurchaseTwilioNumberCallable;
+  exports.tenantSetupReleaseTwilioNumberCallable =
+    authClaims.tenantSetupReleaseTwilioNumberCallable;
+
+  // Orphan-cleanup Firestore trigger: closes pre-tenant Twilio subaccount
+  // when its setup doc is deleted (TTL expiry / admin cleanup / unadopted).
+  exports.onTenantSetupDocDeleted =
+    tenantSetupCleanup.onTenantSetupDocDeleted;
 
   // Phase 2 — admin-driven POS user CRUD (Dashboard_Admin user editor).
   exports.tenantCreateUserCallable = authClaims.tenantCreateUserCallable;

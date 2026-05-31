@@ -13,6 +13,8 @@ export const ROUTES = {
   intake: "/intake",
   stand: "/stand",
   phone: "/phone",
+  phoneOrdering: "/phone/ordering",
+  phoneOrderingScan: "/phone/ordering/:orderID",
   dbViewer: "/db-viewer",
   tokens: "/tokens",
   stripeConnect: "/stripe-connect",

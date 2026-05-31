@@ -6,7 +6,7 @@ import { sortWorkorders } from "../helpers";
 import styles from "./ListShell.module.css";
 
 const USER_DROPDOWN_BUTTON_STYLE = {
-  paddingHorizontal: 7,
+  paddingHorizontal: 10,
   paddingVertical: 2,
   borderWidth: 1,
   borderColor: C.borderDefault,
@@ -17,6 +17,14 @@ const USER_DROPDOWN_BUTTON_STYLE = {
 const USER_DROPDOWN_TEXT_STYLE = {
   fontSize: 13,
   color: C.textDefault,
+};
+
+const HAMBURGER_BUTTON_STYLE = {
+  paddingHorizontal: 5,
+  paddingVertical: 2,
+  borderWidth: 0,
+  backgroundColor: C.surfaceAccentMuted,
+  borderRadius: Radius.control,
 };
 
 export function ListShell({
@@ -31,6 +39,7 @@ export function ListShell({
   onSwitchUser,
   onLogoutApp,
   onOpenWorkorder,
+  onOpenOrdering,
   onActivity,
 }) {
   const zShowAlert = useAlertScreenStore((state) => state.showAlert);
@@ -61,23 +70,36 @@ export function ListShell({
           <Image icon={ICONS.gears1} size={24} className={styles.headerIcon} />
           <span className={styles.headerTitle}>WARPSPEED</span>
         </div>
-        <DropdownMenu
-          buttonIcon={isClockedIn ? ICONS.check : ICONS.redx}
-          buttonIconSize={13}
-          buttonText={userLabel}
-          buttonStyle={USER_DROPDOWN_BUTTON_STYLE}
-          buttonTextStyle={USER_DROPDOWN_TEXT_STYLE}
-          dataArr={[
-            { label: isClockedIn ? "Clock Out" : "Clock In" },
-            { label: "Switch User" },
-            { label: "Log Out App" },
-          ]}
-          onSelect={(item) => {
-            if (item.label === "Clock In" || item.label === "Clock Out") onToggleClock();
-            else if (item.label === "Switch User") onSwitchUser();
-            else if (item.label === "Log Out App") onLogoutApp();
-          }}
-        />
+        <div className={styles.headerSlot}>
+          <DropdownMenu
+            buttonIcon={isClockedIn ? ICONS.check : ICONS.redx}
+            buttonIconSize={13}
+            buttonText={userLabel}
+            buttonStyle={USER_DROPDOWN_BUTTON_STYLE}
+            buttonTextStyle={USER_DROPDOWN_TEXT_STYLE}
+            dataArr={[
+              { label: isClockedIn ? "Clock Out" : "Clock In" },
+              { label: "Switch User" },
+              { label: "Log Out App" },
+            ]}
+            onSelect={(item) => {
+              if (item.label === "Clock In" || item.label === "Clock Out") onToggleClock();
+              else if (item.label === "Switch User") onSwitchUser();
+              else if (item.label === "Log Out App") onLogoutApp();
+            }}
+          />
+        </div>
+        <div className={styles.headerSlot}>
+          <DropdownMenu
+            buttonIcon={ICONS.menu2}
+            buttonIconSize={21}
+            buttonStyle={HAMBURGER_BUTTON_STYLE}
+            dataArr={[{ label: "Ordering" }]}
+            onSelect={(item) => {
+              if (item.label === "Ordering") onOpenOrdering?.();
+            }}
+          />
+        </div>
       </div>
 
       <AlertBox showAlert={zShowAlert} />

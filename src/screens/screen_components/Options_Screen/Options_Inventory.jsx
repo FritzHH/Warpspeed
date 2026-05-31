@@ -396,6 +396,7 @@ const QuickItemCanvasCard = ({
               fontSize: itemObj.fontSize || 10,
               color: itemObj.textColor || C.text,
               lineHeight: ((itemObj.fontSize || 10) + 6) + "px",
+              textAlign: "center",
             }}
           />
         </div>
@@ -1224,7 +1225,8 @@ export function InventoryComponent({}) {
       }
 
       const existingIndex = workorderLines.findIndex((l) => l.inventoryItem?.id === item.id);
-      if (existingIndex !== -1) {
+      const existingHasDiscount = existingIndex !== -1 && !!workorderLines[existingIndex].discountObj?.name;
+      if (existingIndex !== -1 && !existingHasDiscount) {
         workorderLines = cloneDeep(workorderLines);
         workorderLines[existingIndex].qty = (workorderLines[existingIndex].qty || 1) + 1;
       } else {

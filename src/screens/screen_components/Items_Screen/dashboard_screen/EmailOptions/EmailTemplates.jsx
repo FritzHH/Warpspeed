@@ -275,7 +275,8 @@ export const EmailTemplates = ({ zSettingsObj, handleSettingsFieldChange }) => {
     let ticketLabel = templateObj.type === "saleReceipt" ? "Sale Receipt" : templateObj.type === "refundReceipt" ? "Refund Receipt" : templateObj.type === "intakeReceipt" ? "Intake / Estimate" : templateObj.type === "creditReceipt" ? "Credit Receipt" : templateObj.type === "giftCardReceipt" ? "Gift Card Receipt" : "";
     let subjectVal = isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "subject") ?? templateObj.subject) : templateObj.subject;
     let labelVal = isNewTemplate(templateObj.id) ? (getLocalValue(templateObj.id, "label") ?? getLabel(templateObj)) : getLabel(templateObj);
-    let canDelete = !templateObj.type && templateObj.removable !== false;
+    let defaultForId = (SETTINGS_OBJ.emailTemplates || []).find((d) => d.id === templateObj.id);
+    let canDelete = !templateObj.type && templateObj.removable !== false && defaultForId?.removable !== false;
     let expanded = isExpanded(templateObj.id);
 
     return (

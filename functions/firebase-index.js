@@ -7776,6 +7776,8 @@ if (DEPLOY_TARGET === "saas") {
     authClaims.tenantSetupPurchaseTwilioNumberCallable;
   exports.tenantSetupReleaseTwilioNumberCallable =
     authClaims.tenantSetupReleaseTwilioNumberCallable;
+  exports.tenantSetupFinalizeCallable =
+    authClaims.tenantSetupFinalizeCallable;
 
   // Orphan-cleanup Firestore trigger: closes pre-tenant Twilio subaccount
   // when its setup doc is deleted (TTL expiry / admin cleanup / unadopted).

@@ -11,10 +11,13 @@ import React, { useState } from "react";
 // These get saved to `formData.a2p` on the setup doc and the actual
 // registration happens after the tenant is live.
 
+const POS_APP_URL = "https://cadence-pos.web.app/";
+
 export function TenantSetupA2pForm({
   email,
   formData,
   onSaveFormData,
+  onFinalize,
 }) {
   const a2p = (formData && formData.a2p) || {};
   const [legalName, setLegalName] = useState(a2p.legalName || "");
@@ -26,6 +29,7 @@ export function TenantSetupA2pForm({
   const [saveError, setSaveError] = useState("");
   const [savingField, setSavingField] = useState("");
   const [continuing, setContinuing] = useState(false);
+  const [finalizeResult, setFinalizeResult] = useState(null);
 
   async function persist(field, value) {
     setSaveError("");
@@ -74,10 +78,14 @@ export function TenantSetupA2pForm({
           supportPhone,
           useCase,
         },
-        currentStep: "done",
+        currentStep: "a2p",
       });
+      const result = await onFinalize();
+      setFinalizeResult(result || { success: true });
     } catch (err) {
-      setSaveError(err?.message || "Failed to continue.");
+      setSaveError(
+        err?.message || "Failed to finalize your account. Please try again."
+      );
     } finally {
       setContinuing(false);
     }
@@ -90,6 +98,44 @@ export function TenantSetupA2pForm({
     supportEmail.trim() &&
     supportPhone.trim() &&
     useCase.trim();
+
+  if (finalizeResult && finalizeResult.success) {
+    const warnings = [];
+    if (finalizeResult.twilioAdoptionError) {
+      warnings.push(
+        "Texting setup couldn't finish automatically. Your account is live; contact support to enable messaging."
+      );
+    }
+    if (finalizeResult.connectAccountError) {
+      warnings.push(
+        "Stripe payments setup didn't complete. You can finish it from your account dashboard once you sign in."
+      );
+    }
+    return (
+      <div className="centerScreen">
+        <div className="card cardWide">
+          <h1 className="cardTitle">You're all set</h1>
+          <p className="cardSubtitle">
+            Welcome to Cadence POS. Your account is live.
+          </p>
+          <p>
+            Sign in to your new shop at{" "}
+            <a href={POS_APP_URL}>{POS_APP_URL}</a> using <strong>{email}</strong>.
+          </p>
+          {warnings.length > 0 && (
+            <div className="errorText">
+              {warnings.map((w, i) => (
+                <div key={i}>{w}</div>
+              ))}
+            </div>
+          )}
+          <a href={POS_APP_URL} className="primaryButton" style={{ display: "inline-block", textDecoration: "none" }}>
+            Open Cadence POS →
+          </a>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="centerScreen">
@@ -190,7 +236,7 @@ export function TenantSetupA2pForm({
             onClick={handleContinue}
             disabled={!allFilled || continuing}
           >
-            {continuing ? "Saving…" : "Continue"}
+            {continuing ? "Finalizing…" : "Finish setup"}
           </button>
         </div>
 

@@ -59,6 +59,13 @@ const {
   numberWebhooksAreCurrent,
   tenantTwilioDocRef,
   getSetupTwilioClient,
+  loadSetupSubaccountAuthToken,
+  storeSubaccountAuthToken,
+  destroySetupSubaccountSecret,
+  secretManagerRef,
+  routingDocRef,
+  storeNumberDocRef,
+  CURRENT_WEBHOOK_CONFIG,
 } = require("./twilio-common");
 const { getTierDoc } = require("./billing-helpers");
 const {
@@ -4155,6 +4162,500 @@ exports.tenantSetupReleaseTwilioNumberCallable = onCall(
       success: true,
       released: true,
       phoneNumber: purchased.phoneNumber,
+    };
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────
+// Tenant adoption (signup → live tenant).
+//
+// Final step of the self-serve setup wizard. Caller is the prospect, signed
+// in via email-link, with NO custom claims yet. Validates the setup doc has
+// every field the wizard collects, then promotes it into a real tenant:
+//
+//   1. Generate a unique tenantID slug from businessName.
+//   2. setCustomUserClaims({tenantID, privilege: "owner", stores: [storeID]}).
+//   3. Write tenants/{tenantID}, stores/{storeID}, and settings doc.
+//   4. Adopt the pre-tenant Twilio subaccount: migrate auth token from the
+//      setup-keyed secret to the tenant-keyed secret, reconfigure the
+//      purchased number's webhooks, write tenant Twilio + per-store number +
+//      routing docs, destroy the setup-keyed secret.
+//   5. Persist A2P brand/campaign answers to tenants/{tenantID}/private/a2p
+//      for the (currently deferred) submission step.
+//   6. Best-effort Stripe Connect Account create.
+//   7. CRITICAL — stamp `twilioSubaccountStatus: "adopted"` on the setup doc
+//      BEFORE deleting it. The setup-cleanup trigger short-circuits on that
+//      exact string; without the stamp, the trigger fires unconditionally
+//      and closes the live, tenant-owned subaccount.
+//   8. Delete the setup doc.
+//
+// monthly_sub tenants get auto-assigned to the cheapest active tier — the
+// signup flow doesn't ask the prospect to pick. Tier swap happens later via
+// the in-app billing UI.
+// ─────────────────────────────────────────────────────────────────────────
+
+function slugifyTenantID(businessName) {
+  if (!businessName || typeof businessName !== "string") return "";
+  const slug = businessName
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (slug.length < 3) return "";
+  return slug.length > 50 ? slug.slice(0, 50).replace(/-+$/g, "") : slug;
+}
+
+async function generateUniqueTenantID(db, businessName) {
+  const base = slugifyTenantID(businessName);
+  if (!base) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Business name does not yield a valid tenant ID slug."
+    );
+  }
+  if (!TENANT_ID_PATTERN.test(base)) {
+    throw new HttpsError(
+      "failed-precondition",
+      `Generated slug "${base}" does not match TENANT_ID_PATTERN.`
+    );
+  }
+  for (let i = 0; i < 10; i++) {
+    const candidate = i === 0 ? base : `${base}-${i + 1}`;
+    if (!TENANT_ID_PATTERN.test(candidate)) continue;
+    const snap = await db.collection("tenants").doc(candidate).get();
+    if (!snap.exists) return candidate;
+  }
+  const suffix = crypto.randomBytes(3).toString("hex");
+  const fallback = `${base}-${suffix}`;
+  if (!TENANT_ID_PATTERN.test(fallback)) {
+    throw new HttpsError(
+      "internal",
+      "Could not generate a unique tenant ID."
+    );
+  }
+  return fallback;
+}
+
+async function findCheapestActiveTier(db) {
+  const snap = await db.collection("platform-billing-tiers").get();
+  let best = null;
+  snap.forEach((doc) => {
+    const t = doc.data() || {};
+    if (t.active !== true) return;
+    if (t.archived === true) return;
+    if (!t.stripePriceID) return;
+    const amount =
+      typeof t.monthlyAmount === "number" ? t.monthlyAmount : Infinity;
+    if (best === null || amount < best.monthlyAmount) {
+      best = { tierID: doc.id, monthlyAmount: amount };
+    }
+  });
+  if (!best) {
+    throw new HttpsError(
+      "failed-precondition",
+      "No active billing tiers configured. Contact support."
+    );
+  }
+  return best.tierID;
+}
+
+exports.tenantSetupFinalizeCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [
+      stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY,
+      twilioSubaccountInternals.TWILIO_MASTER_ACCOUNT_SID,
+      twilioSubaccountInternals.TWILIO_MASTER_AUTH_TOKEN,
+    ],
+  },
+  async (request) => {
+    const { auth, callerEmail, docRef, data } = await loadSetupDocForCaller(
+      request
+    );
+
+    // Re-entry guard: if the caller already has tenant claims, they've
+    // already been adopted (or were a member of another tenant before this
+    // signup). Either way, bail out — the cleanup trigger / TTL will sweep
+    // the lingering setup doc later.
+    if (auth.token && auth.token.tenantID) {
+      throw new HttpsError(
+        "already-exists",
+        `You are already a member of tenant ${auth.token.tenantID}. Contact support if this is a mistake.`
+      );
+    }
+
+    const formData = data.formData || {};
+    const signupType = data.signupType;
+    if (signupType !== "single" && signupType !== "multi") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Signup type must be chosen before finalizing."
+      );
+    }
+    const billingTier = data.billingTier;
+    if (billingTier !== "per_sale" && billingTier !== "monthly_sub") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Billing tier missing from setup doc."
+      );
+    }
+
+    const businessName = normalizeStoreString(formData.businessName, 200);
+    if (!businessName) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Business name is required (≤200 chars)."
+      );
+    }
+    const ownerFirstName = normalizeName(formData.ownerFirstName);
+    const ownerLastName = normalizeName(formData.ownerLastName);
+    if (!ownerFirstName || !ownerLastName) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Owner first and last name are required."
+      );
+    }
+    const ownerPhone = normalizePhone(formData.ownerPhone);
+    if (!ownerPhone) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Owner phone is required and must be a valid US/E.164 number."
+      );
+    }
+    const tenantStreet = normalizeStoreString(formData.tenantStreet, 200);
+    const tenantCity = normalizeStoreString(formData.tenantCity, 100);
+    const tenantStateRaw = normalizeStoreString(formData.tenantState, 2);
+    const tenantZip = normalizeZip(formData.tenantZip);
+    const tenantUnit = normalizeOptionalStoreString(formData.tenantUnit, 50);
+    if (
+      !tenantStreet ||
+      !tenantCity ||
+      !tenantStateRaw ||
+      !/^[A-Za-z]{2}$/.test(tenantStateRaw) ||
+      !tenantZip ||
+      tenantUnit === null
+    ) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Tenant address is incomplete or malformed."
+      );
+    }
+    const tenantState = tenantStateRaw.toUpperCase();
+
+    const storeName = normalizeStoreString(formData.storeName, 200);
+    const storeOwnerFirstName = normalizeName(formData.storeOwnerFirstName);
+    const storeOwnerLastName = normalizeName(formData.storeOwnerLastName);
+    const storeOwnerPhone = normalizePhone(formData.storeOwnerPhone);
+    const storeStreet = normalizeStoreString(formData.storeStreet, 200);
+    const storeCity = normalizeStoreString(formData.storeCity, 100);
+    const storeStateRaw = normalizeStoreString(formData.storeState, 2);
+    const storeZip = normalizeZip(formData.storeZip);
+    if (
+      !storeName ||
+      !storeOwnerFirstName ||
+      !storeOwnerLastName ||
+      !storeOwnerPhone ||
+      !storeStreet ||
+      !storeCity ||
+      !storeStateRaw ||
+      !/^[A-Za-z]{2}$/.test(storeStateRaw) ||
+      !storeZip
+    ) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Store details are incomplete or malformed."
+      );
+    }
+    const storeState = storeStateRaw.toUpperCase();
+
+    const a2p = (formData && formData.a2p) || {};
+    const a2pLegalName = normalizeStoreString(a2p.legalName, 200);
+    const a2pEIN = normalizeStoreString(a2p.ein, 20);
+    const a2pWebsite = normalizeStoreString(a2p.website, 500);
+    const a2pSupportEmail = normalizeEmail(a2p.supportEmail);
+    const a2pSupportPhone = normalizePhone(a2p.supportPhone);
+    const a2pUseCase = normalizeStoreString(a2p.useCase, 2000);
+    if (
+      !a2pLegalName ||
+      !a2pEIN ||
+      !a2pWebsite ||
+      !a2pSupportEmail ||
+      !a2pSupportPhone ||
+      !a2pUseCase
+    ) {
+      throw new HttpsError(
+        "failed-precondition",
+        "A2P registration fields are incomplete."
+      );
+    }
+
+    if (billingTier === "monthly_sub" && !data.paymentMethodCollected) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Monthly subscription plans require a payment method on file before finalizing."
+      );
+    }
+
+    const purchased = data.purchasedPhoneNumber;
+    if (!purchased || !purchased.phoneNumberSid || !purchased.phoneNumber) {
+      throw new HttpsError(
+        "failed-precondition",
+        "A phone number must be purchased before finalizing."
+      );
+    }
+
+    if (
+      !data.twilioSubaccountSid ||
+      data.twilioSubaccountStatus !== "active"
+    ) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Twilio subaccount is missing or not active for this signup."
+      );
+    }
+
+    const db = getFirestore();
+
+    // Resolve tier for monthly_sub: pick the cheapest active tier from the
+    // catalog. Tier swap (if any) happens later via the in-app billing UI.
+    let subscriptionTierID = null;
+    if (billingTier === "monthly_sub") {
+      subscriptionTierID = await findCheapestActiveTier(db);
+    }
+
+    const tenantID = await generateUniqueTenantID(db, businessName);
+    const storeID = generateEAN13Barcode();
+
+    // Stamp claims FIRST. This is the irreversible step that ties the user
+    // to this tenantID. Everything downstream (tenant docs, Twilio adoption,
+    // Stripe Connect) is recoverable from the claims+tenantID anchor.
+    await setUserClaims(auth.uid, {
+      tenantID,
+      privilege: "owner",
+      stores: [storeID],
+    });
+
+    const tenantRef = db.collection("tenants").doc(tenantID);
+    await tenantRef.set({
+      name: businessName,
+      ownerUID: auth.uid,
+      ownerEmail: callerEmail,
+      ownerFirstName,
+      ownerLastName,
+      ownerPhone,
+      street: tenantStreet,
+      unit: tenantUnit,
+      city: tenantCity,
+      state: tenantState,
+      zip: tenantZip,
+      billingModel: billingTier,
+      platformFeePercent:
+        billingTier === "per_sale" ? DEFAULT_PLATFORM_FEE_PERCENT : null,
+      subscriptionStatus: null,
+      stripeBillingCustomerID: data.stripeBillingCustomerID || null,
+      stripeSubscriptionID: null,
+      subscriptionGraceUntil: null,
+      signupType,
+      adoptedFromSetupEmail: callerEmail,
+      createdAt: FieldValue.serverTimestamp(),
+      createdByUID: auth.uid,
+      createdByKind: "tenant-self-serve",
+    });
+
+    const storeRef = tenantRef.collection("stores").doc(storeID);
+    await storeRef.set({
+      subscriptionTierID,
+      stripeSubscriptionItemID: null,
+      stripeSubscriptionPriceID: null,
+      isSetupComplete: true,
+      createdAt: FieldValue.serverTimestamp(),
+      createdByUID: auth.uid,
+    });
+
+    const storeAddress = {
+      street: storeStreet,
+      unit: "",
+      city: storeCity,
+      state: storeState,
+      zip: storeZip,
+      phone: storeOwnerPhone,
+      supportEmail: a2pSupportEmail,
+      officeEmail: "",
+    };
+    const settingsDoc = buildBootstrapSettings({
+      tenantID,
+      storeID,
+      storeDisplayName: storeName,
+      storeAddress,
+      salesTaxPercent: null,
+    });
+    await storeRef.collection("settings").doc("settings").set(settingsDoc);
+
+    // Twilio adoption: migrate the auth token from the setup-keyed secret to
+    // the tenant-keyed secret, reconfigure the purchased number's webhooks
+    // for inbound routing, write tenant Twilio + per-store number + routing
+    // docs, then destroy the setup-keyed secret.
+    let twilioAdoptionError = null;
+    try {
+      const authToken = await loadSetupSubaccountAuthToken(callerEmail);
+      await storeSubaccountAuthToken(tenantID, authToken);
+
+      const setupClient = await getSetupTwilioClient(callerEmail, {
+        subaccountSid: data.twilioSubaccountSid,
+      });
+      await setupClient
+        .incomingPhoneNumbers(purchased.phoneNumberSid)
+        .update({
+          ...CURRENT_WEBHOOK_CONFIG,
+          friendlyName: `tenant-${tenantID}-store-${storeID}`,
+        });
+
+      const batch = db.batch();
+      batch.set(tenantTwilioDocRef(db, tenantID), {
+        subaccountSid: data.twilioSubaccountSid,
+        secretManagerRef: secretManagerRef(tenantID),
+        status: "active",
+        a2pBrandSid: null,
+        a2pCampaignSid: null,
+        createdAt: FieldValue.serverTimestamp(),
+        createdByUID: auth.uid,
+        createdByKind: "tenant-adoption",
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      batch.set(
+        storeNumberDocRef(db, tenantID, storeID, purchased.phoneNumberSid),
+        {
+          phoneNumber: purchased.phoneNumber,
+          phoneNumberSid: purchased.phoneNumberSid,
+          capabilities: purchased.capabilities || {
+            sms: true,
+            mms: true,
+            voice: true,
+          },
+          friendlyName: `tenant-${tenantID}-store-${storeID}`,
+          source: "purchased",
+          portStatus: null,
+          assignedAt: FieldValue.serverTimestamp(),
+          assignedByUID: auth.uid,
+          webhooks: {
+            smsUrl: CURRENT_WEBHOOK_CONFIG.smsUrl,
+            statusCallback: CURRENT_WEBHOOK_CONFIG.statusCallback,
+            voiceUrl: CURRENT_WEBHOOK_CONFIG.voiceUrl,
+            configuredAt: FieldValue.serverTimestamp(),
+          },
+        }
+      );
+      batch.set(routingDocRef(db, purchased.phoneNumber), {
+        tenantID,
+        storeID,
+        subaccountSid: data.twilioSubaccountSid,
+        phoneNumberSid: purchased.phoneNumberSid,
+        status: "active",
+        assignedAt: FieldValue.serverTimestamp(),
+      });
+      await batch.commit();
+
+      await destroySetupSubaccountSecret(callerEmail);
+    } catch (err) {
+      twilioAdoptionError = (err && err.message) || String(err);
+      logger.error("tenantSetupFinalizeCallable: Twilio adoption failed", {
+        tenantID,
+        email: callerEmail,
+        error: twilioAdoptionError,
+      });
+    }
+
+    // Persist A2P answers for the (deferred) brand/campaign submission step.
+    // Stored under tenants/{tenantID}/private/a2p so the future submitter
+    // function reads it directly without going through the setup doc.
+    await tenantRef.collection("private").doc("a2p").set({
+      legalName: a2pLegalName,
+      ein: a2pEIN,
+      website: a2pWebsite,
+      supportEmail: a2pSupportEmail,
+      supportPhone: a2pSupportPhone,
+      useCase: a2pUseCase,
+      brandSubmissionStatus: "pending",
+      capturedAt: FieldValue.serverTimestamp(),
+    });
+
+    // Best-effort Stripe Connect account. Failure here doesn't block the
+    // adoption — the owner can retry via the in-app Connect onboarding flow.
+    const stripeAddress = {
+      line1: tenantStreet,
+      line2: tenantUnit || undefined,
+      city: tenantCity,
+      state: tenantState,
+      postal_code: tenantZip,
+      country: "US",
+    };
+    let stripeAccountID = null;
+    let connectAccountError = null;
+    let representativeError = null;
+    try {
+      const result = await stripeConnectInternals.createAccountInternal({
+        secret: stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY,
+        db,
+        tenantID,
+        email: callerEmail,
+        businessName,
+        byUID: auth.uid,
+        businessType: "company",
+        mcc: "5940",
+        companyPhone: ownerPhone,
+        companyAddress: stripeAddress,
+        representative: {
+          firstName: ownerFirstName,
+          lastName: ownerLastName,
+          email: callerEmail,
+          phone: ownerPhone,
+          address: stripeAddress,
+        },
+        fullBakeForTest: false,
+      });
+      stripeAccountID = result.stripeAccountID;
+      representativeError = result.representativeError || null;
+    } catch (err) {
+      connectAccountError = (err && err.message) || String(err);
+      logger.error("tenantSetupFinalizeCallable: Connect create failed", {
+        tenantID,
+        error: connectAccountError,
+      });
+    }
+
+    // CRITICAL adoption contract: stamp the setup doc with the literal string
+    // "adopted" BEFORE deleting it. The setup-cleanup trigger matches this
+    // exact string to skip closing the live, tenant-owned subaccount.
+    await docRef.update({
+      twilioSubaccountStatus: "adopted",
+      adoptedAt: FieldValue.serverTimestamp(),
+      adoptedTenantID: tenantID,
+      adoptedStoreID: storeID,
+      adoptedByUID: auth.uid,
+    });
+
+    await docRef.delete();
+
+    logger.info("tenantSetupFinalizeCallable: tenant adopted", {
+      tenantID,
+      storeID,
+      ownerUID: auth.uid,
+      ownerEmail: callerEmail,
+      billingTier,
+      subscriptionTierID,
+      stripeAccountID,
+      connectAccountError,
+      representativeError,
+      twilioAdoptionError,
+    });
+
+    return {
+      success: true,
+      tenantID,
+      storeID,
+      stripeAccountID,
+      connectAccountError,
+      representativeError,
+      twilioAdoptionError,
     };
   }
 );

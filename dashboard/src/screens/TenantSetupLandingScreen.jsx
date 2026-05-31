@@ -36,6 +36,10 @@ const updateSetupCallable = httpsCallable(
   functions,
   "updateTenantAccountSetupCallable"
 );
+const finalizeCallable = httpsCallable(
+  functions,
+  "tenantSetupFinalizeCallable"
+);
 
 export function TenantSetupLandingScreen() {
   const [stage, setStage] = useState(STAGE.LOADING);
@@ -146,6 +150,23 @@ export function TenantSetupLandingScreen() {
     return res.data;
   }
 
+  // Finalize signup: promote setup doc into a real tenant + store, set
+  // owner claims, adopt the Twilio subaccount + purchased number, persist
+  // a2p info, best-effort create a Stripe Connect account, then delete the
+  // setup doc. After success, force a token refresh so the client picks up
+  // the new claims, then return the result to the caller.
+  async function handleFinalize() {
+    const res = await finalizeCallable({});
+    if (auth.currentUser) {
+      try {
+        await auth.currentUser.getIdToken(true);
+      } catch {
+        // Non-fatal — the next sign-in will pick up claims either way.
+      }
+    }
+    return res.data;
+  }
+
   if (stage === STAGE.LOADING || stage === STAGE.SIGNING_IN || stage === STAGE.FETCHING_DOC) {
     const label =
       stage === STAGE.SIGNING_IN
@@ -233,6 +254,7 @@ export function TenantSetupLandingScreen() {
           email={resolvedEmail}
           formData={formData}
           onSaveFormData={handleSaveFormData}
+          onFinalize={handleFinalize}
         />
       );
     }

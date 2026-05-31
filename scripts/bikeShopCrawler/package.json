@@ -1,0 +1,14 @@
+{
+  "name": "bike-shop-crawler",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "miami": "node test-miami.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "p-limit": "^5.0.0"
+  }
+}

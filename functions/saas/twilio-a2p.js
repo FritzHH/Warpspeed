@@ -378,6 +378,7 @@ async function submitCampaignInternal({
     friendlyName: `${tenantID}-messaging`,
     usecase: useCase.toLowerCase().replace(/_/g, " "),
     useInboundWebhookOnNumber: true,
+    mmsConverter: true,
   });
 
   const campaign = await client.messaging.v1

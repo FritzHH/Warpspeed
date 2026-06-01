@@ -14,6 +14,11 @@ import { functions } from "../firebase";
 // per_sale uses it for the semi-monthly accumulation invoice run that bills
 // fees across all sale types (Connect-card, cash, check, gift) so we can't
 // rely on Connect application_fee alone.
+//
+// Billing-tier picker: prospect chooses per_sale vs monthly_sub here. Any
+// admin-set value at email-send time is just the initial default — the
+// radio writes back to the top-level billingTier field on the setup doc
+// and finalize reads that value.
 
 const createSetupIntentCallable = httpsCallable(
   functions,
@@ -48,6 +53,7 @@ export function TenantSetupPaymentForm({
   billingTier,
   paymentMethodCollected,
   onSaveFormData,
+  onChooseBillingTier,
   onPaymentMethodSaved,
 }) {
   const isCanada = (formData?.country || "US").toUpperCase() === "CA";
@@ -55,7 +61,23 @@ export function TenantSetupPaymentForm({
   const [clientSecret, setClientSecret] = useState("");
   const [intentLoading, setIntentLoading] = useState(false);
   const [intentError, setIntentError] = useState("");
-  const tierCopy = BILLING_TIER_COPY[billingTier] || null;
+  const [tierSaving, setTierSaving] = useState(false);
+  const [tierError, setTierError] = useState("");
+
+  async function handleSelectTier(nextTier) {
+    if (tierSaving || nextTier === billingTier) return;
+    setTierError("");
+    setTierSaving(true);
+    try {
+      await onChooseBillingTier(nextTier);
+    } catch (err) {
+      const code = err?.code || "";
+      const msg = err?.message || "Failed to save billing plan.";
+      setTierError(code ? `${code}: ${msg}` : msg);
+    } finally {
+      setTierSaving(false);
+    }
+  }
 
   async function handleBack() {
     setSaveError("");
@@ -112,22 +134,41 @@ export function TenantSetupPaymentForm({
           </button>
         </div>
 
-        {tierCopy && (
-          <div className="tierBanner">
-            <div className="tierBannerHeader">
-              <div className="tierBannerEyebrow">You're signing up for</div>
-              <div className="tierBannerBadge">{tierCopy.badge}</div>
-            </div>
-            <div className="tierBannerLabel">{tierCopy.label}</div>
-            <div className="tierBannerDetail">{tierCopy.detail}</div>
-          </div>
-        )}
-
         <h1 className="cardTitle">Payment</h1>
         <p className="cardSubtitle">
-          Signed in as <strong>{email}</strong>. Save the card we'll keep on
-          file for billing.
+          Signed in as <strong>{email}</strong>. Pick the billing plan you want
+          and save a card on file.
         </p>
+
+        <div className="sectionHeading">Billing plan</div>
+        <div className="tierPicker">
+          {["per_sale", "monthly_sub"].map((tier) => {
+            const copy = BILLING_TIER_COPY[tier];
+            const selected = billingTier === tier;
+            return (
+              <button
+                key={tier}
+                type="button"
+                className={
+                  "tierOption" + (selected ? " tierOptionSelected" : "")
+                }
+                onClick={() => handleSelectTier(tier)}
+                disabled={tierSaving}
+                aria-pressed={selected}
+              >
+                <div className="tierOptionHeader">
+                  <div className="tierOptionBadge">{copy.badge}</div>
+                  <div className="tierOptionRadio" aria-hidden="true">
+                    {selected ? "●" : "○"}
+                  </div>
+                </div>
+                <div className="tierOptionLabel">{copy.label}</div>
+                <div className="tierOptionDetail">{copy.detail}</div>
+              </button>
+            );
+          })}
+        </div>
+        {tierError && <div className="errorText">{tierError}</div>}
 
         <div className="sectionHeading">Payment method</div>
 
@@ -178,11 +219,7 @@ export function TenantSetupPaymentForm({
           </>
         ) : (
           <div className="setupSectionPlaceholder">
-            Billing tier missing. Email{" "}
-            <a href="mailto:support@retailsoftsystems.com">
-              support@retailsoftsystems.com
-            </a>{" "}
-            to refresh your link.
+            Pick a billing plan above to continue.
           </div>
         )}
 

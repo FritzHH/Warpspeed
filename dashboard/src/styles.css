@@ -1128,6 +1128,84 @@ body {
   margin-top: 4px;
 }
 
+/* Tier picker: two side-by-side clickable cards on the Payment step where
+   the prospect picks per_sale vs monthly_sub. Selected option gets the
+   accent border + soft fill so the choice is obvious at a glance. */
+.tierPicker {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.tierOption {
+  display: flex;
+  flex-direction: column;
+  text-align: left;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+  font-family: inherit;
+}
+
+.tierOption:hover:not(:disabled) {
+  border-color: var(--accent, var(--text));
+}
+
+.tierOption:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.tierOptionSelected {
+  border-color: var(--accent, var(--text));
+  background-color: var(--accent-soft, var(--surface-alt));
+}
+
+.tierOptionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.tierOptionBadge {
+  background-color: var(--accent, var(--text));
+  color: var(--accent-fg, #fff);
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 999px;
+}
+
+.tierOptionRadio {
+  font-size: 18px;
+  line-height: 1;
+  color: var(--accent, var(--text));
+}
+
+.tierOptionLabel {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tierOptionDetail {
+  font-size: 12px;
+  color: var(--text);
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+@media (max-width: 540px) {
+  .tierPicker {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Active variant of the placeholder, used when the prospect hasn't started
    card setup yet — gives them a CTA button and a brief reassurance line. */
 .setupSectionPlaceholderActive {
@@ -1335,4 +1413,231 @@ body {
   font-size: 13px;
   color: var(--text-muted);
   margin-bottom: 10px;
+}
+
+/* Three-way SMS choice picker on the phone-setup form. Each row is a labeled
+   radio with title + detail; active row gets the accent border + soft fill
+   so the prospect can see at a glance which path they're on. */
+.phoneChoiceList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
+  margin-bottom: 14px;
+}
+
+.phoneChoiceRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.phoneChoiceRow:hover {
+  border-color: var(--accent, var(--text));
+}
+
+.phoneChoiceRowActive {
+  border-color: var(--accent, var(--text));
+  background-color: var(--accent-soft, var(--surface-alt));
+}
+
+.phoneChoiceRow input[type="radio"] {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.phoneChoiceBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.phoneChoiceTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.phoneChoiceDetail {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* Sub-form area below the choice list; shown for the currently selected
+   choice. Padded so it visually nests under the radio rows. */
+.phoneChoicePanel {
+  margin-top: 6px;
+  margin-bottom: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Opt-out review screen — summary card listing the final account
+   configuration before the user clicks Finish setup. */
+.reviewSummary {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-top: 12px;
+  margin-bottom: 14px;
+}
+
+.reviewSummaryRow {
+  display: flex;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.reviewSummaryRow:last-child {
+  border-bottom: none;
+}
+
+.reviewSummaryLabel {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  width: 160px;
+  flex-shrink: 0;
+}
+
+.reviewSummaryValue {
+  font-size: 14px;
+  color: var(--text);
+  flex: 1;
+}
+
+/* Secondary button — outlined neutral CTA. Used inside owned-card blocks
+   for "Pick a different number" and similar reversal actions. */
+.secondaryButton {
+  background-color: transparent;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+  align-self: flex-start;
+}
+
+.secondaryButton:hover {
+  border-color: var(--accent, var(--text));
+  background-color: var(--accent-soft, var(--surface-alt));
+}
+
+.secondaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Portal home — list of tile-rows linking out to specific portal tasks.
+   Each row hover-highlights to telegraph its clickability. */
+.portalActionList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+  margin-bottom: 14px;
+}
+
+.portalActionRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.portalActionRow:hover {
+  border-color: var(--accent, var(--text));
+  background-color: var(--accent-soft, var(--surface-alt));
+}
+
+.portalActionBody {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.portalActionTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.portalActionDetail {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.portalActionChevron {
+  font-size: 18px;
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.additionalOwnerCard {
+  margin-top: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background-color: var(--bg);
+}
+
+.additionalOwnerHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.additionalOwnerLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.toggleRow {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.toggleRow input[type="checkbox"] {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+
+.toggleRow:hover {
+  background-color: var(--bg);
 }

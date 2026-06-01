@@ -3917,6 +3917,22 @@ exports.updateTenantAccountSetupCallable = onCall(
       updates.formData = { ...existing, ...payload.formData };
     }
 
+    // Billing tier is prospect-selectable in the Payment step. Admin-set
+    // value (from email-send time) acts as the initial default; the wizard
+    // radio overwrites it freely until finalize.
+    if (payload.billingTier !== undefined) {
+      if (
+        payload.billingTier !== "per_sale" &&
+        payload.billingTier !== "monthly_sub"
+      ) {
+        throw new HttpsError(
+          "invalid-argument",
+          "billingTier must be 'per_sale' or 'monthly_sub'."
+        );
+      }
+      updates.billingTier = payload.billingTier;
+    }
+
     await docRef.update(updates);
 
     return {
@@ -3924,7 +3940,7 @@ exports.updateTenantAccountSetupCallable = onCall(
       email: callerEmail,
       formData: updates.formData || data.formData || {},
       signupType: updates.signupType || data.signupType || null,
-      billingTier: data.billingTier || null,
+      billingTier: updates.billingTier || data.billingTier || null,
     };
   }
 );

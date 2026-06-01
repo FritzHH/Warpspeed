@@ -220,6 +220,17 @@ export function TenantSetupLandingScreen() {
     return res.data;
   }
 
+  // Persist the prospect's billingTier pick from the Payment step radio.
+  // Top-level field (not formData) — matches server-side schema.
+  async function handleChooseBillingTier(billingTier) {
+    const res = await updateSetupCallable({ billingTier });
+    setSetupDoc((prev) => ({
+      ...(prev || {}),
+      billingTier: res.data.billingTier,
+    }));
+    return res.data;
+  }
+
   // Finalize signup: promote setup doc into a real tenant + store, set
   // owner claims, adopt the Twilio subaccount + purchased number, persist
   // a2p info, best-effort create a Stripe Connect account, then delete the
@@ -404,6 +415,7 @@ export function TenantSetupLandingScreen() {
           billingTier={setupDoc?.billingTier}
           paymentMethodCollected={setupDoc?.paymentMethodCollected}
           onSaveFormData={handleSaveFormData}
+          onChooseBillingTier={handleChooseBillingTier}
           onPaymentMethodSaved={loadSetupDoc}
         />
       );

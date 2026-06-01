@@ -51,13 +51,16 @@ async function createConnectedAccount(secret, {
   mcc,
   companyPhone,
   companyAddress,
+  country,
   fullBakeForTest = false,
 }) {
   if (fullBakeForTest) assertTestModeKey(secret);
   const stripe = getClient(secret);
+  const normalizedCountry = (country || "US").toUpperCase();
   const payload = {
     type: "express",
     email,
+    country: normalizedCountry,
     capabilities: {
       card_payments: { requested: true },
       transfers: { requested: true },
@@ -94,15 +97,28 @@ async function createConnectedAccount(secret, {
       ip: "127.0.0.1",
       user_agent: "cadence-platform/full-bake",
     };
-    payload.external_account = {
-      object: "bank_account",
-      country: "us",
-      currency: "usd",
-      routing_number: "110000000",
-      account_number: "000123456789",
-      account_holder_name: businessName || "Test Account",
-      account_holder_type: businessType === "company" ? "company" : "individual",
-    };
+    if (normalizedCountry === "CA") {
+      payload.external_account = {
+        object: "bank_account",
+        country: "ca",
+        currency: "cad",
+        transit_number: "11000",
+        institution_number: "000",
+        account_number: "000123456789",
+        account_holder_name: businessName || "Test Account",
+        account_holder_type: businessType === "company" ? "company" : "individual",
+      };
+    } else {
+      payload.external_account = {
+        object: "bank_account",
+        country: "us",
+        currency: "usd",
+        routing_number: "110000000",
+        account_number: "000123456789",
+        account_holder_name: businessName || "Test Account",
+        account_holder_type: businessType === "company" ? "company" : "individual",
+      };
+    }
   }
   return stripe.accounts.create(payload);
 }

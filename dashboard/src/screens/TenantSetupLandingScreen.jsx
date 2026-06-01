@@ -12,6 +12,7 @@ import { TenantSetupStoreDetailsForm } from "./TenantSetupStoreDetailsForm";
 import { TenantSetupPaymentForm } from "./TenantSetupPaymentForm";
 import { TenantSetupPhoneForm } from "./TenantSetupPhoneForm";
 import { TenantSetupA2pForm } from "./TenantSetupA2pForm";
+import { TenantSetupReviewForm } from "./TenantSetupReviewForm";
 
 // Stages of the landing page state machine. We sit on LOADING while we figure
 // out which path applies (already signed in vs. email-link vs. neither), then
@@ -23,7 +24,7 @@ const STAGE = {
   FETCHING_DOC: "fetching_doc",
   READY: "ready",
   ERROR: "error",
-  INVALID_LINK: "invalid_link",
+  RESUME: "resume",
 };
 
 const EMAIL_LOCALSTORAGE_KEY = "cadence.tenantSetup.emailForSignIn";
@@ -40,6 +41,10 @@ const finalizeCallable = httpsCallable(
   functions,
   "tenantSetupFinalizeCallable"
 );
+const resendCallable = httpsCallable(
+  functions,
+  "requestTenantSetupResendCallable"
+);
 
 export function TenantSetupLandingScreen() {
   const [stage, setStage] = useState(STAGE.LOADING);
@@ -47,25 +52,40 @@ export function TenantSetupLandingScreen() {
   const [setupDoc, setSetupDoc] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
   const [typeSaving, setTypeSaving] = useState(false);
+  const [resumeEmail, setResumeEmail] = useState("");
+  const [resumeSubmitting, setResumeSubmitting] = useState(false);
+  const [resumeSent, setResumeSent] = useState(false);
+  const [resumeError, setResumeError] = useState("");
   const ranRef = useRef(false);
+  const linkConsumedRef = useRef(false);
 
   useEffect(() => {
     if (ranRef.current) return;
     ranRef.current = true;
 
     const unsub = onAuthStateChanged(auth, async (user) => {
-      // Path A: user is already signed in (email-link consumed earlier this
-      // session, or they returned mid-flow). Skip straight to loading the
-      // setup doc.
+      // Prefer the existing session. The common case where a prospect
+      // closes the tab and re-clicks the email link has a still-valid
+      // Firebase session that already owns the setup doc — retrying the
+      // now-spent oobCode would just dump them on the resume screen for
+      // no reason. If the signed-in identity ISN'T authorized for the doc
+      // (stale platform-admin session in the same browser, prior test
+      // signup, etc.), loadSetupDoc's catch falls back to the email-link
+      // path with the right identity.
       if (user) {
         setEmail(user.email || "");
         await loadSetupDoc();
         return;
       }
 
-      // Path B: user not signed in. If the URL is a Firebase email-link, do
-      // the sign-in dance.
-      if (isSignInWithEmailLink(auth, window.location.href)) {
+      // No session: consume the email-link if one is in the URL.
+      // linkConsumedRef guards against re-attempting the now-spent oobCode
+      // on the next auth-state fire triggered by completeSignIn itself.
+      if (
+        !linkConsumedRef.current &&
+        isSignInWithEmailLink(auth, window.location.href)
+      ) {
+        linkConsumedRef.current = true;
         const stored = window.localStorage.getItem(EMAIL_LOCALSTORAGE_KEY);
         if (stored) {
           await completeSignIn(stored);
@@ -75,8 +95,11 @@ export function TenantSetupLandingScreen() {
         return;
       }
 
-      // Path C: not signed in, not an email-link. Random visitor hit the URL.
-      setStage(STAGE.INVALID_LINK);
+      // No session, no link — drop onto the resume screen with the email
+      // pre-filled from localStorage when we have one.
+      const stored = window.localStorage.getItem(EMAIL_LOCALSTORAGE_KEY);
+      if (stored) setResumeEmail(stored);
+      setStage(STAGE.RESUME);
     });
 
     return unsub;
@@ -90,10 +113,40 @@ export function TenantSetupLandingScreen() {
       window.localStorage.removeItem(EMAIL_LOCALSTORAGE_KEY);
       // onAuthStateChanged above fires next, which calls loadSetupDoc.
     } catch (err) {
+      // Email-link failures (spent oobCode, expired, malformed) shouldn't
+      // dump raw "auth/invalid-action-code" copy on the prospect. Route to
+      // the resume screen with the email pre-filled so they can request a
+      // fresh link in one click.
+      setResumeEmail(emailToUse || "");
+      setResumeSent(false);
+      setResumeError("");
+      setStage(STAGE.RESUME);
+    }
+  }
+
+  async function handleResumeSubmit(e) {
+    e.preventDefault();
+    const trimmed = (resumeEmail || "").trim().toLowerCase();
+    if (!trimmed || resumeSubmitting) return;
+    setResumeSubmitting(true);
+    setResumeError("");
+    try {
+      await resendCallable({ email: trimmed });
+      window.localStorage.setItem(EMAIL_LOCALSTORAGE_KEY, trimmed);
+      setResumeSent(true);
+    } catch (err) {
       const code = err?.code || "";
-      const msg = err?.message || "Sign-in failed.";
-      setErrorMsg(code ? `${code}: ${msg}` : msg);
-      setStage(STAGE.ERROR);
+      // Throttle from the callable comes back as resource-exhausted; surface
+      // a friendly wording without leaking the underlying rate-limit detail.
+      if (code === "functions/resource-exhausted") {
+        setResumeError(
+          "Please wait a moment before requesting another link."
+        );
+      } else {
+        setResumeError("Something went wrong. Please try again.");
+      }
+    } finally {
+      setResumeSubmitting(false);
     }
   }
 
@@ -106,6 +159,23 @@ export function TenantSetupLandingScreen() {
       setStage(STAGE.READY);
     } catch (err) {
       const code = err?.code || "";
+      // Stale-session collision: signed in as someone who doesn't own the
+      // setup doc keyed to the link recipient. If the URL still carries an
+      // email-link, sign out and let onAuthStateChanged refire with
+      // user=null, which then takes the link branch with the right
+      // identity. Covers platform-admin testing in the same browser.
+      if (
+        code === "functions/permission-denied" &&
+        !linkConsumedRef.current &&
+        isSignInWithEmailLink(auth, window.location.href)
+      ) {
+        try {
+          await auth.signOut();
+          return;
+        } catch {
+          // Fall through to ERROR if sign-out itself fails.
+        }
+      }
       const msg = err?.message || "Failed to load your signup.";
       setErrorMsg(code ? `${code}: ${msg}` : msg);
       setStage(STAGE.ERROR);
@@ -210,16 +280,52 @@ export function TenantSetupLandingScreen() {
     );
   }
 
-  if (stage === STAGE.INVALID_LINK) {
+  if (stage === STAGE.RESUME) {
+    if (resumeSent) {
+      return (
+        <div className="centerScreen">
+          <div className="card">
+            <h1 className="cardTitle">Check your email</h1>
+            <p className="cardSubtitle">
+              If you have a signup in progress, we just sent a fresh link to{" "}
+              <strong>{resumeEmail}</strong>. Click it to continue where you
+              left off.
+            </p>
+            <p className="helperText">
+              The link can take a minute to arrive. Check your spam folder if
+              you don't see it.
+            </p>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="centerScreen">
-        <div className="card">
-          <h1 className="cardTitle">No active signup</h1>
+        <form className="card" onSubmit={handleResumeSubmit}>
+          <h1 className="cardTitle">Continue your setup</h1>
           <p className="cardSubtitle">
-            This page is reachable only through a Cadence POS signup link
-            emailed to you. If you need one, contact support.
+            Enter the email you started with and we'll send you a fresh link
+            to pick up where you left off.
           </p>
-        </div>
+          <label className="fieldLabel">Email</label>
+          <input
+            type="email"
+            className="textInput"
+            value={resumeEmail}
+            onChange={(e) => setResumeEmail(e.target.value)}
+            autoFocus
+            autoComplete="email"
+            disabled={resumeSubmitting}
+          />
+          {resumeError && <div className="errorText">{resumeError}</div>}
+          <button
+            type="submit"
+            className="primaryButton"
+            disabled={resumeSubmitting || !resumeEmail.trim()}
+          >
+            {resumeSubmitting ? "Sending…" : "Send fresh link"}
+          </button>
+        </form>
       </div>
     );
   }
@@ -229,9 +335,15 @@ export function TenantSetupLandingScreen() {
       <div className="centerScreen">
         <div className="card">
           <h1 className="cardTitle">Something went wrong</h1>
-          <p className="cardSubtitle">{errorMsg}</p>
+          <p className="cardSubtitle">
+            We couldn't load your signup. Please try again in a moment.
+          </p>
           <p className="helperText">
-            If your link is expired, contact support to send a new one.
+            If this keeps happening, email{" "}
+            <a href="mailto:support@retailsoftsystems.com">
+              support@retailsoftsystems.com
+            </a>{" "}
+            and we'll help you out.
           </p>
         </div>
       </div>
@@ -248,6 +360,17 @@ export function TenantSetupLandingScreen() {
   const resolvedEmail = setupDoc?.email || email;
 
   if (signupType === "single" || signupType === "multi") {
+    if (currentStep === "review") {
+      return (
+        <TenantSetupReviewForm
+          email={resolvedEmail}
+          formData={formData}
+          onSaveFormData={handleSaveFormData}
+          onFinalize={handleFinalize}
+        />
+      );
+    }
+
     if (currentStep === "a2p" || currentStep === "done") {
       return (
         <TenantSetupA2pForm
@@ -266,6 +389,7 @@ export function TenantSetupLandingScreen() {
           formData={formData}
           billingTier={setupDoc?.billingTier}
           purchasedPhoneNumber={setupDoc?.purchasedPhoneNumber}
+          poolNumberInfo={setupDoc?.poolNumberInfo}
           onSaveFormData={handleSaveFormData}
           onPhoneNumberChanged={loadSetupDoc}
         />

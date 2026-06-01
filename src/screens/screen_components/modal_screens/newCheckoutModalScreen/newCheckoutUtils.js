@@ -4,6 +4,7 @@ import {
   calculateRunningTotals,
   capitalizeFirstLetterOfString,
   formatCurrencyDisp,
+  roundCentsToNickel,
   log,
 } from "../../../../utils";
 import { dbSendSMS, dbSendReceipt } from "../../../../db_calls_wrapper";
@@ -179,7 +180,23 @@ export function recomputeSaleAmounts(sale, transactions, credits) {
     sum + (t.refunds || []).reduce((s, r) => s + (r.amount || 0), 0), 0
   );
   sale.amountCaptured = txnTotal + (creditTotal - creditRefundedTotal) - totalRefunded;
-  sale.paymentComplete = sale.amountCaptured >= (sale.total || 0) && (sale.total || 0) > 0;
+
+  // CAD cash rounding: when cash was used on a CAD sale and the captured
+  // amount lands at the nickel-rounded total, treat the sale as complete.
+  // This handles round-DOWN cases (e.g., $1.02 bill paid as $1.00 cash)
+  // where amountCaptured < total but the customer has paid in full per
+  // Canadian rounding rules. Card-only sales still require exact settle.
+  const currency =
+    useSettingsStore.getState().getSettings()?.currency || "USD";
+  const isCAD = (currency || "").toUpperCase() === "CAD";
+  const hasCashTxn = txns.some((t) => t.method === "cash");
+  const exactComplete = sale.amountCaptured >= (sale.total || 0);
+  const cashRoundedComplete =
+    isCAD &&
+    hasCashTxn &&
+    sale.amountCaptured >= roundCentsToNickel(sale.total || 0);
+  sale.paymentComplete =
+    (exactComplete || cashRoundedComplete) && (sale.total || 0) > 0;
   return sale;
 }
 

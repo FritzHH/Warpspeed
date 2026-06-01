@@ -9,19 +9,11 @@ import {
 import { httpsCallable } from "firebase/functions";
 import { functions } from "../firebase";
 
-// Stage 3a: payment-on-file. Split from the older combined payment-phone
-// form so phone selection can live on its own step (which has its own
-// state — mode picker, search, purchase) without intermixing.
-//
-// monthly_sub: Stripe Elements SetupIntent flow. Card → SetupIntent confirm
-// → paymentMethodID → server attaches + sets as default. Setup doc gets
-// paymentMethodCollected=true so the eventual tenant provisioner has a saved
-// PM to point the Subscription at.
-//
-// per_sale: card collection deferred until period-billed accumulation
-// invoicing is built (approach #2 — covers cash/check/gift sales that
-// Connect application_fee can't see). Per-sale prospects advance straight
-// past this step with a deferred-message placeholder.
+// Stage 3a: payment-on-file. Both tiers collect a card via the same
+// SetupIntent flow — monthly_sub points the recurring subscription at it;
+// per_sale uses it for the semi-monthly accumulation invoice run that bills
+// fees across all sale types (Connect-card, cash, check, gift) so we can't
+// rely on Connect application_fee alone.
 
 const createSetupIntentCallable = httpsCallable(
   functions,
@@ -40,7 +32,7 @@ const stripePromise = STRIPE_PUBLISHABLE_KEY
 const BILLING_TIER_COPY = {
   per_sale: {
     label: "Per-sale plan",
-    detail: "0.5% of every sale, billed monthly to the card on file.",
+    detail: "0.5% of every sale, billed twice monthly to the card on file. $10/month minimum.",
     badge: "Per-sale",
   },
   monthly_sub: {
@@ -52,13 +44,13 @@ const BILLING_TIER_COPY = {
 
 export function TenantSetupPaymentForm({
   email,
-  // eslint-disable-next-line no-unused-vars
   formData,
   billingTier,
   paymentMethodCollected,
   onSaveFormData,
   onPaymentMethodSaved,
 }) {
+  const isCanada = (formData?.country || "US").toUpperCase() === "CA";
   const [saveError, setSaveError] = useState("");
   const [clientSecret, setClientSecret] = useState("");
   const [intentLoading, setIntentLoading] = useState(false);
@@ -77,7 +69,8 @@ export function TenantSetupPaymentForm({
   async function handleContinue() {
     setSaveError("");
     try {
-      await onSaveFormData({ currentStep: "phone" });
+      // CA tenants skip phone + A2P (CASL, not US A2P 10DLC); jump to review.
+      await onSaveFormData({ currentStep: isCanada ? "review" : "phone" });
     } catch (err) {
       setSaveError(err?.message || "Failed to continue.");
     }
@@ -107,8 +100,8 @@ export function TenantSetupPaymentForm({
   );
 
   const canContinue =
-    billingTier === "per_sale" ||
-    (billingTier === "monthly_sub" && paymentMethodCollected);
+    (billingTier === "per_sale" || billingTier === "monthly_sub") &&
+    paymentMethodCollected;
 
   return (
     <div className="centerScreen">
@@ -133,21 +126,21 @@ export function TenantSetupPaymentForm({
         <h1 className="cardTitle">Payment</h1>
         <p className="cardSubtitle">
           Signed in as <strong>{email}</strong>. Save the card we'll keep on
-          file for your subscription.
+          file for billing.
         </p>
 
         <div className="sectionHeading">Payment method</div>
 
-        {billingTier === "monthly_sub" && (
+        {billingTier ? (
           <>
             {paymentMethodCollected ? (
               <div className="setupSectionSuccess">
-                Card on file — you're all set for monthly billing.
+                Card on file — you're all set.
               </div>
             ) : !clientSecret ? (
               <div className="setupSectionPlaceholderActive">
                 <p className="placeholderHint">
-                  We'll save your card now and charge it monthly once your
+                  We'll save your card now and use it for billing once your
                   account is live. No charge today.
                 </p>
                 <button
@@ -160,7 +153,11 @@ export function TenantSetupPaymentForm({
                 </button>
                 {!stripePromise && (
                   <div className="errorText">
-                    Stripe publishable key is missing. Contact support.
+                    Stripe publishable key is missing. Email{" "}
+                    <a href="mailto:support@retailsoftsystems.com">
+                      support@retailsoftsystems.com
+                    </a>{" "}
+                    for help.
                   </div>
                 )}
                 {intentError && (
@@ -179,18 +176,13 @@ export function TenantSetupPaymentForm({
               </Elements>
             )}
           </>
-        )}
-
-        {billingTier === "per_sale" && (
+        ) : (
           <div className="setupSectionPlaceholder">
-            No card needed at signup. Per-sale plans are billed monthly from
-            sales activity once your account is live.
-          </div>
-        )}
-
-        {!billingTier && (
-          <div className="setupSectionPlaceholder">
-            Billing tier missing. Contact support to refresh your link.
+            Billing tier missing. Email{" "}
+            <a href="mailto:support@retailsoftsystems.com">
+              support@retailsoftsystems.com
+            </a>{" "}
+            to refresh your link.
           </div>
         )}
 
@@ -267,7 +259,7 @@ function SetupIntentForm({ onSuccess }) {
   if (success) {
     return (
       <div className="setupSectionSuccess">
-        Card on file — you're all set for monthly billing.
+        Card on file — you're all set.
       </div>
     );
   }

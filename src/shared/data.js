@@ -116,6 +116,11 @@ export const NONREMOVABLE_STATUSES = [
 ];
 
 export const SETTINGS_OBJ = {
+  country: "US",
+  currency: "USD",
+  // Tax registration number (GST/HST in Canada, optional sales-tax permit
+  // number in the US). Displayed on receipts when present; empty = hidden.
+  taxRegistrationNumber: "",
   laborRateByHour: 9000,
   statuses: [
     ...NONREMOVABLE_STATUSES,

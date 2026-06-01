@@ -490,22 +490,42 @@ export function checkInputForNumbersOnly(valString, includeDecimal = true) {
   return isGood;
 }
 
-export function formatCurrencyDisp(value, withCurrency = false) {
-  let locale = "en-US";
-  let currency = "USD";
+const CURRENCY_LOCALES = {
+  USD: "en-US",
+  CAD: "en-CA",
+};
+
+// Canadian retailers can no longer accept pennies — cash payments round to
+// the nearest nickel. Card/check/etc. settle exact. Uses "round-half-up"
+// (the closest fit to CRA guidance for retail). Pass cents in, get nickels.
+export function roundCentsToNickel(cents) {
+  const n = Number(cents) || 0;
+  return Math.round(n / 5) * 5;
+}
+
+// Currency-aware cash-rounding gate. Returns the input unchanged for USD
+// and any currency we don't know; returns nickel-rounded cents for CAD.
+export function roundCashCentsForCurrency(cents, currency) {
+  const normalized = (currency || "USD").toUpperCase();
+  if (normalized === "CAD") return roundCentsToNickel(cents);
+  return Number(cents) || 0;
+}
+
+export function formatCurrencyDisp(value, withCurrency = false, currency = "USD") {
+  const normalized = (currency || "USD").toUpperCase();
+  const locale = CURRENCY_LOCALES[normalized] || "en-US";
   const cents = typeof value === "string" ? Number(value) : value;
   if (!Number.isFinite(cents)) return "";
   const amount = cents / 100;
   const opts = withCurrency
     ? {
       style: "currency",
-      currency,
+      currency: normalized,
       minimumFractionDigits: 2,
       maximumFractionDigits: 2,
     }
     : { minimumFractionDigits: 2, maximumFractionDigits: 2 };
   return amount.toLocaleString(locale, opts);
-  // log(input);
 }
 
 export function usdTypeMask(raw, { withDollar = false } = {}) {

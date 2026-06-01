@@ -22,6 +22,9 @@ export function TenantSetupMultiShopForm({
   onSaveFormData,
   onSwitchType,
 }) {
+  // Country selector — drives currency (server-derived), Stripe Connect
+  // account country, and downstream address-format expectations.
+  const [country, setCountry] = useState(formData.country || "US");
   const [businessName, setBusinessName] = useState(formData.businessName || "");
   const [ownerFirstName, setOwnerFirstName] = useState(
     formData.ownerFirstName || ""
@@ -46,6 +49,19 @@ export function TenantSetupMultiShopForm({
     setSaveError("");
     try {
       await onSaveFormData({ [field]: value });
+      setSaveStatus("saved");
+    } catch (err) {
+      setSaveStatus("error");
+      setSaveError(err?.message || "Failed to save.");
+    }
+  }
+
+  async function handleCountryChange(nextCountry) {
+    setCountry(nextCountry);
+    setSaveStatus("saving");
+    setSaveError("");
+    try {
+      await onSaveFormData({ country: nextCountry });
       setSaveStatus("saved");
     } catch (err) {
       setSaveStatus("error");
@@ -86,6 +102,33 @@ export function TenantSetupMultiShopForm({
           stores in the next step. Your progress saves automatically as you
           fill in each field.
         </p>
+
+        <div className="sectionHeading">Country</div>
+        <p className="helperText">
+          We use this to set up payments and your business's currency.
+        </p>
+        <div className="nameRow">
+          <label className="toggleRow">
+            <input
+              type="radio"
+              name="country"
+              value="US"
+              checked={country === "US"}
+              onChange={() => handleCountryChange("US")}
+            />
+            <span>United States (USD)</span>
+          </label>
+          <label className="toggleRow">
+            <input
+              type="radio"
+              name="country"
+              value="CA"
+              checked={country === "CA"}
+              onChange={() => handleCountryChange("CA")}
+            />
+            <span>Canada (CAD)</span>
+          </label>
+        </div>
 
         <div className="sectionHeading">Business</div>
 
@@ -161,11 +204,11 @@ export function TenantSetupMultiShopForm({
 
         <div className="nameRow">
           <div className="fieldGroup">
-            <div className="fieldLabel">State</div>
+            <div className="fieldLabel">{country === "CA" ? "Province" : "State"}</div>
             <input
               className="textInput"
               type="text"
-              placeholder="FL"
+              placeholder={country === "CA" ? "ON" : "FL"}
               maxLength={2}
               value={stateCode}
               onChange={(e) => setStateCode(e.target.value.toUpperCase())}
@@ -174,11 +217,11 @@ export function TenantSetupMultiShopForm({
             />
           </div>
           <div className="fieldGroup">
-            <div className="fieldLabel">ZIP</div>
+            <div className="fieldLabel">{country === "CA" ? "Postal code" : "ZIP"}</div>
             <input
               className="textInput"
               type="text"
-              placeholder="34135"
+              placeholder={country === "CA" ? "A1A 1A1" : "34135"}
               value={zip}
               onChange={(e) => setZip(e.target.value)}
               onBlur={() => persist("tenantZip", zip.trim())}

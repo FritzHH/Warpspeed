@@ -75,6 +75,7 @@ const {
   _internals: twilioSubaccountInternals,
 } = require("./twilio-subaccounts");
 const stripeConnect = require("./stripe-connect");
+const { provisionOwnersWithPins } = require("./owner-pin-provisioning");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -85,6 +86,12 @@ const PLATFORM_NOREPLY_APP_PASSWORD = defineSecret("PLATFORM_NOREPLY_APP_PASSWOR
 const INVITE_LANDING_URL = "https://cadence-pos.web.app/invite-accept";
 const INVITE_TTL_DAYS = 7;
 const TENANT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
+
+// Tenant portal lives on the cadence-dashboard hosting site. After finalize,
+// the owner is emailed a Firebase email-link that lands on /portal so they
+// can sign in and (if applicable) initiate a number port-in for their
+// permanent number.
+const PORTAL_LANDING_URL = "https://cadence-dashboard.web.app/portal";
 
 function requireAuth(request) {
   const auth = request.auth;
@@ -153,6 +160,111 @@ function renderResendLinkFooterHtml(email) {
   return `<p style="margin-top:24px;color:#666;font-size:13px">Need a fresh link? <a href="${url}">Click here to email yourself a new one</a>. (Limited to one new link per minute.)</p>`;
 }
 
+// Builds a Firebase email-link sign-in URL that lands on the tenant portal.
+// `nextPath` is appended as a query so the portal can route to a specific
+// page after sign-in (e.g. /portal/port-number for pool tenants).
+function buildPortalActionCodeSettings(nextPath) {
+  const safePath = typeof nextPath === "string" && nextPath.startsWith("/")
+    ? nextPath
+    : "/portal";
+  return {
+    url: `${PORTAL_LANDING_URL}?next=${encodeURIComponent(safePath)}`,
+    handleCodeInApp: true,
+  };
+}
+
+// Inline-branded HTML for the post-onboarding portal welcome email. Reused
+// for opt-out / purchase / pool variants by passing different bodyHtml.
+function renderPortalWelcomeEmailHtml({ headerLine, bodyHtml, signInLink }) {
+  const accent = "#2563eb";
+  return `<div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#111;max-width:560px;margin:0 auto">
+  <div style="border-top:4px solid ${accent};padding:24px 0 8px 0">
+    <div style="font-size:11px;letter-spacing:0.18em;color:${accent};font-weight:700;text-transform:uppercase">Cadence POS</div>
+    <h1 style="margin:6px 0 4px 0;font-size:22px;letter-spacing:-0.01em">${headerLine}</h1>
+  </div>
+  ${bodyHtml}
+  <div style="margin-top:28px;padding:18px 0;border-top:1px solid #e5e7eb">
+    <p style="margin:0 0 10px 0;font-size:14px">Click below to sign in to your portal:</p>
+    <p style="margin:0 0 14px 0"><a href="${signInLink}" style="display:inline-block;padding:10px 18px;background:${accent};color:#fff;text-decoration:none;border-radius:6px;font-weight:600">Open Cadence Portal</a></p>
+    <p style="margin:0;color:#666;font-size:12px;word-break:break-all">Or copy this link: ${signInLink}</p>
+    <p style="margin:14px 0 0 0;color:#666;font-size:12px">This link is single-use and expires after a short time.</p>
+  </div>
+</div>`;
+}
+
+// Sends the post-onboarding portal welcome email. Non-fatal: if the email
+// send fails, the tenant is still live and can request a new link from
+// support (we log the failure). Branches body copy on smsChoice.
+async function sendPortalWelcomeEmail({
+  ownerEmail,
+  tenantName,
+  smsChoice,
+  poolExpiresAtMs,
+}) {
+  const fromEmail = PLATFORM_NOREPLY_EMAIL.value();
+  const smtpUser = PLATFORM_NOREPLY_SMTP_USER.value();
+  const fromPassword = PLATFORM_NOREPLY_APP_PASSWORD.value();
+  if (!fromEmail || !smtpUser || !fromPassword) {
+    throw new Error("Portal welcome email secrets are not configured.");
+  }
+
+  const nextPath = smsChoice === "pool" ? "/portal/port-number" : "/portal";
+  const signInLink = await admin
+    .auth()
+    .generateSignInWithEmailLink(
+      ownerEmail,
+      buildPortalActionCodeSettings(nextPath)
+    );
+
+  let headerLine;
+  let bodyHtml;
+  if (smsChoice === "pool") {
+    const expiryStr = poolExpiresAtMs
+      ? new Date(poolExpiresAtMs).toLocaleDateString("en-US", {
+          month: "long",
+          day: "numeric",
+          year: "numeric",
+        })
+      : "in 30 days";
+    headerLine = `${tenantName} is live`;
+    bodyHtml = `<p style="margin:8px 0 14px 0;line-height:1.55">Welcome to Cadence. Your account is up and running.</p>
+<div style="margin:18px 0;padding:14px 16px;border:1px solid #fcd34d;background:#fffbeb;border-radius:6px">
+  <p style="margin:0 0 6px 0;font-weight:700;color:#92400e">Temporary number — expires ${expiryStr}</p>
+  <p style="margin:0;color:#7c2d12;font-size:14px;line-height:1.5">You're currently using a temporary phone number from our pool. To keep your real business number long-term, start the port-in process from the portal before this number expires.</p>
+</div>
+<p style="margin:8px 0 0 0;line-height:1.55">From the portal you can: initiate a port-in for your real number, manage your team, and review billing.</p>`;
+  } else if (smsChoice === "opt_out") {
+    headerLine = `${tenantName} is live`;
+    bodyHtml = `<p style="margin:8px 0 14px 0;line-height:1.55">Welcome to Cadence. Your account is up and running.</p>
+<p style="margin:8px 0 14px 0;line-height:1.55">You opted out of text messaging during signup. If you change your mind, you can enable it any time from your in-app Subscription settings.</p>
+<p style="margin:8px 0 0 0;line-height:1.55">From the portal you can manage your team, review billing, and update your account info.</p>`;
+  } else {
+    headerLine = `${tenantName} is live`;
+    bodyHtml = `<p style="margin:8px 0 14px 0;line-height:1.55">Welcome to Cadence. Your account is up and running.</p>
+<p style="margin:8px 0 0 0;line-height:1.55">From the portal you can manage your team, review billing, and update your account info.</p>`;
+  }
+
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: { user: smtpUser, pass: fromPassword },
+  });
+
+  const subject = `Your Cadence portal is ready — ${tenantName}`;
+  const html = renderPortalWelcomeEmailHtml({
+    headerLine,
+    bodyHtml,
+    signInLink,
+  });
+
+  const info = await transporter.sendMail({
+    from: `"Cadence POS" <${fromEmail}>`,
+    to: ownerEmail,
+    subject,
+    html,
+  });
+  return { messageId: info.messageId };
+}
+
 function normalizeStoreString(value, maxLen) {
   if (!value || typeof value !== "string") return null;
   const trimmed = value.trim();
@@ -168,11 +280,40 @@ function normalizeOptionalStoreString(value, maxLen) {
   return trimmed;
 }
 
-function normalizeZip(zip) {
+function normalizeZip(zip, country = "US") {
   if (!zip || typeof zip !== "string") return null;
   const trimmed = zip.trim();
+  if ((country || "US").toUpperCase() === "CA") {
+    // Canadian postal codes: A1A 1A1 (with or without space). Normalize to
+    // upper-case, single-space, no double spaces. ANSI rule: alternating
+    // letter/digit, never D O F I Q U as the first letter, never W or Z as
+    // the first letter — we keep the regex permissive (full alphabet) since
+    // Canada Post accepts more than spec for some private codes.
+    const compact = trimmed.replace(/\s+/g, "").toUpperCase();
+    if (!/^[A-Z]\d[A-Z]\d[A-Z]\d$/.test(compact)) return null;
+    return `${compact.slice(0, 3)} ${compact.slice(3)}`;
+  }
   if (!/^\d{5}(-\d{4})?$/.test(trimmed)) return null;
   return trimmed;
+}
+
+// Country/currency support. One country per tenant (Stripe Connect = one
+// account = one country = one currency). Currency is derived server-side
+// from country so it's a single source of truth.
+const SUPPORTED_COUNTRIES = ["US", "CA"];
+const COUNTRY_CURRENCY = {
+  US: "USD",
+  CA: "CAD",
+};
+
+function normalizeCountry(value) {
+  if (!value || typeof value !== "string") return null;
+  const upper = value.trim().toUpperCase();
+  return SUPPORTED_COUNTRIES.includes(upper) ? upper : null;
+}
+
+function currencyForCountry(country) {
+  return COUNTRY_CURRENCY[country] || "USD";
 }
 
 function normalizeSalesTaxPercent(value) {
@@ -451,6 +592,8 @@ function buildBootstrapSettings({
   storeDisplayName,
   storeAddress,
   salesTaxPercent,
+  country,
+  currency,
 }) {
   // Deep clone — SETTINGS_OBJ is pure data (no functions/Dates/Maps).
   const settings = JSON.parse(JSON.stringify(SETTINGS_OBJ));
@@ -462,6 +605,9 @@ function buildBootstrapSettings({
     storeAddress,
     salesTaxPercent,
   });
+
+  if (country) settings.country = country;
+  if (currency) settings.currency = currency;
 
   settings.thankYouBlurb = "Thank you for your business!";
   settings.quickItemButtons = [];
@@ -523,6 +669,7 @@ exports.platformAdminCreateTenantCallable = onCall(
       ownerFirstName,
       ownerLastName,
       ownerPhone,
+      tenantCountry,
       tenantStreet,
       tenantUnit,
       tenantCity,
@@ -563,6 +710,9 @@ exports.platformAdminCreateTenantCallable = onCall(
       );
     }
 
+    const normalizedCountry = normalizeCountry(tenantCountry) || "US";
+    const normalizedCurrency = currencyForCountry(normalizedCountry);
+
     // Tenant address: the supervising-authority address. Per-store operational
     // address is collected later from the owner via the cadence-pos onboarding
     // flow. Tenant phone is the ownerPhone; tax % is per-store.
@@ -582,9 +732,14 @@ exports.platformAdminCreateTenantCallable = onCall(
     if (!normalizedState || !/^[A-Za-z]{2}$/.test(normalizedState)) {
       throw new HttpsError("invalid-argument", "tenantState must be a 2-letter code.");
     }
-    const normalizedZip = normalizeZip(tenantZip);
+    const normalizedZip = normalizeZip(tenantZip, normalizedCountry);
     if (!normalizedZip) {
-      throw new HttpsError("invalid-argument", "tenantZip must be 5 digits or ZIP+4.");
+      throw new HttpsError(
+        "invalid-argument",
+        normalizedCountry === "CA"
+          ? "tenantZip must be a Canadian postal code (e.g. A1A 1A1)."
+          : "tenantZip must be 5 digits or ZIP+4."
+      );
     }
 
     const normalizedBillingModel = normalizeBillingModel(billingModel);
@@ -696,6 +851,8 @@ exports.platformAdminCreateTenantCallable = onCall(
       ownerFirstName: normalizedFirstName,
       ownerLastName: normalizedLastName,
       ownerPhone: normalizedPhone,
+      country: normalizedCountry,
+      currency: normalizedCurrency,
       street: normalizedStreet,
       unit: normalizedUnit,
       city: normalizedCity,
@@ -736,6 +893,8 @@ exports.platformAdminCreateTenantCallable = onCall(
       storeDisplayName: null,
       storeAddress: null,
       salesTaxPercent: null,
+      country: normalizedCountry,
+      currency: normalizedCurrency,
     });
     await storeRef.collection("settings").doc("settings").set(settingsDoc);
 
@@ -760,7 +919,7 @@ exports.platformAdminCreateTenantCallable = onCall(
       city: normalizedCity,
       state: normalizedState,
       postal_code: normalizedZip,
-      country: "US",
+      country: normalizedCountry,
     };
     let stripeAccountID = null;
     let connectAccountError = null;
@@ -777,6 +936,7 @@ exports.platformAdminCreateTenantCallable = onCall(
         mcc: "5940",
         companyPhone: normalizedPhone,
         companyAddress: stripeAddress,
+        country: normalizedCountry,
         representative: {
           firstName: normalizedFirstName,
           lastName: normalizedLastName,
@@ -905,10 +1065,6 @@ exports.platformAdminCreateStoreCallable = onCall(
     if (!normalizedState || !/^[A-Za-z]{2}$/.test(normalizedState)) {
       throw new HttpsError("invalid-argument", "storeState must be a 2-letter code.");
     }
-    const normalizedZip = normalizeZip(storeZip);
-    if (!normalizedZip) {
-      throw new HttpsError("invalid-argument", "storeZip must be 5 digits or ZIP+4.");
-    }
     const normalizedStorePhone = normalizePhone(storePhone);
     if (!normalizedStorePhone) {
       throw new HttpsError(
@@ -931,6 +1087,16 @@ exports.platformAdminCreateStoreCallable = onCall(
       throw new HttpsError("not-found", `Tenant ${tenantID} not found.`);
     }
     const tenantData = tenantSnap.data() || {};
+    const tenantCountryForStore = tenantData.country || "US";
+    const normalizedZip = normalizeZip(storeZip, tenantCountryForStore);
+    if (!normalizedZip) {
+      throw new HttpsError(
+        "invalid-argument",
+        tenantCountryForStore === "CA"
+          ? "storeZip must be a Canadian postal code (e.g. A1A 1A1)."
+          : "storeZip must be 5 digits or ZIP+4."
+      );
+    }
 
     let sourceSettings = null;
     if (mode === "copy") {
@@ -2747,10 +2913,8 @@ exports.ownerCompleteBootstrapCallable = onCall(
     if (!normalizedState || !/^[A-Za-z]{2}$/.test(normalizedState)) {
       throw new HttpsError("invalid-argument", "storeState must be a 2-letter code.");
     }
-    const normalizedZip = normalizeZip(storeZip);
-    if (!normalizedZip) {
-      throw new HttpsError("invalid-argument", "storeZip must be 5 digits or ZIP+4.");
-    }
+    // Postal code validated against tenant.country after tenant doc fetched
+    // below — see `normalizedZip` assignment near tenant lookup.
     const normalizedStorePhone = normalizePhone(storePhone);
     if (!normalizedStorePhone) {
       throw new HttpsError(
@@ -2869,6 +3033,16 @@ exports.ownerCompleteBootstrapCallable = onCall(
       throw new HttpsError(
         "permission-denied",
         "Caller is not the owner of this tenant."
+      );
+    }
+    const tenantCountryForStore = tenantData.country || "US";
+    const normalizedZip = normalizeZip(storeZip, tenantCountryForStore);
+    if (!normalizedZip) {
+      throw new HttpsError(
+        "invalid-argument",
+        tenantCountryForStore === "CA"
+          ? "storeZip must be a Canadian postal code (e.g. A1A 1A1)."
+          : "storeZip must be 5 digits or ZIP+4."
       );
     }
 
@@ -3486,6 +3660,140 @@ exports.platformAdminSendTenantSetupAuthCallable = onCall(
   }
 );
 
+// Self-serve "send me a fresh sign-in link" path. PUBLIC (no auth) because
+// the whole point is the caller can't sign in — their original email-link
+// was single-use and is now spent (new machine, refresh-token expired, or
+// they just clicked it twice). The page calls this with whatever email
+// the prospect types.
+//
+// Anti-enumeration shape: returns { success: true } silently when no setup
+// doc exists for the email. Throttles to 1 resend per minute per email
+// when a doc does exist — this leaks one bit per email per minute, which
+// is an acceptable tradeoff for giving honest users feedback during normal
+// "I clicked too fast" interactions. We don't expose whether the doc
+// expired or was adopted — both are silent-ok like the no-doc case.
+exports.requestTenantSetupResendCallable = onCall(
+  {
+    region: "us-central1",
+    secrets: [
+      PLATFORM_NOREPLY_EMAIL,
+      PLATFORM_NOREPLY_SMTP_USER,
+      PLATFORM_NOREPLY_APP_PASSWORD,
+    ],
+  },
+  async (request) => {
+    const { email } = request.data || {};
+    const normalizedEmail = normalizeEmail(email);
+    if (!normalizedEmail) {
+      throw new HttpsError("invalid-argument", "A valid email is required.");
+    }
+
+    const db = getFirestore();
+    const docRef = tenantAccountSetupDocRef(db, normalizedEmail);
+    const snap = await docRef.get();
+
+    if (!snap.exists) {
+      logger.info("requestTenantSetupResendCallable: no doc; silent ok", {
+        email: normalizedEmail,
+      });
+      return { success: true };
+    }
+
+    const docData = snap.data() || {};
+
+    // Already adopted: setup doc was kept around past finalize for some
+    // reason (e.g., cleanup trigger hadn't run yet). Silent ok — the
+    // owner should be using the portal welcome link, not the setup one.
+    if (docData.adoptedAt || docData.status === "adopted") {
+      logger.info(
+        "requestTenantSetupResendCallable: already adopted; silent ok",
+        { email: normalizedEmail }
+      );
+      return { success: true };
+    }
+
+    // Expired: silent ok. We treat expired identical to "no doc" so a
+    // prospect can't probe the 30-day window. They need to talk to
+    // support to get re-issued.
+    const now = Date.now();
+    if (
+      docData.expiresAt &&
+      typeof docData.expiresAt.toMillis === "function" &&
+      docData.expiresAt.toMillis() < now
+    ) {
+      logger.info("requestTenantSetupResendCallable: expired; silent ok", {
+        email: normalizedEmail,
+      });
+      return { success: true };
+    }
+
+    const lastSentMs =
+      docData.lastEmailSentAt &&
+      typeof docData.lastEmailSentAt.toMillis === "function"
+        ? docData.lastEmailSentAt.toMillis()
+        : 0;
+    if (now - lastSentMs < 60_000) {
+      throw new HttpsError(
+        "resource-exhausted",
+        "Please wait a moment before requesting another link."
+      );
+    }
+
+    const fromEmail = PLATFORM_NOREPLY_EMAIL.value();
+    const smtpUser = PLATFORM_NOREPLY_SMTP_USER.value();
+    const fromPassword = PLATFORM_NOREPLY_APP_PASSWORD.value();
+    if (!fromEmail || !smtpUser || !fromPassword) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Email secrets are not configured."
+      );
+    }
+
+    const signInLink = await admin
+      .auth()
+      .generateSignInWithEmailLink(normalizedEmail, {
+        url: TENANT_SETUP_LANDING_URL,
+        handleCodeInApp: true,
+      });
+
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: smtpUser, pass: fromPassword },
+    });
+
+    const subject = "Your Cadence POS signup link (refreshed)";
+    const html = `<p>Hi,</p>
+<p>Click the link below to continue your Cadence POS account setup. The link is single-use; once you click it you'll stay signed in and can return to finish later.</p>
+<p><a href="${signInLink}">${signInLink}</a></p>
+<p>If you didn't request this, you can ignore the email.</p>
+<p>— The Cadence POS team</p>`;
+
+    try {
+      const info = await transporter.sendMail({
+        from: `"Cadence POS" <${fromEmail}>`,
+        to: normalizedEmail,
+        subject,
+        html,
+      });
+      await docRef.update({
+        lastEmailSentAt: FieldValue.serverTimestamp(),
+        emailSendCount: FieldValue.increment(1),
+      });
+      logger.info("requestTenantSetupResendCallable: sent", {
+        email: normalizedEmail,
+        messageId: info.messageId,
+      });
+      return { success: true };
+    } catch (err) {
+      logger.error("requestTenantSetupResendCallable: send failed", {
+        email: normalizedEmail,
+        error: err.message,
+      });
+      throw new HttpsError("internal", "Failed to send link.");
+    }
+  }
+);
+
 // Invoked from the tenant setup landing page after the prospect has been
 // signed in via email-link. Caller is authenticated as the prospect email but
 // has no custom claims (not a tenant yet). Looks up the setup doc, verifies
@@ -3535,6 +3843,9 @@ exports.getTenantAccountSetupCallable = onCall(
       paymentMethodCollected: !!data.paymentMethodCollected,
       stripeBillingCustomerID: data.stripeBillingCustomerID || null,
       purchasedPhoneNumber: data.purchasedPhoneNumber || null,
+      poolNumberInfo: data.poolNumberInfo || null,
+      twilioSubaccountSid: data.twilioSubaccountSid || null,
+      twilioSubaccountStatus: data.twilioSubaccountStatus || null,
     };
   }
 );
@@ -3664,10 +3975,10 @@ exports.tenantSetupCreateSetupIntentCallable = onCall(
         "This setup link has expired. Ask support to send a new one."
       );
     }
-    if (data.billingTier !== "monthly_sub") {
+    if (data.billingTier !== "monthly_sub" && data.billingTier !== "per_sale") {
       throw new HttpsError(
         "failed-precondition",
-        "Card collection at signup only applies to monthly subscription plans."
+        "Billing tier missing from setup doc — contact support."
       );
     }
 
@@ -3779,10 +4090,10 @@ exports.tenantSetupConfirmPaymentMethodCallable = onCall(
         "This setup link has expired. Ask support to send a new one."
       );
     }
-    if (data.billingTier !== "monthly_sub") {
+    if (data.billingTier !== "monthly_sub" && data.billingTier !== "per_sale") {
       throw new HttpsError(
         "failed-precondition",
-        "Card collection at signup only applies to monthly subscription plans."
+        "Billing tier missing from setup doc — contact support."
       );
     }
     if (!data.stripeBillingCustomerID) {
@@ -4167,6 +4478,103 @@ exports.tenantSetupReleaseTwilioNumberCallable = onCall(
 );
 
 // ─────────────────────────────────────────────────────────────────────────
+// tenantSetupAssignPoolNumberCallable — STUB-backed temp pool assignment.
+//
+// Called from the phone-form step when the prospect picks "temporary pool
+// number" instead of "buy permanent". Hands back a 30-day pool number from
+// twilio-pool.js (currently a stub that returns mock data). Stamps the
+// setup doc with `poolNumberInfo` so the finalize callable knows to wire
+// the tenant as `numberSource: "pool"` rather than "purchase".
+//
+// Idempotent — calling twice replaces the previous assignment without
+// double-charging the pool (in stub mode there's nothing to undo; the real
+// implementation will need to return the previous pool number first).
+// ─────────────────────────────────────────────────────────────────────────
+exports.tenantSetupAssignPoolNumberCallable = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const { callerEmail, docRef } = await loadSetupDocForCaller(request);
+
+    const { areaCode } = request.data || {};
+    if (!areaCode || typeof areaCode !== "string" || !/^\d{3}$/.test(areaCode)) {
+      throw new HttpsError(
+        "invalid-argument",
+        "areaCode is required (3 digits)."
+      );
+    }
+
+    const { assignTempNumberToTenant } = require("./twilio-pool");
+    const assigned = await assignTempNumberToTenant(callerEmail, areaCode);
+
+    const poolNumberInfo = {
+      phoneNumber: assigned.phoneNumber,
+      twilioSID: assigned.twilioSID,
+      capabilities: assigned.capabilities,
+      areaCode,
+      expiresAt: Timestamp.fromMillis(assigned.expiresAt),
+      assignedAt: FieldValue.serverTimestamp(),
+      isStub: !!assigned._stub,
+    };
+
+    await docRef.update({
+      poolNumberInfo,
+      lastUpdatedAt: FieldValue.serverTimestamp(),
+    });
+
+    logger.info("tenantSetupAssignPoolNumberCallable: assigned", {
+      email: callerEmail,
+      areaCode,
+      phoneNumber: assigned.phoneNumber,
+      isStub: !!assigned._stub,
+    });
+
+    return {
+      success: true,
+      poolNumberInfo: {
+        ...poolNumberInfo,
+        expiresAt: assigned.expiresAt,
+        assignedAt: Date.now(),
+      },
+    };
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────
+// tenantSetupReleasePoolNumberCallable — symmetric release for pool numbers.
+// Lets the prospect change their mind and pick a different area code or
+// switch to purchase/opt-out.
+// ─────────────────────────────────────────────────────────────────────────
+exports.tenantSetupReleasePoolNumberCallable = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const { callerEmail, docRef, data } = await loadSetupDocForCaller(request);
+
+    const pool = data.poolNumberInfo;
+    if (!pool || !pool.phoneNumber) {
+      return { success: true, released: false };
+    }
+
+    const { releaseTempNumber } = require("./twilio-pool");
+    try {
+      await releaseTempNumber(callerEmail, pool.phoneNumber);
+    } catch (err) {
+      logger.warn("tenantSetupReleasePoolNumberCallable: pool release failed", {
+        email: callerEmail,
+        phoneNumber: pool.phoneNumber,
+        error: (err && err.message) || String(err),
+      });
+    }
+
+    await docRef.update({
+      poolNumberInfo: FieldValue.delete(),
+      lastUpdatedAt: FieldValue.serverTimestamp(),
+    });
+
+    return { success: true, released: true };
+  }
+);
+
+// ─────────────────────────────────────────────────────────────────────────
 // Tenant adoption (signup → live tenant).
 //
 // Final step of the self-serve setup wizard. Caller is the prospect, signed
@@ -4265,6 +4673,9 @@ exports.tenantSetupFinalizeCallable = onCall(
       stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY,
       twilioSubaccountInternals.TWILIO_MASTER_ACCOUNT_SID,
       twilioSubaccountInternals.TWILIO_MASTER_AUTH_TOKEN,
+      PLATFORM_NOREPLY_EMAIL,
+      PLATFORM_NOREPLY_SMTP_USER,
+      PLATFORM_NOREPLY_APP_PASSWORD,
     ],
   },
   async (request) => {
@@ -4299,13 +4710,7 @@ exports.tenantSetupFinalizeCallable = onCall(
       );
     }
 
-    const businessName = normalizeStoreString(formData.businessName, 200);
-    if (!businessName) {
-      throw new HttpsError(
-        "failed-precondition",
-        "Business name is required (≤200 chars)."
-      );
-    }
+    // Primary owner (required for both signup types).
     const ownerFirstName = normalizeName(formData.ownerFirstName);
     const ownerLastName = normalizeName(formData.ownerLastName);
     if (!ownerFirstName || !ownerLastName) {
@@ -4321,39 +4726,20 @@ exports.tenantSetupFinalizeCallable = onCall(
         "Owner phone is required and must be a valid US/E.164 number."
       );
     }
-    const tenantStreet = normalizeStoreString(formData.tenantStreet, 200);
-    const tenantCity = normalizeStoreString(formData.tenantCity, 100);
-    const tenantStateRaw = normalizeStoreString(formData.tenantState, 2);
-    const tenantZip = normalizeZip(formData.tenantZip);
-    const tenantUnit = normalizeOptionalStoreString(formData.tenantUnit, 50);
-    if (
-      !tenantStreet ||
-      !tenantCity ||
-      !tenantStateRaw ||
-      !/^[A-Za-z]{2}$/.test(tenantStateRaw) ||
-      !tenantZip ||
-      tenantUnit === null
-    ) {
-      throw new HttpsError(
-        "failed-precondition",
-        "Tenant address is incomplete or malformed."
-      );
-    }
-    const tenantState = tenantStateRaw.toUpperCase();
 
+    const tenantCountry = normalizeCountry(formData.country) || "US";
+    const tenantCurrency = currencyForCountry(tenantCountry);
+
+    // Shop/store fields (required for both signup types — single-shop's
+    // shop section writes these directly; multi-shop's store-details form
+    // writes them).
     const storeName = normalizeStoreString(formData.storeName, 200);
-    const storeOwnerFirstName = normalizeName(formData.storeOwnerFirstName);
-    const storeOwnerLastName = normalizeName(formData.storeOwnerLastName);
-    const storeOwnerPhone = normalizePhone(formData.storeOwnerPhone);
     const storeStreet = normalizeStoreString(formData.storeStreet, 200);
     const storeCity = normalizeStoreString(formData.storeCity, 100);
     const storeStateRaw = normalizeStoreString(formData.storeState, 2);
-    const storeZip = normalizeZip(formData.storeZip);
+    const storeZip = normalizeZip(formData.storeZip, tenantCountry);
     if (
       !storeName ||
-      !storeOwnerFirstName ||
-      !storeOwnerLastName ||
-      !storeOwnerPhone ||
       !storeStreet ||
       !storeCity ||
       !storeStateRaw ||
@@ -4367,50 +4753,195 @@ exports.tenantSetupFinalizeCallable = onCall(
     }
     const storeState = storeStateRaw.toUpperCase();
 
-    const a2p = (formData && formData.a2p) || {};
-    const a2pLegalName = normalizeStoreString(a2p.legalName, 200);
-    const a2pEIN = normalizeStoreString(a2p.ein, 20);
-    const a2pWebsite = normalizeStoreString(a2p.website, 500);
-    const a2pSupportEmail = normalizeEmail(a2p.supportEmail);
-    const a2pSupportPhone = normalizePhone(a2p.supportPhone);
-    const a2pUseCase = normalizeStoreString(a2p.useCase, 2000);
+    // Store-owner fields. For single-shop the primary owner IS the store
+    // owner — the wizard collects owner info once and we copy it here.
+    // For multi-shop the per-store form supplies separate values.
+    let storeOwnerFirstName;
+    let storeOwnerLastName;
+    let storeOwnerPhone;
+    if (signupType === "single") {
+      storeOwnerFirstName = ownerFirstName;
+      storeOwnerLastName = ownerLastName;
+      storeOwnerPhone = ownerPhone;
+    } else {
+      storeOwnerFirstName = normalizeName(formData.storeOwnerFirstName);
+      storeOwnerLastName = normalizeName(formData.storeOwnerLastName);
+      storeOwnerPhone = normalizePhone(formData.storeOwnerPhone);
+      if (
+        !storeOwnerFirstName ||
+        !storeOwnerLastName ||
+        !storeOwnerPhone
+      ) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Store owner details are incomplete or malformed."
+        );
+      }
+    }
+
+    // Holding-company name. For single-shop, empty businessName means
+    // "same as shop name" — copy from storeName.
+    let businessName = normalizeStoreString(formData.businessName, 200);
+    if (!businessName) {
+      if (signupType === "single") {
+        businessName = storeName;
+      } else {
+        throw new HttpsError(
+          "failed-precondition",
+          "Business name is required (≤200 chars)."
+        );
+      }
+    }
+
+    // Holding-company address. For single-shop, empty tenant address means
+    // "same as shop address" — copy from store address.
+    const tenantUnit = normalizeOptionalStoreString(formData.tenantUnit, 50);
+    if (tenantUnit === null) {
+      throw new HttpsError(
+        "failed-precondition",
+        "Tenant unit is malformed."
+      );
+    }
+    let tenantStreet = normalizeStoreString(formData.tenantStreet, 200);
+    let tenantCity = normalizeStoreString(formData.tenantCity, 100);
+    let tenantStateRaw = normalizeStoreString(formData.tenantState, 2);
+    let tenantZip = normalizeZip(formData.tenantZip, tenantCountry);
+    if (signupType === "single") {
+      if (!tenantStreet) tenantStreet = storeStreet;
+      if (!tenantCity) tenantCity = storeCity;
+      if (!tenantStateRaw) tenantStateRaw = storeStateRaw;
+      if (!tenantZip) tenantZip = storeZip;
+    }
     if (
-      !a2pLegalName ||
-      !a2pEIN ||
-      !a2pWebsite ||
-      !a2pSupportEmail ||
-      !a2pSupportPhone ||
-      !a2pUseCase
+      !tenantStreet ||
+      !tenantCity ||
+      !tenantStateRaw ||
+      !/^[A-Za-z]{2}$/.test(tenantStateRaw) ||
+      !tenantZip
     ) {
       throw new HttpsError(
         "failed-precondition",
-        "A2P registration fields are incomplete."
+        "Tenant address is incomplete or malformed."
       );
     }
+    const tenantState = tenantStateRaw.toUpperCase();
 
-    if (billingTier === "monthly_sub" && !data.paymentMethodCollected) {
+    // Additional owners (optional). Each entry needs all four fields and
+    // a unique email vs. caller and other entries. PINs are generated
+    // server-side at finalize and emailed — no client-supplied PINs.
+    const rawAdditionalOwners = Array.isArray(formData.additionalOwners)
+      ? formData.additionalOwners
+      : [];
+    const additionalOwners = [];
+    const seenOwnerEmails = new Set([normalizeEmail(callerEmail)]);
+    for (let i = 0; i < rawAdditionalOwners.length; i++) {
+      const raw = rawAdditionalOwners[i] || {};
+      const aoFirstName = normalizeName(raw.firstName);
+      const aoLastName = normalizeName(raw.lastName);
+      const aoEmail = normalizeEmail(raw.email);
+      const aoPhone = normalizePhone(raw.phone);
+      if (!aoFirstName || !aoLastName || !aoEmail || !aoPhone) {
+        throw new HttpsError(
+          "failed-precondition",
+          `Additional owner #${i + 1} has missing or invalid fields.`
+        );
+      }
+      if (seenOwnerEmails.has(aoEmail)) {
+        throw new HttpsError(
+          "failed-precondition",
+          `Additional owner #${i + 1} email "${aoEmail}" duplicates another owner.`
+        );
+      }
+      seenOwnerEmails.add(aoEmail);
+      additionalOwners.push({
+        firstName: aoFirstName,
+        lastName: aoLastName,
+        email: aoEmail,
+        phone: aoPhone,
+      });
+    }
+
+    // SMS choice: "opt_out" | "purchase" | "pool". Determines whether
+    // we need a Twilio subaccount/number at all and which adoption path to
+    // run downstream. CA tenants are forced to opt_out — Twilio A2P 10DLC is
+    // a US-carrier regulatory regime; CA uses CASL and a separate compliance
+    // path we don't run during signup. CA owners can wire SMS later.
+    const rawSmsChoice =
+      typeof formData.smsChoice === "string" ? formData.smsChoice : null;
+    const smsChoice =
+      tenantCountry === "CA"
+        ? "opt_out"
+        : rawSmsChoice === "opt_out" || rawSmsChoice === "pool"
+          ? rawSmsChoice
+          : "purchase";
+    const smsOptOut = smsChoice === "opt_out";
+
+    // A2P registration applies to BOTH purchase and pool paths (carriers
+    // require a registered brand for any SMS-sending number, including
+    // temp pool ones). Opt-out skips it entirely.
+    let a2pLegalName = null;
+    let a2pEIN = null;
+    let a2pWebsite = null;
+    let a2pSupportEmail = null;
+    let a2pSupportPhone = null;
+    let a2pUseCase = null;
+    if (!smsOptOut) {
+      const a2p = (formData && formData.a2p) || {};
+      a2pLegalName = normalizeStoreString(a2p.legalName, 200);
+      a2pEIN = normalizeStoreString(a2p.ein, 20);
+      a2pWebsite = normalizeStoreString(a2p.website, 500);
+      a2pSupportEmail = normalizeEmail(a2p.supportEmail);
+      a2pSupportPhone = normalizePhone(a2p.supportPhone);
+      a2pUseCase = normalizeStoreString(a2p.useCase, 2000);
+      if (
+        !a2pLegalName ||
+        !a2pEIN ||
+        !a2pWebsite ||
+        !a2pSupportEmail ||
+        !a2pSupportPhone ||
+        !a2pUseCase
+      ) {
+        throw new HttpsError(
+          "failed-precondition",
+          "A2P registration fields are incomplete."
+        );
+      }
+    }
+
+    if (!data.paymentMethodCollected) {
       throw new HttpsError(
         "failed-precondition",
-        "Monthly subscription plans require a payment method on file before finalizing."
+        "A payment method on file is required before finalizing."
       );
     }
 
+    // Validate the source-specific phone-number prerequisite. Opt-out
+    // tenants finalize with no number at all.
     const purchased = data.purchasedPhoneNumber;
-    if (!purchased || !purchased.phoneNumberSid || !purchased.phoneNumber) {
-      throw new HttpsError(
-        "failed-precondition",
-        "A phone number must be purchased before finalizing."
-      );
-    }
-
-    if (
-      !data.twilioSubaccountSid ||
-      data.twilioSubaccountStatus !== "active"
-    ) {
-      throw new HttpsError(
-        "failed-precondition",
-        "Twilio subaccount is missing or not active for this signup."
-      );
+    const poolInfo = data.poolNumberInfo;
+    if (smsChoice === "purchase") {
+      if (!purchased || !purchased.phoneNumberSid || !purchased.phoneNumber) {
+        throw new HttpsError(
+          "failed-precondition",
+          "A phone number must be purchased before finalizing."
+        );
+      }
+      if (
+        !data.twilioSubaccountSid ||
+        data.twilioSubaccountStatus !== "active"
+      ) {
+        throw new HttpsError(
+          "failed-precondition",
+          "Twilio subaccount is missing or not active for this signup."
+        );
+      }
+    } else if (smsChoice === "pool") {
+      if (!poolInfo || !poolInfo.phoneNumber || !poolInfo.twilioSID) {
+        throw new HttpsError(
+          "failed-precondition",
+          "A pool number must be assigned before finalizing."
+        );
+      }
     }
 
     const db = getFirestore();
@@ -4434,6 +4965,17 @@ exports.tenantSetupFinalizeCallable = onCall(
       stores: [storeID],
     });
 
+    // numberSource on the tenant doc lets the rest of the app and the
+    // post-onboarding port-in portal know which lane the tenant is on:
+    //   "purchase" — owns a permanent number (no port-in needed)
+    //   "pool"     — has a 30-day temp number, expected to port in
+    //   "none"     — opted out of SMS entirely, can enable later
+    const numberSource = smsOptOut ? "none" : smsChoice; // "purchase" | "pool" | "none"
+    const poolExpiresAt =
+      smsChoice === "pool" && poolInfo && poolInfo.expiresAt
+        ? poolInfo.expiresAt
+        : null;
+
     const tenantRef = db.collection("tenants").doc(tenantID);
     await tenantRef.set({
       name: businessName,
@@ -4442,6 +4984,8 @@ exports.tenantSetupFinalizeCallable = onCall(
       ownerFirstName,
       ownerLastName,
       ownerPhone,
+      country: tenantCountry,
+      currency: tenantCurrency,
       street: tenantStreet,
       unit: tenantUnit,
       city: tenantCity,
@@ -4455,6 +4999,9 @@ exports.tenantSetupFinalizeCallable = onCall(
       stripeSubscriptionID: null,
       subscriptionGraceUntil: null,
       signupType,
+      smsOptOut,
+      numberSource,
+      poolNumberExpiresAt: poolExpiresAt,
       adoptedFromSetupEmail: callerEmail,
       createdAt: FieldValue.serverTimestamp(),
       createdByUID: auth.uid,
@@ -4487,96 +5034,298 @@ exports.tenantSetupFinalizeCallable = onCall(
       storeDisplayName: storeName,
       storeAddress,
       salesTaxPercent: null,
+      country: tenantCountry,
+      currency: tenantCurrency,
     });
     await storeRef.collection("settings").doc("settings").set(settingsDoc);
 
-    // Twilio adoption: migrate the auth token from the setup-keyed secret to
-    // the tenant-keyed secret, reconfigure the purchased number's webhooks
-    // for inbound routing, write tenant Twilio + per-store number + routing
-    // docs, then destroy the setup-keyed secret.
-    let twilioAdoptionError = null;
+    // Owner provisioning: stamp owner claims, write email_users docs, and
+    // email each owner (primary + additional) an auto-generated 4-digit PIN.
+    // Non-fatal: per-owner failures are captured in the returned results
+    // array — the tenant is already live by this point, so a missed PIN
+    // email is recoverable via the in-app team-management UI.
+    let ownerProvisioningResults = null;
+    let ownerProvisioningError = null;
     try {
-      const authToken = await loadSetupSubaccountAuthToken(callerEmail);
-      await storeSubaccountAuthToken(tenantID, authToken);
-
-      const setupClient = await getSetupTwilioClient(callerEmail, {
-        subaccountSid: data.twilioSubaccountSid,
-      });
-      await setupClient
-        .incomingPhoneNumbers(purchased.phoneNumberSid)
-        .update({
-          ...CURRENT_WEBHOOK_CONFIG,
-          friendlyName: `tenant-${tenantID}-store-${storeID}`,
-        });
-
-      const batch = db.batch();
-      batch.set(tenantTwilioDocRef(db, tenantID), {
-        subaccountSid: data.twilioSubaccountSid,
-        secretManagerRef: secretManagerRef(tenantID),
-        status: "active",
-        a2pBrandSid: null,
-        a2pCampaignSid: null,
-        createdAt: FieldValue.serverTimestamp(),
-        createdByUID: auth.uid,
-        createdByKind: "tenant-adoption",
-        updatedAt: FieldValue.serverTimestamp(),
-      });
-      batch.set(
-        storeNumberDocRef(db, tenantID, storeID, purchased.phoneNumberSid),
-        {
-          phoneNumber: purchased.phoneNumber,
-          phoneNumberSid: purchased.phoneNumberSid,
-          capabilities: purchased.capabilities || {
-            sms: true,
-            mms: true,
-            voice: true,
-          },
-          friendlyName: `tenant-${tenantID}-store-${storeID}`,
-          source: "purchased",
-          portStatus: null,
-          assignedAt: FieldValue.serverTimestamp(),
-          assignedByUID: auth.uid,
-          webhooks: {
-            smsUrl: CURRENT_WEBHOOK_CONFIG.smsUrl,
-            statusCallback: CURRENT_WEBHOOK_CONFIG.statusCallback,
-            voiceUrl: CURRENT_WEBHOOK_CONFIG.voiceUrl,
-            configuredAt: FieldValue.serverTimestamp(),
-          },
-        }
-      );
-      batch.set(routingDocRef(db, purchased.phoneNumber), {
+      ownerProvisioningResults = await provisionOwnersWithPins({
+        db,
         tenantID,
         storeID,
-        subaccountSid: data.twilioSubaccountSid,
-        phoneNumberSid: purchased.phoneNumberSid,
-        status: "active",
-        assignedAt: FieldValue.serverTimestamp(),
+        tenantName: businessName,
+        primaryOwner: {
+          uid: auth.uid,
+          email: callerEmail,
+          firstName: ownerFirstName,
+          lastName: ownerLastName,
+          phone: ownerPhone,
+        },
+        additionalOwners,
+        createdByUID: auth.uid,
+        buildPortalSignInLink: async (ownerEmail) =>
+          admin
+            .auth()
+            .generateSignInWithEmailLink(
+              ownerEmail,
+              buildPortalActionCodeSettings("/portal")
+            ),
+        smtpConfig: {
+          fromEmail: PLATFORM_NOREPLY_EMAIL.value(),
+          smtpUser: PLATFORM_NOREPLY_SMTP_USER.value(),
+          fromPassword: PLATFORM_NOREPLY_APP_PASSWORD.value(),
+        },
       });
-      await batch.commit();
-
-      await destroySetupSubaccountSecret(callerEmail);
     } catch (err) {
-      twilioAdoptionError = (err && err.message) || String(err);
-      logger.error("tenantSetupFinalizeCallable: Twilio adoption failed", {
-        tenantID,
-        email: callerEmail,
-        error: twilioAdoptionError,
-      });
+      ownerProvisioningError = (err && err.message) || String(err);
+      logger.error(
+        "tenantSetupFinalizeCallable: owner provisioning batch failed",
+        { tenantID, storeID, error: ownerProvisioningError }
+      );
+    }
+
+    // Twilio adoption — branches on smsChoice:
+    //   "purchase": migrate auth token from setup-keyed secret to tenant-
+    //               keyed secret, reconfigure webhooks on the bought number,
+    //               write tenant Twilio + per-store number + routing docs,
+    //               destroy the setup-keyed secret.
+    //   "pool":     similar shape but the subaccount + number came from the
+    //               platform pool. STUB-MODE: we only stamp the per-store
+    //               doc with `source: "pool"` and `expiresAt`; the real
+    //               subaccount-transfer step is deferred (see twilio-pool.js).
+    //   "opt_out":  skip entirely. Tenant has no number; they can enable
+    //               SMS later from the in-app Subscription page.
+    let twilioAdoptionError = null;
+    if (smsChoice === "purchase") {
+      try {
+        const authToken = await loadSetupSubaccountAuthToken(callerEmail);
+        await storeSubaccountAuthToken(tenantID, authToken);
+
+        const setupClient = await getSetupTwilioClient(callerEmail, {
+          subaccountSid: data.twilioSubaccountSid,
+        });
+        await setupClient
+          .incomingPhoneNumbers(purchased.phoneNumberSid)
+          .update({
+            ...CURRENT_WEBHOOK_CONFIG,
+            friendlyName: `tenant-${tenantID}-store-${storeID}`,
+          });
+
+        const batch = db.batch();
+        batch.set(tenantTwilioDocRef(db, tenantID), {
+          subaccountSid: data.twilioSubaccountSid,
+          secretManagerRef: secretManagerRef(tenantID),
+          status: "active",
+          a2pBrandSid: null,
+          a2pCampaignSid: null,
+          createdAt: FieldValue.serverTimestamp(),
+          createdByUID: auth.uid,
+          createdByKind: "tenant-adoption",
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        batch.set(
+          storeNumberDocRef(db, tenantID, storeID, purchased.phoneNumberSid),
+          {
+            phoneNumber: purchased.phoneNumber,
+            phoneNumberSid: purchased.phoneNumberSid,
+            capabilities: purchased.capabilities || {
+              sms: true,
+              mms: true,
+              voice: true,
+            },
+            friendlyName: `tenant-${tenantID}-store-${storeID}`,
+            source: "purchased",
+            portStatus: null,
+            assignedAt: FieldValue.serverTimestamp(),
+            assignedByUID: auth.uid,
+            webhooks: {
+              smsUrl: CURRENT_WEBHOOK_CONFIG.smsUrl,
+              statusCallback: CURRENT_WEBHOOK_CONFIG.statusCallback,
+              voiceUrl: CURRENT_WEBHOOK_CONFIG.voiceUrl,
+              configuredAt: FieldValue.serverTimestamp(),
+            },
+          }
+        );
+        batch.set(routingDocRef(db, purchased.phoneNumber), {
+          tenantID,
+          storeID,
+          subaccountSid: data.twilioSubaccountSid,
+          phoneNumberSid: purchased.phoneNumberSid,
+          status: "active",
+          assignedAt: FieldValue.serverTimestamp(),
+        });
+        await batch.commit();
+
+        await destroySetupSubaccountSecret(callerEmail);
+      } catch (err) {
+        twilioAdoptionError = (err && err.message) || String(err);
+        logger.error("tenantSetupFinalizeCallable: Twilio adoption failed", {
+          tenantID,
+          email: callerEmail,
+          error: twilioAdoptionError,
+        });
+      }
+    } else if (smsChoice === "pool") {
+      // STUB-mode pool adoption. The real implementation will:
+      //   1. Transfer the pool number from the pool subaccount to the
+      //      tenant's subaccount via Twilio API.
+      //   2. Migrate the pool subaccount auth-token secret over to the
+      //      tenant-keyed secret slot.
+      //   3. Reconfigure webhooks on the transferred number.
+      // For now we only stamp the per-store doc + routing entry so that
+      // the rest of the codebase can read it as "this tenant has a number,
+      // it just expires in 30 days".
+      try {
+        const expiresAtTs =
+          poolInfo.expiresAt && typeof poolInfo.expiresAt.toMillis === "function"
+            ? poolInfo.expiresAt
+            : null;
+        const batch = db.batch();
+        batch.set(tenantTwilioDocRef(db, tenantID), {
+          subaccountSid: null,
+          secretManagerRef: null,
+          status: "pool-stub",
+          a2pBrandSid: null,
+          a2pCampaignSid: null,
+          createdAt: FieldValue.serverTimestamp(),
+          createdByUID: auth.uid,
+          createdByKind: "tenant-adoption-pool-stub",
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+        batch.set(
+          storeNumberDocRef(db, tenantID, storeID, poolInfo.twilioSID),
+          {
+            phoneNumber: poolInfo.phoneNumber,
+            phoneNumberSid: poolInfo.twilioSID,
+            capabilities: poolInfo.capabilities || {
+              sms: true,
+              mms: true,
+              voice: true,
+            },
+            friendlyName: `tenant-${tenantID}-store-${storeID}-pool`,
+            source: "pool",
+            portStatus: null,
+            expiresAt: expiresAtTs,
+            assignedAt: FieldValue.serverTimestamp(),
+            assignedByUID: auth.uid,
+            isStub: !!poolInfo.isStub,
+          }
+        );
+        batch.set(routingDocRef(db, poolInfo.phoneNumber), {
+          tenantID,
+          storeID,
+          subaccountSid: null,
+          phoneNumberSid: poolInfo.twilioSID,
+          status: "active-pool-stub",
+          assignedAt: FieldValue.serverTimestamp(),
+        });
+        await batch.commit();
+      } catch (err) {
+        twilioAdoptionError = (err && err.message) || String(err);
+        logger.error("tenantSetupFinalizeCallable: pool adoption failed", {
+          tenantID,
+          email: callerEmail,
+          error: twilioAdoptionError,
+        });
+      }
     }
 
     // Persist A2P answers for the (deferred) brand/campaign submission step.
     // Stored under tenants/{tenantID}/private/a2p so the future submitter
     // function reads it directly without going through the setup doc.
-    await tenantRef.collection("private").doc("a2p").set({
-      legalName: a2pLegalName,
-      ein: a2pEIN,
-      website: a2pWebsite,
-      supportEmail: a2pSupportEmail,
-      supportPhone: a2pSupportPhone,
-      useCase: a2pUseCase,
-      brandSubmissionStatus: "pending",
-      capturedAt: FieldValue.serverTimestamp(),
-    });
+    // Skipped entirely for opt-out tenants since they have no number to
+    // register a brand for.
+    if (!smsOptOut) {
+      await tenantRef.collection("private").doc("a2p").set({
+        legalName: a2pLegalName,
+        ein: a2pEIN,
+        website: a2pWebsite,
+        supportEmail: a2pSupportEmail,
+        supportPhone: a2pSupportPhone,
+        useCase: a2pUseCase,
+        numberSource,
+        brandSubmissionStatus: "pending",
+        capturedAt: FieldValue.serverTimestamp(),
+      });
+    }
+
+    // Best-effort Stripe Billing subscription. The Payment step already
+    // attached a PM and stored stripeBillingCustomerID + stripeDefaultPaymentMethodID
+    // on the setup doc; here we re-tag that customer with the new tenantID and
+    // kick off the live $X/mo subscription so the owner walks straight into a
+    // funded account. Failure is non-fatal — the owner can enroll from the
+    // in-app BillingModalScreen instead.
+    let billingSubscriptionError = null;
+    let stripeSubscriptionID = null;
+    if (
+      billingTier === "monthly_sub" &&
+      subscriptionTierID &&
+      data.stripeBillingCustomerID &&
+      data.stripeDefaultPaymentMethodID
+    ) {
+      try {
+        const stripe = new Stripe(
+          stripeConnectInternals.STRIPE_PLATFORM_SECRET_KEY.value()
+        );
+
+        // Re-parent the platform-account customer with tenant metadata. It
+        // was created during the Payment step with only setupDocEmail; now
+        // that the tenant exists, tag it for downstream lookups.
+        await stripe.customers.update(data.stripeBillingCustomerID, {
+          name: businessName,
+          metadata: {
+            tenantID,
+            ownerUID: auth.uid,
+            source: "tenant_setup_finalize",
+          },
+        });
+
+        const tierSnap = await db
+          .collection("platform-billing-tiers")
+          .doc(subscriptionTierID)
+          .get();
+        const tier = tierSnap.exists ? tierSnap.data() || {} : {};
+        if (!tier.stripePriceID) {
+          throw new Error(
+            `Billing tier ${subscriptionTierID} has no stripePriceID.`
+          );
+        }
+
+        const subscription = await stripe.subscriptions.create({
+          customer: data.stripeBillingCustomerID,
+          items: [{ price: tier.stripePriceID }],
+          default_payment_method: data.stripeDefaultPaymentMethodID,
+          payment_behavior: "default_incomplete",
+          payment_settings: {
+            save_default_payment_method: "on_subscription",
+          },
+          expand: ["latest_invoice.payment_intent"],
+          metadata: {
+            tenantID,
+            tierID: subscriptionTierID,
+            createdByUID: auth.uid,
+            source: "tenant_setup_finalize",
+          },
+        });
+        stripeSubscriptionID = subscription.id;
+
+        await tenantRef.update({
+          subscriptionTierID,
+          stripeSubscriptionID: subscription.id,
+          stripeSubscriptionPriceID: tier.stripePriceID,
+          subscriptionStatus: subscription.status,
+          subscriptionStartedAt: FieldValue.serverTimestamp(),
+        });
+      } catch (err) {
+        billingSubscriptionError = (err && err.message) || String(err);
+        logger.error(
+          "tenantSetupFinalizeCallable: Billing subscription create failed",
+          {
+            tenantID,
+            subscriptionTierID,
+            error: billingSubscriptionError,
+          }
+        );
+      }
+    }
 
     // Best-effort Stripe Connect account. Failure here doesn't block the
     // adoption — the owner can retry via the in-app Connect onboarding flow.
@@ -4586,7 +5335,7 @@ exports.tenantSetupFinalizeCallable = onCall(
       city: tenantCity,
       state: tenantState,
       postal_code: tenantZip,
-      country: "US",
+      country: tenantCountry,
     };
     let stripeAccountID = null;
     let connectAccountError = null;
@@ -4603,6 +5352,7 @@ exports.tenantSetupFinalizeCallable = onCall(
         mcc: "5940",
         companyPhone: ownerPhone,
         companyAddress: stripeAddress,
+        country: tenantCountry,
         representative: {
           firstName: ownerFirstName,
           lastName: ownerLastName,
@@ -4623,17 +5373,72 @@ exports.tenantSetupFinalizeCallable = onCall(
     }
 
     // CRITICAL adoption contract: stamp the setup doc with the literal string
-    // "adopted" BEFORE deleting it. The setup-cleanup trigger matches this
-    // exact string to skip closing the live, tenant-owned subaccount.
-    await docRef.update({
-      twilioSubaccountStatus: "adopted",
+    // "adopted" BEFORE deleting it ONLY when the purchase path actually
+    // adopted a subaccount. For pool/opt-out the prospect may have created
+    // a setup subaccount earlier in the flow (started "buy", switched mid-
+    // way) — we want the cleanup trigger to close it on delete, not skip it.
+    const adoptionStamp = {
       adoptedAt: FieldValue.serverTimestamp(),
       adoptedTenantID: tenantID,
       adoptedStoreID: storeID,
       adoptedByUID: auth.uid,
-    });
+      adoptedSmsChoice: smsChoice,
+    };
+    if (smsChoice === "purchase" && !twilioAdoptionError) {
+      adoptionStamp.twilioSubaccountStatus = "adopted";
+    }
+    await docRef.update(adoptionStamp);
 
     await docRef.delete();
+
+    // Post-adoption portal welcome email. Body branches on smsChoice
+    // (purchase / pool-with-expiry banner / opt-out). Non-fatal: a failure
+    // here doesn't roll back the live tenant — the owner can request a
+    // fresh link from support. Logged loudly so alerting catches a bad
+    // SMTP config.
+    let portalWelcomeEmailError = null;
+    try {
+      const poolExpiresAtMs =
+        smsChoice === "pool" &&
+        poolInfo &&
+        poolInfo.expiresAt &&
+        typeof poolInfo.expiresAt.toMillis === "function"
+          ? poolInfo.expiresAt.toMillis()
+          : null;
+      const result = await sendPortalWelcomeEmail({
+        ownerEmail: callerEmail,
+        tenantName: businessName,
+        smsChoice,
+        poolExpiresAtMs,
+      });
+      logger.info("tenantSetupFinalizeCallable: portal welcome email sent", {
+        tenantID,
+        ownerEmail: callerEmail,
+        messageId: result.messageId,
+      });
+    } catch (err) {
+      portalWelcomeEmailError = (err && err.message) || String(err);
+      logger.error(
+        "tenantSetupFinalizeCallable: portal welcome email failed",
+        {
+          tenantID,
+          ownerEmail: callerEmail,
+          error: portalWelcomeEmailError,
+        }
+      );
+    }
+
+    const ownerProvisioningSummary = ownerProvisioningResults
+      ? ownerProvisioningResults.map((r) => ({
+          email: r.email,
+          role: r.role,
+          authCreated: r.authCreated,
+          claimsSet: r.claimsSet,
+          emailUserDocWritten: r.emailUserDocWritten,
+          emailSent: r.emailSent,
+          error: r.error,
+        }))
+      : null;
 
     logger.info("tenantSetupFinalizeCallable: tenant adopted", {
       tenantID,
@@ -4642,20 +5447,35 @@ exports.tenantSetupFinalizeCallable = onCall(
       ownerEmail: callerEmail,
       billingTier,
       subscriptionTierID,
+      smsChoice,
+      numberSource,
       stripeAccountID,
+      stripeSubscriptionID,
       connectAccountError,
       representativeError,
       twilioAdoptionError,
+      billingSubscriptionError,
+      portalWelcomeEmailError,
+      ownerProvisioningError,
+      ownerProvisioningSummary,
+      additionalOwnersCount: additionalOwners.length,
     });
 
     return {
       success: true,
       tenantID,
       storeID,
+      smsChoice,
+      numberSource,
       stripeAccountID,
+      stripeSubscriptionID,
       connectAccountError,
       representativeError,
       twilioAdoptionError,
+      billingSubscriptionError,
+      portalWelcomeEmailError,
+      ownerProvisioningError,
+      ownerProvisioningSummary,
     };
   }
 );

@@ -417,6 +417,7 @@ function createPrintBase(workorder, customer, salesTaxPercent, context) {
   r.shopContactBlurb = _settings.shopContactBlurb || SHOP_CONTACT_BLURB;
   r.thankYouBlurb = _settings.thankYouBlurb || THANK_YOU_BLURB;
   r.intakeBlurb = _settings.intakeBlurb || INTAKE_BLURB;
+  r.taxRegistrationNumber = _settings.taxRegistrationNumber || "";
   r.customerContact = formatPhoneForDisplay(customer.customerCell) || formatPhoneForDisplay(customer.customerLandline) || customer.email;
 
   delete r.changeLog;
@@ -464,6 +465,7 @@ var printBuilder = {
     receipt.shopName = _settings.storeInfo?.displayName || SHOP_NAME;
     receipt.shopContactBlurb = _settings.shopContactBlurb || SHOP_CONTACT_BLURB;
     receipt.thankYouBlurb = _settings.thankYouBlurb || THANK_YOU_BLURB;
+    receipt.taxRegistrationNumber = _settings.taxRegistrationNumber || "";
     receipt.salesTaxPercent = salesTaxPercent;
     receipt.taxFree = !!workorder?.taxFree;
 
@@ -699,6 +701,7 @@ var printBuilder = {
     receipt.shopName = _settings.storeInfo?.displayName || SHOP_NAME;
     receipt.shopContactBlurb = _settings.shopContactBlurb || SHOP_CONTACT_BLURB;
     receipt.thankYouBlurb = _settings.thankYouBlurb || THANK_YOU_BLURB;
+    receipt.taxRegistrationNumber = _settings.taxRegistrationNumber || "";
 
     // User who printed
     var userFirst = capitalizeFirstLetterOfString((currentUser?.first || "").trim());
@@ -773,6 +776,7 @@ var printBuilder = {
     receipt.shopName = _settings.storeInfo?.displayName || SHOP_NAME;
     receipt.shopContactBlurb = _settings.shopContactBlurb || SHOP_CONTACT_BLURB;
     receipt.thankYouBlurb = _settings.thankYouBlurb || THANK_YOU_BLURB;
+    receipt.taxRegistrationNumber = _settings.taxRegistrationNumber || "";
 
     receipt.first = capitalizeFirstLetterOfString((customer?.first || "").trim());
     receipt.last = capitalizeFirstLetterOfString((customer?.last || "").trim());
@@ -807,6 +811,7 @@ var printBuilder = {
     receipt.shopName = _settings.storeInfo?.displayName || SHOP_NAME;
     receipt.shopContactBlurb = _settings.shopContactBlurb || SHOP_CONTACT_BLURB;
     receipt.thankYouBlurb = _settings.thankYouBlurb || THANK_YOU_BLURB;
+    receipt.taxRegistrationNumber = _settings.taxRegistrationNumber || "";
     receipt.salesTaxPercent = _settings.salesTaxPercent || 0;
     receipt.taxFree = !!giftcardObj.taxFree;
 

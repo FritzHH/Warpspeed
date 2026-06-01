@@ -103,12 +103,24 @@ export function TenantSetupA2pForm({
     const warnings = [];
     if (finalizeResult.twilioAdoptionError) {
       warnings.push(
-        "Texting setup couldn't finish automatically. Your account is live; contact support to enable messaging."
+        <>
+          Texting setup couldn't finish automatically. Your account is live;
+          email{" "}
+          <a href="mailto:support@retailsoftsystems.com">
+            support@retailsoftsystems.com
+          </a>{" "}
+          to enable messaging.
+        </>
       );
     }
     if (finalizeResult.connectAccountError) {
       warnings.push(
         "Stripe payments setup didn't complete. You can finish it from your account dashboard once you sign in."
+      );
+    }
+    if (finalizeResult.billingSubscriptionError) {
+      warnings.push(
+        "Your monthly subscription didn't start automatically. Your card is on file — finish enrollment from the Billing page after sign-in."
       );
     }
     return (

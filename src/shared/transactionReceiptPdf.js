@@ -28,6 +28,12 @@ function addShopHeader(doc, y, data, centerX) {
     y += 10;
   });
 
+  let taxReg = (data.taxRegistrationNumber || "").trim();
+  if (taxReg) {
+    doc.text(taxReg, centerX, y, { align: "center" });
+    y += 10;
+  }
+
   return y + 4;
 }
 

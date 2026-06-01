@@ -2,7 +2,12 @@
 import { useState, useRef, memo } from "react";
 import { Button, CheckBox, TextInput, Image } from "../../../../dom_components";
 import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../../../styles";
-import { usdTypeMask, formatCurrencyDisp } from "../../../../utils";
+import {
+  usdTypeMask,
+  formatCurrencyDisp,
+  roundCashCentsForCurrency,
+} from "../../../../utils";
+import { useSettingsStore } from "../../../../stores";
 import { buildCashTransaction } from "./newCheckoutUtils";
 import { takeId, getId } from "../../../../idPool";
 import { dlog, DCAT } from "./checkoutDebugLog";
@@ -33,11 +38,18 @@ export const CashPayment = memo(function CashPayment({
   const autoLoadedRef = useRef(false);
   const prevAmountRef = useRef(amountLeftToPay);
 
+  // CAD cash payments round to nearest nickel (no pennies in Canada). USD
+  // and any unknown currency stay exact. Card/check paths are unaffected —
+  // only physical cash needs rounding.
+  const currency = useSettingsStore.getState().getSettings()?.currency || "USD";
+  const roundedLeftToPay = roundCashCentsForCurrency(amountLeftToPay, currency);
+  const isCadCash = (currency || "").toUpperCase() === "CAD";
+
   if (amountLeftToPay > 0 && !autoLoadedRef.current && isVisible) {
     autoLoadedRef.current = true;
     prevAmountRef.current = amountLeftToPay;
-    _setPayAmountDisp(formatCurrencyDisp(amountLeftToPay));
-    _setPayAmount(amountLeftToPay);
+    _setPayAmountDisp(formatCurrencyDisp(roundedLeftToPay));
+    _setPayAmount(roundedLeftToPay);
     if (!hasReaders) {
       setTimeout(() => tenderInputRef.current?.focus(), 100);
     }
@@ -46,8 +58,8 @@ export const CashPayment = memo(function CashPayment({
   if (autoLoadedRef.current && amountLeftToPay !== prevAmountRef.current) {
     prevAmountRef.current = amountLeftToPay;
     if (amountLeftToPay > 0) {
-      _setPayAmountDisp(formatCurrencyDisp(amountLeftToPay));
-      _setPayAmount(amountLeftToPay);
+      _setPayAmountDisp(formatCurrencyDisp(roundedLeftToPay));
+      _setPayAmount(roundedLeftToPay);
     } else {
       _setPayAmountDisp("");
       _setPayAmount(0);
@@ -58,14 +70,16 @@ export const CashPayment = memo(function CashPayment({
 
   function handlePayAmountChange(val) {
     let result = usdTypeMask(val, { withDollar: false });
-    dlog(DCAT.INPUT, "payAmount_change", "CashPayment", { cents: result.cents, capped: result.cents > amountLeftToPay });
-    if (result.cents > amountLeftToPay) {
-      _setPayAmountDisp(formatCurrencyDisp(amountLeftToPay));
-      _setPayAmount(amountLeftToPay);
+    let cents = roundCashCentsForCurrency(result.cents, currency);
+    dlog(DCAT.INPUT, "payAmount_change", "CashPayment", { cents, capped: cents > roundedLeftToPay });
+    if (cents > roundedLeftToPay) {
+      _setPayAmountDisp(formatCurrencyDisp(roundedLeftToPay));
+      _setPayAmount(roundedLeftToPay);
       return;
     }
-    _setPayAmountDisp(result.display);
-    _setPayAmount(result.cents);
+    // Snap to nickel for CAD; keep raw display for USD.
+    _setPayAmountDisp(isCadCash ? formatCurrencyDisp(cents) : result.display);
+    _setPayAmount(cents);
   }
 
   function handleTenderAmountChange(val) {
@@ -81,7 +95,10 @@ export const CashPayment = memo(function CashPayment({
       _setStatusMessage("Enter a payment amount");
       return;
     }
-    if (sPayAmount > amountLeftToPay) {
+    // CAD cash rounding can push the rounded pay amount above the raw
+    // amountLeftToPay (e.g., $1.03 bill rounds up to $1.05 due). Compare to
+    // the rounded ceiling so rounding-up doesn't trip the cap.
+    if (sPayAmount > roundedLeftToPay) {
       _setStatusMessage("Amount exceeds balance due");
       return;
     }
@@ -187,8 +204,13 @@ export const CashPayment = memo(function CashPayment({
         </div>
         <div className={styles.valuesCol}>
           <span className={styles.balanceText} style={{ color: C.text }}>
-            {"$ " + formatCurrencyDisp(amountLeftToPay)}
+            {"$ " + formatCurrencyDisp(roundedLeftToPay)}
           </span>
+          {isCadCash && roundedLeftToPay !== amountLeftToPay && (
+            <span style={{ color: C.textMuted, fontSize: 11, marginTop: 2 }}>
+              {`Cash rounded from $${formatCurrencyDisp(amountLeftToPay)} (nearest 5¢)`}
+            </span>
+          )}
           <div
             className={styles.payAmountBox}
             style={{

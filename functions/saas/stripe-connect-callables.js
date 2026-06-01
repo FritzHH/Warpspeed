@@ -102,6 +102,7 @@ async function createAccountInternal({
   mcc,
   companyPhone,
   companyAddress,
+  country,
   representative,
   fullBakeForTest = false,
 }) {
@@ -109,6 +110,7 @@ async function createAccountInternal({
     tenantID,
     email,
     byUID,
+    country,
     fullBakeForTest,
   });
 
@@ -119,6 +121,7 @@ async function createAccountInternal({
     mcc,
     companyPhone,
     companyAddress,
+    country,
     fullBakeForTest,
   });
 
@@ -306,12 +309,26 @@ exports.stripeConnectAccountCreate = onCall(
     assertTenantMatch(auth, tenantID);
     assertPrivilege(auth, "owner");
 
+    const db = getFirestore();
+    let country = "US";
+    try {
+      const tenantSnap = await db.collection("tenants").doc(tenantID).get();
+      const tenantCountry = tenantSnap.exists ? tenantSnap.data()?.country : null;
+      if (tenantCountry) country = tenantCountry;
+    } catch (err) {
+      logger.warn("stripeConnectAccountCreate: tenant country lookup failed", {
+        tenantID,
+        error: err && err.message ? err.message : String(err),
+      });
+    }
+
     return createAccountInternal({
       secret: STRIPE_PLATFORM_SECRET_KEY,
-      db: getFirestore(),
+      db,
       tenantID,
       email,
       businessName,
+      country,
       byUID: auth.uid,
     });
   }

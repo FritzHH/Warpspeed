@@ -1200,6 +1200,127 @@ body {
   line-height: 1.4;
 }
 
+.tierOption:focus-visible {
+  outline: 2px solid var(--accent, var(--text));
+  outline-offset: 2px;
+}
+
+.tierOptionDisabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* Calculate-cost button on the per-sale tier card. Subtle outlined style so
+   it reads as a secondary action and doesn't compete with the radio
+   selection itself. */
+.tierCalcButton {
+  margin-top: 12px;
+  align-self: flex-start;
+  background-color: transparent;
+  border: 1px solid var(--accent, var(--border));
+  color: var(--accent, var(--text));
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.tierCalcButton:hover {
+  background-color: var(--accent-soft, var(--surface-alt));
+}
+
+.tierCalcBackdrop {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.tierCalcModal {
+  background-color: var(--surface);
+  border-radius: 12px;
+  padding: 24px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+  display: flex;
+  flex-direction: column;
+}
+
+.tierCalcTitle {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 4px 0;
+}
+
+.tierCalcSubtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 0 0 18px 0;
+}
+
+.tierCalcInputRow {
+  position: relative;
+  margin-bottom: 16px;
+}
+
+.tierCalcInputDollar {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.tierCalcInput {
+  padding-left: 24px;
+}
+
+.tierCalcResult {
+  background-color: var(--accent-soft, var(--surface-alt));
+  border: 1px solid var(--accent, var(--border));
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.tierCalcResultLabel {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.tierCalcResultValue {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.tierCalcResultNote {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 6px;
+}
+
+.tierCalcFooter {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0 0 18px 0;
+  line-height: 1.4;
+}
+
 @media (max-width: 540px) {
   .tierPicker {
     grid-template-columns: 1fr;

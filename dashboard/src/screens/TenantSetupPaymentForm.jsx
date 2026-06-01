@@ -63,6 +63,8 @@ export function TenantSetupPaymentForm({
   const [intentError, setIntentError] = useState("");
   const [tierSaving, setTierSaving] = useState(false);
   const [tierError, setTierError] = useState("");
+  const [calcOpen, setCalcOpen] = useState(false);
+  const [calcSales, setCalcSales] = useState("");
 
   async function handleSelectTier(nextTier) {
     if (tierSaving || nextTier === billingTier) return;
@@ -78,6 +80,14 @@ export function TenantSetupPaymentForm({
       setTierSaving(false);
     }
   }
+
+  // Per-sale cost calculator: 0.5% of monthly sales with a $10/month floor.
+  // Strip non-numeric chars (commas, $, etc.) so the user can paste freely.
+  const calcSalesNum =
+    parseFloat((calcSales || "").replace(/[^0-9.]/g, "")) || 0;
+  const calcPercentCost = calcSalesNum * 0.005;
+  const calcMonthlyCost = Math.max(10, calcPercentCost);
+  const calcMinApplied = calcSalesNum > 0 && calcPercentCost < 10;
 
   async function handleBack() {
     setSaveError("");
@@ -145,16 +155,28 @@ export function TenantSetupPaymentForm({
           {["per_sale", "monthly_sub"].map((tier) => {
             const copy = BILLING_TIER_COPY[tier];
             const selected = billingTier === tier;
+            // div role="button" instead of <button> so the per-sale card can
+            // host a nested Calculate-cost <button> without invalid markup.
             return (
-              <button
+              <div
                 key={tier}
-                type="button"
+                role="button"
+                tabIndex={tierSaving ? -1 : 0}
+                aria-pressed={selected}
+                aria-disabled={tierSaving}
                 className={
-                  "tierOption" + (selected ? " tierOptionSelected" : "")
+                  "tierOption" +
+                  (selected ? " tierOptionSelected" : "") +
+                  (tierSaving ? " tierOptionDisabled" : "")
                 }
                 onClick={() => handleSelectTier(tier)}
-                disabled={tierSaving}
-                aria-pressed={selected}
+                onKeyDown={(e) => {
+                  if (tierSaving) return;
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    handleSelectTier(tier);
+                  }
+                }}
               >
                 <div className="tierOptionHeader">
                   <div className="tierOptionBadge">{copy.badge}</div>
@@ -164,11 +186,93 @@ export function TenantSetupPaymentForm({
                 </div>
                 <div className="tierOptionLabel">{copy.label}</div>
                 <div className="tierOptionDetail">{copy.detail}</div>
-              </button>
+                {tier === "per_sale" && (
+                  <button
+                    type="button"
+                    className="tierCalcButton"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setCalcOpen(true);
+                    }}
+                  >
+                    Calculate cost
+                  </button>
+                )}
+              </div>
             );
           })}
         </div>
         {tierError && <div className="errorText">{tierError}</div>}
+
+        {calcOpen && (
+          <div
+            className="tierCalcBackdrop"
+            onClick={() => setCalcOpen(false)}
+          >
+            <div
+              className="tierCalcModal"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="tier-calc-title"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h2 id="tier-calc-title" className="tierCalcTitle">
+                Per-sale cost estimate
+              </h2>
+              <p className="tierCalcSubtitle">
+                Enter your average monthly sales to see what you'd pay.
+              </p>
+
+              <label className="fieldLabel" htmlFor="tier-calc-sales">
+                Monthly sales
+              </label>
+              <div className="tierCalcInputRow">
+                <span className="tierCalcInputDollar">$</span>
+                <input
+                  id="tier-calc-sales"
+                  type="text"
+                  inputMode="decimal"
+                  className="textInput tierCalcInput"
+                  value={calcSales}
+                  onChange={(e) => setCalcSales(e.target.value)}
+                  placeholder="0.00"
+                  autoFocus
+                />
+              </div>
+
+              {calcSales.trim().length > 0 && (
+                <div className="tierCalcResult">
+                  <div className="tierCalcResultLabel">
+                    Estimated monthly cost
+                  </div>
+                  <div className="tierCalcResultValue">
+                    ${calcMonthlyCost.toFixed(2)}
+                  </div>
+                  {calcMinApplied && (
+                    <div className="tierCalcResultNote">
+                      $10/month minimum applied (0.5% of $
+                      {calcSalesNum.toFixed(2)} ={" "}
+                      ${calcPercentCost.toFixed(2)})
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <p className="tierCalcFooter">
+                0.5% of monthly sales, with a $10/month minimum. Billed twice
+                per month to the card on file.
+              </p>
+
+              <button
+                type="button"
+                className="primaryButton"
+                onClick={() => setCalcOpen(false)}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
 
         <div className="sectionHeading">Payment method</div>
 

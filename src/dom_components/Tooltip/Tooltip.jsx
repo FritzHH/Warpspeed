@@ -76,6 +76,7 @@ export const Tooltip = ({
   offsetY = 0,
   delayDuration = 400,
   disabled = false,
+  trigger = "hover",
   "aria-describedby": ariaDescribedBy,
 }) => {
   const wrapRef = useRef(null);
@@ -106,6 +107,12 @@ export const Tooltip = ({
     showTimerRef.current = setTimeout(() => setVisible(true), delayDuration);
   }, [text, disabled, delayDuration]);
 
+  const handleFocus = useCallback((e) => {
+    const t = e.target;
+    if (t && typeof t.matches === "function" && !t.matches(":focus-visible")) return;
+    showTooltip();
+  }, [showTooltip]);
+
   const hideTooltip = useCallback(() => {
     clearTimeout(showTimerRef.current);
     setVisible(false);
@@ -113,14 +120,26 @@ export const Tooltip = ({
   }, []);
 
   const handlePointerDown = useCallback(() => {
+    if (trigger === "click") {
+      if (!text || disabled) return;
+      setVisible((v) => {
+        if (v) {
+          setPos({ top: 0, left: 0, ready: false });
+          return false;
+        }
+        return true;
+      });
+      return;
+    }
     suppressShowRef.current = true;
     hideTooltip();
-  }, [hideTooltip]);
+  }, [trigger, text, disabled, hideTooltip]);
 
   const handlePointerLeave = useCallback(() => {
+    if (trigger === "click") return;
     suppressShowRef.current = false;
     hideTooltip();
-  }, [hideTooltip]);
+  }, [trigger, hideTooltip]);
 
   useEffect(() => () => clearTimeout(showTimerRef.current), []);
 
@@ -154,13 +173,14 @@ export const Tooltip = ({
   // until the pointer leaves and re-enters the trigger.
   useEffect(() => {
     if (!visible) return;
-    const onGlobalDown = () => {
+    const onGlobalDown = (e) => {
+      if (trigger === "click" && wrapRef.current?.contains(e.target)) return;
       suppressShowRef.current = true;
       hideTooltip();
     };
     document.addEventListener("pointerdown", onGlobalDown, true);
     return () => document.removeEventListener("pointerdown", onGlobalDown, true);
-  }, [visible, hideTooltip]);
+  }, [visible, hideTooltip, trigger]);
 
   if (!text || disabled) {
     return (
@@ -183,11 +203,11 @@ export const Tooltip = ({
     <>
       <span
         ref={wrapRef}
-        onPointerEnter={showTooltip}
-        onPointerLeave={handlePointerLeave}
+        onPointerEnter={trigger === "hover" ? showTooltip : undefined}
+        onPointerLeave={trigger === "hover" ? handlePointerLeave : undefined}
         onPointerDown={handlePointerDown}
-        onFocus={showTooltip}
-        onBlur={hideTooltip}
+        onFocus={trigger === "hover" ? handleFocus : undefined}
+        onBlur={trigger === "hover" ? hideTooltip : undefined}
         style={{ display: "contents", ...style }}
         aria-describedby={ariaDescribedBy}
       >

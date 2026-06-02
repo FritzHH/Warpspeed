@@ -356,6 +356,14 @@ export function TenantDetailScreen() {
   const [feeBusy, setFeeBusy] = useState(false);
   const [feeError, setFeeError] = useState("");
 
+  // SMS markup multiplier override. Empty string = clear override (inherit
+  // platform default of 1.05). Applies to both per_sale + monthly_sub since
+  // both bill SMS per-text.
+  const [smsMarkupEditing, setSmsMarkupEditing] = useState(false);
+  const [smsMarkupDraft, setSmsMarkupDraft] = useState("");
+  const [smsMarkupBusy, setSmsMarkupBusy] = useState(false);
+  const [smsMarkupError, setSmsMarkupError] = useState("");
+
   // Tier-change state. tierEditing toggles the picker, tierDraft holds the
   // selected tierID, tiers caches the active-tier roster for the dropdown.
   const [tierEditing, setTierEditing] = useState(false);
@@ -717,6 +725,49 @@ export function TenantDetailScreen() {
       setFeeError(code ? `${code}: ${msg}` : msg);
     } finally {
       setFeeBusy(false);
+    }
+  };
+
+  const openSmsMarkupEdit = () => {
+    const current = tenant?.billing?.smsMarkupMultiplierOverride;
+    setSmsMarkupDraft(
+      typeof current === "number" ? String(current) : ""
+    );
+    setSmsMarkupError("");
+    setSmsMarkupEditing(true);
+  };
+
+  const cancelSmsMarkupEdit = () => {
+    if (smsMarkupBusy) return;
+    setSmsMarkupEditing(false);
+    setSmsMarkupError("");
+  };
+
+  const saveSmsMarkup = async () => {
+    const trimmed = smsMarkupDraft.trim();
+    // Empty input → clear the override (callable accepts "" to delete).
+    if (trimmed !== "") {
+      const num = Number(trimmed);
+      if (!Number.isFinite(num) || num <= 0 || num > 5) {
+        setSmsMarkupError("Enter a multiplier between 0 (exclusive) and 5, or leave blank to inherit the platform default.");
+        return;
+      }
+    }
+    setSmsMarkupBusy(true);
+    setSmsMarkupError("");
+    try {
+      await updateTenantBillingCallable({
+        tenantID,
+        smsMarkupMultiplierOverride: trimmed === "" ? "" : Number(trimmed),
+      });
+      await loadTenant();
+      setSmsMarkupEditing(false);
+    } catch (err) {
+      const code = err?.code || "";
+      const msg = err?.message || "Failed to update SMS markup.";
+      setSmsMarkupError(code ? `${code}: ${msg}` : msg);
+    } finally {
+      setSmsMarkupBusy(false);
     }
   };
 
@@ -2476,6 +2527,87 @@ export function TenantDetailScreen() {
             <p className="placeholderText">
               Unknown billing model: <code>{String(model)}</code>.
             </p>
+          );
+        })()}
+
+        {tenant?.billing?.model && (() => {
+          const override = tenant?.billing?.smsMarkupMultiplierOverride;
+          const platformDefault = tenant?.billing?.platformSmsMarkupMultiplier;
+          const effective = typeof override === "number"
+            ? override
+            : (typeof platformDefault === "number" ? platformDefault : 1.05);
+          const inheriting = typeof override !== "number";
+          return (
+            <>
+              <div className="resultRow">
+                <span className="resultLabel">SMS markup multiplier</span>
+                <span className="resultValue">
+                  {effective.toFixed(3)}×
+                  {inheriting ? (
+                    <> <span className="badge badge-info">platform default</span></>
+                  ) : (
+                    <> <span className="badge badge-warn">override</span></>
+                  )}
+                  {!smsMarkupEditing && (
+                    <>
+                      {" "}
+                      <button
+                        type="button"
+                        className="linkButton"
+                        onClick={openSmsMarkupEdit}
+                      >
+                        edit
+                      </button>
+                    </>
+                  )}
+                </span>
+              </div>
+              {smsMarkupEditing && (
+                <div className="inlineConfirm">
+                  <label className="fieldLabel">
+                    SMS markup multiplier override
+                  </label>
+                  <input
+                    className="textInput"
+                    type="number"
+                    min="0"
+                    max="5"
+                    step="0.01"
+                    placeholder="leave blank to inherit"
+                    value={smsMarkupDraft}
+                    onChange={(e) => setSmsMarkupDraft(e.target.value)}
+                    disabled={smsMarkupBusy}
+                  />
+                  <p className="helperText">
+                    Multiplier applied to Twilio's wholesale price per text.
+                    1.0 = pass-through, 1.05 = 5% markup (platform default),
+                    2.0 = 2× markup. Leave blank to clear the override and
+                    inherit the platform default.
+                  </p>
+                  <div className="buttonRow">
+                    <button
+                      type="button"
+                      className="secondaryButton"
+                      onClick={cancelSmsMarkupEdit}
+                      disabled={smsMarkupBusy}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      className="primaryButton"
+                      onClick={saveSmsMarkup}
+                      disabled={smsMarkupBusy}
+                    >
+                      {smsMarkupBusy ? "Saving…" : "Save"}
+                    </button>
+                  </div>
+                  {smsMarkupError && (
+                    <div className="errorText">{smsMarkupError}</div>
+                  )}
+                </div>
+              )}
+            </>
           );
         })()}
 

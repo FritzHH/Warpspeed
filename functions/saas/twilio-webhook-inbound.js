@@ -34,6 +34,7 @@ const {
 } = common;
 
 const INBOUND_TOPIC = "twilio-inbound";
+const SMS_BILLING_TOPIC = "sms-billing-events";
 
 let _pubsub = null;
 function pubsub() {
@@ -213,6 +214,42 @@ exports.handler = onRequest(
       to: toNumber,
       numMedia: parseInt(params.NumMedia || "0", 10),
     });
+
+    // ── Publish to SMS billing topic ──
+    // Inbound is billable (per locked decision); the stamper dedupes by
+    // messageSid + applies the spam-filter hook + fetches the authoritative
+    // Twilio Price. Publishing here (rather than chaining off the inbound
+    // subscriber) keeps the two pipelines independent — a stuck inbound
+    // subscriber doesn't block billing, and vice versa. Twilio's inbound
+    // webhook payload does NOT include Price, so the stamper fetches it
+    // from the Message resource.
+    try {
+      await pubsub()
+        .topic(SMS_BILLING_TOPIC)
+        .publishMessage({
+          json: {
+            messageSid,
+            tenantID,
+            storeID,
+            direction: "inbound",
+            from: fromNumber,
+            to: toNumber,
+            subaccountSid: subaccountSid || accountSid || null,
+            duringSuspension,
+            publishedAt: new Date().toISOString(),
+          },
+        });
+    } catch (err) {
+      logger.error("twilioInboundWebhook: sms-billing publish failed", {
+        messageSid,
+        tenantID,
+        error: err && err.message,
+      });
+      // Don't 500 — the inbound message itself was already published; we'd
+      // rather process the message and lose the billing stamp (admin can
+      // reconcile) than retry the whole flow and risk double-delivery to
+      // the inbound subscriber.
+    }
 
     res.set("Content-Type", "text/xml");
     return res.status(200).send(EMPTY_TWIML);

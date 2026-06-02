@@ -396,6 +396,15 @@ export const SETTINGS_OBJ = {
   useCardFee: false,
   cardFeePercent: 3,
   cardFeeRefund: false,
+  // Per-vendor store config (home warehouse, account number, etc.). Keyed by
+  // VENDOR_CATALOGS[].id. The ordering screen reads
+  // settings.vendors[vendorID].warehouseCode to know which warehouse subcollection
+  // to query against /vendor_catalogs/{vendorID}/inventory_by_warehouse/{code}.
+  vendors: {},
+  // Pointer to the open vendor order that incoming scans get appended to.
+  // Exactly one active order per store; setting this clears the previous.
+  // Empty string = no active order.
+  activeVendorOrderID: "",
   allowStaffPhoneReply: true,
   lockScreenWhenUserLogsOut: false,
   useFacialRecognition: false,

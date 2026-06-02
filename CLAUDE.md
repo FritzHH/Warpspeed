@@ -65,6 +65,16 @@ firebase deploy --only functions:functionName1,functions:functionName2
 
 ---
 
+## TODO management
+
+When the user says "make a todo" (or equivalent — "add a todo", "put this on the todo list", etc.), append the item to `TODO.md` at the project root. Keep the entry short: one bullet with enough context to be actionable, placed under the most appropriate existing section (Known Bugs, Paused Features, Planned Features, Pending Multi-Phase Plans, etc.). Create a new section only if no existing one fits.
+
+**Personal TODOs — the "my" keyword.** When the user's phrasing includes the keyword **"my"** ("add to my todos", "my todo:", "put this on my list", etc.), the item goes under the `## My Personal TODOs` section at the top of `TODO.md` — NOT routed to one of the project sections. These are the user's personal ideas/reminders and live together regardless of topic.
+
+If the TODO needs more context than fits in a bullet (multi-phase plans, schema designs, decision rationale, file/line inventories), put a short pointer entry in `TODO.md` and back it up with a dedicated `.md` file alongside it at the project root. Link the pointer to the backing file by name, matching the pattern existing entries already use (`Source: filename.md`).
+
+---
+
 # Agent behavior
 
 Before acting on any request:

@@ -1,0 +1,200 @@
+.outerBox {
+  width: 97%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.section {
+  width: 100%;
+  border: 1px solid var(--border-default);
+  background-color: var(--surface-raised);
+  border-radius: var(--radius-row);
+  padding: 15px;
+  margin-bottom: 16px;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.sectionTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-default);
+  margin-bottom: 12px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.openOrderingButton {
+  align-self: stretch;
+  padding: 14px 18px;
+  background-color: var(--accent);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: var(--radius-control);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.openOrderingButton:hover {
+  filter: brightness(1.05);
+}
+
+.reconcileButton {
+  align-self: stretch;
+  margin-top: 10px;
+  padding: 12px 18px;
+  background-color: var(--surface-base);
+  color: var(--text-default);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.reconcileButton:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.vendorList {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.vendorRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border: 1px solid var(--border-default);
+  background-color: var(--surface-base);
+  border-radius: var(--radius-row);
+  gap: 12px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.vendorRowLocked {
+  background-color: var(--surface-accent-muted);
+}
+
+.vendorLeft {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+
+.vendorName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-default);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.customBadge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  background-color: transparent;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+.deleteBtn {
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.deleteBtn:hover {
+  transform: translateY(-2px);
+}
+
+.deleteIcon {
+  width: 18px;
+  height: 18px;
+}
+
+.addRow {
+  display: flex;
+  flex-direction: row;
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+  flex-shrink: 0;
+}
+
+.addInput {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 12px;
+  border: 1px solid var(--border-default);
+  background-color: var(--surface-base);
+  color: var(--text-default);
+  border-radius: var(--radius-control);
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.addInput:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.addButton {
+  padding: 8px 16px;
+  background-color: var(--accent);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.addButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.emptyHint {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-style: italic;
+  padding: 8px 0;
+}

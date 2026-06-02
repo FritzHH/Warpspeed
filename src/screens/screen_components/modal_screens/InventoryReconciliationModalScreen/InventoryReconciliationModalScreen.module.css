@@ -1,0 +1,327 @@
+/* InventoryReconciliationModalScreen — 80% × 92% card. Header + stats + list. */
+
+.card {
+  width: 80%;
+  height: 92%;
+  flex-shrink: 0;
+  background-color: var(--surface-base);
+  border-radius: var(--radius-container);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.headerLeft {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.title {
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-default);
+  letter-spacing: 0.4px;
+}
+
+.subtitle {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.statusBar {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background-color: var(--surface-alt);
+}
+
+.statusLabel {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+}
+
+.progressTrack {
+  position: relative;
+  width: 100%;
+  height: 8px;
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.progressFill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  background-color: var(--accent);
+  transition: width 120ms linear;
+}
+
+.statsRow {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-default);
+  background-color: var(--surface-base);
+  box-sizing: border-box;
+}
+
+.statChip {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 12px;
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-row);
+  cursor: pointer;
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+
+.statChip:hover {
+  transform: translateY(-2px);
+}
+
+.statChipActive {
+  border-color: var(--accent);
+  background-color: var(--surface-accent-muted);
+}
+
+.statChipLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+}
+
+.statChipValue {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text-default);
+  font-family: ui-monospace, monospace;
+  line-height: 1;
+}
+
+.statChipReview .statChipValue {
+  color: var(--accent);
+}
+
+.statChipNoMatch .statChipValue {
+  color: var(--danger);
+}
+
+.listWrap {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+}
+
+.emptyState {
+  padding: 32px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.reviewCard {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-row);
+  flex-shrink: 0;
+}
+
+.reviewHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.reviewItemName {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-default);
+}
+
+.reviewItemMeta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.candidateGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.candidateRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background-color: var(--surface-base);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  box-sizing: border-box;
+}
+
+.candidateMain {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.candidateVendor {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.candidateName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-default);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.candidateMeta {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.pickBtn {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-on-accent);
+  background-color: var(--accent);
+  border: none;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  transition: transform 120ms ease, opacity 120ms ease;
+}
+
+.pickBtn:hover {
+  transform: translateY(-2px);
+}
+
+.pickBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
+  transform: none;
+}
+
+.summaryRow {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 12px;
+  background-color: var(--surface-raised);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-row);
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.summaryItemName {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-default);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summaryItemMeta {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summaryBadgeApplied {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--success);
+  padding: 2px 6px;
+  border: 1px solid var(--success);
+  border-radius: var(--radius-pill);
+}
+
+.summaryBadgeNoMatch {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--danger);
+  padding: 2px 6px;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-pill);
+}
+
+.summaryBadgeSkipped {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 2px 6px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+}

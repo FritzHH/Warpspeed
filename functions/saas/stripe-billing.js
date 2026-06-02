@@ -112,7 +112,6 @@ exports.stripeBillingCreateCustomerCallable = onCall(
 
     const db = getFirestore();
     const { ref, data } = await getTenantOrThrow(db, tenantID);
-    assertMonthlySubTenant(data, tenantID);
 
     const stripe = getStripe();
     const stripeBillingCustomerID = await getOrCreateBillingCustomer(
@@ -147,7 +146,6 @@ exports.stripeBillingCreateSetupIntentCallable = onCall(
 
     const db = getFirestore();
     const { data } = await getTenantOrThrow(db, tenantID);
-    assertMonthlySubTenant(data, tenantID);
 
     const stripe = getStripe();
     const customerID = await getOrCreateBillingCustomer(stripe, db, tenantID, data);
@@ -422,7 +420,6 @@ exports.stripeBillingListPaymentMethodsCallable = onCall(
 
     const db = getFirestore();
     const { data } = await getTenantOrThrow(db, tenantID);
-    assertMonthlySubTenant(data, tenantID);
 
     if (!data.stripeBillingCustomerID) {
       return { success: true, paymentMethods: [], defaultPaymentMethodID: null };
@@ -481,7 +478,6 @@ exports.stripeBillingDetachPaymentMethodCallable = onCall(
 
     const db = getFirestore();
     const { data } = await getTenantOrThrow(db, tenantID);
-    assertMonthlySubTenant(data, tenantID);
     if (!data.stripeBillingCustomerID) {
       throw new HttpsError("not-found", "Tenant has no billing customer.");
     }
@@ -495,10 +491,19 @@ exports.stripeBillingDetachPaymentMethodCallable = onCall(
       (pm) => pm.id !== paymentMethodID
     );
 
+    // Guard: don't strand a billing-active tenant with no card. For monthly_sub
+    // that's an active subscription; for per_sale it's an active billing model
+    // where the next fee invoice would have nothing to charge.
     if (!hasOtherPM && data.subscriptionStatus === "active") {
       throw new HttpsError(
         "failed-precondition",
-        "Cannot remove the only payment method while the subscription is active. Add a new card first."
+        "Cannot remove the only payment method while billing is active. Add a new card first."
+      );
+    }
+    if (!hasOtherPM && data.billingModel === "per_sale") {
+      throw new HttpsError(
+        "failed-precondition",
+        "Cannot remove the only payment method while on per-sale billing. Add a new card first."
       );
     }
 
@@ -537,7 +542,6 @@ exports.stripeBillingUpdateDefaultPaymentMethodCallable = onCall(
 
     const db = getFirestore();
     const { data } = await getTenantOrThrow(db, tenantID);
-    assertMonthlySubTenant(data, tenantID);
     if (!data.stripeBillingCustomerID) {
       throw new HttpsError("not-found", "Tenant has no billing customer.");
     }
@@ -600,7 +604,6 @@ exports.stripeBillingListInvoicesCallable = onCall(
 
     const db = getFirestore();
     const { data } = await getTenantOrThrow(db, tenantID);
-    assertMonthlySubTenant(data, tenantID);
     if (!data.stripeBillingCustomerID) {
       return { success: true, invoices: [] };
     }

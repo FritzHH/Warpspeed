@@ -90,6 +90,15 @@
   flex-direction: row;
 }
 
+.sectionCardRowPrices .field {
+  min-width: 0;
+}
+
+.sectionCardRowPrices .fieldInput {
+  width: 100%;
+  box-sizing: border-box;
+}
+
 /* Field */
 .field {
   display: flex;
@@ -214,6 +223,7 @@
   margin-top: 10px;
 }
 
+
 .twoColItem {
   flex: 1;
   margin-top: 0;
@@ -244,6 +254,31 @@
 .sectionInfoIcon {
   margin-left: 6px;
   opacity: 0.4;
+}
+
+.sectionInfoBtn {
+  margin-left: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+.sectionInfoBtn .sectionInfoIcon {
+  margin-left: 0;
+}
+
+.sectionInfoBtn:hover {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 3px 3px var(--shadow-color-default));
+}
+
+.sectionInfoBtn:active {
+  transform: translateY(0);
+  filter: drop-shadow(0 1px 1px var(--shadow-color-default));
 }
 
 /* Quick button placements */

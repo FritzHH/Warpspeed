@@ -23,6 +23,8 @@ import {
   useActiveSalesStore,
   useCustMessagesStore,
   useEmailStore,
+  useOrderingModalStore,
+  useInventoryReconciliationModalStore,
   broadcastWorkorderToDisplay,
 } from "../stores";
 import {
@@ -41,6 +43,12 @@ const NewRefundModalScreen = lazy(() =>
 );
 const FullSaleModal = lazy(() =>
   import("../dom_components/FullSaleModal/FullSaleModal").then((m) => ({ default: m.FullSaleModal }))
+);
+const OrderingModalScreen = lazy(() =>
+  import("./screen_components/modal_screens/OrderingModalScreen/OrderingModalScreen").then((m) => ({ default: m.OrderingModalScreen }))
+);
+const InventoryReconciliationModalScreen = lazy(() =>
+  import("./screen_components/modal_screens/InventoryReconciliationModalScreen/InventoryReconciliationModalScreen").then((m) => ({ default: m.InventoryReconciliationModalScreen }))
 );
 const UserMessagesModalForLogin = lazy(() =>
   import("./screen_components/modal_screens/UserMessagesModal").then((m) => ({ default: m.UserMessagesModal }))
@@ -331,6 +339,8 @@ export function BaseScreen() {
   const zReceiptScan = useCheckoutStore((state) => state.receiptScan);
   const zPendingRefundSaleID = useCheckoutStore((state) => state.pendingRefundSaleID);
   const zSaleModalObj = useOpenWorkordersStore((s) => s.saleModalObj);
+  const zOrderingModalVisible = useOrderingModalStore((s) => s.visible);
+  const zReconcileModalVisible = useInventoryReconciliationModalStore((s) => s.visible);
 
   // Detect sale-ID scans to open refund modal
   useEffect(() => {
@@ -786,6 +796,16 @@ export function BaseScreen() {
         </Suspense>
       )}
       <NewCheckoutModalScreen />
+      {zOrderingModalVisible && (
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <OrderingModalScreen handleExit={() => useOrderingModalStore.getState().hide()} />
+        </Suspense>
+      )}
+      {zReconcileModalVisible && (
+        <Suspense fallback={<SmallLoadingIndicator />}>
+          <InventoryReconciliationModalScreen handleExit={() => useInventoryReconciliationModalStore.getState().hide()} />
+        </Suspense>
+      )}
       {sRefundModalVisible && (
         <Suspense fallback={<SmallLoadingIndicator />}>
           <NewRefundModalScreen

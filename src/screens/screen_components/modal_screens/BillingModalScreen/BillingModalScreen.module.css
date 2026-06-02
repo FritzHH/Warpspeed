@@ -367,30 +367,6 @@
   border-bottom: none;
 }
 
-/* ══════════ PER-SALE NOTICE ══════════ */
-.perSaleNotice {
-  padding: 28px 32px;
-  background-color: var(--surface-alt);
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-row);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin: 22px 28px;
-}
-
-.perSaleTitle {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--text-default);
-}
-
-.perSaleText {
-  font-size: 13px;
-  color: var(--text-muted);
-  line-height: 1.45;
-}
-
 /* ══════════ ADD CARD MODAL ══════════ */
 .addCardCard {
   width: 460px;

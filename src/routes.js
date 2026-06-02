@@ -15,6 +15,7 @@ export const ROUTES = {
   phone: "/phone",
   phoneOrdering: "/phone/ordering",
   phoneOrderingScan: "/phone/ordering/:orderID",
+  phoneOrderingView: "/phone/ordering/:orderID/view",
   dbViewer: "/db-viewer",
   tokens: "/tokens",
   stripeConnect: "/stripe-connect",

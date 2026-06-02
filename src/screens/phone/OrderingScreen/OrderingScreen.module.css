@@ -38,6 +38,18 @@
   flex: 1;
 }
 
+.switchButton {
+  flex: 1;
+  border: 1px solid var(--accent);
+  background-color: transparent;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: var(--radius-control);
+  cursor: pointer;
+}
+
 .count {
   font-size: 14px;
   color: var(--text-muted);

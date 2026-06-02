@@ -22,6 +22,7 @@ import {
   writeBatch as firestoreWriteBatch,
   getCountFromServer,
   deleteField,
+  documentId,
   connectFirestoreEmulator,
 } from "firebase/firestore";
 import {
@@ -56,7 +57,7 @@ import {
 } from "firebase/storage";
 import { getFunctions, httpsCallable, connectFunctionsEmulator } from "firebase/functions";
 import { log } from "./utils";
-import { firebaseApp } from "./init";
+import { firebaseApp, cadenceCatalogApp } from "./init";
 import { APP_BRAND } from "./private_user_constants";
 
 // Initialize services using the existing Firebase app
@@ -68,6 +69,10 @@ export const DB = initializeFirestore(firebaseApp, {
 });
 
 export const RDB = getDatabase(firebaseApp);
+// Read-only handle to cadence-pos RTDB for vendor catalogs (cross-project
+// when Bonita is on warpspeed-bonitabikes; same as RDB when running on
+// cadence-pos itself). Use only via rdbCatalogRead — no writes.
+export const CATALOG_RDB = getDatabase(cadenceCatalogApp);
 export const AUTH = initializeAuth(firebaseApp, { persistence: browserLocalPersistence });
 export const STORAGE = getStorage(firebaseApp);
 // Initialize Firebase Functions with region
@@ -260,6 +265,30 @@ export async function firestoreQuery(
   return querySnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 }
 
+// Batched read by document id. Firestore caps `in` queries at 30 values, so
+// callers can pass any-size id arrays and we chunk transparently. Returns a
+// Map<id, data> with one entry per doc that EXISTS — missing ids are absent
+// from the Map (callers handle "no entry = zero/empty" themselves).
+export async function firestoreReadDocsByIds(collectionPath, ids) {
+  const out = new Map();
+  if (!Array.isArray(ids) || ids.length === 0) return out;
+  const unique = Array.from(new Set(ids.filter(Boolean).map(String)));
+  if (unique.length === 0) return out;
+  const collectionRef = collection(DB, ...collectionPath.split("/"));
+  const CHUNK = 30;
+  const chunks = [];
+  for (let i = 0; i < unique.length; i += CHUNK) {
+    chunks.push(unique.slice(i, i + CHUNK));
+  }
+  const snapshots = await Promise.all(
+    chunks.map((chunk) => getDocs(query(collectionRef, where(documentId(), "in", chunk)))),
+  );
+  snapshots.forEach((snap) => {
+    snap.docs.forEach((d) => out.set(d.id, d.data()));
+  });
+  return out;
+}
+
 export async function firestoreCount(collectionPath, field, operator, value) {
   const collectionRef = collection(DB, ...collectionPath.split("/"));
   const q = query(collectionRef, where(field, operator, value));
@@ -357,6 +386,19 @@ export async function rdbWrite(path, data) {
  */
 export async function rdbRead(path) {
   const dbRef = ref(RDB, path);
+  const snapshot = await get(dbRef);
+  return snapshot.exists() ? snapshot.val() : null;
+}
+
+/**
+ * Read data from the cadence-pos vendor-catalog Realtime Database.
+ * Use for paths under `vendor_catalogs/*`. Cross-project on Bonita; same
+ * as rdbRead when the app runs on cadence-pos itself.
+ * @param {string} path - Database path (e.g., `vendor_catalogs/jbi/items/<id>`)
+ * @returns {Promise<Object|null>} Data or null if not found
+ */
+export async function rdbCatalogRead(path) {
+  const dbRef = ref(CATALOG_RDB, path);
   const snapshot = await get(dbRef);
   return snapshot.exists() ? snapshot.val() : null;
 }

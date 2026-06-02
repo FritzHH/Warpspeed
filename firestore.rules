@@ -59,7 +59,9 @@ service cloud.firestore {
     match /tenants/{tenantID}/stores/{storeID} {
       match /{collection}/{document=**} {
         allow read, write: if hasStoreAccess(tenantID, storeID)
-                           && collection != 'settings';
+                           && collection != 'settings'
+                           && collection != 'vendor-credentials'
+                           && collection != 'vendor-submissions';
       }
       match /settings/{docID=**} {
         allow read: if hasStoreAccess(tenantID, storeID);
@@ -71,6 +73,21 @@ service cloud.firestore {
           // SaaS non-admin: only if protected fields are unchanged
           || settingsProtectedFieldsUnchanged(request.resource, resource)
         );
+      }
+
+      // Vendor credentials — server-only via Admin SDK. No client read or
+      // write at any privilege level. Set/cleared exclusively via
+      // setVendorCredentialsCallable; read only by vendor-submission-worker.
+      match /vendor-credentials/{vendorID=**} {
+        allow read, write: if false;
+      }
+
+      // Vendor submission records — tenant members can read (UI listens
+      // for status changes), only the server (Cloud Function via Admin SDK)
+      // writes. Created by submitVendorOrderCallable, updated by the worker.
+      match /vendor-submissions/{submissionID=**} {
+        allow read: if hasStoreAccess(tenantID, storeID);
+        allow write: if false;
       }
     }
 
@@ -130,6 +147,10 @@ service cloud.firestore {
     match /dlq-escalations/{escalationID} {
       allow read, write: if false;
     }
+    // Vendor-submission idempotency markers — server-only.
+    match /vendor-submissions-processing/{submissionID} {
+      allow read, write: if false;
+    }
 
     // Billing tier catalog — any authed user can read so tenant-side UI can
     // display its assigned tier's label and monthly amount. Writes are
@@ -139,13 +160,16 @@ service cloud.firestore {
       allow write: if false;
     }
 
-    // Vendor catalogs (JBI, etc.) — public read so Bonita's cross-project
-    // secondary-app can read without auth ceremony. Data is non-sensitive
-    // (sourced from each vendor's public FTP). Writes are blocked entirely;
-    // the Cloud Run sync jobs use the Admin SDK which bypasses rules.
-    match /vendor_catalogs/{document=**} {
-      allow read: if true;
-      allow write: if false;
+    // Vendor catalogs moved to Realtime Database (see database.rules.json).
+    // Firestore /vendor_catalogs path is dead; default-deny applies. Manual
+    // data cleanup is a one-time admin task — see TODO.md.
+
+// Cloud Scheduler mirror — server-only. The dashboard reads via the
+    // platformAdminListScheduledJobsCallable (Admin SDK bypasses rules);
+    // direct client reads are blocked. Writes happen exclusively through
+    // the reconciler + update callable.
+    match /platform-scheduled-jobs/{jobID} {
+      allow read, write: if false;
     }
 
     // DLQ entries — platform-admin can read for the admin UI. Writes only

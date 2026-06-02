@@ -7642,6 +7642,13 @@ exports.migrateCustomerPhone = onCall(
   exports.gmailRenewWatch = _gmailHandlers.gmailRenewWatch;
 }
 
+// ── Vendor order submission (JBI) — Bonita sync callable ──────────────
+// cadence-pos submits async via Pub/Sub (functions/saas/vendor-submission-worker.js)
+// but Bonita stays on the simpler single-callable flow until / unless it
+// migrates. Both call into the same handler at functions/vendors/jbi.js.
+const _submitJbiOrder = require("./bonita/submit-jbi-order");
+exports.submitJbiOrderCallable = _submitJbiOrder.submitJbiOrderCallable;
+
 } // ─── end of if (DEPLOY_TARGET === "bonita") ───
 
 // ============================================================================
@@ -7723,6 +7730,8 @@ if (DEPLOY_TARGET === "saas") {
   const connectCheckoutSession = require("./saas/stripe-connect-checkout-session");
   const dlqAdmin = require("./saas/pubsub-dlq-admin");
   const billingTiers = require("./saas/billing-tiers");
+  const platformBillingConfig = require("./saas/platform-billing-config");
+  const platformScheduledJobs = require("./saas/platform-scheduled-jobs");
   const stripeBilling = require("./saas/stripe-billing");
   const stripeBillingWebhook = require("./saas/stripe-billing-webhook");
   const pubsubBillingSubscriber = require("./saas/pubsub-billing-subscriber");
@@ -7738,7 +7747,14 @@ if (DEPLOY_TARGET === "saas") {
   const twilioChurn = require("./saas/twilio-churn");
   const twilioAlerts = require("./saas/twilio-alerts");
   const tenantSetupCleanup = require("./saas/tenant-setup-cleanup");
+  const perSaleStamper = require("./saas/per-sale-stamper");
+  const perSaleInvoicer = require("./saas/per-sale-invoicer");
+  const smsBillingStamper = require("./saas/sms-billing-stamper");
+  const smsBillingInvoicer = require("./saas/sms-billing-invoicer");
   const emailAdmin = require("./saas/email-admin-callables");
+  const chromeExtCallables = require("./saas/chrome-extension-callables");
+  const vendorSubmission = require("./saas/vendor-submission");
+  const vendorSubmissionWorker = require("./saas/vendor-submission-worker");
 
   // Phase 1 auth-claims — tenant provisioning + invite flow.
   exports.platformAdminCreateTenantCallable =
@@ -7776,13 +7792,34 @@ if (DEPLOY_TARGET === "saas") {
     authClaims.tenantSetupPurchaseTwilioNumberCallable;
   exports.tenantSetupReleaseTwilioNumberCallable =
     authClaims.tenantSetupReleaseTwilioNumberCallable;
+  exports.tenantSetupAssignPoolNumberCallable =
+    authClaims.tenantSetupAssignPoolNumberCallable;
+  exports.tenantSetupReleasePoolNumberCallable =
+    authClaims.tenantSetupReleasePoolNumberCallable;
   exports.tenantSetupFinalizeCallable =
     authClaims.tenantSetupFinalizeCallable;
+  exports.requestTenantSetupResendCallable =
+    authClaims.requestTenantSetupResendCallable;
 
   // Orphan-cleanup Firestore trigger: closes pre-tenant Twilio subaccount
   // when its setup doc is deleted (TTL expiry / admin cleanup / unadopted).
   exports.onTenantSetupDocDeleted =
     tenantSetupCleanup.onTenantSetupDocDeleted;
+
+  // Per-sale fee snapshot trigger: stamps billingModelSnapshot,
+  // platformFeePercentSnapshot, feeBillingPeriodKey on completed-sales docs
+  // so the semi-monthly accumulation invoicer has stable, period-keyed
+  // records to range-query (per_sale tenants only; monthly_sub no-ops).
+  exports.onCompletedSaleCreated =
+    perSaleStamper.onCompletedSaleCreated;
+
+  // Semi-monthly per_sale invoicer: scheduled at 01:00 America/Chicago on
+  // the 1st (bills prior month 2H) and 16th (bills current month 1H).
+  // Manual callable supports super-admin dry-runs and force-replay.
+  exports.runPerSaleInvoicerScheduledFn =
+    perSaleInvoicer.runPerSaleInvoicerScheduledFn;
+  exports.runPerSaleInvoicerManualCallable =
+    perSaleInvoicer.runPerSaleInvoicerManualCallable;
 
   // Phase 2 — admin-driven POS user CRUD (Dashboard_Admin user editor).
   exports.tenantCreateUserCallable = authClaims.tenantCreateUserCallable;
@@ -7792,6 +7829,30 @@ if (DEPLOY_TARGET === "saas") {
   // Phase 3 — passwordless sign-in via emailed code.
   exports.requestSignInCodeCallable = authClaims.requestSignInCodeCallable;
   exports.verifySignInCodeCallable = authClaims.verifySignInCodeCallable;
+
+  // Cadence Chrome Extension — "Add to Cadence" injection on jbi.bike +
+  // active-order picker + side-panel data fetch.
+  // Dual-auth: verifies Bonita tokens (interim) via second admin app.
+  exports.addJBIItemToVendorOrder =
+    chromeExtCallables.addJBIItemToVendorOrder;
+  exports.listVendorOrdersCallable =
+    chromeExtCallables.listVendorOrdersCallable;
+  exports.getVendorOrderCallable =
+    chromeExtCallables.getVendorOrderCallable;
+  exports.setActiveVendorOrderCallable =
+    chromeExtCallables.setActiveVendorOrderCallable;
+  exports.applyInventoryCostFromExtensionCallable =
+    chromeExtCallables.applyInventoryCostFromExtensionCallable;
+
+  // Vendor order submission — async dispatch via Pub/Sub. Three callables
+  // for the UI + one Pub/Sub-triggered worker for the actual send.
+  exports.submitVendorOrderCallable =
+    vendorSubmission.submitVendorOrderCallable;
+  exports.setVendorCredentialsCallable =
+    vendorSubmission.setVendorCredentialsCallable;
+  exports.getVendorCredentialMetaCallable =
+    vendorSubmission.getVendorCredentialMetaCallable;
+  exports.pubsubVendorOrderSubmissionWorker = vendorSubmissionWorker.handler;
 
   exports.pubsubStripeEventSubscriber = pubsubSubscriber.handler;
   exports.pubsubStripeDeadLetterIngestor = pubsubDeadLetter.ingestor;
@@ -7924,6 +7985,22 @@ if (DEPLOY_TARGET === "saas") {
   exports.platformAdminArchiveBillingTierCallable =
     billingTiers.platformAdminArchiveBillingTierCallable;
 
+  exports.platformAdminGetBillingConfigCallable =
+    platformBillingConfig.platformAdminGetBillingConfigCallable;
+  exports.platformAdminUpdateBillingConfigCallable =
+    platformBillingConfig.platformAdminUpdateBillingConfigCallable;
+
+  // Cloud Scheduler control plane — mirror + edit. GCP is the system of
+  // record; the periodic sync reconciles out-of-band gcloud edits.
+  exports.runScheduledJobsSyncScheduledFn =
+    platformScheduledJobs.runScheduledJobsSyncScheduledFn;
+  exports.platformAdminSyncScheduledJobsCallable =
+    platformScheduledJobs.platformAdminSyncScheduledJobsCallable;
+  exports.platformAdminListScheduledJobsCallable =
+    platformScheduledJobs.platformAdminListScheduledJobsCallable;
+  exports.platformAdminUpdateScheduledJobCallable =
+    platformScheduledJobs.platformAdminUpdateScheduledJobCallable;
+
   exports.stripeBillingCreateCustomerCallable =
     stripeBilling.stripeBillingCreateCustomerCallable;
   exports.stripeBillingCreateSetupIntentCallable =
@@ -7946,5 +8023,23 @@ if (DEPLOY_TARGET === "saas") {
   exports.stripeWebhookV2_Billing = stripeBillingWebhook.handler;
   exports.pubsubStripeBillingEventSubscriber = pubsubBillingSubscriber.handler;
   exports.pubsubStripeBillingDeadLetterIngestor = pubsubBillingSubscriber.ingestor;
+
+  // SMS per-text billing — Pub/Sub fan-out mirroring the Stripe billing
+  // pattern. The twilio inbound + status webhooks publish to
+  // `sms-billing-events`; the stamper writes idempotent stamp docs at
+  // tenants/{tid}/sms-billing-stamps/{messageSid} for the invoicer to
+  // range-query. DLQ ingestor persists exhausted events into the shared
+  // `saas-dlq` collection for admin review.
+  exports.pubsubSmsBillingEventSubscriber = smsBillingStamper.handler;
+  exports.pubsubSmsBillingDeadLetterIngestor = smsBillingStamper.ingestor;
+
+  // Semi-monthly SMS-only invoicer for monthly_sub tenants (per_sale tenants
+  // get SMS bundled into their per-sale invoice via per-sale-invoicer).
+  // Scheduled at 01:00 America/Chicago on 1st (bills prior month 2H) and
+  // 16th (bills current month 1H), mirroring the per_sale cadence.
+  exports.runSmsInvoicerScheduledFn =
+    smsBillingInvoicer.runSmsInvoicerScheduledFn;
+  exports.runSmsInvoicerManualCallable =
+    smsBillingInvoicer.runSmsInvoicerManualCallable;
 }
 

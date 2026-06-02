@@ -46,6 +46,8 @@ import {
   rollupSmsByStore,
   rollupSmsByFeature,
   bucketSmsByDay,
+  loadSmsBillingStamps,
+  sumSmsBilling,
 } from "./analyticsHelpers";
 
 const TABS = [
@@ -86,6 +88,10 @@ export const AnalyticsModalScreen = ({ handleExit }) => {
   const [sSmsLoading, _setSmsLoading] = useState(false);
   const [sSmsLoadedForRange, _setSmsLoadedForRange] = useState(null);
 
+  // SMS billing stamps (tenant-scoped, single Firestore query). Loaded in
+  // parallel with the multi-store fan-out above so both populate together.
+  const [sSmsBillingStamps, _setSmsBillingStamps] = useState([]);
+
   // ── Load on range change ──
   useEffect(() => {
     let cancelled = false;
@@ -121,11 +127,15 @@ export const AnalyticsModalScreen = ({ handleExit }) => {
 
     let cancelled = false;
     _setSmsLoading(true);
-    loadSmsEventsAllStores(sStartMs, sEndMs, { limit: 10000 })
-      .then(({ events, storeIDs }) => {
+    Promise.all([
+      loadSmsEventsAllStores(sStartMs, sEndMs, { limit: 10000 }),
+      loadSmsBillingStamps(sStartMs, sEndMs, { limit: 10000 }),
+    ])
+      .then(([fanout, stamps]) => {
         if (cancelled) return;
-        _setSmsEvents(events || []);
-        _setSmsStoreIDs(storeIDs || []);
+        _setSmsEvents(fanout?.events || []);
+        _setSmsStoreIDs(fanout?.storeIDs || []);
+        _setSmsBillingStamps(stamps || []);
         _setSmsLoadedForRange(rangeKey);
         _setSmsLoading(false);
       })
@@ -133,6 +143,7 @@ export const AnalyticsModalScreen = ({ handleExit }) => {
         if (cancelled) return;
         _setSmsEvents([]);
         _setSmsStoreIDs([]);
+        _setSmsBillingStamps([]);
         _setSmsLoading(false);
       });
     return () => { cancelled = true; };
@@ -163,6 +174,7 @@ export const AnalyticsModalScreen = ({ handleExit }) => {
     () => bucketSmsByDay(sSmsEvents, sStartMs, sEndMs),
     [sSmsEvents, sStartMs, sEndMs]
   );
+  const smsBilling = useMemo(() => sumSmsBilling(sSmsBillingStamps), [sSmsBillingStamps]);
 
   function handlePreset(p) {
     _setPresetLabel(p.label);
@@ -295,6 +307,7 @@ export const AnalyticsModalScreen = ({ handleExit }) => {
               smsByStore={smsByStore}
               smsByFeature={smsByFeature}
               smsDayBuckets={smsDayBuckets}
+              smsBilling={smsBilling}
               storeIDs={sSmsStoreIDs}
               currentStoreID={sSmsStoreIDs[0] || null}
               days={days}
@@ -619,6 +632,7 @@ function SMSTab({
   smsByStore,
   smsByFeature,
   smsDayBuckets,
+  smsBilling,
   storeIDs,
   currentStoreID,
   days,
@@ -640,9 +654,58 @@ function SMSTab({
   const showStoreCards = storeCount > 1 && storeCount <= 3;
   const showStoreTable = storeCount > 3;
 
+  const billing = smsBilling || {
+    stampCount: 0, billedCount: 0, unbilledCount: 0,
+    inboundCount: 0, outboundCount: 0,
+    totalBilledCents: 0, twilioCostCents: 0, markupAmountCents: 0,
+    avgMarkupMultiplier: 0,
+  };
+  const billedMonthlyProjection = (billing.totalBilledCents / Math.max(1, days)) * 30;
+  const effectiveMultiplier = billing.avgMarkupMultiplier > 0
+    ? billing.avgMarkupMultiplier
+    : 1.05;
+
   return (
     <div className={styles.scroll}>
-      {/* Top metric cards */}
+      {/* ── SMS BILLING (what the tenant is charged) ── */}
+      <SectionCard title="SMS Billing (this tenant)">
+        <p style={{ fontSize: 12, color: C.textMuted, padding: "0 4px 8px 4px" }}>
+          What this tenant is being billed for SMS in this window. Per-text billing
+          stamps every inbound + outbound terminal message with
+          <code className={styles.code} style={{ margin: "0 4px" }}>|twilioPrice| × markup</code>
+          rounded to cents. Markup default 1.05; per-tenant override at
+          <code className={styles.code} style={{ marginLeft: 4 }}>smsMarkupMultiplierOverride</code>.
+        </p>
+        <div className={styles.metricRow}>
+          <MetricCard
+            label="Total Billed (window)"
+            value={centsToDisplay(billing.totalBilledCents)}
+            accent={C.green}
+            sub={"~" + centsToDisplay(billedMonthlyProjection) + "/mo extrapolated"}
+          />
+          <MetricCard
+            label="Markup Margin"
+            value={centsToDisplay(billing.markupAmountCents)}
+            accent={C.purple}
+            sub={"avg multiplier " + effectiveMultiplier.toFixed(3) + "×"}
+          />
+          <MetricCard
+            label="Twilio Wholesale"
+            value={centsToDisplay(billing.twilioCostCents)}
+            accent={C.blue}
+            sub="pass-through cost (fractional cents)"
+          />
+          <MetricCard
+            label="Stamps"
+            value={billing.stampCount.toLocaleString()}
+            accent={C.darkBlue}
+            sub={billing.outboundCount + " out · " + billing.inboundCount + " in"
+              + (billing.unbilledCount > 0 ? " · " + billing.unbilledCount + " unbilled" : "")}
+          />
+        </div>
+      </SectionCard>
+
+      {/* Top metric cards — self-cost (what we pay Twilio) */}
       <div className={styles.metricRow}>
         <MetricCard
           label="Total SMS Cost (window)"

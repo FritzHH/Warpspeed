@@ -18,7 +18,6 @@ const RADIUS_KM = 8;
 const RADIUS_M = RADIUS_KM * 1000;
 const CONCURRENCY = 5;
 const PRICE_PER_1K_USD = 40;
-const PAGE_DELAY_MS = 2000;
 
 const ENDPOINT = "https://places.googleapis.com/v1/places:searchNearby";
 const FIELD_MASK = [
@@ -31,7 +30,6 @@ const FIELD_MASK = [
   "places.userRatingCount",
   "places.regularOpeningHours",
   "places.googleMapsUri",
-  "nextPageToken",
 ].join(",");
 
 const COLUMNS = [
@@ -71,7 +69,7 @@ function generateHexTiles(box, radiusKm) {
   return tiles;
 }
 
-async function searchNearbyPage({ lat, lng, radiusM, pageToken }) {
+async function searchNearby({ lat, lng, radiusM }) {
   const body = {
     includedPrimaryTypes: ["bicycle_store"],
     maxResultCount: 20,
@@ -79,7 +77,6 @@ async function searchNearbyPage({ lat, lng, radiusM, pageToken }) {
       circle: { center: { latitude: lat, longitude: lng }, radius: radiusM },
     },
   };
-  if (pageToken) body.pageToken = pageToken;
 
   const res = await fetch(ENDPOINT, {
     method: "POST",
@@ -96,23 +93,8 @@ async function searchNearbyPage({ lat, lng, radiusM, pageToken }) {
     throw new Error(`Places API ${res.status}: ${text}`);
   }
 
-  return res.json();
-}
-
-async function searchTileAllPages({ lat, lng, radiusM }) {
-  const places = [];
-  let pageToken = null;
-  let pages = 0;
-
-  do {
-    const resp = await searchNearbyPage({ lat, lng, radiusM, pageToken });
-    if (resp.places) places.push(...resp.places);
-    pageToken = resp.nextPageToken || null;
-    pages++;
-    if (pageToken) await new Promise((r) => setTimeout(r, PAGE_DELAY_MS));
-  } while (pageToken && pages < 3);
-
-  return { places, pages };
+  const data = await res.json();
+  return data.places || [];
 }
 
 function parseAddress(formatted) {
@@ -208,6 +190,8 @@ async function main() {
   let apiCalls = 0;
   let duplicates = 0;
   let completed = 0;
+  let cappedTiles = 0;
+  let failedTiles = 0;
 
   const limit = pLimit(CONCURRENCY);
 
@@ -215,12 +199,13 @@ async function main() {
     tiles.map((tile) =>
       limit(async () => {
         try {
-          const { places, pages } = await searchTileAllPages({
+          const places = await searchNearby({
             lat: tile.lat,
             lng: tile.lng,
             radiusM: RADIUS_M,
           });
-          apiCalls += pages;
+          apiCalls++;
+          if (places.length === 20) cappedTiles++;
 
           for (const p of places) {
             if (shopMap.has(p.id)) duplicates++;
@@ -228,11 +213,13 @@ async function main() {
           }
 
           completed++;
+          const cap = places.length === 20 ? " [CAP - may be incomplete]" : "";
           console.log(
-            `[${ts()}] Tile ${completed}/${tiles.length} (${tile.lat.toFixed(3)}, ${tile.lng.toFixed(3)}) -> ${places.length} results, ${pages} page(s)`
+            `[${ts()}] Tile ${completed}/${tiles.length} (${tile.lat.toFixed(3)}, ${tile.lng.toFixed(3)}) -> ${places.length} results${cap}`
           );
         } catch (err) {
           completed++;
+          failedTiles++;
           console.error(
             `[${ts()}] Tile ${completed}/${tiles.length} FAILED: ${err.message}`
           );
@@ -251,6 +238,14 @@ async function main() {
   );
   console.log(`[${ts()}] API calls: ${apiCalls}`);
   console.log(`[${ts()}] Estimated cost: $${estCost.toFixed(2)}`);
+  if (cappedTiles > 0) {
+    console.log(
+      `[${ts()}] WARNING: ${cappedTiles} tile(s) hit the 20-result cap - dense areas may be incomplete`
+    );
+  }
+  if (failedTiles > 0) {
+    console.log(`[${ts()}] WARNING: ${failedTiles} tile(s) failed`);
+  }
 
   const stamp = startedAt.toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const outDir = path.join(__dirname, "output");
@@ -271,6 +266,8 @@ async function main() {
         elapsedSeconds: Math.round((completedAt - startedAt) / 1000),
         tilesQueried: tiles.length,
         apiCallsTotal: apiCalls,
+        cappedTiles,
+        failedTiles,
         estimatedCostUsd: estCost,
         uniqueShopsFound: shops.length,
         duplicateHits: duplicates,

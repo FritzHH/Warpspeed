@@ -534,6 +534,22 @@ export const VENDOR_CATALOGS = [
     catalogPath: "vendor_catalogs/jbi",
     color: "blue",
     accountNumber: "", // TODO: surface on desktop split-view; not necessary yet
+    // Warehouse-code → state mapping inferred from PDF column order (unverified by JBI).
+    // Inventory data is correct regardless; only display labels depend on this mapping.
+    warehouses: [
+      { code: "avail_101", state: "FL", name: "Florida" },
+      { code: "avail_102", state: "NC", name: "North Carolina" },
+      { code: "avail_103", state: "NY", name: "New York" },
+      { code: "avail_104", state: "AL", name: "Alabama" },
+      { code: "avail_105", state: "IN", name: "Indiana" },
+      { code: "avail_106", state: "PA", name: "Pennsylvania" },
+      { code: "avail_107", state: "MN", name: "Minnesota" },
+      { code: "avail_108", state: "TX", name: "Texas" },
+      { code: "avail_109", state: "CO", name: "Colorado" },
+      { code: "avail_110", state: "WA", name: "Washington" },
+      { code: "avail_111", state: "FCL", name: "Florida Closeout" },
+      { code: "avail_112", state: "CA", name: "California" },
+    ],
   },
   {
     id: "qbp",
@@ -541,6 +557,7 @@ export const VENDOR_CATALOGS = [
     catalogPath: "vendor_catalogs/qbp",
     color: "green",
     accountNumber: "", // TODO: surface on desktop split-view; not necessary yet
+    warehouses: [],
   },
   {
     id: "other",
@@ -548,6 +565,7 @@ export const VENDOR_CATALOGS = [
     catalogPath: null,
     color: "orange",
     accountNumber: "", // TODO: surface on desktop split-view; not necessary yet
+    warehouses: [],
   },
 ];
 
@@ -556,9 +574,11 @@ export const INVENTORY_ITEM_PROTO = {
   informalName: "",
   brand: "",
   vendorId: "",
+  vendorName: "",
   catalogName: "",
   price: 0,
   salePrice: 0,
+  msrp: 0,
   category: "Item",
   id: "",
   cost: "",
@@ -568,6 +588,27 @@ export const INVENTORY_ITEM_PROTO = {
   customPart: false,
   customLabor: false,
   receiptNoteRequired: false,
+  // Vendor specs snapshot. Copied from /vendor_catalogs/{vendor}/specs/{itemId}
+  // at "Add to inventory" time so the item is self-contained for display.
+  // Refresh via inventory modal button (manual) — no live listener.
+  //   source         = "jbi" | "qbp" | "manual" | "" (origin of the snapshot)
+  //   lastUpdated    = millis mirroring the vendor doc's lastUpdated at copy time
+  //   entries        = ordered list of { title, value, key?, unit? }
+  //     - title/value: required; what the generic SpecsList renderer shows
+  //     - key:   canonical attribute id (e.g. "wheelDiameter") — typed sources
+  //              (QBP) populate it so future query/filter code can match across
+  //              items without title-string fuzzy-matching. Freeform sources
+  //              (JBI) omit it.
+  //     - unit:  optional, only when separating a numeric value from its unit
+  //              helps a downstream comparator. Display renderer ignores it.
+  // Ingestion-side vendor knowledge (mapping JBI's freeform titles or QBP's
+  // typed schema into this shape) stays in the vendor-specific sync code, so
+  // every read site sees one uniform structure.
+  specs: {
+    source: "",
+    lastUpdated: 0,
+    entries: [],
+  },
 };
 
 // Vendor order = a purchase order being built (phone scanner + desktop polish).
@@ -575,6 +616,7 @@ export const INVENTORY_ITEM_PROTO = {
 // sub-collection so per-scan writes don't rewrite the parent.
 export const VENDOR_ORDER_PROTO = {
   id: "",
+  name: "",
   createdMillis: 0,
   createdByUserID: "",
   lastModifiedMillis: 0,
@@ -602,6 +644,10 @@ export const VENDOR_ORDER_ITEM_PROTO = {
   vendorItemID: "",
   catalogSnapshot: null,
   notes: "",
+  // Optional per-line customer/workorder assignment. Set by user via UI when
+  // ordering an item for a specific customer or workorder. Empty = stock order.
+  customerName: "",
+  workorderID: "",
 };
 
 

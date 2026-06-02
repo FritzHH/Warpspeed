@@ -53,8 +53,8 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
         onClick={() => onSelect(workorder)}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") onSelect(workorder); }}
         style={{
-          borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
           borderColor: C.buttonLightGreenOutline,
+          borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
           borderLeftWidth: 4,
           backgroundColor: shouldBlinkRed
             ? undefined

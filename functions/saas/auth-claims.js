@@ -346,6 +346,23 @@ function normalizePlatformFeePercent(value) {
   return num;
 }
 
+// smsMarkupMultiplierOverride is a per-tenant override of the platform
+// default (1.05, in platform-billing/config). 1.0 = pass-through, 1.05 = 5%
+// markup, 2.0 = 2× markup. Capped at 5× as a sanity guard. Distinct return
+// values: undefined = "clear the override, inherit platform default";
+// null = invalid input; number = valid override to write.
+const SMS_MARKUP_MULTIPLIER_MAX = 5;
+function normalizeSmsMarkupMultiplier(value) {
+  if (value === undefined || value === null || value === "") {
+    return undefined;
+  }
+  const num = Number(value);
+  if (!Number.isFinite(num) || num <= 0 || num > SMS_MARKUP_MULTIPLIER_MAX) {
+    return null;
+  }
+  return num;
+}
+
 function formatUSPhoneForDisplay(e164) {
   const m = (e164 || "").match(/^\+1(\d{3})(\d{3})(\d{4})$/);
   if (!m) return e164 || "";
@@ -1215,9 +1232,18 @@ exports.platformAdminUpdateTenantBillingCallable = onCall(
     const auth = requireAuth(request);
     assertPlatformAdmin(auth);
 
-    const { tenantID, platformFeePercent } = request.data || {};
+    const data = request.data || {};
+    const { tenantID, platformFeePercent } = data;
+    const hasFeePercent = Object.prototype.hasOwnProperty.call(data, "platformFeePercent");
+    const hasSmsMarkup = Object.prototype.hasOwnProperty.call(data, "smsMarkupMultiplierOverride");
     if (!tenantID || typeof tenantID !== "string") {
       throw new HttpsError("invalid-argument", "tenantID is required.");
+    }
+    if (!hasFeePercent && !hasSmsMarkup) {
+      throw new HttpsError(
+        "invalid-argument",
+        "Provide platformFeePercent and/or smsMarkupMultiplierOverride."
+      );
     }
 
     const db = getFirestore();
@@ -1227,30 +1253,64 @@ exports.platformAdminUpdateTenantBillingCallable = onCall(
       throw new HttpsError("not-found", `Tenant ${tenantID} not found.`);
     }
     const tenantData = snap.data() || {};
-    if (tenantData.billingModel !== "per_sale") {
-      throw new HttpsError(
-        "failed-precondition",
-        `Tenant ${tenantID} is on ${tenantData.billingModel || "no"} billing — platformFeePercent only applies to per_sale tenants.`
-      );
+
+    const update = {};
+
+    if (hasFeePercent) {
+      if (tenantData.billingModel !== "per_sale") {
+        throw new HttpsError(
+          "failed-precondition",
+          `Tenant ${tenantID} is on ${tenantData.billingModel || "no"} billing — platformFeePercent only applies to per_sale tenants.`
+        );
+      }
+      const normalized = normalizePlatformFeePercent(platformFeePercent);
+      if (normalized === null) {
+        throw new HttpsError(
+          "invalid-argument",
+          `platformFeePercent must be a number between 0 and ${PLATFORM_FEE_PERCENT_MAX}.`
+        );
+      }
+      update.platformFeePercent = normalized;
     }
 
-    const normalized = normalizePlatformFeePercent(platformFeePercent);
-    if (normalized === null) {
-      throw new HttpsError(
-        "invalid-argument",
-        `platformFeePercent must be a number between 0 and ${PLATFORM_FEE_PERCENT_MAX}.`
-      );
+    let clearedMarkup = false;
+    let appliedMarkup = null;
+    if (hasSmsMarkup) {
+      const normalizedMarkup = normalizeSmsMarkupMultiplier(data.smsMarkupMultiplierOverride);
+      if (normalizedMarkup === null) {
+        throw new HttpsError(
+          "invalid-argument",
+          `smsMarkupMultiplierOverride must be a number between 0 (exclusive) and ${SMS_MARKUP_MULTIPLIER_MAX}, or empty to inherit the platform default.`
+        );
+      }
+      if (normalizedMarkup === undefined) {
+        update.smsMarkupMultiplierOverride = FieldValue.delete();
+        clearedMarkup = true;
+      } else {
+        update.smsMarkupMultiplierOverride = normalizedMarkup;
+        appliedMarkup = normalizedMarkup;
+      }
     }
 
-    await tenantRef.update({ platformFeePercent: normalized });
+    await tenantRef.update(update);
 
     logger.info("platformAdminUpdateTenantBillingCallable: updated", {
       tenantID,
-      platformFeePercent: normalized,
+      platformFeePercent: hasFeePercent ? update.platformFeePercent : "unchanged",
+      smsMarkupMultiplierOverride: hasSmsMarkup
+        ? (clearedMarkup ? "cleared" : appliedMarkup)
+        : "unchanged",
       uid: auth.uid,
     });
 
-    return { success: true, tenantID, platformFeePercent: normalized };
+    return {
+      success: true,
+      tenantID,
+      platformFeePercent: hasFeePercent ? update.platformFeePercent : undefined,
+      smsMarkupMultiplierOverride: hasSmsMarkup
+        ? (clearedMarkup ? null : appliedMarkup)
+        : undefined,
+    };
   }
 );
 
@@ -1275,7 +1335,7 @@ async function buildTenantSummary(db, tenantDoc) {
   // is actually on a monthly_sub plan with a recorded tierID. Use a direct
   // doc read (not getTierDoc) so archived/deleted tiers don't throw; the
   // dashboard list view needs to render historical state gracefully.
-  const [twilioSnap, a2pSnap, connectSnap, storesCountSnap, emailAuthSnap, tierSnap] =
+  const [twilioSnap, a2pSnap, connectSnap, storesCountSnap, emailAuthSnap, tierSnap, platformBillingConfigSnap] =
     await Promise.all([
       tenantRef.collection("private").doc("twilio").get(),
       tenantRef.collection("private").doc("twilio-a2p").get(),
@@ -1285,6 +1345,7 @@ async function buildTenantSummary(db, tenantDoc) {
       tdata.subscriptionTierID
         ? db.collection("platform-billing-tiers").doc(tdata.subscriptionTierID).get()
         : Promise.resolve(null),
+      db.collection("platform-billing").doc("config").get(),
     ]);
 
   const twilioData = twilioSnap.exists ? twilioSnap.data() || {} : {};
@@ -1293,6 +1354,20 @@ async function buildTenantSummary(db, tenantDoc) {
     ? null
     : connectSnap.docs[0].data() || {};
   const tierData = tierSnap && tierSnap.exists ? tierSnap.data() || {} : null;
+  const platformBillingConfig =
+    platformBillingConfigSnap && platformBillingConfigSnap.exists
+      ? platformBillingConfigSnap.data() || {}
+      : {};
+  const platformSmsMarkupRaw = Number(platformBillingConfig.smsMarkupMultiplier);
+  const platformSmsMarkupMultiplier =
+    Number.isFinite(platformSmsMarkupRaw) && platformSmsMarkupRaw > 0
+      ? platformSmsMarkupRaw
+      : null;
+  const tenantSmsMarkupRaw = Number(tdata.smsMarkupMultiplierOverride);
+  const smsMarkupMultiplierOverride =
+    Number.isFinite(tenantSmsMarkupRaw) && tenantSmsMarkupRaw > 0
+      ? tenantSmsMarkupRaw
+      : null;
 
   // Per-account email summary. Status derives from the cached values written
   // by the OAuth callback / sync / renew-watch handlers in gmail.js. We
@@ -1369,6 +1444,8 @@ async function buildTenantSummary(db, tenantDoc) {
       stripeSubscriptionID: tdata.stripeSubscriptionID || null,
       stripeSubscriptionPriceID: tdata.stripeSubscriptionPriceID || null,
       subscriptionGraceUntil,
+      smsMarkupMultiplierOverride,
+      platformSmsMarkupMultiplier,
     },
     twilio: {
       hasSubaccount: Boolean(twilioData.subaccountSid),

@@ -27,8 +27,8 @@ export const BillingSuspensionBanner = () => {
       : null;
 
   const message = isBlocked
-    ? "Subscription suspended — update billing in Subscription to restore payment processing"
-    : `Payment failed — ${remaining} until subscription is suspended. Update billing in Subscription.`;
+    ? "Billing suspended — update payment method in Subscription to restore payment processing"
+    : `Payment failed — ${remaining} until billing is suspended. Update payment method in Subscription.`;
 
   return createPortal(
     <div

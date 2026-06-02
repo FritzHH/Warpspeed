@@ -1,5 +1,6 @@
 const { runMasterSync } = require("./modes/master");
 const { runInventorySync } = require("./modes/inventory");
+const { runSpecsSync } = require("./modes/specs");
 
 const MODE = (process.env.JBI_MODE || "").trim().toLowerCase();
 
@@ -10,9 +11,11 @@ async function main() {
       return await runMasterSync();
     case "inventory":
       return await runInventorySync();
+    case "specs":
+      return await runSpecsSync();
     default:
       throw new Error(
-        `JBI_MODE must be 'master' or 'inventory' (got: '${MODE}')`,
+        `JBI_MODE must be 'master', 'inventory', or 'specs' (got: '${MODE}')`,
       );
   }
 }

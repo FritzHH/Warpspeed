@@ -1,11 +1,12 @@
 /*eslint-disable*/
-import { useState, useRef, lazy, Suspense } from "react";
+import { useState, useRef, useEffect, lazy, Suspense } from "react";
 import cloneDeep from "lodash/cloneDeep";
 import debounce from "lodash/debounce";
 import {
   useSettingsStore,
   useInventoryStore,
   useLoginStore,
+  useOrderingModalStore,
 } from "../../../stores";
 import {
   Button,
@@ -23,12 +24,16 @@ import {
 } from "../../../dom_components";
 import { C, ICONS, Radius } from "../../../styles";
 import styles from "./InventoryItemModalScreen.module.css";
-import { formatCurrencyDisp, showAlert, deepEqual, localStorageWrapper } from "../../../utils";
+import { formatCurrencyDisp, showAlert, deepEqual, localStorageWrapper, generate36CharUUID } from "../../../utils";
 import {
   dbSaveInventoryItem,
   dbDeleteInventoryItem,
   dbSavePrintObj,
+  dbListenToVendorOrders,
+  dbListenToVendorOrderItems,
+  dbSaveVendorOrderItem,
 } from "../../../db_calls_wrapper";
+import { VENDOR_ORDER_ITEM_PROTO } from "../../../data";
 import { labelPrintBuilder } from "../../../shared/labelPrintBuilder";
 const QuickButtonPickerModal = lazy(() =>
   import("./QuickButtonPickerModal").then((m) => ({ default: m.QuickButtonPickerModal }))
@@ -159,6 +164,63 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
   const [sDirty, _setDirty] = useState(false);
   const [sPrintSuccess, _setPrintSuccess] = useState(false);
   const [sPrintQty, _setPrintQty] = useState(1);
+  const [sOpenOrders, _setOpenOrders] = useState([]);
+  const [sOrderItemCounts, _setOrderItemCounts] = useState({});
+  const [sAddToOrderOpen, _setAddToOrderOpen] = useState(false);
+
+  useEffect(() => {
+    const unsub = dbListenToVendorOrders((data) => {
+      const arr = Array.isArray(data) ? data : [];
+      _setOpenOrders(
+        arr
+          .filter((o) => !o.status || o.status === "open")
+          .sort(
+            (a, b) =>
+              (b.lastModifiedMillis || 0) - (a.lastModifiedMillis || 0),
+          ),
+      );
+    });
+    return () => {
+      if (typeof unsub === "function") unsub();
+    };
+  }, []);
+
+  const openOrderIDsKey = sOpenOrders.map((o) => o.id).join(",");
+  useEffect(() => {
+    if (!openOrderIDsKey) {
+      _setOrderItemCounts({});
+      return;
+    }
+    const ids = openOrderIDsKey.split(",");
+    const unsubs = ids.map((orderID) =>
+      dbListenToVendorOrderItems(orderID, (data) => {
+        const count = Array.isArray(data) ? data.length : 0;
+        _setOrderItemCounts((prev) =>
+          prev[orderID] === count ? prev : { ...prev, [orderID]: count },
+        );
+      }),
+    );
+    return () => {
+      unsubs.forEach((u) => { if (typeof u === "function") u(); });
+    };
+  }, [openOrderIDsKey]);
+
+  async function handleAddToOrder(orderID) {
+    if (!orderID) return;
+    const currentUser = useLoginStore.getState().getCurrentUser?.() || {};
+    const orderItem = cloneDeep(VENDOR_ORDER_ITEM_PROTO);
+    orderItem.id = generate36CharUUID();
+    orderItem.scannedBarcode =
+      sItem.primaryBarcode ||
+      (Array.isArray(sItem.barcodes) ? sItem.barcodes[0] : "") ||
+      "";
+    orderItem.qty = 1;
+    orderItem.addedMillis = Date.now();
+    orderItem.addedByUserID = currentUser.id || "";
+    orderItem.lookupStatus = "matched";
+    orderItem.vendorItemID = sItem.id;
+    await dbSaveVendorOrderItem(orderID, orderItem);
+  }
 
   // debounced inventory save
   const debouncedInvSaveRef = useRef(
@@ -458,6 +520,117 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
             iconSize={22}
             actions={[
               !isNew && (
+                sOpenOrders.length === 0 ? (
+                  <LargeModalHeaderButton
+                    key="addToOrder"
+                    variant="default"
+                    icon={ICONS.add}
+                    iconPosition="only"
+                    tooltip="No open orders available"
+                    disabled={true}
+                  />
+                ) : sOpenOrders.length === 1 ? (
+                  <LargeModalHeaderButton
+                    key="addToOrder"
+                    variant="default"
+                    icon={ICONS.add}
+                    iconPosition="only"
+                    tooltip="Add to order"
+                    onClick={() => handleAddToOrder(sOpenOrders[0].id)}
+                  />
+                ) : (
+                  <PrintActionSlot
+                    key="addToOrder"
+                    style={{ width: 44, height: 44, position: "relative", flexShrink: 0 }}
+                  >
+                    <Tooltip text="Add to order" position="bottom" disabled={sAddToOrderOpen}>
+                      <DropdownMenu
+                        portal
+                        onOpenChange={(open) => _setAddToOrderOpen(open)}
+                        dataArr={[
+                          {
+                            slug: "__goToOrdering__",
+                            label: (
+                              <span style={{ color: C.accent, fontWeight: 600 }}>
+                                Go to ordering
+                              </span>
+                            ),
+                          },
+                          { _isDivider: true },
+                          ...sOpenOrders.map((o) => {
+                            const name =
+                              o.name ||
+                              (o.createdMillis
+                                ? new Date(o.createdMillis).toLocaleString()
+                                : "Unnamed order");
+                            const count = sOrderItemCounts[o.id] || 0;
+                            return {
+                              slug: o.id,
+                              label: (
+                                <span
+                                  style={{
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "space-between",
+                                    width: "100%",
+                                    gap: 8,
+                                  }}
+                                >
+                                  <span
+                                    style={{
+                                      overflow: "hidden",
+                                      textOverflow: "ellipsis",
+                                      whiteSpace: "nowrap",
+                                    }}
+                                  >
+                                    {name}
+                                  </span>
+                                  <span
+                                    style={{
+                                      flexShrink: 0,
+                                      fontSize: 11,
+                                      fontWeight: 700,
+                                      padding: "2px 8px",
+                                      borderRadius: 999,
+                                      backgroundColor: C.surfaceAccentMuted,
+                                      color: C.accent,
+                                      minWidth: 22,
+                                      textAlign: "center",
+                                    }}
+                                  >
+                                    {count}
+                                  </span>
+                                </span>
+                              ),
+                            };
+                          }),
+                        ]}
+                        onSelect={(menuItem) => {
+                          if (menuItem.slug === "__goToOrdering__") {
+                            useOrderingModalStore.getState().show();
+                            handleExit();
+                            return;
+                          }
+                          handleAddToOrder(menuItem.slug);
+                        }}
+                        buttonText=""
+                        buttonIcon={ICONS.add}
+                        buttonIconSize={22}
+                        buttonStyle={{
+                          backgroundColor: "transparent",
+                          borderColor: "transparent",
+                          borderRadius: Radius.control,
+                          width: 44,
+                          height: 44,
+                          padding: 8,
+                        }}
+                        aria-label="Add to order"
+                      />
+                    </Tooltip>
+                  </PrintActionSlot>
+                )
+              ),
+              !isNew && (
                 <LargeModalHeaderButton
                   key="delete"
                   variant="danger"
@@ -557,14 +730,11 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
             {/* Names */}
             <div className={styles.sectionCard} style={sectionCardInline}>
               {renderField("Catalog Name", "formalName", { autoFocus: true })}
-              {renderField("Quick Button/Descriptive Name", "informalName", { multiline: true, hint: " -- use enter key to space name to fit quick button card if desired" })}
+              {/* {renderField("Quick Button/Descriptive Name", "informalName", { multiline: true, hint: " -- use enter key to space name to fit quick button card if desired" })} */}
             </div>
 
-            {/* Brand + Category */}
+            {/* Category + Brand */}
             <div className={`${styles.sectionCard} ${styles.sectionCardRow}`} style={sectionCardInline}>
-              <div className={styles.brandWrap}>
-                {renderField("Brand", "brand")}
-              </div>
               <div className={styles.categoryWrap}>
                 <label className={styles.fieldLabel} style={{ color: C.textMuted }}>Category</label>
                 {sEditing ? (
@@ -586,6 +756,9 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                   <span className={styles.fieldValue} style={{ color: C.text }}>{sItem.category || "Item"}</span>
                 )}
               </div>
+              <div className={styles.brandWrap}>
+                {renderField("Brand", "brand")}
+              </div>
             </div>
 
             {/* Prices */}
@@ -596,8 +769,9 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                 </div>
               )}
               {renderField("Price", "price", { currency: true, flex: 1 })}
-              {renderField("Sale Price", "salePrice", { currency: true, flex: 1 })}
-              {renderField("Cost", "cost", { currency: true, flex: 1, last: true })}
+              {renderField("Sale Price", "salePrice", { currency: true, flex: 1, last: sItem.category === "Labor" })}
+              {sItem.category !== "Labor" && renderField("Cost", "cost", { currency: true, flex: 1 })}
+              {sItem.category !== "Labor" && renderField("MSRP", "msrp", { currency: true, flex: 1, last: true })}
             </div>
 
             {/* Barcodes */}
@@ -664,15 +838,34 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                   <span className={styles.fieldValue} style={{ color: C.text }}>-</span>
                 )}
               </div>
+              <div className={styles.barcodesCol}>
+                {renderField("Vendor ID", "vendorId", { last: true })}
+              </div>
             </div>
 
-            <div className={styles.sectionCard} style={sectionCardInline}>
-              <CheckBox
-                text="Receipt Note Required"
-                isChecked={!!sItem.receiptNoteRequired}
-                onCheck={() => handleFieldChange("receiptNoteRequired", !sItem.receiptNoteRequired)}
-                textStyle={{ fontSize: 14, color: sItem.receiptNoteRequired ? C.green : C.textMuted }}
-              />
+            <div className={styles.twoCol}>
+              <div className={styles.twoColItem} style={sectionCardInline}>
+                <div className={styles.sectionHeader}>
+                  <div className={styles.sectionHeaderLeft}>
+                    <span className={styles.sectionTitle} style={{ color: C.text }}>
+                      Receipt Note Required
+                    </span>
+                    <Tooltip text="Require a customer receipt note to be entered when this item is added to a workorder" position="right" trigger="click">
+                      <button type="button" className={styles.sectionInfoBtn} aria-label="Info">
+                        <Image icon={ICONS.info} size={16} className={styles.sectionInfoIcon} />
+                      </button>
+                    </Tooltip>
+                  </div>
+                  <CheckBox
+                    isChecked={!!sItem.receiptNoteRequired}
+                    onCheck={() => handleFieldChange("receiptNoteRequired", !sItem.receiptNoteRequired)}
+                  />
+                </div>
+              </div>
+
+              <div className={styles.twoColItem} style={sectionCardInline}>
+                {renderField("Vendor Name", "vendorName", { last: true })}
+              </div>
             </div>
 
             <div className={styles.twoCol}>
@@ -683,8 +876,10 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                     <span className={styles.sectionTitle} style={{ color: C.text }}>
                       Quick Button Placement
                     </span>
-                    <Tooltip text="Assign this item to quick button menus for fast access" position="right">
-                      <Image icon={ICONS.info} size={16} className={styles.sectionInfoIcon} />
+                    <Tooltip text="Assign this item to quick button menus for fast access" position="right" trigger="click">
+                      <button type="button" className={styles.sectionInfoBtn} aria-label="Info">
+                        <Image icon={ICONS.info} size={16} className={styles.sectionInfoIcon} />
+                      </button>
                     </Tooltip>
                   </div>
                   <Button
@@ -737,8 +932,10 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                     <span className={styles.sectionTitle} style={{ color: C.text }}>
                       Auto Customer Note
                     </span>
-                    <Tooltip text="When this item is added to a workorder, these notes will automatically appear in Customer Notes" position="right">
-                      <Image icon={ICONS.info} size={16} className={styles.sectionInfoIcon} />
+                    <Tooltip text="When this item is added to a workorder, these notes will automatically appear in Customer Notes" position="right" trigger="click">
+                      <button type="button" className={styles.sectionInfoBtn} aria-label="Info">
+                        <Image icon={ICONS.info} size={16} className={styles.sectionInfoIcon} />
+                      </button>
                     </Tooltip>
                   </div>
                 </div>

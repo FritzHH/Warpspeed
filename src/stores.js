@@ -218,6 +218,20 @@ export const useTabNamesStore = create(
   )
 );
 
+export const useOrderingModalStore = create((set, get) => ({
+  visible: false,
+  show: () => set({ visible: true }),
+  hide: () => set({ visible: false }),
+  getVisible: () => get().visible,
+}));
+
+export const useInventoryReconciliationModalStore = create((set, get) => ({
+  visible: false,
+  show: () => set({ visible: true }),
+  hide: () => set({ visible: false }),
+  getVisible: () => get().visible,
+}));
+
 export const useInvModalStore = create((set, get) => ({
   currentFocusName: null,
   item: { ...INVENTORY_ITEM_PROTO },
@@ -359,10 +373,10 @@ export const useCheckoutStore = create((set, get) => ({
   setIsCheckingOut: (isCheckingOut) => {
     if (isCheckingOut && useBillingStore.getState().isPaymentBlocked()) {
       useAlertScreenStore.getState().setValues({
-        title: "Subscription Suspended",
+        title: "Billing Suspended",
         severity: "warning",
         message:
-          "Payment processing is disabled while your Cadence subscription is past due.",
+          "Payment processing is disabled while your Cadence billing is past due.",
         subMessage:
           "Open Subscription from the admin menu to update your payment method.",
         btn1Text: "OK",
@@ -2321,12 +2335,14 @@ export const useBillingStore = create((set, get) => ({
     return typeof v === "number" ? v : null;
   },
 
-  // True only for monthly_sub tenants where the grace window has expired
-  // while past_due. Used as a hard gate at the checkout entry.
+  // True when the grace window has expired while past_due, regardless of
+  // billing model. Used as a hard gate at the checkout entry. Both
+  // monthly_sub (failed subscription invoice) and per_sale (failed fee
+  // accumulation invoice) route through the same webhook and land on the
+  // same subscriptionStatus field, so one gate covers both.
   isPaymentBlocked: () => {
     const t = get().tenantDoc;
     if (!t) return false;
-    if (t.billingModel !== "monthly_sub") return false;
     const status = t.subscriptionStatus;
     if (status === "canceled" || status === "unpaid") return true;
     if (status !== "past_due") return false;
@@ -2335,12 +2351,12 @@ export const useBillingStore = create((set, get) => ({
     return Date.now() > grace;
   },
 
-  // True for monthly_sub tenants past_due but still inside the grace window.
-  // Surfaces the warning banner; does NOT block payment flows.
+  // True for tenants past_due but still inside the grace window. Surfaces
+  // the warning banner; does NOT block payment flows. Applies to both
+  // monthly_sub and per_sale — same field, same semantics.
   isInGracePeriod: () => {
     const t = get().tenantDoc;
     if (!t) return false;
-    if (t.billingModel !== "monthly_sub") return false;
     if (t.subscriptionStatus !== "past_due") return false;
     const grace = t.subscriptionGraceUntil;
     if (typeof grace !== "number") return false;

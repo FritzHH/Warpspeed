@@ -7,8 +7,14 @@ import { CreateTenantScreen } from "./screens/CreateTenantScreen";
 import { TenantDetailScreen } from "./screens/TenantDetailScreen";
 import { AddStoreScreen } from "./screens/AddStoreScreen";
 import { BillingTiersScreen } from "./screens/BillingTiersScreen";
+import { PlatformBillingConfigScreen } from "./screens/PlatformBillingConfigScreen";
+import { AdminScreen } from "./screens/AdminScreen";
+import { ScheduledJobsScreen } from "./screens/ScheduledJobsScreen";
 import { DeniedScreen } from "./screens/DeniedScreen";
 import { TenantSetupLandingScreen } from "./screens/TenantSetupLandingScreen";
+import { PortalLayout } from "./screens/portal/PortalLayout";
+import { PortNumberRoute } from "./screens/portal/PortNumberRoute";
+import { PortalHomeRoute } from "./screens/portal/PortalHomeRoute";
 
 export function App() {
   return (
@@ -18,6 +24,17 @@ export function App() {
           in via the email-link, with no custom claims) don't get bounced to
           the DeniedScreen. */}
       <Route path="/welcome" element={<TenantSetupLandingScreen />} />
+
+      {/* Tenant-owner post-onboarding portal. Gated by Firebase email-link
+          auth + a tenant-owner claims check (privilege >= 3 + tenantID).
+          Sits outside the platform-admin gate so live tenants — who don't
+          have platformAdmin = true — can complete one-shot flows like
+          number port-in without being bounced to DeniedScreen. */}
+      <Route path="/portal" element={<PortalLayout />}>
+        <Route index element={<PortalHomeRoute />} />
+        <Route path="port-number" element={<PortNumberRoute />} />
+      </Route>
+
       <Route path="/*" element={<AuthGatedApp />} />
     </Routes>
   );
@@ -60,7 +77,10 @@ function AuthGatedApp() {
         path="/tenants/:tenantID/stores/new"
         element={<AddStoreScreen />}
       />
+      <Route path="/billing/config" element={<PlatformBillingConfigScreen />} />
       <Route path="/billing/tiers" element={<BillingTiersScreen />} />
+      <Route path="/admin" element={<AdminScreen />} />
+      <Route path="/admin/scheduled-jobs" element={<ScheduledJobsScreen />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

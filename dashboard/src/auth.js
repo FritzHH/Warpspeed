@@ -33,3 +33,15 @@ export function onAuthStateChanged(callback) {
 export function isPlatformAdmin(claims) {
   return claims?.platformAdmin === true;
 }
+
+// Tenant-owner check for the post-onboarding portal (e.g., /portal/port-number).
+// The auth-claims phase-2 spec stamps live tenant users with
+// { tenantID, privilege, stores: [] }. Owners get privilege >= 3 (admin tier);
+// portal routes that act on the tenant's Twilio subaccount require this gate
+// so a tenant employee with the email-link can't accidentally trigger a port-in.
+export function isTenantOwner(claims) {
+  if (!claims) return false;
+  if (!claims.tenantID) return false;
+  const priv = claims.privilege;
+  return typeof priv === "number" && priv >= 3;
+}

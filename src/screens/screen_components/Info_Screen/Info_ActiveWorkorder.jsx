@@ -7,6 +7,8 @@ import {
   DatePicker as DatePicker_,
   DropdownMenu,
   Image as Image_,
+  LargeModalHeader,
+  LargeModalHeaderButton,
   Pressable as Pressable_,
   ScreenModal,
   TextInput as TextInput_,
@@ -2009,7 +2011,19 @@ export const ActiveWorkorderComponent = ({}) => {
                       handleOuterClick={() => _sSetShowTracker(false)}
                       Component={() => (
                         <div style={{ width: "80vw", height: "85vh", backgroundColor: C.backgroundWhite, borderRadius: Radius.container, overflow: "hidden", display: "flex", flexDirection: "column" }}>
-                          <div style={{ flex: 1, padding: 10 }}>
+                          <LargeModalHeader
+                            title="Package Tracking"
+                            actions={
+                              <LargeModalHeaderButton
+                                variant="default"
+                                icon={ICONS.close1}
+                                onClick={() => _sSetShowTracker(false)}
+                              >
+                                CLOSE
+                              </LargeModalHeaderButton>
+                            }
+                          />
+                          <div style={{ flex: 1, padding: 10, minHeight: 0 }}>
                             <iframe
                               src={"https://www.17track.net/en/track?nums=" + encodeURIComponent(sActiveOrderedItem.trackingNumber.trim())}
                               style={{ width: "100%", height: "100%", border: "none", borderRadius: Radius.control }}

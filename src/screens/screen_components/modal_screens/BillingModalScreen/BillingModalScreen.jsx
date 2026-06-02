@@ -322,41 +322,7 @@ function BillingModalInner({ handleExit }) {
     );
   }
 
-  if (isPerSale) {
-    return (
-      <Dialog visible={true} onClose={handleExit}>
-        <div className={styles.card}>
-          <LargeModalHeader
-            title={
-              <div className={styles.headerLeft}>
-                <span className={styles.title}>Subscription</span>
-                <span className={styles.subtitle}>Per-sale billing tenant</span>
-              </div>
-            }
-            actions={
-              <LargeModalHeaderButton variant="default" onClick={handleExit}>
-                CLOSE
-              </LargeModalHeaderButton>
-            }
-          />
-          <div className={styles.body}>
-            <div className={styles.perSaleNotice}>
-              <div className={styles.perSaleTitle}>You are on per-sale billing.</div>
-              <div className={styles.perSaleText}>
-                Cadence collects {typeof sTenantDoc.platformFeePercent === "number" ? sTenantDoc.platformFeePercent : "—"}% on
-                each successful transaction. There is no monthly subscription to manage.
-              </div>
-              <div className={styles.perSaleText}>
-                For billing questions, contact your Cadence account representative.
-              </div>
-            </div>
-          </div>
-        </div>
-      </Dialog>
-    );
-  }
-
-  if (!isMonthlySub) {
+  if (!isMonthlySub && !isPerSale) {
     return (
       <Dialog visible={true} onClose={handleExit}>
         <div className={styles.card}>
@@ -388,7 +354,9 @@ function BillingModalInner({ handleExit }) {
             <div className={styles.headerLeft}>
               <span className={styles.title}>Subscription</span>
               <span className={styles.subtitle}>
-                {sTenantDoc.name || tenantID}
+                {isPerSale
+                  ? `Per-sale billing — ${sTenantDoc.name || tenantID}`
+                  : sTenantDoc.name || tenantID}
               </span>
             </div>
           }
@@ -438,7 +406,7 @@ function BillingModalInner({ handleExit }) {
 
         {graceExpired && (
           <div className={styles.banner} style={{ backgroundColor: C.lightRed, color: C.text }}>
-            Subscription is past due and the grace period has expired. Update your payment method to restore service.
+            Billing is past due and the grace period has expired. Update your payment method to restore service.
           </div>
         )}
         {inGrace && (
@@ -547,7 +515,18 @@ function OverviewTab({
 
       <div className={styles.section}>
         <div className={styles.sectionLabel}>Plan</div>
-        {tier ? (
+        {tenant.billingModel === "per_sale" ? (
+          <div className={styles.tierCard}>
+            <div className={styles.tierLabel}>Per-sale billing</div>
+            <div className={styles.tierAmount}>
+              {typeof tenant.platformFeePercent === "number" ? tenant.platformFeePercent : "—"}%
+              <span className={styles.tierSuffix}>per transaction</span>
+            </div>
+            <div className={styles.tierDescription}>
+              Cadence collects this percentage on each successful transaction, billed twice monthly on the 1st and 16th. A payment method on file is required so invoices charge automatically.
+            </div>
+          </div>
+        ) : tier ? (
           <div className={styles.tierCard}>
             <div className={styles.tierLabel}>{tier.label}</div>
             <div className={styles.tierAmount}>
@@ -773,7 +752,7 @@ function AddCardModal({ tenantID, tier, hasSubscription, onClose, onSuccess, onE
   const [sCardComplete, _setCardComplete] = useState(false);
   const [sExpComplete, _setExpComplete] = useState(false);
   const [sCvcComplete, _setCvcComplete] = useState(false);
-  const [sStartSub, _setStartSub] = useState(!hasSubscription);
+  const [sStartSub, _setStartSub] = useState(!hasSubscription && !!tier);
   const [sBusy, _setBusy] = useState(false);
   const [sError, _setError] = useState("");
 
@@ -830,13 +809,12 @@ function AddCardModal({ tenantID, tier, hasSubscription, onClose, onSuccess, onE
         return;
       }
 
-      if (hasSubscription) {
-        await updateDefaultPMCallable({ tenantID, paymentMethodID });
-        onSuccess("Card saved and set as default.");
-        return;
-      }
-
-      onSuccess("Card saved.");
+      // hasSubscription: monthly_sub replacing/adding to active sub.
+      // !hasSubscription && !sStartSub: per_sale, or monthly_sub before tier
+      // assignment — set as default either way so the next auto-charged
+      // invoice hits this card.
+      await updateDefaultPMCallable({ tenantID, paymentMethodID });
+      onSuccess("Card saved and set as default.");
     } catch (err) {
       const msg = err?.message || "Could not save card.";
       _setError(msg);

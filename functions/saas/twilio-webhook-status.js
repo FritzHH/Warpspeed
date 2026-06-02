@@ -16,6 +16,7 @@ const { onRequest } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
+const { PubSub } = require("@google-cloud/pubsub");
 const twilio = require("twilio");
 const common = require("./twilio-common");
 
@@ -30,6 +31,13 @@ const {
 } = common;
 
 const TERMINAL_STATUSES = new Set(["delivered", "undelivered", "failed"]);
+const SMS_BILLING_TOPIC = "sms-billing-events";
+
+let _pubsub = null;
+function pubsub() {
+  if (!_pubsub) _pubsub = new PubSub();
+  return _pubsub;
+}
 
 exports.handler = onRequest(
   {
@@ -177,6 +185,42 @@ exports.handler = onRequest(
       errorCode,
       isTerminal,
     });
+
+    // ── Publish to SMS billing topic on terminal status only ──
+    // Outbound bills regardless of delivery outcome (Twilio charges us on
+    // any terminal state). Publishing only on terminal status means we
+    // emit at most one billing event per Twilio message regardless of how
+    // many intermediate callbacks fire (queued / sending / sent).
+    if (isTerminal) {
+      try {
+        await pubsub()
+          .topic(SMS_BILLING_TOPIC)
+          .publishMessage({
+            json: {
+              messageSid,
+              tenantID,
+              storeID,
+              direction: "outbound",
+              from: fromNumber,
+              to: toNumber || null,
+              subaccountSid: subaccountSid || accountSid || null,
+              twilioPriceHint: params.Price || null,
+              twilioPriceUnitHint: params.PriceUnit || null,
+              terminalStatus: messageStatus,
+              publishedAt: new Date().toISOString(),
+            },
+          });
+      } catch (err) {
+        logger.error("twilioStatusCallbackWebhook: sms-billing publish failed", {
+          messageSid,
+          tenantID,
+          error: err && err.message,
+        });
+        // Don't 500 — status was already written. Billing event loss is
+        // recoverable via admin reconcile; double-status would corrupt the
+        // statusHistory array.
+      }
+    }
 
     return res.status(200).send("OK");
   }

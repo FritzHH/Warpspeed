@@ -1,0 +1,8 @@
+{
+  "rules": {
+    "vendor_catalogs": {
+      ".read": true,
+      ".write": false
+    }
+  }
+}

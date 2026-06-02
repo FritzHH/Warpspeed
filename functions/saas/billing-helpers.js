@@ -30,6 +30,61 @@ async function getTenantOrThrow(db, tenantID) {
   return { ref, snap, data: snap.data() || {} };
 }
 
+// Semi-monthly period key in America/Chicago. Days 1-15 → "YYYY-MM-1H";
+// days 16-EOM → "YYYY-MM-2H". This key is stamped on completed-sales docs
+// at write time so the accumulation invoicer can range-query a closed
+// period cheaply (single equality filter, no millis math) and so the rate
+// at point-of-sale is locked even if the tenant's % changes later.
+function computeFeeBillingPeriodKey(completedAtMillis, timeZone = "America/Chicago") {
+  if (!Number.isFinite(completedAtMillis)) return null;
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date(completedAtMillis));
+  let year = "";
+  let month = "";
+  let day = "";
+  for (const p of parts) {
+    if (p.type === "year") year = p.value;
+    else if (p.type === "month") month = p.value;
+    else if (p.type === "day") day = p.value;
+  }
+  if (!year || !month || !day) return null;
+  const dayNum = parseInt(day, 10);
+  if (!Number.isFinite(dayNum)) return null;
+  const half = dayNum <= 15 ? "1H" : "2H";
+  return `${year}-${month}-${half}`;
+}
+
+// Compute the fee snapshot to stamp on a completed-sale doc. Returns null
+// for non-per_sale tenants (monthly_sub charges via Stripe Billing; nothing
+// to accumulate). Returns null on missing/invalid percent so the snapshot
+// stamper doesn't write a half-filled record the invoicer can't reason about.
+async function resolveSaleFeeSnapshot(db, tenantID, completedAtMillis) {
+  if (!tenantID || !Number.isFinite(completedAtMillis)) return null;
+
+  const snap = await db.collection("tenants").doc(tenantID).get();
+  if (!snap.exists) return null;
+  const tdata = snap.data() || {};
+
+  const model = tdata.billingModel || null;
+  if (model !== "per_sale") return null;
+
+  const pct = Number(tdata.platformFeePercent);
+  if (!Number.isFinite(pct) || pct <= 0) return null;
+
+  const feeBillingPeriodKey = computeFeeBillingPeriodKey(completedAtMillis);
+  if (!feeBillingPeriodKey) return null;
+
+  return {
+    billingModelSnapshot: model,
+    platformFeePercentSnapshot: pct,
+    feeBillingPeriodKey,
+  };
+}
+
 async function resolveApplicationFeeAmount(db, tenantID, amount) {
   if (!tenantID || typeof amount !== "number" || amount <= 0) return 0;
 
@@ -139,4 +194,6 @@ module.exports = {
   getTierDoc,
   getSubscriptionStatus,
   readSubscriptionStatus,
+  computeFeeBillingPeriodKey,
+  resolveSaleFeeSnapshot,
 };

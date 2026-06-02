@@ -1762,3 +1762,29 @@ body {
 .toggleRow:hover {
   background-color: var(--bg);
 }
+
+/* ── Scheduled jobs (admin) ──────────────────────────────────────────── */
+
+.scheduledJobCard {
+  margin-top: 10px;
+  padding: 14px 16px;
+  background-color: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scheduledJobHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.scheduledJobTitle {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 14px;
+}

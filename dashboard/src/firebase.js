@@ -2,6 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFunctions } from "firebase/functions";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 // cadence-pos config. Firebase web config values are not secrets — the same
 // values ship in the tenant app. Security is enforced by Firestore rules,
@@ -19,3 +20,4 @@ export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const functions = getFunctions(app, "us-central1");
 export const db = getFirestore(app);
+export const storage = getStorage(app);

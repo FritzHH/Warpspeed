@@ -475,9 +475,7 @@ export const Items_WorkorderItemsTab = ({}) => {
             title: "Cannot Mark Tax-Free",
             message: "The following parts must be removed before this workorder can be marked tax-free:\n\n" + itemList,
             btn1Text: "OK",
-            handleBtn1Press: () => {
-              useAlertScreenStore.getState().setValues({ showAlert: false });
-            },
+            handleBtn1Press: () => {},
           });
         } else {
           useAlertScreenStore.getState().setValues({
@@ -487,16 +485,13 @@ export const Items_WorkorderItemsTab = ({}) => {
             message: "No shop parts, even a drop of oil, must leave with the customer for this workorder to qualify as tax-free.",
             btn1Text: "Confirm Tax-Free",
             handleBtn1Press: () => {
-              useAlertScreenStore.getState().setValues({ showAlert: false });
               let floorCheck = checkSaleFloor(null, { taxFree: true });
               if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
               useOpenWorkordersStore.getState().setField("taxFree", true);
               useOpenWorkordersStore.getState().setField("taxFreeReceiptNote", useSettingsStore.getState().settings?.taxFreeReceiptNote || "");
             },
             btn2Text: "Cancel",
-            handleBtn2Press: () => {
-              useAlertScreenStore.getState().setValues({ showAlert: false });
-            },
+            handleBtn2Press: () => {},
           });
         }
       }

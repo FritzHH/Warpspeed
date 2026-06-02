@@ -623,6 +623,91 @@ export function rollupSmsByFeature(events) {
   return Object.values(map).sort((a, b) => b.costCents - a.costCents);
 }
 
+// ─── SMS Billing Stamps (Phase 4 — per-text billing) ──────────────────────
+// Distinct from usage-events above (which are platform self-cost analytics).
+// Stamps live at tenants/{tid}/sms-billing-stamps/{messageSid} and represent
+// what the TENANT is being billed for each Twilio message — Twilio cost
+// times the markup multiplier. The SMS tab surfaces both:
+//   • Self-cost view (existing helpers above) — what we pay Twilio
+//   • Billing view (helpers below) — what the tenant pays us
+
+/**
+ * Load SMS billing stamps for the current tenant within a date range.
+ * Stamps are tenant-scoped (one stamp per messageSid regardless of store)
+ * so no per-store fan-out is needed — single Firestore query.
+ *
+ *  → [{ messageSid, storeID, direction, billed, billedCents,
+ *       twilioCostFractionalCents, markupMultiplier, smsBillingPeriodKey, ... }]
+ */
+export async function loadSmsBillingStamps(startMillis, endMillis, opts = {}) {
+  const { tenantID } = getTenantStoreIDs();
+  if (!tenantID) return [];
+
+  const path = `tenants/${tenantID}/sms-billing-stamps`;
+  const where = [
+    { field: "receivedAtMs", operator: ">=", value: startMillis },
+    { field: "receivedAtMs", operator: "<=", value: endMillis },
+  ];
+  try {
+    const stamps = await firestoreQuery(path, where, {
+      orderBy: { field: "receivedAtMs", direction: "desc" },
+      limit: opts.limit || 10000,
+    });
+    return stamps || [];
+  } catch (err) {
+    return [];
+  }
+}
+
+/**
+ * Aggregate billing stamps across an array. Splits inbound/outbound so the
+ * tile can show direction breakdown. `markupAmountCents` is what we kept
+ * above Twilio's wholesale cost (markup margin in cents).
+ *
+ *  → {
+ *      stampCount, billedCount, unbilledCount,
+ *      inboundCount, outboundCount,
+ *      totalBilledCents, twilioCostCents, markupAmountCents,
+ *      avgMarkupMultiplier
+ *    }
+ */
+export function sumSmsBilling(stamps) {
+  let stampCount = 0;
+  let billedCount = 0;
+  let unbilledCount = 0;
+  let inboundCount = 0;
+  let outboundCount = 0;
+  let totalBilledCents = 0;
+  let twilioCostFractionalCents = 0;
+  let markupMultSum = 0;
+  let markupMultCount = 0;
+  for (const s of stamps) {
+    stampCount += 1;
+    if (s.billed) billedCount += 1; else unbilledCount += 1;
+    if (s.direction === "inbound") inboundCount += 1;
+    else if (s.direction === "outbound") outboundCount += 1;
+    totalBilledCents += Number(s.billedCents) || 0;
+    twilioCostFractionalCents += Number(s.twilioCostFractionalCents) || 0;
+    const m = Number(s.markupMultiplier);
+    if (Number.isFinite(m) && m > 0) {
+      markupMultSum += m;
+      markupMultCount += 1;
+    }
+  }
+  const twilioCostCents = Math.round(twilioCostFractionalCents);
+  return {
+    stampCount,
+    billedCount,
+    unbilledCount,
+    inboundCount,
+    outboundCount,
+    totalBilledCents,
+    twilioCostCents,
+    markupAmountCents: Math.max(0, totalBilledCents - twilioCostCents),
+    avgMarkupMultiplier: markupMultCount > 0 ? markupMultSum / markupMultCount : 0,
+  };
+}
+
 /**
  * Daily SMS cost buckets. Same shape as bucketByDay but only sums the SMS
  * portion of each event so the trend chart is SMS-specific.

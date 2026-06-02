@@ -216,17 +216,15 @@ export function buildIntakeReceiptPDF(data) {
     doc.text(bikeInfo, leftX + 28, y);
     y += 12;
   }
-  if (data.description) {
-    doc.text("Description: " + data.description, leftX, y);
-    y += 12;
-  }
   let colors = [data.color1, data.color2].filter(Boolean).join(", ");
   if (colors) {
     doc.text("Colors: " + colors, leftX, y);
     y += 12;
   }
-  if (isIntake && (data.waitTimeEstimateLabel || data.waitTime)) {
-    doc.text("Estimate: " + (data.waitTimeEstimateLabel || data.waitTime), leftX, y);
+  let estimateText = data.waitTimeEstimateLabel || data.waitTime || "";
+  let hasEstimate = estimateText && estimateText !== "Missing estimate" && estimateText !== "No estimate";
+  if (isIntake && hasEstimate) {
+    doc.text("Estimate: " + estimateText, leftX, y);
     y += 12;
   }
 

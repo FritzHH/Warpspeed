@@ -1,16 +1,16 @@
-const admin = require("firebase-admin");
 const { withFtpClient } = require("../ftp");
-const { initFirestore, BatchWriter } = require("../firestore");
+const { initRtdb, MultiPathWriter } = require("../rtdb");
 const { getLastSyncMeta, setLastSyncMeta, shouldSkip } = require("../meta");
 const { createTabParser } = require("../parser");
 
 const REMOTE_FILE = "/inv_mast.txt";
 const META_KEY = "lastMasterSync";
-const ITEMS_SUBCOLLECTION = "items";
+const ITEMS_PATH = "vendor_catalogs/jbi/items";
+const ITEMS_BY_UPC_PATH = "vendor_catalogs/jbi/items_by_upc";
 
 async function runMasterSync() {
   const startedAt = Date.now();
-  const db = initFirestore();
+  const db = initRtdb();
 
   return await withFtpClient(async (ftpClient) => {
     const remoteModTime = await ftpClient.lastMod(REMOTE_FILE);
@@ -20,30 +20,43 @@ async function runMasterSync() {
     if (shouldSkip(lastSync, remoteModTime)) {
       console.log(`[jbi-master] skipping - remote unchanged since last sync`);
       await setLastSyncMeta(db, META_KEY, {
-        ftpModTime: admin.firestore.Timestamp.fromDate(remoteModTime),
+        ftpModTime: remoteModTime.getTime(),
         skipped: true,
         durationSec: (Date.now() - startedAt) / 1000,
       });
       return { skipped: true };
     }
 
+    console.log(`[jbi-master] wiping ${ITEMS_PATH} and ${ITEMS_BY_UPC_PATH}`);
+    await db.ref().update({
+      [ITEMS_PATH]: null,
+      [ITEMS_BY_UPC_PATH]: null,
+    });
+
     const parser = createTabParser({ columns: true });
     const downloadPromise = ftpClient.downloadTo(parser, REMOTE_FILE);
 
-    const writer = new BatchWriter(db);
-    const itemsCol = db
-      .collection("vendor_catalogs")
-      .doc("jbi")
-      .collection(ITEMS_SUBCOLLECTION);
-
+    const writer = new MultiPathWriter(db);
     let itemCount = 0;
+    let upcCount = 0;
+
     for await (const row of parser) {
       const itemId = row.item_id;
       if (!itemId) continue;
-      await writer.set(itemsCol.doc(itemId), cleanRow(row));
+
+      await writer.set(`${ITEMS_PATH}/${itemId}`, cleanRow(row));
       itemCount++;
+
+      const upc = (row.upc_ean || "").trim();
+      if (upc) {
+        await writer.set(`${ITEMS_BY_UPC_PATH}/${upc}`, itemId);
+        upcCount++;
+      }
+
       if (itemCount % 1000 === 0) {
-        console.log(`[jbi-master] processed ${itemCount} items`);
+        console.log(
+          `[jbi-master] processed ${itemCount} items (${upcCount} UPCs so far)`,
+        );
       }
     }
 
@@ -52,16 +65,17 @@ async function runMasterSync() {
 
     const durationSec = (Date.now() - startedAt) / 1000;
     await setLastSyncMeta(db, META_KEY, {
-      ftpModTime: admin.firestore.Timestamp.fromDate(remoteModTime),
+      ftpModTime: remoteModTime.getTime(),
       itemCount,
+      upcCount,
       durationSec,
       skipped: false,
     });
 
     console.log(
-      `[jbi-master] done. ${itemCount} items in ${durationSec.toFixed(1)}s`,
+      `[jbi-master] done. ${itemCount} items, ${upcCount} UPCs in ${durationSec.toFixed(1)}s`,
     );
-    return { skipped: false, itemCount, durationSec };
+    return { skipped: false, itemCount, upcCount, durationSec };
   });
 }
 
@@ -72,7 +86,6 @@ function cleanRow(row) {
       cleaned[key] = value;
     }
   }
-  cleaned.lastUpdated = admin.firestore.FieldValue.serverTimestamp();
   return cleaned;
 }
 

@@ -42,6 +42,11 @@ const OrderSelectScreen = lazy(() =>
     default: m.OrderSelectScreen,
   }))
 );
+const OrderViewerScreen = lazy(() =>
+  import("./screens/phone/OrderViewerScreen/OrderViewerScreen").then((m) => ({
+    default: m.OrderViewerScreen,
+  }))
+);
 import { HomeScreen } from "./screens/HomeScreen";
 const DatabaseViewerScreen = lazy(() =>
   import("./screens/DatabaseViewerScreen").then((m) => ({
@@ -560,6 +565,14 @@ function App() {
             element={
               <Suspense fallback={<LoadingIndicator />}>
                 <OrderingScreen />
+              </Suspense>
+            }
+          />
+          <Route
+            path="ordering/:orderID/view"
+            element={
+              <Suspense fallback={<LoadingIndicator />}>
+                <OrderViewerScreen />
               </Suspense>
             }
           />

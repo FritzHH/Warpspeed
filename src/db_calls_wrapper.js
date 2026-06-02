@@ -15,6 +15,9 @@ import {
   firestoreRead,
   firestoreUpdate,
   firestoreQuery,
+  firestoreReadDocsByIds,
+  rdbRead,
+  rdbCatalogRead,
   firestoreSubscribe,
   firestoreSubscribeCollection,
   firestoreDelete,
@@ -4880,14 +4883,109 @@ export async function dbSaveSubscriptionField(fieldName, fieldVal) {
 //   tenants/{tenantID}/stores/{storeID}/vendor-orders/{orderID}/items/{itemID}
 //     └── one doc per scan, written granularly (no full-order rewrite per scan)
 //
-// Catalogs live at the GLOBAL root (not tenant-scoped) and are public-read:
-//   vendor_catalogs/{vendorID}/items/{item_id}      ← keyed by vendor's item_id
-//   vendor_catalogs/{vendorID}/inventory/{item_id}  ← warehouse stock (hourly)
+// Catalogs live in Realtime Database at the GLOBAL root (not tenant-scoped),
+// public-read for authed users:
+//   vendor_catalogs/{vendorID}/items/{itemId}                 ← master row
+//   vendor_catalogs/{vendorID}/items_by_upc/{upc}: "itemId"   ← reverse-index pointer
+//   vendor_catalogs/{vendorID}/inventory_by_item/{itemId}: { avail_NNN: qty, ... }
+//     └── per-item warehouse map; sparse — missing key = zero stock at that
+//         warehouse, missing item node = no inventory data at all.
 //
-// Resolver flow (dbResolveOrderItem): local inventory first (Zustand);
-// on miss, parallel query across VENDOR_CATALOGS by upc_ean. Result writes
-// back to the item doc; the desktop's items listener picks it up live.
+// Resolver flow (dbResolveOrderItem): local inventory first (Zustand); on miss,
+// parallel reverse-index reads across VENDOR_CATALOGS (items_by_upc/{upc} →
+// itemId → items/{itemId}). Result writes back to the item doc; the desktop's
+// items listener picks it up live.
 // ----------------------------------------------------------------------------
+
+function buildVendorInventoryItemPath(vendorId, itemId) {
+  return `vendor_catalogs/${vendorId}/inventory_by_item/${itemId}`;
+}
+
+// Read on-hand qty for a single (vendor, warehouse, item). Returns a finite
+// number when the RTDB endpoint actually has a value (including a real 0), or
+// `null` when the path is missing/non-finite/errored. Callers should treat
+// `null` as "unknown" and render accordingly — a 0 must only mean a 0 came
+// from the source.
+export async function readInventoryQty(vendorId, warehouseCode, itemId) {
+  if (!vendorId || !warehouseCode || !itemId) return null;
+  try {
+    const qty = await rdbCatalogRead(`${buildVendorInventoryItemPath(vendorId, itemId)}/${warehouseCode}`);
+    if (qty === null || qty === undefined) return null;
+    const n = Number(qty);
+    return Number.isFinite(n) ? n : null;
+  } catch (e) {
+    log("readInventoryQty failed", { vendorId, warehouseCode, itemId, error: e?.message });
+    return null;
+  }
+}
+
+// Batch variant for an order's full line-item list. Returns Map<itemId, qty>.
+// Items absent from the result Map get 0 at the call site (per missing-node semantic).
+export async function readInventoryQtyMap(vendorId, warehouseCode, itemIds) {
+  const out = new Map();
+  if (!vendorId || !warehouseCode || !Array.isArray(itemIds) || itemIds.length === 0) {
+    return out;
+  }
+  try {
+    await Promise.all(
+      itemIds.map(async (id) => {
+        const qty = await readInventoryQty(vendorId, warehouseCode, id);
+        out.set(id, qty);
+      }),
+    );
+    return out;
+  } catch (e) {
+    log("readInventoryQtyMap failed", { vendorId, warehouseCode, count: itemIds.length, error: e?.message });
+    return out;
+  }
+}
+
+// Fan out across every warehouse for a vendor for a single item. Used by the
+// "check elsewhere" popover when the home warehouse is out. One RTDB read
+// returns the full warehouse map; we slice it locally per warehouse. `onResult`
+// fires synchronously for each warehouse so the existing streaming UI keeps
+// its hook (all entries arrive in one tick rather than trickling in). Returned
+// array is sorted: in-stock first by qty desc, home pinned to top.
+export async function checkInventoryAcrossWarehouses(
+  vendorId,
+  itemId,
+  { homeWarehouseCode = "", onResult } = {},
+) {
+  if (!vendorId || !itemId) return [];
+  const vendor = VENDOR_CATALOGS.find((v) => v.id === vendorId);
+  const warehouses = vendor?.warehouses || [];
+  if (warehouses.length === 0) return [];
+
+  let qtyMap = {};
+  try {
+    qtyMap = (await rdbCatalogRead(buildVendorInventoryItemPath(vendorId, itemId))) || {};
+  } catch (e) {
+    log("checkInventoryAcrossWarehouses read failed", { vendorId, itemId, error: e?.message });
+  }
+
+  const results = warehouses.map((wh) => {
+    const raw = Number(qtyMap[wh.code]);
+    const qty = Number.isFinite(raw) ? raw : 0;
+    const entry = {
+      code: wh.code,
+      name: wh.name || wh.code,
+      state: wh.state || "",
+      qty,
+      isHome: wh.code === homeWarehouseCode,
+    };
+    if (typeof onResult === "function") {
+      try { onResult(entry); } catch (e) { log("onResult callback threw", e?.message); }
+    }
+    return entry;
+  });
+
+  results.sort((a, b) => {
+    if (a.isHome !== b.isHome) return a.isHome ? -1 : 1;
+    if ((a.qty > 0) !== (b.qty > 0)) return a.qty > 0 ? -1 : 1;
+    return b.qty - a.qty;
+  });
+  return results;
+}
 
 function buildVendorOrderPath(tenantID, storeID, orderID) {
   return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.VENDOR_ORDERS}/${orderID}`;
@@ -4988,6 +5086,26 @@ export async function dbDeleteVendorOrderItem(orderID, itemID) {
     return { success: true };
   } catch (error) {
     log("Error deleting vendor order item:", error);
+    return { success: false, error };
+  }
+}
+
+export async function dbDeleteVendorOrder(orderID) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) return { success: false };
+    if (!orderID) return { success: false };
+    const itemsPath = buildVendorOrderItemsCollectionPath(tenantID, storeID, orderID);
+    const items = await firestoreQuery(itemsPath);
+    await Promise.all(
+      (items || []).map((item) =>
+        firestoreDelete(buildVendorOrderItemPath(tenantID, storeID, orderID, item.id)),
+      ),
+    );
+    await firestoreDelete(buildVendorOrderPath(tenantID, storeID, orderID));
+    return { success: true };
+  } catch (error) {
+    log("Error deleting vendor order:", error);
     return { success: false, error };
   }
 }
@@ -5121,12 +5239,11 @@ export async function dbResolveOrderItem(orderID, item) {
     const results = await Promise.all(
       targets.map(async (vendor) => {
         try {
-          const matches = await firestoreQuery(
-            `${vendor.catalogPath}/items`,
-            [{ field: "upc_ean", operator: "==", value: scanned }],
-            { limit: 1 }
-          );
-          return { vendor, match: matches[0] || null };
+          const itemId = await rdbCatalogRead(`${vendor.catalogPath}/items_by_upc/${scanned}`);
+          if (!itemId) return { vendor, match: null };
+          const match = await rdbCatalogRead(`${vendor.catalogPath}/items/${itemId}`);
+          if (!match) return { vendor, match: null };
+          return { vendor, match: { ...match, item_id: itemId } };
         } catch (e) {
           log("Catalog query failed for vendor " + vendor.id, e?.message);
           return { vendor, match: null };
@@ -5173,4 +5290,260 @@ export async function dbResolveOrderItem(orderID, item) {
     log("Error resolving order item:", error);
     return { success: false, error };
   }
+}
+
+// ============================================================================
+// INVENTORY RECONCILIATION
+// ============================================================================
+//
+// Maps an existing local inventory item (which may lack vendorId / cost /
+// msrp / etc.) onto vendor-catalog records in RTDB by UPC match.
+//
+// Search key = primaryBarcode plus every entry in barcodes[], deduped.
+// For each queryable VENDOR_CATALOGS entry (catalogPath set), every code is
+// probed against `{catalogPath}/items_by_upc/{code}` in parallel. Hits are
+// collapsed per-vendor (multiple local barcodes can resolve to the same
+// catalog item) and the catalog item + specs are fetched in parallel.
+//
+// Buckets returned to the caller:
+//   • matched   — exactly one vendor has any hit. Auto-applicable.
+//   • ambiguous — two or more vendors have hits. User picks which one
+//                 "owns" the item for future ordering.
+//   • no_match  — zero vendors hit; nothing to do.
+//
+// This function does NOT write. Use buildReconciliationUpdate() + apply via
+// dbSaveInventoryItem() to commit a chosen candidate.
+
+function pickCatalogName(catalogItem) {
+  if (!catalogItem) return "";
+  return (
+    catalogItem.description ||
+    catalogItem.item_description ||
+    catalogItem.short_description ||
+    catalogItem.product_name ||
+    catalogItem.name ||
+    catalogItem.desc ||
+    ""
+  );
+}
+
+function pickCatalogBrand(catalogItem) {
+  if (!catalogItem) return "";
+  return (
+    catalogItem.brand ||
+    catalogItem.brand_name ||
+    catalogItem.manufacturer ||
+    catalogItem.mfg ||
+    ""
+  );
+}
+
+function pickCatalogCost(catalogItem) {
+  if (!catalogItem) return "";
+  const raw =
+    catalogItem.cost ??
+    catalogItem.dealer_cost ??
+    catalogItem.dealer_price ??
+    catalogItem.wholesale ??
+    "";
+  return raw === "" || raw == null ? "" : String(raw);
+}
+
+function pickCatalogMsrp(catalogItem) {
+  if (!catalogItem) return 0;
+  const raw =
+    catalogItem.msrp ??
+    catalogItem.map ??
+    catalogItem.retail ??
+    catalogItem.list_price ??
+    0;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
+// Pulls every plausible barcode field off the catalog doc. JBI today writes
+// a combined `upc_ean` field but the schema is vendor-defined, so we cast a
+// wide net.
+function extractCatalogBarcodes(catalogItem) {
+  if (!catalogItem) return [];
+  const fields = [
+    "upc",
+    "upc_ean",
+    "ean",
+    "barcode",
+    "primary_barcode",
+    "gtin",
+  ];
+  const out = [];
+  for (const f of fields) {
+    const v = catalogItem[f];
+    if (typeof v === "string" && v.trim()) out.push(v.trim());
+  }
+  return out;
+}
+
+function normalizeBarcodeKey(code) {
+  if (typeof code !== "string") return "";
+  return code.trim();
+}
+
+export async function dbProbeInventoryAgainstCatalogs(localItem) {
+  try {
+    if (!localItem || typeof localItem !== "object") {
+      return { status: "no_match", candidates: [], searchedCodes: [] };
+    }
+
+    const codes = [];
+    const seen = new Set();
+    const push = (raw) => {
+      const k = normalizeBarcodeKey(raw);
+      if (!k || seen.has(k)) return;
+      seen.add(k);
+      codes.push(k);
+    };
+    push(localItem.primaryBarcode);
+    if (Array.isArray(localItem.barcodes)) {
+      localItem.barcodes.forEach(push);
+    }
+
+    if (codes.length === 0) {
+      return { status: "no_match", candidates: [], searchedCodes: [] };
+    }
+
+    const vendors = VENDOR_CATALOGS.filter((v) => v.catalogPath);
+    if (vendors.length === 0) {
+      return { status: "no_match", candidates: [], searchedCodes: codes };
+    }
+
+    // For each vendor, probe every code in parallel and collect the unique
+    // catalog itemIds that matched (and which local codes matched them).
+    const perVendor = await Promise.all(
+      vendors.map(async (vendor) => {
+        const probes = await Promise.all(
+          codes.map(async (code) => {
+            try {
+              const itemId = await rdbCatalogRead(
+                `${vendor.catalogPath}/items_by_upc/${code}`,
+              );
+              return itemId ? { code, itemId } : null;
+            } catch (e) {
+              log(
+                `Reconciliation probe failed: ${vendor.id}/${code}`,
+                e?.message,
+              );
+              return null;
+            }
+          }),
+        );
+
+        const itemIdToCodes = new Map();
+        probes.forEach((hit) => {
+          if (!hit) return;
+          const arr = itemIdToCodes.get(hit.itemId) || [];
+          arr.push(hit.code);
+          itemIdToCodes.set(hit.itemId, arr);
+        });
+
+        if (itemIdToCodes.size === 0) return null;
+
+        const fetched = await Promise.all(
+          Array.from(itemIdToCodes.entries()).map(
+            async ([itemId, matchedCodes]) => {
+              const [catalogItem, specs] = await Promise.all([
+                rdbCatalogRead(`${vendor.catalogPath}/items/${itemId}`).catch(
+                  () => null,
+                ),
+                rdbCatalogRead(`${vendor.catalogPath}/specs/${itemId}`).catch(
+                  () => null,
+                ),
+              ]);
+              if (!catalogItem) return null;
+              return {
+                vendorID: vendor.id,
+                vendorName: vendor.displayName,
+                itemId,
+                catalogItem,
+                specs,
+                matchedCodes,
+                vendorCodes: extractCatalogBarcodes(catalogItem),
+              };
+            },
+          ),
+        );
+
+        return fetched.filter(Boolean);
+      }),
+    );
+
+    const candidates = perVendor.filter(Boolean).flat();
+
+    let status;
+    if (candidates.length === 0) {
+      status = "no_match";
+    } else {
+      const vendorIDs = new Set(candidates.map((c) => c.vendorID));
+      status = vendorIDs.size === 1 ? "matched" : "ambiguous";
+    }
+
+    return { status, candidates, searchedCodes: codes };
+  } catch (error) {
+    log("Error probing inventory against catalogs:", error);
+    return { status: "no_match", candidates: [], searchedCodes: [] };
+  }
+}
+
+// Given a local item and a chosen candidate from
+// dbProbeInventoryAgainstCatalogs(), return the shallow-merge object to
+// write back. primaryBarcode and price are intentionally absent so the
+// caller can `{...local, ...payload}` without clobbering them.
+//
+//   formalName  ← catalog name
+//   brand       ← catalog brand (unchanged if catalog missing it)
+//   cost        ← catalog cost (string, matches current local shape)
+//   msrp        ← catalog msrp (number)
+//   vendorId    ← chosen vendor.id
+//   vendorName  ← chosen vendor.displayName
+//   catalogName ← catalog name (kept as the vendor-side name even if user
+//                  later edits formalName locally)
+//   barcodes[]  ← union(local.barcodes, vendor barcodes) minus primaryBarcode
+//   specs       ← snapshot { source, lastUpdated, entries }
+export function buildReconciliationUpdate(localItem, candidate) {
+  if (!candidate || !candidate.catalogItem) return {};
+
+  const catalogName = pickCatalogName(candidate.catalogItem);
+  const catalogBrand = pickCatalogBrand(candidate.catalogItem);
+  const cost = pickCatalogCost(candidate.catalogItem);
+  const msrp = pickCatalogMsrp(candidate.catalogItem);
+
+  const primary = normalizeBarcodeKey(localItem?.primaryBarcode);
+  const merged = new Set();
+  if (Array.isArray(localItem?.barcodes)) {
+    localItem.barcodes.forEach((b) => {
+      const k = normalizeBarcodeKey(b);
+      if (k && k !== primary) merged.add(k);
+    });
+  }
+  candidate.vendorCodes.forEach((b) => {
+    const k = normalizeBarcodeKey(b);
+    if (k && k !== primary) merged.add(k);
+  });
+
+  const specsEntries = Array.isArray(candidate.specs) ? candidate.specs : [];
+
+  const payload = {
+    formalName: catalogName || localItem?.formalName || "",
+    cost,
+    msrp,
+    vendorId: candidate.vendorID,
+    vendorName: candidate.vendorName,
+    catalogName: catalogName || localItem?.catalogName || "",
+    barcodes: Array.from(merged),
+    specs: {
+      source: candidate.vendorID,
+      lastUpdated: Date.now(),
+      entries: specsEntries,
+    },
+  };
+  if (catalogBrand) payload.brand = catalogBrand;
+  return payload;
 }

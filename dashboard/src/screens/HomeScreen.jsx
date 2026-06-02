@@ -359,8 +359,14 @@ export function HomeScreen({ user, claims }) {
             <p className="cardSubtitle">Signed in as {user?.email}</p>
           </div>
           <div className="buttonRow">
+            <Link to="/billing/config" className="secondaryButton">
+              Platform billing
+            </Link>
             <Link to="/billing/tiers" className="secondaryButton">
               Billing tiers
+            </Link>
+            <Link to="/admin" className="secondaryButton">
+              Cadence admin
             </Link>
             <Link to="/tenants/new" className="primaryButton primaryButtonInline">
               + New tenant

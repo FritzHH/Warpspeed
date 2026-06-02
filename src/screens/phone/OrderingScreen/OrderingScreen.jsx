@@ -171,11 +171,16 @@ export function OrderingScreen() {
       <div className={styles.header}>
         <button
           className={styles.backButton}
-          onClick={() => navigate(ROUTES.phoneOrdering)}
+          onClick={() => navigate(ROUTES.phone)}
         >
           ←
         </button>
-        <span className={styles.title}>Ordering</span>
+        <button
+          className={styles.switchButton}
+          onClick={() => navigate(ROUTES.phoneOrdering + "?switch=1")}
+        >
+          Switch
+        </button>
         <span className={styles.count}>{sItemCount} items</span>
       </div>
       <div className={styles.body}>

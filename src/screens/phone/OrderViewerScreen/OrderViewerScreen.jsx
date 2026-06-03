@@ -197,12 +197,7 @@ function ItemRow({ item, inventory, visible, warehouseQty }) {
     );
   }, [item.scannedBarcode, inventory]);
 
-  const catalogName =
-    item.catalogSnapshot?.description ||
-    item.catalogSnapshot?.item_description ||
-    item.catalogSnapshot?.short_description ||
-    item.catalogSnapshot?.product_name ||
-    "";
+  const catalogName = String(item.catalogSnapshot?.name || "");
   const storeName = localMatch?.formalName || localMatch?.informalName || "";
   const displayName =
     storeName || catalogName || item.scannedBarcode || "(unknown)";

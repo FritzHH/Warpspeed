@@ -1,10 +1,11 @@
 // Cadence Chrome Extension — content script.
 //
 // Injects an "Add to Cadence" button beside each vendor's add-to-cart button
-// on every listing/detail page we know about, plus a sticky Cadence-branded
-// header bar (sandwiched below the vendor's own sticky header). The header,
-// side panel, button styling, and ordering flow are identical across vendors —
-// per-vendor differences live ONLY in the VENDOR_ADAPTERS table below.
+// on every listing/detail page we know about, plus a slide-in side panel that
+// shows the active order, hosts sign-in / sign-out, and lets the user adjust
+// line qty + reconcile costs. The panel, button styling, and ordering flow are
+// identical across vendors — per-vendor differences live ONLY in the
+// VENDOR_ADAPTERS table below.
 //
 // Vendor pages render results via AJAX/MutationObserver — the script MUST
 // react to DOM mutations rather than assuming everything's present at
@@ -18,8 +19,22 @@
 // location.host. Nothing else in this file changes.
 
 const INJECTED_ATTR = "data-cadence-injected";
-const HEADER_HOST_ID = "cadence-extension-header-host";
 const PANEL_HOST_ID = "cadence-extension-panel-host";
+// Persisted boolean in chrome.storage.local. When true, every fresh page load
+// opens the panel in its 36px minimized state instead of full-width. Cleared
+// (set to false) when the user clicks the maximize bar.
+const PANEL_MINIMIZED_KEY = "panelMinimized";
+
+// In-memory map of vendorItemID → total qty across all lines in the active
+// order. Sourced from the side panel's last fetch + patched optimistically on
+// every add. Drives the on-page button's "Added [N]" badge so we don't have
+// to re-inject buttons or re-fetch the order on every interaction.
+let orderQtyByPn = {};
+
+// Button color states for the injected "Add to Cadence" / "Added" button.
+// Blue while the part isn't in the order; green with a qty badge once it is.
+const ADD_BTN_BLUE_BG = "linear-gradient(180deg, #3b82f6 0%, #2563eb 100%)";
+const ADD_BTN_GREEN_BG = "linear-gradient(180deg, #22a85d 0%, #1f9d55 100%)";
 
 // ────────────────────────────────────────────────────────────────────
 // Vendor adapters — isolate per-vendor selectors + scrape logic.
@@ -147,392 +162,12 @@ const VENDOR_ADAPTERS = {
 const VENDOR = VENDOR_ADAPTERS[location.host] || null;
 
 // ────────────────────────────────────────────────────────────────────
-// Header bar (Shadow DOM, sticky, below the vendor's own sticky header)
-// ────────────────────────────────────────────────────────────────────
-
-function ensureHeaderBar() {
-  if (document.getElementById(HEADER_HOST_ID)) return;
-  const host = document.createElement("div");
-  host.id = HEADER_HOST_ID;
-  // position:fixed so we render outside the vendor's layout flow. The `top`
-  // value is computed dynamically by applyHeaderLayout() — it slots us below
-  // any of the vendor's own top-anchored fixed/sticky chrome (nav, search
-  // bar, etc.) rather than covering them.
-  host.style.cssText = `
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    z-index: 2147483000;
-  `;
-  const shadow = host.attachShadow({ mode: "open" });
-  shadow.innerHTML = `
-    <style>
-      .bar {
-        background: linear-gradient(90deg, #1f9d55 0%, #38b269 100%);
-        color: #fff;
-        font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-        font-size: 13px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        padding: 6px 14px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
-      }
-      .brand { font-weight: 700; letter-spacing: 0.3px; }
-
-      /* Signed-in three-column layout: View Order is dead-center of the bar. */
-      .signed-in .left,
-      .signed-in .center,
-      .signed-in .right {
-        flex: 1;
-        display: flex;
-        align-items: center;
-      }
-      .signed-in .left { justify-content: flex-start; gap: 12px; }
-      .signed-in .center { justify-content: center; }
-      .signed-in .right { justify-content: flex-end; gap: 10px; }
-
-      .indicator {
-        display: flex;
-        align-items: center;
-        gap: 6px;
-        font-size: 13px;
-      }
-      .indicator .dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: #fff;
-        box-shadow: 0 0 0 2px rgba(255,255,255,0.45);
-        flex-shrink: 0;
-      }
-      .indicator.empty { opacity: 0.85; font-style: italic; }
-      .indicator.empty .dot {
-        background: rgba(255,255,255,0.3);
-        box-shadow: none;
-      }
-      .indicator.empty .label { display: none; }
-      .indicator .label {
-        font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
-        font-size: 11px;
-        font-weight: 500;
-        letter-spacing: 0.4px;
-        text-transform: uppercase;
-        color: rgba(255,255,255,0.7);
-      }
-      .indicator .name {
-        font-weight: 600;
-        max-width: 280px;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      button.view-order {
-        background: #fff;
-        color: #1f9d55;
-        border: none;
-        border-radius: 4px;
-        padding: 6px 22px;
-        font-weight: 700;
-        font-size: 13px;
-        font-family: inherit;
-        cursor: pointer;
-      }
-      button.view-order:hover { background: #f0fff5; }
-      button.view-order:disabled {
-        background: rgba(255,255,255,0.3);
-        color: rgba(255,255,255,0.9);
-        cursor: not-allowed;
-      }
-
-      button.logout {
-        background: transparent;
-        color: #fff;
-        border: 1px solid rgba(255,255,255,0.55);
-        border-radius: 3px;
-        padding: 4px 12px;
-        font-size: 12px;
-        font-family: inherit;
-        cursor: pointer;
-      }
-      button.logout:hover { background: rgba(255,255,255,0.15); }
-
-      /* Signed-out inline form (component-swap with the signed-in row) */
-      .signed-out, .signed-in {
-        display: flex;
-        align-items: center;
-        gap: 10px;
-        flex: 1;
-      }
-      .signed-out input {
-        background: rgba(255,255,255,0.95);
-        color: #1f2937;
-        border: 1px solid rgba(255,255,255,0.6);
-        border-radius: 3px;
-        padding: 5px 8px;
-        font-size: 13px;
-        font-family: inherit;
-        width: 200px;
-      }
-      .signed-out input::placeholder { color: #9ca3af; }
-      .signed-out input:focus {
-        outline: 2px solid #176b3a;
-        outline-offset: -1px;
-      }
-      .signed-out button.signin {
-        background: #fff;
-        color: #1f9d55;
-        border: none;
-        border-radius: 3px;
-        padding: 5px 16px;
-        font-weight: 700;
-        font-size: 13px;
-        font-family: inherit;
-        cursor: pointer;
-      }
-      .signed-out button.signin:hover { background: #f0fff5; }
-      .signed-out button.signin:disabled { opacity: 0.6; cursor: not-allowed; }
-      .signed-out .err {
-        color: #fff;
-        background: rgba(197, 48, 48, 0.85);
-        padding: 2px 8px;
-        border-radius: 3px;
-        font-size: 12px;
-      }
-      .signed-out .err:empty { display: none; }
-    </style>
-    <div class="bar">
-      <div class="signed-out" id="signedOut">
-        <span class="brand">Cadence Systems</span>
-        <input type="text" id="loginEmail" placeholder="Email"
-               autocomplete="off" name="cadence_login_email"
-               data-lpignore="true" data-1p-ignore />
-        <input type="password" id="loginPassword" placeholder="Password"
-               autocomplete="new-password" name="cadence_login_pw"
-               data-lpignore="true" data-1p-ignore />
-        <button type="button" class="signin" id="signInBtn">Sign in</button>
-        <span class="err" id="signInErr"></span>
-      </div>
-      <div class="signed-in" id="signedIn" style="display: none;">
-        <div class="left">
-          <span class="brand">Cadence Systems</span>
-          <span class="indicator empty" id="orderIndicator">
-            <span class="dot"></span>
-            <span class="label">Active order:</span>
-            <span class="name" id="orderName">Loading…</span>
-          </span>
-        </div>
-        <div class="center">
-          <button type="button" class="view-order" id="viewOrder" disabled>View Order</button>
-        </div>
-        <div class="right">
-          <button type="button" class="logout" id="logoutBtn">Sign out</button>
-        </div>
-      </div>
-    </div>
-  `;
-  // Insert at the very top of body so it sticks above the vendor's content.
-  // The vendor's own header is also sticky and has a higher visual position;
-  // ours sits beneath it without mutating the vendor's nav.
-  document.body.insertBefore(host, document.body.firstChild);
-
-  shadow.getElementById("viewOrder").addEventListener("click", () => {
-    openSidePanel();
-  });
-
-  shadow.getElementById("logoutBtn").addEventListener("click", async () => {
-    // Guard against MV3 "extension context invalidated" — happens when the
-    // extension was reloaded while this tab kept running the old content
-    // script. chrome.runtime is undefined in that state.
-    try {
-      if (!chrome.runtime || !chrome.runtime.sendMessage) {
-        setIndicator(shadow, "Extension reloaded — refresh this tab", false);
-        return;
-      }
-      await chrome.runtime.sendMessage({ type: "signOut" });
-      // storage.onChanged listener will fire refreshHeaderStatus, which swaps
-      // back to the signed-out form.
-    } catch (err) {
-      setIndicator(shadow, "Sign-out failed — refresh this tab", false);
-    }
-  });
-
-  // Inline sign-in form (signed-out state).
-  shadow.getElementById("signInBtn").addEventListener("click", () => handleSignIn(shadow));
-  shadow.getElementById("loginEmail").addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter") handleSignIn(shadow);
-  });
-  shadow.getElementById("loginPassword").addEventListener("keydown", (ev) => {
-    if (ev.key === "Enter") handleSignIn(shadow);
-  });
-
-  applyHeaderLayout();
-  refreshHeaderStatus();
-}
-
-async function handleSignIn(shadow) {
-  const emailEl = shadow.getElementById("loginEmail");
-  const pwEl = shadow.getElementById("loginPassword");
-  const btn = shadow.getElementById("signInBtn");
-  const err = shadow.getElementById("signInErr");
-  err.textContent = "";
-  const email = emailEl.value.trim();
-  const password = pwEl.value;
-  if (!email || !password) {
-    err.textContent = "Email + password required";
-    return;
-  }
-  btn.disabled = true;
-  btn.textContent = "Signing in…";
-  try {
-    const resp = await chrome.runtime.sendMessage({
-      type: "signIn",
-      email,
-      password,
-      // project omitted — background falls back to ACTIVE_PROJECT in config.js
-    });
-    if (!resp || !resp.ok) {
-      err.textContent = (resp && resp.error) || "Sign-in failed";
-    } else {
-      pwEl.value = "";
-      // storage.onChanged listener will fire refreshHeaderStatus, which swaps
-      // the form out for the signed-in row.
-    }
-  } catch (e) {
-    err.textContent = (e && e.message) || String(e);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Sign in";
-  }
-}
-
-// Reposition our bar to slot below any of the vendor's top-anchored
-// fixed/sticky chrome and add body padding-top so their content gets pushed
-// down by our bar's height. Re-runs on resize and on relevant DOM mutations.
-const ORIG_BODY_PAD_ATTR = "data-cadence-orig-body-pt";
-
-function applyHeaderLayout() {
-  const host = document.getElementById(HEADER_HOST_ID);
-  if (!host) return;
-  const vendorChromeBottom = measureVendorTopChromeBottom();
-  host.style.top = `${vendorChromeBottom}px`;
-  const barHeight = host.getBoundingClientRect().height || 32;
-
-  // Preserve the vendor's original body padding-top exactly once so we can
-  // compose our extra shift on top of it instead of fighting with subsequent
-  // runs.
-  if (!document.body.hasAttribute(ORIG_BODY_PAD_ATTR)) {
-    const orig = parseInt(getComputedStyle(document.body).paddingTop, 10) || 0;
-    document.body.setAttribute(ORIG_BODY_PAD_ATTR, String(orig));
-  }
-  const orig = parseInt(document.body.getAttribute(ORIG_BODY_PAD_ATTR), 10) || 0;
-  document.body.style.paddingTop = `${orig + barHeight}px`;
-}
-
-// Find the lowest "bottom edge" of any element that's pinned to the top of
-// the viewport (position:fixed/sticky with top <= ~5px and height > 0).
-// Skips our own injected hosts so we don't measure ourselves.
-function measureVendorTopChromeBottom() {
-  let maxBottom = 0;
-  const skip = new Set([HEADER_HOST_ID, PANEL_HOST_ID]);
-  function check(el) {
-    if (!el || skip.has(el.id)) return;
-    const cs = getComputedStyle(el);
-    if (cs.position !== "fixed" && cs.position !== "sticky") return;
-    const rect = el.getBoundingClientRect();
-    if (rect.top <= 5 && rect.height > 0) {
-      maxBottom = Math.max(maxBottom, rect.bottom);
-    }
-  }
-  // Look at body's direct children and one level deeper. Fixed top chrome
-  // is virtually always within that depth on vendor sites we target.
-  for (const direct of document.body.children) {
-    check(direct);
-    for (const grand of direct.children) check(grand);
-  }
-  return maxBottom;
-}
-
-async function refreshHeaderStatus() {
-  const host = document.getElementById(HEADER_HOST_ID);
-  if (!host || !host.shadowRoot) return;
-  const shadow = host.shadowRoot;
-  const signedOut = shadow.getElementById("signedOut");
-  const signedIn = shadow.getElementById("signedIn");
-  try {
-    const authResp = await chrome.runtime.sendMessage({ type: "getAuth" });
-    const settings = (await chrome.storage.local.get("settings")).settings || {};
-    if (!authResp || !authResp.ok || !authResp.auth) {
-      // Component swap: show the inline sign-in form, hide signed-in row.
-      signedOut.style.display = "";
-      signedIn.style.display = "none";
-      applyHeaderLayout();
-      return;
-    }
-    // Signed in: hide form, show three-column row.
-    signedOut.style.display = "none";
-    signedIn.style.display = "";
-    if (!settings.tenantID || !settings.storeID) {
-      setIndicator(shadow, "Set tenant/store in popup", false);
-      shadow.getElementById("viewOrder").disabled = true;
-      applyHeaderLayout();
-      return;
-    }
-    updateOrderIndicator(shadow, settings);
-    applyHeaderLayout();
-  } catch (err) {
-    setIndicator(shadow, "Cadence error: " + (err && err.message), false);
-  }
-}
-
-// Indicator helper: text + active/empty styling. `active=true` shows the bright
-// dot + "we found your order" treatment; `active=false` shows the dim empty
-// state (used for "Create an order in Cadence" and error/setup messages).
-function setIndicator(shadow, text, active) {
-  const indicator = shadow.getElementById("orderIndicator");
-  const name = shadow.getElementById("orderName");
-  if (!indicator || !name) return;
-  name.textContent = text;
-  if (active) indicator.classList.remove("empty");
-  else indicator.classList.add("empty");
-}
-
-// Resolve the active order from the open-orders list and update the indicator
-// + View Order enabled state. Active-order selection happens inside Cadence
-// itself; the extension just reflects it. Idempotent — safe to call repeatedly.
-async function updateOrderIndicator(shadow, settings) {
-  const viewBtn = shadow.getElementById("viewOrder");
-  try {
-    const resp = await chrome.runtime.sendMessage({
-      type: "listOrders",
-      payload: { tenantID: settings.tenantID, storeID: settings.storeID },
-    });
-    const result = (resp && resp.result) || {};
-    if (!result.success) {
-      setIndicator(shadow, `(${result.reason || "error loading orders"})`, false);
-      viewBtn.disabled = true;
-      return;
-    }
-    const orders = result.orders || [];
-    const activeID = result.activeOrderID || "";
-    const active = activeID ? orders.find((o) => o.id === activeID) : null;
-    if (!active) {
-      setIndicator(shadow, "Create an order in Cadence", false);
-      viewBtn.disabled = true;
-      return;
-    }
-    setIndicator(shadow, active.name || active.id, true);
-    viewBtn.disabled = false;
-  } catch (err) {
-    setIndicator(shadow, "(error loading orders)", false);
-    viewBtn.disabled = true;
-  }
-}
-
-// ────────────────────────────────────────────────────────────────────
-// Side panel (Shadow DOM, slide-in from right, shows active order)
+// Side panel (Shadow DOM, slide-in from right)
+//
+// Single UI surface. Hosts:
+//   - signed-out:    inline sign-in form (component-swap with order view)
+//   - signed-in:     active-order summary, line-item rows, qty adjusters,
+//                    cost-reconcile badges, footer with logout + deep link
 // ────────────────────────────────────────────────────────────────────
 
 function ensureSidePanel() {
@@ -564,7 +199,8 @@ function ensureSidePanel() {
         font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
         font-size: 14px;
         transform: translateX(100%);
-        transition: transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        transition: transform 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94),
+                    width 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94);
         box-shadow: -4px 0 20px rgba(0,0,0,0.18);
         display: flex;
         flex-direction: column;
@@ -589,7 +225,8 @@ function ensureSidePanel() {
         white-space: nowrap;
       }
       .panel-close,
-      .panel-refresh {
+      .panel-refresh,
+      .panel-minimize {
         background: rgba(255,255,255,0.2);
         color: #fff;
         border: none;
@@ -602,8 +239,10 @@ function ensureSidePanel() {
         cursor: pointer;
       }
       .panel-close:hover,
-      .panel-refresh:hover { background: rgba(255,255,255,0.32); }
+      .panel-refresh:hover,
+      .panel-minimize:hover { background: rgba(255,255,255,0.32); }
       .panel-refresh { font-size: 18px; }
+      .panel-minimize { font-size: 22px; padding-bottom: 6px; }
       .panel-meta {
         padding: 10px 16px;
         background: #f4f6f8;
@@ -775,22 +414,203 @@ function ensureSidePanel() {
         border: 6px solid transparent;
         border-bottom-color: #1f2937;
       }
+
+      /* Minimized state — collapses panel to a 36px green bar with the
+         maximize arrow at top and "CADENCE SYSTEMS" vertical brand text
+         centered. Entire bar is clickable. The width transition is on .panel
+         itself so min/max animates in lockstep with applyPanelPush's body
+         padding. */
+      .minimized-bar { display: none; }
+      .panel.minimized { width: 36px; }
+      .panel.minimized .panel-header,
+      .panel.minimized .panel-meta,
+      .panel.minimized .panel-body,
+      .panel.minimized .panel-footer { display: none; }
+      .panel.minimized .minimized-bar {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 20px;
+        height: 100%;
+        background: linear-gradient(180deg, #1f9d55 0%, #38b269 100%);
+        cursor: pointer;
+      }
+      .panel-maximize {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        width: 28px;
+        height: 28px;
+        font-size: 18px;
+        font-weight: 700;
+        line-height: 1;
+        flex-shrink: 0;
+        /* Cosmetic indicator only — the parent .minimized-bar owns the click
+           handler. pointer-events:none keeps clicks from getting absorbed
+           here and ensures the chevron never feels like its own target. */
+        pointer-events: none;
+      }
+      .minimized-brand {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: rgba(255,255,255,0.95);
+        font-weight: 700;
+        font-size: 13px;
+        letter-spacing: 4px;
+        text-transform: uppercase;
+        /* vertical-rl rotates the text 90° clockwise so it reads top-to-bottom
+           with letters tilted right. flex centering inside the 36px bar keeps
+           the rotated glyph block centered horizontally. */
+        writing-mode: vertical-rl;
+        user-select: none;
+      }
+
+      /* Per-line qty adjuster buttons — sit on the right edge of item-meta. */
+      .qty-adjusters {
+        display: inline-flex;
+        flex-direction: column;
+        gap: 1px;
+        margin-left: 8px;
+      }
+      .qty-up,
+      .qty-down {
+        background: #e5e7eb;
+        color: #1f2937;
+        border: none;
+        border-radius: 2px;
+        width: 20px;
+        height: 14px;
+        padding: 0;
+        font-size: 9px;
+        line-height: 1;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-family: inherit;
+      }
+      .qty-up:hover,
+      .qty-down:hover { background: #d1d5db; }
+      .qty-up:disabled,
+      .qty-down:disabled { opacity: 0.5; cursor: not-allowed; }
+
+      /* Sign-in form (component-swap with the order body). Kept in the DOM
+         and toggled via display so typed input survives a refreshSidePanel
+         round-trip. Padding is on the form (not the body) so the order list
+         can keep its own zero-padding row layout. */
+      .login-form {
+        display: none;
+        padding: 24px 4px;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .login-form.visible { display: flex; }
+      .login-form .brand-line {
+        font-weight: 700;
+        font-size: 16px;
+        color: #1f2937;
+        margin-bottom: 4px;
+      }
+      .login-form .hint {
+        color: #6b7280;
+        font-size: 13px;
+        margin-bottom: 8px;
+      }
+      .login-form label {
+        font-size: 12px;
+        font-weight: 600;
+        color: #1f2937;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+      .login-form input {
+        background: #fff;
+        color: #1f2937;
+        border: 1px solid #d1d5db;
+        border-radius: 4px;
+        padding: 8px 10px;
+        font-size: 14px;
+        font-family: inherit;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .login-form input:focus {
+        outline: 2px solid #1f9d55;
+        outline-offset: -1px;
+        border-color: #1f9d55;
+      }
+      .login-form .login-btn {
+        background: #1f9d55;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        padding: 10px 16px;
+        font-weight: 700;
+        font-size: 14px;
+        font-family: inherit;
+        cursor: pointer;
+        margin-top: 6px;
+      }
+      .login-form .login-btn:hover { background: #176b3a; }
+      .login-form .login-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+      .login-form .err {
+        color: #fff;
+        background: #c53030;
+        padding: 6px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+      }
+      .login-form .err:empty { display: none; }
+
+      /* Footer logout button — shares the .footer-actions flex row with the
+         "Edit in Cadence" link. Hidden when signed out (no auth, no point). */
+      .btn-logout {
+        background: #fff;
+        color: #c53030;
+        border: 1px solid #c53030;
+      }
+      .btn-logout:hover { background: #fef2f2; }
+      .btn-logout.hidden { display: none; }
     </style>
     <div class="panel" id="panel">
+      <div class="minimized-bar" id="minimizedBar" role="button" aria-label="Open Cadence panel" title="Open">
+        <span class="panel-maximize" aria-hidden="true">«</span>
+        <div class="minimized-brand">Cadence Systems</div>
+      </div>
       <div class="panel-header">
-        <span class="panel-title" id="panelTitle">Cadence Order</span>
+        <span class="panel-title" id="panelTitle">Cadence</span>
         <button type="button" class="panel-refresh" id="panelRefresh" aria-label="Refresh" title="Refresh">↻</button>
+        <button type="button" class="panel-minimize" id="panelMinimize" aria-label="Minimize" title="Minimize">−</button>
         <button type="button" class="panel-close" id="panelClose" aria-label="Close">×</button>
       </div>
       <div class="panel-meta" id="panelMeta">Loading…</div>
-      <div class="panel-body" id="panelBody"></div>
+      <div class="panel-body" id="panelBody">
+        <form class="login-form" id="loginForm" autocomplete="off">
+          <div class="brand-line">Cadence Systems</div>
+          <div class="hint">Sign in to load your active vendor order.</div>
+          <label for="loginEmail">Email</label>
+          <input type="text" id="loginEmail" placeholder="you@example.com"
+                 autocomplete="off" name="cadence_login_email"
+                 data-lpignore="true" data-1p-ignore />
+          <label for="loginPassword">Password</label>
+          <input type="password" id="loginPassword" placeholder="Password"
+                 autocomplete="new-password" name="cadence_login_pw"
+                 data-lpignore="true" data-1p-ignore />
+          <button type="submit" class="login-btn" id="signInBtn">Sign in</button>
+          <span class="err" id="signInErr"></span>
+        </form>
+        <div id="orderList"></div>
+      </div>
       <div class="panel-footer">
         <div class="total-row">
           <span>Total</span>
           <span id="panelTotal">$0.00</span>
         </div>
         <div class="footer-actions">
-          <button type="button" class="btn-refresh" id="btnRefresh">Refresh</button>
+          <button type="button" class="btn-logout hidden" id="btnLogout">Sign out</button>
           <a class="btn-open" id="btnOpen" target="_blank" rel="noopener noreferrer" aria-disabled="true">Edit in Cadence ↗</a>
         </div>
       </div>
@@ -800,10 +620,41 @@ function ensureSidePanel() {
 
   shadow.getElementById("panelClose").addEventListener("click", closeSidePanel);
   shadow.getElementById("panelRefresh").addEventListener("click", refreshSidePanel);
-  shadow.getElementById("btnRefresh").addEventListener("click", refreshSidePanel);
-  // Event delegation for per-item Apply / Info clicks. Rows are re-rendered on
-  // every refresh so binding once on the body container avoids re-wiring.
-  shadow.getElementById("panelBody").addEventListener("click", handlePanelBodyClick);
+  shadow.getElementById("panelMinimize").addEventListener("click", () =>
+    setSidePanelMinimized(true)
+  );
+  // Whole minimized bar (not just the arrow button) maximizes — the arrow is
+  // pointer-events:none so its click falls through to this listener.
+  shadow.getElementById("minimizedBar").addEventListener("click", () =>
+    setSidePanelMinimized(false)
+  );
+  // Event delegation for per-item Apply / Info / qty adjuster clicks. Rows are
+  // re-rendered on every refresh so binding once on the body container avoids
+  // re-wiring.
+  shadow.getElementById("orderList").addEventListener("click", handlePanelBodyClick);
+
+  // Sign-in form: submit handler (covers Enter key + button click), plus
+  // safeguard against the form actually navigating since we're inside Shadow
+  // DOM and don't want a page reload.
+  const loginForm = shadow.getElementById("loginForm");
+  loginForm.addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    handlePanelSignIn(shadow);
+  });
+
+  // Footer logout. Guard against MV3 "extension context invalidated" — happens
+  // when the extension was reloaded while this tab kept running the old
+  // content script. chrome.runtime is undefined in that state.
+  shadow.getElementById("btnLogout").addEventListener("click", async () => {
+    try {
+      if (!chrome.runtime || !chrome.runtime.sendMessage) return;
+      await chrome.runtime.sendMessage({ type: "signOut" });
+      // storage.onChanged listener will fire refreshSidePanel, which swaps
+      // back to the sign-in form.
+    } catch (_err) {
+      // No-op; user can refresh the tab if sign-out got stuck.
+    }
+  });
 
   return shadow;
 }
@@ -814,9 +665,21 @@ function panelIsOpen() {
   return host.shadowRoot.getElementById("panel").classList.contains("open");
 }
 
-function openSidePanel() {
+async function openSidePanel() {
   const shadow = ensureSidePanel();
   const panel = shadow.getElementById("panel");
+  // Restore the user's last minimized choice BEFORE the open transition runs,
+  // so the panel slides in at the size they last picked. Without this, every
+  // page nav would reset to full-width and the user would have to re-minimize
+  // on every page they visit.
+  try {
+    const stored = await chrome.storage.local.get(PANEL_MINIMIZED_KEY);
+    if (stored && stored[PANEL_MINIMIZED_KEY]) panel.classList.add("minimized");
+    else panel.classList.remove("minimized");
+  } catch (_err) {
+    // chrome.runtime can be unavailable if the extension was reloaded while
+    // this tab kept running. Fall through to default (non-minimized) state.
+  }
   // Force a reflow before applying the open class so the transition runs even
   // on the first open. Without this, browsers occasionally batch the initial
   // transform with the .open transform and skip the animation.
@@ -829,8 +692,178 @@ function openSidePanel() {
 function closeSidePanel() {
   const host = document.getElementById(PANEL_HOST_ID);
   if (!host || !host.shadowRoot) return;
-  host.shadowRoot.getElementById("panel").classList.remove("open");
+  const panel = host.shadowRoot.getElementById("panel");
+  panel.classList.remove("open");
+  // Do NOT strip the .minimized class here — the persisted PANEL_MINIMIZED_KEY
+  // is the source of truth and the next openSidePanel will re-apply it. Close
+  // is a "hide for now" gesture, not a state reset.
   applyPanelPush(false);
+}
+
+// Toggle the minimized state. When minimized, the panel collapses to a 36px
+// green bar with only the maximize button visible; the body padding shifts in
+// sync so the vendor's page reclaims the freed pixels. The choice persists in
+// chrome.storage.local so every subsequent page load opens at the same size
+// — the user owns the state, not the page lifecycle.
+function setSidePanelMinimized(minimized) {
+  const host = document.getElementById(PANEL_HOST_ID);
+  if (!host || !host.shadowRoot) return;
+  const panel = host.shadowRoot.getElementById("panel");
+  if (!panel) return;
+  if (minimized) panel.classList.add("minimized");
+  else panel.classList.remove("minimized");
+  // Persist so the next navigation honors this choice. Fire-and-forget — if
+  // storage write fails we still updated the UI for this tab.
+  try {
+    chrome.storage.local.set({ [PANEL_MINIMIZED_KEY]: !!minimized });
+  } catch (_err) {
+    // Extension context invalidated; nothing to do.
+  }
+  // Re-push the body so the page content adjusts to the new panel width.
+  // applyPanelPush picks the target width by reading the class we just set.
+  applyPanelPush(true);
+}
+
+// ────────────────────────────────────────────────────────────────────
+// In-place panel mutations
+//
+// The naive pattern — call refreshSidePanel() after every action — re-renders
+// the entire list innerHTML, which produces a visible flicker. These helpers
+// surgically patch individual rows (qty change, diff-row removal) and the
+// footer total so common actions feel instant. refreshSidePanel() is still
+// the source of truth for first-time loads, new-row inserts, and recovery
+// from race conditions.
+// ────────────────────────────────────────────────────────────────────
+
+function getPanelShadow() {
+  const host = document.getElementById(PANEL_HOST_ID);
+  return host ? host.shadowRoot : null;
+}
+
+// CSS.escape polyfill for older Chromiums + safety on arbitrary IDs.
+function cssEscape(s) {
+  if (typeof CSS !== "undefined" && CSS.escape) return CSS.escape(String(s));
+  return String(s).replace(/[^a-zA-Z0-9_-]/g, "\\$&");
+}
+
+function findPanelRow(itemID) {
+  const shadow = getPanelShadow();
+  if (!shadow) return null;
+  return shadow.querySelector(`.item[data-item-id="${cssEscape(itemID)}"]`);
+}
+
+// Recompute the footer "Total" from the live row dataset values. Called after
+// any qty patch so the user sees the total move in lockstep with the row.
+function recomputePanelTotal() {
+  const shadow = getPanelShadow();
+  if (!shadow) return;
+  let total = 0;
+  shadow.querySelectorAll(".item").forEach((r) => {
+    const qty = Number(r.dataset.qty || 0);
+    const cost = Number(r.dataset.costCents || 0) / 100;
+    total += qty * cost;
+  });
+  const totalEl = shadow.getElementById("panelTotal");
+  if (totalEl) totalEl.textContent = `$${total.toFixed(2)}`;
+}
+
+// In-place qty update for one row. Patches the visible "qty N" label, the
+// right-side line total (only when that column is showing a total — MSRP/ea
+// columns stay fixed), the qty-adjuster data-qty attrs + disabled clamp, the
+// footer total, and the on-page button badge cache. No list re-render.
+// Returns true if the row was found, false otherwise (caller may fall back).
+function setPanelRowQty(itemID, newQty) {
+  const row = findPanelRow(itemID);
+  if (!row) return false;
+  row.dataset.qty = String(newQty);
+  const meta = row.querySelector(".item-meta");
+  if (meta) {
+    const qtySpan = meta.querySelector("span:first-child");
+    if (qtySpan) qtySpan.textContent = `qty ${newQty}`;
+    const right = meta.querySelector(".right");
+    if (right && right.dataset.rightMode === "total") {
+      const cost = Number(row.dataset.costCents || 0) / 100;
+      right.textContent = `$${(newQty * cost).toFixed(2)}`;
+    }
+  }
+  const upBtn = row.querySelector(".qty-up");
+  const downBtn = row.querySelector(".qty-down");
+  if (upBtn) {
+    upBtn.setAttribute("data-qty", String(newQty));
+    upBtn.disabled = false;
+  }
+  if (downBtn) {
+    downBtn.setAttribute("data-qty", String(newQty));
+    downBtn.disabled = newQty <= 1;
+  }
+  recomputePanelTotal();
+  syncOrderQtyCacheForPn(row.dataset.vendorItemId);
+  return true;
+}
+
+// Re-derive the on-page "Added [N]" badge for a single part number from the
+// current panel rows. Multiple rows can share a pn (legacy duplicates from
+// before the server-side merge landed), so we sum rather than copy.
+function syncOrderQtyCacheForPn(pn) {
+  if (!pn) return;
+  const shadow = getPanelShadow();
+  if (!shadow) return;
+  let total = 0;
+  shadow
+    .querySelectorAll(`.item[data-vendor-item-id="${cssEscape(pn)}"]`)
+    .forEach((r) => {
+      total += Number(r.dataset.qty || 0);
+    });
+  orderQtyByPn[pn] = total;
+  refreshAllInjectedButtons();
+}
+
+// Rebuild the entire cache from a fresh items array. Called from
+// refreshSidePanel right after the order fetch so the on-page buttons reflect
+// reality at every full reconcile.
+function setOrderQtyCache(items) {
+  const next = {};
+  for (const it of items || []) {
+    if (it && it.vendorItemID) {
+      next[it.vendorItemID] =
+        (next[it.vendorItemID] || 0) + Number(it.qty || 0);
+    }
+  }
+  orderQtyByPn = next;
+  refreshAllInjectedButtons();
+}
+
+// Visual state of one injected "Add to Cadence" button. qty 0 → blue default;
+// qty > 0 → green "Added" with a chip-style qty badge. Inline styles so we
+// don't depend on a stylesheet living inside the vendor page.
+function updateInjectedButtonState(btn, qty) {
+  const inOrder = qty > 0;
+  btn.dataset.cadenceState = inOrder ? "added" : "default";
+  if (inOrder) {
+    btn.innerHTML =
+      `<span style="display:inline-flex;align-items:center;gap:8px;">` +
+      `<span>Added</span>` +
+      `<span class="cadence-add-badge" style="` +
+      `display:inline-flex;align-items:center;justify-content:center;` +
+      `min-width:20px;height:20px;padding:0 6px;` +
+      `background:rgba(255,255,255,0.25);border-radius:10px;` +
+      `font-size:12px;font-weight:700;line-height:1;` +
+      `">${qty}</span></span>`;
+    btn.style.background = ADD_BTN_GREEN_BG;
+  } else {
+    btn.textContent = "Add to Cadence";
+    btn.style.background = ADD_BTN_BLUE_BG;
+  }
+}
+
+// Walk every injected button currently in the DOM and reapply state from the
+// cache. Cheap — typically a handful per page; called after add success,
+// per-row qty change, or full panel refresh.
+function refreshAllInjectedButtons() {
+  document.querySelectorAll(".cadence-add-btn").forEach((btn) => {
+    const pn = btn.dataset.cadencePn;
+    updateInjectedButtonState(btn, orderQtyByPn[pn] || 0);
+  });
 }
 
 // Shift the vendor's body content left by the panel's width so the panel
@@ -858,27 +891,87 @@ function applyPanelPush(open) {
     document.body.style.paddingRight = `${orig}px`;
     return;
   }
-  // Measure the panel's actual rendered width — max-width:90vw can cap it on
-  // narrow viewports, so a hardcoded 440 would over-push.
-  let panelWidth = 440;
+  // Target width — not measured width — so the body's padding-right transition
+  // animates toward the same destination as the panel's width transition.
+  // Reading getBoundingClientRect() mid-transition would feed in an
+  // intermediate value and the body would lag behind by one frame.
+  //   minimized:   36px  (matches .panel.minimized rule)
+  //   default:     440px capped by 90vw (matches the .panel base rule)
+  let panelWidth;
   const host = document.getElementById(PANEL_HOST_ID);
-  if (host && host.shadowRoot) {
-    const panel = host.shadowRoot.getElementById("panel");
-    if (panel) panelWidth = panel.getBoundingClientRect().width;
+  const panel = host && host.shadowRoot && host.shadowRoot.getElementById("panel");
+  if (panel && panel.classList.contains("minimized")) {
+    panelWidth = 36;
+  } else {
+    panelWidth = Math.min(440, window.innerWidth * 0.9);
   }
   document.body.style.paddingRight = `${orig + panelWidth}px`;
+}
+
+// Inline sign-in handler — wired in ensureSidePanel. Re-fires refreshSidePanel
+// on success so the body swaps from form to order; the storage.onChanged
+// listener in start() would also fire it, but invoking it here gives us a
+// faster perceived response without waiting for the storage round-trip.
+async function handlePanelSignIn(shadow) {
+  const emailEl = shadow.getElementById("loginEmail");
+  const pwEl = shadow.getElementById("loginPassword");
+  const btn = shadow.getElementById("signInBtn");
+  const err = shadow.getElementById("signInErr");
+  err.textContent = "";
+  const email = emailEl.value.trim();
+  const password = pwEl.value;
+  if (!email || !password) {
+    err.textContent = "Email + password required";
+    return;
+  }
+  btn.disabled = true;
+  btn.textContent = "Signing in…";
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: "signIn",
+      email,
+      password,
+      // project omitted — background falls back to ACTIVE_PROJECT in config.js
+    });
+    if (!resp || !resp.ok) {
+      err.textContent = (resp && resp.error) || "Sign-in failed";
+    } else {
+      pwEl.value = "";
+    }
+  } catch (e) {
+    err.textContent = (e && e.message) || String(e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Sign in";
+  }
+}
+
+// Swap the panel body between the sign-in form and the order list. Both
+// elements stay mounted; only `display` toggles so the user's typed email
+// survives a sign-in failure or storage event.
+function setPanelMode(shadow, mode /* "signin" | "order" */) {
+  const loginForm = shadow.getElementById("loginForm");
+  const orderList = shadow.getElementById("orderList");
+  const btnLogout = shadow.getElementById("btnLogout");
+  if (mode === "signin") {
+    loginForm.classList.add("visible");
+    orderList.style.display = "none";
+    btnLogout.classList.add("hidden");
+  } else {
+    loginForm.classList.remove("visible");
+    orderList.style.display = "";
+    btnLogout.classList.remove("hidden");
+  }
 }
 
 async function refreshSidePanel() {
   const shadow = ensureSidePanel();
   const meta = shadow.getElementById("panelMeta");
-  const body = shadow.getElementById("panelBody");
+  const orderList = shadow.getElementById("orderList");
   const title = shadow.getElementById("panelTitle");
   const total = shadow.getElementById("panelTotal");
   const btnOpen = shadow.getElementById("btnOpen");
 
-  meta.textContent = "Loading…";
-  body.innerHTML = "";
   total.textContent = "$0.00";
 
   const authResp = await chrome.runtime.sendMessage({ type: "getAuth" }).catch(() => null);
@@ -886,21 +979,35 @@ async function refreshSidePanel() {
   const auth = authResp && authResp.ok ? authResp.auth : null;
 
   if (!auth) {
-    title.textContent = "Cadence Order";
-    meta.textContent = "Sign in via the toolbar popup.";
-    body.innerHTML = `<div class="empty"><strong>Not signed in.</strong><br/>Open the Cadence extension icon and sign in to see your order.</div>`;
+    // Signed-out: show the inline sign-in form, blank the order area, hide the
+    // logout button. Header chrome (title + meta) gets neutral labels so we
+    // don't dangle a stale order name from a previous session.
+    title.textContent = "Cadence";
+    meta.textContent = "Sign in to load your active vendor order.";
+    orderList.innerHTML = "";
     btnOpen.removeAttribute("href");
     btnOpen.setAttribute("aria-disabled", "true");
+    setPanelMode(shadow, "signin");
+    // Drop the badge state on sign-out so on-page buttons stop claiming items
+    // are in an order the user no longer has access to.
+    setOrderQtyCache([]);
     return;
   }
+
+  // Signed-in path: show the order list, hide the form.
+  setPanelMode(shadow, "order");
+
   if (!settings.tenantID || !settings.storeID) {
     title.textContent = "Cadence Order";
     meta.textContent = "Set tenant/store in the popup.";
-    body.innerHTML = `<div class="empty"><strong>Tenant/store not configured.</strong><br/>Open the popup and save your tenant + store IDs.</div>`;
+    orderList.innerHTML = `<div class="empty"><strong>Tenant/store not configured.</strong><br/>Open the popup and save your tenant + store IDs.</div>`;
     btnOpen.removeAttribute("href");
     btnOpen.setAttribute("aria-disabled", "true");
     return;
   }
+
+  meta.textContent = "Loading…";
+  orderList.innerHTML = "";
 
   // Wire the "Edit in Cadence" deep link per project. The in-app side wires
   // its own route handling; this is a tab opener, no auth handoff.
@@ -935,18 +1042,18 @@ async function refreshSidePanel() {
     if (result.reason === "no_active_order") {
       title.textContent = "No active order";
       meta.textContent = "Open Cadence and create or activate an order.";
-      body.innerHTML = `<div class="empty"><strong>No active order.</strong><br/>Create or pick an active vendor order in Cadence, then come back to this page.</div>`;
+      orderList.innerHTML = `<div class="empty"><strong>No active order.</strong><br/>Create or pick an active vendor order in Cadence, then come back to this page.</div>`;
       return;
     }
     if (result.reason === "active_order_missing") {
       title.textContent = "Active order missing";
       meta.textContent = "The previously active order isn't in this store anymore.";
-      body.innerHTML = `<div class="empty"><strong>Active order not found.</strong><br/>It may have been deleted or moved. Open Cadence to pick another.</div>`;
+      orderList.innerHTML = `<div class="empty"><strong>Active order not found.</strong><br/>It may have been deleted or moved. Open Cadence to pick another.</div>`;
       return;
     }
     title.textContent = "Error";
     meta.textContent = result.reason || "unknown error";
-    body.innerHTML = `<div class="empty">${(result.message || result.reason || "Failed to load order").replace(/</g, "&lt;")}</div>`;
+    orderList.innerHTML = `<div class="empty">${(result.message || result.reason || "Failed to load order").replace(/</g, "&lt;")}</div>`;
     return;
   }
 
@@ -958,8 +1065,13 @@ async function refreshSidePanel() {
     : "—";
   meta.textContent = `${items.length} item${items.length === 1 ? "" : "s"} • updated ${addedDate}`;
 
+  // Reconcile the on-page button badges to whatever the server says is in the
+  // order right now. Done before the early-return so an empty order also
+  // resets every badge back to blue.
+  setOrderQtyCache(items);
+
   if (!items.length) {
-    body.innerHTML = `<div class="empty"><strong>No items yet.</strong><br/>Click "Add to Cadence" beside any vendor item to add it here.</div>`;
+    orderList.innerHTML = `<div class="empty"><strong>No items yet.</strong><br/>Click "Add to Cadence" beside any vendor item to add it here.</div>`;
     total.textContent = "$0.00";
     return;
   }
@@ -980,16 +1092,23 @@ async function refreshSidePanel() {
     const name = String(
       display.name || it.vendorItemID || "(unnamed)"
     ).replace(/</g, "&lt;");
-    const pn = String(it.vendorItemID || it.id || "").replace(/</g, "&lt;");
-    const wh = it.warehouseCode
-      ? `${String(it.warehouseCode).replace(/</g, "&lt;")}`
-      : "";
+    // Per-line qty adjuster buttons need the item doc's id (NOT vendorItemID —
+    // the same vendorItemID may appear on multiple lines if added separately).
+    const itemIDAttr = String(it.id || "").replace(/"/g, "&quot;");
+    // vendorItemID stamped on the row so syncOrderQtyCacheForPn can find every
+    // line that shares a part number when one row's qty changes.
+    const vendorItemIDAttr = String(it.vendorItemID || "").replace(/"/g, "&quot;");
     // Optional MSRP/price column on the right when inventory has one. Falls
-    // back to the line total so the right column is never empty.
-    const rightLabel =
-      priceDollars != null && priceDollars > 0
-        ? `$${priceDollars.toFixed(2)} ea`
-        : `$${line.toFixed(2)}`;
+    // back to the line total so the right column is never empty. rightMode is
+    // read by setPanelRowQty to decide whether to recompute on qty changes:
+    // "msrp" stays put, "total" moves with qty.
+    const hasMsrp = priceDollars != null && priceDollars > 0;
+    const rightLabel = hasMsrp
+      ? `$${priceDollars.toFixed(2)} ea`
+      : `$${line.toFixed(2)}`;
+    const rightMode = hasMsrp ? "msrp" : "total";
+    const costCentsAttr =
+      display.costCents != null ? Number(display.costCents) : 0;
 
     // Cost-reconciliation badge. Server returns hasCostDiff=true only when
     // BOTH page-scraped cost and inventory cost exist and disagree. Apply
@@ -1004,36 +1123,45 @@ async function refreshSidePanel() {
         ? ` (${String(display.pageWarehouseCode).replace(/</g, "&lt;")})`
         : "";
       const invIDAttr = String(display.inventoryItemID).replace(/"/g, "&quot;");
+      const vendorLabel = (VENDOR && VENDOR.vendorDisplayName) || "Vendor";
       diffBlock = `
         <div class="diff-row">
-          <span class="diff-badge">Page $${pageDollars.toFixed(2)} • yours $${yoursDollars.toFixed(2)}</span>
+          <span class="diff-badge">${vendorLabel} Cost $${pageDollars.toFixed(2)} • Your Inventory $${yoursDollars.toFixed(2)}</span>
           <button type="button" class="apply-btn" data-action="apply"
                   data-inv-id="${invIDAttr}"
-                  data-new-cost="${Number(display.pageCostCents)}">Apply</button>
+                  data-new-cost="${Number(display.pageCostCents)}">Update Yours</button>
           <button type="button" class="info-btn" data-action="info"
                   aria-label="Why am I seeing this?">i</button>
           <div class="info-tip">
-            The vendor page lists this part at <strong>$${pageDollars.toFixed(2)}</strong>${whText}, but your Cadence inventory has it at <strong>$${yoursDollars.toFixed(2)}</strong>.<br/><br/>
-            Click <strong>Apply</strong> to update your inventory item's cost to match the page. Items already on this vendor order keep the cost they were added with.
+            ${vendorLabel} lists this part at <strong>$${pageDollars.toFixed(2)}</strong>${whText}, but your Cadence inventory has it at <strong>$${yoursDollars.toFixed(2)}</strong>.<br/><br/>
+            Click <strong>Update Yours</strong> to update your inventory item's cost to match ${vendorLabel}. Items already on this vendor order keep the cost they were added with.
           </div>
         </div>
       `;
     }
 
     return `
-      <div class="item">
+      <div class="item" data-item-id="${itemIDAttr}" data-vendor-item-id="${vendorItemIDAttr}" data-qty="${qty}" data-cost-cents="${costCentsAttr}">
         <div class="item-name">${name}</div>
-        <div class="item-pn">${pn}${wh ? " • " + wh : ""}</div>
         <div class="item-meta">
           <span>qty ${qty}</span>
           <span>@ $${costDollars.toFixed(2)}</span>
-          <span class="right">${rightLabel}</span>
+          <span class="right" data-right-mode="${rightMode}">${rightLabel}</span>
+          <div class="qty-adjusters">
+            <button type="button" class="qty-up" data-action="qty-up"
+                    data-item-id="${itemIDAttr}" data-qty="${qty}"
+                    aria-label="Increase quantity">▲</button>
+            <button type="button" class="qty-down" data-action="qty-down"
+                    data-item-id="${itemIDAttr}" data-qty="${qty}"
+                    ${qty <= 1 ? "disabled" : ""}
+                    aria-label="Decrease quantity">▼</button>
+          </div>
         </div>
         ${diffBlock}
       </div>
     `;
   });
-  body.innerHTML = rows.join("");
+  orderList.innerHTML = rows.join("");
   total.textContent = `$${runningTotal.toFixed(2)}`;
 }
 
@@ -1063,7 +1191,8 @@ function scanPageCosts() {
   return out;
 }
 
-// Single delegated click handler on .panel-body — dispatches to Apply / Info.
+// Single delegated click handler on .panel-body — dispatches to Apply / Info /
+// qty adjuster.
 function handlePanelBodyClick(ev) {
   const t = ev.target;
   if (!t || t.nodeType !== 1) return;
@@ -1073,6 +1202,8 @@ function handlePanelBodyClick(ev) {
     handleApplyCostClick(t);
   } else if (action === "info") {
     handleInfoClick(t);
+  } else if (action === "qty-up" || action === "qty-down") {
+    handleQtyAdjustClick(t, action === "qty-up" ? 1 : -1);
   }
 }
 
@@ -1093,9 +1224,10 @@ function handleInfoClick(btn) {
   if (!wasOpen) tip.classList.add("open");
 }
 
-// Apply the scraped page cost to the inventory item. On success, refresh the
-// panel — the diff badge disappears once costs match. On failure, surface a
-// "Retry" affordance on the button itself.
+// Apply the scraped page cost to the inventory item. On success, remove the
+// diff row in place — the row's displayed cost doesn't change (catalogSnapshot
+// still drives it) so a full panel re-render would be pure flicker. On
+// failure, surface a "Retry" affordance on the button itself.
 async function handleApplyCostClick(btn) {
   const invID = btn.getAttribute("data-inv-id");
   const newCostCents = Number(btn.getAttribute("data-new-cost"));
@@ -1121,10 +1253,61 @@ async function handleApplyCostClick(btn) {
       btn.textContent = "Retry";
       return;
     }
-    refreshSidePanel();
+    const diffRow = btn.closest(".diff-row");
+    if (diffRow) diffRow.remove();
   } catch (_err) {
     btn.disabled = false;
     btn.textContent = "Retry";
+  }
+}
+
+// Adjust a single order line's qty by +1 or -1. Clamps at 1 (panel doesn't
+// own deletion — user can remove items in the app). On success, patches the
+// row + footer total + on-page button badge in place — no panel re-render, so
+// the user doesn't see the whole list flicker on every ▲/▼ click.
+async function handleQtyAdjustClick(btn, delta) {
+  const itemID = btn.getAttribute("data-item-id");
+  const currentQty = Number(btn.getAttribute("data-qty"));
+  if (!itemID || !Number.isFinite(currentQty)) return;
+  const newQty = currentQty + delta;
+  if (newQty < 1) return;
+
+  const settings = (await chrome.storage.local.get("settings")).settings || {};
+  if (!settings.tenantID || !settings.storeID) return;
+
+  // Disable both adjusters on this row so a rapid second click can't race the
+  // first request.
+  const adjustersWrap = btn.closest(".qty-adjusters");
+  const buttons = adjustersWrap ? adjustersWrap.querySelectorAll("button") : [btn];
+  buttons.forEach((b) => (b.disabled = true));
+
+  // Restore the pre-click disabled state — qty-down stays disabled at qty 1.
+  const restoreDisabled = () => {
+    buttons.forEach((b) => {
+      b.disabled = false;
+      if (b.classList.contains("qty-down") && currentQty <= 1) b.disabled = true;
+    });
+  };
+
+  try {
+    const resp = await chrome.runtime.sendMessage({
+      type: "setItemQty",
+      payload: {
+        tenantID: settings.tenantID,
+        storeID: settings.storeID,
+        itemID,
+        qty: newQty,
+      },
+    });
+    const result = (resp && resp.result) || {};
+    if (!resp || !resp.ok || !result.success) {
+      restoreDisabled();
+      return;
+    }
+    const patched = setPanelRowQty(itemID, newQty);
+    if (!patched) refreshSidePanel();
+  } catch (_err) {
+    restoreDisabled();
   }
 }
 
@@ -1163,10 +1346,11 @@ function injectButtonsInTree(root) {
     btn.type = "button";
     btn.className = "cadence-add-btn";
     btn.dataset.cadencePn = partNumber;
-    btn.textContent = "Add to Cadence";
+    // Background is owned by updateInjectedButtonState — blue when the part
+    // isn't in the active order, green with a qty badge once it is. Omit it
+    // from cssText so the state helper doesn't have to fight !important.
     btn.style.cssText = `
       padding: 8px 14px;
-      background: linear-gradient(180deg, #22a85d 0%, #1f9d55 100%);
       color: #fff;
       border: none;
       border-radius: 4px;
@@ -1187,6 +1371,11 @@ function injectButtonsInTree(root) {
       ev.stopPropagation();
       handleAddClick(addBtn, btn, partNumber);
     });
+    // Seed text + color from whatever the side panel last knew about this
+    // part. orderQtyByPn is populated on every refreshSidePanel, so a button
+    // injected later (AJAX result, infinite scroll) still gets the right
+    // initial state without a fresh server round-trip.
+    updateInjectedButtonState(btn, orderQtyByPn[partNumber] || 0);
     wrapper.appendChild(btn);
 
     VENDOR.injectWrapper(addBtn, wrapper);
@@ -1216,9 +1405,11 @@ async function handleAddClick(vendorAddBtn, ourBtn, partNumber) {
     return;
   }
 
-  const original = ourBtn.textContent;
+  // Snapshot the pre-click qty so a failure can restore the exact button state
+  // (blue "Add to Cadence" vs green "Added [N]") without re-querying anything.
+  const priorQty = orderQtyByPn[partNumber] || 0;
   ourBtn.disabled = true;
-  ourBtn.textContent = "Adding…";
+  ourBtn.innerHTML = "Adding…";
 
   let resp;
   try {
@@ -1237,40 +1428,58 @@ async function handleAddClick(vendorAddBtn, ourBtn, partNumber) {
     });
   } catch (err) {
     ourBtn.disabled = false;
-    ourBtn.textContent = original;
+    updateInjectedButtonState(ourBtn, priorQty);
     flashFeedback(ourBtn, "Error: " + (err && err.message), "err");
     return;
   }
 
   ourBtn.disabled = false;
-  ourBtn.textContent = original;
 
   if (!resp || !resp.ok) {
+    updateInjectedButtonState(ourBtn, priorQty);
     flashFeedback(ourBtn, "Error: " + (resp && resp.error), "err");
     return;
   }
   const result = resp.result || {};
   if (!result.success) {
+    updateInjectedButtonState(ourBtn, priorQty);
     const reason = result.reason || "unknown";
     if (reason === "not_signed_in") {
-      flashFeedback(ourBtn, "Sign in via popup", "warn");
+      flashFeedback(ourBtn, "Sign in via the side panel", "warn");
+      openSidePanel();
     } else if (reason === "no_active_order") {
       flashFeedback(ourBtn, "Create an order in Cadence first", "warn");
       openSidePanel();
-      refreshHeaderStatus();
     } else if (reason === "active_order_missing") {
       flashFeedback(ourBtn, "Active order missing — pick another in Cadence", "warn");
       openSidePanel();
-      refreshHeaderStatus();
     } else {
       flashFeedback(ourBtn, "Failed: " + (result.message || reason), "err");
     }
     return;
   }
 
-  flashFeedback(ourBtn, "Added to Cadence ✓", "ok");
-  // If the side panel is open, refresh it so the new line appears.
-  if (panelIsOpen()) refreshSidePanel();
+  // Success path. Server returns merged:true when it bumped an existing line's
+  // qty instead of inserting a new one, plus the canonical post-write qty + id.
+  // Fall back to (priorQty + qty) if either field is missing so older deploys
+  // still produce a sensible badge.
+  const mergedQty = Number.isFinite(Number(result.qty))
+    ? Number(result.qty)
+    : priorQty + qty;
+  orderQtyByPn[partNumber] = mergedQty;
+  updateInjectedButtonState(ourBtn, mergedQty);
+
+  // Patch the panel in place when we can (merged into an existing row whose id
+  // we have). Brand-new rows still need a full refresh because we don't have
+  // the server's _display payload locally. Same for missing/old responses.
+  if (panelIsOpen()) {
+    if (result.merged && result.itemID) {
+      const patched = setPanelRowQty(result.itemID, mergedQty);
+      if (!patched) refreshSidePanel();
+    } else {
+      refreshSidePanel();
+    }
+  }
 }
 
 // Shows a temporary message below our wrapper. Mirrors the JBI-style
@@ -1311,26 +1520,7 @@ function scheduleScan() {
   requestAnimationFrame(() => {
     scheduled = false;
     injectButtonsInTree(document);
-    // Re-measure the vendor's chrome too — collapsing nav-on-scroll,
-    // dismissable banners, etc. can change the offset.
-    applyHeaderLayout();
   });
-}
-
-// On full page load, auto-open the side panel so the active order is visible
-// without an extra click. Silent no-op if the user isn't signed in or hasn't
-// set tenant/store yet — the header bar will prompt them.
-async function autoOpenOnPageLoad() {
-  try {
-    const authResp = await chrome.runtime.sendMessage({ type: "getAuth" });
-    if (!authResp || !authResp.ok || !authResp.auth) return;
-    const settings = (await chrome.storage.local.get("settings")).settings || {};
-    if (!settings.tenantID || !settings.storeID) return;
-    openSidePanel();
-  } catch {
-    // Extension context invalid, network glitch, etc. — staying quiet here is
-    // better than throwing on every page load.
-  }
 }
 
 function start() {
@@ -1338,39 +1528,34 @@ function start() {
     document.addEventListener("DOMContentLoaded", start, { once: true });
     return;
   }
-  // Vendor-agnostic UI (header, panel, button injection) only runs when we
-  // recognize the host. The manifest's content_scripts match-list is the
-  // primary gate, but this belt-and-suspenders check prevents the header
-  // from showing if the extension is ever loaded against a host without a
-  // registered VENDOR_ADAPTERS entry.
+  // Vendor-agnostic UI (panel, button injection) only runs when we recognize
+  // the host. The manifest's content_scripts match-list is the primary gate,
+  // but this belt-and-suspenders check prevents the panel from opening if the
+  // extension is ever loaded against a host without a registered
+  // VENDOR_ADAPTERS entry.
   if (!VENDOR) return;
 
-  ensureHeaderBar();
-  autoOpenOnPageLoad();
+  // Always auto-open the panel on page load. Refresh decides what to render —
+  // sign-in form when there's no auth, order summary otherwise.
+  openSidePanel();
   injectButtonsInTree(document);
   const observer = new MutationObserver(() => scheduleScan());
   observer.observe(document.body, { childList: true, subtree: true });
   window.addEventListener(
     "resize",
     () => {
-      applyHeaderLayout();
       if (panelIsOpen()) applyPanelPush(true);
     },
     { passive: true }
   );
-  // The vendor's fixed header sometimes appears AFTER our first measurement (lazy
-  // load, web-font reflow). A small follow-up pass catches that case.
-  setTimeout(applyHeaderLayout, 500);
-  setTimeout(applyHeaderLayout, 1500);
 
   // React to storage changes (sign-in / settings updates) by refreshing the
-  // header status bar without forcing the user to reload. If the side panel
-  // is open we also refresh it — settings.tenantID/storeID changes invalidate
-  // the displayed order.
+  // panel without forcing the user to reload. Covers the case where the
+  // popup or another tab signs the user in/out — the open panel here picks
+  // up the new state and swaps form↔order accordingly.
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== "local") return;
     if (changes.auth || changes.settings) {
-      refreshHeaderStatus();
       if (panelIsOpen()) refreshSidePanel();
     }
   });

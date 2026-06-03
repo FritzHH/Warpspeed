@@ -3,7 +3,6 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { onAuthStateChanged, isPlatformAdmin } from "./auth";
 import { LoginScreen } from "./screens/LoginScreen";
 import { HomeScreen } from "./screens/HomeScreen";
-import { CreateTenantScreen } from "./screens/CreateTenantScreen";
 import { TenantDetailScreen } from "./screens/TenantDetailScreen";
 import { AddStoreScreen } from "./screens/AddStoreScreen";
 import { BillingTiersScreen } from "./screens/BillingTiersScreen";
@@ -67,11 +66,7 @@ function AuthGatedApp() {
   }
   return (
     <Routes>
-      <Route
-        path="/"
-        element={<HomeScreen user={authState.user} claims={authState.claims} />}
-      />
-      <Route path="/tenants/new" element={<CreateTenantScreen />} />
+      <Route path="/" element={<HomeScreen user={authState.user} />} />
       <Route path="/tenants/:tenantID" element={<TenantDetailScreen />} />
       <Route
         path="/tenants/:tenantID/stores/new"

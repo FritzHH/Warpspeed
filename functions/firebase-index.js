@@ -7649,6 +7649,24 @@ exports.migrateCustomerPhone = onCall(
 const _submitJbiOrder = require("./bonita/submit-jbi-order");
 exports.submitJbiOrderCallable = _submitJbiOrder.submitJbiOrderCallable;
 
+// ── Vendor order submission (QBP) — Bonita sync callable + response poller ──
+// QBP uses EFTP (file drops to /out, response .por files in /in). The callable
+// uploads + registers a pending-qbp-responses tracking doc and returns
+// immediately ("submitted-pending-vendor"). The scheduled poller drains /in
+// on a 3-minute cadence and completes the submission docs. Both call into
+// the shared handler at functions/vendors/qbp.js.
+const _submitQbpOrder = require("./bonita/submit-qbp-order");
+exports.submitQbpOrderCallable = _submitQbpOrder.submitQbpOrderCallable;
+const _qbpResponsePollerBonita = require("./bonita/qbp-response-poller");
+exports.qbpResponsePollerBonita = _qbpResponsePollerBonita.qbpResponsePollerBonita;
+
+// ── Phone voice webhooks — Bonita inbound calls ───────────────────────
+// `phoneVoiceInbound` is the Twilio "A CALL COMES IN" webhook.
+// `phoneVoiceDialAction` is the action callback on the <Dial> block.
+const _phoneVoice = require("./bonita/phone-voice");
+exports.phoneVoiceInbound = _phoneVoice.phoneVoiceInbound;
+exports.phoneVoiceDialAction = _phoneVoice.phoneVoiceDialAction;
+
 } // ─── end of if (DEPLOY_TARGET === "bonita") ───
 
 // ============================================================================
@@ -7843,6 +7861,10 @@ if (DEPLOY_TARGET === "saas") {
     chromeExtCallables.setActiveVendorOrderCallable;
   exports.applyInventoryCostFromExtensionCallable =
     chromeExtCallables.applyInventoryCostFromExtensionCallable;
+  exports.setVendorOrderItemQtyCallable =
+    chromeExtCallables.setVendorOrderItemQtyCallable;
+  exports.deleteVendorOrderItemCallable =
+    chromeExtCallables.deleteVendorOrderItemCallable;
 
   // Vendor order submission — async dispatch via Pub/Sub. Three callables
   // for the UI + one Pub/Sub-triggered worker for the actual send.
@@ -7853,6 +7875,15 @@ if (DEPLOY_TARGET === "saas") {
   exports.getVendorCredentialMetaCallable =
     vendorSubmission.getVendorCredentialMetaCallable;
   exports.pubsubVendorOrderSubmissionWorker = vendorSubmissionWorker.handler;
+
+  // QBP response poller — scheduled drain of /in for every tenant's pending
+  // .por responses. The vendor-submission-worker (above) uploads the .poi
+  // and writes the pending-qbp-responses tracking doc; this poller closes
+  // the loop by downloading the .por, parsing RSLT codes, and updating the
+  // submission doc. See functions/saas/qbp-response-poller.js.
+  const _qbpResponsePollerSaas = require("./saas/qbp-response-poller");
+  exports.qbpResponsePollerSaas =
+    _qbpResponsePollerSaas.qbpResponsePollerSaas;
 
   exports.pubsubStripeEventSubscriber = pubsubSubscriber.handler;
   exports.pubsubStripeDeadLetterIngestor = pubsubDeadLetter.ingestor;

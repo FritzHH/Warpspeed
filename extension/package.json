@@ -1,0 +1,23 @@
+{
+  "name": "cadence-extension",
+  "version": "0.4.0",
+  "private": true,
+  "description": "Cadence vendor-order extension (Chrome / Firefox / Safari).",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "node build.mjs --watch",
+    "build:chrome": "node build.mjs --browser=chrome",
+    "build:firefox": "node build.mjs --browser=firefox",
+    "build:safari": "node build.mjs --browser=safari",
+    "lint:firefox": "web-ext lint --source-dir=dist/firefox --no-config-discovery",
+    "pack:firefox": "web-ext build --source-dir=dist/firefox --artifacts-dir=dist/artifacts --overwrite-dest --no-config-discovery"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.0",
+    "web-ext": "^8.3.0"
+  },
+  "dependencies": {
+    "webextension-polyfill": "^0.12.0"
+  }
+}

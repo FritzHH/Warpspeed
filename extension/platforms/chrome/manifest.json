@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Cadence — Add to Vendor Order",
+  "short_name": "Cadence",
+  "version": "0.4.0",
+  "description": "Injects an Add to Cadence button beside vendor ADD buttons (JBI, QBP) so vendor orders consolidate inside Cadence.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://www.jbi.bike/*",
+    "https://www.qbp.com/*",
+    "https://identitytoolkit.googleapis.com/*",
+    "https://securetoken.googleapis.com/*",
+    "https://us-central1-cadence-pos.cloudfunctions.net/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.jbi.bike/site/product_details.php*",
+        "https://www.jbi.bike/site/search_usd.php*",
+        "https://www.qbp.com/qbponlinestorefront/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Cadence"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["assets/trash.webp"],
+      "matches": ["https://www.jbi.bike/*", "https://www.qbp.com/*"]
+    }
+  ]
+}

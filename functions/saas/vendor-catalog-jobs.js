@@ -62,6 +62,32 @@ const VENDOR_CATALOG_JOBS = [
     recommendedTimeZone: "America/New_York",
     skipIfUnchanged: true,
   },
+  {
+    basename: "vendor-catalog-qbp-master",
+    vendor: "qbp",
+    vendorDisplayName: "QBP",
+    displayName: "QBP – Catalog Master",
+    description:
+      "Hits QBP API1 /1/product/skulist, then per-SKU /1/product/sku/{sku}, and writes the cleaned product detail to /vendor_catalogs/qbp/items/{SKU} plus a reverse UPC index at /vendor_catalogs/qbp/items_by_upc/{upc}.",
+    tooltip:
+      "QBP has no FTP/modTime equivalent, so the job hashes the skulist response and skips if it matches the last sync stamp at /vendor_catalogs/qbp/_meta/lastMasterSync. Per-SKU fetches run bounded-parallel (QBP_CONCURRENCY, default 8). One bad SKU increments missCount instead of aborting.",
+    recommendedCadence: "0 5 * * *",
+    recommendedTimeZone: "America/New_York",
+    skipIfUnchanged: true,
+  },
+  {
+    basename: "vendor-catalog-qbp-inventory",
+    vendor: "qbp",
+    vendorDisplayName: "QBP",
+    displayName: "QBP – Inventory Levels",
+    description:
+      "Fans out across QBP warehouse codes (QBP_WAREHOUSES, default PA,MN,NV) hitting /1/availability/warehouse/{code}, then writes per-SKU { warehouseCode: qty } maps to /vendor_catalogs/qbp/inventory_by_item/{SKU}.",
+    tooltip:
+      "Always runs — warehouse stock changes constantly and QBP exposes no cheap change-detect. Meta stamped at /vendor_catalogs/qbp/_meta/lastInventorySync with warehousesSeen + totalQty + itemsWithStockCount.",
+    recommendedCadence: "15 * * * *",
+    recommendedTimeZone: "America/New_York",
+    skipIfUnchanged: false,
+  },
 ];
 
 const VENDOR_CATALOG_JOBS_BY_BASENAME = Object.fromEntries(

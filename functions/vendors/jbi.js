@@ -77,7 +77,7 @@ exports.submit = async function jbiSubmit({ order, items, vendorConfig, creds, c
     itemNumber: String(it.vendorItemID || ""),
     qty: Number(it.qty || 0),
     cost: it.sourceCost != null ? String(it.sourceCost) : "",
-    upc: (it.catalogSnapshot && it.catalogSnapshot.upc_ean) || "",
+    upc: (it.catalogSnapshot && it.catalogSnapshot.primaryUpc) || "",
   }));
 
   // Prefer API when we have an apiKey — single-shot, fewer moving parts.

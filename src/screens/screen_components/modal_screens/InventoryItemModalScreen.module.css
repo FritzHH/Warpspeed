@@ -281,6 +281,36 @@
   filter: drop-shadow(0 1px 1px var(--shadow-color-default));
 }
 
+/* Vendor web page link button */
+.vendorLinkBtn {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 6px 12px;
+  background-color: var(--surface-base);
+  border: 1px solid var(--button-light-green-outline);
+  border-radius: var(--radius-control);
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  font-family: inherit;
+  transition: transform 120ms ease, filter 120ms ease;
+}
+
+.vendorLinkBtn:hover {
+  transform: translateY(-2px);
+  filter: drop-shadow(0 3px 3px var(--shadow-color-default));
+}
+
+.vendorLinkBtn:active {
+  transform: translateY(0);
+  filter: drop-shadow(0 1px 1px var(--shadow-color-default));
+}
+
 /* Quick button placements */
 .placementsEmpty {
   font-size: 13px;

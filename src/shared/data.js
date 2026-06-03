@@ -732,3 +732,32 @@ export const SETTINGS_OBJ = {
   nextSaleCounter: 1,
 };
 
+// Phone-system config. Lives at:
+//   tenants/{tenantID}/stores/{storeID}/phone-config/main
+// Hours + holidays + timezone are NOT here -- they come from SETTINGS_OBJ
+// (storeHours.standard, storeHours.special, storeInfo.state/zip) so there is
+// one source of truth. This doc owns only phone-specific settings.
+export const PHONE_CONFIG_OBJ = {
+  manualOverride: "auto", // "auto" | "force_open" | "force_closed"
+  sipEndpoints: [], // e.g. ["sip:shopphones@yourshop.sip.us1.twilio.com"]
+  ringTimeoutSeconds: 20,
+  greetingOpen: {
+    type: "text", // "text" | "audio"
+    text: "Thanks for calling. One moment while we connect you.",
+    audioURL: "",
+    audioPath: "",
+  },
+  greetingAfterHours: {
+    type: "text",
+    text: "Thanks for calling. We're currently closed. Please call back during business hours.",
+    audioURL: "",
+    audioPath: "",
+  },
+  greetingNoAnswer: {
+    type: "text",
+    text: "Sorry we missed your call. Please try us back later. Thanks for calling.",
+    audioURL: "",
+    audioPath: "",
+  },
+};
+

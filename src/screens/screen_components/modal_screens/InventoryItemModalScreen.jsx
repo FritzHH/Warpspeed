@@ -861,6 +861,16 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                     onCheck={() => handleFieldChange("receiptNoteRequired", !sItem.receiptNoteRequired)}
                   />
                 </div>
+                {sItem.vendorURL ? (
+                  <a
+                    className={styles.vendorLinkBtn}
+                    href={sItem.vendorURL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Go to vendor web page
+                  </a>
+                ) : null}
               </div>
 
               <div className={styles.twoColItem} style={sectionCardInline}>

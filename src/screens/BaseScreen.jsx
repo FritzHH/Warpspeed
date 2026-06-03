@@ -25,6 +25,7 @@ import {
   useEmailStore,
   useOrderingModalStore,
   useInventoryReconciliationModalStore,
+  usePhoneConfigStore,
   broadcastWorkorderToDisplay,
 } from "../stores";
 import {
@@ -59,6 +60,7 @@ import { newCheckoutGetStripeReaders, readActiveSale, recoverPendingActiveSales 
 import { AUTH, firestoreSubscribe, firestoreSubscribeCollection } from "../db_calls";
 import {
   dbListenToSettings,
+  dbListenToPhoneConfig,
   dbListenToTenantUsers,
   dbListenToOpenWorkorders,
   dbListenToCurrentPunchClock,
@@ -598,6 +600,13 @@ export function BaseScreen() {
       }, onError);
     });
 
+    register("phone-config", (onConnected, onError) => {
+      return dbListenToPhoneConfig((data) => {
+        usePhoneConfigStore.getState().setPhoneConfig(data);
+        onConnected();
+      }, onError);
+    });
+
     register("punch-clock", (onConnected, onError) => {
       return dbListenToCurrentPunchClock((data) => {
         let notes = data?.notes || {};
@@ -802,7 +811,7 @@ export function BaseScreen() {
         </Suspense>
       )}
       {zReconcileModalVisible && (
-        <Suspense fallback={<SmallLoadingIndicator />}>
+        <Suspense fallback={null}>
           <InventoryReconciliationModalScreen handleExit={() => useInventoryReconciliationModalStore.getState().hide()} />
         </Suspense>
       )}

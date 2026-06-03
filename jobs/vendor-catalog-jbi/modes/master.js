@@ -44,12 +44,17 @@ async function runMasterSync() {
       const itemId = row.item_id;
       if (!itemId) continue;
 
-      await writer.set(`${ITEMS_PATH}/${itemId}`, cleanRow(row));
+      const canonical = toCanonicalItem(row, itemId);
+      if (!canonical) continue;
+
+      await writer.set(`${ITEMS_PATH}/${itemId}`, canonical);
       itemCount++;
 
-      const upc = (row.upc_ean || "").trim();
-      if (upc) {
-        await writer.set(`${ITEMS_BY_UPC_PATH}/${upc}`, itemId);
+      if (canonical.primaryUpc) {
+        await writer.set(
+          `${ITEMS_BY_UPC_PATH}/${canonical.primaryUpc}`,
+          itemId,
+        );
         upcCount++;
       }
 
@@ -79,14 +84,79 @@ async function runMasterSync() {
   });
 }
 
-function cleanRow(row) {
-  const cleaned = {};
-  for (const [key, value] of Object.entries(row)) {
-    if (value !== undefined && value !== null && value !== "") {
-      cleaned[key] = value;
-    }
-  }
-  return cleaned;
+// Convert a raw JBI inv_mast.txt row into the canonical inventory-mapping
+// shape used everywhere downstream (chrome extension auto-create,
+// reconciliation, search). Mirror in
+// jobs/vendor-catalog-qbp/modes/master.js#toCanonicalItem.
+//
+//   id          - JBI item_id (also the RTDB key)
+//   name        - display name (description / item_description / etc.)
+//   brand       - brand label (brand / brand_name / manufacturer / etc.)
+//   cost        - dealer cost in CENTS (row.cost dollars)
+//   msrp        - MSRP in CENTS (row.msrp dollars, with synonyms)
+//   primaryUpc  - row.upc_ean
+//   allUpcs[]   - [primaryUpc] when present (JBI exposes only one barcode)
+//
+// JBI publishes prices as dollar strings ("12.50"); Cadence inventory stores
+// cents. Convert via dollarsToCents.
+//
+// Returns null when the row has neither a name nor a UPC - nothing useful we
+// can store, drop it from the catalog.
+function toCanonicalItem(row, itemId) {
+  if (!row || typeof row !== "object") return null;
+
+  const name = pick(row, [
+    "description",
+    "item_description",
+    "short_descr",
+    "short_description",
+    "product_name",
+  ]);
+
+  const brand = pick(row, [
+    "brand",
+    "brand_name",
+    "manufacturer",
+    "mfg_name",
+  ]);
+
+  const msrpRaw = pick(row, [
+    "msrp",
+    "msrp_price",
+    "suggested_retail",
+    "suggested_retail_price",
+    "retail_price",
+    "srp",
+  ]);
+
+  const primaryUpc = String(row.upc_ean || "").trim();
+  const allUpcs = primaryUpc ? [primaryUpc] : [];
+
+  if (!name && allUpcs.length === 0) return null;
+
+  return {
+    id: itemId,
+    name,
+    brand,
+    cost: dollarsToCents(row.cost),
+    msrp: dollarsToCents(msrpRaw),
+    primaryUpc,
+    allUpcs,
+  };
 }
 
-module.exports = { runMasterSync };
+function pick(row, keys) {
+  for (const k of keys) {
+    const v = row[k];
+    if (v != null && String(v).trim() !== "") return String(v).trim();
+  }
+  return "";
+}
+
+function dollarsToCents(v) {
+  if (v == null || v === "") return 0;
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
+}
+
+module.exports = { runMasterSync, toCanonicalItem };

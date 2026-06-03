@@ -202,6 +202,12 @@ export const build_db_path = {
     giftCardReceiptPDF: (giftCardID, tenantID, storeID) => {
       return `${tenantID}/${storeID}/receipts/giftcards/${giftCardID}.pdf`;
     },
+
+    // Phone greeting audio file paths
+    phoneGreeting: (tenantID, storeID, fileName) => {
+      const timestamp = Date.now();
+      return `${tenantID}/${storeID}/phone-greetings/${timestamp}_${fileName}`;
+    },
   },
 };
 
@@ -241,6 +247,7 @@ export const DB_NODES = {
     USERS: "users",
     VENDOR_ORDERS: "vendor-orders",
     VENDOR_CATALOGS: "vendor_catalogs",
+    PHONE_CONFIG: "phone-config",
   },
 
   // Realtime Database nodes

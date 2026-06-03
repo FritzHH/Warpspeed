@@ -34,6 +34,10 @@ import {
   remove,
   onValue,
   off,
+  query as rdbQuery,
+  orderByKey,
+  startAt,
+  limitToFirst,
   connectDatabaseEmulator,
 } from "firebase/database";
 import {
@@ -400,6 +404,26 @@ export async function rdbRead(path) {
 export async function rdbCatalogRead(path) {
   const dbRef = ref(CATALOG_RDB, path);
   const snapshot = await get(dbRef);
+  return snapshot.exists() ? snapshot.val() : null;
+}
+
+/**
+ * Read a small window of children from the vendor-catalog RTDB. Used by
+ * diagnostic samplers — avoids pulling tens of thousands of items just to
+ * inspect a few. Optional `startKey` lets callers grab a random slice
+ * instead of always the first N (RTDB keys are sorted lexicographically).
+ * @param {string} path - Database path (e.g. `vendor_catalogs/qbp/items`)
+ * @param {Object} [options]
+ * @param {string} [options.startKey] - Inclusive starting key
+ * @param {number} [options.limit=10] - Max children to return
+ * @returns {Promise<Object|null>} Map of key→value, or null when path empty
+ */
+export async function rdbCatalogQueryLimited(path, { startKey = null, limit = 10 } = {}) {
+  const baseRef = ref(CATALOG_RDB, path);
+  const q = startKey != null
+    ? rdbQuery(baseRef, orderByKey(), startAt(startKey), limitToFirst(limit))
+    : rdbQuery(baseRef, orderByKey(), limitToFirst(limit));
+  const snapshot = await get(q);
   return snapshot.exists() ? snapshot.val() : null;
 }
 

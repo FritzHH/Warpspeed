@@ -41,6 +41,7 @@ export const CALLABLES = {
   getOrder: `${CALLABLE_BASE_URL}/getVendorOrderCallable`,
   setActiveOrder: `${CALLABLE_BASE_URL}/setActiveVendorOrderCallable`,
   applyInventoryCost: `${CALLABLE_BASE_URL}/applyInventoryCostFromExtensionCallable`,
+  setItemQty: `${CALLABLE_BASE_URL}/setVendorOrderItemQtyCallable`,
 };
 
 // Cadence brand color for the injected button.

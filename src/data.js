@@ -3,11 +3,15 @@
 import { DISCOUNT_TYPES, MILLIS_IN_HOUR, PERMISSION_LEVELS } from "./constants";
 import { getRgbFromNamedColor } from "./utils";
 import { C } from "./styles";
-import { NONREMOVABLE_STATUSES, SETTINGS_OBJ } from "./shared/data";
+import {
+  NONREMOVABLE_STATUSES,
+  SETTINGS_OBJ,
+  PHONE_CONFIG_OBJ,
+} from "./shared/data";
 
 // Re-exports so existing tenant-app imports (`import { SETTINGS_OBJ } from
 // "./data"`) keep working after the move to src/shared/.
-export { NONREMOVABLE_STATUSES, SETTINGS_OBJ };
+export { NONREMOVABLE_STATUSES, SETTINGS_OBJ, PHONE_CONFIG_OBJ };
 
 ////////// hardcoded settings and options ///////
 export const SHADOW_RADIUS_NOTHING = {
@@ -575,6 +579,8 @@ export const INVENTORY_ITEM_PROTO = {
   brand: "",
   vendorId: "",
   vendorName: "",
+  vendorURL: "",
+  image_url: "",
   catalogName: "",
   price: 0,
   salePrice: 0,

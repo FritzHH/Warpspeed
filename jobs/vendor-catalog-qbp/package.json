@@ -1,0 +1,20 @@
+{
+  "name": "vendor-catalog-qbp",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloud Run Job: sync QBP API1 catalog into /vendor_catalogs/qbp on cadence-pos RTDB",
+  "main": "index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "master": "QBP_MODE=master node index.js",
+    "inventory": "QBP_MODE=inventory node index.js"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^4.4.1",
+    "firebase-admin": "^12.6.0"
+  }
+}

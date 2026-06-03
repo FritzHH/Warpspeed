@@ -47,6 +47,7 @@ import {
   dbSavePunchObject,
   dbSaveSettings,
   dbSaveSettingsField,
+  dbSavePhoneConfigField,
   dbSendSMS,
   dbGetCustomer,
 } from "./db_calls_wrapper";
@@ -1933,6 +1934,28 @@ export const useSettingsStore = create(
     {
       name: "warpspeed_settings",
       partialize: (s) => ({ settings: s.settings, tenantUsers: s.tenantUsers }),
+    }
+  )
+);
+
+export const usePhoneConfigStore = create(
+  persist(
+    (set, get) => ({
+      phoneConfig: null,
+
+      getPhoneConfig: () => get().phoneConfig,
+
+      setPhoneConfig: (phoneConfig) => set({ phoneConfig }),
+
+      setField: (fieldName, fieldVal, sendToDB = true) => {
+        const current = get().phoneConfig || {};
+        set({ phoneConfig: { ...current, [fieldName]: fieldVal } });
+        if (sendToDB) dbSavePhoneConfigField(fieldName, fieldVal);
+      },
+    }),
+    {
+      name: "warpspeed_phone_config",
+      partialize: (s) => ({ phoneConfig: s.phoneConfig }),
     }
   )
 );

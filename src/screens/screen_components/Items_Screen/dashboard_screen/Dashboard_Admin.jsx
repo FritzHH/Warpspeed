@@ -95,6 +95,7 @@ import { ImportComponent } from "./ImportComponent/ImportComponent";
 import { CardReaderManager } from "./readers_printers/CardReaderManager";
 import { PrintersComponent } from "./readers_printers/PrintersComponent";
 import { OrderingComponent } from "./OrderingComponent/OrderingComponent";
+import { PhoneSettingsComponent } from "./PhoneSettings/PhoneSettingsComponent";
 
 
 const TAB_NAMES = {
@@ -118,6 +119,7 @@ const TAB_NAMES = {
   analytics: "Analytics",
   dlqAdmin: "DLQ Admin",
   subscription: "Subscription",
+  phone: "Phone",
 };
 
 const TAB_GATES = {
@@ -138,6 +140,7 @@ const TAB_GATES = {
   [TAB_NAMES.emailTemplates]: 4,
   [TAB_NAMES.import]: 4,
   [TAB_NAMES.backup]: 4,
+  [TAB_NAMES.phone]: 4,
 };
 
 async function applyPinHashing(userObj, prevUser) {
@@ -467,6 +470,7 @@ export function Dashboard_Admin({}) {
                 { key: "emailTemplates", label: TAB_NAMES.emailTemplates, icon: ICONS.notes, gate: TAB_GATES[TAB_NAMES.emailTemplates], tab: TAB_NAMES.emailTemplates },
                 { key: "import", label: TAB_NAMES.import, icon: ICONS.importIcon, gate: TAB_GATES[TAB_NAMES.import], tab: TAB_NAMES.import },
                 { key: "backup", label: TAB_NAMES.backup, icon: ICONS.tools, gate: TAB_GATES[TAB_NAMES.backup], tab: TAB_NAMES.backup },
+                { key: "phone", label: TAB_NAMES.phone, icon: ICONS.cellPhone, iconSize: 22, gate: TAB_GATES[TAB_NAMES.phone], tab: TAB_NAMES.phone },
               ];
               if (zIsPlatformAdmin) {
                 menuItems.push({
@@ -607,6 +611,7 @@ export function Dashboard_Admin({}) {
                   {sExpand === TAB_NAMES.import && <ImportComponent />}
                   {sExpand === TAB_NAMES.backup && <BackupRecoveryComponent />}
                   {sExpand === TAB_NAMES.ordering && <OrderingComponent />}
+                  {sExpand === TAB_NAMES.phone && <PhoneSettingsComponent />}
                 </>
               )}
             </div>

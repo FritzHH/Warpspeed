@@ -1,0 +1,14 @@
+{
+  "name": "qbp-eftp-test",
+  "private": true,
+  "description": "Throwaway scripts to validate QBP API1 + EFTP integration before building the in-app vendor handler.",
+  "type": "commonjs",
+  "scripts": {
+    "discover": "node 1-discover.js",
+    "build-poi": "node 2-build-poi.js",
+    "upload": "node 3-upload.js"
+  },
+  "dependencies": {
+    "basic-ftp": "^5.0.5"
+  }
+}

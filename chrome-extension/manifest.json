@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Cadence — Add to Vendor Order",
   "short_name": "Cadence",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Injects an Add to Cadence button beside vendor ADD buttons (JBI, QBP) so vendor orders consolidate inside Cadence.",
   "permissions": [
     "storage"

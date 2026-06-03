@@ -266,6 +266,11 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
           sendResponse({ ok: true, result });
           return;
         }
+        case "setItemQty": {
+          const result = await callCallable(CALLABLES.setItemQty, msg.payload || {});
+          sendResponse({ ok: true, result });
+          return;
+        }
         default:
           sendResponse({ ok: false, error: "unknown_message" });
       }

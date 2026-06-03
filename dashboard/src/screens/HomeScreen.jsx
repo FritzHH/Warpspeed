@@ -5,60 +5,17 @@ import { functions } from "../firebase";
 import { signOut } from "../auth";
 
 const listTenantsCallable = httpsCallable(functions, "listTenantsCallable");
-const createTenantCallable = httpsCallable(
+const sendTenantSetupAuthCallable = httpsCallable(
   functions,
-  "platformAdminCreateTenantCallable"
-);
-const sendOwnerWelcomeEmailCallable = httpsCallable(
-  functions,
-  "platformAdminSendOwnerWelcomeEmailCallable"
+  "platformAdminSendTenantSetupAuthCallable"
 );
 const deleteTenantCallable = httpsCallable(
   functions,
   "platformAdminDeleteTenantCallable"
 );
-const sendTenantSetupAuthCallable = httpsCallable(
-  functions,
-  "platformAdminSendTenantSetupAuthCallable"
-);
 
 function isValidEmailShape(s) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((s || "").trim());
-}
-
-function formatDateForTenantID(date) {
-  const months = [
-    "jan", "feb", "mar", "apr", "may", "jun",
-    "jul", "aug", "sep", "oct", "nov", "dec",
-  ];
-  const month = months[date.getMonth()];
-  const day = date.getDate();
-  let hours = date.getHours();
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  const ampm = hours >= 12 ? "pm" : "am";
-  hours = hours % 12;
-  if (hours === 0) hours = 12;
-  return `${month}-${day}-${hours}-${minutes}-${ampm}`;
-}
-
-function buildTestTenantPayload() {
-  const dateStr = formatDateForTenantID(new Date());
-  return {
-    tenantID: `test-connect-${dateStr}`,
-    tenantName: `Test Connect ${dateStr}`,
-    ownerEmail: "hieb.fritz@gmail.com",
-    ownerFirstName: "Test",
-    ownerLastName: "Connect",
-    ownerPhone: "2393369177",
-    tenantStreet: "123 Test St",
-    tenantUnit: "",
-    tenantCity: "Testville",
-    tenantState: "CA",
-    tenantZip: "94016",
-    billingModel: "per_sale",
-    platformFeePercent: 0.5,
-    fullBakeForTest: true,
-  };
 }
 
 function formatDate(ms) {
@@ -113,22 +70,15 @@ function badgesFor(tenant) {
   return out;
 }
 
-export function HomeScreen({ user, claims }) {
+export function HomeScreen({ user }) {
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [tenants, setTenants] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
-  const [showClaims, setShowClaims] = useState(false);
-  const [testRunning, setTestRunning] = useState(false);
-  const [testResult, setTestResult] = useState(null);
-  const [testError, setTestError] = useState("");
-  const [emailResult, setEmailResult] = useState(null);
-  const [emailError, setEmailError] = useState("");
   const [deletingTenantID, setDeletingTenantID] = useState("");
   const [deleteError, setDeleteError] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
-  const [signupBillingTier, setSignupBillingTier] = useState("per_sale");
   const [signupSending, setSignupSending] = useState(false);
   const [signupResult, setSignupResult] = useState(null);
   const [signupError, setSignupError] = useState("");
@@ -165,26 +115,17 @@ export function HomeScreen({ user, claims }) {
     if (!ok) return;
     setDeletingTenantID(tenant.tenantID);
     setDeleteError("");
-    console.log(
-      "DeleteTenant: firing platformAdminDeleteTenantCallable",
-      JSON.stringify({ tenantID: tenant.tenantID, nukeExternal: true }, null, 2)
-    );
     try {
-      const res = await deleteTenantCallable({
+      await deleteTenantCallable({
         tenantID: tenant.tenantID,
         nukeExternal: true,
         skipConfirmation: true,
       });
-      console.log(
-        "DeleteTenant: result",
-        JSON.stringify(res.data, null, 2)
-      );
       await refreshTenants();
     } catch (err) {
       const code = err?.code || "";
       const msg = err?.message || "Delete failed.";
       const full = code ? `${code}: ${msg}` : msg;
-      console.error("DeleteTenant: error", full, err);
       setDeleteError(`${tenant.tenantID}: ${full}`);
     } finally {
       setDeletingTenantID("");
@@ -200,79 +141,22 @@ export function HomeScreen({ user, claims }) {
     setSignupSending(true);
     setSignupResult(null);
     setSignupError("");
-    const payload = { email: normalized, billingTier: signupBillingTier };
-    console.log(
-      "SendSignupAuth: firing platformAdminSendTenantSetupAuthCallable",
-      JSON.stringify(payload, null, 2)
-    );
     try {
-      const res = await sendTenantSetupAuthCallable(payload);
-      console.log(
-        "SendSignupAuth: result",
-        JSON.stringify(res.data, null, 2)
-      );
+      const res = await sendTenantSetupAuthCallable({
+        email: normalized,
+        // Tier is picked per-store at /welcome onboarding; this satisfies the
+        // callable's required-param validator until it's dropped server-side.
+        billingTier: "per_sale",
+      });
       setSignupResult(res.data);
       setSignupEmail("");
-      setSignupBillingTier("per_sale");
     } catch (err) {
       const code = err?.code || "";
       const msg = err?.message || "Send failed.";
       const full = code ? `${code}: ${msg}` : msg;
-      console.error("SendSignupAuth: error", full, err);
       setSignupError(full);
     } finally {
       setSignupSending(false);
-    }
-  }
-
-  async function handleCreateTestAccount() {
-    setTestRunning(true);
-    setTestResult(null);
-    setTestError("");
-    setEmailResult(null);
-    setEmailError("");
-    const payload = buildTestTenantPayload();
-    console.log(
-      "CreateTestAccount: firing platformAdminCreateTenantCallable with payload",
-      JSON.stringify(payload, null, 2)
-    );
-    try {
-      const res = await createTenantCallable(payload);
-      console.log(
-        "CreateTestAccount: result",
-        JSON.stringify(res.data, null, 2)
-      );
-      setTestResult(res.data);
-
-      const newTenantID = res.data?.tenantID || payload.tenantID;
-      console.log(
-        "CreateTestAccount: firing platformAdminSendOwnerWelcomeEmailCallable",
-        JSON.stringify({ tenantID: newTenantID }, null, 2)
-      );
-      try {
-        const emailRes = await sendOwnerWelcomeEmailCallable({
-          tenantID: newTenantID,
-        });
-        console.log(
-          "CreateTestAccount: welcome email result",
-          JSON.stringify(emailRes.data, null, 2)
-        );
-        setEmailResult(emailRes.data);
-      } catch (emailErr) {
-        const code = emailErr?.code || "";
-        const msg = emailErr?.message || "Welcome email failed.";
-        const full = code ? `${code}: ${msg}` : msg;
-        console.error("CreateTestAccount: welcome email error", full, emailErr);
-        setEmailError(full);
-      }
-    } catch (err) {
-      const code = err?.code || "";
-      const msg = err?.message || "Test create failed.";
-      const full = code ? `${code}: ${msg}` : msg;
-      console.error("CreateTestAccount: error", full, err);
-      setTestError(full);
-    } finally {
-      setTestRunning(false);
     }
   }
 
@@ -321,20 +205,6 @@ export function HomeScreen({ user, claims }) {
             disabled={signupSending}
             autoComplete="off"
           />
-          <div className="fieldLabel">Billing tier</div>
-          <select
-            className="textInput"
-            value={signupBillingTier}
-            onChange={(e) => setSignupBillingTier(e.target.value)}
-            disabled={signupSending}
-          >
-            <option value="per_sale">
-              Per-sale (0.5% per sale, billed monthly)
-            </option>
-            <option value="monthly_sub">
-              Monthly subscription ($50/mo)
-            </option>
-          </select>
           <button
             type="button"
             className="primaryButton"
@@ -353,160 +223,119 @@ export function HomeScreen({ user, claims }) {
         </div>
 
         <div className="card cardList">
-        <div className="listHeader">
-          <div>
-            <h1 className="cardTitle">Cadence Dashboard</h1>
-            <p className="cardSubtitle">Signed in as {user?.email}</p>
+          <div className="listHeader">
+            <div>
+              <h1 className="cardTitle">Cadence Dashboard</h1>
+              <p className="cardSubtitle">Signed in as {user?.email}</p>
+            </div>
+            <div className="buttonRow">
+              <Link to="/billing/config" className="secondaryButton">
+                Platform billing
+              </Link>
+              <Link to="/billing/tiers" className="secondaryButton">
+                Billing tiers
+              </Link>
+              <Link to="/admin" className="secondaryButton">
+                Cadence admin
+              </Link>
+            </div>
           </div>
-          <div className="buttonRow">
-            <Link to="/billing/config" className="secondaryButton">
-              Platform billing
-            </Link>
-            <Link to="/billing/tiers" className="secondaryButton">
-              Billing tiers
-            </Link>
-            <Link to="/admin" className="secondaryButton">
-              Cadence admin
-            </Link>
-            <Link to="/tenants/new" className="primaryButton primaryButtonInline">
-              + New tenant
-            </Link>
-          </div>
-        </div>
 
-        <input
-          type="text"
-          className="textInput searchInput"
-          placeholder="Search by tenant ID or name..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          autoComplete="off"
-        />
+          <input
+            type="text"
+            className="textInput searchInput"
+            placeholder="Search by tenant ID or name..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            autoComplete="off"
+          />
 
-        {error && <div className="errorText">{error}</div>}
-        {deleteError && <div className="errorText">{deleteError}</div>}
+          {error && <div className="errorText">{error}</div>}
+          {deleteError && <div className="errorText">{deleteError}</div>}
 
-        {loading && !tenants && (
-          <div className="placeholderText">Loading tenants...</div>
-        )}
+          {loading && !tenants && (
+            <div className="placeholderText">Loading tenants...</div>
+          )}
 
-        {!loading && tenants && tenants.length === 0 && (
-          <div className="emptyState">
-            {debouncedSearch
-              ? `No tenants match "${debouncedSearch}".`
-              : "No tenants yet. Create the first one to get started."}
-          </div>
-        )}
+          {!loading && tenants && tenants.length === 0 && (
+            <div className="emptyState">
+              {debouncedSearch
+                ? `No tenants match "${debouncedSearch}".`
+                : "No tenants yet. Send your first authorization to get started."}
+            </div>
+          )}
 
-        {tenants && tenants.length > 0 && (
-          <div className="tenantList">
-            {tenants.map((t) => {
-              const badges = badgesFor(t);
-              return (
-                <Link
-                  key={t.tenantID}
-                  to={`/tenants/${t.tenantID}`}
-                  className="tenantRow linkReset"
-                >
-                  <div className="tenantRowMain">
-                    <div className="tenantRowName">{t.name || t.tenantID}</div>
-                    <div className="tenantRowMeta">
-                      <span className="tenantRowID">{t.tenantID}</span>
-                      <span className="tenantRowDot">•</span>
-                      <span>{t.ownerEmail}</span>
-                      {t.storeCount > 0 && (
-                        <>
-                          <span className="tenantRowDot">•</span>
-                          <span>
-                            {t.storeCount} store
-                            {t.storeCount === 1 ? "" : "s"}
+          {tenants && tenants.length > 0 && (
+            <div className="tenantList">
+              {tenants.map((t) => {
+                const badges = badgesFor(t);
+                return (
+                  <Link
+                    key={t.tenantID}
+                    to={`/tenants/${t.tenantID}`}
+                    className="tenantRow linkReset"
+                  >
+                    <div className="tenantRowMain">
+                      <div className="tenantRowName">{t.name || t.tenantID}</div>
+                      <div className="tenantRowMeta">
+                        <span className="tenantRowID">{t.tenantID}</span>
+                        <span className="tenantRowDot">•</span>
+                        <span>{t.ownerEmail}</span>
+                        {t.storeCount > 0 && (
+                          <>
+                            <span className="tenantRowDot">•</span>
+                            <span>
+                              {t.storeCount} store
+                              {t.storeCount === 1 ? "" : "s"}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                    <div className="tenantRowSide">
+                      <div className="badgeRow">
+                        {badges.map((b, i) => (
+                          <span
+                            key={i}
+                            className={`badge badge-${b.tone}`}
+                          >
+                            {b.label}
                           </span>
-                        </>
-                      )}
+                        ))}
+                      </div>
+                      <div className="tenantRowDate">
+                        {formatDate(t.createdAt)}
+                      </div>
+                      <button
+                        type="button"
+                        className="dangerButton"
+                        onClick={(e) => handleDeleteTenant(e, t)}
+                        disabled={deletingTenantID === t.tenantID}
+                        title="Delete tenant + Stripe + Twilio + Auth user"
+                        style={{
+                          marginTop: 0,
+                          padding: "4px 10px",
+                          fontSize: 12,
+                        }}
+                      >
+                        {deletingTenantID === t.tenantID ? "Deleting…" : "Delete"}
+                      </button>
                     </div>
-                  </div>
-                  <div className="tenantRowSide">
-                    <div className="badgeRow">
-                      {badges.map((b, i) => (
-                        <span
-                          key={i}
-                          className={`badge badge-${b.tone}`}
-                        >
-                          {b.label}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="tenantRowDate">
-                      {formatDate(t.createdAt)}
-                    </div>
-                    <button
-                      type="button"
-                      className="dangerButton"
-                      onClick={(e) => handleDeleteTenant(e, t)}
-                      disabled={deletingTenantID === t.tenantID}
-                      title="Delete tenant + Stripe + Twilio + Auth user (dev)"
-                      style={{
-                        marginTop: 0,
-                        padding: "4px 10px",
-                        fontSize: 12,
-                      }}
-                    >
-                      {deletingTenantID === t.tenantID ? "Deleting…" : "Delete"}
-                    </button>
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        )}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
 
-        <div className="cardFooter">
-          <button
-            type="button"
-            className="secondaryButton"
-            onClick={handleCreateTestAccount}
-            disabled={testRunning}
-          >
-            {testRunning ? "Creating Test Account…" : "Create Test Account"}
-          </button>
-          {testError && <div className="errorText">{testError}</div>}
-          {testResult && (
-            <div className="claimsBlock">
-              <pre className="claimsCode">
-                {JSON.stringify(testResult, null, 2)}
-              </pre>
-            </div>
-          )}
-          {emailError && <div className="errorText">{emailError}</div>}
-          {emailResult && (
-            <div className="claimsBlock">
-              <pre className="claimsCode">
-                {JSON.stringify(emailResult, null, 2)}
-              </pre>
-            </div>
-          )}
-          <button
-            type="button"
-            className="linkButton"
-            onClick={() => setShowClaims((v) => !v)}
-          >
-            {showClaims ? "Hide" : "Show"} custom claims
-          </button>
-          {showClaims && (
-            <div className="claimsBlock">
-              <pre className="claimsCode">
-                {JSON.stringify(claims, null, 2)}
-              </pre>
-            </div>
-          )}
-          <button
-            type="button"
-            className="secondaryButton"
-            onClick={() => signOut()}
-          >
-            Sign out
-          </button>
-        </div>
+          <div className="cardFooter">
+            <button
+              type="button"
+              className="secondaryButton"
+              onClick={() => signOut()}
+            >
+              Sign out
+            </button>
+          </div>
         </div>
       </div>
     </div>

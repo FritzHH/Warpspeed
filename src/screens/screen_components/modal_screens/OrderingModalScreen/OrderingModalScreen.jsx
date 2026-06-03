@@ -19,6 +19,7 @@ import {
   LargeModalHeaderButton,
   ModalFooter,
   ModalFooterButton,
+  TabMenuButton,
   TextInput,
   Tooltip,
 } from "../../../../dom_components";
@@ -615,11 +616,72 @@ function OrderItemsTable({ items, inventory, orderID }) {
     return () => { cancelled = true; };
   }, [lookupKey, settingsVendors]);
 
+  // Vendor tabs — "All" + one tab per vendor with items in this order + "Other"
+  // when any items are unassigned. Recomputed when items change so newly-scanned
+  // items light up their tab automatically.
+  const tabIDs = useMemo(() => {
+    const present = new Set();
+    let hasOther = false;
+    previewItems.forEach((it) => {
+      const vid = it && it.vendorCatalogID;
+      if (!vid || vid === "other") {
+        hasOther = true;
+      } else {
+        present.add(vid);
+      }
+    });
+    const ordered = VENDOR_CATALOGS
+      .filter((v) => v.id !== "other" && present.has(v.id))
+      .map((v) => v.id);
+    // Vendors in items but not in VENDOR_CATALOGS (shouldn't happen, but keep
+    // the tab so the items aren't invisible).
+    present.forEach((id) => {
+      if (!ordered.includes(id)) ordered.push(id);
+    });
+    return ["all", ...ordered, ...(hasOther ? ["other"] : [])];
+  }, [previewItems]);
+
+  const [sActiveTab, _setActiveTab] = useState("all");
+
+  // If the active tab disappears (e.g. last item of that vendor removed),
+  // fall back to "all" instead of leaving a stale selection.
+  useEffect(() => {
+    if (!tabIDs.includes(sActiveTab)) _setActiveTab("all");
+  }, [tabIDs, sActiveTab]);
+
+  const displayedItems = useMemo(() => {
+    if (sActiveTab === "all") return previewItems;
+    if (sActiveTab === "other") {
+      return previewItems.filter(
+        (it) => !it.vendorCatalogID || it.vendorCatalogID === "other",
+      );
+    }
+    return previewItems.filter((it) => it.vendorCatalogID === sActiveTab);
+  }, [previewItems, sActiveTab]);
+
+  function tabLabel(id) {
+    if (id === "all") return "ALL";
+    if (id === "other") return "OTHER";
+    const v = VENDOR_CATALOGS.find((c) => c.id === id);
+    return (v?.displayName || id).toUpperCase();
+  }
+
   return (
     <>
       <OrderItemSearchRow orderID={orderID} items={items} inventory={inventory} />
 
-      <div className={styles.tableWrap}>
+      <div className={styles.tableHeader}>
+        <div className={styles.vendorTabsBar}>
+          {tabIDs.map((id) => (
+            <TabMenuButton
+              key={id}
+              text={tabLabel(id)}
+              isSelected={sActiveTab === id}
+              onPress={() => _setActiveTab(id)}
+            />
+          ))}
+        </div>
+
         <div className={`${styles.row} ${styles.headerRow}`}>
           <div className={styles.colName}>Item</div>
           <div className={styles.colVendor}>Vendor</div>
@@ -630,8 +692,10 @@ function OrderItemsTable({ items, inventory, orderID }) {
           <div className={styles.colPrice}>MSRP</div>
           <div className={styles.colPrice}>{"Sale\nPrice"}</div>
         </div>
+      </div>
 
-        {previewItems.map((item) => (
+      <div className={styles.tableWrap}>
+        {displayedItems.map((item) => (
           <OrderItemRow
             key={item.id}
             item={item}
@@ -1113,12 +1177,7 @@ function OrderItemRow({ item, inventory, orderID, warehouseQty, homeWarehouseCod
     );
   }, [item.scannedBarcode, inventory]);
 
-  const catalogName =
-    item.catalogSnapshot?.description ||
-    item.catalogSnapshot?.item_description ||
-    item.catalogSnapshot?.short_description ||
-    item.catalogSnapshot?.product_name ||
-    "";
+  const catalogName = String(item.catalogSnapshot?.name || "");
 
   const storeName = localMatch?.formalName || localMatch?.informalName || "";
   const primaryName = storeName || catalogName || item.scannedBarcode || "(unknown)";

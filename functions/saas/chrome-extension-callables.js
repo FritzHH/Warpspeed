@@ -151,77 +151,67 @@ const COMMON_OPTS = {
 };
 
 // ────────────────────────────────────────────────────────────────────
-// JBI catalog → inventory mapping
+// Vendor catalog -> inventory mapping
 // ────────────────────────────────────────────────────────────────────
 
-// Build a Cadence inventory doc from a JBI catalog snapshot. Mirrors
-// INVENTORY_ITEM_PROTO in src/data.js — keep in sync if either side changes.
+// Build a Cadence inventory doc from a vendor-catalog snapshot. Catalog
+// snapshots are in canonical shape (see
+// jobs/vendor-catalog-*/modes/master.js#toCanonicalItem) so this mapper is
+// vendor-agnostic. Mirrors INVENTORY_ITEM_PROTO in src/data.js - keep in
+// sync if either side changes.
 //
-// Field-name uncertainty: JBI's inv_mast.txt columns are passed through
-// verbatim by the master sync (jobs/vendor-catalog-jbi/modes/master.js).
-// Known fields: upc_ean, short_descr, description, product_name, cost.
-// MSRP/brand column names are unverified — we try common variants and fall
-// back to 0/empty. priceNotSet:true flags inventory items whose MSRP we
-// couldn't resolve so a follow-up sweep / UI can surface them.
+// vendorCatalogID is the catalog the snapshot came from ("jbi", "qbp", ...)
+// and becomes the vendorId / createdFromVendor stamp on the inventory doc.
 //
-// Money convention: JBI publishes dollar strings ("12.50"). Cadence inventory
-// stores cost/price/msrp in CENTS. Convert via Math.round(dollars * 100).
-function buildInventoryItemFromJbiCatalog(catalog, uid) {
+// Canonical cost / msrp are already CENTS (the master jobs do the
+// dollars->cents conversion at write time), so no money math here.
+function buildInventoryItemFromCatalog(catalog, uid, vendorURL, vendorCatalogID) {
   if (!catalog) return null;
-  const dollarsToCents = (v) => {
-    if (v == null || v === "") return 0;
-    const n = Number(v);
-    return Number.isFinite(n) && n > 0 ? Math.round(n * 100) : 0;
-  };
-  const formalName =
-    catalog.description ||
-    catalog.item_description ||
-    catalog.short_descr ||
-    catalog.short_description ||
-    catalog.product_name ||
-    "";
-  const brand =
-    catalog.brand ||
-    catalog.brand_name ||
-    catalog.manufacturer ||
-    catalog.mfg_name ||
-    "";
-  const msrpRaw =
-    catalog.msrp ??
-    catalog.msrp_price ??
-    catalog.suggested_retail ??
-    catalog.suggested_retail_price ??
-    catalog.retail_price ??
-    catalog.srp ??
-    null;
-  const msrpCents = dollarsToCents(msrpRaw);
-  const costCents = dollarsToCents(catalog.cost);
+
+  const formalName = String(catalog.name || "").trim();
+  const brand = String(catalog.brand || "").trim();
+  const costCents = Number.isFinite(catalog.cost) ? catalog.cost : 0;
+  const msrpCents = Number.isFinite(catalog.msrp) ? catalog.msrp : 0;
+  const primaryBarcode = String(catalog.primaryUpc || "").trim();
+  const imageUrl = catalog.imageUrl ? String(catalog.imageUrl).trim() : "";
+
+  const vendorID = vendorCatalogID || "";
   const nowMs = Date.now();
-  return {
+
+  const item = {
     id: crypto.randomUUID(),
     formalName,
     informalName: "",
     brand,
-    vendorId: "jbi",
-    vendorName: "JBI",
+    vendorId: vendorID,
+    vendorName: vendorDisplayNameFor(vendorID),
+    vendorURL: vendorURL ? String(vendorURL) : "",
     catalogName: formalName,
     price: msrpCents,
     salePrice: 0,
     msrp: msrpCents,
     category: "Item",
     cost: costCents,
-    primaryBarcode: String(catalog.upc_ean || ""),
+    primaryBarcode,
     barcodes: [],
     minutes: 0,
     customPart: false,
     customLabor: false,
     receiptNoteRequired: false,
     specs: { source: "", lastUpdated: 0, entries: [] },
-    createdFromVendor: "jbi",
+    createdFromVendor: vendorID,
     createdMillis: nowMs,
     createdByUserID: uid,
     priceNotSet: msrpCents === 0,
   };
+  if (imageUrl) item.image_url = imageUrl;
+  return item;
+}
+
+function vendorDisplayNameFor(vendorCatalogID) {
+  if (vendorCatalogID === "jbi") return "JBI";
+  if (vendorCatalogID === "qbp") return "QBP";
+  return vendorCatalogID || "";
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -235,25 +225,36 @@ function buildInventoryItemFromJbiCatalog(catalog, uid) {
 // on the cadence-pos RTDB. When no `vendorCatalogID` arrives we default to
 // "jbi" for backward compatibility with the v0.1.0 extension.
 //
-// Catalog-driven inventory auto-create is currently JBI-only (the field-name
-// mapping in buildInventoryItemFromJbiCatalog matches JBI's inv_mast.txt
-// columns). For other vendors we still write the order line with the scraped
-// page cost; inventory auto-create kicks in once a per-vendor mapping lands.
+// Catalog-driven inventory auto-create goes through
+// buildInventoryItemFromCatalog against the canonical catalog snapshot. The
+// builder is vendor-agnostic - the vendor-catalog master jobs flatten
+// vendor-specific shapes into one {id, name, brand, cost, msrp, primaryUpc,
+// allUpcs} envelope at write time. For unmapped vendors we still write the
+// order line with the scraped page cost; auto-create kicks in once the
+// vendor's catalog gets imported.
 //
 // PAYLOAD:
 //   { project, idToken?, tenantID, storeID, vendorCatalogID?, vendorItemID,
 //     qty, cost, warehouseCode, warehouseQty }
 // RETURN:
-//   { success: true,  itemID, orderID, matched, itemName, createdInventoryItemID }
+//   { success: true,  itemID, orderID, matched, itemName, createdInventoryItemID,
+//                     merged, qty }
+//     merged=true means an existing line with the same vendorCatalogID +
+//     vendorItemID had its qty bumped instead of a duplicate row being
+//     inserted; itemID then points at the existing doc and qty is the
+//     post-merge total. matched/itemName/createdInventoryItemID retain their
+//     original semantics regardless of merge.
 //   { success: false, reason: "no_active_order" | "active_order_missing" }
 // ────────────────────────────────────────────────────────────────────
 
 exports.addJBIItemToVendorOrder = onCall(COMMON_OPTS, async (request) => {
   const data = request.data || {};
-  const { storeID, vendorItemID, qty, cost, warehouseCode, warehouseQty } = data;
+  const { storeID, vendorItemID, qty, cost, warehouseCode, warehouseQty, vendorURL, vendorItemName } = data;
   // Default to "jbi" so v0.1.0 extensions (which didn't send vendorCatalogID)
   // keep working unchanged.
   const vendorCatalogID = String(data.vendorCatalogID || "jbi").toLowerCase();
+  const vendorURLStr = vendorURL ? String(vendorURL) : "";
+  const vendorItemNameStr = vendorItemName ? String(vendorItemName).trim() : "";
 
   if (!storeID || !vendorItemID) {
     throw new HttpsError(
@@ -311,17 +312,10 @@ exports.addJBIItemToVendorOrder = onCall(COMMON_OPTS, async (request) => {
   // catalog. Lookup mirrors OrderingModalScreen.localMatch (primaryBarcode
   // OR barcodes-array) so two add paths agree on what counts as "matched".
   // Race window: two rapid clicks on the same UPC can both miss and create
-  // duplicates — rare in practice; promote to a transaction if it bites.
-  // Currently JBI-only — buildInventoryItemFromJbiCatalog's field mapping
-  // is keyed to JBI's inv_mast.txt columns. Other vendors skip auto-create
-  // until a per-vendor builder lands.
+  // duplicates - rare in practice; promote to a transaction if it bites.
   let createdInventoryItemID = null;
-  if (
-    vendorCatalogID === "jbi" &&
-    catalogSnapshot &&
-    catalogSnapshot.upc_ean
-  ) {
-    const upc = String(catalogSnapshot.upc_ean);
+  if (catalogSnapshot && catalogSnapshot.primaryUpc) {
+    const upc = String(catalogSnapshot.primaryUpc);
     const inventoryPath = `tenants/${tenantID}/stores/${storeID}/inventory`;
     const [primarySnap, arraySnap] = await Promise.all([
       firestore
@@ -336,21 +330,85 @@ exports.addJBIItemToVendorOrder = onCall(COMMON_OPTS, async (request) => {
         .get(),
     ]);
     if (primarySnap.empty && arraySnap.empty) {
-      const newInvItem = buildInventoryItemFromJbiCatalog(catalogSnapshot, uid);
+      const newInvItem = buildInventoryItemFromCatalog(
+        catalogSnapshot,
+        uid,
+        vendorURLStr,
+        vendorCatalogID,
+      );
       if (newInvItem) {
         await firestore
           .doc(`${inventoryPath}/${newInvItem.id}`)
           .set(newInvItem);
         createdInventoryItemID = newInvItem.id;
       }
+    } else if (vendorURLStr) {
+      // Opportunistic backfill: stamp vendorURL onto an existing inventory
+      // item that doesn't have one yet, so the side panel's clickable name
+      // works even for items added before vendorURL existed.
+      const existingInvDoc = !primarySnap.empty ? primarySnap.docs[0] : arraySnap.docs[0];
+      const existingInv = existingInvDoc.data() || {};
+      if (!existingInv.vendorURL) {
+        await existingInvDoc.ref.update({
+          vendorURL: vendorURLStr,
+          lastModifiedMillis: Date.now(),
+          lastModifiedByUserID: uid,
+        });
+      }
     }
   }
 
-  const itemID = crypto.randomUUID();
+  // Merge into an existing line when the same vendor + part is already on the
+  // order. Avoids the "duplicate row" UX issue where a user clicks Add twice
+  // (or AJAX-injected listings let them click the same part from two pages)
+  // and ends up with two rows that the side panel + invoice can't easily
+  // reconcile. Match key is (vendorCatalogID, vendorItemID) — same shape the
+  // in-app OrderingModalScreen uses when it dedupes incoming scans.
+  //
+  // We do NOT rewrite catalogSnapshot, sourceCost, or warehouse info on
+  // merge: the existing row's stored cost is what was quoted when the user
+  // first committed to this line, and silently mutating it would break the
+  // "items on this order keep the cost they were added with" contract.
+  const itemsCollection = firestore.collection(`${orderPath}/items`);
+  const existingSnap = await itemsCollection
+    .where("vendorCatalogID", "==", vendorCatalogID)
+    .where("vendorItemID", "==", String(vendorItemID))
+    .limit(1)
+    .get();
+
   const nowMs = Date.now();
+
+  if (!existingSnap.empty) {
+    const existingDoc = existingSnap.docs[0];
+    const existing = existingDoc.data() || {};
+    const mergedQty = Number(existing.qty || 0) + qtyNum;
+    await existingDoc.ref.update({
+      qty: mergedQty,
+      lastModifiedMillis: nowMs,
+      lastModifiedByUserID: uid,
+    });
+    await firestore.doc(orderPath).update({
+      lastModifiedMillis: nowMs,
+      lastModifiedByUserID: uid,
+    });
+    const existingSnapshot = existing.catalogSnapshot || catalogSnapshot || {};
+    const itemName = String(existingSnapshot.name || "");
+    return {
+      success: true,
+      itemID: existingDoc.id,
+      orderID: activeOrderID,
+      matched: !!(existing.catalogSnapshot || catalogSnapshot),
+      itemName,
+      createdInventoryItemID,
+      merged: true,
+      qty: mergedQty,
+    };
+  }
+
+  const itemID = crypto.randomUUID();
   const itemDoc = {
     id: itemID,
-    scannedBarcode: (catalogSnapshot && catalogSnapshot.upc_ean) || "",
+    scannedBarcode: (catalogSnapshot && catalogSnapshot.primaryUpc) || "",
     qty: qtyNum,
     addedMillis: nowMs,
     addedByUserID: uid,
@@ -366,6 +424,8 @@ exports.addJBIItemToVendorOrder = onCall(COMMON_OPTS, async (request) => {
     sourceCost: cost != null ? String(cost) : "",
     warehouseCode: warehouseCode || "",
     warehouseQty: warehouseQty != null ? Number(warehouseQty) : null,
+    vendorURL: vendorURLStr,
+    vendorItemName: vendorItemNameStr,
   };
 
   await firestore.doc(`${orderPath}/items/${itemID}`).set(itemDoc);
@@ -374,12 +434,7 @@ exports.addJBIItemToVendorOrder = onCall(COMMON_OPTS, async (request) => {
     lastModifiedByUserID: uid,
   });
 
-  const itemName =
-    (catalogSnapshot &&
-      (catalogSnapshot.short_descr ||
-        catalogSnapshot.description ||
-        catalogSnapshot.product_name)) ||
-    "";
+  const itemName = (catalogSnapshot && String(catalogSnapshot.name || "")) || "";
 
   return {
     success: true,
@@ -388,6 +443,8 @@ exports.addJBIItemToVendorOrder = onCall(COMMON_OPTS, async (request) => {
     matched: !!catalogSnapshot,
     itemName,
     createdInventoryItemID,
+    merged: false,
+    qty: qtyNum,
   };
 });
 
@@ -542,9 +599,9 @@ exports.getVendorOrderCallable = onCall(COMMON_OPTS, async (request) => {
 
   // Resolve display fields using the same precedence as the in-app screen:
   //   name  = inventory.formalName || inventory.informalName
-  //         || catalogSnapshot.description / item_description / short_description / product_name
-  //         || scannedBarcode || vendorItemID || "(unknown)"
-  //   cost  = catalogSnapshot.cost ?? inventory.cost     (cents)
+  //         || catalogSnapshot.name (canonical) || scannedBarcode
+  //         || vendorItemID || "(unknown)"
+  //   cost  = catalogSnapshot.cost ?? inventory.cost     (both cents)
   //   price = inventory.price                            (cents)
   //   msrp  = inventory.msrp                             (cents)
   const toNumOrNull = (v) => {
@@ -562,21 +619,30 @@ exports.getVendorOrderCallable = onCall(COMMON_OPTS, async (request) => {
   const enrichedItems = items.map((it) => {
     const snap = it.catalogSnapshot || {};
     const inv = it.scannedBarcode ? inventoryByBarcode[it.scannedBarcode] : null;
-    const catalogName =
-      snap.description ||
-      snap.item_description ||
-      snap.short_description ||
-      snap.product_name ||
-      "";
+    const catalogName = String(snap.name || "");
     const storeName = (inv && (inv.formalName || inv.informalName)) || "";
+    // vendorItemName falls in just before the part-number bottom — for vendors
+    // whose catalog isn't imported (QBP today), the extension scrapes the
+    // product name off the vendor page and stamps it on the line item so the
+    // side panel shows something readable instead of the SKU.
     const displayName =
       storeName ||
       catalogName ||
+      (it.vendorItemName && String(it.vendorItemName).trim()) ||
       it.scannedBarcode ||
       it.vendorItemID ||
       "(unknown)";
     const inventoryCostCents = toNumOrNull(inv && inv.cost);
-    const costCents = toNumOrNull(snap.cost) ?? inventoryCostCents;
+    // sourceCost is the scraped page price (dollars as a string, e.g. "12.50")
+    // captured at add-time. Acts as the final cost fallback when neither
+    // catalog snapshot nor inventory has a cost — again, QBP today.
+    const sourceCostDollars = Number(it.sourceCost);
+    const sourceCostCents =
+      Number.isFinite(sourceCostDollars) && sourceCostDollars > 0
+        ? Math.round(sourceCostDollars * 100)
+        : null;
+    const costCents =
+      toNumOrNull(snap.cost) ?? inventoryCostCents ?? sourceCostCents;
     const priceCents = toNumOrNull(inv && inv.price);
     const msrpCents = toNumOrNull(inv && inv.msrp);
 
@@ -611,6 +677,7 @@ exports.getVendorOrderCallable = onCall(COMMON_OPTS, async (request) => {
         pageCostCents,
         pageWarehouseCode,
         hasCostDiff,
+        vendorURL: (inv && inv.vendorURL) || it.vendorURL || "",
       },
     };
   });
@@ -726,7 +793,149 @@ exports.applyInventoryCostFromExtensionCallable = onCall(
   }
 );
 
+// ────────────────────────────────────────────────────────────────────
+// setVendorOrderItemQtyCallable
+//
+// Updates the qty on a single line item of the active vendor order. Used by
+// the Chrome extension side panel's per-row up/down adjusters. The panel
+// clamps to qty >= 1 (deletion stays an in-app action), but we re-validate
+// server-side so a tampered client can't write 0/negative qty.
+//
+// PAYLOAD:
+//   { project, idToken?, tenantID, storeID, itemID, qty, orderID? }
+//   orderID is OPTIONAL — when omitted, the callable resolves the active
+//   order from settings.activeVendorOrderID (same fallback as
+//   getVendorOrderCallable).
+// RETURN:
+//   { success: true,  itemID, qty }
+//   { success: false, reason: "no_active_order" | "active_order_missing" | "item_not_found" }
+// ────────────────────────────────────────────────────────────────────
+
+exports.setVendorOrderItemQtyCallable = onCall(COMMON_OPTS, async (request) => {
+  const data = request.data || {};
+  const { storeID, itemID } = data;
+  if (!storeID || !itemID) {
+    throw new HttpsError(
+      "invalid-argument",
+      "storeID and itemID are required."
+    );
+  }
+  const qtyNum = Number(data.qty);
+  if (!Number.isFinite(qtyNum) || qtyNum < 1) {
+    throw new HttpsError("invalid-argument", "qty must be a positive number.");
+  }
+  const qtyInt = Math.floor(qtyNum);
+
+  const { uid, firestore } = await resolveCaller(request, data);
+  const { tenantID } = data;
+
+  // Resolve the order. Caller-supplied orderID wins; else fall back to the
+  // active order so the side panel doesn't have to send it explicitly.
+  let orderID = data.orderID || "";
+  if (!orderID) {
+    const settingsPath = `tenants/${tenantID}/stores/${storeID}/settings/settings`;
+    const settingsSnap = await firestore.doc(settingsPath).get();
+    orderID =
+      (settingsSnap.exists &&
+        settingsSnap.data() &&
+        settingsSnap.data().activeVendorOrderID) ||
+      "";
+    if (!orderID) {
+      return { success: false, reason: "no_active_order" };
+    }
+  }
+
+  const orderPath = `tenants/${tenantID}/stores/${storeID}/vendor-orders/${orderID}`;
+  const orderSnap = await firestore.doc(orderPath).get();
+  if (!orderSnap.exists) {
+    return { success: false, reason: "active_order_missing", orderID };
+  }
+
+  const itemPath = `${orderPath}/items/${itemID}`;
+  const itemSnap = await firestore.doc(itemPath).get();
+  if (!itemSnap.exists) {
+    return { success: false, reason: "item_not_found", itemID };
+  }
+
+  const nowMs = Date.now();
+  await firestore.doc(itemPath).update({
+    qty: qtyInt,
+    lastModifiedMillis: nowMs,
+    lastModifiedByUserID: uid,
+  });
+  await firestore.doc(orderPath).update({
+    lastModifiedMillis: nowMs,
+    lastModifiedByUserID: uid,
+  });
+
+  return { success: true, itemID, qty: qtyInt };
+});
+
+// ────────────────────────────────────────────────────────────────────
+// deleteVendorOrderItemCallable
+//
+// Removes one line item from the active vendor order. Used by the Chrome
+// extension side panel's per-row trash button. Mirrors setVendorOrderItemQty
+// (active-order fallback, missing-doc handling) but deletes the doc instead
+// of updating its qty.
+//
+// PAYLOAD:
+//   { project, idToken?, tenantID, storeID, itemID, orderID? }
+// RETURN:
+//   { success: true,  itemID }
+//   { success: false, reason: "no_active_order" | "active_order_missing" | "item_not_found" }
+// ────────────────────────────────────────────────────────────────────
+
+exports.deleteVendorOrderItemCallable = onCall(COMMON_OPTS, async (request) => {
+  const data = request.data || {};
+  const { storeID, itemID } = data;
+  if (!storeID || !itemID) {
+    throw new HttpsError(
+      "invalid-argument",
+      "storeID and itemID are required."
+    );
+  }
+
+  const { uid, firestore } = await resolveCaller(request, data);
+  const { tenantID } = data;
+
+  let orderID = data.orderID || "";
+  if (!orderID) {
+    const settingsPath = `tenants/${tenantID}/stores/${storeID}/settings/settings`;
+    const settingsSnap = await firestore.doc(settingsPath).get();
+    orderID =
+      (settingsSnap.exists &&
+        settingsSnap.data() &&
+        settingsSnap.data().activeVendorOrderID) ||
+      "";
+    if (!orderID) {
+      return { success: false, reason: "no_active_order" };
+    }
+  }
+
+  const orderPath = `tenants/${tenantID}/stores/${storeID}/vendor-orders/${orderID}`;
+  const orderSnap = await firestore.doc(orderPath).get();
+  if (!orderSnap.exists) {
+    return { success: false, reason: "active_order_missing", orderID };
+  }
+
+  const itemPath = `${orderPath}/items/${itemID}`;
+  const itemSnap = await firestore.doc(itemPath).get();
+  if (!itemSnap.exists) {
+    return { success: false, reason: "item_not_found", itemID };
+  }
+
+  const nowMs = Date.now();
+  await firestore.doc(itemPath).delete();
+  await firestore.doc(orderPath).update({
+    lastModifiedMillis: nowMs,
+    lastModifiedByUserID: uid,
+  });
+
+  return { success: true, itemID };
+});
+
 // Deploy:
 // firebase deploy \
-//   --only functions:addJBIItemToVendorOrder,functions:listVendorOrdersCallable,functions:getVendorOrderCallable,functions:setActiveVendorOrderCallable,functions:applyInventoryCostFromExtensionCallable \
+//   --only functions:addJBIItemToVendorOrder,functions:listVendorOrdersCallable,functions:getVendorOrderCallable,functions:setActiveVendorOrderCallable,functions:applyInventoryCostFromExtensionCallable,functions:setVendorOrderItemQtyCallable,functions:deleteVendorOrderItemCallable \
 //   --project=cadence-pos --account=fritz@retailsoftsystems.com

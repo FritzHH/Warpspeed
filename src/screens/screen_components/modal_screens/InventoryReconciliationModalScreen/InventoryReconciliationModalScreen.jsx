@@ -24,6 +24,7 @@ import {
   dbProbeInventoryAgainstCatalogs,
   buildReconciliationUpdate,
   dbSaveInventoryItem,
+  dbSampleVendorCatalog,
 } from "../../../../db_calls_wrapper";
 import styles from "./InventoryReconciliationModalScreen.module.css";
 
@@ -69,18 +70,19 @@ export const InventoryReconciliationModalScreen = ({ handleExit }) => {
   const [sReview, _setReview] = useState([]); // [{ localItem, candidates }]
   const [sApplied, _setApplied] = useState([]); // [{ localItem, candidate }]
   const [sNoMatch, _setNoMatch] = useState([]); // [localItem]
+  const [sSampling, _setSampling] = useState(false);
+  const [sSamplingQbp, _setSamplingQbp] = useState(false);
 
   const cancelRef = useRef(false);
 
+  // No vendorId skip: re-probe every item with codes so the run pulls fresh
+  // catalog data (cost/msrp/name) onto items that were already mapped from
+  // a previous reconciliation. Items with no barcodes still can't be probed.
   const { eligibleItems, skipped } = useMemo(() => {
     const eligible = [];
     let skip = 0;
     for (const item of snapshot) {
       if (!item) continue;
-      if (item.vendorId) {
-        skip++;
-        continue;
-      }
       if (getItemCodes(item).length === 0) {
         skip++;
         continue;
@@ -168,6 +170,94 @@ export const InventoryReconciliationModalScreen = ({ handleExit }) => {
     _setPhase("done");
   }
 
+  // Read-only diagnostic: probes the first 10 eligible items and prints local
+  // inventory ↔ matched catalog doc side by side to the console. No writes,
+  // does not touch the review/applied/no-match lists. Use to confirm what the
+  // vendor catalog payload actually contains (cost/msrp/name field shapes).
+  async function runSample() {
+    if (sSampling || sPhase === "scanning") return;
+    _setSampling(true);
+    try {
+      const sample = eligibleItems.slice(0, 10);
+      console.log(
+        `[reconcile][sample] probing ${sample.length} of ${eligibleItems.length} eligible items (read-only)`,
+      );
+      for (const localItem of sample) {
+        try {
+          const result = await dbProbeInventoryAgainstCatalogs(localItem);
+          const candidate = result?.candidates?.[0] || null;
+          console.log(
+            "[reconcile][sample]",
+            JSON.stringify(
+              {
+                local: {
+                  id: localItem.id,
+                  formalName: localItem.formalName,
+                  vendorId: localItem.vendorId,
+                  vendorName: localItem.vendorName,
+                  cost: localItem.cost,
+                  msrp: localItem.msrp,
+                  primaryBarcode: localItem.primaryBarcode,
+                  barcodes: localItem.barcodes,
+                },
+                probeStatus: result?.status,
+                candidateCount: result?.candidates?.length || 0,
+                catalogMatch: candidate
+                  ? {
+                      vendorID: candidate.vendorID,
+                      vendorName: candidate.vendorName,
+                      itemId: candidate.itemId,
+                      catalogItemKeys: Object.keys(candidate.catalogItem || {}),
+                      catalogItem: candidate.catalogItem,
+                    }
+                  : null,
+              },
+              null,
+              2,
+            ),
+          );
+        } catch (err) {
+          console.error("[reconcile][sample] probe failed", localItem?.id, err);
+        }
+      }
+    } finally {
+      _setSampling(false);
+    }
+  }
+
+  // Read-only diagnostic: pulls 3 items + specs straight from the QBP vendor
+  // catalog (no UPC probe, no local-item involvement). Used to inspect catalog
+  // field shape before we map it for reconciliation/ordering. Each click picks
+  // a random lexicographic slice so repeat clicks yield different items.
+  async function runQbpSample() {
+    if (sSamplingQbp) return;
+    _setSamplingQbp(true);
+    try {
+      const sample = await dbSampleVendorCatalog("qbp", 3);
+      console.log(`[reconcile][qbp-sample] pulled ${sample.length} items from QBP catalog`);
+      for (const entry of sample) {
+        console.log(
+          "[reconcile][qbp-sample]",
+          JSON.stringify(
+            {
+              itemId: entry.itemId,
+              itemKeys: Object.keys(entry.item || {}),
+              item: entry.item,
+              specsKeys: entry.specs ? Object.keys(entry.specs) : null,
+              specs: entry.specs,
+            },
+            null,
+            2,
+          ),
+        );
+      }
+    } catch (err) {
+      console.error("[reconcile][qbp-sample] failed", err);
+    } finally {
+      _setSamplingQbp(false);
+    }
+  }
+
   async function handlePickCandidate(reviewEntry, candidate) {
     const merged = await applyCandidate(reviewEntry.localItem, candidate);
     if (!merged) return;
@@ -213,13 +303,31 @@ export const InventoryReconciliationModalScreen = ({ handleExit }) => {
                 disabled={total === 0}
                 tooltip={
                   total === 0
-                    ? "All eligible items already mapped or have no barcodes"
+                    ? "No items have barcodes to probe"
                     : undefined
                 }
               >
                 GO
               </LargeModalHeaderButton>
             ),
+            <LargeModalHeaderButton
+              key="sample"
+              variant="default"
+              onClick={runSample}
+              disabled={total === 0 || sSampling || sPhase === "scanning"}
+              tooltip="Read-only: probe first 10 items and log catalog match to console"
+            >
+              {sSampling ? "TESTING…" : "TEST 10"}
+            </LargeModalHeaderButton>,
+            <LargeModalHeaderButton
+              key="qbpSample"
+              variant="default"
+              onClick={runQbpSample}
+              disabled={sSamplingQbp || sPhase === "scanning"}
+              tooltip="Read-only: pull 3 random items + specs from the QBP catalog to console"
+            >
+              {sSamplingQbp ? "TESTING…" : "TEST QBP"}
+            </LargeModalHeaderButton>,
             <LargeModalHeaderButton
               key="close"
               variant="default"
@@ -270,7 +378,7 @@ export const InventoryReconciliationModalScreen = ({ handleExit }) => {
               onClick={() => _setTab(TABS.NO_MATCH)}
             />
             <StatChip
-              label="Already mapped"
+              label="No barcodes"
               value={skipped}
               active={sTab === TABS.SKIPPED}
               onClick={() => _setTab(TABS.SKIPPED)}
@@ -320,52 +428,25 @@ function StatChip({ label, value, variant, active, onClick }) {
   );
 }
 
+// Canonical catalog reads: vendor-catalog-*/modes/master.js writes a uniform
+// {id, name, brand, cost (cents), msrp (cents), primaryUpc, allUpcs} shape.
+// pickCost / pickMsrp convert back to dollars strings for UI display.
 function pickName(catalogItem) {
-  if (!catalogItem) return "";
-  return (
-    catalogItem.description ||
-    catalogItem.item_description ||
-    catalogItem.short_description ||
-    catalogItem.product_name ||
-    catalogItem.name ||
-    catalogItem.desc ||
-    ""
-  );
+  return String(catalogItem?.name || "");
 }
 
 function pickBrand(catalogItem) {
-  if (!catalogItem) return "";
-  return (
-    catalogItem.brand ||
-    catalogItem.brand_name ||
-    catalogItem.manufacturer ||
-    catalogItem.mfg ||
-    ""
-  );
+  return String(catalogItem?.brand || "");
 }
 
 function pickCost(catalogItem) {
-  if (!catalogItem) return "";
-  const raw =
-    catalogItem.cost ??
-    catalogItem.dealer_cost ??
-    catalogItem.dealer_price ??
-    catalogItem.wholesale ??
-    "";
-  return raw === "" || raw == null ? "" : String(raw);
+  const cents = catalogItem?.cost;
+  return Number.isFinite(cents) && cents > 0 ? (cents / 100).toFixed(2) : "";
 }
 
 function pickMsrp(catalogItem) {
-  if (!catalogItem) return "";
-  const raw =
-    catalogItem.msrp ??
-    catalogItem.map ??
-    catalogItem.retail ??
-    catalogItem.list_price ??
-    "";
-  if (raw === "" || raw == null) return "";
-  const n = Number(raw);
-  return Number.isFinite(n) ? n.toFixed(2) : "";
+  const cents = catalogItem?.msrp;
+  return Number.isFinite(cents) && cents > 0 ? (cents / 100).toFixed(2) : "";
 }
 
 function ReviewList({ rows, onPick, phase }) {
@@ -505,31 +586,24 @@ function SkippedList({ snapshot }) {
   const skippedItems = useMemo(() => {
     return snapshot.filter((it) => {
       if (!it) return false;
-      if (it.vendorId) return true;
-      if (getItemCodes(it).length === 0) return true;
-      return false;
+      return getItemCodes(it).length === 0;
     });
   }, [snapshot]);
 
   if (skippedItems.length === 0) {
     return (
       <div className={styles.emptyState}>
-        No already-mapped items in inventory.
+        Every item has at least one barcode.
       </div>
     );
   }
-  return skippedItems.map((item) => {
-    const reason = item.vendorId
-      ? item.vendorName || item.vendorId
-      : "no barcodes";
-    return (
-      <div key={item.id} className={styles.summaryRow}>
-        <span className={styles.summaryItemName}>
-          {item.formalName || item.informalName || "(unnamed item)"}
-        </span>
-        <span className={styles.summaryItemMeta}>{reason}</span>
-        <span className={styles.summaryBadgeSkipped}>Skipped</span>
-      </div>
-    );
-  });
+  return skippedItems.map((item) => (
+    <div key={item.id} className={styles.summaryRow}>
+      <span className={styles.summaryItemName}>
+        {item.formalName || item.informalName || "(unnamed item)"}
+      </span>
+      <span className={styles.summaryItemMeta}>no barcodes</span>
+      <span className={styles.summaryBadgeSkipped}>Skipped</span>
+    </div>
+  ));
 }

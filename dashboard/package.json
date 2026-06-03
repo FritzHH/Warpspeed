@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "vite",
-    "host": "yarn build && firebase deploy --only hosting",
+    "host": "yarn build && firebase deploy --only hosting:dashboard --project=cadence-pos --account=fritz@retailsoftsystems.com",
     "auth": "firebase login --reauth"
   },
   "dependencies": {

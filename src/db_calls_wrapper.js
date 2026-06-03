@@ -18,6 +18,7 @@ import {
   firestoreReadDocsByIds,
   rdbRead,
   rdbCatalogRead,
+  rdbCatalogQueryLimited,
   firestoreSubscribe,
   firestoreSubscribeCollection,
   firestoreDelete,
@@ -105,6 +106,14 @@ function buildSettingsPath(tenantID, storeID) {
   // Firestore path for settings document (separate settings document)
   // Format: tenants/{tenantID}/stores/{storeID}/settings/settings
   return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.SETTINGS}/${DB_NODES.FIRESTORE.SETTINGS}`;
+}
+
+/**
+ * Build Firestore path for phone-config document
+ * Format: tenants/{tenantID}/stores/{storeID}/phone-config/main
+ */
+function buildPhoneConfigPath(tenantID, storeID) {
+  return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.PHONE_CONFIG}/main`;
 }
 
 /**
@@ -535,6 +544,55 @@ export async function dbSaveSettingsNode(fieldName, value) {
     return { success: true, fieldName, value };
   } catch (error) {
     log("Error saving settings node:", error);
+    return { success: false, error: "Database Error", message: error.message };
+  }
+}
+
+/**
+ * Save a single field in the phone-config document.
+ * Uses Firestore updateDoc so only the specified field is touched.
+ * @param {string} fieldName - Top-level field name (e.g. "sipEndpoints", "manualOverride")
+ * @param {*} value - Value to set
+ * @returns {Promise<Object>} Save result
+ */
+export async function dbSavePhoneConfigField(fieldName, value) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: tenantID and storeID are not configured for dbSavePhoneConfigField");
+      return { success: false, error: "Configuration Error", message: "tenantID and storeID are not configured." };
+    }
+    if (!fieldName || typeof fieldName !== "string") {
+      log("Error: fieldName must be a non-empty string for dbSavePhoneConfigField");
+      return { success: false, error: "Invalid Parameter", message: "fieldName must be a non-empty string" };
+    }
+    const path = buildPhoneConfigPath(tenantID, storeID);
+    // Read-modify-write so the doc is created on first save (updateDoc would fail
+    // if the doc didn't exist yet).
+    const current = (await firestoreRead(path)) || {};
+    await firestoreWrite(path, { ...current, [fieldName]: value });
+    return { success: true, fieldName, value };
+  } catch (error) {
+    log("Error saving phone-config field:", error);
+    return { success: false, error: "Database Error", message: error.message };
+  }
+}
+
+/**
+ * Save the full phone-config doc (used on first init or full overwrite).
+ */
+export async function dbSavePhoneConfig(phoneConfig) {
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+    if (!tenantID || !storeID) {
+      log("Error: tenantID and storeID are not configured for dbSavePhoneConfig");
+      return { success: false, error: "Configuration Error" };
+    }
+    const path = buildPhoneConfigPath(tenantID, storeID);
+    await firestoreWrite(path, phoneConfig);
+    return { success: true };
+  } catch (error) {
+    log("Error saving phone-config:", error);
     return { success: false, error: "Database Error", message: error.message };
   }
 }
@@ -2901,6 +2959,49 @@ export function dbListenToSettings(onChange, onError) {
 }
 
 /**
+ * Listen to changes in the phone-config document for a tenant/store.
+ * Path: tenants/{tenantID}/stores/{storeID}/phone-config/main
+ */
+export function dbListenToPhoneConfig(onChange, onError) {
+  const name = "phoneConfig";
+  try {
+    const { tenantID, storeID } = getTenantAndStore();
+
+    if (!tenantID || !storeID) {
+      log("Error: tenantID and storeID are not configured for dbListenToPhoneConfig");
+      return null;
+    }
+
+    if (!onChange || typeof onChange !== "function") {
+      log("Error: onChange callback function is required for dbListenToPhoneConfig");
+      return null;
+    }
+
+    const path = buildPhoneConfigPath(tenantID, storeID);
+
+    __logListenerAttach(name);
+    const unsubscribe = firestoreSubscribe(path, (data, error, meta) => {
+      if (error) {
+        log("Phone-config listener error", { tenantID, storeID, error });
+        if (onError) onError(error);
+        return;
+      }
+      __logListenerEmit(name, meta);
+      onChange(data, tenantID, storeID);
+    });
+
+    return () => {
+      __logListenerDetach(name);
+      unsubscribe();
+    };
+  } catch (error) {
+    log("Error setting up phone-config listener:", error);
+    if (onError) onError(error);
+    return null;
+  }
+}
+
+/**
  * Listen to changes in current punch clock document for a tenant/store
  * @param {Function} onChange - Callback function called when punch clock changes
  * @returns {Function} Unsubscribe function to stop listening
@@ -4987,6 +5088,47 @@ export async function checkInventoryAcrossWarehouses(
   return results;
 }
 
+// Read a small sample of items + specs from a vendor catalog. Diagnostic-only;
+// used to inspect catalog field shape before wiring it into reconciliation /
+// resolver code. Picks a random lexicographic startKey so repeat calls return
+// different slices, then falls back to the head of the list if the random
+// offset landed past the last key.
+export async function dbSampleVendorCatalog(vendorId, count = 3) {
+  if (!vendorId) return [];
+  const vendor = VENDOR_CATALOGS.find((v) => v.id === vendorId);
+  if (!vendor?.catalogPath) return [];
+
+  const chars = "0123456789abcdefghijklmnopqrstuvwxyz";
+  let startKey = "";
+  for (let i = 0; i < 3; i++) {
+    startKey += chars[Math.floor(Math.random() * chars.length)];
+  }
+
+  let items = await rdbCatalogQueryLimited(`${vendor.catalogPath}/items`, {
+    startKey,
+    limit: count,
+  });
+  if (!items || Object.keys(items).length === 0) {
+    items = await rdbCatalogQueryLimited(`${vendor.catalogPath}/items`, {
+      limit: count,
+    });
+  }
+  if (!items) return [];
+
+  const entries = Object.entries(items).slice(0, count);
+  const results = [];
+  for (const [itemId, item] of entries) {
+    let specs = null;
+    try {
+      specs = await rdbCatalogRead(`${vendor.catalogPath}/specs/${itemId}`);
+    } catch (e) {
+      // some items legitimately lack specs; non-fatal for a diagnostic
+    }
+    results.push({ itemId, item, specs });
+  }
+  return results;
+}
+
 function buildVendorOrderPath(tenantID, storeID, orderID) {
   return `${DB_NODES.FIRESTORE.TENANTS}/${tenantID}/${DB_NODES.FIRESTORE.STORES}/${storeID}/${DB_NODES.FIRESTORE.VENDOR_ORDERS}/${orderID}`;
 }
@@ -5186,14 +5328,19 @@ export function dbListenToVendorOrderItems(orderID, onChange, onError) {
 // the item doc, the listener delivers the update).
 //
 // Order of attempts:
-//   1. Local inventory match (Zustand). If hit and the local item has
-//      vendorId set, short-circuit — write matched + local description.
+//   1. Local inventory match (Zustand). If hit and the local item is
+//      mapped to a known vendor (vendorName matches a VENDOR_CATALOGS
+//      displayName), short-circuit — write matched + local description.
 //   2. Parallel Firestore queries across every VENDOR_CATALOGS entry with
 //      a catalogPath, filtered by upc_ean == scannedBarcode.
 //   3. Resolve:
 //        0 hits → no_match
 //        1 hit  → matched; snapshot the catalog doc
 //        2+     → ambiguous; record candidateVendorIDs for desktop picker
+//
+// Note: `localItem.vendorId` is the VENDOR'S catalog item_id (their own
+// item identifier), NOT a vendor-slug. The vendor slug is derived from
+// `localItem.vendorName` via VENDOR_CATALOGS.displayName matching.
 export async function dbResolveOrderItem(orderID, item) {
   try {
     if (!orderID || !item || !item.id || !item.scannedBarcode) {
@@ -5209,12 +5356,15 @@ export async function dbResolveOrderItem(orderID, item) {
       const codes = Array.isArray(inv.barcodes) ? inv.barcodes : [];
       return codes.includes(scanned);
     });
-    if (localMatch && localMatch.vendorId) {
+    const hintVendor = localMatch
+      ? VENDOR_CATALOGS.find((v) => v.displayName === localMatch.vendorName)
+      : null;
+    if (localMatch && hintVendor) {
       const localDisplay = localMatch.formalName || localMatch.informalName || "";
       await dbUpdateVendorOrderItemFields(orderID, item.id, {
         lookupStatus: "matched",
-        vendorCatalogID: localMatch.vendorId,
-        vendorItemID: localMatch.id || "",
+        vendorCatalogID: hintVendor.id,
+        vendorItemID: localMatch.vendorId || "",
         catalogSnapshot: {
           source: "local-inventory",
           description: localDisplay,
@@ -5226,11 +5376,10 @@ export async function dbResolveOrderItem(orderID, item) {
       return { success: true, via: "local", displayName: localDisplay };
     }
 
-    // 2. Parallel catalog queries. If local had a vendorId hint (even
-    // without a complete match), narrow the search to that vendor.
+    // 2. Parallel catalog queries. If local had a vendor hint (vendorName
+    // matched a known catalog), narrow the search to that vendor.
     const queryable = VENDOR_CATALOGS.filter((v) => v.catalogPath);
-    const hint = localMatch?.vendorId;
-    const targets = hint ? queryable.filter((v) => v.id === hint) : queryable;
+    const targets = hintVendor ? queryable.filter((v) => v.id === hintVendor.id) : queryable;
     if (targets.length === 0) {
       await dbUpdateVendorOrderItemFields(orderID, item.id, { lookupStatus: "no_match" });
       return { success: true, via: "no-catalogs" };
@@ -5253,14 +5402,7 @@ export async function dbResolveOrderItem(orderID, item) {
 
     const hits = results.filter((r) => r.match);
 
-    const pickName = (m) =>
-      m?.description ||
-      m?.item_description ||
-      m?.short_description ||
-      m?.product_name ||
-      m?.name ||
-      m?.desc ||
-      "";
+    const pickName = (m) => String(m?.name || "");
 
     // 3. Resolve
     let update;
@@ -5315,71 +5457,43 @@ export async function dbResolveOrderItem(orderID, item) {
 // dbSaveInventoryItem() to commit a chosen candidate.
 
 function pickCatalogName(catalogItem) {
-  if (!catalogItem) return "";
-  return (
-    catalogItem.description ||
-    catalogItem.item_description ||
-    catalogItem.short_description ||
-    catalogItem.product_name ||
-    catalogItem.name ||
-    catalogItem.desc ||
-    ""
-  );
+  return String(catalogItem?.name || "");
 }
 
 function pickCatalogBrand(catalogItem) {
-  if (!catalogItem) return "";
-  return (
-    catalogItem.brand ||
-    catalogItem.brand_name ||
-    catalogItem.manufacturer ||
-    catalogItem.mfg ||
-    ""
-  );
+  return String(catalogItem?.brand || "");
 }
 
+// Canonical catalog cost is already CENTS (vendor-catalog-*/modes/master.js
+// does the dollars->cents conversion at write time). No money math here.
 function pickCatalogCost(catalogItem) {
-  if (!catalogItem) return "";
-  const raw =
-    catalogItem.cost ??
-    catalogItem.dealer_cost ??
-    catalogItem.dealer_price ??
-    catalogItem.wholesale ??
-    "";
-  return raw === "" || raw == null ? "" : String(raw);
+  const v = catalogItem?.cost;
+  return Number.isFinite(v) ? v : 0;
 }
 
+// Canonical catalog msrp is already CENTS - see pickCatalogCost.
 function pickCatalogMsrp(catalogItem) {
-  if (!catalogItem) return 0;
-  const raw =
-    catalogItem.msrp ??
-    catalogItem.map ??
-    catalogItem.retail ??
-    catalogItem.list_price ??
-    0;
-  const n = Number(raw);
-  return Number.isFinite(n) ? n : 0;
+  const v = catalogItem?.msrp;
+  return Number.isFinite(v) ? v : 0;
 }
 
-// Pulls every plausible barcode field off the catalog doc. JBI today writes
-// a combined `upc_ean` field but the schema is vendor-defined, so we cast a
-// wide net.
+function pickCatalogImageUrl(catalogItem) {
+  const raw = catalogItem?.imageUrl;
+  return typeof raw === "string" ? raw.trim() : "";
+}
+
+// Canonical catalog shape doesn't carry vendor-side modification time
+// (paring kept it lean). Snapshot time at reconcile time is the best we have;
+// stale-detection can come back later by adding `lastUpdated` to canonical
+// shape and populating it in vendor-catalog-*/modes/master.js.
+function pickCatalogLastUpdated(_catalogItem) {
+  return Date.now();
+}
+
+// Canonical catalog carries all known barcodes in allUpcs[] (the master
+// jobs flatten vendor-specific barcode shapes into this array at write time).
 function extractCatalogBarcodes(catalogItem) {
-  if (!catalogItem) return [];
-  const fields = [
-    "upc",
-    "upc_ean",
-    "ean",
-    "barcode",
-    "primary_barcode",
-    "gtin",
-  ];
-  const out = [];
-  for (const f of fields) {
-    const v = catalogItem[f];
-    if (typeof v === "string" && v.trim()) out.push(v.trim());
-  }
-  return out;
+  return Array.isArray(catalogItem?.allUpcs) ? catalogItem.allUpcs : [];
 }
 
 function normalizeBarcodeKey(code) {
@@ -5497,12 +5611,17 @@ export async function dbProbeInventoryAgainstCatalogs(localItem) {
 // write back. primaryBarcode and price are intentionally absent so the
 // caller can `{...local, ...payload}` without clobbering them.
 //
-//   formalName  ← catalog name
-//   brand       ← catalog brand (unchanged if catalog missing it)
-//   cost        ← catalog cost (string, matches current local shape)
-//   msrp        ← catalog msrp (number)
-//   vendorId    ← chosen vendor.id
-//   vendorName  ← chosen vendor.displayName
+//   formalName  ← catalog name (description, etc.)
+//   brand       ← catalog brand (only written when catalog has one)
+//   cost        ← catalog dealer cost converted dollars→cents (number)
+//   msrp        ← catalog msrp converted dollars→cents (number)
+//   image_url   ← catalog image_url (only written when catalog has one)
+//   vendorId    ← catalog item_id (the VENDOR'S own item identifier, used to
+//                  refetch / reorder from the vendor catalog); the vendor
+//                  "slug" (jbi, qbp) is derived from vendorName at lookup
+//                  time via VENDOR_CATALOGS.displayName match
+//   vendorName  ← chosen vendor.displayName ("J&B Importers", "QBP", …) —
+//                  acts as the canonical pointer back to a VENDOR_CATALOGS row
 //   catalogName ← catalog name (kept as the vendor-side name even if user
 //                  later edits formalName locally)
 //   barcodes[]  ← union(local.barcodes, vendor barcodes) minus primaryBarcode
@@ -5514,6 +5633,7 @@ export function buildReconciliationUpdate(localItem, candidate) {
   const catalogBrand = pickCatalogBrand(candidate.catalogItem);
   const cost = pickCatalogCost(candidate.catalogItem);
   const msrp = pickCatalogMsrp(candidate.catalogItem);
+  const imageUrl = pickCatalogImageUrl(candidate.catalogItem);
 
   const primary = normalizeBarcodeKey(localItem?.primaryBarcode);
   const merged = new Set();
@@ -5534,16 +5654,17 @@ export function buildReconciliationUpdate(localItem, candidate) {
     formalName: catalogName || localItem?.formalName || "",
     cost,
     msrp,
-    vendorId: candidate.vendorID,
+    vendorId: candidate.itemId,
     vendorName: candidate.vendorName,
     catalogName: catalogName || localItem?.catalogName || "",
     barcodes: Array.from(merged),
     specs: {
       source: candidate.vendorID,
-      lastUpdated: Date.now(),
+      lastUpdated: pickCatalogLastUpdated(candidate.catalogItem),
       entries: specsEntries,
     },
   };
   if (catalogBrand) payload.brand = catalogBrand;
+  if (imageUrl) payload.image_url = imageUrl;
   return payload;
 }

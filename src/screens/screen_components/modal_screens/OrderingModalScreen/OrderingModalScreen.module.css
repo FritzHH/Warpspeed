@@ -184,6 +184,23 @@
 }
 
 /* ══════════ ITEMS TABLE ══════════ */
+/* tableHeader sits OUTSIDE the scrollable rows container — header row +
+   vendor tabs both stay pinned to the top while rows scroll underneath. */
+.tableHeader {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.vendorTabsBar {
+  display: flex;
+  flex-direction: row;
+  width: 100%;
+  flex-shrink: 0;
+}
+
 .tableWrap {
   flex: 1;
   min-height: 0;
@@ -198,7 +215,7 @@
   grid-template-columns: 44% 7% 8% 7% 7% 10% 7% 10%;
   align-items: center;
   justify-items: center;
-  padding: 4px 0 4px 16px;
+  padding: 4px 0 4px 4px;
   box-sizing: border-box;
   text-align: center;
   width: 100%;
@@ -206,7 +223,7 @@
   border-bottom: 1px solid var(--border-subtle);
 }
 
-.row:nth-child(odd) {
+.row:nth-child(even) {
   background: var(--surface-alt);
 }
 
@@ -217,9 +234,6 @@
   letter-spacing: 0.08em;
   color: var(--text-muted);
   background: var(--surface-alt);
-  position: sticky;
-  top: 0;
-  z-index: 1;
   white-space: pre-line;
 }
 

@@ -528,7 +528,7 @@ export const CUSTOMER_PREVIEW_PROTO = {
 // VENDOR ORDERING ///////////////////////////////////////////////////
 // IDs are stored on inventory items (`vendorId`) and on vendor-order items
 // (`vendorCatalogID`). `catalogPath` points at the Firestore root for that
-// vendor's catalog (`vendor_catalogs/{id}/items/{item_id}`); `null` = logical
+// vendor's catalog (`vendor_catalogs/{id}/items_by_id/{item_id}`); `null` = logical
 // bucket with no catalog (Other / Unmatched). `accountNumber` TODO — not yet
 // needed; will surface on desktop split-view next to the vendor header.
 export const VENDOR_CATALOGS = [
@@ -594,8 +594,9 @@ export const INVENTORY_ITEM_PROTO = {
   customPart: false,
   customLabor: false,
   receiptNoteRequired: false,
-  // Vendor specs snapshot. Copied from /vendor_catalogs/{vendor}/specs/{itemId}
-  // at "Add to inventory" time so the item is self-contained for display.
+  // Vendor specs snapshot. Copied from the `specs` field of
+  // vendor_catalogs/{vendor}/items_by_id/{itemId} (Firestore) at "Add to
+  // inventory" time so the item is self-contained for display.
   // Refresh via inventory modal button (manual) — no live listener.
   //   source         = "jbi" | "qbp" | "manual" | "" (origin of the snapshot)
   //   lastUpdated    = millis mirroring the vendor doc's lastUpdated at copy time

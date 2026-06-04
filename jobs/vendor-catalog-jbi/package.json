@@ -2,7 +2,7 @@
   "name": "vendor-catalog-jbi",
   "version": "1.0.0",
   "private": true,
-  "description": "Cloud Run Job: sync JBI FTP catalog into /vendor_catalogs/jbi on cadence-pos Firestore",
+  "description": "Cloud Run Job: sync JBI FTP catalog into vendor_catalogs/jbi - items in Firestore (nightly diff), inventory in RTDB (15-min)",
   "main": "index.js",
   "type": "commonjs",
   "engines": {
@@ -11,10 +11,10 @@
   "scripts": {
     "start": "node index.js",
     "master": "JBI_MODE=master node index.js",
-    "inventory": "JBI_MODE=inventory node index.js",
-    "specs": "JBI_MODE=specs node index.js"
+    "inventory": "JBI_MODE=inventory node index.js"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.14.0",
     "basic-ftp": "^5.0.5",
     "csv-parse": "^6.1.0",
     "firebase-admin": "^12.6.0"

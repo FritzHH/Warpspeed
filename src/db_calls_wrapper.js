@@ -18,7 +18,7 @@ import {
   firestoreReadDocsByIds,
   rdbRead,
   rdbCatalogRead,
-  rdbCatalogQueryLimited,
+  firestoreCatalogQuery,
   firestoreSubscribe,
   firestoreSubscribeCollection,
   firestoreDelete,
@@ -4984,18 +4984,22 @@ export async function dbSaveSubscriptionField(fieldName, fieldVal) {
 //   tenants/{tenantID}/stores/{storeID}/vendor-orders/{orderID}/items/{itemID}
 //     └── one doc per scan, written granularly (no full-order rewrite per scan)
 //
-// Catalogs live in Realtime Database at the GLOBAL root (not tenant-scoped),
-// public-read for authed users:
-//   vendor_catalogs/{vendorID}/items/{itemId}                 ← master row
-//   vendor_catalogs/{vendorID}/items_by_upc/{upc}: "itemId"   ← reverse-index pointer
-//   vendor_catalogs/{vendorID}/inventory_by_item/{itemId}: { avail_NNN: qty, ... }
-//     └── per-item warehouse map; sparse — missing key = zero stock at that
-//         warehouse, missing item node = no inventory data at all.
+// Catalogs are hosted on cadence-pos at the GLOBAL root (not tenant-scoped):
+//   Firestore  vendor_catalogs/{vendorID}/items_by_id/{itemId}    ← master doc
+//              └── canonical item; allUpcs[] holds every barcode, specs[] is
+//                  folded inline. UPC lookups use array-contains over allUpcs;
+//                  no separate reverse-index collection.
+//   RTDB       vendor_catalogs/{vendorID}/inventory_by_item/{itemId}: { WH: qty }
+//              └── per-item warehouse map; sparse — missing key = zero stock at
+//                  that warehouse, missing item node = no inventory data at all.
+//
+// Items refresh nightly via Cloud Run Job (diff baseline → Firestore batches).
+// Inventory refreshes every 15 min via separate RTDB writer job. Two different
+// data stores, two different cadences — chosen for cost & write fan-out shape.
 //
 // Resolver flow (dbResolveOrderItem): local inventory first (Zustand); on miss,
-// parallel reverse-index reads across VENDOR_CATALOGS (items_by_upc/{upc} →
-// itemId → items/{itemId}). Result writes back to the item doc; the desktop's
-// items listener picks it up live.
+// parallel array-contains queries across VENDOR_CATALOGS (Firestore). Result
+// writes back to the order item doc; the desktop's items listener picks it up.
 // ----------------------------------------------------------------------------
 
 function buildVendorInventoryItemPath(vendorId, itemId) {
@@ -5088,45 +5092,20 @@ export async function checkInventoryAcrossWarehouses(
   return results;
 }
 
-// Read a small sample of items + specs from a vendor catalog. Diagnostic-only;
+// Read a small sample of items from a vendor catalog. Diagnostic-only;
 // used to inspect catalog field shape before wiring it into reconciliation /
-// resolver code. Picks a random lexicographic startKey so repeat calls return
-// different slices, then falls back to the head of the list if the random
-// offset landed past the last key.
+// resolver code. Specs are now folded into each item doc - no separate fetch.
 export async function dbSampleVendorCatalog(vendorId, count = 3) {
   if (!vendorId) return [];
   const vendor = VENDOR_CATALOGS.find((v) => v.id === vendorId);
   if (!vendor?.catalogPath) return [];
 
-  const chars = "0123456789abcdefghijklmnopqrstuvwxyz";
-  let startKey = "";
-  for (let i = 0; i < 3; i++) {
-    startKey += chars[Math.floor(Math.random() * chars.length)];
-  }
-
-  let items = await rdbCatalogQueryLimited(`${vendor.catalogPath}/items`, {
-    startKey,
-    limit: count,
-  });
-  if (!items || Object.keys(items).length === 0) {
-    items = await rdbCatalogQueryLimited(`${vendor.catalogPath}/items`, {
-      limit: count,
-    });
-  }
-  if (!items) return [];
-
-  const entries = Object.entries(items).slice(0, count);
-  const results = [];
-  for (const [itemId, item] of entries) {
-    let specs = null;
-    try {
-      specs = await rdbCatalogRead(`${vendor.catalogPath}/specs/${itemId}`);
-    } catch (e) {
-      // some items legitimately lack specs; non-fatal for a diagnostic
-    }
-    results.push({ itemId, item, specs });
-  }
-  return results;
+  const items = await firestoreCatalogQuery(
+    `${vendor.catalogPath}/items_by_id`,
+    [],
+    { limit: count },
+  );
+  return items.map((item) => ({ itemId: item.id, item, specs: item.specs || null }));
 }
 
 function buildVendorOrderPath(tenantID, storeID, orderID) {
@@ -5388,11 +5367,14 @@ export async function dbResolveOrderItem(orderID, item) {
     const results = await Promise.all(
       targets.map(async (vendor) => {
         try {
-          const itemId = await rdbCatalogRead(`${vendor.catalogPath}/items_by_upc/${scanned}`);
-          if (!itemId) return { vendor, match: null };
-          const match = await rdbCatalogRead(`${vendor.catalogPath}/items/${itemId}`);
-          if (!match) return { vendor, match: null };
-          return { vendor, match: { ...match, item_id: itemId } };
+          const hits = await firestoreCatalogQuery(
+            `${vendor.catalogPath}/items_by_id`,
+            [{ field: "allUpcs", operator: "array-contains", value: scanned }],
+            { limit: 1 },
+          );
+          if (hits.length === 0) return { vendor, match: null };
+          const match = hits[0];
+          return { vendor, match: { ...match, item_id: match.id } };
         } catch (e) {
           log("Catalog query failed for vendor " + vendor.id, e?.message);
           return { vendor, match: null };
@@ -5439,13 +5421,14 @@ export async function dbResolveOrderItem(orderID, item) {
 // ============================================================================
 //
 // Maps an existing local inventory item (which may lack vendorId / cost /
-// msrp / etc.) onto vendor-catalog records in RTDB by UPC match.
+// msrp / etc.) onto vendor-catalog records on cadence-pos Firestore by UPC
+// match.
 //
 // Search key = primaryBarcode plus every entry in barcodes[], deduped.
-// For each queryable VENDOR_CATALOGS entry (catalogPath set), every code is
-// probed against `{catalogPath}/items_by_upc/{code}` in parallel. Hits are
-// collapsed per-vendor (multiple local barcodes can resolve to the same
-// catalog item) and the catalog item + specs are fetched in parallel.
+// For each queryable VENDOR_CATALOGS entry (catalogPath set), one Firestore
+// `array-contains-any` query over the local codes returns every catalog item
+// whose allUpcs intersects ours. Specs are read from each match's `specs`
+// field (folded into the doc during master ingest).
 //
 // Buckets returned to the caller:
 //   • matched   — exactly one vendor has any hit. Auto-applicable.
@@ -5529,63 +5512,57 @@ export async function dbProbeInventoryAgainstCatalogs(localItem) {
       return { status: "no_match", candidates: [], searchedCodes: codes };
     }
 
-    // For each vendor, probe every code in parallel and collect the unique
-    // catalog itemIds that matched (and which local codes matched them).
+    // For each vendor, one Firestore array-contains-any query over the local
+    // codes returns every catalog item whose allUpcs intersects ours. Cap at
+    // 30 values per query (Firestore limit); reconciliation rarely sees >5.
+    // Intersect each match's allUpcs with our local codes to recover which
+    // codes matched. Specs come from the doc itself (folded in master ingest).
     const perVendor = await Promise.all(
       vendors.map(async (vendor) => {
-        const probes = await Promise.all(
-          codes.map(async (code) => {
-            try {
-              const itemId = await rdbCatalogRead(
-                `${vendor.catalogPath}/items_by_upc/${code}`,
-              );
-              return itemId ? { code, itemId } : null;
-            } catch (e) {
-              log(
-                `Reconciliation probe failed: ${vendor.id}/${code}`,
-                e?.message,
-              );
-              return null;
+        const codeChunks = [];
+        for (let i = 0; i < codes.length; i += 30) {
+          codeChunks.push(codes.slice(i, i + 30));
+        }
+        const matches = [];
+        try {
+          const seen = new Set();
+          for (const chunk of codeChunks) {
+            const hits = await firestoreCatalogQuery(
+              `${vendor.catalogPath}/items_by_id`,
+              [{ field: "allUpcs", operator: "array-contains-any", value: chunk }],
+            );
+            for (const h of hits) {
+              if (seen.has(h.id)) continue;
+              seen.add(h.id);
+              matches.push(h);
             }
-          }),
-        );
+          }
+        } catch (e) {
+          log(
+            `Reconciliation probe failed: ${vendor.id}`,
+            e?.message,
+          );
+          return null;
+        }
 
-        const itemIdToCodes = new Map();
-        probes.forEach((hit) => {
-          if (!hit) return;
-          const arr = itemIdToCodes.get(hit.itemId) || [];
-          arr.push(hit.code);
-          itemIdToCodes.set(hit.itemId, arr);
+        if (matches.length === 0) return null;
+
+        const codeSet = new Set(codes);
+        const fetched = matches.map((catalogItem) => {
+          const vendorCodes = extractCatalogBarcodes(catalogItem);
+          const matchedCodes = vendorCodes.filter((c) => codeSet.has(c));
+          return {
+            vendorID: vendor.id,
+            vendorName: vendor.displayName,
+            itemId: catalogItem.id,
+            catalogItem,
+            specs: catalogItem.specs || null,
+            matchedCodes,
+            vendorCodes,
+          };
         });
 
-        if (itemIdToCodes.size === 0) return null;
-
-        const fetched = await Promise.all(
-          Array.from(itemIdToCodes.entries()).map(
-            async ([itemId, matchedCodes]) => {
-              const [catalogItem, specs] = await Promise.all([
-                rdbCatalogRead(`${vendor.catalogPath}/items/${itemId}`).catch(
-                  () => null,
-                ),
-                rdbCatalogRead(`${vendor.catalogPath}/specs/${itemId}`).catch(
-                  () => null,
-                ),
-              ]);
-              if (!catalogItem) return null;
-              return {
-                vendorID: vendor.id,
-                vendorName: vendor.displayName,
-                itemId,
-                catalogItem,
-                specs,
-                matchedCodes,
-                vendorCodes: extractCatalogBarcodes(catalogItem),
-              };
-            },
-          ),
-        );
-
-        return fetched.filter(Boolean);
+        return fetched;
       }),
     );
 

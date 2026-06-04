@@ -1,6 +1,6 @@
 const { runMasterSync } = require("./modes/master");
 const { runInventorySync } = require("./modes/inventory");
-const { runSpecsSync } = require("./modes/specs");
+const { runCountProbe } = require("./modes/count");
 
 const MODE = (process.env.JBI_MODE || "").trim().toLowerCase();
 
@@ -11,11 +11,11 @@ async function main() {
       return await runMasterSync();
     case "inventory":
       return await runInventorySync();
-    case "specs":
-      return await runSpecsSync();
+    case "count":
+      return await runCountProbe();
     default:
       throw new Error(
-        `JBI_MODE must be 'master', 'inventory', or 'specs' (got: '${MODE}')`,
+        `JBI_MODE must be 'master', 'inventory', or 'count' (got: '${MODE}')`,
       );
   }
 }

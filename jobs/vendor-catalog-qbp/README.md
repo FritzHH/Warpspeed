@@ -1,6 +1,6 @@
 # vendor-catalog-qbp
 
-Cloud Run Job that syncs the QBP API1 catalog into the cadence-pos Realtime Database under `/vendor_catalogs/qbp`. Modeled after `vendor-catalog-jbi` so consumers in `src/db_calls_wrapper.js` read both vendors with identical code paths.
+Cloud Run Job that syncs the QBP API1 catalog into cadence-pos. **Items live on Firestore** (nightly diff against a GCS baseline); **inventory lives on RTDB** (15-min refresh). Modeled after `vendor-catalog-jbi` so consumers in `src/db_calls_wrapper.js` read both vendors with identical code paths.
 
 ## Modes
 
@@ -8,25 +8,34 @@ Mode is selected via the `QBP_MODE` env var on the Cloud Run Job.
 
 | Mode | Endpoint(s) | Writes to | Cadence | Skip-if-unchanged? |
 |------|-------------|-----------|---------|--------------------|
-| `master` | `/1/product/skulist` + `/1/product/sku/{sku}` per SKU | `vendor_catalogs/qbp/items/{SKU}` and `vendor_catalogs/qbp/items_by_upc/{upc}` | Daily ~05:00 ET | Yes (sha256 of skulist) |
-| `inventory` | `/1/availability/warehouse/{code}` per warehouse | `vendor_catalogs/qbp/inventory_by_item/{SKU}/{warehouseCode}` | Hourly :15 | No (always runs) |
+| `master` | `/1/product/skulist` + `/1/product/sku/{sku}` per SKU | Firestore `vendor_catalogs/qbp/items_by_id/{SKU}` (diff against GCS baseline) + RTDB `vendor_catalogs/qbp/inventory_by_item/{SKU}` (side-effect) | Nightly ~03:30 ET | Yes (sha256 of skulist) |
+| `inventory` | `/1/availability/warehouse/{code}` per warehouse | RTDB `vendor_catalogs/qbp/inventory_by_item/{SKU}/{warehouseCode}` | Every 15 min | No (always runs) |
 
-No `specs` mode — QBP returns spec data inside the product detail response. We currently pare that down at master-mode write time and don't persist specs; if a UI ever needs them, the canonical shape gets a `specs` field and master.js's `toCanonicalItem` copies them through.
+UPC reverse-lookup uses a Firestore `array-contains` query over `allUpcs` — no separate `items_by_upc` collection.
+
+Specs are folded into each item doc (`specs: []` stub today; once the canonical cross-vendor shape lands, master.js copies them through).
 
 ## Storage shape
 
 ```
+Firestore (cadence-pos)
+vendor_catalogs/qbp/items_by_id/{SKU}
+  └── { id, vendor: "qbp", name, brand, cost (cents), msrp (cents), primaryUpc, allUpcs[], specs[] }
+
+RTDB (cadence-pos)
 vendor_catalogs/qbp/
-├── items/{SKU}/                ← canonical inventory-mapping shape: {id, name, brand, cost (cents), msrp (cents), primaryUpc, allUpcs}
-├── items_by_upc/{upc}: SKU     ← reverse lookup for barcode scans (covers product + pack UPCs)
 ├── inventory_by_item/{SKU}/
 │   ├── PA: 12
 │   ├── MN: 0  (omitted — zeros are not written)
 │   └── NV: 4
 └── _meta/
-    ├── lastMasterSync          ← { responseHash, skuCount, itemCount, upcCount, missCount, durationSec, completedAt }
+    ├── lastMasterSync          ← { responseHash, skuCount, itemCount, addCount, changeCount, deleteCount, inventoryItemCount, missCount, durationSec, completedAt }
     ├── lastInventorySync       ← { warehouses, warehousesSeen, itemsWithStockCount, totalQty, durationSec, completedAt }
     └── lastTouched             ← server timestamp
+
+Cloud Storage
+gs://cadence-pos-vendor-catalog-baselines/qbp-items.json.gz
+  └── gzipped JSON object keyed by SKU; full previous-run snapshot used for diff comparison.
 ```
 
 ## Environment variables
@@ -83,10 +92,10 @@ Master — daily 05:00 ET:
 gcloud scheduler jobs create http vendor-catalog-qbp-master --location=us-central1 --schedule="0 5 * * *" --time-zone="America/New_York" --uri="https://us-central1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/cadence-pos/jobs/vendor-catalog-qbp-master:run" --http-method=POST --oauth-service-account-email=$(gcloud iam service-accounts list --filter='displayName:Default compute service account' --format='value(email)' --project=cadence-pos --account=fritz@retailsoftsystems.com) --project=cadence-pos --account=fritz@retailsoftsystems.com
 ```
 
-Inventory — hourly at :15:
+Inventory — every 15 min:
 
 ```
-gcloud scheduler jobs create http vendor-catalog-qbp-inventory --location=us-central1 --schedule="15 * * * *" --time-zone="America/New_York" --uri="https://us-central1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/cadence-pos/jobs/vendor-catalog-qbp-inventory:run" --http-method=POST --oauth-service-account-email=$(gcloud iam service-accounts list --filter='displayName:Default compute service account' --format='value(email)' --project=cadence-pos --account=fritz@retailsoftsystems.com) --project=cadence-pos --account=fritz@retailsoftsystems.com
+gcloud scheduler jobs create http vendor-catalog-qbp-inventory --location=us-central1 --schedule="*/15 * * * *" --time-zone="America/New_York" --uri="https://us-central1-run.googleapis.com/apis/run.googleapis.com/v1/namespaces/cadence-pos/jobs/vendor-catalog-qbp-inventory:run" --http-method=POST --oauth-service-account-email=$(gcloud iam service-accounts list --filter='displayName:Default compute service account' --format='value(email)' --project=cadence-pos --account=fritz@retailsoftsystems.com) --project=cadence-pos --account=fritz@retailsoftsystems.com
 ```
 
 After scheduling, the next `platformAdminSyncScheduledJobsCallable` run (or 10-minute auto-sync) picks both jobs up, joins them to the registry entries in `functions/saas/vendor-catalog-jobs.js`, and surfaces them in the admin Scheduled Jobs UI.
@@ -109,9 +118,9 @@ QBP_MODE=inventory QBP_API_KEY=... FIREBASE_DATABASE_URL=https://cadence-pos-def
 
 ## Behavior notes
 
-- **Master skip-if-unchanged**: QBP exposes no global "catalog version" timestamp, so the job hashes the `skulist` response and compares against `lastMasterSync.responseHash`. A daily run that finds the same SKU list logs `skipped` and bumps `completedAt` without touching items. Cost of the skip is one cheap `GET /1/product/skulist`.
+- **Master skip-if-unchanged**: QBP exposes no global "catalog version" timestamp, so the job hashes the `skulist` response and compares against `lastMasterSync.responseHash`. A nightly run that finds the same SKU list logs `skipped` and bumps `completedAt` without touching items. Cost of the skip is one cheap `GET /1/product/skulist`.
 - **Per-SKU failures don't abort**: a single 404/timeout on `product/sku/{sku}` increments `missCount` and moves on. Look at `lastMasterSync.missCount` for alerts if the count spikes.
-- **Master wipes before write**: `items` and `items_by_upc` are nulled in a single multi-path update before re-population, so removed SKUs disappear instead of lingering.
+- **Master diffs instead of wiping**: the run builds a `Map<SKU, doc>` of the current catalog, loads the previous run's snapshot from `gs://cadence-pos-vendor-catalog-baselines/qbp-items.json.gz`, computes adds/changes/deletes, and applies only those deltas to Firestore. The new baseline is uploaded last — partial failure leaves the old baseline so the next run re-diffs cleanly.
 - **Inventory always runs**: warehouse stock changes constantly, so skipping would mask real movements. `inventory_by_item` is wiped + replaced on every run.
 - **Zero-qty rows are dropped**: an item with 0 across all warehouses gets no node under `inventory_by_item`. Consumers should treat "missing key" as "out of stock."
 - **Retry policy** lives in `api.js`: 3 retries on 429 / 5xx with exponential backoff (500ms → 1500ms → 4500ms), honoring `Retry-After` headers.

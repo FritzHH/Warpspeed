@@ -1,26 +1,36 @@
-// Master mode - full catalog refresh.
+// QBP nightly catalog ingest: fan-out fetch every SKU detail, build a canonical
+// item map, diff it against the previous baseline in GCS, and write only the
+// deltas to Firestore at vendor_catalogs/qbp/items_by_id/{itemId}.
 //
-// QBP doesn't ship a one-shot catalog file like JBI does. The shape here is:
+// Pipeline:
+//   1. GET /1/product/skulist - flat array of every visible SKU
+//   2. Hash the skulist; skip if it matches the last successful run
+//   3. baseline.load() from GCS
+//   4. For each SKU, GET /1/product/sku/{sku} with bounded concurrency:
+//      - Map response to canonical doc, populate currentMap
+//      - Extract per-warehouse stock; populate inventoryByItem map (side-effect)
+//   5. diffMaps(currentMap, baselineMap) -> { adds, changes, deletes }
+//   6. Firestore batch writes for the deltas (vendor_catalogs/qbp/items_by_id)
+//   7. RTDB writes for the inventory side-effect (vendor_catalogs/qbp/inventory_by_item)
+//   8. baseline.save() AFTER both write paths succeed - mid-run failure keeps
+//      the old baseline so the next run re-diffs cleanly
 //
-//   1. GET /1/product/skulist          -> flat array of every SKU we can see.
-//   2. Hash the skulist; skip if it matches the last successful run.
-//   3. For each SKU, GET /1/product/sku/{sku} (bounded concurrency).
-//   4. Wipe + repopulate /vendor_catalogs/qbp/items/{sku}, building the
-//      items_by_upc reverse-index as we go.
+// Inventory side-effect: master refreshes inventory_by_item as it goes since
+// per-SKU detail already carries stock data. The 15-min inventory mode still
+// owns wipe + full-replace (covers removed SKUs); this is pure additive
+// freshness during the nightly run.
 //
-// We pare the QBP response down to the canonical inventory-mapping shape
-// (id / name / brand / cost / msrp / primaryUpc / allUpcs). Mirror in
-// jobs/vendor-catalog-jbi/modes/master.js#toCanonicalItem. The vendor's
-// classification taxonomy, marketing copy, and ~125 lines of structural
-// metadata per SKU are dropped - we don't rebuild QBP's site, we just map
-// scans to Cadence inventory items.
+// Per-SKU fetch failures bump missCount and skip the row - one bad SKU
+// shouldn't blow up a 50k-item refresh. missCount lands in meta for alerting.
 //
-// On per-SKU fetch failure we increment missCount and skip the row - one
-// bad SKU shouldn't blow up a 50k-item refresh. The miss count lands in
-// meta so alerts can fire if it spikes.
+// TODO(phase-0): The canonical item shape is stubbed. Once the cross-vendor
+// master object + mapping is locked, replace toCanonicalItem(). The pipeline
+// is shape-agnostic - diff/store/read don't care what the doc looks like.
 
 const { qbpRequest, mapWithConcurrency } = require("../api");
 const { initRtdb, MultiPathWriter } = require("../rtdb");
+const { initFirestore, FirestoreBatchWriter } = require("../firestore");
+const { BaselineStore, diffMaps } = require("../baseline");
 const {
   getLastSyncMeta,
   setLastSyncMeta,
@@ -29,27 +39,28 @@ const {
 } = require("../meta");
 
 const META_KEY = "lastMasterSync";
-const ITEMS_PATH = "vendor_catalogs/qbp/items";
-const ITEMS_BY_UPC_PATH = "vendor_catalogs/qbp/items_by_upc";
+const ITEMS_COLLECTION = "vendor_catalogs/qbp/items_by_id";
 const INVENTORY_PATH = "vendor_catalogs/qbp/inventory_by_item";
 
 async function runMasterSync() {
   const startedAt = Date.now();
-  const db = initRtdb();
+  const rtdb = initRtdb();
+  const firestore = initFirestore();
+  const baseline = new BaselineStore("qbp");
 
   console.log(`[qbp-master] fetching skulist`);
   const skulistResp = await qbpRequest("product/skulist");
   const skus = extractSkus(skulistResp);
   console.log(`[qbp-master] skulist returned ${skus.length} SKUs`);
   if (skus.length === 0) {
-    throw new Error("QBP skulist returned 0 SKUs - refusing to wipe catalog");
+    throw new Error("QBP skulist returned 0 SKUs - refusing to diff against empty current");
   }
 
   const responseHash = hashPayload(skus);
-  const lastSync = await getLastSyncMeta(db, META_KEY);
+  const lastSync = await getLastSyncMeta(rtdb, META_KEY);
   if (shouldSkipByHash(lastSync, responseHash)) {
     console.log(`[qbp-master] skipping - skulist hash matches last sync`);
-    await setLastSyncMeta(db, META_KEY, {
+    await setLastSyncMeta(rtdb, META_KEY, {
       responseHash,
       skuCount: skus.length,
       skipped: true,
@@ -58,16 +69,10 @@ async function runMasterSync() {
     return { skipped: true, skuCount: skus.length };
   }
 
-  console.log(`[qbp-master] wiping ${ITEMS_PATH} and ${ITEMS_BY_UPC_PATH}`);
-  await db.ref().update({
-    [ITEMS_PATH]: null,
-    [ITEMS_BY_UPC_PATH]: null,
-  });
+  const baselineMap = await baseline.load();
 
-  const writer = new MultiPathWriter(db);
-  let itemCount = 0;
-  let upcCount = 0;
-  let inventoryItemCount = 0;
+  const currentMap = new Map();
+  const inventoryByItem = new Map();
   let missCount = 0;
   let lastLogged = 0;
 
@@ -94,50 +99,72 @@ async function runMasterSync() {
       missCount++;
       return;
     }
-    await writer.set(`${ITEMS_PATH}/${itemKey}`, canonical);
-    itemCount++;
+    currentMap.set(itemKey, canonical);
 
-    for (const upc of canonical.allUpcs) {
-      await writer.set(`${ITEMS_BY_UPC_PATH}/${upc}`, itemKey);
-      upcCount++;
-    }
-
-    // Stock data is bundled in the per-SKU response; upsert it now so the
-    // master sweep keeps inventory_by_item fresh as a side effect. The
-    // hourly inventory mode still owns the wipe + full-replace cycle for
-    // removed-SKU cleanup; this is pure additive freshness during master.
     const stockMap = extractStockMap(detail);
-    if (stockMap) {
-      await writer.set(`${INVENTORY_PATH}/${itemKey}`, stockMap);
-      inventoryItemCount++;
-    }
+    if (stockMap) inventoryByItem.set(itemKey, stockMap);
 
-    if (itemCount - lastLogged >= 500) {
-      lastLogged = itemCount;
+    if (currentMap.size - lastLogged >= 500) {
+      lastLogged = currentMap.size;
       console.log(
-        `[qbp-master] processed ${itemCount}/${skus.length} (${upcCount} UPCs, ${inventoryItemCount} in-stock, ${missCount} misses)`
+        `[qbp-master] fetched ${currentMap.size}/${skus.length} (${inventoryByItem.size} in-stock, ${missCount} misses)`,
       );
     }
   });
+  console.log(
+    `[qbp-master] built current map: ${currentMap.size} items, ${inventoryByItem.size} with stock, ${missCount} misses`,
+  );
 
+  const { adds, changes, deletes } = diffMaps(currentMap, baselineMap);
+  console.log(
+    `[qbp-master] diff: +${adds.length} adds, ~${changes.length} changes, -${deletes.length} deletes`,
+  );
+
+  const writer = new FirestoreBatchWriter(firestore, ITEMS_COLLECTION);
+  for (const { id, doc } of adds) await writer.set(id, doc);
+  for (const { id, doc } of changes) await writer.set(id, doc);
+  for (const id of deletes) await writer.delete(id);
   await writer.flush();
+  console.log(
+    `[qbp-master] firestore writes complete: ${writer.totalSet} set, ${writer.totalDelete} delete`,
+  );
+
+  const rtdbWriter = new MultiPathWriter(rtdb);
+  for (const [itemKey, stockMap] of inventoryByItem.entries()) {
+    await rtdbWriter.set(`${INVENTORY_PATH}/${itemKey}`, stockMap);
+  }
+  await rtdbWriter.flush();
+  console.log(`[qbp-master] inventory side-effect: ${inventoryByItem.size} items upserted to RTDB`);
+
+  await baseline.save(currentMap);
 
   const durationSec = (Date.now() - startedAt) / 1000;
-  await setLastSyncMeta(db, META_KEY, {
+  await setLastSyncMeta(rtdb, META_KEY, {
     responseHash,
     skuCount: skus.length,
-    itemCount,
-    upcCount,
-    inventoryItemCount,
+    itemCount: currentMap.size,
+    addCount: adds.length,
+    changeCount: changes.length,
+    deleteCount: deletes.length,
+    inventoryItemCount: inventoryByItem.size,
     missCount,
     durationSec,
     skipped: false,
   });
 
   console.log(
-    `[qbp-master] done. ${itemCount} items, ${upcCount} UPCs, ${inventoryItemCount} in-stock, ${missCount} misses in ${durationSec.toFixed(1)}s`
+    `[qbp-master] done. ${currentMap.size} items, ${adds.length}/${changes.length}/${deletes.length} a/c/d, ${inventoryByItem.size} in-stock, ${missCount} misses in ${durationSec.toFixed(1)}s`,
   );
-  return { skipped: false, itemCount, upcCount, inventoryItemCount, missCount, durationSec };
+  return {
+    skipped: false,
+    itemCount: currentMap.size,
+    addCount: adds.length,
+    changeCount: changes.length,
+    deleteCount: deletes.length,
+    inventoryItemCount: inventoryByItem.size,
+    missCount,
+    durationSec,
+  };
 }
 
 // QBP's skulist response shape isn't fully documented and XML envelope
@@ -223,25 +250,12 @@ function unwrapDetail(resp) {
   return envelope;
 }
 
-// Convert a raw QBP product detail object into the canonical inventory-mapping
-// shape used everywhere downstream (chrome extension auto-create,
-// reconciliation, search). Mirror in
-// jobs/vendor-catalog-jbi/modes/master.js#toCanonicalItem.
-//
-//   id          - vendor SKU (also the RTDB key; uppercased)
-//   name        - display name (QBP: detail.name)
-//   brand       - brand label (QBP: detail.brand[0].description)
-//   cost        - dealer cost in CENTS (QBP: detail.dealerPrice.value dollars)
-//   msrp        - MSRP in CENTS (QBP: detail.msrp.value dollars)
-//   primaryUpc  - first barcode value, scan-canonical
-//   allUpcs[]   - every barcode value; drives items_by_upc index
-//
-// QBP barcodes nest under <barcodes><Barcode value="..."/></barcodes>; Barcode
-// is one-object when there's a single barcode and an array when there are many
-// (fast-xml-parser REPEATED_TAGS in api.js does NOT include Barcode).
-//
-// Returns null when the detail has no name AND no UPCs - nothing useful we
-// can store, drop the row from the catalog.
+// TODO(phase-0): replace with the locked cross-vendor canonical shape + mapping.
+// Current shape mirrors the pre-migration RTDB doc plus `vendor`/`specs` tags.
+// QBP doesn't ship a separate specs feed (specs live inline in product detail);
+// stubbed as [] for now and folded once Phase 0 maps QBP detail fields to spec
+// pairs. Diff equality uses stableStringify - shape changes just produce a
+// one-time mass-change diff against the baseline.
 function toCanonicalItem(detail, itemKey) {
   if (!detail || typeof detail !== "object") return null;
 
@@ -277,12 +291,14 @@ function toCanonicalItem(detail, itemKey) {
 
   return {
     id: itemKey,
+    vendor: "qbp",
     name,
     brand,
     cost: dollarsToCents(detail.dealerPrice && detail.dealerPrice.value),
     msrp: dollarsToCents(detail.msrp && detail.msrp.value),
     primaryUpc: allUpcs[0] || "",
     allUpcs,
+    specs: [],
   };
 }
 

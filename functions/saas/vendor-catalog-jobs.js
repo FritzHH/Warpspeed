@@ -29,10 +29,10 @@ const VENDOR_CATALOG_JOBS = [
     vendorDisplayName: "JBI",
     displayName: "JBI – Catalog Master",
     description:
-      "Downloads /inv_mast.txt from JBI's FTP and upserts master catalog rows into /vendor_catalogs/jbi/items/{itemId}.",
+      "Downloads /inv_mast.txt + /product_spec_with_titles.txt from JBI's FTP, diffs the result against the previous baseline in GCS, and writes only adds/changes/deletes to Firestore vendor_catalogs/jbi/items_by_id/{itemId}.",
     tooltip:
-      "Master record per item (description, brand, MSRP, UPC). Job skips if FTP modTime matches the last sync stamp at /vendor_catalogs/jbi.lastMasterSync — over-scheduling is cheap.",
-    recommendedCadence: "0 5 * * *",
+      "Nightly diff-based ingest. Master record per item (description, brand, MSRP, UPC) plus folded specs[]. Skips when /inv_mast.txt modTime matches the last sync stamp at /vendor_catalogs/jbi.lastMasterSync (RTDB meta). Baseline lives in gs://cadence-pos-vendor-catalog-baselines/jbi-items.json.gz; first run is a full upload, steady-state writes are tiny deltas.",
+    recommendedCadence: "0 3 * * *",
     recommendedTimeZone: "America/New_York",
     skipIfUnchanged: true,
   },
@@ -42,23 +42,10 @@ const VENDOR_CATALOG_JOBS = [
     vendorDisplayName: "JBI",
     displayName: "JBI – Inventory Levels",
     description:
-      "Downloads /inv_loc.txt from JBI's FTP and updates per-warehouse stock counts on /vendor_catalogs/jbi/items/{itemId}.",
+      "Downloads /inv_loc.txt from JBI's FTP and writes per-warehouse stock maps to RTDB vendor_catalogs/jbi/inventory_by_item/{itemId}.",
     tooltip:
-      "Stock counts move throughout the day. Job skips if FTP modTime matches the last sync stamp at /vendor_catalogs/jbi.lastInventorySync.",
-    recommendedCadence: "15 * * * *",
-    recommendedTimeZone: "America/New_York",
-    skipIfUnchanged: true,
-  },
-  {
-    basename: "vendor-catalog-jbi-specs",
-    vendor: "jbi",
-    vendorDisplayName: "JBI",
-    displayName: "JBI – Product Specs",
-    description:
-      "Downloads /product_spec_with_titles.txt from JBI's FTP and writes per-item spec arrays to /vendor_catalogs/jbi/specs/{itemId}.",
-    tooltip:
-      "Specs are stored as { specs: [{title, value}, ...], lastUpdated } per item. Only items with at least one non-empty spec value get a doc. Meta is stamped at /vendor_catalogs/jbi.lastSpecsSync with specsWriteCount and totalPairs. Daily is plenty — specs change rarely.",
-    recommendedCadence: "30 5 * * *",
+      "Stock counts move throughout the day. Job skips if FTP modTime matches the last sync stamp at /vendor_catalogs/jbi.lastInventorySync. Inventory stays on RTDB (15-min cadence, point-lookup reads) while master items live on Firestore.",
+    recommendedCadence: "*/15 * * * *",
     recommendedTimeZone: "America/New_York",
     skipIfUnchanged: true,
   },
@@ -68,10 +55,10 @@ const VENDOR_CATALOG_JOBS = [
     vendorDisplayName: "QBP",
     displayName: "QBP – Catalog Master",
     description:
-      "Hits QBP API1 /1/product/skulist, then per-SKU /1/product/sku/{sku}, and writes the cleaned product detail to /vendor_catalogs/qbp/items/{SKU} plus a reverse UPC index at /vendor_catalogs/qbp/items_by_upc/{upc}.",
+      "Hits QBP API1 /1/product/skulist, then per-SKU /1/product/sku/{sku}, diffs the result against the previous baseline in GCS, and writes only adds/changes/deletes to Firestore vendor_catalogs/qbp/items_by_id/{SKU}. Same run also refreshes RTDB vendor_catalogs/qbp/inventory_by_item/{SKU} from the bundled stockLevels.",
     tooltip:
-      "QBP has no FTP/modTime equivalent, so the job hashes the skulist response and skips if it matches the last sync stamp at /vendor_catalogs/qbp/_meta/lastMasterSync. Per-SKU fetches run bounded-parallel (QBP_CONCURRENCY, default 8). One bad SKU increments missCount instead of aborting.",
-    recommendedCadence: "0 5 * * *",
+      "QBP has no FTP/modTime equivalent, so the job hashes the skulist response and skips if it matches the last sync stamp at /vendor_catalogs/qbp/_meta/lastMasterSync. Per-SKU fetches run bounded-parallel (QBP_CONCURRENCY, default 8). One bad SKU increments missCount instead of aborting. Baseline lives in gs://cadence-pos-vendor-catalog-baselines/qbp-items.json.gz.",
+    recommendedCadence: "30 3 * * *",
     recommendedTimeZone: "America/New_York",
     skipIfUnchanged: true,
   },
@@ -81,12 +68,38 @@ const VENDOR_CATALOG_JOBS = [
     vendorDisplayName: "QBP",
     displayName: "QBP – Inventory Levels",
     description:
-      "Fans out across QBP warehouse codes (QBP_WAREHOUSES, default PA,MN,NV) hitting /1/availability/warehouse/{code}, then writes per-SKU { warehouseCode: qty } maps to /vendor_catalogs/qbp/inventory_by_item/{SKU}.",
+      "Fans out across QBP warehouse codes (QBP_WAREHOUSES, default PA,MN,NV) hitting /1/availability/warehouse/{code}, then writes per-SKU { warehouseCode: qty } maps to RTDB vendor_catalogs/qbp/inventory_by_item/{SKU}.",
     tooltip:
       "Always runs — warehouse stock changes constantly and QBP exposes no cheap change-detect. Meta stamped at /vendor_catalogs/qbp/_meta/lastInventorySync with warehousesSeen + totalQty + itemsWithStockCount.",
-    recommendedCadence: "15 * * * *",
+    recommendedCadence: "*/15 * * * *",
     recommendedTimeZone: "America/New_York",
     skipIfUnchanged: false,
+  },
+  {
+    basename: "vendor-catalog-qbp-count",
+    vendor: "qbp",
+    vendorDisplayName: "QBP",
+    displayName: "QBP – Catalog Size Probe",
+    description:
+      "Hits /1/product/skulist and counts the returned array. Writes count + 96-entry rolling history to /vendor_catalogs/qbp/_meta/lastInventoryCount.",
+    tooltip:
+      "Lightweight probe so we can detect catalog-size swings between master syncs. Stamps `unusualSwing: true` when |delta|/previousCount > 5%. Runs every 15 min during continental-US business hours (Mon-Fri 9am ET through 8pm ET).",
+    recommendedCadence: "*/15 9-20 * * 1-5",
+    recommendedTimeZone: "America/New_York",
+    skipIfUnchanged: false,
+  },
+  {
+    basename: "vendor-catalog-jbi-count",
+    vendor: "jbi",
+    vendorDisplayName: "JBI",
+    displayName: "JBI – Catalog Size Probe",
+    description:
+      "FTP-LIST's /inv_mast.txt to check modTime; if unchanged since the last probe, reuses the prior count. If changed, streams the file through a line counter and writes the new count to /vendor_catalogs/jbi/_meta/lastInventoryCount.",
+    tooltip:
+      "Lightweight probe with FTP-modTime gate so we don't pull tens of MB on every 15-min tick. Stamps `unusualSwing: true` when |delta|/previousCount > 5%. Runs every 15 min during continental-US business hours (Mon-Fri 9am ET through 8pm ET).",
+    recommendedCadence: "*/15 9-20 * * 1-5",
+    recommendedTimeZone: "America/New_York",
+    skipIfUnchanged: true,
   },
 ];
 

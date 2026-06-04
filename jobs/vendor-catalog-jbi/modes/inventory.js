@@ -43,13 +43,18 @@ async function runInventorySync() {
       if (!itemId) continue;
       itemCount++;
 
+      // JBI publishes warehouse columns as `avail_pa`, `avail_mn`, etc.
+      // Strip the prefix and uppercase so the stored key matches QBP's
+      // (PA / MN / NV / CO …) - cross-vendor consumers can read one shape.
       const warehouseMap = {};
       for (const key of Object.keys(row)) {
         if (!key.startsWith("avail_") || key === "avail_total") continue;
-        warehousesSeen.add(key);
+        const code = key.substring(6).toUpperCase();
+        if (!code) continue;
+        warehousesSeen.add(code);
         const qty = toInt(row[key]);
         if (qty <= 0) continue;
-        warehouseMap[key] = qty;
+        warehouseMap[code] = qty;
         totalQty += qty;
       }
 

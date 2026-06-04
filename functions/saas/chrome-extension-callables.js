@@ -41,10 +41,11 @@ const crypto = require("crypto");
 const SAAS_PROJECT_ID = "cadence-pos";
 const BONITA_PROJECT_ID = "warpspeed-bonitabikes";
 
-// Default app needs an explicit databaseURL — the JBI vendor catalog lives at
-// `vendor_catalogs/jbi/items/*` on cadence-pos RTDB, and admin.app().database()
-// without a configured URL silently retries forever on bad credentials instead
-// of throwing.
+// Default app needs an explicit databaseURL — vendor inventory lives at
+// `vendor_catalogs/{vendor}/inventory_by_item/*` on cadence-pos RTDB and we
+// also need an admin handle bound to this project for Firestore catalog reads
+// (`vendor_catalogs/{vendor}/items_by_id/*`). admin.app().database() without
+// a configured URL silently retries forever on bad credentials.
 const SAAS_RTDB_URL = `https://${SAAS_PROJECT_ID}-default-rtdb.firebaseio.com`;
 if (!admin.apps.length) admin.initializeApp({ databaseURL: SAAS_RTDB_URL });
 
@@ -221,9 +222,10 @@ function vendorDisplayNameFor(vendorCatalogID) {
 // supports. The "JBI" suffix is preserved to avoid breaking already-deployed
 // extension installs that hardcode the URL. The extension passes
 // `vendorCatalogID` ("jbi", "qbp", …) in the payload; the callable resolves
-// the catalog snapshot from `vendor_catalogs/<vendorCatalogID>/items/<id>`
-// on the cadence-pos RTDB. When no `vendorCatalogID` arrives we default to
-// "jbi" for backward compatibility with the v0.1.0 extension.
+// the catalog snapshot from
+// `vendor_catalogs/<vendorCatalogID>/items_by_id/<id>` on cadence-pos
+// Firestore. When no `vendorCatalogID` arrives we default to "jbi" for
+// backward compatibility with the v0.1.0 extension.
 //
 // Catalog-driven inventory auto-create goes through
 // buildInventoryItemFromCatalog against the canonical catalog snapshot. The
@@ -287,19 +289,16 @@ exports.addJBIItemToVendorOrder = onCall(COMMON_OPTS, async (request) => {
     return { success: false, reason: "active_order_missing", orderID: activeOrderID };
   }
 
-  // Vendor catalogs live on cadence-pos RTDB (default app's RTDB regardless
-  // of who the caller is). Pass SAAS_RTDB_URL explicitly so this works even
-  // when some other SaaS module's `admin.initializeApp()` (without
-  // databaseURL) beat us to the default-app init. Returns null for vendors
-  // whose catalog hasn't been imported yet — the line still gets written
-  // with the scraped page cost.
+  // Vendor catalogs live on cadence-pos Firestore (default app regardless of
+  // caller). Returns null for vendors whose catalog hasn't been imported yet —
+  // the line still gets written with the scraped page cost.
   let catalogSnapshot = null;
   try {
-    const catalogDB = admin.app().database(SAAS_RTDB_URL);
+    const catalogDB = getFirestore();
     const itemSnap = await catalogDB
-      .ref(`vendor_catalogs/${vendorCatalogID}/items/${vendorItemID}`)
-      .once("value");
-    catalogSnapshot = itemSnap.val();
+      .doc(`vendor_catalogs/${vendorCatalogID}/items_by_id/${vendorItemID}`)
+      .get();
+    catalogSnapshot = itemSnap.exists ? itemSnap.data() : null;
   } catch (err) {
     logger.warn("Vendor catalog lookup failed", {
       vendorCatalogID,

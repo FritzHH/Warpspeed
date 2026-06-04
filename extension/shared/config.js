@@ -34,7 +34,8 @@ export const CALLABLE_BASE_URL =
 
 // addItem URL keeps its "JBI" name for backward compat with v0.1.0 installs;
 // the callable itself accepts vendorCatalogID in the payload ("jbi", "qbp", …)
-// and looks up the catalog at vendor_catalogs/<vendorCatalogID>/items/<id>.
+// and looks up the catalog at
+// vendor_catalogs/<vendorCatalogID>/items_by_id/<id> on cadence-pos Firestore.
 export const CALLABLES = {
   addItem: `${CALLABLE_BASE_URL}/addJBIItemToVendorOrder`,
   listOrders: `${CALLABLE_BASE_URL}/listVendorOrdersCallable`,

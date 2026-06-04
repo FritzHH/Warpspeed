@@ -2,7 +2,7 @@
   "name": "vendor-catalog-qbp",
   "version": "1.0.0",
   "private": true,
-  "description": "Cloud Run Job: sync QBP API1 catalog into /vendor_catalogs/qbp on cadence-pos RTDB",
+  "description": "Cloud Run Job: sync QBP API1 catalog into vendor_catalogs/qbp - items in Firestore (nightly diff), inventory in RTDB (15-min)",
   "main": "index.js",
   "type": "commonjs",
   "engines": {
@@ -14,6 +14,7 @@
     "inventory": "QBP_MODE=inventory node index.js"
   },
   "dependencies": {
+    "@google-cloud/storage": "^7.14.0",
     "fast-xml-parser": "^4.4.1",
     "firebase-admin": "^12.6.0"
   }

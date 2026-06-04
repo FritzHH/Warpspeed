@@ -4,6 +4,7 @@
 import { initializeApp } from "firebase/app";
 import {
   initializeFirestore,
+  getFirestore,
   persistentLocalCache,
   persistentMultipleTabManager,
   doc,
@@ -73,10 +74,14 @@ export const DB = initializeFirestore(firebaseApp, {
 });
 
 export const RDB = getDatabase(firebaseApp);
-// Read-only handle to cadence-pos RTDB for vendor catalogs (cross-project
-// when Bonita is on warpspeed-bonitabikes; same as RDB when running on
-// cadence-pos itself). Use only via rdbCatalogRead — no writes.
+// Read-only handles to cadence-pos for vendor catalogs (cross-project when
+// Bonita is on warpspeed-bonitabikes; same as primary when running on
+// cadence-pos itself).
+//   CATALOG_RDB - inventory_by_item (15-min cadence, RTDB)
+//   CATALOG_DB  - items_by_id (nightly diff, Firestore)
+// Use only via the catalog read helpers below — no writes from the client.
 export const CATALOG_RDB = getDatabase(cadenceCatalogApp);
+export const CATALOG_DB = getFirestore(cadenceCatalogApp);
 export const AUTH = initializeAuth(firebaseApp, { persistence: browserLocalPersistence });
 export const STORAGE = getStorage(firebaseApp);
 // Initialize Firebase Functions with region
@@ -398,7 +403,7 @@ export async function rdbRead(path) {
  * Read data from the cadence-pos vendor-catalog Realtime Database.
  * Use for paths under `vendor_catalogs/*`. Cross-project on Bonita; same
  * as rdbRead when the app runs on cadence-pos itself.
- * @param {string} path - Database path (e.g., `vendor_catalogs/jbi/items/<id>`)
+ * @param {string} path - Database path (e.g., `vendor_catalogs/jbi/items_by_id/<id>`)
  * @returns {Promise<Object|null>} Data or null if not found
  */
 export async function rdbCatalogRead(path) {
@@ -412,7 +417,7 @@ export async function rdbCatalogRead(path) {
  * diagnostic samplers — avoids pulling tens of thousands of items just to
  * inspect a few. Optional `startKey` lets callers grab a random slice
  * instead of always the first N (RTDB keys are sorted lexicographically).
- * @param {string} path - Database path (e.g. `vendor_catalogs/qbp/items`)
+ * @param {string} path - Database path (e.g. `vendor_catalogs/qbp/items_by_id`)
  * @param {Object} [options]
  * @param {string} [options.startKey] - Inclusive starting key
  * @param {number} [options.limit=10] - Max children to return
@@ -425,6 +430,48 @@ export async function rdbCatalogQueryLimited(path, { startKey = null, limit = 10
     : rdbQuery(baseRef, orderByKey(), limitToFirst(limit));
   const snapshot = await get(q);
   return snapshot.exists() ? snapshot.val() : null;
+}
+
+/**
+ * Read a single document from the cadence-pos vendor-catalog Firestore.
+ * Use for paths under `vendor_catalogs/{vendor}/items_by_id/{itemId}`.
+ * Cross-project on Bonita; same project when running on cadence-pos.
+ * @param {string} path - Doc path (e.g. `vendor_catalogs/jbi/items_by_id/AB123`)
+ * @returns {Promise<Object|null>} `{ id, ...data }` or null if missing
+ */
+export async function firestoreCatalogRead(path) {
+  const docRef = doc(CATALOG_DB, ...path.split("/"));
+  const snap = await getDoc(docRef);
+  return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+}
+
+/**
+ * Run a query against the cadence-pos vendor-catalog Firestore.
+ * Mirrors firestoreQuery's signature; used for UPC reverse-lookups via
+ * `where("allUpcs", "array-contains", scanned)` and for bounded sample reads.
+ * @param {string} collectionPath - e.g. `vendor_catalogs/jbi/items_by_id`
+ * @param {Array<{field,operator,value}>} whereClauses
+ * @param {{orderBy?:{field,direction?:string}, limit?:number}} options
+ * @returns {Promise<Array<{id:string} & object>>}
+ */
+export async function firestoreCatalogQuery(
+  collectionPath,
+  whereClauses = [],
+  options = {},
+) {
+  const collectionRef = collection(CATALOG_DB, ...collectionPath.split("/"));
+  let q = collectionRef;
+  whereClauses.forEach((clause) => {
+    q = query(q, where(clause.field, clause.operator, clause.value));
+  });
+  if (options.orderBy) {
+    q = query(q, orderBy(options.orderBy.field, options.orderBy.direction || "asc"));
+  }
+  if (options.limit) {
+    q = query(q, limit(options.limit));
+  }
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 /**

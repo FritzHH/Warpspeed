@@ -74,7 +74,7 @@ export const SalesReportsModal = ({ handleExit }) => {
   const [sTransactionModalItem, _setTransactionModalItem] = useState(null);
   const queryIdRef = useRef(0);
   const txnQueryIdRef = useRef(0);
-  const hasUserSelected = useRef(false);
+  const hasUserSelected = useRef(true);
 
   const saleCacheRef = useRef(null);
   const txnCacheRef = useRef(null);

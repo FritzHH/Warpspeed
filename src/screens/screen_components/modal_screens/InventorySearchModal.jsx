@@ -124,7 +124,7 @@ const InventorySearchModal = ({ onAddItems, onClose }) => {
           )}
           {sSearchResults.map((item, idx) => {
             let isChecked = sCheckedIDs.has(item.id);
-            let name = item.informalName || item.formalName || "Unknown";
+            let name = item.catalogName || item.formalName || "Unknown";
             let brand = item.brand || "";
             let price = item.price || 0;
             return (

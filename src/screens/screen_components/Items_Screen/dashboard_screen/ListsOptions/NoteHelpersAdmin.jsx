@@ -9,7 +9,7 @@ import { NoteHelperEditorModal } from "./NoteHelperEditorModal";
 import styles from "./ListOptions.module.css";
 
 const TEST_WORKORDER_LINE = {
-  inventoryItem: { formalName: "Sample Item" },
+  inventoryItem: { catalogName: "Sample Item" },
   intakeNotes: "",
   receiptNotes: "",
 };

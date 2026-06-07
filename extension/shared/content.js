@@ -313,6 +313,62 @@ const VENDOR_ADAPTERS = {
 const VENDOR = VENDOR_ADAPTERS[location.host] || null;
 
 // ────────────────────────────────────────────────────────────────────
+// Pre-reserve body padding at document_start so the page paints at the final
+// width on its very first frame instead of full-width-then-snap. The script
+// runs before document.body exists; we inject a <style> rule into
+// documentElement that browsers apply as soon as body is parsed. Removed by
+// applyPanelPush() once we have an inline padding value to take over.
+//
+// browser.storage.local is async — we use localStorage (sync) as a hint for
+// the minimized state. It's per-origin, so the first visit to a vendor we
+// haven't minimized on may guess wrong; thereafter it matches truth. The
+// hint is rewritten on every openSidePanel + setSidePanelMinimized to keep
+// pace with the authoritative browser.storage value.
+// ────────────────────────────────────────────────────────────────────
+
+const MINIMIZED_HINT_KEY = "__cadence_panel_minimized_hint";
+const PRE_RESERVE_STYLE_ID = "__cadence_pre_reserve_style";
+
+function readMinimizedHint() {
+  try {
+    return localStorage.getItem(MINIMIZED_HINT_KEY) === "1";
+  } catch (_err) {
+    return false;
+  }
+}
+
+function writeMinimizedHint(v) {
+  try {
+    localStorage.setItem(MINIMIZED_HINT_KEY, v ? "1" : "0");
+  } catch (_err) {
+    // localStorage can throw on quota / disabled cookies. The hint is a perf
+    // optimization, not load-bearing — silently ignore.
+  }
+}
+
+function injectPreReserveCss() {
+  if (!VENDOR) return;
+  if (document.getElementById(PRE_RESERVE_STYLE_ID)) return;
+  const width = readMinimizedHint() ? 36 : Math.min(440, window.innerWidth * 0.9);
+  const style = document.createElement("style");
+  style.id = PRE_RESERVE_STYLE_ID;
+  // !important so vendor stylesheets with their own body padding-right rule
+  // don't outweigh us. Stripped before applyPanelPush sets inline padding.
+  style.textContent = `body{padding-right:${width}px !important;}`;
+  (document.head || document.documentElement).appendChild(style);
+}
+
+function removePreReserveCss() {
+  const s = document.getElementById(PRE_RESERVE_STYLE_ID);
+  if (s) s.remove();
+}
+
+// Fire ASAP — runs at document_start, before document.body exists. The style
+// rule sits dormant in the documentElement until body is parsed, at which
+// point it applies on the very first paint.
+injectPreReserveCss();
+
+// ────────────────────────────────────────────────────────────────────
 // Side panel (Shadow DOM, slide-in from right)
 //
 // Single UI surface. Hosts:
@@ -906,7 +962,11 @@ async function openSidePanel() {
   panel.style.transition = "none";
   try {
     const stored = await browser.storage.local.get([PANEL_MINIMIZED_KEY]);
-    if (stored && stored[PANEL_MINIMIZED_KEY]) panel.classList.add("minimized");
+    const isMin = !!(stored && stored[PANEL_MINIMIZED_KEY]);
+    // Keep the localStorage hint aligned with the authoritative truth so the
+    // next navigation pre-reserves correctly on the very first paint.
+    writeMinimizedHint(isMin);
+    if (isMin) panel.classList.add("minimized");
     else panel.classList.remove("minimized");
   } catch (_err) {
     // browser.runtime can be unavailable if the extension was reloaded while
@@ -951,6 +1011,10 @@ function setSidePanelMinimized(minimized) {
   if (!panel) return;
   if (minimized) panel.classList.add("minimized");
   else panel.classList.remove("minimized");
+  // Sync hint so the NEXT page load can pre-reserve the right amount of body
+  // padding synchronously (browser.storage.local is async, localStorage is
+  // sync). browser.storage write below is the authoritative truth.
+  writeMinimizedHint(!!minimized);
   // Persist so the next navigation honors this choice. Fire-and-forget — if
   // storage write fails we still updated the UI for this tab.
   try {
@@ -1028,17 +1092,27 @@ function insertOptimisticPanelRow({ vendorItemID, vendorItemName, qty, costStr, 
   row.setAttribute("data-qty", String(qty));
   row.setAttribute("data-cost-cents", String(costCents));
   row.setAttribute("data-optimistic", "1");
+  // data-action attrs are stamped here (alongside the tempID) so promoteOptimisticRow
+  // only has to flip `disabled=false` and swap the IDs to make the buttons routable.
+  // Buttons stay `disabled` while the server confirms the add — the user can't
+  // delete or adjust a row that doesn't have a real itemID yet.
   row.innerHTML = `
     <div class="item-name">${nameMarkup}</div>
     <div class="item-meta">
-      <button type="button" class="btn-trash" disabled aria-label="Remove item">
+      <button type="button" class="btn-trash" disabled
+              data-action="delete" data-item-id="${tempID}"
+              aria-label="Remove item">
         <img src="${TRASH_ICON_URL}" alt="" aria-hidden="true" />
       </button>
       <span class="qty-badge">${qty}</span>
       <span>@ $${costDollars.toFixed(2)}</span>
       <div class="qty-adjusters">
-        <button type="button" class="qty-up" disabled aria-label="Increase quantity">▲</button>
-        <button type="button" class="qty-down" disabled aria-label="Decrease quantity">▼</button>
+        <button type="button" class="qty-up" disabled
+                data-action="qty-up" data-item-id="${tempID}" data-qty="${qty}"
+                aria-label="Increase quantity">▲</button>
+        <button type="button" class="qty-down" disabled
+                data-action="qty-down" data-item-id="${tempID}" data-qty="${qty}"
+                aria-label="Decrease quantity">▼</button>
       </div>
       <span class="right" data-right-mode="total">$${line.toFixed(2)}</span>
     </div>
@@ -1046,6 +1120,65 @@ function insertOptimisticPanelRow({ vendorItemID, vendorItemName, qty, costStr, 
   orderList.appendChild(row);
   recomputePanelTotal();
   return tempID;
+}
+
+// Swap an optimistic placeholder for its real server-confirmed state without a
+// full re-render. Patches data-item-id everywhere it appears (row + each
+// action button), reconciles qty (in case the server merged with an existing
+// line), enables the previously-disabled buttons, and updates the display
+// name to the catalog/inventory-resolved one when available.
+//
+// Trade-off: cost-diff badges only appear on the next manual refresh — we
+// don't have inventory cost client-side to compute them here. Worth the
+// trade because the full re-render this replaces (a) flickers and (b) races
+// any in-flight delete the user fires immediately after add.
+function promoteOptimisticRow(tempID, realID, mergedQty, displayName) {
+  if (!tempID || !realID) return;
+  const row = findPanelRow(tempID);
+  if (!row) return;
+  row.setAttribute("data-item-id", String(realID));
+  row.removeAttribute("data-optimistic");
+
+  const qtyNum = Number(mergedQty);
+  const qtyValid = Number.isFinite(qtyNum) && qtyNum >= 1;
+  if (qtyValid) {
+    row.dataset.qty = String(qtyNum);
+    const qtyBadge = row.querySelector(".qty-badge");
+    if (qtyBadge) qtyBadge.textContent = String(qtyNum);
+    const right = row.querySelector(".item-meta .right");
+    if (right && right.dataset.rightMode === "total") {
+      const cost = Number(row.dataset.costCents || 0) / 100;
+      right.textContent = `$${(qtyNum * cost).toFixed(2)}`;
+    }
+  }
+
+  const upBtn = row.querySelector(".qty-up");
+  const downBtn = row.querySelector(".qty-down");
+  const trashBtn = row.querySelector(".btn-trash");
+  if (upBtn) {
+    upBtn.setAttribute("data-item-id", String(realID));
+    if (qtyValid) upBtn.setAttribute("data-qty", String(qtyNum));
+    upBtn.disabled = false;
+  }
+  if (downBtn) {
+    downBtn.setAttribute("data-item-id", String(realID));
+    if (qtyValid) downBtn.setAttribute("data-qty", String(qtyNum));
+    downBtn.disabled = qtyValid ? qtyNum <= 1 : false;
+  }
+  if (trashBtn) {
+    trashBtn.setAttribute("data-item-id", String(realID));
+    trashBtn.disabled = false;
+  }
+
+  if (displayName && String(displayName).trim()) {
+    const nameEl = row.querySelector(".item-name");
+    if (nameEl) {
+      const link = nameEl.querySelector("a.item-name-link");
+      if (link) link.textContent = String(displayName);
+      else nameEl.textContent = String(displayName);
+    }
+  }
+  recomputePanelTotal();
 }
 
 function removeOptimisticPanelRow(tempID) {
@@ -1180,6 +1313,11 @@ const PANEL_PUSH_TRANSITION =
   "padding-right 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94)";
 
 function applyPanelPush(open, instant) {
+  // Strip the document_start pre-reserve CSS BEFORE we read computed padding —
+  // otherwise getComputedStyle would feed our own pre-reserved value back into
+  // ORIG_BODY_PAD_RIGHT_ATTR and close-restore would land on the wrong number.
+  // Idempotent — no-op once the pre-reserve style has been removed.
+  removePreReserveCss();
   // Preserve the vendor's original body padding-right exactly once so close
   // restores it without compounding.
   if (!document.body.hasAttribute(ORIG_BODY_PAD_RIGHT_ATTR)) {
@@ -1691,15 +1829,19 @@ async function handleDeleteClick(btn) {
     else delete orderQtyByPn[pn];
     refreshAllInjectedButtons();
   }
-  // If the list is now empty, repaint the panel so the empty-state message
-  // appears (rather than just a blank body).
+  // If the list is now empty, paint the empty-state INLINE rather than
+  // re-fetching the order — a refetch here used to race a still-pending
+  // delete write and bring the just-deleted item back. The empty-state HTML
+  // is canned text, so inlining it costs nothing.
   const shadow = getPanelShadow();
   const orderList = shadow && shadow.getElementById("orderList");
   if (orderList && !orderList.querySelector(".item")) {
-    refreshSidePanel();
-  } else {
-    recomputePanelTotal();
+    orderList.innerHTML = `<div class="empty"><strong>No items yet.</strong><br/>Click "Add to Cadence" beside any vendor item to add it here.</div>`;
+    const meta = shadow && shadow.getElementById("panelMeta");
+    if (meta) meta.textContent = "0 items";
+    syncVendorFilterUI(shadow, false);
   }
+  recomputePanelTotal();
 
   const settings = (await browser.storage.local.get("settings")).settings || {};
   if (!settings.tenantID || !settings.storeID) {
@@ -2003,14 +2145,31 @@ async function handleAddClick(vendorAddBtn, ourBtn, partNumber) {
 
   // Server-confirmed success. Reconcile the cached badge with the canonical
   // post-write qty (covers cases where the server clamps or de-dupes), then
-  // refresh the panel so optimistic placeholders pick up real ids, display
-  // names, and cost-diff badges.
+  // surgically promote the optimistic placeholder OR reconcile the existing
+  // row's qty. We deliberately skip refreshSidePanel here:
+  //   - the full re-render caused a visible flicker ~500ms after every add
+  //   - the in-flight getOrder read raced any delete the user fired
+  //     immediately after, so the just-deleted item would come back when the
+  //     stale fetch repainted the rows
+  // Cost-diff badges for newly-added items now wait until the next manual
+  // refresh — acceptable trade for instant, race-free add+delete behavior.
   const mergedQty = Number.isFinite(Number(result.qty))
     ? Number(result.qty)
     : newCachedQty;
   orderQtyByPn[partNumber] = mergedQty;
   updateInjectedButtonState(ourBtn, mergedQty);
-  if (panelIsOpen()) refreshSidePanel();
+  if (optimisticRowID && result.itemID) {
+    promoteOptimisticRow(
+      optimisticRowID,
+      result.itemID,
+      mergedQty,
+      result.itemName || vendorItemName
+    );
+  } else if (bumpedRowItemID && Number.isFinite(Number(result.qty))) {
+    // Existing row already bumped optimistically; reconcile to the server's
+    // authoritative merged qty (handles concurrent edits from another tab).
+    setPanelRowQty(bumpedRowItemID, Number(result.qty));
+  }
 }
 
 // Shows a temporary message below our wrapper. Mirrors the JBI-style

@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   LargeModalHeader,
   LargeModalHeaderButton,
+  Tooltip,
 } from "../../../dom_components";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
@@ -76,6 +77,17 @@ function getTimeFrameRange(tf) {
   return { start, end: endDate };
 }
 
+function getLastTimeFrameRange(tf) {
+  let begin = tf?.begin || "lastFriday";
+  let end = tf?.end || "thisThursday";
+  let curStart = resolveAnchor(begin);
+  let curEnd = resolveAnchor(end);
+  return {
+    start: curStart.subtract(7, "day").startOf("day"),
+    end: curEnd.subtract(7, "day").endOf("day"),
+  };
+}
+
 const STATIC_SHORTCUTS = [
   {
     label: "Today",
@@ -136,7 +148,13 @@ function pairPunches(filteredArr) {
       pending = obj;
     } else if (obj.option === "out") {
       if (pending) {
-        resArr.push({ in: pending, out: obj });
+        let sameDay = dayjs(pending.millis).isSame(dayjs(obj.millis), "day");
+        if (sameDay) {
+          resArr.push({ in: pending, out: obj });
+        } else {
+          resArr.push({ in: pending });
+          resArr.push({ out: obj });
+        }
         pending = null;
       } else {
         resArr.push({ out: obj });
@@ -197,7 +215,7 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
     employeeUser ? dayjs().endOf("day") : (preselectedUser ? last2DaysEnd : defaultRange.end)
   );
   const [sActiveShortcut, _setActiveShortcut] = useState(
-    employeeUser ? "Today" : (preselectedUser ? null : "Pay Period")
+    employeeUser ? "Today" : null
   );
 
   const [sFilteredArr, _setFilteredArr] = useState([]);
@@ -210,6 +228,7 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
 
   const modifiedPunchIdsRef = useRef(new Set());
   const deletedPunchIdsRef = useRef(new Set());
+  const rowSnapshotRef = useRef(null);
   const queryIdRef = useRef(0);
   const hasAutoFetchedRef = useRef(false);
 
@@ -236,6 +255,26 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
       .then((resArr) => {
         if (thisQueryId !== queryIdRef.current) return;
         resArr = sortBy(resArr || [], "millis");
+        let paired = pairPunches(resArr);
+        console.log(
+          JSON.stringify(
+            {
+              user: { id: user.id, first: user.first, last: user.last },
+              range: {
+                start: dayjs(start).format("YYYY-MM-DD"),
+                end: dayjs(end).format("YYYY-MM-DD"),
+              },
+              totalMinutes: paired.runningTotalMinutes,
+              totalHours: convertMillisToHoursMins(
+                paired.runningTotalMinutes * MILLIS_IN_MINUTE
+              ),
+              displayArr: paired.displayArr,
+              rawPunches: resArr,
+            },
+            null,
+            2
+          )
+        );
         _setFilteredArr(resArr);
         _setLoading(false);
       })
@@ -265,6 +304,15 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
     let curTf = zDefaultPayrollTimeFrame || { begin: "lastFriday", end: "thisThursday" };
     let range = getTimeFrameRange(curTf);
     _setActiveShortcut("Pay Period");
+    _setStartDate(range.start);
+    _setEndDate(range.end);
+    fetchPunches(range.start, range.end);
+  }
+
+  function handleLastPayPeriodShortcut() {
+    let curTf = zDefaultPayrollTimeFrame || { begin: "lastFriday", end: "thisThursday" };
+    let range = getLastTimeFrameRange(curTf);
+    _setActiveShortcut("Last Pay Period");
     _setStartDate(range.start);
     _setEndDate(range.end);
     fetchPunches(range.start, range.end);
@@ -421,6 +469,45 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
     }
 
     _setSaving(false);
+  }
+
+  function handleEnterRowEdit() {
+    rowSnapshotRef.current = {
+      filteredArr: cloneDeep(sFilteredArr),
+      modifiedIds: new Set(modifiedPunchIdsRef.current),
+      deletedIds: new Set(deletedPunchIdsRef.current),
+    };
+  }
+
+  function handleCancelRowEdit() {
+    if (!rowSnapshotRef.current) return;
+    _setFilteredArr(rowSnapshotRef.current.filteredArr);
+    modifiedPunchIdsRef.current = rowSnapshotRef.current.modifiedIds;
+    deletedPunchIdsRef.current = rowSnapshotRef.current.deletedIds;
+    _setHasUnsavedChanges(
+      modifiedPunchIdsRef.current.size > 0 || deletedPunchIdsRef.current.size > 0
+    );
+    rowSnapshotRef.current = null;
+  }
+
+  async function handleSaveRowEdit() {
+    _setSaving(true);
+    try {
+      let savePromises = sFilteredArr
+        .filter((p) => modifiedPunchIdsRef.current.has(p.id))
+        .map((p) => dbSavePunchObject(p));
+      let deletePromises = Array.from(deletedPunchIdsRef.current).map((id) =>
+        dbDeletePunch(id)
+      );
+      await Promise.all([...savePromises, ...deletePromises]);
+      modifiedPunchIdsRef.current = new Set();
+      deletedPunchIdsRef.current = new Set();
+      _setHasUnsavedChanges(false);
+    } catch (e) {
+      log("Error saving row:", e);
+    }
+    _setSaving(false);
+    rowSnapshotRef.current = null;
   }
 
   async function handleEmailPayroll() {
@@ -652,10 +739,10 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
         <div className={styles.cardContent}>
         {/* ═══ LEFT RAIL ═══ */}
         <div className={styles.leftRail}>
-          <div className={styles.leftRailTop}>
-            {isAdmin && (
-              <>
-                <span className={styles.blockSection}>SELECT USER</span>
+          {isAdmin && (
+            <>
+              <span className={styles.blockSection}>SELECT USER</span>
+              <div className={styles.userListScroll}>
                 {(zUsers || []).map((user) => {
                   let isSelected = sSelectedUser?.id === user.id;
                   return (
@@ -670,21 +757,36 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
                     </TouchableOpacity>
                   );
                 })}
-
-                <div className={styles.divider} />
-              </>
-            )}
+              </div>
+            </>
+          )}
+          <div className={styles.leftRailTop}>
+            <span
+              className={`${styles.blockSection} ${isAdmin ? styles.blockSpacedTop : ""}`}
+            >
+              SELECT TIME RANGE
+            </span>
 
             {/* Pay Period button */}
             <TouchableOpacity
               onPress={handleDefaultRangeShortcut}
-              className={`${styles.shortcutRow} ${sActiveShortcut === "Pay Period" ? styles.isActive : styles.isPayPeriod}`}
+              className={`${styles.shortcutRow} ${sActiveShortcut === "Pay Period" ? styles.isActive : ""}`}
             >
               <span className={styles.shortcutRowText}>
                 Pay Period{" "}
                 <span className={styles.shortcutRowSubText}>
                   {(zDefaultPayrollTimeFrame?.begin || "lastFriday").slice(4, 7)} → {(zDefaultPayrollTimeFrame?.end || "thisThursday").slice(4, 7)}
                 </span>
+              </span>
+            </TouchableOpacity>
+
+            {/* Last Pay Period button */}
+            <TouchableOpacity
+              onPress={handleLastPayPeriodShortcut}
+              className={`${styles.shortcutRow} ${sActiveShortcut === "Last Pay Period" ? styles.isActive : ""}`}
+            >
+              <span className={styles.shortcutRowText}>
+                Last Pay Period
               </span>
             </TouchableOpacity>
 
@@ -702,9 +804,7 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
             })}
 
             {isAdmin && (
-              <>
-                <div className={styles.divider} />
-
+              <div className={`${styles.payPeriodBox} ${styles.blockSpacedTop}`}>
                 <span className={styles.blockPayPeriod}>PAY PERIOD</span>
                 <div className={styles.dropdownGroup}>
                   <span className={`${styles.smallLabel} ${styles.textG50}`}>Start Day</span>
@@ -728,7 +828,7 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
                     buttonTextClassName={styles.payrollDropdownText}
                   />
                 </div>
-              </>
+              </div>
             )}
           </div>
 
@@ -833,6 +933,10 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
               handleFullTimeChange={handleFullTimeChange}
               handleCreateMissingPunch={handleCreateMissingPunch}
               handleDeletePunchPress={handleDeletePunchPress}
+              handleEnterRowEdit={handleEnterRowEdit}
+              handleCancelRowEdit={handleCancelRowEdit}
+              handleSaveRowEdit={handleSaveRowEdit}
+              sSaving={sSaving}
               isAdmin={isAdmin}
             />
           )}
@@ -852,7 +956,11 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
                 <div className={styles.summaryRow}>
                   <span className={styles.summaryLabel}>Hourly Rate</span>
                   <TouchableOpacity onPress={() => _setShowRate((p) => !p)} className={styles.eyeToggle}>
-                    <Image icon={sShowRate ? ICONS.downArrow : ICONS.greenRightArrow} size={16} />
+                    <Image
+                      icon={ICONS.downChevron}
+                      size={16}
+                      style={{ transform: sShowRate ? "none" : "rotate(-90deg)" }}
+                    />
                   </TouchableOpacity>
                 </div>
                 <span className={styles.summaryValue}>
@@ -865,7 +973,11 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
                 <div className={styles.summaryRow}>
                   <span className={styles.summaryLabel}>Total Wages</span>
                   <TouchableOpacity onPress={() => _setShowRate((p) => !p)} className={styles.eyeToggle}>
-                    <Image icon={sShowRate ? ICONS.downArrow : ICONS.greenRightArrow} size={16} />
+                    <Image
+                      icon={ICONS.downChevron}
+                      size={16}
+                      style={{ transform: sShowRate ? "none" : "rotate(-90deg)" }}
+                    />
                   </TouchableOpacity>
                 </div>
                 <span className={`${styles.summaryValue} ${styles.textGreenLight}`}>
@@ -874,39 +986,29 @@ export const PayrollModal = ({ handleExit, employeeUser, preselectedUser }) => {
               </div>
             )}
             <div className={styles.footerActions}>
-              {isAdmin && (
+              <Tooltip text={isAdmin ? "Email payroll report" : "Email CSV to yourself"} position="top">
                 <Button
-                  text={sSaving ? "Saving..." : "SAVE"}
+                  text={sEmailing ? "Sending..." : "EMAIL"}
                   colorGradientArr={
-                    sHasUnsavedChanges ? COLOR_GRADIENTS.green : COLOR_GRADIENTS.grey
+                    sSelectedUser && displayArr.length > 0
+                      ? COLOR_GRADIENTS.purple
+                      : COLOR_GRADIENTS.grey
                   }
-                  onPress={handleSave}
-                  enabled={sHasUnsavedChanges && !sSaving}
-                  innerClassName={styles.btnSave}
+                  onPress={() => {
+                    if (!sSelectedUser || displayArr.length === 0 || sEmailing) return;
+                    isAdmin ? handleEmailPayroll() : handleEmployeeEmailCSV();
+                  }}
+                  enabled={
+                    !!sSelectedUser &&
+                    displayArr.length > 0 &&
+                    !sEmailing
+                  }
+                  icon={ICONS.notes}
+                  iconSize={16}
+                  innerClassName={isAdmin ? styles.btnEmail : styles.btnEmailSolo}
                   textClassName={styles.btnTxt14}
                 />
-              )}
-              <Button
-                text={sEmailing ? "Sending..." : "EMAIL"}
-                colorGradientArr={
-                  sSelectedUser && displayArr.length > 0
-                    ? COLOR_GRADIENTS.purple
-                    : COLOR_GRADIENTS.grey
-                }
-                onPress={() => {
-                  if (!sSelectedUser || displayArr.length === 0 || sEmailing) return;
-                  isAdmin ? handleEmailPayroll() : handleEmployeeEmailCSV();
-                }}
-                enabled={
-                  !!sSelectedUser &&
-                  displayArr.length > 0 &&
-                  !sEmailing
-                }
-                icon={ICONS.notes}
-                iconSize={16}
-                innerClassName={isAdmin ? styles.btnEmail : styles.btnEmailSolo}
-                textClassName={styles.btnTxt14}
-              />
+              </Tooltip>
               {sEmailing && !isAdmin && (
                 <SmallLoadingIndicator color="white" className={styles.loadingSpacerLeft} />
               )}
@@ -1072,7 +1174,7 @@ const PunchListHeader = ({ sSelectedUser, isAdmin, sLoading, displayArr, handleN
 
 const PAGE_SIZE = 50;
 
-const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch, handleDeletePunchPress, isAdmin }) => {
+const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch, handleDeletePunchPress, handleEnterRowEdit, handleCancelRowEdit, handleSaveRowEdit, sSaving, isAdmin }) => {
   const [sEditableRowIdx, _setEditableRowIdx] = useState(null);
   const [sPage, _setPage] = useState(0);
   const scrollRef = useRef(null);
@@ -1123,7 +1225,7 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
               <div className={styles.cellIn}>
                 {item.in ? (
                   <div className={styles.editableTimeWrap}>
-                    <Image icon={ICONS.forwardGreen} size={12} className={styles.cellInIcon} />
+                    <Image icon={ICONS.forwardGreen} size={14} className={styles.cellInIcon} />
                     {editable ? (
                       <EditableTimeCell
                         timeObj={item.in}
@@ -1194,53 +1296,82 @@ const PunchList = ({ displayArr, handleFullTimeChange, handleCreateMissingPunch,
               {/* Edit / Delete */}
               {isAdmin && (
                 <div className={styles.cellEdit}>
-                  <TouchableOpacity
-                    onPress={() => {
-                      if (sEditableRowIdx === globalIdx) {
-                        if (item.in && item.out && (item.out.millis - item.in.millis) < MILLIS_IN_MINUTE) {
-                          useAlertScreenStore.getState().setValues({
-                            title: "Invalid Time",
-                            message: "Clock in must be at least 1 minute before clock out.",
-                            btn1Text: "OK",
-                            handleBtn1Press: () => {
-                              useAlertScreenStore.getState().setShowAlert(false);
-                            },
-                            canExitOnOuterClick: true,
-                          });
-                          return;
-                        }
-                        _setEditableRowIdx(null);
-                      } else {
-                        _setEditableRowIdx(globalIdx);
-                      }
-                    }}
-                    className={styles.iconBtn}
-                  >
-                    <Image icon={ICONS.editPencil} size={16} />
-                  </TouchableOpacity>
-                  {editable && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        useAlertScreenStore.getState().setValues({
-                          title: "Delete Punch",
-                          message: "Are you sure you want to delete this entry?",
-                          btn1Text: "Delete",
-                          btn2Text: "Cancel",
-                          handleBtn1Press: () => {
-                            handleDeletePunchPress(item.in || item.out);
+                  {editable ? (
+                    <>
+                      <Tooltip text="Cancel changes" position="left">
+                        <TouchableOpacity
+                          onPress={() => {
+                            if (sSaving) return;
+                            handleCancelRowEdit();
                             _setEditableRowIdx(null);
-                            useAlertScreenStore.getState().setShowAlert(false);
-                          },
-                          handleBtn2Press: () => {
-                            useAlertScreenStore.getState().setShowAlert(false);
-                          },
-                          canExitOnOuterClick: true,
-                        });
-                      }}
-                      className={`${styles.iconBtn} ${styles.iconBtnLeft}`}
-                    >
-                      <Image icon={ICONS.trash} size={14} />
-                    </TouchableOpacity>
+                          }}
+                          className={styles.iconBtn}
+                        >
+                          <Image icon={ICONS.redx} size={18} />
+                        </TouchableOpacity>
+                      </Tooltip>
+                      <Tooltip text="Save changes" position="left">
+                        <TouchableOpacity
+                          onPress={() => {
+                            if (sSaving) return;
+                            if (item.in && item.out && (item.out.millis - item.in.millis) < MILLIS_IN_MINUTE) {
+                              useAlertScreenStore.getState().setValues({
+                                title: "Invalid Time",
+                                message: "Clock in must be at least 1 minute before clock out.",
+                                btn1Text: "OK",
+                                handleBtn1Press: () => {
+                                  useAlertScreenStore.getState().setShowAlert(false);
+                                },
+                                canExitOnOuterClick: true,
+                              });
+                              return;
+                            }
+                            handleSaveRowEdit();
+                            _setEditableRowIdx(null);
+                          }}
+                          className={`${styles.iconBtn} ${styles.iconBtnLeft}`}
+                        >
+                          <Image icon={ICONS.check} size={18} />
+                        </TouchableOpacity>
+                      </Tooltip>
+                      <Tooltip text="Delete entry" position="left">
+                        <TouchableOpacity
+                          onPress={() => {
+                            useAlertScreenStore.getState().setValues({
+                              title: "Delete Punch",
+                              message: "Are you sure you want to delete this entry?",
+                              btn1Text: "Delete",
+                              btn2Text: "Cancel",
+                              handleBtn1Press: () => {
+                                let isOrphanOnly = (!!item.in && !item.out) || (!item.in && !!item.out);
+                                handleDeletePunchPress(item.in || item.out);
+                                if (isOrphanOnly) _setEditableRowIdx(null);
+                                useAlertScreenStore.getState().setShowAlert(false);
+                              },
+                              handleBtn2Press: () => {
+                                useAlertScreenStore.getState().setShowAlert(false);
+                              },
+                              canExitOnOuterClick: true,
+                            });
+                          }}
+                          className={`${styles.iconBtn} ${styles.iconBtnLeft}`}
+                        >
+                          <Image icon={ICONS.trash} size={16} />
+                        </TouchableOpacity>
+                      </Tooltip>
+                    </>
+                  ) : (
+                    <Tooltip text="Edit entry" position="left">
+                      <TouchableOpacity
+                        onPress={() => {
+                          handleEnterRowEdit();
+                          _setEditableRowIdx(globalIdx);
+                        }}
+                        className={styles.iconBtn}
+                      >
+                        <Image icon={ICONS.editPencil} size={18} />
+                      </TouchableOpacity>
+                    </Tooltip>
                   )}
                 </div>
               )}

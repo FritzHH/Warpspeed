@@ -29,7 +29,29 @@ function collectTranslatableText(receipt) {
     entries.push({ key: "thankYouBlurb", value: receipt.thankYouBlurb });
   }
 
-  // Line item text (skip itemName — inventory names stay in English)
+  // Multi-workorder shape: collect from each workorders[].workorderLines + customerNotes
+  var workordersArr = Array.isArray(receipt.workorders) ? receipt.workorders : [];
+  if (workordersArr.length > 0) {
+    workordersArr.forEach(function (wo, woIdx) {
+      (wo.workorderLines || []).forEach(function (line, lineIdx) {
+        if (line.discountName) {
+          entries.push({ key: "wo_" + woIdx + "_line_" + lineIdx + "_discountName", value: line.discountName });
+        }
+        if (line.receiptNotes) {
+          entries.push({ key: "wo_" + woIdx + "_line_" + lineIdx + "_receiptNotes", value: line.receiptNotes });
+        }
+      });
+      (wo.customerNotes || []).forEach(function (note, noteIdx) {
+        var text = typeof note === "string" ? note : note.value || note.text || note.note || "";
+        if (text) {
+          entries.push({ key: "wo_" + woIdx + "_custNote_" + noteIdx, value: text });
+        }
+      });
+    });
+    return entries;
+  }
+
+  // Legacy single-workorder shape: top-level workorderLines + customerNotes
   (receipt.workorderLines || []).forEach(function (line, i) {
     if (line.discountName) {
       entries.push({ key: "line_" + i + "_discountName", value: line.discountName });
@@ -39,7 +61,6 @@ function collectTranslatableText(receipt) {
     }
   });
 
-  // Customer notes
   (receipt.customerNotes || []).forEach(function (note, i) {
     var text = typeof note === "string" ? note : note.value || note.text || note.note || "";
     if (text) {
@@ -118,21 +139,44 @@ export async function translateSalesReceipt(receiptObj, targetLanguage, opts) {
 
     if (key === "thankYouBlurb") {
       translatedReceipt.thankYouBlurb = translated;
-    } else if (key.startsWith("line_")) {
+    } else if (key.startsWith("wo_")) {
+      // Multi-workorder shape: keys are wo_<woIdx>_line_<lineIdx>_<field> or wo_<woIdx>_custNote_<noteIdx>
       var parts = key.split("_");
-      var lineIdx = Number(parts[1]);
-      var field = parts[2];
-      if (translatedReceipt.workorderLines[lineIdx]) {
-        translatedReceipt.workorderLines[lineIdx][field] = translated;
+      var woIdx = Number(parts[1]);
+      var wo = translatedReceipt.workorders && translatedReceipt.workorders[woIdx];
+      if (!wo) return;
+      if (parts[2] === "line") {
+        var lineIdx = Number(parts[3]);
+        var field = parts[4];
+        if (wo.workorderLines && wo.workorderLines[lineIdx]) {
+          wo.workorderLines[lineIdx][field] = translated;
+        }
+      } else if (parts[2] === "custNote") {
+        var noteIdx = Number(parts[3]);
+        var originalWO = receiptObj.workorders && receiptObj.workorders[woIdx];
+        var originalNote = originalWO && originalWO.customerNotes && originalWO.customerNotes[noteIdx];
+        if (typeof originalNote === "string") {
+          wo.customerNotes[noteIdx] = translated;
+        } else if (originalNote && typeof originalNote === "object") {
+          var textField = originalNote.value ? "value" : originalNote.text ? "text" : "note";
+          wo.customerNotes[noteIdx][textField] = translated;
+        }
+      }
+    } else if (key.startsWith("line_")) {
+      var parts2 = key.split("_");
+      var lineIdx2 = Number(parts2[1]);
+      var field2 = parts2[2];
+      if (translatedReceipt.workorderLines[lineIdx2]) {
+        translatedReceipt.workorderLines[lineIdx2][field2] = translated;
       }
     } else if (key.startsWith("custNote_")) {
-      var noteIdx = Number(key.split("_")[1]);
-      var originalNote = receiptObj.customerNotes[noteIdx];
-      if (typeof originalNote === "string") {
-        translatedReceipt.customerNotes[noteIdx] = translated;
-      } else if (originalNote && typeof originalNote === "object") {
-        var textField = originalNote.value ? "value" : originalNote.text ? "text" : "note";
-        translatedReceipt.customerNotes[noteIdx][textField] = translated;
+      var noteIdx2 = Number(key.split("_")[1]);
+      var originalNote2 = receiptObj.customerNotes[noteIdx2];
+      if (typeof originalNote2 === "string") {
+        translatedReceipt.customerNotes[noteIdx2] = translated;
+      } else if (originalNote2 && typeof originalNote2 === "object") {
+        var textField2 = originalNote2.value ? "value" : originalNote2.text ? "text" : "note";
+        translatedReceipt.customerNotes[noteIdx2][textField2] = translated;
       }
     }
   });

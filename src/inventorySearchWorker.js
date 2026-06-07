@@ -109,10 +109,11 @@ function searchInventory(query, items) {
   }
 
   const FIELDS = [
+    { key: "catalogName", weight: 1.0 },
     { key: "formalName", weight: 1.0 },
     { key: "brand", weight: 1.0 },
     { key: "category", weight: 1.0 },
-    { key: "informalName", weight: 1.0 },
+    { key: "quickButtonLabel", weight: 1.0 },
   ];
 
   const ID_FIELDS = ["id", "primaryBarcode"];

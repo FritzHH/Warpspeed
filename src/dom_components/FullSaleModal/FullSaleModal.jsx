@@ -62,6 +62,15 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
   const salesTaxPercent = useSettingsStore((s) => s.settings?.salesTaxPercent) || 0;
   const printers = useSettingsStore((s) => s.settings?.printers);
   const printerStatus = getPrinterStatus({ printers });
+  console.log("FullSaleModal printerStatus:", JSON.stringify({
+    isPrinterOffline: printerStatus.isPrinterOffline,
+    isPrinterOnline: printerStatus.isPrinterOnline,
+    selectedPrinterID: printerStatus.selectedPrinterID,
+    selectedPrinter: printerStatus.selectedPrinter,
+    printerName: printerStatus.printerName,
+    offlineLabel: printerStatus.offlineLabel,
+    printersFromSettings: printers,
+  }, null, 2));
   const currentCustomer = useCurrentCustomerStore((s) => s.getCustomer());
 
   const [sSale, _setSale] = useState(null);
@@ -142,15 +151,16 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
   function handlePrintSale() {
     const _settings = useSettingsStore.getState().getSettings();
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    const mc = currentCustomer?.id && sSale?.customerID && currentCustomer.id === sSale.customerID ? currentCustomer : null;
     const customer = {
-      first: item.customerFirst || "",
-      last: item.customerLast || "",
-      cell: item.customerCell || "",
-      email: item.customerEmail || "",
+      first: mc?.first || sSale?.customerFirst || item.customerFirst || "",
+      last: mc?.last || sSale?.customerLast || item.customerLast || "",
+      cell: mc?.customerCell || sSale?.customerCell || item.customerCell || "",
+      email: mc?.email || sSale?.customerEmail || item.customerEmail || "",
     };
-    const wo = sWorkorders[0] || {};
+    const wos = sWorkorders.length > 0 ? sWorkorders : [{ workorderLines: [], taxFree: false }];
     const creds = [...(sSale.creditsApplied || []), ...(sSale.depositsApplied || [])];
-    let toPrint = printBuilder.sale(sSale, sTransactions, customer, wo, _settings?.salesTaxPercent, _ctx, creds);
+    let toPrint = printBuilder.sale(sSale, sTransactions, customer, wos, _settings?.salesTaxPercent, _ctx, creds);
     toPrint.popCashRegister = false;
     log("DEV — sale receipt:", toPrint);
     dbSavePrintObj(toPrint, localStorageWrapper.getItem("selectedPrinterID") || "");
@@ -159,55 +169,43 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
   function handleDownloadPDF() {
     const _settings = useSettingsStore.getState().getSettings();
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
+    const mc = currentCustomer?.id && sSale?.customerID && currentCustomer.id === sSale.customerID ? currentCustomer : null;
     const customer = {
-      first: item.customerFirst || "",
-      last: item.customerLast || "",
-      cell: item.customerCell || "",
-      email: item.customerEmail || "",
+      first: mc?.first || sSale?.customerFirst || item.customerFirst || "",
+      last: mc?.last || sSale?.customerLast || item.customerLast || "",
+      cell: mc?.customerCell || sSale?.customerCell || item.customerCell || "",
+      email: mc?.email || sSale?.customerEmail || item.customerEmail || "",
     };
-    const wo = sWorkorders[0] || {};
+    const wos = sWorkorders.length > 0 ? sWorkorders : [{ workorderLines: [], taxFree: false }];
     const creds = [...(sSale.creditsApplied || []), ...(sSale.depositsApplied || [])];
-    const receiptData = printBuilder.sale(sSale, sTransactions, customer, wo, _settings?.salesTaxPercent, _ctx, creds);
+    const receiptData = printBuilder.sale(sSale, sTransactions, customer, wos, _settings?.salesTaxPercent, _ctx, creds);
     saveSaleReceiptPDF(receiptData, null, "sale-" + sSale.id + ".pdf");
   }
 
-  function handleSendSale() {
+  function handleSendSale(channel) {
     const _settings = useSettingsStore.getState().getSettings();
+    const mc = currentCustomer?.id && sSale?.customerID && currentCustomer.id === sSale.customerID ? currentCustomer : null;
     const customer = {
-      first: item.customerFirst || "",
-      last: item.customerLast || "",
-      customerCell: item.customerCell || "",
-      email: item.customerEmail || "",
+      first: mc?.first || sSale?.customerFirst || item.customerFirst || "",
+      last: mc?.last || sSale?.customerLast || item.customerLast || "",
+      customerCell: mc?.customerCell || sSale?.customerCell || item.customerCell || "",
+      email: mc?.email || sSale?.customerEmail || item.customerEmail || "",
     };
 
-    const smsTemplate = findTemplateByType(_settings?.smsTemplates || _settings?.textTemplates, "saleReceipt");
-    const emailTemplate = findTemplateByType(_settings?.emailTemplates, "saleReceipt");
+    const isText = channel === "sms";
+    const isEmail = channel === "email";
 
-    const shouldSMS = !!customer.customerCell;
-    const shouldEmail = !!customer.email;
+    const template = isText
+      ? findTemplateByType(_settings?.smsTemplates || _settings?.textTemplates, "saleReceipt")
+      : findTemplateByType(_settings?.emailTemplates, "saleReceipt");
+    const templateContent = isText
+      ? (template?.content || template?.message || template?.text || "")
+      : (template?.message || template?.content || template?.body || "");
 
-    const smsContent = smsTemplate?.content || smsTemplate?.message || smsTemplate?.text || "";
-    const emailContent = emailTemplate?.message || emailTemplate?.content || emailTemplate?.body || "";
-
-    const emptyParts = [];
-    if (shouldSMS && !smsContent.trim()) emptyParts.push("SMS");
-    if (shouldEmail && !emailContent.trim()) emptyParts.push("email");
-    if (emptyParts.length > 0) {
+    if (!templateContent.trim()) {
       useAlertScreenStore.getState().setValues({
         title: "Empty Template",
-        message: "The sale receipt " + emptyParts.join(" and ") + " template is empty. Fill in the template content in Dashboard > " + (emptyParts.includes("SMS") ? "Text Templates" : "Email Templates") + ".",
-        btn1Text: "OK",
-        handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
-        canExitOnOuterClick: true,
-      });
-    }
-
-    const canSMS = shouldSMS && smsContent.trim();
-    const canEmail = shouldEmail && emailContent.trim();
-    if (!canSMS && !canEmail) {
-      useAlertScreenStore.getState().setValues({
-        title: "No Contact Info",
-        message: "This customer has no phone or email on file.",
+        message: "The sale receipt " + (isText ? "SMS" : "email") + " template is empty. Fill in the template content in Dashboard > " + (isText ? "Text Templates" : "Email Templates") + ".",
         btn1Text: "OK",
         handleBtn1Press: () => useAlertScreenStore.getState().setShowAlert(false),
         canExitOnOuterClick: true,
@@ -215,37 +213,33 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
       return;
     }
 
-    const sendingMessage = (
-      <>
-        {canSMS && !!customer.customerCell && (
-          <span style={{ display: "block" }}>
-            <span style={{ color: C.blue, fontWeight: 600 }}>TEXT</span>
-            {" sending to " + formatPhoneWithDashes(customer.customerCell)}
-          </span>
-        )}
-        {canEmail && !!customer.email && (
-          <span style={{ display: "block" }}>
-            <span style={{ color: C.green, fontWeight: 600 }}>EMAIL</span>
-            {" sending to " + customer.email}
-          </span>
-        )}
-      </>
+    const sendingMessage = isText ? (
+      <span style={{ display: "block" }}>
+        <span style={{ color: C.blue, fontWeight: 600 }}>TEXT</span>
+        {" sending to " + formatPhoneWithDashes(customer.customerCell)}
+      </span>
+    ) : (
+      <span style={{ display: "block" }}>
+        <span style={{ color: C.green, fontWeight: 600 }}>EMAIL</span>
+        {" sending to " + customer.email}
+      </span>
     );
     useAlertScreenStore.getState().setValues({ title: "Sending", message: sendingMessage, canExitOnOuterClick: true, autoDismiss: true, autoDismissMs: 1300 });
 
     const { tenantID, storeID } = _settings;
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: _settings };
     const wo = sWorkorders[0] || {};
+    const wos = sWorkorders.length > 0 ? sWorkorders : [{ workorderLines: [], taxFree: false }];
     const creds = [...(sSale.creditsApplied || []), ...(sSale.depositsApplied || [])];
-    const receiptData = printBuilder.sale(sSale, sTransactions, customer, wo, _settings?.salesTaxPercent, _ctx, creds);
+    const receiptData = printBuilder.sale(sSale, sTransactions, customer, wos, _settings?.salesTaxPercent, _ctx, creds);
     const storagePath = build_db_path.cloudStorage.saleReceiptPDF(sSale.id, tenantID, storeID);
 
     dbSendReceipt({
       receiptType: "sale",
       receiptData,
       storagePath,
-      sendSMS: !!(canSMS && customer.customerCell),
-      sendEmail: !!(canEmail && customer.email),
+      sendSMS: isText,
+      sendEmail: isEmail,
       customerEmail: customer.email || "",
       customerCell: customer.customerCell || "",
       customerID: sSale?.customerID || "",
@@ -262,25 +256,37 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
     });
   }
 
-  const hasCellForSend = !!currentCustomer?.customerCell;
-  const hasEmailForSend = !!currentCustomer?.email;
-  const channelSuffix = hasCellForSend && hasEmailForSend
-    ? "Text and Email"
-    : hasCellForSend
-      ? "Text"
-      : hasEmailForSend
-        ? "Email"
-        : "Send";
-  const sendSaleLabel = channelSuffix + " PDF";
-  const pdfMenuItems = [
+  const matchedCustomer = currentCustomer?.id && sSale?.customerID && currentCustomer.id === sSale.customerID ? currentCustomer : null;
+  const hasCellForSend = !!(matchedCustomer?.customerCell || sSale?.customerCell || item.customerCell);
+  const hasEmailForSend = !!(matchedCustomer?.email || sSale?.customerEmail || item.customerEmail);
+  const receiptMenuItems = [
+    {
+      id: "printSale",
+      label: "Print Receipt",
+      disabled: printerStatus.isPrinterOffline,
+      subtitle: printerStatus.isPrinterOffline ? printerStatus.offlineLabel : undefined,
+    },
     { id: "downloadSale", label: "Download PDF" },
-    { id: "sendSale", label: sendSaleLabel },
+    {
+      id: "sendText",
+      label: "Send Text Receipt",
+      disabled: !hasCellForSend,
+      subtitle: hasCellForSend ? undefined : "No phone on file",
+    },
+    {
+      id: "sendEmail",
+      label: "Send Email Receipt",
+      disabled: !hasEmailForSend,
+      subtitle: hasEmailForSend ? undefined : "No email on file",
+    },
   ];
 
-  function handlePdfMenuSelect(item) {
-    if (!item) return;
-    if (item.id === "downloadSale") handleDownloadPDF();
-    else if (item.id === "sendSale") handleSendSale();
+  function handleReceiptMenuSelect(menuItem) {
+    if (!menuItem) return;
+    if (menuItem.id === "printSale") handlePrintSale();
+    else if (menuItem.id === "downloadSale") handleDownloadPDF();
+    else if (menuItem.id === "sendText") handleSendSale("sms");
+    else if (menuItem.id === "sendEmail") handleSendSale("email");
   }
 
   function handleRefund() {
@@ -382,21 +388,13 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
               >
                 Refund
               </LargeModalHeaderButton>,
-              <LargeModalHeaderButton
-                key="print"
-                variant="default"
-                icon={ICONS.receipt}
-                disabled={printerStatus.isPrinterOffline}
-                tooltip={printerStatus.isPrinterOffline ? printerStatus.offlineLabel : undefined}
-                onClick={handlePrintSale}
-              >
-                Print Sale
-              </LargeModalHeaderButton>,
               <DropdownMenu
-                key="pdf"
-                buttonText="PDF Options"
-                dataArr={pdfMenuItems}
-                onSelect={handlePdfMenuSelect}
+                key="receipt"
+                buttonText="Receipt Options"
+                buttonIcon={ICONS.receipt}
+                buttonIconSize={14}
+                dataArr={receiptMenuItems}
+                onSelect={handleReceiptMenuSelect}
                 buttonStyle={{
                   backgroundColor: "transparent",
                   borderColor: C.borderDefault,
@@ -412,10 +410,10 @@ export const FullSaleModal = ({ item, onClose, onRefund }) => {
                 key="close"
                 variant="default"
                 icon={ICONS.close1}
-                iconPosition="only"
-                tooltip="Close"
                 onClick={onClose}
-              />,
+              >
+                Close
+              </LargeModalHeaderButton>,
             ]}
           />
 
@@ -838,7 +836,7 @@ const WorkorderCard = ({ workorder, statuses, salesTaxPercent }) => {
 
 const LineItemRow = ({ line, index }) => {
   const inv = line.inventoryItem || {};
-  const name = inv.formalName || inv.informalName || "Item";
+  const name = inv.catalogName || inv.formalName || "Item";
   const qty = line.qty || 1;
   const hasDiscount = !!line.discountObj?.name;
   const price = hasDiscount ? (line.discountObj.newPrice || 0) : (inv.price || 0) * qty;

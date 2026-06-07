@@ -209,7 +209,7 @@ export function calculateTaxes(totalAmount, workorderObj, settingsObj) {
  *   Tier 5 — Fuzzy (Levenshtein + Jaro-Winkler + Dice)  → 0–0.65
  *
  * Field weights:
- *   formalName: 1.0 | brand: 0.7 | category: 0.5 | informalName: 0.4
+ *   catalogName: 1.0 | formalName: 1.0 | brand: 1.0 | category: 1.0 | quickButtonLabel: 1.0
  *   upc/ean/customSku/manufacturerSku: exact-only at 0.95
  */
 export function searchInventory(query, items) {
@@ -306,10 +306,11 @@ export function searchInventory(query, items) {
 
   // Weighted fields for text matching
   const FIELDS = [
+    { key: "catalogName", weight: 1.0 },
     { key: "formalName", weight: 1.0 },
     { key: "brand", weight: 1.0 },
     { key: "category", weight: 1.0 },
-    { key: "informalName", weight: 1.0 },
+    { key: "quickButtonLabel", weight: 1.0 },
   ];
 
   // Identifier fields — exact match only
@@ -2319,7 +2320,7 @@ export function resolveTemplateStandalone(templateStr, workorder, customer, sett
   try {
     lineItems = (workorder?.workorderLines || [])
       .map((line) => {
-        let name = line.inventoryItem?.informalName || line.inventoryItem?.formalName || "";
+        let name = line.inventoryItem?.catalogName || line.inventoryItem?.formalName || "";
         return line.qty + "x " + name;
       })
       .join(", ");

@@ -213,7 +213,7 @@ async function storeSubaccountAuthToken(tenantID, authToken) {
       secretId,
       secret: {
         replication: { automatic: {} },
-        labels: { tenantid: tenantID, service: "twilio-subaccount" },
+        labels: { type: "twilio-auth", tenant: tenantID },
       },
     });
   } catch (err) {
@@ -292,7 +292,7 @@ async function storeSetupSubaccountAuthToken(normalizedEmail, authToken) {
       secretId,
       secret: {
         replication: { automatic: {} },
-        labels: { service: "twilio-subaccount-setup" },
+        labels: { type: "twilio-setup" },
       },
     });
   } catch (err) {

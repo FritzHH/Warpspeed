@@ -444,8 +444,14 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
       message: "Hi " + user.first + ", you are not clocked in. Would you like to punch in now?",
       btn1Text: "CLOCK IN",
       btn2Text: "NOT NOW",
-      handleBtn1Press: () => {
-        useLoginStore.getState().setCreateUserClock(user.id, Date.now(), "in");
+      handleBtn1Press: async () => {
+        let result = await useLoginStore
+          .getState()
+          .setCreateUserClock(user.id, Date.now(), "in");
+        if (!result?.success) {
+          pauseRef.current = false;
+          throw new Error(result?.error || "Punch failed");
+        }
         useLoginStore.getState().setLastActionMillis();
         pauseRef.current = false;
       },

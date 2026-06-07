@@ -1,48 +1,57 @@
 /* eslint-disable */
 // JBI vendor submission handler.
 //
-// JBI accepts orders via two channels:
-//   1. SFTP/FTP drop — upload a fixed-format order file to the JBI server
-//      under the dealer's account folder.
-//   2. HTTPS API — POST a JSON body with the same line items + apiKey auth.
+// JBI accepts orders via FTP — drop an XML file into the integrator's
+// /Orders/ subfolder on JBI's FTP host. The file is named
+//   JBI-{CustomerOrderNo}-{AccountNumber}.xml
+// and must follow JBI's strict element-order schema (Header → Token →
+// AccountNumber → CustomerOrderNo → DropShip → SingleLocation →
+// DeliveryAddress → LineItems). Missing or out-of-order elements cause
+// the parser to silently consume nothing past that point — a known
+// failure mode that produced an empty cart in test runs until the
+// DeliveryAddress block was added.
 //
-// Strategy: prefer the API when apiKey is present; fall back to FTP. Both
-// are wired so handlers can switch at runtime if one path 5xx's.
+// Response codes:
+//   Code 99 = success                Code 02 = token invalid
+//   Code 03 = duplicate filename     other  = see JBI XML Ordering spec
 //
 // ┌─────────────────────────────────────────────────────────────────┐
-// │  NOTE — FORMAT SPEC NEEDS CONFIRMATION                          │
-// │  The exact JBI order file format (CSV columns / fixed-width /   │
-// │  XML schema) and the exact JBI API endpoint path + JSON body    │
-// │  are not in the codebase. The scaffolding below uses a          │
-// │  reasonable-looking CSV (`item_number,qty,cost`) and a stub     │
-// │  API call. Replace per JBI's published dealer integration spec  │
-// │  before going live.                                             │
+// │  INTEGRATOR MODEL — confirmed by JBI 2026-06-05                 │
+// │                                                                 │
+// │  JBI now treats Cadence as a single integrator, not a dealer.   │
+// │  Credentials are SHARED across all Cadence-using dealers and    │
+// │  live in functions/ secrets, NOT in per-store config:           │
+// │                                                                 │
+// │    JBI_FTP_USERNAME      = "Cadence"                            │
+// │    JBI_FTP_PASSWORD      = (Cadence integrator FTP password)    │
+// │    JBI_FTP_HOST          = (JBI FTP host)                       │
+// │    JBI_PLATFORM_API_KEY  = (integrator <Token> for XML body)    │
+// │                                                                 │
+// │  Per-dealer authorization is server-side at JBI: they flip an   │
+// │  enable bit for each dealer account number before that dealer   │
+// │  can submit via Cadence. No dealer-specific FTP login.          │
 // └─────────────────────────────────────────────────────────────────┘
 //
-// Credentials shape:
+// ┌─────────────────────────────────────────────────────────────────┐
+// │  ONBOARDING INPUTS — what the dealer actually types in Cadence  │
+// │                                                                 │
+// │  ONLY TWO THINGS:                                               │
+// │    1. JBI account number (dealer's HACN-equivalent at JBI)      │
+// │    2. Contact email (for JBI ack notifications)                 │
+// │                                                                 │
+// │  The FTP login and integrator token are Cadence-owned, set      │
+// │  once in Firebase secrets, and reused for every dealer. The     │
+// │  dealer never sees or types them.                               │
+// └─────────────────────────────────────────────────────────────────┘
+//
+// Credentials shape (resolved server-side, not entered by dealer):
 //   { ftpHost, ftpUsername, ftpPassword, apiKey }
 //
-// On cadence-pos (SaaS), these come from the per-store Firestore doc
-//   tenants/{tid}/stores/{sid}/vendor-credentials/jbi
-// and are entered through the per-store vendor config UI.
-//
-// On Bonita (warpspeed-bonitabikes), the sync callable resolves them from
-// platform-level Secret Manager secrets (JBI_FTP_*, JBI_PLATFORM_API_KEY).
-//
-// ┌─────────────────────────────────────────────────────────────────┐
-// │  NOTE — JBI API KEY SCOPE PENDING CONFIRMATION                  │
-// │  Currently the API key is treated as platform-level (single key │
-// │  for all stores). JBI inquiry out: confirm whether the key is   │
-// │  truly platform-wide or per-dealer-account. If per-dealer, move │
-// │  apiKey out of platform secrets and into the per-store credentials│
-// │  doc on Bonita (same path as cadence-pos).                       │
-// └─────────────────────────────────────────────────────────────────┘
-//
-// vendorConfig (settings.vendors.jbi) may carry:
-//   { displayName, dealerAccountNumber, customerPONumber?, shipToAddress? }
+// vendorConfig (settings.vendors.jbi) — per-store:
+//   { displayName, dealerAccountNumber, contactEmail, customerPONumber?, shipToAddress? }
 //
 // Return shape (written to submission.result):
-//   { channel: "api"|"ftp", uploadedAt, itemCount, remoteFileName?, apiResponse? }
+//   { channel: "ftp", uploadedAt, itemCount, remoteFileName }
 
 const fetch = require("node-fetch");
 const ftp = require("basic-ftp");
@@ -77,7 +86,10 @@ exports.submit = async function jbiSubmit({ order, items, vendorConfig, creds, c
     itemNumber: String(it.vendorItemID || ""),
     qty: Number(it.qty || 0),
     cost: it.sourceCost != null ? String(it.sourceCost) : "",
-    upc: (it.catalogSnapshot && it.catalogSnapshot.primaryUpc) || "",
+    upc:
+      (it.catalogSnapshot &&
+        (it.catalogSnapshot.primaryBarcode || it.catalogSnapshot.primaryUpc)) ||
+      "",
   }));
 
   // Prefer API when we have an apiKey — single-shot, fewer moving parts.

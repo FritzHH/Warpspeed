@@ -35,7 +35,7 @@
 //     displayName,
 //     accountNumber,    // 10-digit HACN (e.g. "0000115882")
 //     contactEmail,     // HEMA — receives QBP order-reconciliation email
-//     contactName,      // HCTN
+//     contactName,      // HCTN — optional, defaults to "Buyer" in code
 //     shipToID,         // 10-digit HSTO (from /customer ship-to list)
 //     shipViaCode,      // HSVT (e.g. "U4" = UPS Ground)
 //     paymentTerms,     // HTRM (e.g. "N30:I" = Net 30, ACH US)
@@ -43,6 +43,40 @@
 //                       //          false/missing → CSUB=YES + OSOR=YES (live)
 //     shipDateOffsetDays, // optional override for default ship-date (5)
 //   }
+//
+// ┌─────────────────────────────────────────────────────────────────┐
+// │  ONBOARDING INPUTS — what the dealer actually types in Cadence  │
+// │                                                                 │
+// │  ONLY THREE THINGS:                                             │
+// │    1. Account number (the dealer's QBP account; the bare        │
+// │       digits form, e.g. "115882" — also serves as the EFTP      │
+// │       login with leading zeros stripped)                        │
+// │    2. EFTP password                                             │
+// │    3. API1 key (X-QBPAPI-KEY)                                   │
+// │                                                                 │
+// │  Derived from the account number (no user input needed):        │
+// │    - EFTP login (FTP user)     = accountNumber bare digits      │
+// │    - HACN (10-digit, on order) = accountNumber.padStart(10,"0") │
+// │                                                                 │
+// │  Derived via QBP's API1 (no user input needed):                 │
+// │    - contactEmail (HEMA) → returned by GET /customer            │
+// │    - shipToID (HSTO)     → returned by GET /customer            │
+// │      (or its ship-to list endpoint; usually one default)        │
+// │    - shipViaCode (HSVT)  → returned by GET /shipvia (dealer     │
+// │      picks from list, or Cadence picks a sensible default)     │
+// │    - paymentTerms (HTRM) → returned by GET /customer/terms      │
+// │      (dealer picks if multiple; usually one)                    │
+// │    - contactName (HCTN)  → defaults to "Buyer", not asked       │
+// │                                                                 │
+// │  Discovery flow lives in scripts/qbp-eftp-test/1-discover.js    │
+// │  and is the authoritative reference for what calls QBP's API1   │
+// │  needs to make and what fields the dealer must pick from.       │
+// │                                                                 │
+// │  DO NOT add hard guards that throw when these vendorConfig      │
+// │  fields are missing on the assumption the user has to enter     │
+// │  them. They're derivable. The UI populates them automatically   │
+// │  the first time the dealer pastes API1 + account# + EFTP pwd.   │
+// └─────────────────────────────────────────────────────────────────┘
 
 const ftp = require("basic-ftp");
 const crypto = require("node:crypto");

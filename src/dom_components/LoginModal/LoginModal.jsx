@@ -181,8 +181,11 @@ export const LoginModal = forwardRef(function LoginModal(
       message: "Hi " + userObj.first + ", you are not clocked in. Would you like to punch in now?",
       btn1Text: "CLOCK IN",
       btn2Text: "NOT NOW",
-      handleBtn1Press: () => {
-        useLoginStore.getState().setCreateUserClock(userObj.id, new Date().getTime(), "in");
+      handleBtn1Press: async () => {
+        let result = await useLoginStore
+          .getState()
+          .setCreateUserClock(userObj.id, new Date().getTime(), "in");
+        if (!result?.success) throw new Error(result?.error || "Punch failed");
       },
       handleBtn2Press: () => {
         let freshPauseObj = localStorageWrapper.getItem(LOCAL_DB_KEYS.userClockCheckPauseObj) || {};

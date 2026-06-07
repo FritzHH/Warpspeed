@@ -2,18 +2,24 @@ import React, { useState } from "react";
 import { DropdownMenu, TextInput } from "../../../../../dom_components";
 import { C, ICONS, Radius } from "../../../../../styles";
 import { useAlertScreenStore } from "../../../../../stores";
+import { localStorageWrapper } from "../../../../../utils";
 import styles from "./CardReaderManager.module.css";
+
+// Selected reader is per-device (each workstation has its own physical reader),
+// stored in localStorage. Do NOT move this into Firestore settings -- that
+// causes every workstation to overwrite each other's selection on every snapshot.
+const SELECTED_CARD_READER_LS_KEY = "warpspeed_selected_card_reader";
 
 export function CardReaderManager({
   liveReaders = [],
   savedReaders = [],
   onSaveReaders,
-  selectedReader,
-  onSelectReader,
 }) {
   const [sEditingId, _setEditingId] = useState(null);
   const [sLabelDraft, _setLabelDraft] = useState("");
-  const sSelectedReader = selectedReader && selectedReader.id ? selectedReader : null;
+  const [sSelectedReader, _setSelectedReader] = useState(() =>
+    localStorageWrapper.getItem(SELECTED_CARD_READER_LS_KEY)
+  );
 
   let mergedReaders = liveReaders.map((live) => {
     let saved = savedReaders.find((s) => s.id === live.id);
@@ -50,7 +56,8 @@ export function CardReaderManager({
         let updated = savedReaders.filter((s) => s.id !== reader.id);
         onSaveReaders(updated);
         if (sSelectedReader?.id === reader.id) {
-          onSelectReader({ id: "", label: "" });
+          _setSelectedReader(null);
+          localStorageWrapper.removeItem(SELECTED_CARD_READER_LS_KEY);
         }
         useAlertScreenStore.getState().setShowAlert(false);
       },
@@ -201,7 +208,8 @@ export function CardReaderManager({
           onSelect={(item) => {
             if (item.disabled) return;
             let obj = { id: item.id, label: item.rawLabel || "" };
-            onSelectReader(obj);
+            _setSelectedReader(obj);
+            localStorageWrapper.setItem(SELECTED_CARD_READER_LS_KEY, obj);
           }}
         />
       </div>

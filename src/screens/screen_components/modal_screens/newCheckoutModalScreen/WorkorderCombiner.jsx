@@ -187,10 +187,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                 </div>
 
                 {(wo.workorderLines || []).map((line, lineIdx) => {
-                  let name =
-                    line.inventoryItem?.formalName ||
-                    line.inventoryItem?.informalName ||
-                    "Item";
+                  let name = line.inventoryItem?.catalogName || line.inventoryItem?.formalName || "Item";
                   let price = line.inventoryItem?.price || 0;
 
                   let canEdit = isCombined;
@@ -267,7 +264,7 @@ export const WorkorderCombiner = memo(function WorkorderCombiner({
                                 </div>
                               )}
                               <span className={styles.itemName} style={{ color: C.text }}>
-                                {line.inventoryItem?.formalName || name}
+                                {line.inventoryItem?.catalogName || line.inventoryItem?.formalName || name}
                               </span>
                             </div>
                             {line.intakeNotes ? (

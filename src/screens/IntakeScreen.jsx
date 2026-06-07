@@ -555,7 +555,7 @@ const WorkorderDetailFields = ({
 
 const LineItemRow = ({ line, onDelete }) => {
   let inv = line.inventoryItem;
-  let name = inv?.formalName || inv?.informalName || "(custom item)";
+  let name = inv?.catalogName || inv?.formalName || "(custom item)";
   let price = inv?.price || 0;
 
   return (

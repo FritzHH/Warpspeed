@@ -551,12 +551,12 @@ function OrderItemsTable({ items, inventory, orderID }) {
       .filter(
         (inv) =>
           inv &&
-          (inv.formalName || inv.informalName) &&
+          (inv.catalogName || inv.formalName) &&
           Number(inv.price) > 0,
       )
       .map((inv) => ({
         inv,
-        name: inv.formalName || inv.informalName || "",
+        name: inv.catalogName || inv.formalName || "",
       }))
       .sort((a, b) => b.name.length - a.name.length)
       .slice(0, 5);
@@ -966,7 +966,7 @@ function SearchResultRow({
     onQtyChange(String(current + 1));
   }
 
-  const name = inv.formalName || inv.informalName || "(unnamed)";
+  const name = inv.catalogName || inv.formalName || "(unnamed)";
 
   return (
     <div
@@ -1177,9 +1177,11 @@ function OrderItemRow({ item, inventory, orderID, warehouseQty, homeWarehouseCod
     );
   }, [item.scannedBarcode, inventory]);
 
-  const catalogName = String(item.catalogSnapshot?.name || "");
+  const catalogName = String(
+    item.catalogSnapshot?.catalogName || item.catalogSnapshot?.name || "",
+  );
 
-  const storeName = localMatch?.formalName || localMatch?.informalName || "";
+  const storeName = localMatch?.catalogName || localMatch?.formalName || "";
   const primaryName = storeName || catalogName || item.scannedBarcode || "(unknown)";
   const showCatalogSub =
     !!storeName && !!catalogName && storeName !== catalogName;

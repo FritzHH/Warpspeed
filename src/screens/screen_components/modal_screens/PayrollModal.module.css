@@ -97,7 +97,7 @@
 }
 
 .smallLabel {
-  font-size: 9px;
+  font-size: 11px;
   margin-bottom: 1px;
   display: block;
 }
@@ -120,24 +120,27 @@
 
 .userRowText {
   color: var(--text-on-accent);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
   text-align: center;
+}
+
+.userListScroll {
+  width: 100%;
+  flex-shrink: 0;
+  max-height: 35%;
+  overflow-y: auto;
 }
 
 .shortcutRow {
   width: 100%;
   flex-shrink: 0;
   border-radius: var(--radius-control);
-  padding: 5px 0;
+  padding: 7px 0;
   margin-bottom: 3px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--c-blue-lighter);
-}
-
-.shortcutRow.isPayPeriod {
   background-color: var(--c-blue);
 }
 
@@ -147,13 +150,13 @@
 
 .shortcutRowText {
   color: var(--text-on-accent);
-  font-size: 11px;
+  font-size: 14px;
   font-weight: 600;
   text-align: center;
 }
 
 .shortcutRowSubText {
-  font-size: 10px;
+  font-size: 13px;
 }
 
 .divider {
@@ -193,8 +196,18 @@
 
 /* Title/label `display: block` baked into the class so JS doesn't repeat it */
 .blockTitle      { display: block; font-size: 13px; font-weight: 700; margin-bottom: 6px; text-align: center; color: var(--c-text); }
-.blockSection    { display: block; font-size: 9px;  font-weight: 600; margin-bottom: 3px; text-align: center; color: var(--g-50); }
-.blockPayPeriod  { display: block; font-size: 9px;  font-weight: 600; margin-bottom: 2px; text-align: center; color: var(--g-50); }
+.blockSection    { display: block; font-size: 14px; font-weight: 600; margin-bottom: 3px; text-align: center; color: var(--g-50); }
+.blockPayPeriod  { display: block; font-size: 14px; font-weight: 600; margin-bottom: 4px; text-align: center; color: var(--g-50); }
+.blockSpacedTop  { margin-top: 16px; }
+
+.payPeriodBox {
+  width: 100%;
+  flex-shrink: 0;
+  border: 1px solid var(--g-20);
+  border-radius: var(--radius-control);
+  padding: 8px 8px 6px;
+  box-sizing: border-box;
+}
 
 .dropdownGroup {
   width: 100%;
@@ -624,7 +637,7 @@
 }
 
 .payrollDropdownText {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--c-text);
 }
 

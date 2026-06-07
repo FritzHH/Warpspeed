@@ -19,6 +19,13 @@ function formatCents(cents) {
   return (val / 100).toFixed(2);
 }
 
+function formatMillisDate(millis) {
+  let n = Number(millis);
+  if (!n) return "";
+  let d = new Date(n);
+  return d.toLocaleDateString() + "  " + d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
 function checkPageBreak(doc, y, needed, margin) {
   let pageHeight = doc.internal.pageSize.getHeight();
   if (y + needed > pageHeight - margin) {
@@ -82,6 +89,123 @@ function addTotals(doc, y, data, leftX, rightX, L) {
   if ((data.cardFee || 0) > 0) {
     let label = L.cardFee + (data.cardFeePercent ? " (" + data.cardFeePercent + "%)" : "");
     y = addTotalRow(doc, y, label, data.cardFee, leftX, rightX, false);
+  }
+
+  y += 2;
+  y = addTotalRow(doc, y, L.total, data.finalTotal || data.total || 0, leftX, rightX, true);
+  return y;
+}
+
+function addWorkorderHeader(doc, y, wo, leftX, rightX, margin, L) {
+  y = checkPageBreak(doc, y, 40, margin);
+
+  doc.setFontSize(10);
+  doc.setFont("helvetica", "bold");
+  let woLabel = L.workorder;
+  if (wo.workorderNumber) woLabel += " " + formatWorkorderNumber(wo.workorderNumber);
+  doc.text(woLabel, leftX, y);
+  if (wo.status) {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text(wo.status, rightX, y, { align: "right" });
+  }
+  y += 12;
+
+  let bikeParts = [];
+  if (wo.brand) bikeParts.push(wo.brand);
+  if (wo.description) bikeParts.push(wo.description);
+  let colorParts = [wo.color1, wo.color2].filter(Boolean).join(" / ");
+  if (colorParts) bikeParts.push(colorParts);
+  let bikeLine = bikeParts.join(" — ");
+  if (bikeLine) {
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text(bikeLine, leftX, y);
+    y += 10;
+  }
+
+  let dateLine = [];
+  let startedStr = formatMillisDate(wo.startedOnMillis);
+  let finishedStr = formatMillisDate(wo.finishedOnMillis);
+  if (startedStr) dateLine.push(L.started + ": " + startedStr);
+  if (finishedStr) dateLine.push(L.finished + ": " + finishedStr);
+  if (dateLine.length > 0) {
+    doc.setFontSize(7);
+    doc.setTextColor(100, 100, 100);
+    dateLine.forEach((d) => {
+      doc.text(d, leftX, y);
+      y += 9;
+    });
+    doc.setTextColor(0);
+  }
+
+  return y + 2;
+}
+
+function addWorkorderSubtotals(doc, y, wo, leftX, rightX, L) {
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+
+  y = addTotalRow(doc, y, L.subtotal, wo.subtotal || 0, leftX, rightX, false);
+  if ((wo.discount || 0) > 0) {
+    y = addTotalRow(doc, y, L.discount, -(wo.discount || 0), leftX, rightX, false);
+  }
+  y = addTotalRow(doc, y, L.salesTax, wo.tax || 0, leftX, rightX, false);
+  y = addTotalRow(doc, y, L.woSubtotal, wo.total || 0, leftX, rightX, true);
+  return y;
+}
+
+function addWorkorderCustomerNotes(doc, y, wo, leftX, rightX, margin, L) {
+  let notes = wo.customerNotes || [];
+  if (notes.length === 0) return y;
+
+  let contentWidth = rightX - leftX;
+  y = checkPageBreak(doc, y, 24, margin);
+
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "bold");
+  doc.text(L.notesHeader, leftX, y);
+  y += 11;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  notes.forEach((note) => {
+    y = checkPageBreak(doc, y, 12, margin);
+    let noteText = typeof note === "string" ? note : note.value || note.text || note.note || "";
+    if (noteText) {
+      let noteLines = doc.splitTextToSize("• " + noteText, contentWidth - 6);
+      noteLines.forEach((nl) => {
+        doc.text(nl, leftX + 2, y);
+        y += 9;
+      });
+      y += 2;
+    }
+  });
+  return y + 2;
+}
+
+function addSaleTotalBlock(doc, y, data, leftX, rightX, L) {
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  doc.text(L.saleTotal, leftX, y);
+  y += 13;
+
+  doc.setFont("helvetica", "normal");
+  y = addTotalRow(doc, y, L.subtotal, data.runningSubtotal || data.subtotal || 0, leftX, rightX, false);
+
+  if ((data.runningDiscount || data.discount || 0) > 0) {
+    y = addTotalRow(doc, y, L.discount, -(data.runningDiscount || data.discount || 0), leftX, rightX, false);
+  }
+
+  y = addTotalRow(doc, y, L.salesTax, data.runningTax || data.tax || 0, leftX, rightX, false);
+
+  if ((data.cardFee || 0) > 0) {
+    let label = L.cardFee + (data.cardFeePercent ? " (" + data.cardFeePercent + "%)" : "");
+    y = addTotalRow(doc, y, label, data.cardFee, leftX, rightX, false);
+  }
+
+  if ((data.amountPaid || 0) > 0) {
+    y = addTotalRow(doc, y, L.amountPaid, -(data.amountPaid || 0), leftX, rightX, false);
   }
 
   y += 2;
@@ -212,7 +336,9 @@ export function buildSaleReceiptPDF(data, labels) {
     y += 11;
   }
 
-  if (data.workorderNumber) {
+  let workordersArr = Array.isArray(data.workorders) ? data.workorders.filter(Boolean) : [];
+
+  if (workordersArr.length === 0 && data.workorderNumber) {
     doc.text(L.woNumber + ": " + formatWorkorderNumber(data.workorderNumber), leftX, y);
     y += 11;
   }
@@ -220,12 +346,30 @@ export function buildSaleReceiptPDF(data, labels) {
   y += 4;
   y = addDivider(doc, y, leftX, rightX);
 
-  y = addLineItems(doc, data.workorderLines, y, leftX, rightX, margin, true, L);
-  y = addDivider(doc, y, leftX, rightX);
+  if (workordersArr.length > 0) {
+    // Multi-workorder layout: render each WO with its own header, lines, per-WO subtotal block, and notes.
+    workordersArr.forEach((wo) => {
+      y = addWorkorderHeader(doc, y, wo, leftX, rightX, margin, L);
+      y = addLineItems(doc, wo.workorderLines, y, leftX, rightX, margin, true, L);
+      y = addWorkorderSubtotals(doc, y, wo, leftX, rightX, L);
+      y = addWorkorderCustomerNotes(doc, y, wo, leftX, rightX, margin, L);
+      y += 4;
+      y = addDivider(doc, y, leftX, rightX);
+    });
 
-  y = addTotals(doc, y, data, leftX, rightX, L);
-  y += 4;
-  y = addDivider(doc, y, leftX, rightX);
+    // Grand SALE TOTAL block — always shown so the reader sees the final tally separately.
+    y = addSaleTotalBlock(doc, y, data, leftX, rightX, L);
+    y += 4;
+    y = addDivider(doc, y, leftX, rightX);
+  } else {
+    // Legacy single-workorder layout
+    y = addLineItems(doc, data.workorderLines, y, leftX, rightX, margin, true, L);
+    y = addDivider(doc, y, leftX, rightX);
+
+    y = addTotals(doc, y, data, leftX, rightX, L);
+    y += 4;
+    y = addDivider(doc, y, leftX, rightX);
+  }
 
   let payments = data.payments || [];
   if (payments.length > 0) {
@@ -267,7 +411,9 @@ export function buildSaleReceiptPDF(data, labels) {
     y = addDivider(doc, y, leftX, rightX);
   }
 
-  let customerNotes = data.customerNotes || [];
+  // Skip top-level customer notes when multi-WO layout is used — those notes already
+  // rendered inside each per-workorder section.
+  let customerNotes = workordersArr.length > 0 ? [] : (data.customerNotes || []);
   if (customerNotes.length > 0) {
     y = checkPageBreak(doc, y, 30, margin);
     doc.setFontSize(9);

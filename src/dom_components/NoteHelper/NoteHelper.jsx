@@ -185,7 +185,7 @@ export const NoteHelper = forwardRef(function NoteHelper(
         <div className={styles.header} style={{ borderBottomColor: C.buttonLightGreenOutline }}>
           <div className={styles.itemNameRow}>
             <span className={styles.itemName} style={{ fontSize: 13 + fontSizeAdj, color: C.text }}>
-              {workorderLine.inventoryItem?.formalName || workorderLine.inventoryItem?.informalName || "Item"}
+              {workorderLine.inventoryItem?.catalogName || workorderLine.inventoryItem?.formalName || "Item"}
             </span>
             {onViewItem && (
               <button

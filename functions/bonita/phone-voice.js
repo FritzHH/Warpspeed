@@ -333,10 +333,102 @@ exports.phoneVoiceDialAction = onRequest(
   }
 );
 
+// ═══════════════════════════════════════════════════════════════
+// Webhook: phoneVoiceSipOutbound
+// Bound to the SIP Domain "A CALL COMES IN" webhook. Fires when a
+// registered SIP phone (WP810) places an outbound call through
+// Twilio. Replaces the TwiML-Bin approach because static bins
+// can't parse the SIP URI — for SIP-originated calls both
+// {{To}} and {{Called}} expand to the full URI (e.g.
+// `sips:2393369177@bonitabikes.sip.twilio.com:5061`), and dropping
+// that into <Number> makes Twilio interpret the SIPS letters as
+// keypad digits (S=7,I=4,P=7,S=7 → "7477"), prefix them to the
+// real digits, and try to dial Russia (+7477...). Error 13227.
+// ═══════════════════════════════════════════════════════════════
+function parseSipUriUserPart(rawUri) {
+  if (!rawUri) return "";
+  const m = String(rawUri).match(/^sips?:([^@;>]+)@/i);
+  return m ? m[1] : "";
+}
+
+function normalizeDialDigits(userPart) {
+  let s = String(userPart || "").trim();
+  const hasPlus = s.startsWith("+");
+  s = s.replace(/\D/g, "");
+  if (!s) return "";
+  if (hasPlus) return `+${s}`;
+  if (s.length === 11 && s.startsWith("1")) return `+${s}`;
+  if (s.length === 10) return `+1${s}`;
+  return s; // let <Number> reject if invalid
+}
+
+exports.phoneVoiceSipOutbound = onRequest(
+  {
+    region: "us-central1",
+    memory: "256MiB",
+    secrets: [twilioSecretKey],
+  },
+  async (request, response) => {
+    try {
+      if (!validateTwilioSignature(request, twilioSecretKey.value(), "phoneVoiceSipOutbound")) {
+        log("phoneVoiceSipOutbound: invalid Twilio signature");
+        return response.status(403).send(EMPTY_TWIML);
+      }
+
+      const twilioData = request.body || {};
+      const callSid = twilioData.CallSid || "no-sid";
+      const rawTo = String(twilioData.To || "");
+      const rawFrom = String(twilioData.From || "");
+
+      const userPart = parseSipUriUserPart(rawTo);
+      const dialDest = normalizeDialDigits(userPart);
+      const digitsOnly = dialDest.replace(/\D/g, "");
+
+      if (!dialDest || digitsOnly.length < 7) {
+        log("phoneVoiceSipOutbound: unparseable destination", {
+          callSid,
+          rawTo,
+          userPart,
+          dialDest,
+        });
+        return sendTwiML(response, EMPTY_TWIML);
+      }
+
+      // Hardcoded Bonita caller ID. Multi-store SaaS version would
+      // resolve store from the From SIP URI's user-part and read
+      // phone-config/main.outboundCallerID per store.
+      const callerId = "+12393171234";
+
+      log("phoneVoiceSipOutbound: dialing", {
+        callSid,
+        from: rawFrom,
+        rawTo,
+        dialDest,
+        callerId,
+      });
+
+      const VoiceResponse = twilio.twiml.VoiceResponse;
+      const resp = new VoiceResponse();
+      const dial = resp.dial({ callerId, answerOnBridge: true });
+      dial.number(dialDest);
+
+      return sendTwiML(response, resp.toString());
+    } catch (err) {
+      log("phoneVoiceSipOutbound: unexpected error", {
+        error: err.message,
+        stack: err.stack,
+      });
+      return sendTwiML(response, EMPTY_TWIML);
+    }
+  }
+);
+
 // Exported for unit tests.
 exports._internal = {
   parseTimeToMinutes,
   isWithinWindow,
   resolveOpenStatus,
   resolveStoreFromToNumber,
+  parseSipUriUserPart,
+  normalizeDialDigits,
 };

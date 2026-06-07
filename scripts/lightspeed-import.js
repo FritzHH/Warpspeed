@@ -751,7 +751,7 @@ function mapWorkorders(
       const inventoryItem = {
         id: item ? item.itemID : crypto.randomUUID(),
         formalName: item ? (item.description || "Unknown Item") : "Unknown Item",
-        informalName: "",
+        quickButtonLabel: "",
         brand: "",
         price: dollarsToCents(wi.unitPrice),
         salePrice: 0,
@@ -800,7 +800,7 @@ function mapWorkorders(
         inventoryItem: {
           id: crypto.randomUUID(),
           formalName: sanitize((wl.note || "").trim()) || (isLabor ? "Custom Labor" : "Custom Item"),
-          informalName: "",
+          quickButtonLabel: "",
           brand: "",
           price,
           salePrice: 0,
@@ -1176,7 +1176,7 @@ function buildStandaloneWorkorders(sales, salesLinesCSVText, itemsCSVText, custo
       var inventoryItem = {
         id: item ? item.itemID : crypto.randomUUID(),
         formalName: item ? (item.description || "Unknown Item") : "Unknown Item",
-        informalName: "",
+        quickButtonLabel: "",
         brand: "",
         price: priceCents,
         salePrice: 0,
@@ -1285,7 +1285,7 @@ function mapInventory(itemsCSVText) {
     items.push({
       id: primaryBarcode || generateEAN13Barcode(),
       formalName: (item.description || "").trim(),
-      informalName: "",
+      quickButtonLabel: "",
       brand: (item.brand || "").trim(),
       price: dollarsToCents(item.price || "0"),
       salePrice: 0,

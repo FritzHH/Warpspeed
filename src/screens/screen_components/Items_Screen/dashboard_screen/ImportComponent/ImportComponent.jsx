@@ -58,6 +58,10 @@ const ImportComponent = () => {
   const [sWoLookup, _setWoLookup] = useState("2949");
   const [sCustLookup, _setCustLookup] = useState("");
   const [sLookupLoading, _setLookupLoading] = useState(false);
+  const [sInfMigrating, _setInfMigrating] = useState(false);
+  const [sInfMigrateStatus, _setInfMigrateStatus] = useState("");
+  const [sFmlMigrating, _setFmlMigrating] = useState(false);
+  const [sFmlMigrateStatus, _setFmlMigrateStatus] = useState("");
 
   // --- Lightspeed handlers ---
 
@@ -458,8 +462,8 @@ const ImportComponent = () => {
     };
     return rows.map((r) => ({
       id: (r.id || "").trim(),
-      formalName: r.formalName || "",
-      informalName: r.informalName || "",
+      catalogName: r.catalogName || r.formalName || "",
+      quickButtonLabel: r.quickButtonLabel || r.informalName || "",
       brand: r.brand || "",
       category: r.category || "Item",
       price: toNum(r.price),
@@ -587,8 +591,8 @@ const ImportComponent = () => {
       }
       const cols = [
         "id",
-        "formalName",
-        "informalName",
+        "catalogName",
+        "quickButtonLabel",
         "brand",
         "category",
         "price",
@@ -623,6 +627,124 @@ const ImportComponent = () => {
     } catch (e) {
       console.error("[Inventory CSV Download] Error:", e);
       _setLsResult("Download error: " + e.message);
+    }
+  }
+
+  // One-time migration: move informalName -> quickButtonLabel on every inventory
+  // item in zustand + Firestore, then strip the informalName key. Disables the
+  // inventory listener up front so the in-flight rewrites don't get echoed back
+  // mid-batch. dbBatchWrite chunks 200 docs per Firestore batch with a 500ms
+  // gap between batches, which keeps us well under per-second write quotas.
+  async function handleMigrateInformalName() {
+    const inv = useInventoryStore.getState().getInventoryArr() || [];
+    const affected = inv.filter((it) => Object.prototype.hasOwnProperty.call(it, "informalName"));
+    if (!affected.length) {
+      alert("No inventory items have an informalName field. Nothing to migrate.");
+      return;
+    }
+    const ok = window.confirm(
+      "Migrate " + affected.length + " of " + inv.length + " inventory items?\n\n" +
+      "For each item, informalName will be moved into quickButtonLabel (only if " +
+      "quickButtonLabel is empty), and the informalName field will be removed.\n\n" +
+      "The inventory listener will be disabled. Refresh after to restore live sync."
+    );
+    if (!ok) return;
+
+    _setInfMigrating(true);
+    _setInfMigrateStatus("Disabling inventory listener...");
+    try {
+      console.log("[Migrate informalName] disabling inventory listener...");
+      disableListener("inventory");
+
+      // Rebuild every item: collapse informalName into quickButtonLabel and drop the key.
+      // We rewrite ALL items (not just affected) so the local store stays a single
+      // consistent snapshot. dbBatchWrite is only called with affected items to
+      // minimize Firestore writes.
+      const migratedById = {};
+      for (const it of affected) {
+        const next = { ...it };
+        if (!next.quickButtonLabel) next.quickButtonLabel = next.informalName || "";
+        delete next.informalName;
+        migratedById[next.id] = next;
+      }
+      const nextStore = inv.map((it) => migratedById[it.id] || it);
+      const toWrite = Object.values(migratedById);
+
+      console.log("[Migrate informalName] writing " + toWrite.length + " items to Firestore...");
+      _setInfMigrateStatus("Uploading 0 / " + toWrite.length + "...");
+      const result = await dbBatchWrite(toWrite, "inventory", (done, total) => {
+        _setInfMigrateStatus("Uploading " + done + " / " + total + "...");
+      });
+      if (!result.success) throw new Error("dbBatchWrite reported failure");
+
+      console.log("[Migrate informalName] updating zustand...");
+      useInventoryStore.getState().setItems(nextStore);
+
+      _setInfMigrateStatus("Done. Migrated " + toWrite.length + " items. Refresh to restore live sync.");
+      alert("Migrated " + toWrite.length + " items. Refresh the page to restore the inventory listener.");
+    } catch (err) {
+      console.error("[Migrate informalName] Error:", err);
+      _setInfMigrateStatus("Error: " + err.message);
+      alert("Migration error: " + err.message);
+    } finally {
+      _setInfMigrating(false);
+    }
+  }
+
+  // One-time migration: move formalName -> catalogName on every inventory item
+  // in zustand + Firestore, then strip the formalName key. Same shape as
+  // handleMigrateInformalName: disables the inventory listener up front so
+  // in-flight rewrites don't get echoed back mid-batch, then dbBatchWrite
+  // chunks 200 docs per Firestore batch with a 500ms gap between batches.
+  async function handleMigrateFormalName() {
+    const inv = useInventoryStore.getState().getInventoryArr() || [];
+    const affected = inv.filter((it) => Object.prototype.hasOwnProperty.call(it, "formalName"));
+    if (!affected.length) {
+      alert("No inventory items have a formalName field. Nothing to migrate.");
+      return;
+    }
+    const ok = window.confirm(
+      "Migrate " + affected.length + " of " + inv.length + " inventory items?\n\n" +
+      "For each item, formalName will be moved into catalogName (only if " +
+      "catalogName is empty), and the formalName field will be removed.\n\n" +
+      "The inventory listener will be disabled. Refresh after to restore live sync."
+    );
+    if (!ok) return;
+
+    _setFmlMigrating(true);
+    _setFmlMigrateStatus("Disabling inventory listener...");
+    try {
+      console.log("[Migrate formalName] disabling inventory listener...");
+      disableListener("inventory");
+
+      const migratedById = {};
+      for (const it of affected) {
+        const next = { ...it };
+        if (!next.catalogName) next.catalogName = next.formalName || "";
+        delete next.formalName;
+        migratedById[next.id] = next;
+      }
+      const nextStore = inv.map((it) => migratedById[it.id] || it);
+      const toWrite = Object.values(migratedById);
+
+      console.log("[Migrate formalName] writing " + toWrite.length + " items to Firestore...");
+      _setFmlMigrateStatus("Uploading 0 / " + toWrite.length + "...");
+      const result = await dbBatchWrite(toWrite, "inventory", (done, total) => {
+        _setFmlMigrateStatus("Uploading " + done + " / " + total + "...");
+      });
+      if (!result.success) throw new Error("dbBatchWrite reported failure");
+
+      console.log("[Migrate formalName] updating zustand...");
+      useInventoryStore.getState().setItems(nextStore);
+
+      _setFmlMigrateStatus("Done. Migrated " + toWrite.length + " items. Refresh to restore live sync.");
+      alert("Migrated " + toWrite.length + " items. Refresh the page to restore the inventory listener.");
+    } catch (err) {
+      console.error("[Migrate formalName] Error:", err);
+      _setFmlMigrateStatus("Error: " + err.message);
+      alert("Migration error: " + err.message);
+    } finally {
+      _setFmlMigrating(false);
     }
   }
 
@@ -663,8 +785,8 @@ const ImportComponent = () => {
         const price = isTube ? (tubeCost > 600 ? 1878 : 939) : dollarsToCents(stripDollar(item["Price"]));
         const mapped = {
           id,
-          formalName: desc,
-          informalName: "",
+          catalogName: desc,
+          quickButtonLabel: "",
           brand: "",
           price,
           salePrice: 0,
@@ -683,8 +805,8 @@ const ImportComponent = () => {
         }
       }
       skipped.sort((a, b) => {
-        const aName = a.formalName.toLowerCase();
-        const bName = b.formalName.toLowerCase();
+        const aName = a.catalogName.toLowerCase();
+        const bName = b.catalogName.toLowerCase();
         const aIsLabor = aName.includes("labor");
         const bIsLabor = bName.includes("labor");
         const aIsPart = aName.includes("part");
@@ -693,7 +815,7 @@ const ImportComponent = () => {
         const aGroup = aIsLabor ? 0 : aIsPart ? 1 : 2;
         const bGroup = bIsLabor ? 0 : bIsPart ? 1 : 2;
         if (aGroup !== bGroup) return aGroup - bGroup;
-        return a.formalName.localeCompare(b.formalName);
+        return a.catalogName.localeCompare(b.catalogName);
       });
       console.log("[Inventory Import] " + toImport.length + " items to import, " + skipped.length + " skipped (no price), " + missingCodes + " items with no UPC/EAN in source.");
 
@@ -833,8 +955,8 @@ const ImportComponent = () => {
         const retailPrice = invPriceMap[descKey];
         return {
           id: generateEAN13Barcode(),
-          formalName: item.description || "",
-          informalName: "",
+          catalogName: item.description || "",
+          quickButtonLabel: "",
           brand: "",
           price: retailPrice ? dollarsToCents(retailPrice) : dollarsToCents(item.defaultCost),
           salePrice: 0,
@@ -1081,8 +1203,8 @@ const ImportComponent = () => {
         const retailPrice = invPriceMap[descKey];
         return {
           id: generateEAN13Barcode(),
-          formalName: item.description || "",
-          informalName: "",
+          catalogName: item.description || "",
+          quickButtonLabel: "",
           brand: "",
           price: retailPrice ? dollarsToCents(retailPrice) : dollarsToCents(item.defaultCost),
           salePrice: 0,
@@ -1761,8 +1883,8 @@ const ImportComponent = () => {
         const retailPrice = invPriceMap[descKey];
         return {
           id: generateEAN13Barcode(),
-          formalName: item.description || "",
-          informalName: "",
+          catalogName: item.description || "",
+          quickButtonLabel: "",
           brand: "",
           price: retailPrice ? dollarsToCents(retailPrice) : dollarsToCents(item.defaultCost),
           salePrice: 0,
@@ -2203,6 +2325,46 @@ const ImportComponent = () => {
             All inventory items
           </span>
         </button>
+        {/* --- Migrate informalName -> quickButtonLabel --- */}
+        <button
+          type="button"
+          onClick={handleMigrateInformalName}
+          disabled={sInfMigrating}
+          className={styles.cardButton}
+          style={{
+            borderColor: C.orange,
+            backgroundColor: sInfMigrating ? C.surfaceAlt : C.listItemWhite,
+            opacity: sInfMigrating ? 0.5 : 1,
+            marginBottom: 20,
+          }}
+        >
+          <span className={styles.cardButtonTitle} style={{ color: C.orange }}>
+            {sInfMigrating ? (sInfMigrateStatus || "Migrating...") : "Migrate informalName \u2192 quickButtonLabel"}
+          </span>
+          <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
+            Disables inventory listener, batched 200 / 500ms. Refresh to restore.
+          </span>
+        </button>
+        {/* --- Migrate formalName -> catalogName --- */}
+        <button
+          type="button"
+          onClick={handleMigrateFormalName}
+          disabled={sFmlMigrating}
+          className={styles.cardButton}
+          style={{
+            borderColor: C.orange,
+            backgroundColor: sFmlMigrating ? C.surfaceAlt : C.listItemWhite,
+            opacity: sFmlMigrating ? 0.5 : 1,
+            marginBottom: 20,
+          }}
+        >
+          <span className={styles.cardButtonTitle} style={{ color: C.orange }}>
+            {sFmlMigrating ? (sFmlMigrateStatus || "Migrating...") : "Migrate formalName \u2192 catalogName"}
+          </span>
+          <span className={styles.cardButtonSubtitle} style={{ color: C.textMuted }}>
+            Disables inventory listener, batched 200 / 500ms. Refresh to restore.
+          </span>
+        </button>
         <div className={styles.divider} style={{ backgroundColor: C.buttonLightGreenOutline }} />
         {/* --- Lightspeed Connection --- */}
         <span className={styles.sectionTitle} style={{ color: C.text }}>
@@ -2467,10 +2629,10 @@ const ImportComponent = () => {
                 shopContactBlurb: "239-555-0000 | bonitabikes@email.com",
                 thankYouBlurb: "Thank you for choosing Bonita Bikes!",
                 workorderLines: [
-                  { qty: 1, inventoryItem: { formalName: "Brake Pad Set - Shimano 105", price: 3500 }, id: "line1" },
-                  { qty: 2, inventoryItem: { formalName: "Inner Tube 700x25c", price: 800 }, id: "line2" },
-                  { qty: 1, inventoryItem: { formalName: "Chain - KMC X11 Silver", price: 3500 }, id: "line3" },
-                  { qty: 1, inventoryItem: { formalName: "Labor - Full Tune Up", price: 7500 }, id: "line4" },
+                  { qty: 1, inventoryItem: { catalogName: "Brake Pad Set - Shimano 105", price: 3500 }, id: "line1" },
+                  { qty: 2, inventoryItem: { catalogName: "Inner Tube 700x25c", price: 800 }, id: "line2" },
+                  { qty: 1, inventoryItem: { catalogName: "Chain - KMC X11 Silver", price: 3500 }, id: "line3" },
+                  { qty: 1, inventoryItem: { catalogName: "Labor - Full Tune Up", price: 7500 }, id: "line4" },
                 ],
                 customerNotes: ["Customer requested rush service", "Pickup after 5pm"],
                 internalNotes: ["Rear derailleur cable frayed — replaced"],

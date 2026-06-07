@@ -98,8 +98,8 @@ export const InventoryReconciliationModalScreen = ({ handleExit }) => {
     };
   }, []);
 
-  async function applyCandidate(localItem, candidate) {
-    const payload = buildReconciliationUpdate(localItem, candidate);
+  async function applyCandidate(localItem, candidate, alternates = []) {
+    const payload = buildReconciliationUpdate(localItem, candidate, alternates);
     const merged = { ...localItem, ...payload };
     try {
       await dbSaveInventoryItem(merged, merged.id);
@@ -192,13 +192,16 @@ export const InventoryReconciliationModalScreen = ({ handleExit }) => {
               {
                 local: {
                   id: localItem.id,
+                  catalogName: localItem.catalogName,
                   formalName: localItem.formalName,
                   vendorId: localItem.vendorId,
+                  vendorPartId: localItem.vendorPartId,
                   vendorName: localItem.vendorName,
                   cost: localItem.cost,
                   msrp: localItem.msrp,
                   primaryBarcode: localItem.primaryBarcode,
                   barcodes: localItem.barcodes,
+                  alternateVendors: localItem.alternateVendors,
                 },
                 probeStatus: result?.status,
                 candidateCount: result?.candidates?.length || 0,
@@ -243,8 +246,6 @@ export const InventoryReconciliationModalScreen = ({ handleExit }) => {
               itemId: entry.itemId,
               itemKeys: Object.keys(entry.item || {}),
               item: entry.item,
-              specsKeys: entry.specs ? Object.keys(entry.specs) : null,
-              specs: entry.specs,
             },
             null,
             2,
@@ -259,7 +260,13 @@ export const InventoryReconciliationModalScreen = ({ handleExit }) => {
   }
 
   async function handlePickCandidate(reviewEntry, candidate) {
-    const merged = await applyCandidate(reviewEntry.localItem, candidate);
+    // Picked vendor wins; the remaining candidates from OTHER vendors get
+    // serialized into alternateVendors[] so the item carries a cross-UPC
+    // stock pointer even without a future reconciliation pass.
+    const alternates = reviewEntry.candidates.filter(
+      (c) => c.vendorID !== candidate.vendorID,
+    );
+    const merged = await applyCandidate(reviewEntry.localItem, candidate, alternates);
     if (!merged) return;
     _setReview((prev) =>
       prev.filter((r) => r.localItem.id !== reviewEntry.localItem.id),
@@ -428,11 +435,12 @@ function StatChip({ label, value, variant, active, onClick }) {
   );
 }
 
-// Canonical catalog reads: vendor-catalog-*/modes/master.js writes a uniform
-// {id, name, brand, cost (cents), msrp (cents), primaryUpc, allUpcs} shape.
-// pickCost / pickMsrp convert back to dollars strings for UI display.
+// Canonical catalog reads (post 2026-06): vendor-catalog-*/modes/master.js
+// writes {vendorId, vendorPartId, catalogName, brand, cost (cents),
+// msrp (cents), primaryBarcode, barcodes, image_url, category}.
+// Legacy fallback to `name` for any not-yet-reingested docs.
 function pickName(catalogItem) {
-  return String(catalogItem?.name || "");
+  return String(catalogItem?.catalogName || catalogItem?.name || "");
 }
 
 function pickBrand(catalogItem) {
@@ -467,8 +475,7 @@ function ReviewList({ rows, onPick, phase }) {
 function ReviewCard({ entry, onPick }) {
   const [sBusy, _setBusy] = useState(false);
   const local = entry.localItem;
-  const localName =
-    local.formalName || local.informalName || "(unnamed item)";
+  const localName = local.catalogName || local.formalName || "(unnamed item)";
   const codes = getItemCodes(local);
   return (
     <div className={styles.reviewCard}>
@@ -540,7 +547,7 @@ function AppliedList({ rows, phase }) {
     return (
       <div key={localItem.id} className={styles.summaryRow}>
         <span className={styles.summaryItemName}>
-          {localItem.formalName || localItem.informalName || "(unnamed item)"}
+          {localItem.catalogName || localItem.formalName || "(unnamed item)"}
         </span>
         <span className={styles.summaryItemMeta}>
           → {candidate.vendorName}
@@ -567,7 +574,7 @@ function NoMatchList({ rows, phase }) {
     return (
       <div key={item.id} className={styles.summaryRow}>
         <span className={styles.summaryItemName}>
-          {item.formalName || item.informalName || "(unnamed item)"}
+          {item.catalogName || item.formalName || "(unnamed item)"}
         </span>
         <span className={styles.summaryItemMeta}>
           {codes.length === 0
@@ -600,7 +607,7 @@ function SkippedList({ snapshot }) {
   return skippedItems.map((item) => (
     <div key={item.id} className={styles.summaryRow}>
       <span className={styles.summaryItemName}>
-        {item.formalName || item.informalName || "(unnamed item)"}
+        {item.catalogName || item.formalName || "(unnamed item)"}
       </span>
       <span className={styles.summaryItemMeta}>no barcodes</span>
       <span className={styles.summaryBadgeSkipped}>Skipped</span>

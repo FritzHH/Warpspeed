@@ -1,6 +1,6 @@
 const { withFtpClient } = require("../ftp");
 const { initRtdb, MultiPathWriter } = require("../rtdb");
-const { getLastSyncMeta, setLastSyncMeta, shouldSkip } = require("../meta");
+const { setLastSyncMeta } = require("../meta");
 const { createTabParser } = require("../parser");
 
 const REMOTE_FILE = "/inv_loc.txt";
@@ -14,17 +14,6 @@ async function runInventorySync() {
   return await withFtpClient(async (ftpClient) => {
     const remoteModTime = await ftpClient.lastMod(REMOTE_FILE);
     console.log(`[jbi-inventory] remote modTime: ${remoteModTime.toISOString()}`);
-
-    const lastSync = await getLastSyncMeta(db, META_KEY);
-    if (shouldSkip(lastSync, remoteModTime)) {
-      console.log(`[jbi-inventory] skipping - remote unchanged since last sync`);
-      await setLastSyncMeta(db, META_KEY, {
-        ftpModTime: remoteModTime.getTime(),
-        skipped: true,
-        durationSec: (Date.now() - startedAt) / 1000,
-      });
-      return { skipped: true };
-    }
 
     console.log(`[jbi-inventory] wiping ${INVENTORY_PATH}`);
     await db.ref(INVENTORY_PATH).remove();

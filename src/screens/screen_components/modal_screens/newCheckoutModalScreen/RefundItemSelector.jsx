@@ -14,10 +14,7 @@ const RefundItemRow = memo(function RefundItemRow({
   isDisabled,
   onToggle,
 }) {
-  let name =
-    line.inventoryItem?.formalName ||
-    line.inventoryItem?.informalName ||
-    "Unknown Item";
+  let name = line.inventoryItem?.catalogName || line.inventoryItem?.formalName || "Unknown Item";
   let price = line.discountObj?.newPrice != null
     ? line.discountObj.newPrice
     : line.inventoryItem?.price || 0;
@@ -41,7 +38,7 @@ const RefundItemRow = memo(function RefundItemRow({
         isChecked={isSelected || isRefunded}
         onCheck={() => {
           if (!isRefunded && !isDisabled) {
-            dlog(DCAT.CHECKBOX, "toggleItem", "RefundItemSelector", { lineId: line.id, itemName: line.inventoryItem?.formalName || line.inventoryItem?.informalName });
+            dlog(DCAT.CHECKBOX, "toggleItem", "RefundItemSelector", { lineId: line.id, itemName: line.inventoryItem?.catalogName || line.inventoryItem?.formalName });
             onToggle(line);
           }
         }}

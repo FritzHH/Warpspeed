@@ -1,0 +1,168 @@
+QBP POINT-OF-SALE API
+(API1)
+
+Developer Guide
+
+                                                                                                                             1
+Contents
+
+Introduction ................................................................................................................................................ 3
+Authentication ............................................................................................................................................ 3
+Access.......................................................................................................................................................... 3
+Controller Overview.................................................................................................................................... 4
+Response and Request Format (JSON & XML)............................................................................................ 5
+
+   Response Format .................................................................................................................................... 5
+   Request Body Format ............................................................................................................................. 6
+Versioning ................................................................................................................................................... 6
+Product Images ........................................................................................................................................... 6
+
+                                                                                                                             2
+Introduction
+
+QBP'S Point-of-Sale (POS) API (AKA "API1") is a RESTful service that provides partner developers
+with product content from QBP. The intended use is to periodically query the POS API to gather
+product information and store the data in the partner database.
+
+Data that is provided from the POS API is not highly structured. This gives developers the freedom
+(and responsibility) to organize the raw data provided by the POS API in a database in whatever way
+works best for individual implementation. The data can be split up into several tables in a highly
+relational schema or used in a more document-oriented approach.
+
+This document provides an overview of the POS API from a developer's perspective, providing
+guidance on its proper and effective use. Low-level documentation of each endpoint within the POS
+API is provided through Swagger UI. It can currently be used as a web-based REST client (this feature
+may be removed in the future), or the parameters can be used in any REST client (such as Postman).
+
+Documentation Site (Swagger UI): https://api1.qbp.com/api/login
+*Secondary authentication is required after initial successful login.
+Development/QA Base URL: https://api.qbp.com/api/1/
+Production Base URL: https://api1.qbp.com/api/1/
+
+NOTE: Occasionally, Swagger will not log out properly and the user will see this the next time they try to
+log in:
+
+To force a correct logout, copy and paste https://api1.qbp.com/api/logout into the browser address bar
+and hit enter.
+
+Authentication
+
+All POS API endpoints are secured. To authenticate, an API Key must be provided in the request
+header for each call to the API. The header field name is X-QBPAPI-KEY and its value is the API1 API
+Key provided by QBP.
+
+Access
+
+The POS API is free.
+Request Account API Key by reaching out to salesandserviceoperations@qbp.com.
+
+                                                                                                                             3
+Controller Overview
+
+The POS API was designed with a wide set of use cases, and as such contains many options for
+retrieving and organizing product data. Typically, retailers will refine their product categories, and call
+combinations of endpoints that deliver the product data and availability most specific to them in the
+most efficient way possible. However the solution is designed, QBP recommends maintaining a local
+database of product information, updating details periodically, and updating inventory hourly.
+What follows is a list of available controllers, their method, description, and suggestions for best use.
+
+    · Brand controller
+Each Product also resides within a brand sub-object; all products belonging to the same Brand will
+offer the same brand information.
+
+GET /1/brand returns the entire list of IDs and names for the brands supported by QBP. This call is
+intended to support retailers that stock a specific set of brands; obtaining and using a list of brand ID's
+to pull applicable product lists from GET /1/product/brand/id/{id}. POST /1/brand /id and GET
+/1/brand/id/{id} are included in this controller, but offer little additional value.
+
+    · Customer controller
+Requests in the customer controller category return information from the QBP account associated to
+the API key in use. They are most commonly used to retrieve invoices, especially for Lightspeed
+subscribers who can use the integration to pull invoice data into Lightspeed for automatic inventory
+reconciliation. If any response details are incorrect, they can be updated at
+qbp.com/qbponlinestorefront/; QBP Customer Service can also assist.
+
+    · Product Availability controller
+Product Availability requests query inventory by collection of SKUs, per SKU or by specified
+distribution center. GET /1/availability/warehouse/{warehouseCode} is most frequently called of the
+three options.
+
+    · Product Category controller
+This endpoint provides a list of all product categories. Each category has a parent category (except for
+the root) and child categories (except for leaf categories) that form a category hierarchy tree. The
+category tree represents how QBP organizes the products. Product Detail contains a category code
+for codes that the product belongs to. The category tree will contain empty categories if the account
+does not have access to any of the products belonging to that category. For this reason, "pruning"
+category trees based on the products in the account database is recommended. GET /1/category is
+the most used of the three options in this controller.
+
+    · Product controller
+Product requests are the most common of all the queries sent through the POS API, particularly GET
+/1/product/sku/{sku} which offers the most parameters for query refinement, and delivers product
+information for a specific SKU, including availability by warehouse.
+
+                                                                                                                             4
+Bullet Points are optional in the product response. They exist at both the Model and Product level.
+When listed at the model level, the list of zero to many bullet points apply to every product belonging
+to the model family. Bullet points that are unique to the product are housed at the product level. To
+obtain a complete list of all the bullet points relating to a product, combine model and product bullet
+points.
+
+The Product object can also contain lists of other related product codes grouped by:
+Substitutes: Products than can be used in place of the current product.
+Supersedes: Products that have replaced the current product.
+SmallParts: Related small part products.
+SeeAlsos: Similar products.
+Recommendations: Related recommended products.
+
+Note: Due to the delivery method of the model information from QBP's Product Information
+Management (PIM) software, GET /1/product/modellist is known to contain irrelevant model IDs; if
+an ID in the productModelListResponse does not return data when passed through POST /1/model/id
+or POST /1/model/id/{id}, it is junk data and should be ignored.
+
+    · Product Model controller
+The Product object contains a sub-object named model. A Model is grouping of related products ­
+such as a size run or color variations. The Model response offers more information about its child
+products and is identical for all products sharing the same Model.
+
+Product Model responses deliver product details within the model ID's passed in the request. Retailers
+can use the response to periodically update their product databases with the models they carry, then
+regularly call the availability operations against the SKUs identified, for inventory updates. For this
+reason POST /1/model/id is one of three most regularly called requests offered by API1. See note in
+Product controller for further information about empty data returned in this response.
+
+    · SKU controller
+GET /1/product/skulist delivers all product SKUs available at QBP, while GET /2/product/skulist filters
+the list to remove discontinued and restricted items. GET /1/product/skulist is the most commonly
+used of the two.
+
+Response and Request Format (JSON & XML)
+
+JSON is the recommended format for API1 requests (POST bodies) and responses; however, both
+JSON and XML are fully supported.
+
+Response Format
+Use an Accept header on the request with a value of either application/json, or application/xml to
+specify how the response is formatted.
+
+                                                                                                                             5
+Request Body Format
+Some endpoints are used to post parameters as a body of the request. Use a Content-Type header on
+the request with a value of either application/json, or application/xml to indicate how the POST body
+is formatted. Examples of the request and response formats of both types can be found in the test
+harness.
+
+Versioning
+
+Occasionally, QBP will make use of versioning to give end users time to code to new endpoints before
+deprecating old functionality. It is recommended that where a higher numbered operation is
+available, that one is used.
+
+Product Images
+
+Product Images are available with a subscription to the Content License Service (CLS) API. Each
+Product detail response contains at least one image file name. QBP recommends fetching image files
+with each larger product refresh request.
+
+                                                                                                                             6
+

@@ -4363,12 +4363,12 @@ exports.lightspeedImportData = onCall(
       const mapped = [];
       for (const item of lsActive) {
         const price = Math.round(parseFloat(item.defaultCost || "0") * 100); // dollars to cents
-        const formalName = item.description || "";
-        const isLabor = formalName.toLowerCase().includes("labor");
+        const catalogName = item.description || "";
+        const isLabor = catalogName.toLowerCase().includes("labor");
 
         mapped.push({
-          formalName,
-          informalName: "",
+          catalogName,
+          quickButtonLabel: "",
           brand: "",
           price: 0,
           salePrice: 0,
@@ -6378,7 +6378,7 @@ function findHighestItem(workorderLines) {
     const lineTotal = (Number(line.qty) || 1) * (Number(line.inventoryItem?.price) || 0);
     if (lineTotal > highestPrice) {
       highestPrice = lineTotal;
-      highestName = line.inventoryItem?.formalName || line.inventoryItem?.informalName || "";
+      highestName = line.inventoryItem?.catalogName || line.inventoryItem?.formalName || "";
     }
   });
   return { highestName, highestPrice };
@@ -6567,6 +6567,7 @@ async function completeSaleServerSide({
   // Workorder stays in open-workorders after link-to-pay completion (not archived to completed-workorders).
   let allLines = [];
   let primaryWO = null;
+  let allWorkorders = [];
   for (const woID of workorderIDs) {
     const woSnap = await db.collection("tenants").doc(tenantID)
       .collection("stores").doc(storeID)
@@ -6575,6 +6576,7 @@ async function completeSaleServerSide({
     if (woSnap.exists) {
       const wo = woSnap.data();
       if (!primaryWO) primaryWO = wo;
+      allWorkorders.push(wo);
       allLines = [...allLines, ...(wo.workorderLines || [])];
     }
   }
@@ -6598,7 +6600,7 @@ async function completeSaleServerSide({
         customerLandline: customer?.customerLandline || "",
         email: customer?.email || primaryWO?.customerEmail || "",
       };
-      const printObj = sharedPrintBuilder.sale(sale, allTransactions, customerForPrint, primaryWO, sale.salesTaxPercent || 0, printContext, [...(sale.creditsApplied || []), ...(sale.depositsApplied || [])]);
+      const printObj = sharedPrintBuilder.sale(sale, allTransactions, customerForPrint, allWorkorders.length > 0 ? allWorkorders : primaryWO, sale.salesTaxPercent || 0, printContext, [...(sale.creditsApplied || []), ...(sale.depositsApplied || [])]);
       printObj.id = crypto.randomUUID();
       printObj.timestamp = Date.now();
 
@@ -7033,7 +7035,7 @@ exports.createTextToPayInvoice = onCall(
           const qty = Number(line.qty) || 1;
           const price = Number(line.inventoryItem?.price) || 0;
           return {
-            itemName: line.inventoryItem?.formalName || line.inventoryItem?.informalName || "",
+            itemName: line.inventoryItem?.catalogName || line.inventoryItem?.formalName || "",
             qty,
             price,
             finalPrice: line.discountObj?.newPrice || price * qty,
@@ -7660,12 +7662,15 @@ exports.submitQbpOrderCallable = _submitQbpOrder.submitQbpOrderCallable;
 const _qbpResponsePollerBonita = require("./bonita/qbp-response-poller");
 exports.qbpResponsePollerBonita = _qbpResponsePollerBonita.qbpResponsePollerBonita;
 
-// ── Phone voice webhooks — Bonita inbound calls ───────────────────────
-// `phoneVoiceInbound` is the Twilio "A CALL COMES IN" webhook.
-// `phoneVoiceDialAction` is the action callback on the <Dial> block.
+// ── Phone voice webhooks — Bonita inbound + outbound ──────────────────
+// `phoneVoiceInbound` — Twilio number "A CALL COMES IN" webhook.
+// `phoneVoiceDialAction` — action callback on the <Dial> block.
+// `phoneVoiceSipOutbound` — SIP Domain "A CALL COMES IN" webhook
+// (fires when a registered SIP phone places an outbound call).
 const _phoneVoice = require("./bonita/phone-voice");
 exports.phoneVoiceInbound = _phoneVoice.phoneVoiceInbound;
 exports.phoneVoiceDialAction = _phoneVoice.phoneVoiceDialAction;
+exports.phoneVoiceSipOutbound = _phoneVoice.phoneVoiceSipOutbound;
 
 } // ─── end of if (DEPLOY_TARGET === "bonita") ───
 

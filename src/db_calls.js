@@ -448,7 +448,7 @@ export async function firestoreCatalogRead(path) {
 /**
  * Run a query against the cadence-pos vendor-catalog Firestore.
  * Mirrors firestoreQuery's signature; used for UPC reverse-lookups via
- * `where("allUpcs", "array-contains", scanned)` and for bounded sample reads.
+ * `where("barcodes", "array-contains", scanned)` and for bounded sample reads.
  * @param {string} collectionPath - e.g. `vendor_catalogs/jbi/items_by_id`
  * @param {Array<{field,operator,value}>} whereClauses
  * @param {{orderBy?:{field,direction?:string}, limit?:number}} options

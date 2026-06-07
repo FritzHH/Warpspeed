@@ -36,7 +36,7 @@ import {
 } from "../../../../stores";
 import { lightenRGBByPercent, formatCurrencyDisp, log, printBuilder, replaceOrAddToArr, formatPhoneWithDashes, formatPhoneForDisplay, findTemplateByType, resolveStatus, usdTypeMask, generateEAN13Barcode, createNewWorkorder, localStorageWrapper, getPrinterStatus } from "../../../../utils";
 import { WORKORDER_ITEM_PROTO, WORKORDER_PROTO, CONTACT_RESTRICTIONS, RECEIPT_TYPES, RECEIPT_PROTO, CUSTOMER_LANGUAGES, TRANSACTION_PROTO, CREDIT_APPLIED_PROTO, CUSTOMER_DEPOST_TYPES, CUSTOMER_DEPOSIT_PROTO, TAB_NAMES, CUSTOMER_PROTO } from "../../../../data";
-import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer, dbDeleteWorkorder } from "../../../../db_calls_wrapper";
+import { dbSavePrintObj, dbGetCompletedWorkorder, dbSaveCustomer, dbGetCompletedSale, dbGetCustomer, dbSoftDeleteWorkorder } from "../../../../db_calls_wrapper";
 import { takeId, getId } from "../../../../idPool";
 import {
   createNewSale,
@@ -106,7 +106,7 @@ function broadcastSaleToDisplay(sale, combinedWOs, customerFirst, customerLast, 
     id: line.id,
     qty: line.qty,
     inventoryItem: {
-      formalName: line.inventoryItem?.formalName || "",
+      formalName: line.inventoryItem?.catalogName || line.inventoryItem?.formalName || "",
       price: line.inventoryItem?.price || 0,
     },
     discountObj: line.discountObj
@@ -685,7 +685,7 @@ export function NewCheckoutModalScreen() {
 
   // ─── Inventory Item Management ────────────────────────────
   function handleAddItem(invItem) {
-    dlog(DCAT.BUTTON, "handleAddItem", "CheckoutModal", { itemID: invItem?.id, itemName: invItem?.formalName, price: invItem?.price });
+    dlog(DCAT.BUTTON, "handleAddItem", "CheckoutModal", { itemID: invItem?.id, itemName: invItem?.catalogName || invItem?.formalName, price: invItem?.price });
     let primaryWO = sCombinedWorkorders[0];
     if (!primaryWO) return;
     const { _score, ...cleanItem } = invItem;
@@ -1222,8 +1222,10 @@ export function NewCheckoutModalScreen() {
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
 
     // Build the sale receipt — it computes popCashRegister and cashChangeGiven
-    let woForReceipt = primaryWO || { workorderLines: [], taxFree: false };
-    let saleReceipt = printBuilder.sale(sale, localTxns, customerForReceipt, woForReceipt, settings?.salesTaxPercent, _ctx, localCreds);
+    let workordersForReceipt = sCombinedWorkorders.length > 0
+      ? sCombinedWorkorders
+      : [{ workorderLines: [], taxFree: false }];
+    let saleReceipt = printBuilder.sale(sale, localTxns, customerForReceipt, workordersForReceipt, settings?.salesTaxPercent, _ctx, localCreds);
     log("Receipt object (sale complete):", JSON.stringify(saleReceipt, null, 2));
 
     // Translate receipt if non-English language is set
@@ -1352,8 +1354,10 @@ export function NewCheckoutModalScreen() {
       const settings = useSettingsStore.getState().getSettings();
       const printerID = localStorageWrapper.getItem("selectedPrinterID") || "";
       const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-      let woForReceipt = primaryWO || { workorderLines: [], taxFree: false };
-      let saleReceipt = printBuilder.sale(sSale, sTransactions, customerForReceipt, woForReceipt, settings?.salesTaxPercent, _ctx, sCredits);
+      let workordersForReceipt = sCombinedWorkorders.length > 0
+        ? sCombinedWorkorders
+        : [{ workorderLines: [], taxFree: false }];
+      let saleReceipt = printBuilder.sale(sSale, sTransactions, customerForReceipt, workordersForReceipt, settings?.salesTaxPercent, _ctx, sCredits);
       // log("Receipt object (partial/reprint):", JSON.stringify(saleReceipt, null, 2));
       return { saleReceipt, customerForReceipt, primaryWO, settings, printerID };
     }
@@ -1450,17 +1454,24 @@ export function NewCheckoutModalScreen() {
       });
       return;
     }
-    // Standalone: no money captured (or fully refunded) — clean up Firestore, keep workorder local
-    if (isStandalone && !(sSale?.amountCaptured > 0)) {
+    // Standalone: no money captured (or fully refunded) — clean up Firestore, keep workorder local.
+    // Gate on the local sCombinedWorkorders set (every WO truly standalone) rather than
+    // zOpenWorkorder, which can drift to null mid-modal-life and misfire the hard delete on
+    // customer-attached WOs. Per-WO customerID guard inside the loop is belt-and-suspenders.
+    const allStandalone =
+      sCombinedWorkorders.length > 0 &&
+      sCombinedWorkorders.every((wo) => !wo.customerID);
+    if (allStandalone && !(sSale?.amountCaptured > 0)) {
       if (sSale?.id && salePersistedRef.current) {
         deleteActiveSale(sSale.id);
       }
       let woStore = useOpenWorkordersStore.getState();
       for (let wo of sCombinedWorkorders) {
+        if (wo.customerID) continue;
         let current = woStore.workorders.find((w) => w.id === wo.id);
         if (current) {
           woStore.setWorkorder({ ...current, activeSaleID: "", saleID: "" }, false);
-          dbDeleteWorkorder(wo.id);
+          dbSoftDeleteWorkorder(wo.id);
         }
       }
       resetAndClose();
@@ -1533,7 +1544,7 @@ export function NewCheckoutModalScreen() {
     let stripeStore = useStripePaymentStore.getState();
     // If reader is waiting for a card, cancel the payment on the terminal
     if (stripeStore.cardStatus === "waitingForCard" || stripeStore.cardStatus === "initiating") {
-      let savedReader = useSettingsStore.getState().getSettings()?.selectedCardReaderObj;
+      let savedReader = localStorageWrapper.getItem("warpspeed_selected_card_reader");
       if (savedReader?.id) {
         newCheckoutCancelStripePayment(savedReader.id).catch((err) => log("clearReader on close error:", err));
       }
@@ -1577,11 +1588,14 @@ export function NewCheckoutModalScreen() {
       ? { first: primaryWO.customerFirst || "", last: primaryWO.customerLast || "", customerCell: primaryWO.customerCell || "", email: primaryWO.customerEmail || "", id: primaryWO.customerID || "" }
       : { first: zCustomer?.first || "", last: zCustomer?.last || "", customerCell: zCustomer?.customerCell || "", email: zCustomer?.email || "", id: zCustomer?.id || "" };
     const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings: zSettings };
+    let workordersForReceipt = sCombinedWorkorders.length > 0
+      ? sCombinedWorkorders
+      : [{ workorderLines: [], taxFree: false }];
     let toPrint = printBuilder.sale(
       sSale,
       sTransactions,
       customer,
-      primaryWO || { workorderLines: [], taxFree: false },
+      workordersForReceipt,
       zSettings?.salesTaxPercent,
       _ctx,
       sCredits
@@ -1623,8 +1637,11 @@ export function NewCheckoutModalScreen() {
       if (canSMS || canEmail) {
         const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
         let woForReceipt = primaryWO || { workorderLines: [], taxFree: false };
-        let receipt = printBuilder.sale(sSale, sTransactions, customerForReceipt, woForReceipt, settings?.salesTaxPercent, _ctx, sCredits);
-        sendSaleReceipt(sSale, customerForReceipt, woForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, null, null, getTranslateCode(sReceiptLanguage), sTransactions, sCredits);
+        let workordersForReceipt = sCombinedWorkorders.length > 0
+          ? sCombinedWorkorders
+          : [woForReceipt];
+        let receipt = printBuilder.sale(sSale, sTransactions, customerForReceipt, workordersForReceipt, settings?.salesTaxPercent, _ctx, sCredits);
+        sendSaleReceipt(sSale, customerForReceipt, workordersForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, null, null, getTranslateCode(sReceiptLanguage), sTransactions, sCredits);
         _setReceiptSentOverlay({ sentSMS: !!canSMS, sentEmail: !!canEmail });
       }
     } else {
@@ -1653,8 +1670,10 @@ export function NewCheckoutModalScreen() {
     let canSMS = phone && smsContent.trim();
     let canEmail = email && emailContent.trim();
     if (canSMS || canEmail) {
-      let woForReceipt = primaryWO || { workorderLines: [], taxFree: false };
-      await sendSaleReceipt(sSale, customerForReceipt, woForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, null, null, getTranslateCode(sReceiptLanguage), sTransactions, sCredits);
+      let workordersForReceipt = sCombinedWorkorders.length > 0
+        ? sCombinedWorkorders
+        : [{ workorderLines: [], taxFree: false }];
+      await sendSaleReceipt(sSale, customerForReceipt, workordersForReceipt, settings, canSMS ? smsTemplate : null, canEmail ? emailTemplate : null, null, null, getTranslateCode(sReceiptLanguage), sTransactions, sCredits);
       _setReceiptSentOverlay({ sentSMS: !!canSMS, sentEmail: !!canEmail });
     }
     _sSetShowSendReceiptModal(false);
@@ -1671,10 +1690,12 @@ export function NewCheckoutModalScreen() {
       ? { first: zCustomer?.first || "", last: zCustomer?.last || "", customerCell: zCustomer?.customerCell || "", email: zCustomer?.email || "", id: zCustomer?.id || "" }
       : { first: primaryWO.customerFirst || "", last: primaryWO.customerLast || "", customerCell: primaryWO.customerCell || "", email: primaryWO.customerEmail || "", id: primaryWO.customerID || "" };
     let _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
-    let wo = (isDeposit || !primaryWO) ? { workorderLines: [], taxFree: false } : primaryWO;
+    let workordersForReceipt = (isDeposit || sCombinedWorkorders.length === 0)
+      ? [{ workorderLines: [], taxFree: false }]
+      : sCombinedWorkorders;
     let paymentsForReceipt = payment ? [payment] : sTransactions;
     let creditsForReceipt = payment ? [] : sCredits;
-    let receipt = printBuilder.sale(sSale, paymentsForReceipt, customer, wo, settings?.salesTaxPercent, _ctx, creditsForReceipt);
+    let receipt = printBuilder.sale(sSale, paymentsForReceipt, customer, workordersForReceipt, settings?.salesTaxPercent, _ctx, creditsForReceipt);
     if (payment) {
       receipt.transactionOnly = true;
       receipt.popCashRegister = false;

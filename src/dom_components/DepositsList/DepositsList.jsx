@@ -73,6 +73,14 @@ export const DepositsList = forwardRef(function DepositsList(
                 >
                   {isGiftCard ? "Gift Card" : isCredit ? "Credit" : "Deposit"}
                 </span>
+                {item.refunded && (
+                  <span
+                    className={styles.badge}
+                    style={{ backgroundColor: lightenRGBByPercent(C.lightred, 70), color: C.lightred }}
+                  >
+                    Refunded
+                  </span>
+                )}
                 {!!noteText && (
                   <span className={styles.noteText} style={{ color: C.textMuted }}>
                     {noteText}
@@ -84,15 +92,29 @@ export const DepositsList = forwardRef(function DepositsList(
               </span>
             </div>
             <div className={styles.rowRight}>
-              <span className={styles.amount} style={{ color: C.text }}>
-                {"$" + formatCurrencyDisp(item.amountCents)}
-              </span>
-              {(item.reservedCents || 0) > 0 && (
+              {item.refunded ? (
+                <>
+                  <span
+                    className={styles.amount}
+                    style={{ color: C.textMuted, textDecoration: "line-through" }}
+                  >
+                    {"$" + formatCurrencyDisp(item.amountCents)}
+                  </span>
+                  <span className={styles.amount} style={{ color: C.text }}>
+                    $0
+                  </span>
+                </>
+              ) : (
+                <span className={styles.amount} style={{ color: C.text }}>
+                  {"$" + formatCurrencyDisp(item.amountCents)}
+                </span>
+              )}
+              {!item.refunded && (item.reservedCents || 0) > 0 && (
                 <span className={styles.reservedText} style={{ color: C.orange }}>
                   In use: {"$" + formatCurrencyDisp(item.reservedCents)}
                 </span>
               )}
-              {(item.reservedCents || 0) > 0 && item.amountCents > item.reservedCents && (
+              {!item.refunded && (item.reservedCents || 0) > 0 && item.amountCents > item.reservedCents && (
                 <span className={styles.availableText} style={{ color: C.green }}>
                   Available: {"$" + formatCurrencyDisp(item.amountCents - item.reservedCents)}
                 </span>

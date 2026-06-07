@@ -1806,7 +1806,6 @@ export async function dbSavePrintObj(printObj, printerID) {
     let cleanedPrintObj = removeEmptyFields(printObj);
 
     let stringifiedPrintObj = stringifyAllObjectFields(cleanedPrintObj);
-    log("dbSavePrintObj:", JSON.stringify(stringifiedPrintObj, null, 2));
 
     const result = await firestoreWrite(path, stringifiedPrintObj);
 
@@ -2041,69 +2040,6 @@ export async function dbGetWorkorder(workorderID) {
 }
 
 // deleters ////////////////////////////////////////////////////////////////////
-
-/**
- * Delete workorder from Firestore by ID
- * @param {string} workorderID - Workorder ID (required)
- * @returns {Promise<Object>} Delete result
- */
-export async function dbDeleteWorkorder(workorderID) {
-  try {
-    const { tenantID, storeID } = getTenantAndStore();
-
-    if (!tenantID || !storeID) {
-      log(
-        "Error: tenantID and storeID are not configured for dbDeleteWorkorder"
-      );
-      return {
-        success: false,
-        error: "Configuration Error",
-        message:
-          "tenantID and storeID are not configured. Please check your settings.",
-        workorderID: null,
-        tenantID,
-        storeID,
-      };
-    }
-
-    if (!workorderID) {
-      log("Error: workorderID is required for dbDeleteWorkorder");
-      return {
-        success: false,
-        error: "Validation Error",
-        message: "workorderID is required for dbDeleteWorkorder",
-        workorderID: null,
-        tenantID,
-        storeID,
-      };
-    }
-
-    const path = buildWorkorderPath(tenantID, storeID, workorderID);
-    log(`Deleting workorder from path: ${path}`);
-
-    await firestoreDelete(path);
-
-    log(`Successfully deleted workorder with ID: ${workorderID}`);
-    return {
-      success: true,
-      message: "Workorder deleted successfully",
-      workorderID,
-      tenantID,
-      storeID,
-      path,
-    };
-  } catch (error) {
-    log("Error in dbDeleteWorkorder:", error);
-    return {
-      success: false,
-      error: "Database Error",
-      message: "An error occurred while deleting the workorder",
-      workorderID: null,
-      tenantID: null,
-      storeID: null,
-    };
-  }
-}
 
 export async function dbSoftDeleteWorkorder(workorderID) {
   try {
@@ -4985,10 +4921,11 @@ export async function dbSaveSubscriptionField(fieldName, fieldVal) {
 //     └── one doc per scan, written granularly (no full-order rewrite per scan)
 //
 // Catalogs are hosted on cadence-pos at the GLOBAL root (not tenant-scoped):
-//   Firestore  vendor_catalogs/{vendorID}/items_by_id/{itemId}    ← master doc
-//              └── canonical item; allUpcs[] holds every barcode, specs[] is
-//                  folded inline. UPC lookups use array-contains over allUpcs;
-//                  no separate reverse-index collection.
+//   Firestore  vendor_catalogs/{vendorID}/items_by_id/{vendorPartId} ← master
+//              doc, keyed by the vendor's own SKU.
+//              └── canonical item; barcodes[] holds every UPC. UPC lookups use
+//                  array-contains over barcodes; no separate reverse-index
+//                  collection.
 //   RTDB       vendor_catalogs/{vendorID}/inventory_by_item/{itemId}: { WH: qty }
 //              └── per-item warehouse map; sparse — missing key = zero stock at
 //                  that warehouse, missing item node = no inventory data at all.
@@ -5094,7 +5031,8 @@ export async function checkInventoryAcrossWarehouses(
 
 // Read a small sample of items from a vendor catalog. Diagnostic-only;
 // used to inspect catalog field shape before wiring it into reconciliation /
-// resolver code. Specs are now folded into each item doc - no separate fetch.
+// resolver code. Canonical catalog shape no longer carries specs (dropped
+// from the master mappers 2026-06).
 export async function dbSampleVendorCatalog(vendorId, count = 3) {
   if (!vendorId) return [];
   const vendor = VENDOR_CATALOGS.find((v) => v.id === vendorId);
@@ -5105,7 +5043,7 @@ export async function dbSampleVendorCatalog(vendorId, count = 3) {
     [],
     { limit: count },
   );
-  return items.map((item) => ({ itemId: item.id, item, specs: item.specs || null }));
+  return items.map((item) => ({ itemId: item.id, item }));
 }
 
 function buildVendorOrderPath(tenantID, storeID, orderID) {
@@ -5339,7 +5277,7 @@ export async function dbResolveOrderItem(orderID, item) {
       ? VENDOR_CATALOGS.find((v) => v.displayName === localMatch.vendorName)
       : null;
     if (localMatch && hintVendor) {
-      const localDisplay = localMatch.formalName || localMatch.informalName || "";
+      const localDisplay = localMatch.catalogName || localMatch.formalName || "";
       await dbUpdateVendorOrderItemFields(orderID, item.id, {
         lookupStatus: "matched",
         vendorCatalogID: hintVendor.id,
@@ -5369,7 +5307,7 @@ export async function dbResolveOrderItem(orderID, item) {
         try {
           const hits = await firestoreCatalogQuery(
             `${vendor.catalogPath}/items_by_id`,
-            [{ field: "allUpcs", operator: "array-contains", value: scanned }],
+            [{ field: "barcodes", operator: "array-contains", value: scanned }],
             { limit: 1 },
           );
           if (hits.length === 0) return { vendor, match: null };
@@ -5384,7 +5322,9 @@ export async function dbResolveOrderItem(orderID, item) {
 
     const hits = results.filter((r) => r.match);
 
-    const pickName = (m) => String(m?.name || "");
+    // Catalog now ships catalogName (was `name` pre-2026-06). Fall back so
+    // already-resolved-but-not-yet-displayed line items still render.
+    const pickName = (m) => String(m?.catalogName || m?.name || "");
 
     // 3. Resolve
     let update;
@@ -5427,8 +5367,7 @@ export async function dbResolveOrderItem(orderID, item) {
 // Search key = primaryBarcode plus every entry in barcodes[], deduped.
 // For each queryable VENDOR_CATALOGS entry (catalogPath set), one Firestore
 // `array-contains-any` query over the local codes returns every catalog item
-// whose allUpcs intersects ours. Specs are read from each match's `specs`
-// field (folded into the doc during master ingest).
+// whose barcodes intersect ours.
 //
 // Buckets returned to the caller:
 //   • matched   — exactly one vendor has any hit. Auto-applicable.
@@ -5439,8 +5378,11 @@ export async function dbResolveOrderItem(orderID, item) {
 // This function does NOT write. Use buildReconciliationUpdate() + apply via
 // dbSaveInventoryItem() to commit a chosen candidate.
 
+// Canonical catalog shape (post 2026-06): catalogName / barcodes / image_url.
+// Legacy fallbacks (name / allUpcs / imageUrl) kept so the helpers stay
+// correct against any docs that haven't been re-ingested yet.
 function pickCatalogName(catalogItem) {
-  return String(catalogItem?.name || "");
+  return String(catalogItem?.catalogName || catalogItem?.name || "");
 }
 
 function pickCatalogBrand(catalogItem) {
@@ -5461,22 +5403,25 @@ function pickCatalogMsrp(catalogItem) {
 }
 
 function pickCatalogImageUrl(catalogItem) {
-  const raw = catalogItem?.imageUrl;
+  const raw = catalogItem?.image_url ?? catalogItem?.imageUrl;
   return typeof raw === "string" ? raw.trim() : "";
 }
 
-// Canonical catalog shape doesn't carry vendor-side modification time
-// (paring kept it lean). Snapshot time at reconcile time is the best we have;
-// stale-detection can come back later by adding `lastUpdated` to canonical
-// shape and populating it in vendor-catalog-*/modes/master.js.
-function pickCatalogLastUpdated(_catalogItem) {
-  return Date.now();
+function pickCatalogPrimaryBarcode(catalogItem) {
+  const raw = catalogItem?.primaryBarcode ?? catalogItem?.primaryUpc;
+  return typeof raw === "string" ? raw.trim() : "";
 }
 
-// Canonical catalog carries all known barcodes in allUpcs[] (the master
-// jobs flatten vendor-specific barcode shapes into this array at write time).
+function pickCatalogVendorPartId(catalogItem) {
+  const raw =
+    catalogItem?.vendorPartId ?? catalogItem?.item_id ?? catalogItem?.id;
+  return typeof raw === "string" ? raw.trim() : raw != null ? String(raw) : "";
+}
+
 function extractCatalogBarcodes(catalogItem) {
-  return Array.isArray(catalogItem?.allUpcs) ? catalogItem.allUpcs : [];
+  if (Array.isArray(catalogItem?.barcodes)) return catalogItem.barcodes;
+  if (Array.isArray(catalogItem?.allUpcs)) return catalogItem.allUpcs;
+  return [];
 }
 
 function normalizeBarcodeKey(code) {
@@ -5513,10 +5458,10 @@ export async function dbProbeInventoryAgainstCatalogs(localItem) {
     }
 
     // For each vendor, one Firestore array-contains-any query over the local
-    // codes returns every catalog item whose allUpcs intersects ours. Cap at
+    // codes returns every catalog item whose barcodes intersects ours. Cap at
     // 30 values per query (Firestore limit); reconciliation rarely sees >5.
-    // Intersect each match's allUpcs with our local codes to recover which
-    // codes matched. Specs come from the doc itself (folded in master ingest).
+    // Intersect each match's barcodes with our local codes to recover which
+    // codes matched.
     const perVendor = await Promise.all(
       vendors.map(async (vendor) => {
         const codeChunks = [];
@@ -5529,7 +5474,7 @@ export async function dbProbeInventoryAgainstCatalogs(localItem) {
           for (const chunk of codeChunks) {
             const hits = await firestoreCatalogQuery(
               `${vendor.catalogPath}/items_by_id`,
-              [{ field: "allUpcs", operator: "array-contains-any", value: chunk }],
+              [{ field: "barcodes", operator: "array-contains-any", value: chunk }],
             );
             for (const h of hits) {
               if (seen.has(h.id)) continue;
@@ -5554,9 +5499,8 @@ export async function dbProbeInventoryAgainstCatalogs(localItem) {
           return {
             vendorID: vendor.id,
             vendorName: vendor.displayName,
-            itemId: catalogItem.id,
+            itemId: pickCatalogVendorPartId(catalogItem) || catalogItem.id,
             catalogItem,
-            specs: catalogItem.specs || null,
             matchedCodes,
             vendorCodes,
           };
@@ -5583,27 +5527,28 @@ export async function dbProbeInventoryAgainstCatalogs(localItem) {
   }
 }
 
-// Given a local item and a chosen candidate from
+// Given a local item, a chosen candidate, and any other candidates from
 // dbProbeInventoryAgainstCatalogs(), return the shallow-merge object to
 // write back. primaryBarcode and price are intentionally absent so the
 // caller can `{...local, ...payload}` without clobbering them.
 //
-//   formalName  ← catalog name (description, etc.)
-//   brand       ← catalog brand (only written when catalog has one)
-//   cost        ← catalog dealer cost converted dollars→cents (number)
-//   msrp        ← catalog msrp converted dollars→cents (number)
-//   image_url   ← catalog image_url (only written when catalog has one)
-//   vendorId    ← catalog item_id (the VENDOR'S own item identifier, used to
-//                  refetch / reorder from the vendor catalog); the vendor
-//                  "slug" (jbi, qbp) is derived from vendorName at lookup
-//                  time via VENDOR_CATALOGS.displayName match
-//   vendorName  ← chosen vendor.displayName ("J&B Importers", "QBP", …) —
-//                  acts as the canonical pointer back to a VENDOR_CATALOGS row
-//   catalogName ← catalog name (kept as the vendor-side name even if user
-//                  later edits formalName locally)
-//   barcodes[]  ← union(local.barcodes, vendor barcodes) minus primaryBarcode
-//   specs       ← snapshot { source, lastUpdated, entries }
-export function buildReconciliationUpdate(localItem, candidate) {
+//   catalogName      ← catalog catalogName (canonical display field)
+//   brand            ← catalog brand (only written when catalog has one)
+//   cost             ← catalog dealer cost in cents (number)
+//   msrp             ← catalog msrp in cents (number)
+//   image_url        ← catalog image_url (only written when catalog has one)
+//   vendorId         ← vendor SLUG ("jbi" / "qbp") — the canonical pointer
+//                       to a VENDOR_CATALOGS row
+//   vendorPartId     ← vendor's own SKU; used to refetch / reorder from
+//                       the vendor catalog
+//   category         ← "Item"
+//   alternateVendors ← thin pointers [{ vendorId, vendorPartId }] for each
+//                       OTHER candidate (different vendorID than chosen).
+//                       Lets the order screen surface cross-vendor stock
+//                       without resurrecting multi-vendor data per item.
+//   barcodes[]       ← union(local.barcodes, vendor barcodes) minus
+//                       primaryBarcode
+export function buildReconciliationUpdate(localItem, candidate, alternates = []) {
   if (!candidate || !candidate.catalogItem) return {};
 
   const catalogName = pickCatalogName(candidate.catalogItem);
@@ -5620,26 +5565,36 @@ export function buildReconciliationUpdate(localItem, candidate) {
       if (k && k !== primary) merged.add(k);
     });
   }
-  candidate.vendorCodes.forEach((b) => {
-    const k = normalizeBarcodeKey(b);
-    if (k && k !== primary) merged.add(k);
-  });
+  if (Array.isArray(candidate.vendorCodes)) {
+    candidate.vendorCodes.forEach((b) => {
+      const k = normalizeBarcodeKey(b);
+      if (k && k !== primary) merged.add(k);
+    });
+  }
 
-  const specsEntries = Array.isArray(candidate.specs) ? candidate.specs : [];
+  // Dedupe by vendorId — if multiple SKUs from the same alt vendor match the
+  // same UPC, the first one wins (rare but possible).
+  const altSeen = new Set();
+  altSeen.add(candidate.vendorID);
+  const alternateVendors = [];
+  for (const a of alternates) {
+    if (!a || altSeen.has(a.vendorID)) continue;
+    altSeen.add(a.vendorID);
+    alternateVendors.push({
+      vendorId: a.vendorID,
+      vendorPartId: String(a.itemId || ""),
+    });
+  }
 
   const payload = {
-    formalName: catalogName || localItem?.formalName || "",
+    catalogName: catalogName || localItem?.catalogName || localItem?.formalName || "",
     cost,
     msrp,
-    vendorId: candidate.itemId,
-    vendorName: candidate.vendorName,
-    catalogName: catalogName || localItem?.catalogName || "",
+    vendorId: candidate.vendorID,
+    vendorPartId: String(candidate.itemId || ""),
+    category: "Item",
+    alternateVendors,
     barcodes: Array.from(merged),
-    specs: {
-      source: candidate.vendorID,
-      lastUpdated: pickCatalogLastUpdated(candidate.catalogItem),
-      entries: specsEntries,
-    },
   };
   if (catalogBrand) payload.brand = catalogBrand;
   if (imageUrl) payload.image_url = imageUrl;

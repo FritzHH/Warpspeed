@@ -859,8 +859,157 @@ function register(deps) {
   );
 
   // ───────────────────────────────────────────────────────────────────────────
-  // gmailSendEmail — compose + send via Gmail API; mirrors the sent message
-  // into the per-tenant emails cache.
+  // sendGmailEmailInternal — reusable Gmail send helper. Compose + send via
+  // Gmail API + mirror into the per-tenant emails cache. Does NOT perform
+  // caller-identity checks — the caller (callable / internal flow) owns
+  // auth verification before invoking this.
+  //
+  // Required: db, tenantID, accountKey, to.
+  // Returns: { success, messageId, threadId }.
+  // ───────────────────────────────────────────────────────────────────────────
+  const _noopTracker = {
+    bump: () => {},
+    set: () => {},
+    setContext: () => {},
+  };
+  async function sendGmailEmailInternal({
+    db,
+    tenantID,
+    accountKey,
+    to,
+    cc,
+    bcc,
+    subject,
+    bodyHtml,
+    bodyText,
+    threadId,
+    inReplyTo,
+    references,
+    attachments,
+    videoStorageUrl,
+    tracker,
+  }) {
+    tracker = tracker || _noopTracker;
+
+    if (!db || !tenantID || !accountKey) {
+      throw new HttpsError(
+        "invalid-argument",
+        "sendGmailEmailInternal: db, tenantID, and accountKey are required"
+      );
+    }
+    if (!to || !to.length) {
+      throw new HttpsError("invalid-argument", "At least one recipient required");
+    }
+
+    tracker.set("accountKey", accountKey);
+    tracker.set("recipientCount", (to?.length || 0) + (cc?.length || 0) + (bcc?.length || 0));
+    tracker.set("attachmentCount", attachments?.length || 0);
+    tracker.set("hasVideo", videoStorageUrl ? 1 : 0);
+
+    const accessToken = await getGmailAccessToken(db, tenantID, accountKey);
+    const authRef = _authDocRef(db, tenantID, accountKey);
+    const authData = (await authRef.get()).data();
+    tracker.bump("firestoreReads", 1);
+    const fromEmail = authData.email;
+
+    let htmlContent = bodyHtml || "";
+    if (videoStorageUrl) {
+      htmlContent += `<br/><p><a href="${videoStorageUrl}">📎 Video attachment</a></p>`;
+    }
+
+    const boundary = "boundary_" + Date.now().toString(36);
+    const mixedBoundary = "mixed_" + Date.now().toString(36);
+    const hasAttachments = attachments && attachments.length > 0;
+
+    let rawHeaders = [`From: ${fromEmail}`, `To: ${to.join(", ")}`];
+    if (cc?.length) rawHeaders.push(`Cc: ${cc.join(", ")}`);
+    if (bcc?.length) rawHeaders.push(`Bcc: ${bcc.join(", ")}`);
+    rawHeaders.push(`Subject: ${subject || ""}`);
+    if (inReplyTo) rawHeaders.push(`In-Reply-To: ${inReplyTo}`);
+    if (references) rawHeaders.push(`References: ${references}`);
+    rawHeaders.push(`MIME-Version: 1.0`);
+
+    let rawMessage;
+    if (hasAttachments) {
+      rawHeaders.push(`Content-Type: multipart/mixed; boundary="${mixedBoundary}"`);
+      let parts = rawHeaders.join("\r\n") + "\r\n\r\n";
+      parts += `--${mixedBoundary}\r\n`;
+      parts += `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n`;
+      if (bodyText) {
+        parts += `--${boundary}\r\nContent-Type: text/plain; charset="UTF-8"\r\n\r\n${bodyText}\r\n`;
+      }
+      parts += `--${boundary}\r\nContent-Type: text/html; charset="UTF-8"\r\n\r\n${htmlContent}\r\n`;
+      parts += `--${boundary}--\r\n`;
+
+      for (const att of attachments) {
+        parts += `--${mixedBoundary}\r\n`;
+        parts += `Content-Type: ${att.mimeType || "application/octet-stream"}; name="${att.filename}"\r\n`;
+        parts += `Content-Disposition: attachment; filename="${att.filename}"\r\n`;
+        parts += `Content-Transfer-Encoding: base64\r\n\r\n`;
+        parts += att.content + "\r\n";
+      }
+      parts += `--${mixedBoundary}--`;
+      rawMessage = parts;
+    } else {
+      rawHeaders.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+      let parts = rawHeaders.join("\r\n") + "\r\n\r\n";
+      if (bodyText) {
+        parts += `--${boundary}\r\nContent-Type: text/plain; charset="UTF-8"\r\n\r\n${bodyText}\r\n`;
+      }
+      parts += `--${boundary}\r\nContent-Type: text/html; charset="UTF-8"\r\n\r\n${htmlContent}\r\n`;
+      parts += `--${boundary}--`;
+      rawMessage = parts;
+    }
+
+    const encodedMessage = Buffer.from(rawMessage)
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/, "");
+
+    const sendBody = { raw: encodedMessage };
+    if (threadId) sendBody.threadId = threadId;
+
+    const sendRes = await fetch(`${GMAIL_API_BASE}/messages/send`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(sendBody),
+    });
+    tracker.bump("gmailApiCalls", 1);
+    tracker.bump("gmailMessagesSent", 1);
+    tracker.bump("emailBytesSent", rawMessage.length);
+
+    if (!sendRes.ok) {
+      const errBody = await sendRes.text();
+      _log("Gmail send failed", errBody);
+      throw new HttpsError("internal", "Failed to send email");
+    }
+
+    const sentMsg = await sendRes.json();
+    tracker.setContext({ correlationID: sentMsg.id });
+
+    const msgRes = await fetch(
+      `${GMAIL_API_BASE}/messages/${sentMsg.id}?format=full`,
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    tracker.bump("gmailApiCalls", 1);
+    if (msgRes.ok) {
+      const fullMsg = await msgRes.json();
+      const parsed = _parseGmailMessage(fullMsg);
+      parsed.accountKey = accountKey;
+      await _emailsCollection(db, tenantID).doc(parsed.id).set(parsed, { merge: true });
+      tracker.bump("firestoreWrites", 1);
+    }
+
+    return { success: true, messageId: sentMsg.id, threadId: sentMsg.threadId };
+  }
+
+  // ───────────────────────────────────────────────────────────────────────────
+  // gmailSendEmail — onCall wrapper. Adds auth + tenant-match guards then
+  // delegates to sendGmailEmailInternal.
   // ───────────────────────────────────────────────────────────────────────────
   const gmailSendEmail = onCall(
     {
@@ -879,11 +1028,6 @@ function register(deps) {
         attachments, videoStorageUrl,
       } = request.data;
 
-      tracker.set("accountKey", accountKey);
-      tracker.set("recipientCount", (to?.length || 0) + (cc?.length || 0) + (bcc?.length || 0));
-      tracker.set("attachmentCount", attachments?.length || 0);
-      tracker.set("hasVideo", videoStorageUrl ? 1 : 0);
-
       if (!tenantID || !accountKey) {
         throw new HttpsError("invalid-argument", "tenantID and accountKey required");
       }
@@ -893,105 +1037,16 @@ function register(deps) {
       guards.assertTenantMatch(request.auth, tenantID);
 
       const db = await getDB();
-      const accessToken = await getGmailAccessToken(db, tenantID, accountKey);
-      const authRef = _authDocRef(db, tenantID, accountKey);
-      const authData = (await authRef.get()).data();
-      tracker.bump("firestoreReads", 1);
-      const fromEmail = authData.email;
-
-      let htmlContent = bodyHtml || "";
-      if (videoStorageUrl) {
-        htmlContent += `<br/><p><a href="${videoStorageUrl}">📎 Video attachment</a></p>`;
-      }
-
-      const boundary = "boundary_" + Date.now().toString(36);
-      const mixedBoundary = "mixed_" + Date.now().toString(36);
-      const hasAttachments = attachments && attachments.length > 0;
-
-      let rawHeaders = [`From: ${fromEmail}`, `To: ${to.join(", ")}`];
-      if (cc?.length) rawHeaders.push(`Cc: ${cc.join(", ")}`);
-      if (bcc?.length) rawHeaders.push(`Bcc: ${bcc.join(", ")}`);
-      rawHeaders.push(`Subject: ${subject || ""}`);
-      if (inReplyTo) rawHeaders.push(`In-Reply-To: ${inReplyTo}`);
-      if (references) rawHeaders.push(`References: ${references}`);
-      rawHeaders.push(`MIME-Version: 1.0`);
-
-      let rawMessage;
-      if (hasAttachments) {
-        rawHeaders.push(`Content-Type: multipart/mixed; boundary="${mixedBoundary}"`);
-        let parts = rawHeaders.join("\r\n") + "\r\n\r\n";
-        parts += `--${mixedBoundary}\r\n`;
-        parts += `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n`;
-        if (bodyText) {
-          parts += `--${boundary}\r\nContent-Type: text/plain; charset="UTF-8"\r\n\r\n${bodyText}\r\n`;
-        }
-        parts += `--${boundary}\r\nContent-Type: text/html; charset="UTF-8"\r\n\r\n${htmlContent}\r\n`;
-        parts += `--${boundary}--\r\n`;
-
-        for (const att of attachments) {
-          parts += `--${mixedBoundary}\r\n`;
-          parts += `Content-Type: ${att.mimeType || "application/octet-stream"}; name="${att.filename}"\r\n`;
-          parts += `Content-Disposition: attachment; filename="${att.filename}"\r\n`;
-          parts += `Content-Transfer-Encoding: base64\r\n\r\n`;
-          parts += att.content + "\r\n";
-        }
-        parts += `--${mixedBoundary}--`;
-        rawMessage = parts;
-      } else {
-        rawHeaders.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
-        let parts = rawHeaders.join("\r\n") + "\r\n\r\n";
-        if (bodyText) {
-          parts += `--${boundary}\r\nContent-Type: text/plain; charset="UTF-8"\r\n\r\n${bodyText}\r\n`;
-        }
-        parts += `--${boundary}\r\nContent-Type: text/html; charset="UTF-8"\r\n\r\n${htmlContent}\r\n`;
-        parts += `--${boundary}--`;
-        rawMessage = parts;
-      }
-
-      const encodedMessage = Buffer.from(rawMessage)
-        .toString("base64")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_")
-        .replace(/=+$/, "");
-
-      const sendBody = { raw: encodedMessage };
-      if (threadId) sendBody.threadId = threadId;
-
-      const sendRes = await fetch(`${GMAIL_API_BASE}/messages/send`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(sendBody),
+      return sendGmailEmailInternal({
+        db,
+        tenantID,
+        accountKey,
+        to, cc, bcc,
+        subject, bodyHtml, bodyText,
+        threadId, inReplyTo, references,
+        attachments, videoStorageUrl,
+        tracker,
       });
-      tracker.bump("gmailApiCalls", 1);
-      tracker.bump("gmailMessagesSent", 1);
-      tracker.bump("emailBytesSent", rawMessage.length);
-
-      if (!sendRes.ok) {
-        const errBody = await sendRes.text();
-        _log("Gmail send failed", errBody);
-        throw new HttpsError("internal", "Failed to send email");
-      }
-
-      const sentMsg = await sendRes.json();
-      tracker.setContext({ correlationID: sentMsg.id });
-
-      const msgRes = await fetch(
-        `${GMAIL_API_BASE}/messages/${sentMsg.id}?format=full`,
-        { headers: { Authorization: `Bearer ${accessToken}` } }
-      );
-      tracker.bump("gmailApiCalls", 1);
-      if (msgRes.ok) {
-        const fullMsg = await msgRes.json();
-        const parsed = _parseGmailMessage(fullMsg);
-        parsed.accountKey = accountKey;
-        await _emailsCollection(db, tenantID).doc(parsed.id).set(parsed, { merge: true });
-        tracker.bump("firestoreWrites", 1);
-      }
-
-      return { success: true, messageId: sentMsg.id, threadId: sentMsg.threadId };
     })
   );
 
@@ -1378,6 +1433,10 @@ function register(deps) {
     gmailSetupWatch,
     gmailReconnectWatch,
     gmailRenewWatch,
+    // Internal helper — same access-token / mime-build / cache-mirror logic
+    // as gmailSendEmail, minus caller-identity checks. For reuse by callables
+    // that already established their own auth context (e.g. sendReceiptCallable).
+    sendGmailEmailInternal,
   };
 }
 

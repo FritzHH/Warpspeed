@@ -22,4 +22,9 @@ export const DEFAULT_SALE_LABELS = {
   woNumber: "WO #",
   discountPrefix: "Discount",
   notePrefix: "Note",
+  workorder: "Workorder",
+  started: "Started",
+  finished: "Finished",
+  woSubtotal: "WO Subtotal",
+  saleTotal: "SALE TOTAL",
 };

@@ -100,7 +100,14 @@ export const NONREMOVABLE_STATUSES = [
     hidden: true,
   },
 
-
+  {
+    id: "part_in_cart",
+    textColor: "white",
+    backgroundColor: "orange",
+    label: "Part in Cart",
+    removable: false,
+    hidden: true,
+  },
 
   {
     id: "finished_and_paid",
@@ -413,10 +420,6 @@ export const SETTINGS_OBJ = {
   storeID: "999",
   users: [],
   cardReaders: [],
-  selectedCardReaderObj: {
-    label: "",
-    id: "",
-  },
   defaultPayrollTimeFrame: {
     "begin": 'lastFriday',
     "end": 'thisThursday',

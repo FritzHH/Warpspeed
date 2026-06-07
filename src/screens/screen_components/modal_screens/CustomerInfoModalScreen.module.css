@@ -193,7 +193,42 @@
 .tabBar {
   display: flex;
   flex-direction: row;
+  align-items: center;
   flex-shrink: 0;
+}
+
+.tabBadgesRight {
+  margin-left: auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 14px;
+  padding: 0 12px;
+}
+
+.tabBadgeGroup {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+}
+
+.tabBadgeChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 6px;
+  border-radius: var(--radius-control);
+}
+
+.tabBadgeChipText {
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.tabBadgeAmount {
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .tabLabel {

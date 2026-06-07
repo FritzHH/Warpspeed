@@ -25,7 +25,6 @@ import { broadcastToDisplay, broadcastClear, DISPLAY_MSG_TYPES } from "./broadca
 import { calculateRunningTotals } from "./utils";
 
 import {
-  dbDeleteWorkorder,
   dbSoftDeleteWorkorder,
   dbGetCompletedSale,
   dbGetCompletedWorkorder,
@@ -706,29 +705,71 @@ export const useLoginStore = create(
     set({ currentUser });
   },
 
-  // create new punch obj, log user in locally and send punch obj to DB
-  setCreateUserClock: (userID, millis, option) => {
+  // create new punch obj, log user in locally and send punch obj to DB.
+  // async + awaited writes: local state only flips on confirmed Firestore write
+  // so a silent network failure can't leave the UI showing "clocked in" when
+  // the punch never saved. Returns { success, error }. On failure, pushes an
+  // error alert and leaves local state untouched.
+  setCreateUserClock: async (userID, millis, option) => {
     let punch = { ...TIME_PUNCH_PROTO };
     punch.id = crypto.randomUUID();
     punch.userID = userID;
     punch.option = option;
     punch.millis = millis;
 
-    let punchClock = { ...get().punchClock };
+    let slotPromise =
+      option === "in"
+        ? dbSetUserPunchSlot(userID, punch)
+        : dbClearUserPunchSlot(userID);
+    let savePromise = dbSavePunchObject(punch, punch.id);
 
-    if (option === "in") {
-      punchClock[userID] = punch;
+    let timeoutPromise = new Promise((_, reject) =>
+      setTimeout(
+        () => reject(new Error("Timed out after 6 seconds")),
+        6000
+      )
+    );
+
+    try {
+      let [slotRes, saveRes] = await Promise.race([
+        Promise.all([slotPromise, savePromise]),
+        timeoutPromise,
+      ]);
+      if (!slotRes?.success || !saveRes?.success) {
+        let msg =
+          slotRes?.message ||
+          slotRes?.error ||
+          saveRes?.message ||
+          saveRes?.error ||
+          "Unknown error";
+        throw new Error(msg);
+      }
+
+      let punchClock = { ...get().punchClock };
+      if (option === "in") {
+        punchClock[userID] = punch;
+      } else {
+        punchClock = removeFieldFromObj(punchClock, userID);
+      }
       set({ punchClock });
-      dbSetUserPunchSlot(userID, punch);
-    } else {
-      punchClock = removeFieldFromObj(punchClock, userID);
-      set({ punchClock });
-      dbClearUserPunchSlot(userID);
+
+      return { success: true, punch };
+    } catch (error) {
+      let errMsg = error?.message || String(error);
+      log("setCreateUserClock failed:", errMsg);
+      useAlertScreenStore.getState().setValues({
+        title: "Punch Failed",
+        severity: "danger",
+        message:
+          "Could not save the " +
+          (option === "in" ? "clock-in" : "clock-out") +
+          ". Please check your connection and try again.",
+        subMessage: errMsg,
+        btn1Text: "OK",
+        handleBtn1Press: () => {},
+      });
+      return { success: false, error: errMsg };
     }
-
-    let tenantID = useSettingsStore.getState().getSettings()?.tenantID;
-    let storeID = useSettingsStore.getState().getSettings()?.storeID;
-    dbSavePunchObject(punch, punch.id, tenantID, storeID);
   },
 
   setPunchClock: (punchClock) => set({ punchClock }),
@@ -999,8 +1040,13 @@ export const useLoginStore = create(
           message: "Hi " + userObj.first + ", you are not clocked in. Would you like to punch in now?",
           btn1Text: "CLOCK IN",
           btn2Text: "CANCEL",
-          handleBtn1Press: () => {
-            get().setCreateUserClock(userObj.id, new Date().getTime(), "in");
+          handleBtn1Press: async () => {
+            let result = await get().setCreateUserClock(
+              userObj.id,
+              new Date().getTime(),
+              "in"
+            );
+            if (!result?.success) throw new Error(result?.error || "Punch failed");
             get().setLastActionMillis();
             callback();
           },
@@ -1362,7 +1408,7 @@ export function broadcastWorkorderToDisplay(wo) {
     id: line.id,
     qty: line.qty,
     inventoryItem: {
-      formalName: line.inventoryItem?.formalName || "",
+      formalName: line.inventoryItem?.catalogName || line.inventoryItem?.formalName || "",
       price: line.inventoryItem?.price || 0,
     },
     discountObj: line.discountObj
@@ -1442,7 +1488,7 @@ export function broadcastFullWorkorderToDisplay(wo) {
     id: line.id,
     qty: line.qty,
     inventoryItem: {
-      formalName: line.inventoryItem?.formalName || "",
+      formalName: line.inventoryItem?.catalogName || line.inventoryItem?.formalName || "",
       price: line.inventoryItem?.price || 0,
     },
     discountObj: line.discountObj
@@ -1510,7 +1556,7 @@ export function getChangeLogUser() {
 }
 
 function getItemName(item) {
-  return item?.formalName || item?.informalName || "item";
+  return item?.catalogName || item?.formalName || "item";
 }
 
 export function diffWorkorderLines(oldLines, newLines) {

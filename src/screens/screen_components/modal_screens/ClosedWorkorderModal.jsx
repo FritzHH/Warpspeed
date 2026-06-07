@@ -874,7 +874,7 @@ export const ClosedWorkorderModal = ({ workorder, onClose, onGoToWorkorder, onRe
             <div className={styles.itemsList}>
               {lines.map((item, idx) => {
                 const inv = item.inventoryItem || {};
-                const name = inv.formalName || inv.informalName || "Item";
+                const name = inv.catalogName || inv.formalName || "Item";
                 const price = item.useSalePrice ? (inv.salePrice || inv.price || 0) : (inv.price || 0);
                 const hasDiscount = !!item.discountObj?.name;
                 return (

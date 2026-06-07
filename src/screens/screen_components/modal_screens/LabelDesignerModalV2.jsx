@@ -31,7 +31,7 @@ const LABEL_SIZES = [
 ];
 
 const AVAILABLE_FIELDS = [
-  { name: "formalName", label: "Product Name", type: "text", placeholder: "Tire Kenda Kwick Trax 700x35 Continental Gatorskin Folding" },
+  { name: "catalogName", label: "Product Name", type: "text", placeholder: "Tire Kenda Kwick Trax 700x35 Continental Gatorskin Folding" },
   { name: "informalName", label: "Product Short Name", type: "text", placeholder: "Kwick Trax 700x35" },
   { name: "brand", label: "Brand", type: "text", placeholder: "Continental" },
   { name: "id", label: "Barcode Number", type: "text", placeholder: "4827103956281" },

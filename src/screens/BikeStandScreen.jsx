@@ -611,7 +611,7 @@ export function BikeStandScreen() {
   //////////////////////////////////////////////////////////////////////////////
 
   async function inventoryItemSelected(invItem) {
-    console.log("[STAND] inventoryItemSelected:", invItem?.formalName, "hasWorkorderReady:", hasWorkorderReady, "selectedWorkorder:", !!selectedWorkorder, "pendingCustomer:", sPendingCustomer);
+    console.log("[STAND] inventoryItemSelected:", invItem?.catalogName || invItem?.formalName, "hasWorkorderReady:", hasWorkorderReady, "selectedWorkorder:", !!selectedWorkorder, "pendingCustomer:", sPendingCustomer);
     if (!hasWorkorderReady || !invItem) return;
     let wo = await ensureWorkorderExists();
     console.log("[STAND] ensureWorkorderExists returned:", wo?.id);
@@ -2933,7 +2933,7 @@ export function BikeStandScreen() {
                   >
                     {canvasItems.map((itemObj) => {
                       let invItem = (zInventory || []).find((i) => i.id === itemObj.inventoryItemID);
-                      let name = invItem ? (invItem.informalName || invItem.formalName || "Unknown") : "(not found)";
+                      let name = invItem ? (invItem.quickButtonLabel || invItem.catalogName || invItem.formalName || "Unknown") : "(not found)";
                       let w = (itemObj.w || QB_DEFAULT_W) + sSubMenuWidthAdj;
                       let h = (itemObj.h || QB_DEFAULT_H);
                       let fontSize = (itemObj.fontSize || 10) + sSubMenuFontAdj;
@@ -3060,8 +3060,7 @@ export function BikeStandScreen() {
                   <div className={styles.standItemsOverlayInner} onClick={(e) => e.stopPropagation()}>
                   {selectedWorkorder.workorderLines.map((line) => {
                     let inv = line.inventoryItem || {};
-                    let informal = inv.informalName || "";
-                    let formal = inv.formalName || "";
+                    let formal = inv.catalogName || inv.formalName || "";
                     let qtyLabel = (line.qty || 1) > 1 ? " x" + line.qty : "";
                     let isSwiped = sSwipedCardID === line.id;
                     let isSwipedLeft = isSwiped && sSwipeDir === "left";
@@ -3420,7 +3419,7 @@ export function BikeStandScreen() {
           {/* Intake notes modal for editing a line's intake notes */}
           {sIntakeNotesLineID && (() => {
             let notesLine = (selectedWorkorder?.workorderLines || []).find((ln) => ln.id === sIntakeNotesLineID);
-            let itemLabel = notesLine?.inventoryItem?.informalName || notesLine?.inventoryItem?.formalName || "Item";
+            let itemLabel = notesLine?.inventoryItem?.catalogName || notesLine?.inventoryItem?.formalName || "Item";
             let noteHelpers = zSettings.noteHelpers || [];
             let activeText = sNotesTarget === "intakeNotes" ? sIntakeNotesText : sReceiptNotesText;
             let activeSetText = sNotesTarget === "intakeNotes" ? _setIntakeNotesText : _setReceiptNotesText;
@@ -4568,7 +4567,7 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
   const isLabor = type === "labor";
   const editInv = editLine?.inventoryItem || null;
 
-  const [sName, _setName] = useState(editInv ? (editInv.formalName || "") : "");
+  const [sName, _setName] = useState(editInv ? (editInv.catalogName || editInv.formalName || "") : "");
   const [sPriceDisplay, _setPriceDisplay] = useState(editInv ? formatCurrencyDisp(editInv.price || 0) : "");
   const [sPriceCents, _setPriceCents] = useState(editInv ? (editInv.price || 0) : 0);
   const [sMinutes, _setMinutes] = useState(editInv?.minutes ? String(editInv.minutes) : "");
@@ -4654,7 +4653,7 @@ const StandCustomItemModal = ({ type, editLine, onSave, onClose }) => {
 
   function handleSave() {
     let invItem = cloneDeep(INVENTORY_ITEM_PROTO);
-    invItem.formalName = sName.trim();
+    invItem.catalogName = sName.trim();
     invItem.price = sPriceCents;
     invItem.category = isLabor ? "Labor" : "Item";
     invItem.customLabor = isLabor;

@@ -22,21 +22,12 @@
 //
 // Per-SKU fetch failures bump missCount and skip the row - one bad SKU
 // shouldn't blow up a 50k-item refresh. missCount lands in meta for alerting.
-//
-// TODO(phase-0): The canonical item shape is stubbed. Once the cross-vendor
-// master object + mapping is locked, replace toCanonicalItem(). The pipeline
-// is shape-agnostic - diff/store/read don't care what the doc looks like.
 
 const { qbpRequest, mapWithConcurrency } = require("../api");
 const { initRtdb, MultiPathWriter } = require("../rtdb");
 const { initFirestore, FirestoreBatchWriter } = require("../firestore");
 const { BaselineStore, diffMaps } = require("../baseline");
-const {
-  getLastSyncMeta,
-  setLastSyncMeta,
-  shouldSkipByHash,
-  hashPayload,
-} = require("../meta");
+const { setLastSyncMeta } = require("../meta");
 
 const META_KEY = "lastMasterSync";
 const ITEMS_COLLECTION = "vendor_catalogs/qbp/items_by_id";
@@ -54,19 +45,6 @@ async function runMasterSync() {
   console.log(`[qbp-master] skulist returned ${skus.length} SKUs`);
   if (skus.length === 0) {
     throw new Error("QBP skulist returned 0 SKUs - refusing to diff against empty current");
-  }
-
-  const responseHash = hashPayload(skus);
-  const lastSync = await getLastSyncMeta(rtdb, META_KEY);
-  if (shouldSkipByHash(lastSync, responseHash)) {
-    console.log(`[qbp-master] skipping - skulist hash matches last sync`);
-    await setLastSyncMeta(rtdb, META_KEY, {
-      responseHash,
-      skuCount: skus.length,
-      skipped: true,
-      durationSec: (Date.now() - startedAt) / 1000,
-    });
-    return { skipped: true, skuCount: skus.length };
   }
 
   const baselineMap = await baseline.load();
@@ -140,7 +118,6 @@ async function runMasterSync() {
 
   const durationSec = (Date.now() - startedAt) / 1000;
   await setLastSyncMeta(rtdb, META_KEY, {
-    responseHash,
     skuCount: skus.length,
     itemCount: currentMap.size,
     addCount: adds.length,
@@ -250,16 +227,17 @@ function unwrapDetail(resp) {
   return envelope;
 }
 
-// TODO(phase-0): replace with the locked cross-vendor canonical shape + mapping.
-// Current shape mirrors the pre-migration RTDB doc plus `vendor`/`specs` tags.
-// QBP doesn't ship a separate specs feed (specs live inline in product detail);
-// stubbed as [] for now and folded once Phase 0 maps QBP detail fields to spec
-// pairs. Diff equality uses stableStringify - shape changes just produce a
-// one-time mass-change diff against the baseline.
+// Maps a per-SKU product detail response to the canonical catalog row shape.
+// The Firestore doc key is the SKU; the body's vendorPartId carries the SKU
+// downstream when the chrome-extension imports a row into a tenant's
+// inventory (where the inventory item's doc key is a Firebase auto-id).
+// image_url is left blank: QBP's detail returns image filenames only
+// (`images.image[].fileName`), and the CDN base hostname hasn't been
+// confirmed yet. TODO: populate once the QBP image URL pattern is known.
 function toCanonicalItem(detail, itemKey) {
   if (!detail || typeof detail !== "object") return null;
 
-  const name = String(detail.name || "").trim();
+  const catalogName = String(detail.name || "").trim();
 
   let brand = "";
   if (Array.isArray(detail.brand) && detail.brand.length > 0) {
@@ -268,7 +246,7 @@ function toCanonicalItem(detail, itemKey) {
     brand = detail.brand.trim();
   }
 
-  const allUpcs = [];
+  const barcodes = [];
   const b = detail.barcodes && detail.barcodes.Barcode;
   if (b) {
     const arr = Array.isArray(b) ? b : [b];
@@ -276,29 +254,30 @@ function toCanonicalItem(detail, itemKey) {
       if (entry == null) continue;
       if (typeof entry === "string" || typeof entry === "number") {
         const s = String(entry).trim();
-        if (s) allUpcs.push(s);
+        if (s) barcodes.push(s);
       } else if (typeof entry === "object") {
         const v = entry.value != null ? entry.value : entry["#text"];
         if (v != null) {
           const s = String(v).trim();
-          if (s) allUpcs.push(s);
+          if (s) barcodes.push(s);
         }
       }
     }
   }
 
-  if (!name && allUpcs.length === 0) return null;
+  if (!catalogName && barcodes.length === 0) return null;
 
   return {
-    id: itemKey,
-    vendor: "qbp",
-    name,
+    vendorId: "qbp",
+    vendorPartId: itemKey,
+    catalogName,
     brand,
+    primaryBarcode: barcodes[0] || "",
+    barcodes,
+    image_url: "",
     cost: dollarsToCents(detail.dealerPrice && detail.dealerPrice.value),
     msrp: dollarsToCents(detail.msrp && detail.msrp.value),
-    primaryUpc: allUpcs[0] || "",
-    allUpcs,
-    specs: [],
+    category: "Item",
   };
 }
 

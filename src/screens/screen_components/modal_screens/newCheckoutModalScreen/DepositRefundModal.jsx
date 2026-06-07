@@ -5,7 +5,7 @@ import { Dialog, Button, SmallLoadingIndicator, CheckBox, LargeModalHeader, Larg
 import { C, COLOR_GRADIENTS, Fonts, Radius } from "../../../../styles";
 import { useZ } from "../../../../hooks/useZ";
 import { useCurrentCustomerStore, useSettingsStore, useLoginStore } from "../../../../stores";
-import { formatCurrencyDisp, formatMillisForDisplay, lightenRGBByPercent, log, generateEAN13Barcode, localStorageWrapper, findTemplateByType, printBuilder } from "../../../../utils";
+import { formatCurrencyDisp, formatMillisForDisplay, lightenRGBByPercent, log, generateEAN13Barcode, localStorageWrapper, findTemplateByType, printBuilder, getPrinterStatus } from "../../../../utils";
 import { readTransaction, writeCashRefund, newCheckoutProcessStripeRefund } from "./newCheckoutFirebaseCalls";
 import { buildRefundObject } from "./newCheckoutUtils";
 import { dbSaveCustomer, dbSavePrintObj, dbSendReceipt } from "../../../../db_calls_wrapper";
@@ -27,6 +27,9 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
   const [sShowConfirm, _setShowConfirm] = useState(false);
   const [sShowRemoveConfirm, _setShowRemoveConfirm] = useState(false);
   const [sRemoved, _setRemoved] = useState(false);
+  const [sRefundPrint, _setRefundPrint] = useState(false);
+  const [sRefundSMS, _setRefundSMS] = useState(false);
+  const [sRefundEmail, _setRefundEmail] = useState(false);
   const zConfirm = useZ("alert", sShowConfirm);
   const zRemoveConfirm = useZ("alert", sShowRemoveConfirm);
 
@@ -124,13 +127,24 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
         if (printerID) dbSavePrintObj({ id: crypto.randomUUID(), receiptType: RECEIPT_TYPES.register }, printerID);
       }
 
-      removeDepositFromCustomer();
+      markDepositRefunded();
     } catch (error) {
       log("Deposit refund error:", error);
       _setErrorMessage(error?.message || "Refund processing failed");
     }
 
     _setProcessing(false);
+  }
+
+  function markDepositRefunded() {
+    if (!customer?.id || !deposit?.id) return;
+    let updatedCustomer = cloneDeep(customer);
+    updatedCustomer.deposits = (updatedCustomer.deposits || []).map((d) =>
+      d.id === deposit.id ? { ...d, refunded: true, refundedMillis: Date.now() } : d
+    );
+    useCurrentCustomerStore.getState().setCustomer(updatedCustomer);
+    dbSaveCustomer(updatedCustomer);
+    if (onCustomerUpdated) onCustomerUpdated(updatedCustomer);
   }
 
   function removeDepositFromCustomer() {
@@ -204,6 +218,9 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
     _setShowConfirm(false);
     _setShowRemoveConfirm(false);
     _setRemoved(false);
+    _setRefundPrint(false);
+    _setRefundSMS(false);
+    _setRefundEmail(false);
     if (onClose) onClose();
   }
 
@@ -234,18 +251,6 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                     onClick={() => _setShowRemoveConfirm(true)}
                   >
                     {"Remove " + label}
-                  </LargeModalHeaderButton>
-                ),
-                (!sLoading && sTransaction && !fullyRefunded && !sRefundComplete) && (
-                  <LargeModalHeaderButton
-                    key="refund"
-                    variant="accent"
-                    disabled={sProcessing}
-                    onClick={() => _setShowConfirm(true)}
-                  >
-                    {sProcessing
-                      ? "PROCESSING..."
-                      : `REFUND FULL ${isGiftCard ? "GIFT CARD" : "DEPOSIT"}${isImportedCard ? " (CASH)" : ""}`}
                   </LargeModalHeaderButton>
                 ),
                 (sRemoved || sRefundComplete) && (
@@ -454,9 +459,22 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                       <span className={styles.refundAmountValue} style={{ color: C.lightred }}>
                         {"$" + formatCurrencyDisp(refundAmount)}
                       </span>
-                      <span className={styles.refundAmountSub} style={{ color: C.textMuted }}>
-                        {isCard ? "Card" : "Cash"} refund - full {label.toLowerCase()} amount
-                      </span>
+                      <Button
+                        colorGradientArr={COLOR_GRADIENTS.red}
+                        text={sProcessing
+                          ? "PROCESSING..."
+                          : `REFUND FULL ${isGiftCard ? "GIFT CARD" : "DEPOSIT"}${isImportedCard ? " (CASH)" : ""}`}
+                        enabled={!sProcessing}
+                        onPress={() => {
+                          let { isPrinterOnline } = getPrinterStatus();
+                          _setRefundPrint(isPrinterOnline);
+                          _setRefundSMS(hasPhone);
+                          _setRefundEmail(false);
+                          _setShowConfirm(true);
+                        }}
+                        buttonStyle={{ marginTop: 8, paddingVertical: 6, paddingHorizontal: 20 }}
+                        textStyle={{ color: C.textWhite, fontWeight: Fonts.weight.textHeavy, fontSize: 12 }}
+                      />
                     </div>
 
                     {sErrorMessage ? (
@@ -513,6 +531,38 @@ export const DepositRefundModal = memo(function DepositRefundModal({ visible, de
                 <span className={styles.confirmMessage} style={{ color: C.text }}>
                   {"Refund $" + formatCurrencyDisp(refundAmount) + " " + (isCard ? "to card" : "in cash") + "? This cannot be undone."}
                 </span>
+                <div className={styles.confirmReceiptRow}>
+                  {(() => {
+                    let { isPrinterOnline } = getPrinterStatus();
+                    return (
+                      <>
+                        <CheckBox
+                          text="Print"
+                          isChecked={sRefundPrint && isPrinterOnline}
+                          enabled={isPrinterOnline}
+                          onCheck={() => _setRefundPrint(!sRefundPrint)}
+                          textStyle={{ fontSize: 11, color: isPrinterOnline ? C.text : C.textDisabled }}
+                          buttonStyle={{ marginRight: 12 }}
+                        />
+                        <CheckBox
+                          text="Text"
+                          isChecked={sRefundSMS && hasPhone}
+                          enabled={hasPhone}
+                          onCheck={() => _setRefundSMS(!sRefundSMS)}
+                          textStyle={{ fontSize: 11, color: hasPhone ? C.text : C.textDisabled }}
+                          buttonStyle={{ marginRight: 12 }}
+                        />
+                        <CheckBox
+                          text="Email"
+                          isChecked={sRefundEmail && hasEmail}
+                          enabled={hasEmail}
+                          onCheck={() => _setRefundEmail(!sRefundEmail)}
+                          textStyle={{ fontSize: 11, color: hasEmail ? C.text : C.textDisabled }}
+                        />
+                      </>
+                    );
+                  })()}
+                </div>
                 <div className={styles.confirmActions}>
                   <Button
                     colorGradientArr={COLOR_GRADIENTS.green}

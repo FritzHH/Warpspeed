@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { ModalHeader } from "../ModalHeader/ModalHeader";
 import { ModalFooter, ModalFooterButton } from "../ModalFooter/ModalFooter";
@@ -66,6 +66,7 @@ export const AlertBox = ({ showAlert }) => {
 
 function AlertCard({ alert, index, isTop, z }) {
   const cardRef = useRef(null);
+  const [sBusy, _setBusy] = useState(false);
 
   useEffect(() => {
     if (!alert.autoDismiss) return;
@@ -87,9 +88,21 @@ function AlertCard({ alert, index, isTop, z }) {
   }
 
   function makeHandler(handler) {
-    return () => {
-      if (typeof handler === "function") handler();
-      dismiss();
+    return async () => {
+      if (typeof handler !== "function") {
+        dismiss();
+        return;
+      }
+      try {
+        _setBusy(true);
+        let result = handler();
+        if (result && typeof result.then === "function") {
+          await result;
+        }
+        dismiss();
+      } catch (err) {
+        _setBusy(false);
+      }
     };
   }
 
@@ -137,7 +150,11 @@ function AlertCard({ alert, index, isTop, z }) {
       {!alert.autoDismiss && (
         <ModalFooter>
           {showCancel && (
-            <ModalFooterButton variant="default" onClick={dismiss}>
+            <ModalFooterButton
+              variant="default"
+              onClick={dismiss}
+              disabled={sBusy}
+            >
               CANCEL
             </ModalFooterButton>
           )}
@@ -145,7 +162,7 @@ function AlertCard({ alert, index, isTop, z }) {
             <ModalFooterButton
               variant="primary"
               onClick={makeHandler(alert.handleBtn3Press)}
-              disabled={!!alert.btn3Disabled}
+              disabled={!!alert.btn3Disabled || sBusy}
               tooltip={alert.btn3Tooltip}
             >
               {alert.btn3Text}
@@ -155,7 +172,7 @@ function AlertCard({ alert, index, isTop, z }) {
             <ModalFooterButton
               variant="default"
               onClick={makeHandler(alert.handleBtn2Press)}
-              disabled={!!alert.btn2Disabled}
+              disabled={!!alert.btn2Disabled || sBusy}
               tooltip={alert.btn2Tooltip}
             >
               {alert.btn2Text}
@@ -164,10 +181,10 @@ function AlertCard({ alert, index, isTop, z }) {
           <ModalFooterButton
             variant="accent"
             onClick={makeHandler(alert.handleBtn1Press)}
-            disabled={!!alert.btn1Disabled}
+            disabled={!!alert.btn1Disabled || sBusy}
             tooltip={alert.btn1Tooltip}
           >
-            {alert.btn1Text}
+            {sBusy ? "Saving..." : alert.btn1Text}
           </ModalFooterButton>
         </ModalFooter>
       )}

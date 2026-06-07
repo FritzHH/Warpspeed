@@ -157,7 +157,11 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
   const zShowLoginScreen = useLoginStore((state) => state.showLoginScreen);
   const quickButtons = zQuickItemButtons || [];
 
-  const [sItem, _setItem] = useState(() => cloneDeep(item));
+  const [sItem, _setItem] = useState(() => {
+    const cloned = cloneDeep(item);
+    if (!cloned.catalogName && cloned.formalName) cloned.catalogName = cloned.formalName;
+    return cloned;
+  });
   const userLevel = useLoginStore.getState().currentUser?.permissions?.level || 0;
   const [sEditing, _setEditing] = useState(!!isNew || userLevel >= 2);
   const [sShowQBPicker, _setShowQBPicker] = useState(false);
@@ -311,7 +315,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
   function handleDeleteItem() {
     showAlert({
       title: "Delete Item",
-      message: `Are you sure you want to delete "${sItem.formalName || sItem.informalName || "this item"}"?`,
+      message: `Are you sure you want to delete "${sItem.catalogName || sItem.formalName || "this item"}"?`,
       btn1Text: "Delete",
       handleBtn1Press: () => {
         useLoginStore.getState().execute(() => {
@@ -691,7 +695,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                   )}
                 </PrintActionSlot>
               ),
-              (isNew && !!sItem.formalName?.trim()) && (
+              (isNew && !!sItem.catalogName?.trim()) && (
                 <LargeModalHeaderButton
                   key="saveNew"
                   variant="accent"
@@ -729,7 +733,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
             <div className={styles.scrollBodyInner}>
             {/* Names */}
             <div className={styles.sectionCard} style={sectionCardInline}>
-              {renderField("Catalog Name", "formalName", { autoFocus: true })}
+              {renderField("Catalog Name", "catalogName", { autoFocus: true })}
               {/* {renderField("Quick Button/Descriptive Name", "informalName", { multiline: true, hint: " -- use enter key to space name to fit quick button card if desired" })} */}
             </div>
 
@@ -756,7 +760,10 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
                   <span className={styles.fieldValue} style={{ color: C.text }}>{sItem.category || "Item"}</span>
                 )}
               </div>
-              <div className={styles.brandWrap}>
+              <div
+                className={styles.brandWrap}
+                style={sItem.category === "Labor" ? { visibility: "hidden" } : undefined}
+              >
                 {renderField("Brand", "brand")}
               </div>
             </div>

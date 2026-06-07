@@ -817,7 +817,7 @@ export async function saveItemSales(sale, workorderLines) {
       entry.millis = Number(sale.millis) || Date.now();
       entry.itemID = line.id || "";
       entry.inventoryItemID = inv.customPart || inv.customLabor ? "" : (inv.id || "");
-      entry.name = inv.formalName || inv.informalName || "";
+      entry.name = inv.catalogName || inv.formalName || "";
       entry.category = inv.category || "";
       entry.customPart = !!inv.customPart;
       entry.customLabor = !!inv.customLabor;

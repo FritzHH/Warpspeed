@@ -89,7 +89,7 @@ export const Items_WorkorderItemsTab = ({}) => {
     (line) => line.inventoryItem?.receiptNoteRequired && !(line.receiptNotes || "").trim()
   );
   const hasPlaceholderItems = (zOpenWorkorder?.workorderLines || []).some((line) => {
-    const name = ((line.inventoryItem?.formalName || "") + " " + (line.inventoryItem?.informalName || "")).toLowerCase();
+    const name = (line.inventoryItem?.catalogName || line.inventoryItem?.formalName || "").toLowerCase();
     return name.includes("placeholder");
   });
   const activeSale = zOpenWorkorder?.activeSaleID
@@ -467,7 +467,7 @@ export const Items_WorkorderItemsTab = ({}) => {
 
         if (partLines.length > 0) {
           const itemList = partLines.map(line =>
-            "\u2022 " + line.inventoryItem.formalName + (line.qty > 1 ? " (x" + line.qty + ")" : "")
+            "\u2022 " + (line.inventoryItem.catalogName || line.inventoryItem.formalName) + (line.qty > 1 ? " (x" + line.qty + ")" : "")
           ).join("\n");
           useAlertScreenStore.getState().setValues({
             showAlert: true,
@@ -829,7 +829,7 @@ export const LineItemComponent = ({
   onOpenNoteHelper,
 }) => {
   const isCustom = inventoryItem.customPart || inventoryItem.customLabor;
-  const isPlaceholder = ((inventoryItem.formalName || "") + " " + (inventoryItem.informalName || "")).toLowerCase().includes("placeholder");
+  const isPlaceholder = (inventoryItem.catalogName || inventoryItem.formalName || "").toLowerCase().includes("placeholder");
   const nameRowClickable = !isLocked && !isPlaceholder;
   const [sNameHovered, _setNameHovered] = useState(false);
   const zPlaceholderReplaceLineID = useOpenWorkordersStore((s) => s.placeholderReplaceLineID);
@@ -958,12 +958,12 @@ export const LineItemComponent = ({
                             style={{ backgroundColor: lightenRGBByPercent(C.red, 85) }}
                           >
                             <span className={lineStyles.placeholderText} style={{ color: C.red }}>
-                              {inventoryItem.formalName || ""}
+                              {inventoryItem.catalogName || inventoryItem.formalName || ""}
                             </span>
                           </div>
                         ) : (
                           <span className={lineStyles.itemName} style={{ color: C.text }}>
-                            {inventoryItem.formalName ? inventoryItem.formalName : (isCustom ? "(tap to edit)" : "")}
+                            {(inventoryItem.catalogName || inventoryItem.formalName) ? (inventoryItem.catalogName || inventoryItem.formalName) : (isCustom ? "(tap to edit)" : "")}
                           </span>
                         )}
                       </div>

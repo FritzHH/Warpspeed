@@ -62,3 +62,5 @@ secret.txt
 _webhooks.json
 reg
 qbp_jbi_creds.json
+.jbi-order-creds.json
+scripts/jbi-test-items.json

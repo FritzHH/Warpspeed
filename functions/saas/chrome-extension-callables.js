@@ -155,64 +155,119 @@ const COMMON_OPTS = {
 // Vendor catalog -> inventory mapping
 // ────────────────────────────────────────────────────────────────────
 
-// Build a Cadence inventory doc from a vendor-catalog snapshot. Catalog
-// snapshots are in canonical shape (see
-// jobs/vendor-catalog-*/modes/master.js#toCanonicalItem) so this mapper is
-// vendor-agnostic. Mirrors INVENTORY_ITEM_PROTO in src/data.js - keep in
-// sync if either side changes.
+// Vendor catalog slugs we know how to probe for alternateVendors. Mirrors
+// VENDOR_CATALOGS in src/data.js minus the "other" sentinel (no catalogPath).
+// Hardcoded server-side so we don't have to ship the client shared file.
+// Update when a new vendor catalog comes online.
+const KNOWN_VENDOR_CATALOG_IDS = ["jbi", "qbp"];
+
+// Build a Cadence inventory doc from a canonical vendor-catalog snapshot.
+// Mirrors INVENTORY_ITEM_PROTO in src/data.js — keep in sync if either
+// side changes.
 //
 // vendorCatalogID is the catalog the snapshot came from ("jbi", "qbp", ...)
-// and becomes the vendorId / createdFromVendor stamp on the inventory doc.
+// and becomes the doc's vendorId / createdFromVendor stamp.
 //
-// Canonical cost / msrp are already CENTS (the master jobs do the
-// dollars->cents conversion at write time), so no money math here.
-function buildInventoryItemFromCatalog(catalog, uid, vendorURL, vendorCatalogID) {
+// id is the Firestore auto-id the caller pre-allocated (so doc key matches
+// doc body). Canonical cost / msrp are already CENTS, no money math here.
+//
+// alternateVendors is the cross-vendor pointer list — populated by the
+// caller via probeAlternateVendors() so it can be awaited in parallel with
+// the existing-inventory lookup.
+//
+// formalName is populated from catalogName for legacy-reader compat during
+// the canonical-shape transition (OrderingModalScreen, InventoryItemModal,
+// BaseScreen receipt scan all still read formalName). vendorName stays
+// empty — new readers should resolve display name via vendorId slug.
+function buildInventoryItemFromCatalog(catalog, id, uid, vendorCatalogID, alternateVendors = []) {
   if (!catalog) return null;
 
-  const formalName = String(catalog.name || "").trim();
+  // Snapshot may be new canonical shape (catalogName/primaryBarcode/barcodes/
+  // image_url) or pre-2026-06 legacy (name/primaryUpc/allUpcs/imageUrl) if it
+  // was captured on an order line before the mapper rewrite.
+  const catalogName = String(catalog.catalogName || catalog.name || "").trim();
   const brand = String(catalog.brand || "").trim();
   const costCents = Number.isFinite(catalog.cost) ? catalog.cost : 0;
   const msrpCents = Number.isFinite(catalog.msrp) ? catalog.msrp : 0;
-  const primaryBarcode = String(catalog.primaryUpc || "").trim();
-  const imageUrl = catalog.imageUrl ? String(catalog.imageUrl).trim() : "";
+  const primaryBarcode = String(catalog.primaryBarcode || catalog.primaryUpc || "").trim();
+  const barcodesRaw = Array.isArray(catalog.barcodes)
+    ? catalog.barcodes
+    : Array.isArray(catalog.allUpcs)
+      ? catalog.allUpcs
+      : (primaryBarcode ? [primaryBarcode] : []);
+  const barcodes = barcodesRaw
+    .map((b) => (b == null ? "" : String(b).trim()))
+    .filter(Boolean);
+  const imageUrl = String(catalog.image_url || catalog.imageUrl || "").trim();
+  const vendorPartId = String(catalog.vendorPartId || catalog.id || catalog.item_id || "").trim();
 
   const vendorID = vendorCatalogID || "";
   const nowMs = Date.now();
 
   const item = {
-    id: crypto.randomUUID(),
-    formalName,
-    informalName: "",
+    id,
+    catalogName,
+    vendorPartId,
+    primaryBarcode,
+    barcodes,
     brand,
+    image_url: imageUrl,
+    cost: costCents,
+    msrp: msrpCents,
     vendorId: vendorID,
-    vendorName: vendorDisplayNameFor(vendorID),
-    vendorURL: vendorURL ? String(vendorURL) : "",
-    catalogName: formalName,
+    category: "Item",
+    alternateVendors,
+    quickButtonLabel: "",
     price: msrpCents,
     salePrice: 0,
-    msrp: msrpCents,
-    category: "Item",
-    cost: costCents,
-    primaryBarcode,
-    barcodes: [],
     minutes: 0,
     customPart: false,
     customLabor: false,
     receiptNoteRequired: false,
-    specs: { source: "", lastUpdated: 0, entries: [] },
+    vendorName: "",
+    formalName: catalogName,
     createdFromVendor: vendorID,
     createdMillis: nowMs,
     createdByUserID: uid,
     priceNotSet: msrpCents === 0,
   };
-  if (imageUrl) item.image_url = imageUrl;
   return item;
 }
 
-function vendorDisplayNameFor(vendorCatalogID) {
-  if (vendorCatalogID === "jbi") return "JBI";
-  if (vendorCatalogID === "qbp") return "QBP";
-  return vendorCatalogID || "";
+// Probe every non-primary vendor catalog for a hit on the given primaryBarcode.
+// Returns thin pointer rows [{ vendorId, vendorPartId }] for inventory's
+// alternateVendors field. Catches per-vendor errors so a transient failure on
+// one catalog doesn't poison the whole inventory-create.
+async function probeAlternateVendors(catalogDB, primaryBarcode, primaryVendorID) {
+  if (!primaryBarcode) return [];
+  const others = KNOWN_VENDOR_CATALOG_IDS.filter((v) => v !== primaryVendorID);
+  if (others.length === 0) return [];
+  const probes = await Promise.all(
+    others.map(async (otherID) => {
+      try {
+        const snap = await catalogDB
+          .collection(`vendor_catalogs/${otherID}/items_by_id`)
+          .where("barcodes", "array-contains", primaryBarcode)
+          .limit(1)
+          .get();
+        if (snap.empty) return null;
+        const doc = snap.docs[0];
+        const d = doc.data() || {};
+        return {
+          vendorId: otherID,
+          vendorPartId: String(d.vendorPartId || doc.id || "").trim(),
+        };
+      } catch (err) {
+        logger.warn("Alternate vendor probe failed", {
+          vendorCatalogID: otherID,
+          primaryBarcode,
+          message: err && err.message,
+        });
+        return null;
+      }
+    })
+  );
+  return probes.filter(Boolean);
 }
 
 // ────────────────────────────────────────────────────────────────────
@@ -230,10 +285,11 @@ function vendorDisplayNameFor(vendorCatalogID) {
 // Catalog-driven inventory auto-create goes through
 // buildInventoryItemFromCatalog against the canonical catalog snapshot. The
 // builder is vendor-agnostic - the vendor-catalog master jobs flatten
-// vendor-specific shapes into one {id, name, brand, cost, msrp, primaryUpc,
-// allUpcs} envelope at write time. For unmapped vendors we still write the
-// order line with the scraped page cost; auto-create kicks in once the
-// vendor's catalog gets imported.
+// vendor-specific shapes into one {vendorId, vendorPartId, catalogName,
+// brand, cost, msrp, primaryBarcode, barcodes, image_url, category} envelope
+// at write time. For unmapped vendors we still write the order line with the
+// scraped page cost; auto-create kicks in once the vendor's catalog gets
+// imported.
 //
 // PAYLOAD:
 //   { project, idToken?, tenantID, storeID, vendorCatalogID?, vendorItemID,
@@ -312,11 +368,20 @@ exports.addJBIItemToVendorOrder = onCall(COMMON_OPTS, async (request) => {
   // OR barcodes-array) so two add paths agree on what counts as "matched".
   // Race window: two rapid clicks on the same UPC can both miss and create
   // duplicates - rare in practice; promote to a transaction if it bites.
+  //
+  // catalogSnapshot is the canonical shape from the master jobs:
+  //   primaryBarcode (was primaryUpc), barcodes (was allUpcs), catalogName
+  //   (was name), image_url (was imageUrl). Fall back to legacy field names
+  //   only for snapshots captured before the 2026-06 mapper rewrite.
   let createdInventoryItemID = null;
-  if (catalogSnapshot && catalogSnapshot.primaryUpc) {
-    const upc = String(catalogSnapshot.primaryUpc);
+  const catalogPrimary = catalogSnapshot
+    ? String(catalogSnapshot.primaryBarcode || catalogSnapshot.primaryUpc || "")
+    : "";
+  if (catalogPrimary) {
+    const upc = catalogPrimary;
     const inventoryPath = `tenants/${tenantID}/stores/${storeID}/inventory`;
-    const [primarySnap, arraySnap] = await Promise.all([
+    const catalogDB = getFirestore();
+    const [primarySnap, arraySnap, alternateVendors] = await Promise.all([
       firestore
         .collection(inventoryPath)
         .where("primaryBarcode", "==", upc)
@@ -327,19 +392,22 @@ exports.addJBIItemToVendorOrder = onCall(COMMON_OPTS, async (request) => {
         .where("barcodes", "array-contains", upc)
         .limit(1)
         .get(),
+      probeAlternateVendors(catalogDB, upc, vendorCatalogID),
     ]);
     if (primarySnap.empty && arraySnap.empty) {
+      // Firestore auto-id so doc key matches the body's `id` field — same
+      // convention as POS-created items.
+      const newId = firestore.collection(inventoryPath).doc().id;
       const newInvItem = buildInventoryItemFromCatalog(
         catalogSnapshot,
+        newId,
         uid,
-        vendorURLStr,
         vendorCatalogID,
+        alternateVendors,
       );
       if (newInvItem) {
-        await firestore
-          .doc(`${inventoryPath}/${newInvItem.id}`)
-          .set(newInvItem);
-        createdInventoryItemID = newInvItem.id;
+        await firestore.doc(`${inventoryPath}/${newId}`).set(newInvItem);
+        createdInventoryItemID = newId;
       }
     } else if (vendorURLStr) {
       // Opportunistic backfill: stamp vendorURL onto an existing inventory
@@ -391,7 +459,9 @@ exports.addJBIItemToVendorOrder = onCall(COMMON_OPTS, async (request) => {
       lastModifiedByUserID: uid,
     });
     const existingSnapshot = existing.catalogSnapshot || catalogSnapshot || {};
-    const itemName = String(existingSnapshot.name || "");
+    const itemName = String(
+      existingSnapshot.catalogName || existingSnapshot.name || "",
+    );
     return {
       success: true,
       itemID: existingDoc.id,
@@ -407,7 +477,10 @@ exports.addJBIItemToVendorOrder = onCall(COMMON_OPTS, async (request) => {
   const itemID = crypto.randomUUID();
   const itemDoc = {
     id: itemID,
-    scannedBarcode: (catalogSnapshot && catalogSnapshot.primaryUpc) || "",
+    scannedBarcode:
+      (catalogSnapshot &&
+        (catalogSnapshot.primaryBarcode || catalogSnapshot.primaryUpc)) ||
+      "",
     qty: qtyNum,
     addedMillis: nowMs,
     addedByUserID: uid,
@@ -433,7 +506,10 @@ exports.addJBIItemToVendorOrder = onCall(COMMON_OPTS, async (request) => {
     lastModifiedByUserID: uid,
   });
 
-  const itemName = (catalogSnapshot && String(catalogSnapshot.name || "")) || "";
+  const itemName =
+    (catalogSnapshot &&
+      String(catalogSnapshot.catalogName || catalogSnapshot.name || "")) ||
+    "";
 
   return {
     success: true,
@@ -596,10 +672,13 @@ exports.getVendorOrderCallable = onCall(COMMON_OPTS, async (request) => {
     }
   }
 
-  // Resolve display fields using the same precedence as the in-app screen:
-  //   name  = inventory.formalName || inventory.informalName
-  //         || catalogSnapshot.name (canonical) || scannedBarcode
-  //         || vendorItemID || "(unknown)"
+  // Resolve display fields using the same precedence as the in-app screen.
+  // catalogName and formalName fall back to each other so we display
+  // correctly across both pre- and post-canonical-rewrite inventory items.
+  //   name  = inventory.catalogName || inventory.formalName
+  //         || inventory.informalName
+  //         || catalogSnapshot.catalogName || catalogSnapshot.name (legacy)
+  //         || scannedBarcode || vendorItemID || "(unknown)"
   //   cost  = catalogSnapshot.cost ?? inventory.cost     (both cents)
   //   price = inventory.price                            (cents)
   //   msrp  = inventory.msrp                             (cents)
@@ -618,8 +697,9 @@ exports.getVendorOrderCallable = onCall(COMMON_OPTS, async (request) => {
   const enrichedItems = items.map((it) => {
     const snap = it.catalogSnapshot || {};
     const inv = it.scannedBarcode ? inventoryByBarcode[it.scannedBarcode] : null;
-    const catalogName = String(snap.name || "");
-    const storeName = (inv && (inv.formalName || inv.informalName)) || "";
+    const catalogName = String(snap.catalogName || snap.name || "");
+    const storeName =
+      (inv && (inv.catalogName || inv.formalName)) || "";
     // vendorItemName falls in just before the part-number bottom — for vendors
     // whose catalog isn't imported (QBP today), the extension scrapes the
     // product name off the vendor page and stamps it on the line item so the

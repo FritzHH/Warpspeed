@@ -253,7 +253,7 @@ export function MobileItemEditScreen() {
                         className={styles.resultName}
                         style={{ color: C.text }}
                       >
-                        {item.formalName || item.informalName || "Unknown"}
+                        {item.catalogName || item.formalName || "Unknown"}
                       </span>
                       <span
                         className={styles.resultPrice}
@@ -313,7 +313,7 @@ export function MobileItemEditScreen() {
               {/* Item name + price */}
               <div className={styles.nameRow}>
                 <span className={styles.itemName} style={{ color: C.text }}>
-                  {item?.formalName || "Unknown Item"}
+                  {item?.catalogName || item?.formalName || "Unknown Item"}
                 </span>
                 <span className={styles.itemTotal} style={{ color: C.text }}>
                   ${formatCurrencyDisp(lineTotal)}

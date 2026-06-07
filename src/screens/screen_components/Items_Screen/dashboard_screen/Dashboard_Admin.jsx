@@ -1983,13 +1983,6 @@ const PaymentProcessingComponent = ({
             liveReaders={zLiveReaders}
             savedReaders={zSettingsObj?.cardReaders || []}
             onSaveReaders={(arr) => handleSettingsFieldChange("cardReaders", arr)}
-            selectedReader={zSettingsObj?.selectedCardReaderObj || { id: "", label: "" }}
-            onSelectReader={(obj) =>
-              handleSettingsFieldChange(
-                "selectedCardReaderObj",
-                obj || { id: "", label: "" }
-              )
-            }
           />
         </div>
       </BoxContainerInnerComponent>
@@ -2754,7 +2747,7 @@ const SPOOF_WORKORDER = {
       useSalePrice: false,
       inventoryItem: {
         manufacturerSku: "",
-        formalName: "HELMET AERIUS RAVEN L/XL M-BK",
+        catalogName: "HELMET AERIUS RAVEN L/XL M-BK",
         cost: 1995,
         brand: "",
         category: "Item",
@@ -2763,7 +2756,6 @@ const SPOOF_WORKORDER = {
         upc: "",
         id: "05YYGGwRFFZ3cnnszUvz",
         customSku: "",
-        informalName: "",
         ean: "",
         price: 0,
       },
@@ -2776,7 +2768,6 @@ const SPOOF_WORKORDER = {
       inventoryItem: {
         price: 6000,
         ean: "",
-        informalName: "",
         customSku: "",
         id: "086Gn523CkHuuPsPIL7r",
         upc: "014658020235",
@@ -2785,7 +2776,7 @@ const SPOOF_WORKORDER = {
         brand: "",
         minutes: 0,
         category: "Item",
-        formalName: "CAR RACK HOLYWD CROSSBAR ADAPTER BOOMERPRO",
+        catalogName: "CAR RACK HOLYWD CROSSBAR ADAPTER BOOMERPRO",
         manufacturerSku: "BA-PRO",
       },
       intakeNotes: "",
@@ -2810,10 +2801,9 @@ const SPOOF_WORKORDER = {
       id: "002482225496",
       inventoryItem: {
         customSku: "",
-        informalName: "",
         ean: "850051028009",
         price: 3000,
-        formalName: "BOTTLE CAGE BIKASE ABC SIDEWINDER ADJUSTABLE DRINK HOLDER BK",
+        catalogName: "BOTTLE CAGE BIKASE ABC SIDEWINDER ADJUSTABLE DRINK HOLDER BK",
         manufacturerSku: "1024",
         salePrice: 0,
         cost: 1849,
@@ -2845,7 +2835,6 @@ const SPOOF_WORKORDER = {
       inventoryItem: {
         price: 800,
         ean: "",
-        informalName: "Valve Core Remover - Park kT",
         customSku: "",
         upc: "763477008572",
         id: "0AwfMK11HyiJJ9FPIbAv",
@@ -2854,7 +2843,7 @@ const SPOOF_WORKORDER = {
         brand: "",
         minutes: 0,
         category: "Item",
-        formalName: "TOOL VALVE CORE REMOVER PARK VC-1",
+        catalogName: "TOOL VALVE CORE REMOVER PARK VC-1",
         manufacturerSku: "VC-1",
       },
     },
@@ -2901,7 +2890,7 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
 
   function handleSelectItem(invItem) {
     _setSelectedItemID(invItem.id);
-    _setLabel(invItem.informalName || invItem.formalName || "");
+    _setLabel(invItem.quickButtonLabel || invItem.catalogName || invItem.formalName || "");
     _setSearchString("");
     _setSearchResults([]);
   }
@@ -3029,7 +3018,8 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
           >
             <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
               <span style={{ fontSize: 13, color: C.text }}>
-                {resolvedItem.informalName ||
+                {resolvedItem.quickButtonLabel ||
+                  resolvedItem.catalogName ||
                   resolvedItem.formalName ||
                   "Unknown"}
               </span>
@@ -3127,7 +3117,7 @@ const StandButtonInventoryModal = ({ buttonObj, onClose, onSave }) => {
             >
               <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
                 <span style={{ fontSize: 13, color: C.text }}>
-                  {item.informalName || item.formalName || "Unknown"}
+                  {item.quickButtonLabel || item.catalogName || item.formalName || "Unknown"}
                 </span>
                 {!!item.brand && (
                   <span style={{ fontSize: 11, color: C.textMuted }}>

@@ -19,8 +19,7 @@ function SearchResultRow({ item, onAdd }) {
       style={{ borderColor: C.buttonLightGreenOutline }}
     >
       <div className={styles.resultNameCol}>
-        <span style={{ color: C.text }}>{item.formalName}</span>
-        <span style={{ color: C.text }}>{item.informalName}</span>
+        <span style={{ color: C.text }}>{item.catalogName || item.formalName}</span>
       </div>
       <div className={styles.resultPriceCol}>
         <span style={{ color: C.text }}>
@@ -59,7 +58,7 @@ export const InventorySearch = memo(function InventorySearch({
         ? inventory.find((item) => item.id === normalized || item.primaryBarcode === normalized || (item.barcodes || []).includes(normalized))
         : inventory.find((item) => item.id === trimmed);
       if (exactMatch) {
-        dlog(DCAT.ACTION, "barcodeScan_found", "InventorySearch", { itemId: exactMatch.id, itemName: exactMatch.formalName });
+        dlog(DCAT.ACTION, "barcodeScan_found", "InventorySearch", { itemId: exactMatch.id, itemName: exactMatch.catalogName || exactMatch.formalName });
         onAddItem(exactMatch);
         _setSearchString("");
         _setSearchResults([]);
@@ -88,7 +87,7 @@ export const InventorySearch = memo(function InventorySearch({
   }
 
   function handleAddItem(invItem) {
-    dlog(DCAT.BUTTON, "handleAddItem", "InventorySearch", { itemId: invItem?.id, itemName: invItem?.formalName });
+    dlog(DCAT.BUTTON, "handleAddItem", "InventorySearch", { itemId: invItem?.id, itemName: invItem?.catalogName || invItem?.formalName });
     if (onAddItem) onAddItem(invItem);
     _setSearchString("");
     _setSearchResults([]);

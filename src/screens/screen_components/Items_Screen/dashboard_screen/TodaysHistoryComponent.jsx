@@ -510,7 +510,7 @@ const RestoreConfirmModal = ({ workorder, salesTaxPercent, restoring, onCancel, 
               ) : lines.map((line, idx) => (
                 <div key={line.id || idx} className={styles.confirmLineItem}>
                   <span className={styles.confirmLineQty}>{line.qty || 1}×</span>
-                  <span className={styles.confirmLineName}>{line.inventoryItem?.formalName || line.inventoryItem?.informalName || "Item"}</span>
+                  <span className={styles.confirmLineName}>{line.inventoryItem?.catalogName || line.inventoryItem?.formalName || "Item"}</span>
                   <span className={styles.confirmLinePrice}>${formatCurrencyDisp(line.inventoryItem?.price || 0)}</span>
                 </div>
               ))}

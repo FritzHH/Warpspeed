@@ -198,3 +198,135 @@
   font-style: italic;
   padding: 8px 0;
 }
+
+.vendorCard {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-default);
+  background-color: var(--surface-accent-muted);
+  border-radius: var(--radius-row);
+  padding: 12px 14px;
+  gap: 12px;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.vendorCardHeader {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.savedBadge {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-on-accent);
+  background-color: var(--accent);
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  flex-shrink: 0;
+}
+
+.credSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.credSectionTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.credFields {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.credField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.credLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-default);
+}
+
+.credInput {
+  padding: 8px 12px;
+  border: 1px solid var(--border-default);
+  background-color: var(--surface-base);
+  color: var(--text-default);
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  box-sizing: border-box;
+  font-family: inherit;
+}
+
+.credInput:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.credActions {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.getStartedButton {
+  padding: 8px 14px;
+  background-color: transparent;
+  color: var(--text-default);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-control);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.getStartedButton:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.credSaveButton {
+  padding: 8px 16px;
+  background-color: var(--accent);
+  color: var(--text-on-accent);
+  border: none;
+  border-radius: var(--radius-control);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.credSaveButton:hover:not(:disabled) {
+  filter: brightness(1.05);
+}
+
+.credSaveButton:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

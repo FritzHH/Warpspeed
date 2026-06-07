@@ -245,7 +245,7 @@ function parseWorkorderLines(wo) {
   var newLines = [];
   (wo.workorderLines || []).forEach(function (workorderLine) {
     var line = Object.assign({}, workorderLine);
-    line.itemName = workorderLine.inventoryItem.formalName;
+    line.itemName = workorderLine.inventoryItem.catalogName || workorderLine.inventoryItem.formalName;
     line.discountName = workorderLine.discountObj?.name;
     line.discountSavings = workorderLine.discountObj?.savings;
     line.price = workorderLine.inventoryItem.price;
@@ -555,7 +555,7 @@ var printBuilder = {
     if (refund.workorderLines && refund.workorderLines.length > 0) {
       receipt.workorderLines = refund.workorderLines.map(function (line) {
         var parsed = Object.assign({}, line);
-        parsed.itemName = line.inventoryItem?.formalName || line.inventoryItem?.informalName || "";
+        parsed.itemName = line.inventoryItem?.catalogName || line.inventoryItem?.formalName || "";
         parsed.price = line.inventoryItem?.price || 0;
         parsed.discountName = line.discountObj?.name;
         parsed.discountSavings = line.discountObj?.savings;
@@ -596,12 +596,59 @@ var printBuilder = {
 
     return receipt;
   },
-  sale: function (sale, payments, customer, workorder, salesTaxPercent, context, credits) {
-    var receipt = createPrintBase(workorder, customer, salesTaxPercent, context);
+  sale: function (sale, payments, customer, workorders, salesTaxPercent, context, credits) {
+    // Accept a single workorder (legacy callers) or an array (multi-workorder sales).
+    var workorderArr = Array.isArray(workorders)
+      ? workorders.filter(Boolean)
+      : (workorders ? [workorders] : []);
+    var primaryWorkorder = workorderArr[0] || { workorderLines: [], taxFree: false };
+
+    var receipt = createPrintBase(primaryWorkorder, customer, salesTaxPercent, context);
     receipt = Object.assign({}, receipt, sale);
     receipt.tax = sale.salesTax != null ? sale.salesTax : (receipt.tax || 0);
     receipt.barcode = sale.id;
     receipt.receiptType = RECEIPT_TYPES.sales;
+
+    // Build top-level workorders[] — each entry has its own lines + per-WO subtotal block.
+    // Renderers should prefer this array; legacy top-level fields (from primary WO) are kept
+    // for backward compat and ignored when workorders[] is non-empty.
+    var _settings = (context || {}).settings || {};
+    var _statuses = _settings.statuses || [];
+    receipt.workorders = workorderArr.map(function (wo) {
+      var woTaxFree = !!wo.taxFree;
+      var woTotals = calculateRunningTotals(wo, salesTaxPercent, [], false, woTaxFree);
+      var woLines = parseWorkorderLines(wo);
+      var color1Label = wo.color1 && typeof wo.color1 === "object"
+        ? (wo.color1.label || "")
+        : (wo.color1 || "");
+      var color2Label = wo.color2 && typeof wo.color2 === "object"
+        ? (wo.color2.label || "")
+        : (wo.color2 || "");
+      var waitTimeLabel = wo.waitTime && typeof wo.waitTime === "object"
+        ? (wo.waitTime.label || "")
+        : (wo.waitTime || "");
+      return {
+        id: wo.id || "",
+        workorderNumber: wo.workorderNumber || "",
+        brand: wo.brand || "",
+        model: wo.model || "",
+        description: wo.description || "",
+        color1: color1Label,
+        color2: color2Label,
+        status: resolveStatus(wo.status, _statuses).label,
+        waitTime: waitTimeLabel,
+        startedOnMillis: wo.startedOnMillis || "",
+        finishedOnMillis: wo.finishedOnMillis || "",
+        workorderLines: woLines,
+        subtotal: woTotals.runningTotal,
+        discount: woTotals.runningDiscount,
+        tax: woTotals.runningTax,
+        total: woTotals.finalTotal,
+        taxFree: woTaxFree,
+        internalNotes: wo.internalNotes || [],
+        customerNotes: wo.customerNotes || [],
+      };
+    });
     // Build unified payments[]: cash/card/check transactions + credits/deposits/gift cards
     var allPayments = (payments || []).map(function (p) {
       var type = p.method === "cash" ? "Cash" : p.method === "check" ? "Check" : "Card";
@@ -665,7 +712,7 @@ var printBuilder = {
     });
     receipt.cashChangeGiven = cashChange;
     receipt.cashChangeGivenDisplay = cashChange ? "$" + (cashChange / 100).toFixed(2) : "";
-    var txDate = workorder?.finishedOnMillis ? new Date(Number(workorder.finishedOnMillis)) : new Date();
+    var txDate = primaryWorkorder?.finishedOnMillis ? new Date(Number(primaryWorkorder.finishedOnMillis)) : new Date();
     receipt.transactionDateTime = txDate.toLocaleDateString() + "  " + txDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
 
     // Deposit/credit sale fields

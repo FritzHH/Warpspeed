@@ -480,7 +480,7 @@ export function MessagesComponent({}) {
     try {
       lineItems = (zWorkorderObj?.workorderLines || [])
         .map((line) => {
-          let name = line.inventoryItem?.informalName || line.inventoryItem?.formalName || "";
+          let name = line.inventoryItem?.catalogName || line.inventoryItem?.formalName || "";
           return line.qty + "x " + name;
         })
         .join(", ");

@@ -49,7 +49,7 @@ export const CustomItemModal = ({
     if (!visible) return;
     if (existingLine) {
       const inv = existingLine.inventoryItem || {};
-      _setName(inv.formalName || "");
+      _setName(inv.catalogName || inv.formalName || "");
       const { display } = usdTypeMask(inv.price);
       _setPriceDisplay(display);
       _setPriceCents(inv.price || 0);
@@ -144,7 +144,7 @@ export const CustomItemModal = ({
   function handleSave() {
     // Build the synthetic inventory item
     let invItem = cloneDeep(INVENTORY_ITEM_PROTO);
-    invItem.formalName = sName.trim();
+    invItem.catalogName = sName.trim();
     invItem.price = sPriceCents;
     invItem.category = isLabor ? "Labor" : "Item";
     invItem.customLabor = isLabor;

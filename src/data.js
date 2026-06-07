@@ -153,6 +153,8 @@ export const CUSTOMER_DEPOSIT_PROTO = {
   note: "",            // user-entered note
   last4: "",           // card last 4 digits (card deposits only, for display)
   type: "",            // "deposit" = regular deposit, "giftcard" = gift card
+  refunded: false,     // true once fully refunded — kept in list as historical record
+  refundedMillis: 0,   // timestamp of full refund
 }
 
 
@@ -451,6 +453,7 @@ export const ITEM_ORDERED_PROTO = {
   partOrdered: "",
   partSource: "",
   partToBeOrdered: true,
+  partInCart: false,
   trackingNumber: "",
   partOrderEstimateMillis: "",
   partOrderedMillis: "",
@@ -574,48 +577,34 @@ export const VENDOR_CATALOGS = [
 ];
 
 export const INVENTORY_ITEM_PROTO = {
-  formalName: "",
-  informalName: "",
-  brand: "",
-  vendorId: "",
-  vendorName: "",
-  vendorURL: "",
-  image_url: "",
+  // vendor mapping
   catalogName: "",
-  price: 0,
-  salePrice: 0,
-  msrp: 0,
-  category: "Item",
-  id: "",
-  cost: "",
+  vendorPartId: "",
   primaryBarcode: "",
   barcodes: [],
+  brand: "",
+  image_url: "", // JBI has this, need to figure out how to get QBP's
+  cost: 0,
+  msrp: 0,
+  vendorId: "", // vendor id, example "jbi"
+  category: "Labor", // vendor catalogs need to change this to "Item"
+  alternateVendors: [], // example: { vendorId: "qbp", vendorPartId: "CH4093" }
+  // on inventory item creation
+
+  // app-specific needs
+
+  quickButtonLabel: "",  // primary short/display name. supersedes informalName.
+  price: 0, // will be filled in by the user on creation or import to local inventory from  vendor catalog
+  salePrice: 0,
   minutes: 0,
   customPart: false,
   customLabor: false,
   receiptNoteRequired: false,
-  // Vendor specs snapshot. Copied from the `specs` field of
-  // vendor_catalogs/{vendor}/items_by_id/{itemId} (Firestore) at "Add to
-  // inventory" time so the item is self-contained for display.
-  // Refresh via inventory modal button (manual) — no live listener.
-  //   source         = "jbi" | "qbp" | "manual" | "" (origin of the snapshot)
-  //   lastUpdated    = millis mirroring the vendor doc's lastUpdated at copy time
-  //   entries        = ordered list of { title, value, key?, unit? }
-  //     - title/value: required; what the generic SpecsList renderer shows
-  //     - key:   canonical attribute id (e.g. "wheelDiameter") — typed sources
-  //              (QBP) populate it so future query/filter code can match across
-  //              items without title-string fuzzy-matching. Freeform sources
-  //              (JBI) omit it.
-  //     - unit:  optional, only when separating a numeric value from its unit
-  //              helps a downstream comparator. Display renderer ignores it.
-  // Ingestion-side vendor knowledge (mapping JBI's freeform titles or QBP's
-  // typed schema into this shape) stays in the vendor-specific sync code, so
-  // every read site sees one uniform structure.
-  specs: {
-    source: "",
-    lastUpdated: 0,
-    entries: [],
-  },
+
+  // to be depracated
+  vendorName: "", // will depracate
+  formalName: "", // will depracate
+  informalName: "", // deprecated — read-only fallback for snapshots written before quickButtonLabel migration
 };
 
 // Vendor order = a purchase order being built (phone scanner + desktop polish).

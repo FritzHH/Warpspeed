@@ -491,8 +491,8 @@ export function mapWorkorders(
       }
       const inventoryItem = {
         id: item ? item.itemID : crypto.randomUUID(),
-        formalName: item ? (item.description || "Unknown Item") : "Unknown Item",
-        informalName: "",
+        catalogName: item ? (item.description || "Unknown Item") : "Unknown Item",
+        quickButtonLabel: "",
         brand: "",
         price: dollarsToCents(wi.unitPrice),
         salePrice: 0,
@@ -547,8 +547,8 @@ export function mapWorkorders(
         receiptNotes: "",
         inventoryItem: {
           id: crypto.randomUUID(),
-          formalName: sanitize((wl.note || "").trim()) || (isLabor ? "Custom Labor" : "Custom Item"),
-          informalName: "",
+          catalogName: sanitize((wl.note || "").trim()) || (isLabor ? "Custom Labor" : "Custom Item"),
+          quickButtonLabel: "",
           brand: "",
           price,
           salePrice: 0,

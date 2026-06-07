@@ -50,14 +50,9 @@ export async function fillInventory() {
     if (lastDigit == 0) lastDigit = 2;
     if (lastDigit == 9) lastDigit = 8;
     let inv = { ...INVENTORY_ITEM_PROTO, id: generateEAN13Barcode() };
-    inv.formalName =
+    inv.catalogName =
       (await randomWordGenerator()) +
       " " +
-      (await randomWordGenerator()) +
-      " " +
-      (await randomWordGenerator());
-    inv.informalName =
-      "(informal name)" +
       (await randomWordGenerator()) +
       " " +
       (await randomWordGenerator());

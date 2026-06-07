@@ -113,7 +113,7 @@ const textColor = C.textSecondary;
 const discountTextColor = C.red;
 
 function OverlayLineItemRow({ item }) {
-  let name = item.inventoryItem?.formalName || "Item";
+  let name = item.inventoryItem?.catalogName || item.inventoryItem?.formalName || "Item";
   let qty = item.qty || 1;
   let unitPrice = item.inventoryItem?.price || 0;
   let hasDiscount = item.discountObj && item.discountObj.savings > 0;
@@ -639,26 +639,11 @@ export function CustomerDisplayScreen() {
     window.addEventListener("beforeunload", handleBeforeUnload);
     window.addEventListener("blur", handleWindowBlur);
     window.addEventListener("focus", handleWindowFocus);
-    // Customer display should always be in fullscreen (polished presentation
-    // for customers). Two paths achieve and maintain that state:
-    //
-    //   1. Auto-fullscreen on mount — fires inside the user-gesture-active
-    //      context immediately after window.open. Zero-touch when permission
-    //      is granted.
-    //   2. Persistent single-click/keydown listener — re-enters fullscreen
-    //      after Esc or any glitch that leaves the window non-fullscreen.
-    //      Does NOT self-remove; the customer screen faces away from the
-    //      operator, so any gesture on it is intentional and means "be
-    //      polished."
-    //
-    // The previous double-click toggle has been removed — auto + persistent
-    // single-click covers entry, Esc handles exit.
     function ensureFullscreen() {
       if (document.fullscreenElement) return;
       document.documentElement.requestFullscreen().catch(() => {});
     }
     if (document.documentElement.requestFullscreen) {
-      ensureFullscreen();
       document.addEventListener("click", ensureFullscreen, true);
       document.addEventListener("keydown", ensureFullscreen, true);
     }

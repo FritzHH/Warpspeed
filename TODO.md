@@ -57,6 +57,7 @@ _Items the user adds with the phrase "my todo" / "add to my todos" / similar (ke
   - Source: `memory/project-saas-provisioning-host-site.md`
 - **Vendor-side order submission (QBP + JBI)** — Today both handlers drop a cart at the vendor's storefront (QBP: `CSUB=NO` lands at qbponlinestorefront; JBI: equivalent cart-only path). Future: support actual customer order submission so the staff member never has to log into the vendor site to finalize. Per-store toggle on `settings.vendors.<vendorID>.submitAsCart` (already plumbed in `functions/vendors/qbp.js` `buildPoiFile`). Then add a per-vendor settings UI for the required submission fields (shipping address, payment selection, etc.). QBP: scope is the submission path itself — does NOT include the currently-known account-side gaps (NT00:R is the only HTRM Bonita has activated; HSVT delivery-mode codes vs. UPS shorthand). Those are separate.
 - **QBP vendor catalog ingestion** — Chrome extension supports adding QBP items via the same UI as JBI (2026-06-02), but no QBP catalog feed exists yet. Backend `addJBIItemToVendorOrder` looks up `vendor_catalogs/qbp/items/<id>` on cadence-pos RTDB and gracefully falls back to "no match" / scraped page cost only. Until a catalog feed lands: QBP items show with `vendorItemID` as the name, the page-scraped cost (no inventory match), and `lookupStatus: "no_match"`. Need: (a) decide on feed source (QBP FTP feed parity with JBI inv_mast.txt, vs scraper, vs QBP API if available), (b) Cloud Run Job mirror of `jobs/vendor-catalog-jbi/` keyed to QBP's product taxonomy, (c) per-vendor `buildInventoryItemFromQbpCatalog` mapping in `functions/saas/chrome-extension-callables.js` to enable auto-create on add (currently JBI-only). Once those land, the extension Just Works — no extension-side changes needed.
+- **Phone system synthetic-call health check** — Twilio's Registered Endpoints tab is unreliable and SIP registrations on WiFi phones (WP810) can silently drop without a customer-facing failure signal until someone calls. Add a scheduled Cloud Function (cron, e.g. every 5–15 min) that places a test call into the Twilio number → checks `DialCallStatus` from `phoneVoiceDialAction` → alerts (SMS to owner / Slack / etc.) after N consecutive failures. Per-store toggle in `phone-config/main`. Implement next, immediately after outbound dial-out fix lands. Goal: never let an inbound dead-air state persist for more than the polling interval.
 
 ---
 
@@ -112,6 +113,20 @@ _Items the user adds with the phrase "my todo" / "add to my todos" / similar (ke
 - [ ] (f) Port-in — deferred.
 - [ ] (g) A2P brand/campaign link.
 - Source: `memory/project-cadence-dashboard-twilio-ui.md`
+
+### Vendor Catalog → Firestore Migration (8 phases, Phase 0 blocks all)
+
+- [ ] Phase 0 — **USER TODO**: lock canonical item shape + JBI/QBP mapping fns. Blocks all subsequent phases.
+- [ ] Phase 1 — Rewrite `jobs/vendor-catalog-jbi/modes/master.js` for Firestore-diff w/ specs folded; drop `specs.js`.
+- [ ] Phase 2 — Rewrite `jobs/vendor-catalog-qbp/modes/master.js` for Firestore-diff.
+- [ ] Phase 3 — Create `gs://cadence-pos-vendor-catalog-baselines` (versioned, 30-day lifecycle); grant Cloud Run SA `objectAdmin`.
+- [ ] Phase 4 — Cloud Scheduler entries: `vendor-catalog-jbi-master` (3 AM ET), `vendor-catalog-qbp-master` (3:30 AM ET).
+- [ ] Phase 5 — Client read helpers in `db_calls_wrapper.js`: `dbGetVendorItemByID`, `dbGetVendorItemByUPC` (array-contains), `dbGetVendorInventoryByItem`. Update Chrome extension callable too.
+- [ ] Phase 6 — Bootstrap run + verification (Firestore counts, GCS baselines, UPC lookup, diff math).
+- [ ] Phase 7 — RTDB cleanup: delete `vendor_catalogs/{jbi,qbp}/items_by_id`, `items_by_upc`, `specs`. Keep `inventory_by_item`.
+- [ ] Phase 8 — Housekeeping: fix `avail_pa` → `PA` in JBI inventory; update memory files.
+- Architecture: hybrid (RTDB inventory @ 15-min, Firestore items @ nightly via GCS baseline-diff). Locked: no listeners ever; ~$8.50/mo all-in.
+- Source: `vendor-catalog-firestore-migration.md`
 
 ---
 

@@ -212,14 +212,14 @@ const QBInventorySearchModal = ({
                       className={styles.modalResultName}
                       style={{ color: alreadyAdded ? C.textMuted : C.text }}
                     >
-                      {item.informalName || item.formalName}
+                      {item.quickButtonLabel || item.catalogName || item.formalName}
                     </span>
-                    {!!item.informalName && (
+                    {!!item.quickButtonLabel && (
                       <span
                         className={styles.modalResultFormal}
                         style={{ color: C.textMuted }}
                       >
-                        {item.formalName}
+                        {item.catalogName || item.formalName}
                       </span>
                     )}
                   </div>
@@ -266,7 +266,7 @@ const ParentButtonItemsList = ({
   function handleItemLabelChange(inventoryItemID, val) {
     const invItem = zInventoryArr.find((o) => o.id === inventoryItemID);
     if (!invItem) return;
-    const updated = { ...invItem, informalName: val };
+    const updated = { ...invItem, quickButtonLabel: val };
     const updatedArr = zInventoryArr.map((i) =>
       i.id === inventoryItemID ? updated : i
     );
@@ -427,12 +427,12 @@ const ParentButtonItemsList = ({
                   className={styles.itemRowFormalName}
                   style={{ color: C.text }}
                 >
-                  {inv.formalName}
+                  {inv.catalogName || inv.formalName}
                 </span>
                 <TextInput
                   placeholder="Descriptive name"
                   placeholderTextColor={C.textDisabled}
-                  value={inv.informalName || ""}
+                  value={inv.quickButtonLabel || ""}
                   onChangeText={(val) =>
                     handleItemLabelChange(inv.id, val)
                   }
@@ -704,7 +704,8 @@ export const QuickItemButtonsComponent = () => {
       formalNames = (btn.items || [])
         .map((entry) => {
           const id = typeof entry === "string" ? entry : entry.inventoryItemID;
-          return zInventoryArr.find((o) => o.id === id)?.formalName;
+          const inv = zInventoryArr.find((o) => o.id === id);
+          return inv?.catalogName || inv?.formalName;
         })
         .filter(Boolean)
         .join(", ");

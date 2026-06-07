@@ -138,7 +138,7 @@ function _buildBarcodeFieldZpl(field, dataValue) {
  * Generate a complete ZPL label string from a template and data object.
  *
  * @param {object} template - { labelWidth, labelHeight, fields: [{type, name, x, y, width, height, fontSize, bold, align}] }
- * @param {object} data     - { formalName, informalName, id, price, salePrice, barcode, brand, ... }
+ * @param {object} data     - { catalogName, formalName, informalName, id, price, salePrice, barcode, brand, ... }
  * @returns {string} Complete ZPL string "^XA...^XZ"
  */
 function generateLabelZpl(template, data) {

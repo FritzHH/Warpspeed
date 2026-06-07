@@ -58,6 +58,7 @@ import styles from "./Info_ActiveWorkorder.module.css";
 // --- Dimming when field has text (easy to adjust) ---
 const FILLED_DROPDOWN_OPACITY = 0.3;                          // dropdown button opacity when text present
 const FILLED_BORDER_COLOR = "rgba(200, 228, 220, 0.25)";      // faded version of C.buttonLightGreenOutline rgb(200,228,220)
+const SWALLOW_DURATION_MS = 750;                              // post-auto-jump keystroke lockout on destination field
 const RECEIPT_DROPDOWN_SELECTIONS = [
   RECEIPT_TYPES.intake,
   RECEIPT_TYPES.workorder,
@@ -370,6 +371,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sBrandFocused, _setBrandFocused] = useState(false);
   const brandWrapperRef = useRef(null);
   const brandBackspaced = useRef(false);
+  const brandPrevValRef = useRef("");
 
   const brandSuggestions = sBrandFocused && zOpenWorkorder?.brand?.trim().length >= 1
     ? (zSettings.allBrands || []).filter(
@@ -392,6 +394,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const descInputRef = useRef(null);
   const color1InputRef = useRef(null);
   const descBackspaced = useRef(false);
+  const descPrevValRef = useRef("");
 
   const descSuggestions = sDescFocused && zOpenWorkorder?.description?.trim().length >= 1
     ? (zSettings.allDescriptions || []).filter(
@@ -438,6 +441,16 @@ export const ActiveWorkorderComponent = ({}) => {
   const color2InputRef = useRef(null);
   const color1Backspaced = useRef(false);
   const color2Backspaced = useRef(false);
+  const color1PrevValRef = useRef("");
+  const color2PrevValRef = useRef("");
+
+  // Auto-select swallow: destination field ignores keystrokes for SWALLOW_DURATION_MS after focus jump
+  const [sDescSwallowing, _setDescSwallowing] = useState(false);
+  const [sColor1Swallowing, _setColor1Swallowing] = useState(false);
+  const [sColor2Swallowing, _setColor2Swallowing] = useState(false);
+  const descSwallowTimerRef = useRef(null);
+  const color1SwallowTimerRef = useRef(null);
+  const color2SwallowTimerRef = useRef(null);
 
   const allColorLabels = COLORS.map((c) => c.label);
 
@@ -812,6 +825,8 @@ export const ActiveWorkorderComponent = ({}) => {
                   value={capitalizeFirstLetterOfString(zOpenWorkorder?.brand)}
                   onKeyPress={(e) => { if (e.nativeEvent.key === "Backspace") brandBackspaced.current = true; }}
                   onChangeText={(val) => {
+                    if (val.length < brandPrevValRef.current.length) brandBackspaced.current = true;
+                    brandPrevValRef.current = val;
                     useOpenWorkordersStore.getState().setField("brand", val, zOpenWorkorder.id);
                     if (!brandBackspaced.current && val.trim().length >= 2) {
                       const q = val.trim().toLowerCase();
@@ -821,11 +836,17 @@ export const ActiveWorkorderComponent = ({}) => {
                       if (matches.length === 1) {
                         useOpenWorkordersStore.getState().setField("brand", matches[0], zOpenWorkorder.id);
                         _setBrandFocused(false);
-                        setTimeout(() => { const el = descInputRef.current?.querySelector?.("input"); if (el) el.focus(); }, 50);
+                        setTimeout(() => {
+                          const el = descInputRef.current?.querySelector?.("input");
+                          if (el) el.focus();
+                          if (descSwallowTimerRef.current) clearTimeout(descSwallowTimerRef.current);
+                          _setDescSwallowing(true);
+                          descSwallowTimerRef.current = setTimeout(() => _setDescSwallowing(false), SWALLOW_DURATION_MS);
+                        }, 50);
                       }
                     }
                   }}
-                  onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setBrandFocused(true); brandBackspaced.current = false; }}
+                  onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setBrandFocused(true); brandBackspaced.current = false; brandPrevValRef.current = zOpenWorkorder?.brand || ""; }}
                   onBlur={() => {
                     setTimeout(() => {
                       _setBrandFocused(false);
@@ -960,7 +981,7 @@ export const ActiveWorkorderComponent = ({}) => {
             >
               <div ref={descInputRef} style={{ width: "45%", position: "relative", zIndex: sDescFocused ? 200 : 10, flexShrink: 0 }}>
                 <TextInput_
-                  placeholder={"Model / description"}
+                  placeholder={sDescSwallowing ? "" : "Model / description"}
                   editable={!isDonePaid}
                   capitalize={true}
                   style={{
@@ -974,10 +995,14 @@ export const ActiveWorkorderComponent = ({}) => {
                     outlineStyle: "none",
                     borderRadius: Radius.control,
                     fontWeight: zOpenWorkorder?.description ? "500" : null,
+                    backgroundColor: sDescSwallowing ? C.dangerMuted : undefined,
                   }}
                   value={capitalizeFirstLetterOfString(zOpenWorkorder?.description)}
-                  onKeyPress={(e) => { if (e.nativeEvent.key === "Backspace") descBackspaced.current = true; }}
+                  onKeyPress={(e) => { if (sDescSwallowing) { e.preventDefault?.(); return; } if (e.nativeEvent.key === "Backspace") descBackspaced.current = true; }}
                   onChangeText={(val) => {
+                    if (sDescSwallowing) return;
+                    if (val.length < descPrevValRef.current.length) descBackspaced.current = true;
+                    descPrevValRef.current = val;
                     useOpenWorkordersStore.getState().setField("description", val, zOpenWorkorder.id);
                     if (!descBackspaced.current && val.trim().length >= 2) {
                       const q = val.trim().toLowerCase();
@@ -987,17 +1012,25 @@ export const ActiveWorkorderComponent = ({}) => {
                       if (matches.length === 1) {
                         useOpenWorkordersStore.getState().setField("description", matches[0], zOpenWorkorder.id);
                         _setDescFocused(false);
-                        setTimeout(() => { const el = color1InputRef.current?.querySelector?.("input"); if (el) el.focus(); }, 50);
+                        setTimeout(() => {
+                          const el = color1InputRef.current?.querySelector?.("input");
+                          if (el) el.focus();
+                          if (color1SwallowTimerRef.current) clearTimeout(color1SwallowTimerRef.current);
+                          _setColor1Swallowing(true);
+                          color1SwallowTimerRef.current = setTimeout(() => _setColor1Swallowing(false), SWALLOW_DURATION_MS);
+                        }, 50);
                       }
                     }
                   }}
-                  onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setDescFocused(true); descBackspaced.current = false; }}
+                  onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setDescFocused(true); descBackspaced.current = false; descPrevValRef.current = zOpenWorkorder?.description || ""; }}
                   onBlur={() => {
                     setTimeout(() => {
                       _setDescFocused(false);
                       descBackspaced.current = false;
                       saveDescToAllDescriptions(zOpenWorkorder?.description);
                     }, 150);
+                    if (descSwallowTimerRef.current) clearTimeout(descSwallowTimerRef.current);
+                    _setDescSwallowing(false);
                   }}
                 />
                 {descSuggestions.length > 0 && (
@@ -1104,7 +1137,7 @@ export const ActiveWorkorderComponent = ({}) => {
               <div style={{ width: "45%", display: "flex", flexDirection: "row", zIndex: 10, flexShrink: 0 }}>
                 <div ref={color1WrapperRef} style={{ width: "48%", zIndex: 10, flexShrink: 0 }}>
                   <TextInput_
-                    placeholder={"Color 1"}
+                    placeholder={sColor1Swallowing ? "" : "Color 1"}
                     editable={!isDonePaid}
                     capitalize={true}
                     value={capitalizeFirstLetterOfString(zOpenWorkorder?.color1.label)}
@@ -1118,11 +1151,14 @@ export const ActiveWorkorderComponent = ({}) => {
                       outlineStyle: "none",
                       borderRadius: Radius.control,
                       fontWeight: zOpenWorkorder?.color1.label ? "500" : null,
-                      backgroundColor: zOpenWorkorder?.color1.backgroundColor,
+                      backgroundColor: sColor1Swallowing ? C.dangerMuted : zOpenWorkorder?.color1.backgroundColor,
                       color: zOpenWorkorder?.color1.textColor,
                     }}
-                    onKeyPress={(e) => { if (e.nativeEvent.key === "Backspace") color1Backspaced.current = true; }}
+                    onKeyPress={(e) => { if (sColor1Swallowing) { e.preventDefault?.(); return; } if (e.nativeEvent.key === "Backspace") color1Backspaced.current = true; }}
                     onChangeText={(val) => {
+                      if (sColor1Swallowing) return;
+                      if (val.length < color1PrevValRef.current.length) color1Backspaced.current = true;
+                      color1PrevValRef.current = val;
                       setBikeColor(val, "color1");
                       if (!color1Backspaced.current && val.trim().length >= 2) {
                         const q = val.trim().toLowerCase();
@@ -1132,16 +1168,24 @@ export const ActiveWorkorderComponent = ({}) => {
                         if (matches.length === 1) {
                           setBikeColor(matches[0], "color1");
                           _setColor1Focused(false);
-                          setTimeout(() => { const el = color2InputRef.current?.querySelector?.("input"); if (el) el.focus(); }, 50);
+                          setTimeout(() => {
+                            const el = color2InputRef.current?.querySelector?.("input");
+                            if (el) el.focus();
+                            if (color2SwallowTimerRef.current) clearTimeout(color2SwallowTimerRef.current);
+                            _setColor2Swallowing(true);
+                            color2SwallowTimerRef.current = setTimeout(() => _setColor2Swallowing(false), SWALLOW_DURATION_MS);
+                          }, 50);
                         }
                       }
                     }}
-                    onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setColor1Focused(true); color1Backspaced.current = false; }}
+                    onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setColor1Focused(true); color1Backspaced.current = false; color1PrevValRef.current = zOpenWorkorder?.color1?.label || ""; }}
                     onBlur={() => {
                       setTimeout(() => {
                         _setColor1Focused(false);
                         color1Backspaced.current = false;
                       }, 150);
+                      if (color1SwallowTimerRef.current) clearTimeout(color1SwallowTimerRef.current);
+                      _setColor1Swallowing(false);
                     }}
                   />
                   {color1Suggestions.length > 0 && (
@@ -1187,7 +1231,7 @@ export const ActiveWorkorderComponent = ({}) => {
                 <div style={{ width: 5, flexShrink: 0 }} />
                 <div ref={color2InputRef} style={{ width: "48%", zIndex: 10, flexShrink: 0 }}>
                   <TextInput_
-                    placeholder={"Color 2"}
+                    placeholder={sColor2Swallowing ? "" : "Color 2"}
                     editable={!isDonePaid}
                     capitalize={true}
                     value={capitalizeFirstLetterOfString(zOpenWorkorder?.color2.label)}
@@ -1201,11 +1245,14 @@ export const ActiveWorkorderComponent = ({}) => {
                       outlineStyle: "none",
                       borderRadius: Radius.control,
                       fontWeight: zOpenWorkorder?.color2.label ? "500" : null,
-                      backgroundColor: zOpenWorkorder?.color2.backgroundColor,
+                      backgroundColor: sColor2Swallowing ? C.dangerMuted : zOpenWorkorder?.color2.backgroundColor,
                       color: zOpenWorkorder?.color2.textColor,
                     }}
-                    onKeyPress={(e) => { if (e.nativeEvent.key === "Backspace") color2Backspaced.current = true; }}
+                    onKeyPress={(e) => { if (sColor2Swallowing) { e.preventDefault?.(); return; } if (e.nativeEvent.key === "Backspace") color2Backspaced.current = true; }}
                     onChangeText={(val) => {
+                      if (sColor2Swallowing) return;
+                      if (val.length < color2PrevValRef.current.length) color2Backspaced.current = true;
+                      color2PrevValRef.current = val;
                       setBikeColor(val, "color2");
                       if (!color2Backspaced.current && val.trim().length >= 2) {
                         const q = val.trim().toLowerCase();
@@ -1218,12 +1265,14 @@ export const ActiveWorkorderComponent = ({}) => {
                         }
                       }
                     }}
-                    onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setColor2Focused(true); color2Backspaced.current = false; }}
+                    onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setColor2Focused(true); color2Backspaced.current = false; color2PrevValRef.current = zOpenWorkorder?.color2?.label || ""; }}
                     onBlur={() => {
                       setTimeout(() => {
                         _setColor2Focused(false);
                         color2Backspaced.current = false;
                       }, 150);
+                      if (color2SwallowTimerRef.current) clearTimeout(color2SwallowTimerRef.current);
+                      _setColor2Swallowing(false);
                     }}
                   />
                   {color2Suggestions.length > 0 && (
@@ -1709,14 +1758,14 @@ export const ActiveWorkorderComponent = ({}) => {
                     style={{
                       display: "flex",
                       flexDirection: "row",
-                      justifyContent: "flex-start",
+                      justifyContent: "space-between",
                       alignItems: "center",
                       width: "100%",
                       marginTop: 11,
                       boxSizing: "border-box",
                     }}
                   >
-                    <div ref={partSourceWrapperRef} style={{ position: "relative", width: "50%", flexShrink: 0, zIndex: 5 }}>
+                    <div ref={partSourceWrapperRef} style={{ position: "relative", width: "48%", flexShrink: 0, zIndex: 5 }}>
                       <TextInput_
                         value={capitalizeFirstLetterOfString(sActiveOrderedItem?.partSource || "")}
                         placeholder={"Item sources"}
@@ -1801,12 +1850,12 @@ export const ActiveWorkorderComponent = ({}) => {
                     </div>
                     <div
                       style={{
-                        width: "50%",
+                        width: "48%",
                         display: "flex",
                         flexDirection: "row",
                         paddingLeft: 5,
                         alignItems: "center",
-                        justifyContent: "center",
+                        justifyContent: "flex-start",
                         flexShrink: 0,
                         boxSizing: "border-box",
                       }}
@@ -1814,7 +1863,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       <div
                         onMouseEnter={(e) => { e.currentTarget.style.opacity = 1; }}
                         onMouseLeave={(e) => { e.currentTarget.style.opacity = sActiveOrderedItem?.partSource ? FILLED_DROPDOWN_OPACITY : 1; }}
-                        style={{ opacity: sActiveOrderedItem?.partSource ? FILLED_DROPDOWN_OPACITY : 1 }}
+                        style={{ opacity: sActiveOrderedItem?.partSource ? FILLED_DROPDOWN_OPACITY : 1, width: "100%" }}
                       >
                         <DropdownMenu
                           dataArr={zSettings.partSources}
@@ -1824,7 +1873,7 @@ export const ActiveWorkorderComponent = ({}) => {
                             savePartSourceToAllPartSources(item);
                           }}
                           modalCoordX={20}
-                          buttonStyle={{ paddingHorizontal: 40 }}
+                          buttonStyle={{ paddingHorizontal: 40, width: "100%" }}
                           ref={partSourcesRef}
                           matchValue={sActiveOrderedItem?.partSource || ""}
                           buttonText={sActiveOrderedItem?.partSource || "Sources"}
@@ -1905,6 +1954,27 @@ export const ActiveWorkorderComponent = ({}) => {
                       </span>
                     )}
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                      <CheckBox
+                        isChecked={!!sActiveOrderedItem?.partInCart}
+                        text="Item in cart"
+                        textStyle={{ fontSize: 11 }}
+                        buttonStyle={{ backgroundColor: "transparent" }}
+                        onCheck={() => {
+                          if (isDonePaid || !hasActiveItem) return;
+                          const newVal = !sActiveOrderedItem?.partInCart;
+                          const updated = { ...sActiveOrderedItem, partInCart: newVal };
+                          if (newVal) {
+                            updated.partToBeOrdered = true;
+                            updated.partOrderedMillis = "";
+                          }
+                          _sSetActiveOrderedItem(updated);
+                          commitOrUpdateActiveItem(updated);
+                          if (newVal) {
+                            useOpenWorkordersStore.getState().setField("status", "part_in_cart", zOpenWorkorder.id);
+                          }
+                        }}
+                      />
+                      <div style={{ display: 'flex', flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
                       <button
                         type="button"
                         disabled={isDonePaid || !hasActiveItem}
@@ -1917,6 +1987,7 @@ export const ActiveWorkorderComponent = ({}) => {
                               const now = Date.now();
                               updated.partOrderedMillis = now;
                               updated.partOrderEstimateMillis = now + (sWaitDays * MILLIS_IN_DAY);
+                              updated.partInCart = false;
                             } else {
                               updated.partOrderedMillis = "";
                             }
@@ -1948,7 +2019,7 @@ export const ActiveWorkorderComponent = ({}) => {
                         <span style={{ fontSize: 11, fontWeight: '600', color: sActiveOrderedItem?.partToBeOrdered ? C.red : C.green }}>{sActiveOrderedItem?.partToBeOrdered ? "Not ordered" : "Ordered"}</span>
                       </button>
                       {!sActiveOrderedItem?.partToBeOrdered && sActiveOrderedItem?.partOrderedMillis ? (
-                        <span style={{ marginTop: 2, fontSize: 9, fontStyle: 'italic', color: C.textMuted, whiteSpace: 'nowrap' }}>
+                        <span style={{ marginLeft: 6, fontSize: 9, fontStyle: 'italic', color: C.textMuted, whiteSpace: 'nowrap' }}>
                           {(() => {
                             const d = new Date(sActiveOrderedItem.partOrderedMillis);
                             const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -1956,6 +2027,7 @@ export const ActiveWorkorderComponent = ({}) => {
                           })()}
                         </span>
                       ) : null}
+                      </div>
                     </div>
                   </div>
 
@@ -2056,7 +2128,7 @@ export const ActiveWorkorderComponent = ({}) => {
                     <div style={{ width: "13%", flexShrink: 0, display: "flex", flexDirection: "column", paddingLeft: 5, borderLeftWidth: 1, borderLeftStyle: "solid", borderLeftColor: C.borderSubtle, boxSizing: "border-box" }}>
                       {/* Plus button */}
                       <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center" }}>
-                        <Tooltip text={addTooltip} position="left">
+                        <Tooltip text={addTooltip} position="top">
                           <Button_
                             icon={ICONS.add}
                             iconSize={32}
@@ -2076,7 +2148,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       {/* Caret navigation */}
                       <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "space-around", alignItems: "center" }}>
                         {canGoRight && (
-                          <Tooltip text={rightTooltip} position="left">
+                          <Tooltip text={rightTooltip} position="top">
                             <Button_
                               icon={ICONS.caretRight}
                               iconSize={22}
@@ -2093,7 +2165,7 @@ export const ActiveWorkorderComponent = ({}) => {
                           </Tooltip>
                         )}
                         {canGoLeft && (
-                          <Tooltip text={leftTooltip} position="left">
+                          <Tooltip text={leftTooltip} position="top">
                             <Button_
                               icon={ICONS.caretLeft}
                               iconSize={22}
@@ -2112,7 +2184,7 @@ export const ActiveWorkorderComponent = ({}) => {
                       </div>
                       {/* Delete button */}
                       <div style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", opacity: canDelete ? 1 : 0.2 }}>
-                        <Tooltip text={deleteTooltip} position="left">
+                        <Tooltip text={deleteTooltip} position="top">
                           <Button_
                             icon={ICONS.redx}
                             iconSize={14}

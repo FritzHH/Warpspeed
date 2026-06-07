@@ -423,10 +423,14 @@ export function splitWorkorderLinesToSingleQty(workorders) {
 
 // ─── Send sale receipt via SMS/email ──────────────────────────
 
-export function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate, emailTemplate, translatedReceipt, translatedPdfLabels, langCode, transactions, credits) {
+export function sendSaleReceipt(sale, customer, workorders, settings, smsTemplate, emailTemplate, translatedReceipt, translatedPdfLabels, langCode, transactions, credits) {
   dlog(DCAT.RECEIPT, "sendSaleReceipt_start", "CheckoutUtils", { saleId: sale?.id, hasCustomer: !!customer, hasSmsTemplate: !!smsTemplate, hasEmailTemplate: !!emailTemplate });
   if (!sale || !settings) return;
   const { tenantID, storeID } = useSettingsStore.getState().getSettings();
+
+  // Accept a single workorder (legacy callers) or an array (multi-workorder sales).
+  const workorderArr = Array.isArray(workorders) ? workorders.filter(Boolean) : (workorders ? [workorders] : []);
+  const primaryWO = workorderArr[0] || null;
 
   const _ctx = { currentUser: useLoginStore.getState().getCurrentUser(), settings };
   let receiptData, pdfLabels;
@@ -434,7 +438,7 @@ export function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate
     receiptData = translatedReceipt;
     pdfLabels = translatedPdfLabels;
   } else {
-    receiptData = printBuilder.sale(sale, transactions || [], customer, workorder, settings?.salesTaxPercent, _ctx, credits);
+    receiptData = printBuilder.sale(sale, transactions || [], customer, workorderArr, settings?.salesTaxPercent, _ctx, credits);
   }
 
   const storagePath = build_db_path.cloudStorage.saleReceiptPDF(sale.id, tenantID, storeID);
@@ -449,7 +453,7 @@ export function sendSaleReceipt(sale, customer, workorder, settings, smsTemplate
     customerCell: customer?.customerCell || "",
     customerID: customer?.id || "",
     saleID: sale?.id || "",
-    workorderID: workorder?.id || "",
+    workorderID: primaryWO?.id || "",
     templateVars: {
       firstName: capitalizeFirstLetterOfString((customer?.first || "Customer").trim()),
       storeName: settings?.storeInfo?.displayName || "our store",

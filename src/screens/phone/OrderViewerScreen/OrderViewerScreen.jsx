@@ -197,8 +197,10 @@ function ItemRow({ item, inventory, visible, warehouseQty }) {
     );
   }, [item.scannedBarcode, inventory]);
 
-  const catalogName = String(item.catalogSnapshot?.name || "");
-  const storeName = localMatch?.formalName || localMatch?.informalName || "";
+  const catalogName = String(
+    item.catalogSnapshot?.catalogName || item.catalogSnapshot?.name || "",
+  );
+  const storeName = localMatch?.catalogName || localMatch?.formalName || "";
   const displayName =
     storeName || catalogName || item.scannedBarcode || "(unknown)";
 

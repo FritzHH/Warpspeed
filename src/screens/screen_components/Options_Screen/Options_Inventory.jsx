@@ -189,8 +189,8 @@ const QuickItemCanvasCard = ({
 
   let w = itemObj.w || DEFAULT_ITEM_W;
   let h = itemObj.h || DEFAULT_ITEM_H;
-  let defaultName = invItem ? (invItem.formalName || "Unknown") : "(not found)";
-  let name = invItem ? (invItem.informalName || invItem.formalName || "Unknown") : "(not found)";
+  let defaultName = invItem ? (invItem.catalogName || invItem.formalName || "Unknown") : "(not found)";
+  let name = invItem ? (invItem.quickButtonLabel || invItem.catalogName || invItem.formalName || "Unknown") : "(not found)";
   let price = invItem ? formatCurrencyDisp(invItem.price) : "";
 
   function handleMouseDown(e) {
@@ -359,9 +359,9 @@ const QuickItemCanvasCard = ({
       }}
     >
       {/* Formal name helper - above card in edit mode */}
-      {sEditMode && invItem?.formalName && (labelMode === "all" || (labelMode === "active" && isSelected)) && (
+      {sEditMode && (invItem?.catalogName || invItem?.formalName) && (labelMode === "all" || (labelMode === "active" && isSelected)) && (
         <div className={styles.formalNameHelper}>
-          {invItem.formalName}
+          {invItem.catalogName || invItem.formalName}
         </div>
       )}
 
@@ -381,7 +381,7 @@ const QuickItemCanvasCard = ({
       {sEditMode ? (
         <div onClick={(e) => e.stopPropagation()} className={styles.cardLabelWrap}>
           <DomTextInput
-            value={invItem?.informalName || ""}
+            value={invItem?.quickButtonLabel || ""}
             placeholder={defaultName}
             placeholderTextColor={C.textMuted}
             onFocus={() => { if (!isSelected) onSelect(itemObj.inventoryItemID); }}
@@ -666,10 +666,10 @@ const QuickItemCanvas = React.forwardRef(({
     saveItems(rawItems.map((it) => it.inventoryItemID === invItemID ? { ...it, x, y, w, h } : it));
   }
 
-  function handleLabelChange(invItemID, informalName) {
+  function handleLabelChange(invItemID, quickButtonLabel) {
     let invItem = findInvItem(invItemID);
     if (!invItem) return;
-    let updated = { ...invItem, informalName };
+    let updated = { ...invItem, quickButtonLabel };
     // Update local inventory store immediately for speed
     let updatedArr = (zInventoryArr || []).map((i) => i.id === invItemID ? updated : i);
     useInventoryStore.getState().setItems(updatedArr);
@@ -1187,7 +1187,7 @@ export function InventoryComponent({}) {
   }
 
   function inventoryItemSelected(item) {
-    console.log("inventoryItemSelected:", item?.formalName, item?.id);
+    console.log("inventoryItemSelected:", item?.catalogName || item?.formalName, item?.id);
     const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
     if (openWorkorder) {
       const statuses = useSettingsStore.getState().settings?.statuses;
@@ -1335,7 +1335,7 @@ export function InventoryComponent({}) {
   }
 
   function handleInventoryInfoPress(item) {
-    console.log("handleInventoryInfoPress:", item?.formalName, item?.id);
+    console.log("handleInventoryInfoPress:", item?.catalogName || item?.formalName, item?.id);
     _setModalItem({ ...item });
   }
 
@@ -1423,7 +1423,7 @@ export function InventoryComponent({}) {
         canvasSelectedTextColor = selItem.textColor || "";
       }
       let invItem = (zInventoryArr || []).find((i) => i.id === sCanvasSelectedItemId);
-      if (invItem) canvasSelectedName = invItem.informalName || invItem.formalName || "";
+      if (invItem) canvasSelectedName = invItem.quickButtonLabel || invItem.catalogName || invItem.formalName || "";
     }
   }
 
@@ -1437,7 +1437,7 @@ export function InventoryComponent({}) {
         if (seen.has(key)) return;
         seen.add(key);
         let inv = (zInventoryArr || []).find((i) => i.id === it.inventoryItemID);
-        let name = inv ? (inv.informalName || inv.formalName || "Item") : "Item";
+        let name = inv ? (inv.quickButtonLabel || inv.catalogName || inv.formalName || "Item") : "Item";
         existingColorSchemes.push({ backgroundColor: it.backgroundColor, textColor: it.textColor || C.text, name });
       });
     });
@@ -1745,9 +1745,9 @@ export function InventoryComponent({}) {
                         }}
                       >
                         <div className={styles.resultsRowName}>
-                          {item.informalName || item.formalName}
-                          {!!item.informalName && !sSelectedButtonID && (
-                            <div className={styles.resultsRowFormal}>{item.formalName}</div>
+                          {item.quickButtonLabel || item.catalogName || item.formalName}
+                          {!!item.quickButtonLabel && !sSelectedButtonID && (
+                            <div className={styles.resultsRowFormal}>{item.catalogName || item.formalName}</div>
                           )}
                         </div>
                         <div className={styles.resultsRowPriceCol}>
@@ -1780,7 +1780,7 @@ export function InventoryComponent({}) {
             <InventoryItemModalScreen
               key={sModalItem.id}
               item={sModalItem}
-              isNew={!!(sModalItem.id && !sModalItem.formalName)}
+              isNew={!!(sModalItem.id && !(sModalItem.catalogName || sModalItem.formalName))}
               handleExit={() => {
                 const wasScanNotFound = _scanNotFoundRef.current;
                 const itemID = sModalItem?.id;
@@ -1788,7 +1788,7 @@ export function InventoryComponent({}) {
                 _setModalItem(null);
                 if (wasScanNotFound && itemID) {
                   const savedItem = useInventoryStore.getState().getInventoryItem(itemID);
-                  if (savedItem?.formalName?.trim() && useOpenWorkordersStore.getState().getOpenWorkorder()) {
+                  if ((savedItem?.catalogName || savedItem?.formalName)?.trim() && useOpenWorkordersStore.getState().getOpenWorkorder()) {
                     inventoryItemSelected(savedItem);
                   }
                 }

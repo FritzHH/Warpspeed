@@ -47,6 +47,7 @@ var labelPrintBuilder = {
       labelWidth: 464,
       labelHeight: 254,
       data: {
+        catalogName: "Test Product",
         formalName: "Test Product",
         price: "$9.99",
         primaryBarcode: "TEST12345",
@@ -61,18 +62,21 @@ var labelPrintBuilder = {
    * WarpHub fetches the template, merges data, and generates ZPL.
    *
    * @param {string} templateId - Slug key of the label template (e.g. "standard-product")
-   * @param {object} item       - Inventory item (formalName, id, price, salePrice, primaryBarcode)
+   * @param {object} item       - Inventory item (catalogName, id, price, salePrice, primaryBarcode)
    * @param {number} [copies]   - Number of copies (default 1)
    * @param {object} [template] - Template layout object { labelWidth, labelHeight, fields[] }
    * @returns {{ id: string, templateId: string, data: object, template: object, copies: number }}
    */
   label: function (templateId, item, copies, template) {
+    var resolvedCatalogName = item.catalogName || item.formalName || "";
     var job = {
       id: _generateSimpleID(),
       templateId: templateId,
       data: {
-        formalName: item.formalName || "",
-        informalName: item.informalName || "",
+        catalogName: resolvedCatalogName,
+        formalName: resolvedCatalogName,
+        informalName: item.quickButtonLabel || item.informalName || "",
+        quickButtonLabel: item.quickButtonLabel || item.informalName || "",
         id: item.id || "",
         price: formatCentsAsCurrency(item.price),
         salePrice: formatCentsAsCurrency(item.salePrice),
@@ -101,9 +105,12 @@ var labelPrintBuilder = {
       console.warn("zplLabel: no template provided for", templateId);
       return { id: _generateSimpleID(), zpl: "", copies: 1 };
     }
+    var resolvedCatalogName = item.catalogName || item.formalName || "";
     var data = {
-      formalName: item.formalName || "",
-      informalName: item.informalName || "",
+      catalogName: resolvedCatalogName,
+      formalName: resolvedCatalogName,
+      informalName: item.quickButtonLabel || item.informalName || "",
+      quickButtonLabel: item.quickButtonLabel || item.informalName || "",
       brand: item.brand || "",
       id: item.id || "",
       price: formatCentsAsCurrency(item.price),
@@ -132,6 +139,7 @@ var labelPrintBuilder = {
       return { id: _generateSimpleID(), zpl: "", copies: 1 };
     }
     var testData = {
+      catalogName: "Tire Kenda Kwick Trax 700x35 Continental Gatorskin Folding",
       formalName: "Tire Kenda Kwick Trax 700x35 Continental Gatorskin Folding",
       informalName: "Kwick Trax 700x35",
       brand: "Continental",

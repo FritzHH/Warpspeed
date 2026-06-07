@@ -247,22 +247,32 @@ export const TabBar = ({
 
   function CameraIcon() {
     const showError = zCameraStatus === "failed";
+    if (showError) {
+      return (
+        <Tooltip text="Camera offline — click for details" position="bottom">
+          <button
+            type="button"
+            className={tabBarStyles.printerOfflineBtn}
+            onClick={showCameraError}
+          >
+            <img src={ICONS.camera} alt="" className={tabBarStyles.printerOfflineIcon} />
+            <span className={tabBarStyles.printerOfflineText}>Offline</span>
+          </button>
+        </Tooltip>
+      );
+    }
     return (
-      <div className={tabBarStyles.cameraBtnWrap}>
-        <button
-          type="button"
-          title="Camera on and identifying"
-          className={tabBarStyles.cameraBtn}
-          onClick={showError ? showCameraError : () => _sSetShowCameraPreview(true)}
-        >
-          <img src={ICONS.camera} alt="" className={tabBarStyles.cameraIcon} />
-          {showError && (
-            <span className={tabBarStyles.cameraErrorOverlay}>
-              <img src={ICONS.redx} alt="" className={tabBarStyles.cameraIcon} />
-            </span>
-          )}
-        </button>
-      </div>
+      <Tooltip text="Camera on and identifying" position="bottom">
+        <div className={tabBarStyles.cameraBtnWrap}>
+          <button
+            type="button"
+            className={tabBarStyles.cameraBtn}
+            onClick={() => _sSetShowCameraPreview(true)}
+          >
+            <img src={ICONS.camera} alt="" className={tabBarStyles.cameraIcon} />
+          </button>
+        </div>
+      </Tooltip>
     );
   }
 
@@ -342,17 +352,19 @@ export const TabBar = ({
           let selectedPrinter = selectedID && zPrinters?.[selectedID];
           if (selectedPrinter && selectedPrinter.active !== true) {
             return (
-              <button
-                type="button"
-                className={tabBarStyles.printerOfflineBtn}
-                onClick={() => {
-                  useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.dashboard);
-                  useTabNamesStore.getState().setDashboardExpand("Readers/Printers");
-                }}
-              >
-                <img src={ICONS.print} alt="" className={tabBarStyles.printerOfflineIcon} />
-                <span className={tabBarStyles.printerOfflineText}>Offline</span>
-              </button>
+              <Tooltip text="Printer offline — click to open Readers/Printers" position="bottom">
+                <button
+                  type="button"
+                  className={tabBarStyles.printerOfflineBtn}
+                  onClick={() => {
+                    useTabNamesStore.getState().setItemsTabName(TAB_NAMES.itemsTab.dashboard);
+                    useTabNamesStore.getState().setDashboardExpand("Readers/Printers");
+                  }}
+                >
+                  <img src={ICONS.print} alt="" className={tabBarStyles.printerOfflineIcon} />
+                  <span className={tabBarStyles.printerOfflineText}>Offline</span>
+                </button>
+              </Tooltip>
             );
           }
           return null;
@@ -543,8 +555,11 @@ const UserClockModal = ({ user, handleExit, handleViewHistory, handleOpenMessage
         ".",
       btn1Text: "YES, I AM " + (user?.first ? user.first.toUpperCase() : "THIS USER"),
       btn2Text: "NO",
-      handleBtn1Press: () => {
-        useLoginStore.getState().setCreateUserClock(user.id, millis, option);
+      handleBtn1Press: async () => {
+        let result = await useLoginStore
+          .getState()
+          .setCreateUserClock(user.id, millis, option);
+        if (!result?.success) throw new Error(result?.error || "Punch failed");
         if (option === "out") {
           let clockPauseObj = localStorageWrapper.getItem(LOCAL_DB_KEYS.userClockCheckPauseObj);
           if (!clockPauseObj) clockPauseObj = {};

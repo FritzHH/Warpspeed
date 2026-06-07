@@ -85,7 +85,7 @@ export function ItemSearchModal({ onClose, onAddItems }) {
             >
               <CheckBox isChecked={isSelected} onCheck={() => toggleSelect(item)} />
               <span className={styles.resultName}>
-                {item.formalName || item.informalName || "Unknown"}
+                {item.catalogName || item.formalName || "Unknown"}
               </span>
               <span className={styles.resultPrice}>${formatCurrencyDisp(item.price)}</span>
             </div>

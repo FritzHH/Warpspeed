@@ -134,7 +134,9 @@ export const CustomerInfoScreenModalComponent = ({
   useEffect(() => {
     mountedRef.current = true;
 
-    if (hasCachedCustomer) loadWorkorders(initialCustomer);
+    if (hasCachedCustomer) {
+      loadWorkorders(initialCustomer);
+    }
 
     if (incomingCustomer || !customerID || isNewCustomer) return;
 
@@ -427,20 +429,27 @@ export const CustomerInfoScreenModalComponent = ({
           isNewCustomer ? (
             "New Customer"
           ) : (
-            <>
-              Customer Info
-              {(sCustomerInfo.first || sCustomerInfo.last) && (
-                <>
-                  {" - "}
-                  <span style={{ color: C.blue, marginLeft: 10 }}>
-                    {[sCustomerInfo.first, sCustomerInfo.last]
-                      .filter(Boolean)
-                      .map((s) => capitalizeFirstLetterOfString(s))
-                      .join(" ")}
-                  </span>
-                </>
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", lineHeight: 1.2 }}>
+              <div>
+                Customer Info
+                {(sCustomerInfo.first || sCustomerInfo.last) && (
+                  <>
+                    {" - "}
+                    <span style={{ color: C.blue, marginLeft: 10 }}>
+                      {[sCustomerInfo.first, sCustomerInfo.last]
+                        .filter(Boolean)
+                        .map((s) => capitalizeFirstLetterOfString(s))
+                        .join(" ")}
+                    </span>
+                  </>
+                )}
+              </div>
+              {!!sCustomerInfo.id && (
+                <div style={{ fontSize: 11, fontWeight: 400, color: C.textMuted, marginTop: 2 }}>
+                  ID: {sCustomerInfo.id}
+                </div>
               )}
-            </>
+            </div>
           )
         }
         actions={[
@@ -808,6 +817,50 @@ export const CustomerInfoScreenModalComponent = ({
                 onPress={() => _sSetActiveTab("messages")}
               />
             )}
+            {(() => {
+              const totals = (sCustomerInfo.deposits || []).reduce(
+                (acc, d) => {
+                  if (d.refunded || (d.amountCents || 0) <= 0) return acc;
+                  if (d.type === "giftcard") acc.giftCardCents += d.amountCents;
+                  else acc.depositCents += d.amountCents;
+                  return acc;
+                },
+                { depositCents: 0, giftCardCents: 0 }
+              );
+              const creditCents = (sCustomerInfo.credits || []).reduce(
+                (s, c) => s + ((c.amountCents || 0) > 0 ? c.amountCents : 0),
+                0
+              );
+              if (totals.depositCents === 0 && creditCents === 0 && totals.giftCardCents === 0) return null;
+              return (
+                <div className={styles.tabBadgesRight}>
+                  {totals.depositCents > 0 && (
+                    <div className={styles.tabBadgeGroup}>
+                      <div className={styles.tabBadgeChip} style={{ backgroundColor: lightenRGBByPercent(C.green, 70) }}>
+                        <span className={styles.tabBadgeChipText} style={{ color: C.green }}>Deposit</span>
+                      </div>
+                      <span className={styles.tabBadgeAmount} style={{ color: C.green }}>{formatCurrencyDisp(totals.depositCents, true)}</span>
+                    </div>
+                  )}
+                  {creditCents > 0 && (
+                    <div className={styles.tabBadgeGroup}>
+                      <div className={styles.tabBadgeChip} style={{ backgroundColor: lightenRGBByPercent(C.blue, 70) }}>
+                        <span className={styles.tabBadgeChipText} style={{ color: C.blue }}>Credit</span>
+                      </div>
+                      <span className={styles.tabBadgeAmount} style={{ color: C.blue }}>{formatCurrencyDisp(creditCents, true)}</span>
+                    </div>
+                  )}
+                  {totals.giftCardCents > 0 && (
+                    <div className={styles.tabBadgeGroup}>
+                      <div className={styles.tabBadgeChip} style={{ backgroundColor: lightenRGBByPercent(C.orange, 70) }}>
+                        <span className={styles.tabBadgeChipText} style={{ color: C.orange }}>Gift Card</span>
+                      </div>
+                      <span className={styles.tabBadgeAmount} style={{ color: C.orange }}>{formatCurrencyDisp(totals.giftCardCents, true)}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
           <div className={styles.tabPanel}>
             {sActiveTab === "workorders" && (
@@ -1194,7 +1247,7 @@ const WorkorderCard = ({ workorder, statuses, taxPercent, onSelect }) => {
               {workorder.workorderLines.map((line) => (
                 <div key={line.id} className={styles.woItemRow}>
                   <span className={styles.woItemName} style={{ color: C.text }}>
-                    {line.inventoryItem?.formalName || "Unnamed item"}
+                    {line.inventoryItem?.catalogName || line.inventoryItem?.formalName || "Unnamed item"}
                   </span>
                   {line.qty > 1 && <span className={styles.woItemQty}>{line.qty}</span>}
                 </div>

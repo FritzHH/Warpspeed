@@ -11,9 +11,13 @@ import {
   Tooltip,
 } from "../../../../dom_components";
 import { C, COLOR_GRADIENTS, ICONS, Radius } from "../../../../styles";
-import { usdTypeMask, formatCurrencyDisp, log } from "../../../../utils";
+import { usdTypeMask, formatCurrencyDisp, log, localStorageWrapper } from "../../../../utils";
 import { takeId, getId } from "../../../../idPool";
-import { useStripePaymentStore, useSettingsStore } from "../../../../stores";
+import { useStripePaymentStore } from "../../../../stores";
+
+// Selected reader is per-device (each workstation has its own physical reader),
+// stored in localStorage. Do NOT move this into Firestore settings.
+const SELECTED_CARD_READER_LS_KEY = "warpspeed_selected_card_reader";
 import { buildCardTransaction, buildCardTransactionFromSDK } from "./newCheckoutUtils";
 import {
   newCheckoutProcessStripePayment,
@@ -171,7 +175,7 @@ export const CardReaderPayment = memo(function CardReaderPayment({
       let live = stripeReaders.find((r) => r.id === sCardReader.id);
       return live || sCardReader;
     }
-    let saved = useSettingsStore.getState().getSettings()?.selectedCardReaderObj;
+    let saved = localStorageWrapper.getItem(SELECTED_CARD_READER_LS_KEY);
     if (saved?.id) {
       let live = stripeReaders.find((r) => r.id === saved.id);
       if (live) return live;
@@ -308,9 +312,10 @@ export const CardReaderPayment = memo(function CardReaderPayment({
     _zSetCardMessage("");
     if (reader) {
       console.log("handleReaderSelect busy check:", JSON.stringify({ action: reader.action, zPaymentIntentID, zCardStatus }, null, 2));
-      useSettingsStore
-        .getState()
-        .setField("selectedCardReaderObj", { id: reader.id, label: item.label || reader.id });
+      localStorageWrapper.setItem(SELECTED_CARD_READER_LS_KEY, {
+        id: reader.id,
+        label: item.label || reader.id,
+      });
       if (reader.action && reader.action.type) {
         let piID = reader.action.process_payment_intent?.payment_intent || "";
         if (piID && piID === zPaymentIntentID) {

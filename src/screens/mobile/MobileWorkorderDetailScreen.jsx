@@ -453,7 +453,7 @@ export function MobileWorkorderDetailScreen() {
               <div className={styles.lineMain}>
                 <div className={styles.lineNameCol}>
                   <span className={styles.lineName} style={{ color: C.text }}>
-                    {item?.formalName || "Unknown Item"}
+                    {item?.catalogName || item?.formalName || "Unknown Item"}
                   </span>
                   {line.qty > 1 && (
                     <span className={styles.lineQty} style={{ color: C.lightText }}>

@@ -67,7 +67,7 @@ export function fillInventoryFromLightspeedObjArr(lightspeedObjArr) {
     let barcode = generateEAN13Barcode();
     inv.id = barcode;
     inv.primaryBarcode = barcode;
-    inv.formalName = obj.description;
+    inv.catalogName = obj.description;
     inv.cost = trimToTwoDecimals(obj.cost);
     inv.price = trimToTwoDecimals(obj.cost * 2);
     dbSaveInventoryItem(inv);

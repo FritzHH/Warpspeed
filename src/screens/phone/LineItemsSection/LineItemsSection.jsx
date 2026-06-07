@@ -36,10 +36,7 @@ export function LineItemsSection({
       </div>
 
       {lines.map((line, idx) => {
-        const name =
-          line.inventoryItem?.formalName ||
-          line.inventoryItem?.informalName ||
-          "Item";
+        const name = line.inventoryItem?.catalogName || line.inventoryItem?.formalName || "Item";
         const unitPrice = line.useSalePrice
           ? line.inventoryItem?.salePrice
           : line.inventoryItem?.price;

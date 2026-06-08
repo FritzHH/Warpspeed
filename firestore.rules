@@ -60,7 +60,7 @@ service cloud.firestore {
       match /{collection}/{document=**} {
         allow read, write: if hasStoreAccess(tenantID, storeID)
                            && collection != 'settings'
-                           && collection != 'vendor-credentials'
+                           && collection != 'vendor_connections'
                            && collection != 'vendor-submissions';
       }
       match /settings/{docID=**} {
@@ -75,10 +75,14 @@ service cloud.firestore {
         );
       }
 
-      // Vendor credentials — server-only via Admin SDK. No client read or
-      // write at any privilege level. Set/cleared exclusively via
-      // setVendorCredentialsCallable; read only by vendor-submission-worker.
-      match /vendor-credentials/{vendorID=**} {
+      // Vendor connection state — server-only via Admin SDK. Non-secret
+      // connection fields (account number, contact email) plus metadata
+      // (isConnected, fieldsConfigured, lastUpdatedMillis). No client read
+      // or write at any privilege level. Set/cleared exclusively via
+      // setVendorCredentialsCallable / clearVendorCredentialsCallable; read
+      // via getVendorCredentialMetaCallable (never echoes secret values).
+      // Secret material lives in Google Secret Manager — never Firestore.
+      match /vendor_connections/{vendorID=**} {
         allow read, write: if false;
       }
 

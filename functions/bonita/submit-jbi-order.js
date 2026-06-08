@@ -107,16 +107,16 @@ exports.submitJbiOrderCallable = onCall(
       throw new HttpsError("internal", `Failed to load order: ${err && err.message ? err.message : err}`);
     }
 
-    const vendorConfig =
-      (settings.vendors && settings.vendors.jbi) || {
-        displayName: "JBI",
-      };
-
-    const creds = {
-      ftpHost: JBI_FTP_HOST.value() || "",
-      ftpUsername: JBI_FTP_USERNAME.value() || "",
-      ftpPassword: JBI_FTP_PASSWORD.value() || "",
-      apiKey: JBI_PLATFORM_API_KEY.value() || "",
+    // The JBI handler reads platform creds via .value() on its own
+    // defineSecret instances; the onCall `secrets:` option above keeps
+    // them available at runtime. The dealer's account number + contact
+    // email come from legacy settings.vendors.jbi on Bonita; SaaS reads
+    // the same shape from Firestore vendor_connections/jbi.connection.
+    const vendorConfig = (settings.vendors && settings.vendors.jbi) || {};
+    const connection = {
+      accountNumber:
+        vendorConfig.accountNumber || vendorConfig.dealerAccountNumber || "",
+      contactEmail: vendorConfig.contactEmail || "",
     };
 
     const submissionID = `bonita-${Date.now()}`;
@@ -134,8 +134,8 @@ exports.submitJbiOrderCallable = onCall(
       result = await jbiHandler.submit({
         order,
         items,
-        vendorConfig,
-        creds,
+        connection,
+        secrets: {},
         ctx,
       });
     } catch (err) {

@@ -4,33 +4,40 @@
 // Three callables that drive the vendor-order submission flow:
 //
 //   - submitVendorOrderCallable         Enqueue a submission (async via Pub/Sub).
-//   - setVendorCredentialsCallable      Write credentials to locked subcollection.
+//   - setVendorCredentialsCallable      Persist per-store vendor credentials.
 //   - getVendorCredentialMetaCallable   Read NON-SECRET metadata only (no echo).
 //
 // Auth model: tenant manager+ for all three (write requires ability to
 // place orders / manage vendor accounts). Tenant match is enforced; cross-
 // tenant access is rejected.
 //
+// Storage shape (post-refactor):
+//
+//   * Firestore  tenants/{tID}/stores/{sID}/vendor_connections/{vendor}
+//       Non-secret connection state: accountNumber, contactEmail,
+//       isConnected, lastVerified, fieldsConfigured (the union of
+//       connection + secret keys, for UI display only). Client read
+//       is blocked by Firestore rules; the only path in or out is
+//       through these callables.
+//
+//   * Secret Manager  vendor-{vendor}-{tID}-{sID}
+//       Credential strings. Single-string vendors store the raw value;
+//       multi-string vendors (QBP — eftpPassword + apiKey) store a
+//       JSON blob. See functions/saas/vendor-creds.js for the helper.
+//
 // Submission flow:
 //
-//   1. Callable validates the request, loads order + items + vendor config,
-//      writes a `vendor-submissions/{submissionID}` doc with status="queued",
-//      then publishes to the `vendor-order-submissions` Pub/Sub topic.
+//   1. submitVendorOrderCallable validates the request, loads order +
+//      items + the vendor_connections doc, writes a
+//      vendor-submissions/{submissionID} doc with status="queued", then
+//      publishes to the `vendor-order-submissions` Pub/Sub topic.
 //      Returns immediately with { success: true, submissionID }.
 //
-//   2. The Pub/Sub worker (vendor-submission-worker.js) picks up the message,
-//      loads credentials from the locked subcollection (clients can never
-//      read it), dispatches to a per-vendor handler module, and writes the
-//      result back onto the submission doc.
-//
-// Credentials storage:
-//
-//   Path: tenants/{tenantID}/stores/{storeID}/vendor-credentials/{vendorID}
-//   Access: server-only via Admin SDK (Firestore rule blocks all client
-//   reads/writes). Shape is vendor-specific — JBI stores
-//   { ftpHost, ftpUsername, ftpPassword, apiKey }; QBP stores its own set.
-//   The callable doesn't enforce a shape so handlers can evolve their
-//   credential schemas without API churn. UI defines what it sends.
+//   2. The Pub/Sub worker (vendor-submission-worker.js) loads connection
+//      state from Firestore and secret material from Secret Manager,
+//      dispatches to a per-vendor handler, and writes the result back
+//      onto the submission doc.
+
 const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
@@ -41,6 +48,12 @@ const {
   assertTenantMatch,
   assertPrivilege,
 } = require("./auth-guards");
+const {
+  VENDOR_FIELD_PARTITION,
+  vendorConnectionDocRef,
+  storeVendorSecret,
+  destroyVendorSecret,
+} = require("./vendor-creds");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -67,22 +80,26 @@ function requireStr(value, name) {
   return value.trim();
 }
 
-// Submission doc path. Stored on the store (not the tenant) so it follows
-// the order it represents — vendor orders are per-store, not per-tenant.
 function submissionDocPath(tenantID, storeID, submissionID) {
   return `tenants/${tenantID}/stores/${storeID}/vendor-submissions/${submissionID}`;
-}
-
-function credentialsDocPath(tenantID, storeID, vendorID) {
-  return `tenants/${tenantID}/stores/${storeID}/vendor-credentials/${vendorID}`;
 }
 
 function orderDocPath(tenantID, storeID, orderID) {
   return `tenants/${tenantID}/stores/${storeID}/vendor-orders/${orderID}`;
 }
 
-function settingsDocPath(tenantID, storeID) {
-  return `tenants/${tenantID}/stores/${storeID}/settings/settings`;
+// Helper for callables that want a plain object of trimmed non-empty
+// string entries. Anything non-string or empty-after-trim is dropped.
+function pickStringEntries(obj, allowedKeys) {
+  const out = {};
+  if (!obj || typeof obj !== "object") return out;
+  for (const key of allowedKeys) {
+    const value = obj[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      out[key] = value.trim();
+    }
+  }
+  return out;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -123,15 +140,24 @@ exports.submitVendorOrderCallable = onCall(
       );
     }
 
-    // ── Resolve the vendor config from settings ──
-    const settingsSnap = await db.doc(settingsDocPath(tenantID, storeID)).get();
-    const settings = (settingsSnap.exists && settingsSnap.data()) || {};
-    const vendors = settings.vendors || {};
-    const vendorConfig = vendors[vendorID];
-    if (!vendorConfig) {
+    // ── Vendor must have a connected vendor_connections doc ──
+    const connectionSnap = await vendorConnectionDocRef(
+      db,
+      tenantID,
+      storeID,
+      vendorID,
+    ).get();
+    if (!connectionSnap.exists) {
       throw new HttpsError(
-        "not-found",
-        `Vendor ${vendorID} is not configured for this store.`
+        "failed-precondition",
+        `Vendor ${vendorID} is not configured for this store.`,
+      );
+    }
+    const connection = connectionSnap.data() || {};
+    if (connection.isConnected !== true) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Vendor ${vendorID} credentials are not marked connected.`,
       );
     }
 
@@ -156,7 +182,6 @@ exports.submitVendorOrderCallable = onCall(
       status: "queued",
       createdMillis: nowMs,
       createdByUID: auth.uid,
-      submissionType: vendorConfig.submissionType || vendorID,
       attemptCount: 0,
     };
     await db.doc(submissionDocPath(tenantID, storeID, submissionID)).set(submissionDoc);
@@ -175,8 +200,6 @@ exports.submitVendorOrderCallable = onCall(
           },
         });
     } catch (err) {
-      // If publish fails the submission doc is orphaned in "queued" state.
-      // Mark it failed so the UI doesn't spin forever.
       logger.error("submitVendorOrderCallable: pubsub publish failed", {
         submissionID,
         error: err && err.message,
@@ -209,12 +232,17 @@ exports.submitVendorOrderCallable = onCall(
 // ────────────────────────────────────────────────────────────────────────
 // setVendorCredentialsCallable
 //
+// Splits incoming creds into Firestore non-secret state + Secret Manager
+// secret material per VENDOR_FIELD_PARTITION. Either half can be omitted
+// (e.g. JBI has no secrets; QBP could update connection fields without
+// rotating the secret).
+//
 // PAYLOAD:
-//   { tenantID, storeID, vendorID, creds }
-//   `creds` is a flat object of string fields. The handler module dictates
-//   the shape (e.g. JBI: { ftpHost, ftpUsername, ftpPassword, apiKey }).
-//   Any field whose value is empty string / null / undefined is treated as
-//   a clear and removed from the doc; non-empty fields overwrite.
+//   {
+//     tenantID, storeID, vendorID,
+//     connection: { accountNumber?, contactEmail?, ... },
+//     secrets:    { eftpPassword?, apiKey?, ... },
+//   }
 // RETURN:
 //   { success: true, fieldsConfigured, lastUpdatedMillis }
 // ────────────────────────────────────────────────────────────────────────
@@ -231,90 +259,155 @@ exports.setVendorCredentialsCallable = onCall(
     assertTenantMatch(auth, tenantID);
     assertPrivilege(auth, "manager");
 
-    const creds = data.creds;
-    if (!creds || typeof creds !== "object" || Array.isArray(creds)) {
-      throw new HttpsError("invalid-argument", "creds must be an object.");
+    const partition = VENDOR_FIELD_PARTITION[vendorID];
+    if (!partition) {
+      throw new HttpsError(
+        "invalid-argument",
+        `Vendor "${vendorID}" has no field partition configured.`,
+      );
     }
+
+    const incomingConnection = pickStringEntries(
+      data.connection,
+      partition.connection,
+    );
+    const incomingSecrets = pickStringEntries(data.secrets, partition.secrets);
 
     const db = getFirestore();
-    const ref = db.doc(credentialsDocPath(tenantID, storeID, vendorID));
-
-    // Build the write payload: keep only non-empty string values; drop the
-    // rest. Caller can pass { fieldX: "" } to clear a specific field.
-    const credsToWrite = {};
-    const fieldsConfigured = [];
-    Object.entries(creds).forEach(([key, value]) => {
-      if (typeof value === "string" && value.length > 0) {
-        credsToWrite[key] = value;
-        fieldsConfigured.push(key);
-      }
-    });
-
-    const nowMs = Date.now();
-
-    if (fieldsConfigured.length === 0) {
-      // Nothing to write — explicit reset. Delete the doc entirely so
-      // getVendorCredentialMeta reports hasCredentials=false cleanly.
-      await ref.delete().catch(() => {});
-      logger.info("setVendorCredentialsCallable: cleared", {
-        tenantID,
-        storeID,
-        vendorID,
-      });
-      return {
-        success: true,
-        fieldsConfigured: [],
-        lastUpdatedMillis: nowMs,
-      };
-    }
-
-    // Read existing to merge / preserve fields the caller didn't send.
+    const ref = vendorConnectionDocRef(db, tenantID, storeID, vendorID);
     const existingSnap = await ref.get();
     const existing = (existingSnap.exists && existingSnap.data()) || {};
-    const existingCreds = existing.creds || {};
+    const existingConnection = existing.connection || {};
+    const existingFieldsConfigured = Array.isArray(existing.fieldsConfigured)
+      ? existing.fieldsConfigured
+      : [];
 
-    const mergedCreds = { ...existingCreds, ...credsToWrite };
-    const mergedFields = Object.keys(mergedCreds).sort();
+    // Merge incoming connection over existing. Empty/missing keys leave
+    // prior values untouched; UI sends a key with an empty string only
+    // when the user explicitly clears it (validation strips that
+    // upstream in pickStringEntries — empty string == "not provided").
+    const mergedConnection = { ...existingConnection, ...incomingConnection };
+
+    // Track which keys are "configured" so the UI can render a checkmark
+    // without seeing the secret values. Once a secret key has been
+    // written it stays in this list across subsequent saves that only
+    // update the connection half.
+    const fieldSet = new Set(existingFieldsConfigured);
+    Object.keys(mergedConnection).forEach((k) => fieldSet.add(k));
+    Object.keys(incomingSecrets).forEach((k) => fieldSet.add(k));
+    const mergedFieldsConfigured = Array.from(fieldSet).sort();
+
+    if (Object.keys(incomingSecrets).length > 0) {
+      // Single-secret vendors store the raw value; multi-secret vendors
+      // store JSON. We always JSON.stringify so the helper stays uniform
+      // — the loader does JSON.parse on read.
+      await storeVendorSecret(
+        vendorID,
+        tenantID,
+        storeID,
+        JSON.stringify(incomingSecrets),
+      );
+    }
+
+    const nowMs = Date.now();
+    // isConnected: true once we have at least one connection field AND
+    // (no secret keys exist for this vendor OR at least one secret has
+    // been written at some point — tracked via fieldsConfigured).
+    const requiredSecretsEverSet = partition.secrets.every((k) =>
+      fieldSet.has(k),
+    );
+    const hasConnectionFields = Object.keys(mergedConnection).length > 0;
+    const isConnected = hasConnectionFields && requiredSecretsEverSet;
 
     await ref.set(
       {
         vendorID,
-        creds: mergedCreds,
-        fieldsConfigured: mergedFields,
+        connection: mergedConnection,
+        fieldsConfigured: mergedFieldsConfigured,
+        isConnected,
         lastUpdatedMillis: nowMs,
         lastUpdatedByUID: auth.uid,
-        // First-touch stamp preserved on subsequent writes.
+        lastVerifiedMillis: isConnected ? nowMs : (existing.lastVerifiedMillis || 0),
         createdMillis: existing.createdMillis || nowMs,
       },
-      { merge: true }
+      { merge: true },
     );
 
     logger.info("setVendorCredentialsCallable: saved", {
       tenantID,
       storeID,
       vendorID,
-      fieldCount: mergedFields.length,
+      connectionKeys: Object.keys(incomingConnection),
+      secretKeysReceived: Object.keys(incomingSecrets).length,
+      isConnected,
     });
 
     return {
       success: true,
-      fieldsConfigured: mergedFields,
+      fieldsConfigured: mergedFieldsConfigured,
+      isConnected,
       lastUpdatedMillis: nowMs,
     };
   }
 );
 
 // ────────────────────────────────────────────────────────────────────────
-// getVendorCredentialMetaCallable
+// clearVendorCredentialsCallable
 //
-// Returns *metadata* only — NEVER echoes the actual secret values. The UI
-// uses this to render "Credentials set ✓ (last updated …)" without seeing
-// the password / api key.
+// Deletes the vendor_connections doc AND destroys the Secret Manager
+// entry (if any). Used when a tenant disconnects a vendor entirely.
 //
 // PAYLOAD:
 //   { tenantID, storeID, vendorID }
 // RETURN:
-//   { success: true, hasCredentials, fieldsConfigured, lastUpdatedMillis }
+//   { success: true }
+// ────────────────────────────────────────────────────────────────────────
+
+exports.clearVendorCredentialsCallable = onCall(
+  { region: "us-central1" },
+  async (request) => {
+    const auth = requireAuth(request);
+    const data = request.data || {};
+    const tenantID = requireStr(data.tenantID, "tenantID");
+    const storeID = requireStr(data.storeID, "storeID");
+    const vendorID = requireStr(data.vendorID, "vendorID");
+
+    assertTenantMatch(auth, tenantID);
+    assertPrivilege(auth, "manager");
+
+    const db = getFirestore();
+    await vendorConnectionDocRef(db, tenantID, storeID, vendorID)
+      .delete()
+      .catch(() => {});
+    await destroyVendorSecret(vendorID, tenantID, storeID);
+
+    logger.info("clearVendorCredentialsCallable: cleared", {
+      tenantID,
+      storeID,
+      vendorID,
+    });
+    return { success: true };
+  },
+);
+
+// ────────────────────────────────────────────────────────────────────────
+// getVendorCredentialMetaCallable
+//
+// Returns *metadata* only — NEVER echoes secret values. Connection
+// fields are surfaced because they're non-secret (account number, email)
+// and the UI may want to display them with a "stored" indicator. Secret
+// keys are reported by name only, in `fieldsConfigured`.
+//
+// PAYLOAD:
+//   { tenantID, storeID, vendorID }
+// RETURN:
+//   {
+//     success: true,
+//     hasCredentials, isConnected,
+//     connection,            // non-secret values, ok to echo
+//     fieldsConfigured,      // names of all keys ever written
+//     lastUpdatedMillis,
+//   }
 // ────────────────────────────────────────────────────────────────────────
 
 exports.getVendorCredentialMetaCallable = onCall(
@@ -330,20 +423,32 @@ exports.getVendorCredentialMetaCallable = onCall(
     assertPrivilege(auth, "manager");
 
     const db = getFirestore();
-    const snap = await db.doc(credentialsDocPath(tenantID, storeID, vendorID)).get();
+    const snap = await vendorConnectionDocRef(
+      db,
+      tenantID,
+      storeID,
+      vendorID,
+    ).get();
     if (!snap.exists) {
       return {
         success: true,
         hasCredentials: false,
+        isConnected: false,
+        connection: {},
         fieldsConfigured: [],
         lastUpdatedMillis: 0,
       };
     }
     const docData = snap.data() || {};
+    const fieldsConfigured = Array.isArray(docData.fieldsConfigured)
+      ? docData.fieldsConfigured
+      : [];
     return {
       success: true,
-      hasCredentials: Array.isArray(docData.fieldsConfigured) && docData.fieldsConfigured.length > 0,
-      fieldsConfigured: docData.fieldsConfigured || [],
+      hasCredentials: fieldsConfigured.length > 0,
+      isConnected: docData.isConnected === true,
+      connection: docData.connection || {},
+      fieldsConfigured,
       lastUpdatedMillis: docData.lastUpdatedMillis || 0,
     };
   }

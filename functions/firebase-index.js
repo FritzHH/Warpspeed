@@ -7877,6 +7877,8 @@ if (DEPLOY_TARGET === "saas") {
     vendorSubmission.submitVendorOrderCallable;
   exports.setVendorCredentialsCallable =
     vendorSubmission.setVendorCredentialsCallable;
+  exports.clearVendorCredentialsCallable =
+    vendorSubmission.clearVendorCredentialsCallable;
   exports.getVendorCredentialMetaCallable =
     vendorSubmission.getVendorCredentialMetaCallable;
   exports.pubsubVendorOrderSubmissionWorker = vendorSubmissionWorker.handler;

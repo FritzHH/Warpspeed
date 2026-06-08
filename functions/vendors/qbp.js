@@ -27,22 +27,30 @@
 // retry uploads to the same /out path — FTP overwrites, QBP processes once,
 // no double-orders.
 //
-// Credentials (creds, passed by the worker / callable):
-//   { eftpUser, eftpPassword, eftpHost?, apiKey? }
-//
-// vendorConfig (settings.vendors.qbp):
+// Handler input (passed by the worker / sync callable):
 //   {
-//     displayName,
-//     accountNumber,    // 10-digit HACN (e.g. "0000115882")
-//     contactEmail,     // HEMA — receives QBP order-reconciliation email
-//     contactName,      // HCTN — optional, defaults to "Buyer" in code
-//     shipToID,         // 10-digit HSTO (from /customer ship-to list)
-//     shipViaCode,      // HSVT (e.g. "U4" = UPS Ground)
-//     paymentTerms,     // HTRM (e.g. "N30:I" = Net 30, ACH US)
-//     submitAsCart,     // boolean: true → CSUB=NO (cart-only test),
-//                       //          false/missing → CSUB=YES + OSOR=YES (live)
-//     shipDateOffsetDays, // optional override for default ship-date (5)
+//     order, items,           // see worker
+//     connection: {           // Firestore vendor_connections/qbp.connection
+//       accountNumber,        // bare digits, e.g. "115882"
+//     },
+//     secrets: {              // Secret Manager vendor-qbp-{tID}-{sID}
+//       eftpPassword,         // QBP-issued EFTP password
+//       apiKey,               // X-QBPAPI-KEY (for future API1 discovery)
+//     },
+//     ctx,                    // { tenantID, storeID, vendorID, orderID, submissionID, logger }
 //   }
+//
+// Derived inside this handler (no user input needed):
+//   eftpUser = connection.accountNumber stripped of leading zeros
+//   HACN     = connection.accountNumber zero-padded to 10 digits
+//
+// Header fields that the .poi spec needs but the dealer does NOT type:
+//   contactEmail (HEMA), shipToID (HSTO), shipViaCode (HSVT),
+//   paymentTerms (HTRM), contactName (HCTN). These are auto-discovered
+//   via QBP's API1 (GET /customer, /customer/terms, /shipvia) — see
+//   scripts/qbp-eftp-test/1-discover.js. The discovery callable is
+//   deferred; for now they default in code (HCTN="Buyer", others
+//   pulled from order.qbpDiscovered or fall back to safe placeholders).
 //
 // ┌─────────────────────────────────────────────────────────────────┐
 // │  ONBOARDING INPUTS — what the dealer actually types in Cadence  │
@@ -54,28 +62,9 @@
 // │    2. EFTP password                                             │
 // │    3. API1 key (X-QBPAPI-KEY)                                   │
 // │                                                                 │
-// │  Derived from the account number (no user input needed):        │
-// │    - EFTP login (FTP user)     = accountNumber bare digits      │
-// │    - HACN (10-digit, on order) = accountNumber.padStart(10,"0") │
-// │                                                                 │
-// │  Derived via QBP's API1 (no user input needed):                 │
-// │    - contactEmail (HEMA) → returned by GET /customer            │
-// │    - shipToID (HSTO)     → returned by GET /customer            │
-// │      (or its ship-to list endpoint; usually one default)        │
-// │    - shipViaCode (HSVT)  → returned by GET /shipvia (dealer     │
-// │      picks from list, or Cadence picks a sensible default)     │
-// │    - paymentTerms (HTRM) → returned by GET /customer/terms      │
-// │      (dealer picks if multiple; usually one)                    │
-// │    - contactName (HCTN)  → defaults to "Buyer", not asked       │
-// │                                                                 │
-// │  Discovery flow lives in scripts/qbp-eftp-test/1-discover.js    │
-// │  and is the authoritative reference for what calls QBP's API1   │
-// │  needs to make and what fields the dealer must pick from.       │
-// │                                                                 │
-// │  DO NOT add hard guards that throw when these vendorConfig      │
-// │  fields are missing on the assumption the user has to enter     │
-// │  them. They're derivable. The UI populates them automatically   │
-// │  the first time the dealer pastes API1 + account# + EFTP pwd.   │
+// │  DO NOT add hard guards that throw when HSTO/HSVT/HTRM/HEMA     │
+// │  are missing — they're discoverable via API1 and will be        │
+// │  populated by the (deferred) discovery callable.                │
 // └─────────────────────────────────────────────────────────────────┘
 
 const ftp = require("basic-ftp");
@@ -93,31 +82,23 @@ const FTP_TIMEOUT_MS = 60_000;
 exports.submit = async function qbpSubmit({
   order,
   items,
-  vendorConfig,
-  creds,
+  connection,
+  secrets,
   ctx,
 }) {
   const { tenantID, storeID, orderID, submissionID, logger } = ctx;
 
-  if (!creds || !creds.eftpUser || !creds.eftpPassword) {
+  const accountNumber = String((connection && connection.accountNumber) || "")
+    .replace(/\D/g, "");
+  if (!accountNumber) {
+    throw new Error("QBP: connection missing accountNumber.");
+  }
+  const eftpUser = accountNumber.replace(/^0+/, "");
+  const eftpPassword = secrets && secrets.eftpPassword;
+  if (!eftpUser || !eftpPassword) {
     throw new Error(
-      "QBP: missing EFTP credentials (need eftpUser + eftpPassword)."
+      "QBP: missing EFTP credentials (need accountNumber + eftpPassword).",
     );
-  }
-  if (!vendorConfig || !vendorConfig.accountNumber) {
-    throw new Error("QBP: vendor settings missing accountNumber (HACN).");
-  }
-  if (!vendorConfig.contactEmail) {
-    throw new Error("QBP: vendor settings missing contactEmail (HEMA).");
-  }
-  if (!vendorConfig.shipToID) {
-    throw new Error("QBP: vendor settings missing shipToID (HSTO).");
-  }
-  if (!vendorConfig.shipViaCode) {
-    throw new Error("QBP: vendor settings missing shipViaCode (HSVT).");
-  }
-  if (!vendorConfig.paymentTerms) {
-    throw new Error("QBP: vendor settings missing paymentTerms (HTRM).");
   }
 
   // Filter to QBP-tagged items. Items from other catalogs end up in the
@@ -134,7 +115,7 @@ exports.submit = async function qbpSubmit({
   const poiBody = buildPoiFile({
     order,
     items: qbpItems,
-    vendorConfig,
+    accountNumber,
     submissionID,
   });
 
@@ -151,10 +132,10 @@ exports.submit = async function qbpSubmit({
   client.ftp.verbose = false;
   try {
     await client.access({
-      host: creds.eftpHost || DEFAULT_EFTP_HOST,
-      port: creds.eftpPort || DEFAULT_EFTP_PORT,
-      user: creds.eftpUser,
-      password: creds.eftpPassword,
+      host: DEFAULT_EFTP_HOST,
+      port: DEFAULT_EFTP_PORT,
+      user: eftpUser,
+      password: eftpPassword,
       secure: false,
     });
     const stream = Readable.from([Buffer.from(poiBody, "utf8")]);
@@ -183,7 +164,7 @@ exports.submit = async function qbpSubmit({
         submissionID,
         orderID,
         eftpFilename,
-        accountNumber: vendorConfig.accountNumber,
+        accountNumber,
         uploadedAt: FieldValue.serverTimestamp(),
         uploadedMillis: Date.now(),
         attempts: 0,
@@ -230,14 +211,23 @@ function buildFilename(submissionID) {
 // Record order matters per the published example; do not reorder casually.
 // Newlines: LF only — spec warns "lines including carriage returns may cause
 // entire file to be corrupted." See scripts/qbp-eftp-test/2-build-poi.js.
-function buildPoiFile({ order, items, vendorConfig, submissionID }) {
-  const submitAsCart = vendorConfig.submitAsCart === true;
+//
+// HSTO/HSVT/HTRM/HEMA: order may carry a `qbpDiscovered` block populated
+// by the (deferred) discovery callable. Until that ships, the order is
+// sent as cart-only (CSUB=NO) so QBP builds the cart in the dealer's
+// portal without auto-submitting — leaves headroom while we still pass
+// placeholder values for the discoverable fields.
+function buildPoiFile({ order, items, accountNumber, submissionID }) {
+  const discovered = (order && order.qbpDiscovered) || {};
+  const submitAsCart = discovered.shipToID
+    ? order.qbpSubmitAsCart === true
+    : true; // No discovery → cart-only until dealer reviews in portal.
   const csub = submitAsCart ? "NO" : "YES";
   // OSOR (out-of-stock-on-receipt) only meaningful with CSUB=YES; spec says
   // YES = ship partial, NO = ship none until full. Default YES so a single
   // OOS item doesn't block the whole order.
   const osor = submitAsCart ? "NO" : "YES";
-  const hshd = formatShipDate(vendorConfig.shipDateOffsetDays || 5);
+  const hshd = formatShipDate(discovered.shipDateOffsetDays || 5);
 
   // HCPO: 1–10 alphanumeric. Prefer customer PO from order, fall back to
   // order.name, then submissionID tail.
@@ -249,17 +239,25 @@ function buildPoiFile({ order, items, vendorConfig, submissionID }) {
     .replace(/[^a-zA-Z0-9]/g, "")
     .slice(0, 10) || "PO";
 
+  const hema = discovered.contactEmail || "";
+  const hsto = discovered.shipToID
+    ? pad10Digit(discovered.shipToID)
+    : pad10Digit(accountNumber);
+  const hsvt = discovered.shipViaCode || "U4"; // UPS Ground default
+  const htrm = discovered.paymentTerms || "N30:I"; // Net 30 / ACH default
+  const hctn = discovered.contactName || "Buyer";
+
   const lines = [
     "FT,PO",
     "FV,4.0",
-    `HEMA,${vendorConfig.contactEmail}`,
-    `HACN,${pad10Digit(vendorConfig.accountNumber)}`,
-    `HCTN,${vendorConfig.contactName || "Buyer"}`,
+    `HEMA,${hema}`,
+    `HACN,${pad10Digit(accountNumber)}`,
+    `HCTN,${hctn}`,
     `HCPO,${hcpo}`,
     `HSHD,${hshd}`,
-    `HSTO,${pad10Digit(vendorConfig.shipToID)}`,
-    `HSVT,${vendorConfig.shipViaCode}`,
-    `HTRM,${vendorConfig.paymentTerms}`,
+    `HSTO,${hsto}`,
+    `HSVT,${hsvt}`,
+    `HTRM,${htrm}`,
     `CSUB,${csub}`,
     `OSOR,${osor}`,
     // CREP=ftp asks QBP to drop the .por back into the same EFTP /in
@@ -332,14 +330,16 @@ exports.parsePorBody = function parsePorBody(text) {
 };
 
 // Same FTP-access helper the poller uses to download + delete the .por.
-exports.openFtpClient = async function openFtpClient(creds) {
+// Accepts the derived shape { eftpUser, eftpPassword } — the poller is
+// responsible for deriving eftpUser from connection.accountNumber.
+exports.openFtpClient = async function openFtpClient({ eftpUser, eftpPassword }) {
   const client = new ftp.Client(FTP_TIMEOUT_MS);
   client.ftp.verbose = false;
   await client.access({
-    host: creds.eftpHost || DEFAULT_EFTP_HOST,
-    port: creds.eftpPort || DEFAULT_EFTP_PORT,
-    user: creds.eftpUser,
-    password: creds.eftpPassword,
+    host: DEFAULT_EFTP_HOST,
+    port: DEFAULT_EFTP_PORT,
+    user: eftpUser,
+    password: eftpPassword,
     secure: false,
   });
   return client;
@@ -357,6 +357,7 @@ exports.deletePorFromIn = async function deletePorFromIn(client, eftpFilename) {
   }
 };
 
-// No `secrets` export — the SaaS path loads creds from the per-store
-// vendor-credentials Firestore doc; the Bonita sync callable declares
-// QBP_EFTP_USER / QBP_EFTP_PASSWORD secrets in its own onCall options.
+// No `secrets` export — per-store creds live in Secret Manager keyed by
+// (tenantID, storeID) and are loaded via loadVendorState in the worker.
+// (Bonita's legacy sync path declares its own platform secrets in
+// functions/bonita/qbp-sync-callable.js — unaffected by this module.)

@@ -7,9 +7,11 @@
 //      vendor-submissions-processing/{submissionID}. If the doc already
 //      exists, this is a redelivery — ack-and-drop.
 //   2. Load the submission doc, the order header, items subcollection,
-//      vendor config (from settings), and the credentials doc.
+//      and the vendor's split state (connection from Firestore
+//      vendor_connections/{vendor}, secrets from Secret Manager) via
+//      loadVendorState (see functions/saas/vendor-creds.js).
 //   3. Resolve a handler from the registry (functions/vendors/) and call
-//      handler.submit(payload).
+//      handler.submit({ order, items, connection, secrets, ctx }).
 //   4. Write the result back onto the submission doc with status
 //      "success" | "failure" and either `result` or `error`.
 //   5. On exception with delivery-attempt > MAX_DELIVERY_ATTEMPTS, route
@@ -17,13 +19,13 @@
 //      (admin DLQ ingestor takes it from there).
 //
 // Note: vendor handlers run with extended timeout (FTP/HTTP can be slow).
-// Default is 60s in COMMON_OPTS; bump per-handler if needed.
 const { onMessagePublished } = require("firebase-functions/v2/pubsub");
 const { logger } = require("firebase-functions");
 const admin = require("firebase-admin");
 const { getFirestore, FieldValue } = require("firebase-admin/firestore");
 const { PubSub } = require("@google-cloud/pubsub");
 const vendorRegistry = require("../vendors");
+const { loadVendorState } = require("./vendor-creds");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -153,25 +155,16 @@ exports.handler = onMessagePublished(
         { merge: true }
       );
 
-      // ── Load order + items + vendor config + credentials ──
+      // ── Load order + items + vendor split state ──
       const orderRef = db
         .collection("tenants").doc(tenantID)
         .collection("stores").doc(storeID)
         .collection("vendor-orders").doc(orderID);
 
-      const [orderSnap, itemsSnap, settingsSnap, credsSnap] = await Promise.all([
+      const [orderSnap, itemsSnap, vendorState] = await Promise.all([
         orderRef.get(),
         orderRef.collection("items").get(),
-        db
-          .collection("tenants").doc(tenantID)
-          .collection("stores").doc(storeID)
-          .collection("settings").doc("settings")
-          .get(),
-        db
-          .collection("tenants").doc(tenantID)
-          .collection("stores").doc(storeID)
-          .collection("vendor-credentials").doc(vendorID)
-          .get(),
+        loadVendorState(db, vendorID, tenantID, storeID),
       ]);
 
       if (!orderSnap.exists) {
@@ -182,13 +175,7 @@ exports.handler = onMessagePublished(
         .map((d) => d.data() || {})
         .sort((a, b) => Number(a.addedMillis || 0) - Number(b.addedMillis || 0));
 
-      const settings = (settingsSnap.exists && settingsSnap.data()) || {};
-      const vendorConfig = (settings.vendors && settings.vendors[vendorID]) || null;
-      if (!vendorConfig) {
-        throw new Error(`Vendor ${vendorID} no longer configured in settings.`);
-      }
-
-      const creds = (credsSnap.exists && credsSnap.data() && credsSnap.data().creds) || {};
+      const { connection, secrets } = vendorState;
 
       // ── Resolve handler ──
       // Locked vendors only — custom vendors are CSV-download on the client
@@ -212,8 +199,8 @@ exports.handler = onMessagePublished(
       const result = await handler.submit({
         order,
         items,
-        vendorConfig,
-        creds,
+        connection,
+        secrets,
         ctx,
       });
 

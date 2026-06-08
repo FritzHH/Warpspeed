@@ -7,18 +7,29 @@ import {
 } from "../../../../../stores";
 import { VENDOR_CATALOGS } from "../../../../../data";
 import { ICONS } from "../../../../../styles";
+import { setVendorCredentialsCallable } from "../../../../../db_calls";
+import { APP_BRAND } from "../../../../../private_user_constants";
 import { generate36CharUUID } from "../../../../../utils";
 import { VendorGetStartedModal } from "./VendorGetStartedModal";
 import styles from "./OrderingComponent.module.css";
+
+// Vendor credential storage (Firestore vendor_connections + Secret Manager)
+// is SaaS-only. Bonita continues to write vendor config into the legacy
+// settings.vendors path; setVendorCredentialsCallable isn't deployed there.
+const IS_SAAS = APP_BRAND === "rss";
 
 // Credential schemas per vendor. Matches the ONBOARDING INPUTS blocks in
 // functions/vendors/jbi.js and functions/vendors/qbp.js — these are the ONLY
 // fields a dealer types. Everything else (HSTO/HSVT/HTRM for QBP, FTP login +
 // integrator token for JBI) is derived server-side or platform-owned.
+//
+// `connection` keys go into Firestore vendor_connections doc (non-secret).
+// `secrets` keys go into Google Secret Manager (callable never echoes them
+// back). Must mirror VENDOR_FIELD_PARTITION in functions/saas/vendor-creds.js.
 const VENDOR_CRED_SCHEMA = {
   jbi: {
     label: "JBI account credentials",
-    fields: [
+    connection: [
       {
         key: "accountNumber",
         label: "Account number",
@@ -32,16 +43,19 @@ const VENDOR_CRED_SCHEMA = {
         placeholder: "orders@yourshop.com",
       },
     ],
+    secrets: [],
   },
   qbp: {
     label: "QBP integrator credentials",
-    fields: [
+    connection: [
       {
         key: "accountNumber",
         label: "Account number",
         type: "text",
         placeholder: "e.g. 115882",
       },
+    ],
+    secrets: [
       {
         key: "eftpPassword",
         label: "EFTP password",
@@ -57,6 +71,10 @@ const VENDOR_CRED_SCHEMA = {
     ],
   },
 };
+
+function allSchemaFields(schema) {
+  return [...schema.connection, ...schema.secrets];
+}
 
 // "Get Started" email templates. The dealer sends this to the vendor to
 // request the credentials they'll paste into the card above. Email addresses
@@ -101,29 +119,9 @@ const VENDOR_GETSTARTED = {
   },
 };
 
-// Client-side obfuscation, NOT cryptographic encryption. A Cloud Function
-// will decrypt server-side with a Secret Manager key when submitting orders.
-// This XOR layer just keeps cleartext credentials out of network panels and
-// Firestore console. DB storage destination is TBD — the scrambled blob is
-// currently only console-logged at save.
-const SCRAMBLE_KEY = "cadence-vendor-creds-v1";
-
-function scrambleCredsBlob(plaintext) {
-  if (!plaintext) return "";
-  const bytes = new TextEncoder().encode(plaintext);
-  const keyBytes = new TextEncoder().encode(SCRAMBLE_KEY);
-  const out = new Uint8Array(bytes.length);
-  for (let i = 0; i < bytes.length; i++) {
-    out[i] = bytes[i] ^ keyBytes[i % keyBytes.length];
-  }
-  let binary = "";
-  for (let i = 0; i < out.length; i++) binary += String.fromCharCode(out[i]);
-  return btoa(binary);
-}
-
 function emptyFormForSchema(schema) {
   const out = {};
-  schema.fields.forEach((f) => {
+  allSchemaFields(schema).forEach((f) => {
     out[f.key] = "";
   });
   return out;
@@ -139,9 +137,15 @@ const INITIAL_CRED_FORM = Object.entries(VENDOR_CRED_SCHEMA).reduce(
 
 export function OrderingComponent() {
   const zVendors = useSettingsStore((s) => s.getSettings()?.vendors) || {};
+  const zTenantID = useSettingsStore((s) => s.getSettings()?.tenantID) || "";
+  const zStoreID = useSettingsStore((s) => s.getSettings()?.storeID) || "";
   const [sNewName, _setNewName] = useState("");
   const [sCredForm, _setCredForm] = useState(INITIAL_CRED_FORM);
-  const [sSavedAt, _setSavedAt] = useState({});
+  // Per-vendor save state. After a successful save callable the entry holds
+  // { savedAtMillis, isConnected, fieldsConfigured } so we can show "Saved"
+  // and (eventually) a "Connected" indicator without re-querying the server.
+  const [sSavedState, _setSavedState] = useState({});
+  const [sSavingVendorID, _setSavingVendorID] = useState(null);
   const [sGetStartedVendorID, _setGetStartedVendorID] = useState(null);
 
   const lockedVendors = useMemo(
@@ -238,41 +242,85 @@ export function OrderingComponent() {
     const schema = VENDOR_CRED_SCHEMA[vendorID];
     if (!schema) return false;
     const values = sCredForm[vendorID] || {};
-    return schema.fields.every((f) => (values[f.key] || "").trim().length > 0);
+    return allSchemaFields(schema).every(
+      (f) => (values[f.key] || "").trim().length > 0,
+    );
   }
 
-  function handleSaveCreds(vendorID) {
+  function pickEntries(values, fields) {
+    const out = {};
+    fields.forEach((f) => {
+      const v = (values[f.key] || "").trim();
+      if (v) out[f.key] = v;
+    });
+    return out;
+  }
+
+  async function handleSaveCreds(vendorID) {
     const schema = VENDOR_CRED_SCHEMA[vendorID];
     if (!schema) return;
+    if (!zTenantID || !zStoreID) {
+      useAlertScreenStore.getState().setValues({
+        title: "MISSING STORE CONTEXT",
+        message:
+          "Cannot save vendor credentials — tenant or store ID is not set on this device.",
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+      return;
+    }
     const values = sCredForm[vendorID] || {};
-    const payload = schema.fields.reduce((acc, f) => {
-      acc[f.key] = (values[f.key] || "").trim();
-      return acc;
-    }, {});
-    const scrambled = scrambleCredsBlob(JSON.stringify(payload));
-    console.log(
-      JSON.stringify(
-        {
-          event: "vendor-creds-scrambled",
-          vendorID,
-          scrambled,
-          bytes: scrambled.length,
-          note: "DB storage destination TBD; placeholder console-log only",
+    const connection = pickEntries(values, schema.connection);
+    const secrets = pickEntries(values, schema.secrets);
+
+    _setSavingVendorID(vendorID);
+    try {
+      const res = await setVendorCredentialsCallable({
+        tenantID: zTenantID,
+        storeID: zStoreID,
+        vendorID,
+        connection,
+        secrets,
+      });
+      const data = (res && res.data) || {};
+      _setSavedState((prev) => ({
+        ...prev,
+        [vendorID]: {
+          savedAtMillis: data.lastUpdatedMillis || Date.now(),
+          isConnected: data.isConnected === true,
+          fieldsConfigured: Array.isArray(data.fieldsConfigured)
+            ? data.fieldsConfigured
+            : [],
         },
-        null,
-        2,
-      ),
-    );
-    _setSavedAt((prev) => ({ ...prev, [vendorID]: Date.now() }));
-    _setCredForm((prev) => ({
-      ...prev,
-      [vendorID]: emptyFormForSchema(schema),
-    }));
+      }));
+      _setCredForm((prev) => ({
+        ...prev,
+        [vendorID]: emptyFormForSchema(schema),
+      }));
+    } catch (err) {
+      const message =
+        (err && err.message) || "Failed to save vendor credentials.";
+      useAlertScreenStore.getState().setValues({
+        title: "SAVE FAILED",
+        message,
+        btn1Text: "OK",
+        handleBtn1Press: () => useAlertScreenStore.getState().resetAll(),
+        showAlert: true,
+        canExitOnOuterClick: true,
+      });
+    } finally {
+      _setSavingVendorID(null);
+    }
   }
 
   function renderLockedVendor(v) {
     const schema = VENDOR_CRED_SCHEMA[v.id];
-    if (!schema) {
+    // On Bonita (non-SaaS builds), the cred entry form is hidden — Bonita
+    // writes vendor config to legacy settings.vendors via a different path
+    // and doesn't have setVendorCredentialsCallable deployed.
+    if (!schema || !IS_SAAS) {
       return (
         <div
           key={v.id}
@@ -285,17 +333,23 @@ export function OrderingComponent() {
       );
     }
     const values = sCredForm[v.id] || {};
-    const saved = !!sSavedAt[v.id];
+    const savedState = sSavedState[v.id];
+    const isSaving = sSavingVendorID === v.id;
+    const fields = allSchemaFields(schema);
     return (
       <div key={v.id} className={styles.vendorCard}>
         <div className={styles.vendorCardHeader}>
           <span className={styles.vendorName}>{v.displayName}</span>
-          {saved ? <span className={styles.savedBadge}>Saved</span> : null}
+          {savedState ? (
+            <span className={styles.savedBadge}>
+              {savedState.isConnected ? "Connected" : "Saved"}
+            </span>
+          ) : null}
         </div>
         <div className={styles.credSection}>
           <span className={styles.credSectionTitle}>{schema.label}</span>
           <div className={styles.credFields}>
-            {schema.fields.map((field) => {
+            {fields.map((field) => {
               const inputID = `cred-${v.id}-${field.key}`;
               return (
                 <div key={field.key} className={styles.credField}>
@@ -313,6 +367,7 @@ export function OrderingComponent() {
                     placeholder={field.placeholder}
                     autoComplete="off"
                     spellCheck={false}
+                    disabled={isSaving}
                   />
                 </div>
               );
@@ -330,9 +385,9 @@ export function OrderingComponent() {
               type="button"
               className={styles.credSaveButton}
               onClick={() => handleSaveCreds(v.id)}
-              disabled={!hasAllRequiredCredValues(v.id)}
+              disabled={!hasAllRequiredCredValues(v.id) || isSaving}
             >
-              Save credentials
+              {isSaving ? "Saving…" : "Save credentials"}
             </button>
           </div>
         </div>

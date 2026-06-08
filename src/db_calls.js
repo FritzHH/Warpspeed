@@ -906,6 +906,23 @@ export const verifySignInCodeCallable = httpsCallable(
   "verifySignInCodeCallable"
 );
 
+// SaaS vendor credentials — persist per-store vendor connection state
+// (Firestore) + secret material (Google Secret Manager). Read via the
+// meta callable, which never echoes secret values. See
+// functions/saas/vendor-submission.js for the payload shapes.
+export const setVendorCredentialsCallable = httpsCallable(
+  functions,
+  "setVendorCredentialsCallable"
+);
+export const clearVendorCredentialsCallable = httpsCallable(
+  functions,
+  "clearVendorCredentialsCallable"
+);
+export const getVendorCredentialMetaCallable = httpsCallable(
+  functions,
+  "getVendorCredentialMetaCallable"
+);
+
 export function sendSMS(messageBody) {
   return sendSMSCallable(messageBody)
     .then((result) => {

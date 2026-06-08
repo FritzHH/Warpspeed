@@ -92,13 +92,15 @@ exports.submitQbpOrderCallable = onCall(
       );
     }
 
-    const vendorConfig =
-      (settings.vendors && settings.vendors.qbp) || {
-        displayName: "QBP",
-      };
-
-    const creds = {
-      eftpUser: QBP_EFTP_USER.value() || "",
+    // QBP handler now derives eftpUser from connection.accountNumber
+    // (bare-digit form, leading zeros stripped). Bonita keeps
+    // settings.vendors.qbp.accountNumber set; QBP_EFTP_USER secret is
+    // now redundant but left in place for rollback safety.
+    const vendorConfig = (settings.vendors && settings.vendors.qbp) || {};
+    const connection = {
+      accountNumber: vendorConfig.accountNumber || QBP_EFTP_USER.value() || "",
+    };
+    const secrets = {
       eftpPassword: QBP_EFTP_PASSWORD.value() || "",
     };
 
@@ -139,8 +141,8 @@ exports.submitQbpOrderCallable = onCall(
       result = await qbpHandler.submit({
         order,
         items,
-        vendorConfig,
-        creds,
+        connection,
+        secrets,
         ctx,
       });
     } catch (err) {

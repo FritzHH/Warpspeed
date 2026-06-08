@@ -3,9 +3,11 @@
 //
 // Runs on a 3-minute schedule. Uses a collectionGroup query to find every
 // pending-qbp-responses doc across every tenant + store, groups by
-// (tenantID, storeID), loads each store's QBP EFTP credentials from
-// tenants/{tid}/stores/{sid}/vendor-credentials/qbp.creds, then opens one
-// FTP connection per store to drain matching .por files from /in.
+// (tenantID, storeID), loads each store's QBP creds via loadVendorState
+// (connection.accountNumber from Firestore vendor_connections/qbp,
+// eftpPassword from Secret Manager), derives the EFTP login server-side,
+// then opens one FTP connection per store to drain matching .por files
+// from /in.
 //
 // Same logic as the Bonita poller (functions/bonita/qbp-response-poller.js);
 // only difference is multi-tenant cred sourcing. The shared parse/upload
@@ -18,6 +20,7 @@ const { getFirestore } = require("firebase-admin/firestore");
 const { Writable } = require("stream");
 
 const qbpHandler = require("../vendors/qbp");
+const { loadVendorState } = require("./vendor-creds");
 
 if (!admin.apps.length) admin.initializeApp();
 
@@ -108,17 +111,30 @@ exports.qbpResponsePollerSaas = onSchedule(
 );
 
 async function processStoreGroup(db, tenantID, storeID, entries) {
-  // Load creds from vendor-credentials/qbp.creds (same path the worker uses).
-  const credsSnap = await db
-    .collection("tenants").doc(tenantID)
-    .collection("stores").doc(storeID)
-    .collection("vendor-credentials").doc("qbp")
-    .get();
+  // Load split state via the same helper the worker uses. Connection has
+  // accountNumber; secrets has eftpPassword. EFTP login is the account
+  // number with leading zeros stripped — derived here, never stored.
+  let connection;
+  let secrets;
+  try {
+    const state = await loadVendorState(db, "qbp", tenantID, storeID);
+    connection = state.connection;
+    secrets = state.secrets;
+  } catch (err) {
+    logger.warn("qbp-response-poller-saas: load creds failed, skipping group", {
+      tenantID,
+      storeID,
+      count: entries.length,
+      error: err && err.message,
+    });
+    return;
+  }
 
-  const credsData = credsSnap.exists ? credsSnap.data() : null;
-  const creds = (credsData && credsData.creds) || {};
-  if (!creds.eftpUser || !creds.eftpPassword) {
-    logger.warn("qbp-response-poller-saas: no creds for store, skipping group", {
+  const accountNumber = String(connection.accountNumber || "").replace(/\D/g, "");
+  const eftpUser = accountNumber.replace(/^0+/, "");
+  const eftpPassword = secrets.eftpPassword;
+  if (!eftpUser || !eftpPassword) {
+    logger.warn("qbp-response-poller-saas: incomplete creds for store, skipping group", {
       tenantID,
       storeID,
       count: entries.length,
@@ -128,7 +144,7 @@ async function processStoreGroup(db, tenantID, storeID, entries) {
 
   let client;
   try {
-    client = await qbpHandler.openFtpClient(creds);
+    client = await qbpHandler.openFtpClient({ eftpUser, eftpPassword });
   } catch (err) {
     logger.error("qbp-response-poller-saas: FTP connect failed", {
       tenantID,

@@ -668,7 +668,7 @@ export const useLoginStore = create(
   punchClock: {}, // object of current user punches showing who is currently logged in
   modalVisible: false,
   lastActionMillis: 0,
-  postLoginFunctionCallback: null,
+  _loginPromptResolver: null,
   showLoginScreen: false,
   cameraStatus: "loading", // "loading" | "ready" | "failed" | "idle" | "matched"
   cameraError: null,
@@ -1005,7 +1005,6 @@ export const useLoginStore = create(
   setCameraError: (cameraError) => set({ cameraError }),
   setCameraStream: (cameraStream) => set({ cameraStream }),
   triggerCameraRetry: () => set((state) => ({ cameraRetryTrigger: state.cameraRetryTrigger + 1, cameraStatus: "loading", cameraError: null })),
-  setPostLoginFunctionCallback: (postLoginFunctionCallback) => set({ postLoginFunctionCallback }),
   setRunBackgroundRecognition: (runBackgroundRecognition) =>
     set(() => ({ runBackgroundRecognition })),
   setModalVisible: (modalVisible) => set((state) => ({ modalVisible })),
@@ -1024,17 +1023,32 @@ export const useLoginStore = create(
     set((state) => ({ showLoginScreen }));
   },
 
-  requireLogin: (callback) => {
+  isSessionValid: ({ level } = {}) => {
+    let userObj = get().currentUser;
+    if (!userObj) return false;
     let lastAction = get().lastActionMillis;
     let now = new Date().getTime();
     let diffSeconds = (now - lastAction) / 1000;
     let timeout = useSettingsStore.getState().getSettings()?.activeLoginTimeoutSeconds || 60;
-    let userObj = get().currentUser;
+    if (diffSeconds > timeout) return false;
+    if (level) {
+      if (permissionToLevel(userObj.permissions) < permissionToLevel(level)) return false;
+    }
+    return true;
+  },
 
-    if (!userObj || diffSeconds > timeout) {
-      // If we know who the user is (face recognized) but they're not clocked in,
-      // offer clock-in as a way to authenticate — clocking in counts as logging in
-      if (userObj && !get().punchClock[userObj.id]) {
+  promptLogin: ({ level } = {}) => {
+    if (get().isSessionValid({ level })) return Promise.resolve(true);
+
+    let prev = get()._loginPromptResolver;
+    if (prev) prev(false);
+
+    return new Promise((resolve) => {
+      let userObj = get().currentUser;
+      // Face-recognized but not clocked in: offer punch-in as an auth path.
+      // Only when no privilege level is required (clock-in doesn't elevate).
+      if (!level && userObj && !get().punchClock[userObj.id]) {
+        set({ _loginPromptResolver: resolve, adminPrivilege: "" });
         useAlertScreenStore.getState().setValues({
           title: "PUNCH CLOCK",
           message: "Hi " + userObj.first + ", you are not clocked in. Would you like to punch in now?",
@@ -1048,15 +1062,10 @@ export const useLoginStore = create(
             );
             if (!result?.success) throw new Error(result?.error || "Punch failed");
             get().setLastActionMillis();
-            callback();
+            get().resolveLoginPrompt(true);
           },
           handleBtn2Press: () => {
-            // Declined clock-in, show regular login modal
-            set({
-              postLoginFunctionCallback: () => { callback(); },
-              showLoginScreen: true,
-              adminPrivilege: "",
-            });
+            set({ showLoginScreen: true, adminPrivilege: "" });
           },
           showAlert: true,
         });
@@ -1064,43 +1073,23 @@ export const useLoginStore = create(
       }
 
       set({
-        postLoginFunctionCallback: () => {
-          callback();
-        },
+        _loginPromptResolver: resolve,
         showLoginScreen: true,
-        adminPrivilege: "",
+        adminPrivilege: level || "",
       });
-      return;
-    }
-    callback();
+    });
   },
 
-  execute: (postLoginFunctionCallback, priviledgeLevel) => {
-    let lastMillis = get().lastActionMillis;
-    let cur = new Date().getTime();
-    let diff = (cur - lastMillis) / 1000;
-    let userObj = get().currentUser;
-
-    let hasAccess = true;
-
-    if (priviledgeLevel && userObj) {
-      hasAccess = permissionToLevel(userObj.permissions) >= permissionToLevel(priviledgeLevel);
+  resolveLoginPrompt: (success) => {
+    let resolver = get()._loginPromptResolver;
+    if (!resolver) return;
+    let ok = !!success;
+    if (ok) {
+      let requiredLevel = get().adminPrivilege || undefined;
+      if (!get().isSessionValid({ level: requiredLevel })) ok = false;
     }
-
-    let timeout = useSettingsStore.getState().getSettings()?.activeLoginTimeoutSeconds || 60;
-    if (diff > timeout || !hasAccess || !userObj) {
-      set({ postLoginFunctionCallback, showLoginScreen: true, adminPrivilege: priviledgeLevel || "" });
-      return;
-    } else if (hasAccess) {
-      postLoginFunctionCallback();
-    }
-  },
-  runPostLoginFunction: () => {
-    const cb = get().postLoginFunctionCallback;
-    if (cb) {
-      cb();
-      set({ postLoginFunctionCallback: null });
-    }
+    set({ _loginPromptResolver: null });
+    resolver(ok);
   },
     }),
     {
@@ -1835,12 +1824,7 @@ export const useOpenWorkordersStore = create(
           if (workorderID === get().openWorkorderID) broadcastWorkorderToDisplay(workorder);
         };
 
-        // Require login for any changelog-tracked field edit
-        if (CHANGELOG_TRACKED_FIELDS.includes(fieldName)) {
-          useLoginStore.getState().requireLogin(doSet);
-        } else {
-          doSet();
-        }
+        doSet();
       },
 
       removeWorkorder: (workorderID, saveToDB = true, batch = true) => {

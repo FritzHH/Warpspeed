@@ -318,8 +318,8 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
       message: `Are you sure you want to delete "${sItem.catalogName || sItem.formalName || "this item"}"?`,
       btn1Text: "Delete",
       handleBtn1Press: () => {
-        useLoginStore.getState().execute(() => {
-          // clean up auto customer note from settings
+        useLoginStore.getState().promptLogin({ level: "Editor" }).then((ok) => {
+          if (!ok) return;
           const autoNotes = useSettingsStore.getState().settings?.autoCustomerNoteTexts || [];
           const filtered = autoNotes.filter((n) => n.inventoryItemID !== sItem.id);
           if (filtered.length !== autoNotes.length) {
@@ -328,7 +328,7 @@ export const InventoryItemModalScreen = ({ item, isNew, handleExit }) => {
           useInventoryStore.getState().removeItem(sItem);
           dbDeleteInventoryItem(sItem.id);
           handleExit();
-        }, "Editor");
+        });
       },
     });
   }

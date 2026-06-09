@@ -188,7 +188,7 @@ export function Dashboard_Admin({}) {
   const zIsPlatformAdmin = useLoginStore((state) => state.getAuthClaims())?.platformAdmin === true;
   const zIsSaasOwner = useLoginStore((state) => state.getAuthClaims())?.privilege === "owner";
   const guardedMenuPress = (action, level = 3) => () =>
-    useLoginStore.getState().execute(action, levelToPrivilegeName(level));
+    useLoginStore.getState().promptLogin({ level: levelToPrivilegeName(level) }).then((ok) => { if (ok) action(); });
   // local state ///////////////////////////////////////////////////////////
   const [sFacialRecognitionModalUserObj, _setFacialRecognitionModalUserObj] =
     useState(false);

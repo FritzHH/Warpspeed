@@ -43,7 +43,11 @@ import {
   StatusPickerModal,
   DropdownMenu,
   AlertBox,
+  AutoJumpBlocker,
 } from "../dom_components";
+import { useAutoJumpBlock } from "../hooks/useAutoJumpBlock";
+import { activeInputStyle } from "../shared/activeInputStyle";
+import { confirmAddHint } from "../shared/confirmAddHint";
 import {
   dbListenToSettings,
   dbListenToInventory,
@@ -346,6 +350,7 @@ export function BikeStandScreen() {
   const zIntakeNotes = useZ("modal", !!sIntakeNotesLineID);
   const zBikeInfoModal = useZ("modal", sShowBikeInfoModal);
   const zFooterMenu = useZ("dropdown", sShowFooterMenu);
+  const autoJumpBlock = useAutoJumpBlock();
   const inactivityTimerRef = useRef(null);
 
   const INACTIVITY_TIMEOUT = 5 * 60 * 1000;
@@ -884,26 +889,20 @@ export function BikeStandScreen() {
   }
 
   function saveBrandToAllBrands(brand) {
-    if (!brand || !brand.trim()) return;
-    const trimmed = brand.trim();
-    if (trimmed.length < 3) return;
-    const existing = zSettings.allBrands || [];
-    if (existing.some((b) => b.toLowerCase() === trimmed.toLowerCase())) return;
-    const updated = [...existing, trimmed].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-    useSettingsStore.getState().setField("allBrands", updated);
+    confirmAddHint({ kind: "brand", value: brand, settingsKey: "allBrands" });
   }
 
   function saveDescToAllDescriptions(desc) {
-    if (!desc || !desc.trim()) return;
-    const trimmed = desc.trim();
-    if (trimmed.length < 3) return;
-    const existing = zSettings.allDescriptions || [];
-    if (existing.some((d) => d.toLowerCase() === trimmed.toLowerCase())) return;
-    const updated = [...existing, trimmed].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-    useSettingsStore.getState().setField("allDescriptions", updated);
+    confirmAddHint({ kind: "description", value: desc, settingsKey: "allDescriptions" });
   }
 
   const allColorLabels = COLORS.map((c) => c.label);
+
+  const isInvalidBikeColor = (label) => {
+    if (!label || !label.trim()) return false;
+    const lc = label.trim().toLowerCase();
+    return !allColorLabels.some((c) => c.toLowerCase() === lc);
+  };
 
   const brandSuggestions = !sSuggestionsHidden && sDetailField === "brand" && sDetailForm.brand?.trim().length >= 2
     ? (zSettings.allBrands || []).filter(
@@ -936,8 +935,11 @@ export function BikeStandScreen() {
 
   function saveDetailOnLeave(leavingField) {
     if (!leavingField || !selectedWorkorder) return;
-    if (leavingField === "brand") saveBrandToAllBrands(selectedWorkorder.brand);
-    if (leavingField === "description") saveDescToAllDescriptions(selectedWorkorder.description);
+    const typed = sDetailForm[leavingField];
+    const stored = selectedWorkorder[leavingField];
+    const value = (typed && typed.trim()) ? typed : stored;
+    if (leavingField === "brand") saveBrandToAllBrands(value);
+    if (leavingField === "description") saveDescToAllDescriptions(value);
     detailBackspaced.current = false;
   }
 
@@ -1038,12 +1040,14 @@ export function BikeStandScreen() {
         }
         let idx = DETAIL_FIELDS.indexOf(sDetailField);
         let next = DETAIL_FIELDS[idx + 1];
-        if (next) {
-          _setDetailField(next);
-          _setDetailKeypadOverride(null);
-        } else {
-          _setDetailField(null);
-        }
+        const labelMap = { brand: "Brand", description: "Description", color1: "Color 1", color2: "Color 2", waitDays: "Wait Days" };
+        const nextLabel = next ? labelMap[next] || next : null;
+        _setDetailField(null);
+        _setDetailKeypadOverride(null);
+        autoJumpBlock.trigger(
+          nextLabel ? `${match}  \u2192  ${nextLabel}` : match,
+          () => { if (next) _setDetailField(next); },
+        );
         return;
       }
     }
@@ -1561,19 +1565,14 @@ export function BikeStandScreen() {
                         <TextInput
                           placeholder="Brand"
                           editable={false}
-                          style={{
-                            width: "100%",
-                            borderWidth: sDetailField === "brand" ? 2 : 1,
-                            borderColor: sDetailField === "brand" ? C.blue : selectedWorkorder?.brand ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
-                            color: C.text,
+                          style={activeInputStyle({
+                            isActive: sDetailField === "brand",
+                            hasValue: !!(sDetailField === "brand" ? sDetailForm.brand : selectedWorkorder?.brand),
+                            fontSize: 32,
                             paddingVertical: 12,
                             paddingHorizontal: 10,
-                            fontSize: 32,
-                            outlineStyle: "none",
                             borderRadius: Radius.row,
-                            fontWeight: (sDetailField === "brand" ? sDetailForm.brand : selectedWorkorder?.brand) ? "500" : null,
-                            backgroundColor: sDetailField === "brand" ? lightenRGBByPercent(C.blue, 85) : undefined,
-                          }}
+                          })}
                           value={sDetailField === "brand" ? capitalizeFirstLetterOfString(sDetailForm.brand) : capitalizeFirstLetterOfString(selectedWorkorder?.brand)}
                         />
                       </div>
@@ -1595,7 +1594,12 @@ export function BikeStandScreen() {
                                 _setDetailForm((prev) => ({ ...prev, brand: item }));
                                 let idx = DETAIL_FIELDS.indexOf("brand");
                                 let next = DETAIL_FIELDS[idx + 1];
-                                if (next) { _setDetailField(next); _setDetailKeypadOverride(null); } else { _setDetailField(null); }
+                                _setDetailField(null);
+                                _setDetailKeypadOverride(null);
+                                autoJumpBlock.trigger(
+                                  `${item}  →  Description`,
+                                  () => { if (next) _setDetailField(next); },
+                                );
                               }}
                             >
                               <span className={styles.bmSuggestionItemText} style={{ color: C.text }}>{item}</span>
@@ -1660,19 +1664,14 @@ export function BikeStandScreen() {
                         <TextInput
                           placeholder="Model/Description"
                           editable={false}
-                          style={{
-                            width: "100%",
-                            borderWidth: sDetailField === "description" ? 2 : 1,
-                            borderColor: sDetailField === "description" ? C.blue : selectedWorkorder?.description ? "rgba(200, 228, 220, 0.25)" : C.buttonLightGreenOutline,
-                            color: C.text,
+                          style={activeInputStyle({
+                            isActive: sDetailField === "description",
+                            hasValue: !!(sDetailField === "description" ? sDetailForm.description : selectedWorkorder?.description),
+                            fontSize: 32,
                             paddingVertical: 12,
                             paddingHorizontal: 10,
-                            fontSize: 32,
-                            outlineStyle: "none",
                             borderRadius: Radius.row,
-                            fontWeight: (sDetailField === "description" ? sDetailForm.description : selectedWorkorder?.description) ? "500" : null,
-                            backgroundColor: sDetailField === "description" ? lightenRGBByPercent(C.blue, 85) : undefined,
-                          }}
+                          })}
                           value={sDetailField === "description" ? capitalizeFirstLetterOfString(sDetailForm.description) : capitalizeFirstLetterOfString(selectedWorkorder?.description)}
                         />
                       </div>
@@ -1753,7 +1752,11 @@ export function BikeStandScreen() {
                               outlineStyle: "none",
                               borderRadius: Radius.row,
                               fontWeight: (sDetailField === "color1" ? sDetailForm.color1 : selectedWorkorder?.color1?.label) ? "500" : null,
-                              backgroundColor: sDetailField === "color1" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color1?.backgroundColor,
+                              backgroundColor: isInvalidBikeColor(sDetailField === "color1" ? sDetailForm.color1 : selectedWorkorder?.color1?.label)
+                                ? C.danger
+                                : sDetailField === "color1"
+                                  ? lightenRGBByPercent(C.blue, 85)
+                                  : selectedWorkorder?.color1?.backgroundColor,
                               color: selectedWorkorder?.color1?.textColor || C.text,
                             }}
                             value={sDetailField === "color1" ? capitalizeFirstLetterOfString(sDetailForm.color1) : capitalizeFirstLetterOfString(selectedWorkorder?.color1?.label)}
@@ -1804,7 +1807,11 @@ export function BikeStandScreen() {
                               outlineStyle: "none",
                               borderRadius: Radius.row,
                               fontWeight: (sDetailField === "color2" ? sDetailForm.color2 : selectedWorkorder?.color2?.label) ? "500" : null,
-                              backgroundColor: sDetailField === "color2" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color2?.backgroundColor,
+                              backgroundColor: isInvalidBikeColor(sDetailField === "color2" ? sDetailForm.color2 : selectedWorkorder?.color2?.label)
+                                ? C.danger
+                                : sDetailField === "color2"
+                                  ? lightenRGBByPercent(C.blue, 85)
+                                  : selectedWorkorder?.color2?.backgroundColor,
                               color: selectedWorkorder?.color2?.textColor || C.text,
                             }}
                             value={sDetailField === "color2" ? capitalizeFirstLetterOfString(sDetailForm.color2) : capitalizeFirstLetterOfString(selectedWorkorder?.color2?.label)}
@@ -2006,12 +2013,13 @@ export function BikeStandScreen() {
                       onPress={() => { if (!hasBrand) return; saveDetailOnLeave(sDetailField); _setShowBikeInfoModal(false); _setDetailField(null); }}
                     >
                       <Image icon={ICONS.gears1} size={36} />
-                      <span className={styles.bmAddItemsText} style={{ color: hasBrand ? C.textWhite : C.textMuted }}>Edit Workorder</span>
+                      <span className={styles.bmAddItemsText} style={{ color: hasBrand ? C.textWhite : C.textMuted }}>Go to Workorder</span>
                     </StandTouch>
                   </div>
                 );
               })()}
             </div>
+            <AutoJumpBlocker show={autoJumpBlock.blocking} message={autoJumpBlock.message} />
           </div>
         );
       })()}
@@ -2409,7 +2417,11 @@ export function BikeStandScreen() {
                               outlineStyle: "none",
                               borderRadius: Radius.control,
                               fontWeight: (sDetailField === "color1" ? sDetailForm.color1 : selectedWorkorder?.color1?.label) ? "500" : null,
-                              backgroundColor: sDetailField === "color1" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color1?.backgroundColor,
+                              backgroundColor: isInvalidBikeColor(sDetailField === "color1" ? sDetailForm.color1 : selectedWorkorder?.color1?.label)
+                                ? C.danger
+                                : sDetailField === "color1"
+                                  ? lightenRGBByPercent(C.blue, 85)
+                                  : selectedWorkorder?.color1?.backgroundColor,
                               color: selectedWorkorder?.color1?.textColor || C.text,
                             }}
                             value={sDetailField === "color1" ? capitalizeFirstLetterOfString(sDetailForm.color1) : capitalizeFirstLetterOfString(selectedWorkorder?.color1?.label)}
@@ -2432,7 +2444,11 @@ export function BikeStandScreen() {
                               outlineStyle: "none",
                               borderRadius: Radius.control,
                               fontWeight: (sDetailField === "color2" ? sDetailForm.color2 : selectedWorkorder?.color2?.label) ? "500" : null,
-                              backgroundColor: sDetailField === "color2" ? lightenRGBByPercent(C.blue, 85) : selectedWorkorder?.color2?.backgroundColor,
+                              backgroundColor: isInvalidBikeColor(sDetailField === "color2" ? sDetailForm.color2 : selectedWorkorder?.color2?.label)
+                                ? C.danger
+                                : sDetailField === "color2"
+                                  ? lightenRGBByPercent(C.blue, 85)
+                                  : selectedWorkorder?.color2?.backgroundColor,
                               color: selectedWorkorder?.color2?.textColor || C.text,
                             }}
                             value={sDetailField === "color2" ? capitalizeFirstLetterOfString(sDetailForm.color2) : capitalizeFirstLetterOfString(selectedWorkorder?.color2?.label)}
@@ -4500,8 +4516,6 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                 {[
                   { key: "first", label: "First Name" },
                   { key: "last", label: "Last Name" },
-                  { key: "phone", label: "Phone" },
-                  { key: "email", label: "Email" },
                 ].map((field) => (
                   <StandTouch key={field.key} onPress={() => _setActiveField(field.key)}>
                     <div
@@ -4513,14 +4527,40 @@ const NewWorkorderModal = ({ onSelect, onClose }) => {
                     >
                       <span className={styles.nwmFormLabel} style={{ color: C.textMuted }}>{field.label}</span>
                       <span className={styles.nwmFormValue} style={{ color: C.text }}>
-                        {field.key === "phone"
-                          ? formatPhoneWithDashes((sCreateForm[field.key] || "").replace(/\D/g, ""))
-                          : sCreateForm[field.key] || ""}
+                        {sCreateForm[field.key] || ""}
                         {sActiveField === field.key && <span style={{ color: C.blue }}>|</span>}
                       </span>
                     </div>
                   </StandTouch>
                 ))}
+                <div className={styles.nwmFormFieldRow}>
+                  {[
+                    { key: "phone", label: "Phone" },
+                    { key: "email", label: "Email" },
+                  ].map((field) => (
+                    <StandTouch
+                      key={field.key}
+                      onPress={() => _setActiveField(field.key)}
+                      style={{ flex: 1, minWidth: 0 }}
+                    >
+                      <div
+                        className={styles.nwmFormField}
+                        style={{
+                          borderColor: sActiveField === field.key ? C.blue : C.buttonLightGreenOutline,
+                          backgroundColor: sActiveField === field.key ? lightenRGBByPercent(C.blue, 85) : C.listItemWhite,
+                        }}
+                      >
+                        <span className={styles.nwmFormLabel} style={{ color: C.textMuted }}>{field.label}</span>
+                        <span className={styles.nwmFormValue} style={{ color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {field.key === "phone"
+                            ? formatPhoneWithDashes((sCreateForm[field.key] || "").replace(/\D/g, ""))
+                            : sCreateForm[field.key] || ""}
+                          {sActiveField === field.key && <span style={{ color: C.blue }}>|</span>}
+                        </span>
+                      </div>
+                    </StandTouch>
+                  ))}
+                </div>
               </div>
 
               {/* Keypad for create mode */}
@@ -5238,7 +5278,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
                 ...inputStyle,
                 width: "24%",
                 fontWeight: zWorkorder?.color1?.label ? "500" : null,
-                backgroundColor: zWorkorder?.color1?.backgroundColor,
+                backgroundColor: isInvalidBikeColor(zWorkorder?.color1?.label) ? C.danger : zWorkorder?.color1?.backgroundColor,
                 color: zWorkorder?.color1?.textColor || C.text,
               }}
               onChangeText={(val) => setBikeColor(val, "color1")}
@@ -5252,7 +5292,7 @@ const StandWorkorderDetail = ({ workorderID, customer, onBack, onShowCustomerMod
                 ...inputStyle,
                 width: "24%",
                 fontWeight: zWorkorder?.color2?.label ? "500" : null,
-                backgroundColor: zWorkorder?.color2?.backgroundColor,
+                backgroundColor: isInvalidBikeColor(zWorkorder?.color2?.label) ? C.danger : zWorkorder?.color2?.backgroundColor,
                 color: zWorkorder?.color2?.textColor || C.text,
               }}
               onChangeText={(val) => setBikeColor(val, "color2")}

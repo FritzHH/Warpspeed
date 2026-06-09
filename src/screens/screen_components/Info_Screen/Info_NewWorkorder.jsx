@@ -26,6 +26,7 @@ import {
   startNewWorkorder,
 } from "../../../db_calls_wrapper";
 import { TicketSearchInput } from "../../../shared/TicketSearchInput";
+import { useGatedAction } from "../../../hooks/useLoginGate";
 import { readTransaction } from "../modal_screens/newCheckoutModalScreen/newCheckoutFirebaseCalls";
 const CustomerInfoScreenModalComponent = lazy(() =>
   import("../modal_screens/CustomerInfoModalScreen").then((m) => ({ default: m.CustomerInfoScreenModalComponent }))
@@ -330,18 +331,16 @@ export function NewWorkorderComponent({}) {
     _setCustomerInfo(custInfo);
   }
 
-  function handleStartStandaloneSalePress() {
-    useLoginStore.getState().requireLogin(async () => {
-      useCurrentCustomerStore.getState().setCustomer(null, false);
-      useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
-      await startNewWorkorder();
-      useTabNamesStore.getState().setItems({
-        infoTabName: TAB_NAMES.infoTab.checkout,
-        itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-        optionsTabName: TAB_NAMES.optionsTab.inventory,
-      });
+  const handleStartStandaloneSalePress = useGatedAction(async () => {
+    useCurrentCustomerStore.getState().setCustomer(null, false);
+    useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
+    await startNewWorkorder();
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.checkout,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+      optionsTabName: TAB_NAMES.optionsTab.inventory,
     });
-  }
+  });
 
   function handleCancelCreateNewCustomerPress() {
     _setTextInput("");
@@ -349,24 +348,22 @@ export function NewWorkorderComponent({}) {
     _setCustomerInfo(null);
   }
 
-  function handleCreateNewCustomerPressed(customerInfoFromModal) {
-    useLoginStore.getState().requireLogin(async () => {
-      let newCustomer = cloneDeep(customerInfoFromModal || sCustomerInfo);
-      newCustomer.id = crypto.randomUUID();
-      newCustomer.millisCreated = new Date().getTime();
+  const handleCreateNewCustomerPressed = useGatedAction(async (customerInfoFromModal) => {
+    let newCustomer = cloneDeep(customerInfoFromModal || sCustomerInfo);
+    newCustomer.id = crypto.randomUUID();
+    newCustomer.millisCreated = new Date().getTime();
 
-      _setCustomerInfo(newCustomer);
-      useCurrentCustomerStore.getState().setCustomer(newCustomer);
-      useRecentCustomersStore.getState().addRecentCustomer(newCustomer);
-      await startNewWorkorder(newCustomer);
-      useTabNamesStore.getState().setItems({
-        infoTabName: TAB_NAMES.infoTab.workorder,
-        itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-        optionsTabName: TAB_NAMES.optionsTab.inventory,
-      });
-      useCustomerSearchStore.getState().reset();
+    _setCustomerInfo(newCustomer);
+    useCurrentCustomerStore.getState().setCustomer(newCustomer);
+    useRecentCustomersStore.getState().addRecentCustomer(newCustomer);
+    await startNewWorkorder(newCustomer);
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.workorder,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+      optionsTabName: TAB_NAMES.optionsTab.inventory,
     });
-  }
+    useCustomerSearchStore.getState().reset();
+  });
 
   //////////////////////////////////////////////////////////////////////
   //////////////////////////////////////////////////////////////////////

@@ -35,6 +35,7 @@ import {
 } from "../../../stores";
 import { broadcastClear } from "../../../broadcastChannel";
 import { getWorkorderDeleteGuard } from "../../../shared/workorderDeleteGuard";
+import { useGatedInput, useGatedAction, sessionValid } from "../../../hooks/useLoginGate";
 const CustomItemModal = lazy(() =>
   import("../modal_screens/CustomItemModal").then((m) => ({ default: m.CustomItemModal }))
 );
@@ -246,32 +247,30 @@ export const Items_WorkorderItemsTab = ({}) => {
     });
   }
 
-  function deleteWorkorderLineItem(index) {
-    useLoginStore.getState().requireLogin(() => {
-      let deletedLine = zOpenWorkorder.workorderLines[index];
-      let workorderLines = zOpenWorkorder.workorderLines.filter(
-        (o, idx) => idx != index
-      );
-      let floorCheck = checkSaleFloor(workorderLines);
-      if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
-      useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
+  const deleteWorkorderLineItem = useGatedAction((index) => {
+    let deletedLine = zOpenWorkorder.workorderLines[index];
+    let workorderLines = zOpenWorkorder.workorderLines.filter(
+      (o, idx) => idx != index
+    );
+    let floorCheck = checkSaleFloor(workorderLines);
+    if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
+    useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
 
-      // remove auto customer note if no other line references the same item
-      if (deletedLine?.inventoryItem?.id) {
-        const itemID = deletedLine.inventoryItem.id;
-        const stillHasItem = workorderLines.some(
-          (line) => line.inventoryItem?.id === itemID
-        );
-        if (!stillHasItem) {
-          let customerNotes = zOpenWorkorder.customerNotes || [];
-          let filtered = customerNotes.filter((n) => n.autoNoteItemID !== itemID);
-          if (filtered.length !== customerNotes.length) {
-            useOpenWorkordersStore.getState().setField("customerNotes", filtered);
-          }
+    // remove auto customer note if no other line references the same item
+    if (deletedLine?.inventoryItem?.id) {
+      const itemID = deletedLine.inventoryItem.id;
+      const stillHasItem = workorderLines.some(
+        (line) => line.inventoryItem?.id === itemID
+      );
+      if (!stillHasItem) {
+        let customerNotes = zOpenWorkorder.customerNotes || [];
+        let filtered = customerNotes.filter((n) => n.autoNoteItemID !== itemID);
+        if (filtered.length !== customerNotes.length) {
+          useOpenWorkordersStore.getState().setField("customerNotes", filtered);
         }
       }
-    });
-  }
+    }
+  });
 
   function saveQtyMapToDb() {
     let updatedLines = buildLinesWithQtyOverrides();
@@ -296,68 +295,60 @@ export const Items_WorkorderItemsTab = ({}) => {
     _setQtyMap({});
   }
 
-  function modifyQtyPressed(workorderLine, option) {
-    useLoginStore.getState().requireLogin(() => {
-      let currentQty = qtyMapRef.current[workorderLine.id] !== undefined
-        ? qtyMapRef.current[workorderLine.id]
-        : workorderLine.qty;
+  const modifyQtyPressed = useGatedAction((workorderLine, option) => {
+    let currentQty = qtyMapRef.current[workorderLine.id] !== undefined
+      ? qtyMapRef.current[workorderLine.id]
+      : workorderLine.qty;
 
-      let newQty;
-      if (option === "up") {
-        newQty = currentQty + 1;
-      } else {
-        newQty = currentQty - 1;
-        if (newQty <= 0) return;
-        if (hasActiveSale) {
-          let proposedLines = buildLinesWithQtyOverrides({ [workorderLine.id]: newQty });
-          if (proposedLines) {
-            let floorCheck = checkSaleFloor(proposedLines);
-            if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
-          }
+    let newQty;
+    if (option === "up") {
+      newQty = currentQty + 1;
+    } else {
+      newQty = currentQty - 1;
+      if (newQty <= 0) return;
+      if (hasActiveSale) {
+        let proposedLines = buildLinesWithQtyOverrides({ [workorderLine.id]: newQty });
+        if (proposedLines) {
+          let floorCheck = checkSaleFloor(proposedLines);
+          if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
         }
       }
+    }
 
-      // Update local state instantly
-      qtyMapRef.current = { ...qtyMapRef.current, [workorderLine.id]: newQty };
-      _setQtyMap({ ...qtyMapRef.current });
+    // Update local state instantly
+    qtyMapRef.current = { ...qtyMapRef.current, [workorderLine.id]: newQty };
+    _setQtyMap({ ...qtyMapRef.current });
 
-      // Debounce DB write
-      clearTimeout(qtyTimerRef.current);
-      qtyTimerRef.current = setTimeout(() => saveQtyMapToDb(), 700);
-    });
-  }
+    // Debounce DB write
+    clearTimeout(qtyTimerRef.current);
+    qtyTimerRef.current = setTimeout(() => saveQtyMapToDb(), 700);
+  });
 
-  function handleQtyTextInput(workorderLine, newQty) {
-    useLoginStore.getState().requireLogin(() => {
-      qtyMapRef.current = { ...qtyMapRef.current, [workorderLine.id]: newQty };
-      _setQtyMap({ ...qtyMapRef.current });
+  const handleQtyTextInput = useGatedAction((workorderLine, newQty) => {
+    qtyMapRef.current = { ...qtyMapRef.current, [workorderLine.id]: newQty };
+    _setQtyMap({ ...qtyMapRef.current });
 
-      clearTimeout(qtyTimerRef.current);
-      qtyTimerRef.current = setTimeout(() => saveQtyMapToDb(), 1500);
-    });
-  }
+    clearTimeout(qtyTimerRef.current);
+    qtyTimerRef.current = setTimeout(() => saveQtyMapToDb(), 1500);
+  });
 
-  function handleQtyBlurSave(workorderLine, rawVal) {
-    useLoginStore.getState().requireLogin(() => {
-      let qty = Number(rawVal);
-      if (!qty || qty <= 0) qty = 1;
-      clearTimeout(qtyTimerRef.current);
-      qtyMapRef.current = { ...qtyMapRef.current, [workorderLine.id]: qty };
-      _setQtyMap({ ...qtyMapRef.current });
-      saveQtyMapToDb();
-    });
-  }
+  const handleQtyBlurSave = useGatedAction((workorderLine, rawVal) => {
+    let qty = Number(rawVal);
+    if (!qty || qty <= 0) qty = 1;
+    clearTimeout(qtyTimerRef.current);
+    qtyMapRef.current = { ...qtyMapRef.current, [workorderLine.id]: qty };
+    _setQtyMap({ ...qtyMapRef.current });
+    saveQtyMapToDb();
+  });
 
-  function editWorkorderLine(workorderLine, saveToDB = true) {
-    useLoginStore.getState().requireLogin(() => {
-      useOpenWorkordersStore.getState().setField(
-        "workorderLines",
-        replaceOrAddToArr(zOpenWorkorder.workorderLines, workorderLine),
-        undefined,
-        saveToDB
-      );
-    });
-  }
+  const editWorkorderLine = useGatedAction((workorderLine, saveToDB = true) => {
+    useOpenWorkordersStore.getState().setField(
+      "workorderLines",
+      replaceOrAddToArr(zOpenWorkorder.workorderLines, workorderLine),
+      undefined,
+      saveToDB
+    );
+  });
 
   function handleCustomItemEditSave(updatedLine) {
     if (hasActiveSale) {
@@ -370,47 +361,42 @@ export const Items_WorkorderItemsTab = ({}) => {
     editWorkorderLine(updatedLine);
   }
 
-  function applyDiscount(workorderLine, discountObj) {
-    useLoginStore.getState().requireLogin(() => {
-      let workorderLines = zOpenWorkorder.workorderLines.map((o) => {
-        if (o.id === workorderLine.id) {
-          workorderLine = { ...workorderLine, discountObj };
-          let discountedWorkorderLine =
-            applyDiscountToWorkorderItem(workorderLine);
-          return discountedWorkorderLine;
-        }
-        return o;
-      });
-
-      let floorCheck = checkSaleFloor(workorderLines);
-      if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
-
-      useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
-    });
-  }
-
-  function splitItems(workorderLine, index) {
-    useLoginStore.getState().requireLogin(() => {
-      let num = workorderLine.qty;
-      let workorderLines = cloneDeep(zOpenWorkorder.workorderLines);
-      for (let i = 0; i <= num - 1; i++) {
-        let newLine = cloneDeep(workorderLine);
-        newLine.qty = 1;
-        newLine.id = crypto.randomUUID();
-        newLine.discountObj = null;
-        if (i === 0) {
-          workorderLines[index] = newLine;
-          continue;
-        }
-        workorderLines.splice(index + 1, 0, newLine);
+  const applyDiscount = useGatedAction((workorderLine, discountObj) => {
+    let workorderLines = zOpenWorkorder.workorderLines.map((o) => {
+      if (o.id === workorderLine.id) {
+        workorderLine = { ...workorderLine, discountObj };
+        let discountedWorkorderLine =
+          applyDiscountToWorkorderItem(workorderLine);
+        return discountedWorkorderLine;
       }
-
-      useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
+      return o;
     });
-  }
 
-  function handleDeleteWorkorder() {
-    useLoginStore.getState().requireLogin(() => {
+    let floorCheck = checkSaleFloor(workorderLines);
+    if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
+
+    useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
+  });
+
+  const splitItems = useGatedAction((workorderLine, index) => {
+    let num = workorderLine.qty;
+    let workorderLines = cloneDeep(zOpenWorkorder.workorderLines);
+    for (let i = 0; i <= num - 1; i++) {
+      let newLine = cloneDeep(workorderLine);
+      newLine.qty = 1;
+      newLine.id = crypto.randomUUID();
+      newLine.discountObj = null;
+      if (i === 0) {
+        workorderLines[index] = newLine;
+        continue;
+      }
+      workorderLines.splice(index + 1, 0, newLine);
+    }
+
+    useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);
+  });
+
+  const handleDeleteWorkorder = useGatedAction(() => {
     const deleteFun = () => {
       // Clean up associated active sale to prevent orphans
       let saleID = zOpenWorkorder.activeSaleID;
@@ -450,53 +436,50 @@ export const Items_WorkorderItemsTab = ({}) => {
       btn1Text: "Delete",
       handleBtn1Press: deleteFun,
     });
-    });
-  }
+  });
 
-  function handleTaxFreeToggle() {
-    useLoginStore.getState().requireLogin(() => {
-      const currentlyTaxFree = !!zOpenWorkorder.taxFree;
-      if (currentlyTaxFree) {
-        useOpenWorkordersStore.getState().setField("taxFree", false);
-        useOpenWorkordersStore.getState().setField("taxFreeReceiptNote", "");
-      } else {
-        const partLines = (zOpenWorkorder.workorderLines || []).filter(line => {
-          const inv = line.inventoryItem;
-          return !inv.customLabor && inv.category !== "Labor";
+  const handleTaxFreeToggle = useGatedAction(() => {
+    const currentlyTaxFree = !!zOpenWorkorder.taxFree;
+    if (currentlyTaxFree) {
+      useOpenWorkordersStore.getState().setField("taxFree", false);
+      useOpenWorkordersStore.getState().setField("taxFreeReceiptNote", "");
+    } else {
+      const partLines = (zOpenWorkorder.workorderLines || []).filter(line => {
+        const inv = line.inventoryItem;
+        return !inv.customLabor && inv.category !== "Labor";
+      });
+
+      if (partLines.length > 0) {
+        const itemList = partLines.map(line =>
+          "\u2022 " + (line.inventoryItem.catalogName || line.inventoryItem.formalName) + (line.qty > 1 ? " (x" + line.qty + ")" : "")
+        ).join("\n");
+        useAlertScreenStore.getState().setValues({
+          showAlert: true,
+          fullScreen: true,
+          title: "Cannot Mark Tax-Free",
+          message: "The following parts must be removed before this workorder can be marked tax-free:\n\n" + itemList,
+          btn1Text: "OK",
+          handleBtn1Press: () => {},
         });
-
-        if (partLines.length > 0) {
-          const itemList = partLines.map(line =>
-            "\u2022 " + (line.inventoryItem.catalogName || line.inventoryItem.formalName) + (line.qty > 1 ? " (x" + line.qty + ")" : "")
-          ).join("\n");
-          useAlertScreenStore.getState().setValues({
-            showAlert: true,
-            fullScreen: true,
-            title: "Cannot Mark Tax-Free",
-            message: "The following parts must be removed before this workorder can be marked tax-free:\n\n" + itemList,
-            btn1Text: "OK",
-            handleBtn1Press: () => {},
-          });
-        } else {
-          useAlertScreenStore.getState().setValues({
-            showAlert: true,
-            fullScreen: true,
-            title: "Tax-Free Confirmation",
-            message: "No shop parts, even a drop of oil, must leave with the customer for this workorder to qualify as tax-free.",
-            btn1Text: "Confirm Tax-Free",
-            handleBtn1Press: () => {
-              let floorCheck = checkSaleFloor(null, { taxFree: true });
-              if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
-              useOpenWorkordersStore.getState().setField("taxFree", true);
-              useOpenWorkordersStore.getState().setField("taxFreeReceiptNote", useSettingsStore.getState().settings?.taxFreeReceiptNote || "");
-            },
-            btn2Text: "Cancel",
-            handleBtn2Press: () => {},
-          });
-        }
+      } else {
+        useAlertScreenStore.getState().setValues({
+          showAlert: true,
+          fullScreen: true,
+          title: "Tax-Free Confirmation",
+          message: "No shop parts, even a drop of oil, must leave with the customer for this workorder to qualify as tax-free.",
+          btn1Text: "Confirm Tax-Free",
+          handleBtn1Press: () => {
+            let floorCheck = checkSaleFloor(null, { taxFree: true });
+            if (!floorCheck.allowed) { showFloorBlockedAlert(floorCheck); return; }
+            useOpenWorkordersStore.getState().setField("taxFree", true);
+            useOpenWorkordersStore.getState().setField("taxFreeReceiptNote", useSettingsStore.getState().settings?.taxFreeReceiptNote || "");
+          },
+          btn2Text: "Cancel",
+          handleBtn2Press: () => {},
+        });
       }
-    });
-  }
+    }
+  });
 
   const previewBgStyle = zIsPreview
     ? {
@@ -748,7 +731,8 @@ export const Items_WorkorderItemsTab = ({}) => {
             iconSize={34}
             enabled={!isDonePaid && !hasMissingReceiptNotes && !hasPlaceholderItems}
             buttonStyle={{ paddingVertical: 0, opacity: (isDonePaid || hasMissingReceiptNotes || hasPlaceholderItems) ? 0.3 : 1 }}
-            onPress={() => useLoginStore.getState().requireLogin(() => {
+            onPress={() => useLoginStore.getState().promptLogin().then((ok) => {
+              if (!ok) return;
               const proceed = () => {
                 if (useOpenWorkordersStore.getState().castingToDisplay) {
                   broadcastClear();
@@ -831,6 +815,7 @@ export const LineItemComponent = ({
   const isCustom = inventoryItem.customPart || inventoryItem.customLabor;
   const isPlaceholder = (inventoryItem.catalogName || inventoryItem.formalName || "").toLowerCase().includes("placeholder");
   const nameRowClickable = !isLocked && !isPlaceholder;
+  const lineGate = useGatedInput();
   const [sNameHovered, _setNameHovered] = useState(false);
   const zPlaceholderReplaceLineID = useOpenWorkordersStore((s) => s.placeholderReplaceLineID);
   const isInReplaceMode = isPlaceholder && zPlaceholderReplaceLineID === workorderLine.id;
@@ -919,11 +904,14 @@ export const LineItemComponent = ({
                       onClick={(e) => {
                         if (!nameRowClickable) return;
                         e.stopPropagation();
-                        useLoginStore.getState().requireLogin(() => {
+                        const pageX = e.pageX || 0;
+                        const pageY = e.pageY || 0;
+                        useLoginStore.getState().promptLogin().then((ok) => {
+                          if (!ok) return;
                           if (isCustom) {
-                            onEditCustomItem?.(workorderLine, e.pageX || 0, e.pageY || 0);
+                            onEditCustomItem?.(workorderLine, pageX, pageY);
                           } else {
-                            onOpenNoteHelper?.(workorderLine, e.pageX || 0, e.pageY || 0);
+                            onOpenNoteHelper?.(workorderLine, pageX, pageY);
                           }
                         });
                       }}
@@ -978,11 +966,10 @@ export const LineItemComponent = ({
                           capitalize={true}
                           editable={!isLocked}
                           style={{ color: "orange", flex: 1, paddingLeft: 3, paddingRight: 3, fontSize: 16 }}
-                          onFocus={() => useLoginStore.getState().requireLogin(() => {})}
+                          onPointerDown={lineGate.onPointerDown}
+                          onFocus={lineGate.onFocus}
                           onChangeText={(val) => {
-                            useLoginStore.getState().requireLogin(() => {
-                              __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
-                            });
+                            __setWorkorderLineItem({ ...workorderLine, intakeNotes: val });
                           }}
                           placeholder="Intake notes..."
                           placeholderTextColor={C.textDisabled}
@@ -1003,11 +990,10 @@ export const LineItemComponent = ({
                           debounceMs={500}
                           editable={!isLocked}
                           style={{ color: "green", flex: 1, paddingLeft: 3, paddingRight: 3, fontSize: 14 }}
-                          onFocus={() => useLoginStore.getState().requireLogin(() => {})}
+                          onPointerDown={lineGate.onPointerDown}
+                          onFocus={lineGate.onFocus}
                           onChangeText={(val) => {
-                            useLoginStore.getState().requireLogin(() => {
-                              __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
-                            });
+                            __setWorkorderLineItem({ ...workorderLine, receiptNotes: val });
                           }}
                           placeholder={receiptNoteRequired ? "Receipt note required for this item before checkout" : "Receipt notes..."}
                           placeholderTextColor={receiptNoteRequired ? C.lightred : C.textDisabled}

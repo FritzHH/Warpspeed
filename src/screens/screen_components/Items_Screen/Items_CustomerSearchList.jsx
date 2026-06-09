@@ -16,6 +16,7 @@ const CustomerInfoScreenModalComponent = lazy(() =>
   import("../modal_screens/CustomerInfoModalScreen").then((m) => ({ default: m.CustomerInfoScreenModalComponent }))
 );
 import { startNewWorkorder } from "../../../db_calls_wrapper";
+import { useGatedAction } from "../../../hooks/useLoginGate";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
 import defaultLogo from "../../../resources/default_app_logo_large.png";
 import styles from "./Items_CustomerSearchList.module.css";
@@ -78,21 +79,19 @@ export function CustomerSearchListComponent({}) {
   const [sModalX, _setModalX] = useState(0);
   const z = useZ("dropdown", !!sSelectedCustomer);
 
-  function handleCustomerSelected(customer) {
-    useLoginStore.getState().requireLogin(async () => {
-      useRecentCustomersStore.getState().addRecentCustomer(customer);
-      useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
-      await startNewWorkorder(customer);
-      useCurrentCustomerStore.getState().setCustomer(customer);
-      useTabNamesStore.getState().setItems({
-        infoTabName: TAB_NAMES.infoTab.workorder,
-        itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-        optionsTabName: TAB_NAMES.optionsTab.inventory,
-      });
-      _setCustomerInfo();
-      useCustomerSearchStore.getState().reset();
+  const handleCustomerSelected = useGatedAction(async (customer) => {
+    useRecentCustomersStore.getState().addRecentCustomer(customer);
+    useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
+    await startNewWorkorder(customer);
+    useCurrentCustomerStore.getState().setCustomer(customer);
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.workorder,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+      optionsTabName: TAB_NAMES.optionsTab.inventory,
     });
-  }
+    _setCustomerInfo();
+    useCustomerSearchStore.getState().reset();
+  });
 
   return (
     <div className={styles.root}>

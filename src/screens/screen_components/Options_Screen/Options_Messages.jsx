@@ -757,7 +757,8 @@ export function MessagesComponent({}) {
   function handleMediaPicked(mediaItem) {
     _setShowMediaPicker(false);
     if (!mediaItem || !mediaItem.url) return;
-    useLoginStore.getState().requireLogin(() => {
+    useLoginStore.getState().promptLogin().then((ok) => {
+      if (!ok) return;
       pendingMediaRef.current = [mediaItem];
       pendingActionRef.current = "media";
       _setShowReplyModal(true);
@@ -772,7 +773,8 @@ export function MessagesComponent({}) {
   function handleMediaMultiSelect(mediaItems) {
     _setShowMediaPicker(false);
     if (!mediaItems || !mediaItems.length) return;
-    useLoginStore.getState().requireLogin(() => {
+    useLoginStore.getState().promptLogin().then((ok) => {
+      if (!ok) return;
       pendingMediaRef.current = mediaItems;
       pendingActionRef.current = "media";
       _setShowReplyModal(true);
@@ -1027,8 +1029,9 @@ export function MessagesComponent({}) {
   async function handleToggleForwardResponses() {
     let phone = sCustomPhoneMode ? sCustomPhone : zCustomer?.customerCell;
     if (!phone || phone.length !== 10) return;
-    useLoginStore.getState().requireLogin(async () => {
-      let currentUser = useLoginStore.getState().getCurrentUser();
+    let ok = await useLoginStore.getState().promptLogin();
+    if (!ok) return;
+    let currentUser = useLoginStore.getState().getCurrentUser();
       let thread = zSmsThreads.find(t => t.phone === phone);
       let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
       let isCurrentlyForwarding = arr.some((f) => f.userID === currentUser.id);
@@ -1067,7 +1070,6 @@ export function MessagesComponent({}) {
         await dbUpdateMessageCanRespond(phone, null, true);
       }
       await dbToggleSMSForwarding(phone, currentUser.id, !isCurrentlyForwarding, currentUser.phone, currentUser.first);
-    });
   }
 
   async function handleStartRecording() {
@@ -1492,7 +1494,8 @@ export function MessagesComponent({}) {
           value={sNewMessage}
           onChange={handleMessageChange}
           onSend={() => {
-            useLoginStore.getState().requireLogin(() => {
+            useLoginStore.getState().promptLogin().then((ok) => {
+              if (!ok) return;
               if (isUnmodifiedTemplateRef.current) {
                 sendMessage(sNewMessage, "", false, null);
                 isUnmodifiedTemplateRef.current = false;
@@ -1522,7 +1525,7 @@ export function MessagesComponent({}) {
             else if (pendingActionRef.current === "audio") { handleSendAudio(canRespond); }
             else { sendMessage(sNewMessage, "", canRespond); }
           }}
-          onSendAudio={() => useLoginStore.getState().requireLogin(() => handleSendAudio(sCanRespond))}
+          onSendAudio={() => useLoginStore.getState().promptLogin().then((ok) => { if (ok) handleSendAudio(sCanRespond); })}
           onDeleteAudio={handleDeleteAudio}
           selectedForwardIDs={sSelectedForwardIDs}
           onChangeSelectedForwardIDs={_setSelectedForwardIDs}
@@ -1600,7 +1603,8 @@ export function MessagesComponent({}) {
                   })()}
                   onSelect={(item) => {
                     if (item.key === "media") { _setShowMediaPicker(true); return; }
-                    useLoginStore.getState().requireLogin(() => {
+                    useLoginStore.getState().promptLogin().then((ok) => {
+                      if (!ok) return;
                       if (item.key === "workorder") { pendingActionRef.current = "intake"; _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); handleSendWorkorderTicket(sCanRespond); pendingActionRef.current = null; }); }
                       else if (item.key === "finalized") { pendingActionRef.current = "finalized"; _setShowReplyModal(true); scheduleAutoSend(() => { _setShowReplyModal(false); handleSendFinalizedTicket(sCanRespond); pendingActionRef.current = null; }); }
                       else if (item.key === "payment") handleSendSMSPayment();
@@ -2047,7 +2051,8 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
 
   function handleSend() {
     if (!sNewMessage.trim() || !phone || phone.length !== 10) return;
-    useLoginStore.getState().requireLogin(() => {
+    useLoginStore.getState().promptLogin().then((ok) => {
+      if (!ok) return;
       pendingSendTextRef.current = sNewMessage;
       _setShowReplyModal(true);
       scheduleAutoSend(() => {
@@ -2146,8 +2151,9 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
 
   async function handleHubToggleForward() {
     if (!phone || phone.length !== 10) return;
-    useLoginStore.getState().requireLogin(async () => {
-      let currentUser = useLoginStore.getState().getCurrentUser();
+    let ok = await useLoginStore.getState().promptLogin();
+    if (!ok) return;
+    let currentUser = useLoginStore.getState().getCurrentUser();
       let arr = Array.isArray(thread?.forwardTo) ? thread.forwardTo : [];
       let isCurrentlyForwarding = arr.some((f) => f.userID === currentUser.id);
       if (isCurrentlyForwarding && arr.length > 1) {
@@ -2192,7 +2198,6 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
         }
       }
       await dbToggleSMSForwarding(phone, currentUser.id, !isCurrentlyForwarding, currentUser.phone, currentUser.first);
-    });
   }
 
   async function handleStartRecording() {
@@ -2503,7 +2508,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
             if (pendingActionRef.current === "audio") { handleSendAudio(canRespond); }
             else { doSend(pendingSendTextRef.current, canRespond); }
           }}
-          onSendAudio={() => useLoginStore.getState().requireLogin(() => handleSendAudio(sCanRespond))}
+          onSendAudio={() => useLoginStore.getState().promptLogin().then((ok) => { if (ok) handleSendAudio(sCanRespond); })}
           onDeleteAudio={handleDeleteAudio}
           selectedForwardIDs={sSelectedForwardIDs}
           onChangeSelectedForwardIDs={_setSelectedForwardIDs}
@@ -2541,7 +2546,7 @@ function HubConversationPanel({ phone, thread, previewMode, onShowPhoneEntry, on
               {matchingWorkorders.length < 1 && (
                 <TooltipDom text={sHubMediaUploading ? "Uploading..." : "Send photo/video"} position="top">
                   <TouchableOpacityDom
-                    onPress={() => !sHubMediaUploading && useLoginStore.getState().requireLogin(() => hubFileInputRef.current?.click())}
+                    onPress={() => !sHubMediaUploading && useLoginStore.getState().promptLogin().then((ok) => { if (ok) hubFileInputRef.current?.click(); })}
                     className={hubStyles.iconBtn}
                     style={{ opacity: sHubMediaUploading ? 0.4 : 1 }}
                   >

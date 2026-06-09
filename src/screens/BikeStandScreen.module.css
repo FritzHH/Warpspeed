@@ -511,7 +511,7 @@
   width: 100%;
   border: none;
   cursor: pointer;
-  font-size: 21px;
+  font-size: 26px;
   font-weight: 600;
   color: var(--text-on-accent);
 }
@@ -520,7 +520,7 @@
   padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   flex-shrink: 0;
 }
 
@@ -528,22 +528,29 @@
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 10px;
-  padding: 10px;
+  gap: 14px;
+  padding: 16px 14px;
   border-radius: var(--radius-row);
   border-width: 2px;
   border-style: solid;
   cursor: pointer;
 }
 
+.nwmFormFieldRow {
+  display: flex;
+  flex-direction: row;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
 .nwmFormLabel {
-  font-size: 16px;
-  width: 80px;
+  font-size: 22px;
+  width: 110px;
   flex-shrink: 0;
 }
 
 .nwmFormValue {
-  font-size: 19px;
+  font-size: 26px;
   font-weight: 500;
   flex: 1;
   min-width: 0;
@@ -1741,7 +1748,7 @@
 }
 
 .bmAddItemsText {
-  font-size: 36px;
+  font-size: 41px;
   font-weight: 700;
 }
 

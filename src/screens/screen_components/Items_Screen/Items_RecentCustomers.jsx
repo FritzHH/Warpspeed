@@ -7,11 +7,11 @@ import {
   useCurrentCustomerStore,
   useOpenWorkordersStore,
   useTabNamesStore,
-  useLoginStore,
   useCustomerSearchStore,
 } from "../../../stores";
 import { TAB_NAMES } from "../../../data";
 import { startNewWorkorder, dbGetCustomer } from "../../../db_calls_wrapper";
+import { useGatedAction } from "../../../hooks/useLoginGate";
 import defaultLogo from "../../../resources/default_app_logo_large.png";
 import { capitalizeFirstLetterOfString, formatPhoneForDisplay } from "../../../utils";
 import { C, COLOR_GRADIENTS, ICONS } from "../../../styles";
@@ -35,21 +35,19 @@ export function RecentCustomersComponent() {
   const [sModalX, _setModalX] = useState(0);
   const z = useZ("dropdown", !!sSelectedCustomer);
 
-  function handleRecentCustomerSelected(customer) {
-    useLoginStore.getState().requireLogin(async () => {
-      useRecentCustomersStore.getState().addRecentCustomer(customer);
-      useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
-      await startNewWorkorder(customer);
-      useCurrentCustomerStore.getState().setCustomer(customer);
-      useTabNamesStore.getState().setItems({
-        infoTabName: TAB_NAMES.infoTab.workorder,
-        itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-        optionsTabName: TAB_NAMES.optionsTab.inventory,
-      });
-      _setCustomerInfo(null);
-      useCustomerSearchStore.getState().reset();
+  const handleRecentCustomerSelected = useGatedAction(async (customer) => {
+    useRecentCustomersStore.getState().addRecentCustomer(customer);
+    useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
+    await startNewWorkorder(customer);
+    useCurrentCustomerStore.getState().setCustomer(customer);
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.workorder,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+      optionsTabName: TAB_NAMES.optionsTab.inventory,
     });
-  }
+    _setCustomerInfo(null);
+    useCustomerSearchStore.getState().reset();
+  });
 
   if (zRecentCustomers.length === 0) {
     return (

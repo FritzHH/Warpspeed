@@ -7,6 +7,7 @@ import { Tooltip } from "../../../dom_components/Tooltip/Tooltip";
 import { C, ICONS } from "../../../styles";
 import { useState, useRef } from "react";
 import { useOpenWorkordersStore, useLoginStore, useSettingsStore } from "../../../stores";
+import { useGatedInput, useGatedAction, sessionValid } from "../../../hooks/useLoginGate";
 import styles from "./Notes_MainComponent.module.css";
 
 const EMPTY_NOTES = [];
@@ -84,48 +85,46 @@ export function Notes_MainComponent() {
     return `${months[d.getMonth()]} ${d.getDate()}, '${yy}`;
   }
 
-  function outsideClicked(option) {
-    useLoginStore.getState().requireLogin(() => {
-      let notesArr;
-      let fieldName;
-      if (option == "customer") {
-        notesArr = zCustomerNotes;
-        fieldName = "customerNotes";
-      } else {
-        notesArr = zInternalNotes;
-        fieldName = "internalNotes";
-      }
+  const outsideClicked = useGatedAction((option) => {
+    let notesArr;
+    let fieldName;
+    if (option == "customer") {
+      notesArr = zCustomerNotes;
+      fieldName = "customerNotes";
+    } else {
+      notesArr = zInternalNotes;
+      fieldName = "internalNotes";
+    }
 
-      const newId = crypto.randomUUID();
-      notesArr.unshift({
-        name: formatUserShowName(),
-        userID: useLoginStore.getState().currentUser.id,
-        value: "",
-        id: newId,
-        createdAt: Date.now(),
-      });
-
-      useOpenWorkordersStore.getState().setField(fieldName, notesArr);
-      _setEditingNoteId(newId);
+    const newId = crypto.randomUUID();
+    notesArr.unshift({
+      name: formatUserShowName(),
+      userID: useLoginStore.getState().currentUser.id,
+      value: "",
+      id: newId,
+      createdAt: Date.now(),
     });
-  }
 
-  function deleteItem(item, index, option) {
-    useLoginStore.getState().requireLogin(() => {
-      let notesArr;
-      let fieldName;
-      if (option == "customer") {
-        notesArr = zCustomerNotes;
-        fieldName = "customerNotes";
-      } else {
-        notesArr = zInternalNotes;
-        fieldName = "internalNotes";
-      }
+    useOpenWorkordersStore.getState().setField(fieldName, notesArr);
+    _setEditingNoteId(newId);
+  });
 
-      notesArr = notesArr.filter((o) => o.id != item.id);
-      useOpenWorkordersStore.getState().setField(fieldName, notesArr);
-    });
-  }
+  const deleteItem = useGatedAction((item, index, option) => {
+    let notesArr;
+    let fieldName;
+    if (option == "customer") {
+      notesArr = zCustomerNotes;
+      fieldName = "customerNotes";
+    } else {
+      notesArr = zInternalNotes;
+      fieldName = "internalNotes";
+    }
+
+    notesArr = notesArr.filter((o) => o.id != item.id);
+    useOpenWorkordersStore.getState().setField(fieldName, notesArr);
+  });
+
+  const noteGate = useGatedInput();
 
   function textChanged(value, index, option) {
     let notesArr;
@@ -157,7 +156,7 @@ export function Notes_MainComponent() {
   }
 
   function handleInputFocus(e) {
-    useLoginStore.getState().requireLogin(() => {});
+    if (!sessionValid()) { noteGate.onFocus(e); return; }
     const el = e.target;
     const offset = cursorOffsetRef.current;
     cursorOffsetRef.current = null;
@@ -255,6 +254,7 @@ export function Notes_MainComponent() {
                       debounceMs={1000}
                       onChangeText={(val) => textChanged(val, index, "customer")}
                       onBlur={() => _setEditingNoteId(null)}
+                      onPointerDown={noteGate.onPointerDown}
                       onFocus={handleInputFocus}
                       className={styles.noteInput}
                       style={{ color: C.text, lineHeight: "18px" }}
@@ -349,6 +349,7 @@ export function Notes_MainComponent() {
                       debounceMs={1000}
                       onChangeText={(val) => textChanged(val, index, "internal")}
                       onBlur={() => _setEditingNoteId(null)}
+                      onPointerDown={noteGate.onPointerDown}
                       onFocus={handleInputFocus}
                       className={styles.noteInput}
                       style={{ color: C.text, lineHeight: "18px" }}

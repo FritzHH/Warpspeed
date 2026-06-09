@@ -38,12 +38,11 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
     startOfToday.setHours(0, 0, 0, 0);
     return workorder.startedOnMillis >= startOfToday.getTime();
   })();
-  const shouldBlinkRed = isCreatedToday && !workorder.waitTime?.label && !isFinished;
+  const isMissingEstimate = isCreatedToday && !workorder.waitTime?.label && !isFinished;
 
   let rowClassName = styles.row;
   if (isSelected) rowClassName += " " + styles.selected;
   if (isPreviewed) rowClassName += " " + styles.previewed;
-  if (shouldBlinkRed) rowClassName += " " + styles.blinkRed;
 
   return (
       <div
@@ -56,15 +55,18 @@ const WorkorderRowItem = React.memo(function WorkorderRowItem({
           borderColor: C.buttonLightGreenOutline,
           borderLeftColor: rs.backgroundColor || C.buttonLightGreenOutline,
           borderLeftWidth: 4,
-          backgroundColor: shouldBlinkRed
-            ? undefined
-            : isSelected
-              ? lightenRGBByPercent(C.lightred, 85)
-              : isFinished
-                ? lightenRGBByPercent(C.green, 85)
-                : C.listItemWhite,
+          backgroundColor: isSelected
+            ? lightenRGBByPercent(C.lightred, 85)
+            : isFinished
+              ? lightenRGBByPercent(C.green, 85)
+              : C.listItemWhite,
         }}
       >
+        {isMissingEstimate && (
+          <div className={styles.missingEstimateBanner}>
+            MISSING TIME ESTIMATE
+          </div>
+        )}
         {workorder.hasNewSMS && (
           <div className={styles.smsBanner}>
             {lastOutgoingSenderName && (

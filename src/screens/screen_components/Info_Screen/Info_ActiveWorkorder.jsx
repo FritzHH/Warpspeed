@@ -2,6 +2,7 @@
 
 import { capitalizeFirstLetterOfString, checkInputForNumbersOnly, formatCurrencyDisp, formatMillisForDisplay, formatPhoneWithDashes, formatPhoneWithParens, createNewWorkorder, generateEAN13Barcode, generate36CharUUID, lightenRGBByPercent, log, deepEqual, printBuilder, removeUnusedFields, resolveStatus, calculateWaitEstimateLabel, findTemplateByType, scheduleAutoText, localStorageWrapper, getPrinterStatus } from "../../../utils";
 import {
+  AutoJumpBlocker,
   Button as Button_,
   CheckBox,
   DatePicker as DatePicker_,
@@ -16,6 +17,9 @@ import {
   Toast,
   Tooltip,
 } from "../../../dom_components";
+import { useAutoJumpBlock } from "../../../hooks/useAutoJumpBlock";
+import { useGatedInput, useGatedAction, sessionValid } from "../../../hooks/useLoginGate";
+import { confirmAddHint } from "../../../shared/confirmAddHint";
 import * as PopoverPrimitive from "@radix-ui/react-popover";
 import { C, COLOR_GRADIENTS, Colors, ICONS, Radius } from "../../../styles";
 import { useZ } from "../../../hooks/useZ";
@@ -54,11 +58,10 @@ const WorkorderMediaModal = lazy(() =>
 );
 import { dbSavePrintObj, dbSendReceipt, startNewWorkorder } from "../../../db_calls_wrapper";
 import styles from "./Info_ActiveWorkorder.module.css";
+import { activeInputStyle, SWALLOW_DURATION_MS } from "../../../shared/activeInputStyle";
 
 // --- Dimming when field has text (easy to adjust) ---
 const FILLED_DROPDOWN_OPACITY = 0.3;                          // dropdown button opacity when text present
-const FILLED_BORDER_COLOR = "rgba(200, 228, 220, 0.25)";      // faded version of C.buttonLightGreenOutline rgb(200,228,220)
-const SWALLOW_DURATION_MS = 750;                              // post-auto-jump keystroke lockout on destination field
 const RECEIPT_DROPDOWN_SELECTIONS = [
   RECEIPT_TYPES.intake,
   RECEIPT_TYPES.workorder,
@@ -221,18 +224,17 @@ export const ActiveWorkorderComponent = ({}) => {
   const [sShowTracker, _sSetShowTracker] = useState(false);
   const hasCommittedRef = useRef(false);
   const hasActiveItem = sActiveOrderedItem !== null;
+  const gate = useGatedInput();
 
-  function handleAddOrderedItem() {
-    useLoginStore.getState().requireLogin(() => {
-      const newItem = { ...cloneDeep(ITEM_ORDERED_PROTO), id: generate36CharUUID() };
-      const nextIndex = (zOpenWorkorder?.orderedItems || []).length;
-      _sSetActiveOrderedItem(newItem);
-      _sSetActiveOrderedIndex(nextIndex);
-      hasCommittedRef.current = false;
-      _setWaitDays(0);
-      setTimeout(() => partOrderedInputRef.current?.focus(), 0);
-    });
-  }
+  const handleAddOrderedItem = useGatedAction(() => {
+    const newItem = { ...cloneDeep(ITEM_ORDERED_PROTO), id: generate36CharUUID() };
+    const nextIndex = (zOpenWorkorder?.orderedItems || []).length;
+    _sSetActiveOrderedItem(newItem);
+    _sSetActiveOrderedIndex(nextIndex);
+    hasCommittedRef.current = false;
+    _setWaitDays(0);
+    setTimeout(() => partOrderedInputRef.current?.focus(), 0);
+  });
 
   function commitOrUpdateActiveItem(item) {
     const woID = zOpenWorkorder?.id;
@@ -254,31 +256,29 @@ export const ActiveWorkorderComponent = ({}) => {
     commitOrUpdateActiveItem(updated);
   }
 
-  function handleDeleteActiveOrderedItem() {
-    useLoginStore.getState().requireLogin(() => {
-      const woID = zOpenWorkorder?.id;
-      if (!woID || !sActiveOrderedItem) return;
-      const current = zOpenWorkorder?.orderedItems || [];
-      const updated = current.filter((o) => o.id !== sActiveOrderedItem.id);
-      useOpenWorkordersStore.getState().setField("orderedItems", updated, woID);
-      if (updated.length === 0) {
-        _sSetActiveOrderedItem(null);
-        _sSetActiveOrderedIndex(-1);
-        hasCommittedRef.current = false;
-        _setWaitDays(0);
-        return;
-      }
-      const nextIndex = Math.min(sActiveOrderedIndex, updated.length - 1);
-      const nextItem = cloneDeep(updated[nextIndex]);
-      _sSetActiveOrderedItem(nextItem);
-      _sSetActiveOrderedIndex(nextIndex);
-      hasCommittedRef.current = true;
-      const days = nextItem.partOrderEstimateMillis && nextItem.partOrderedMillis
-        ? Math.max(0, Math.round((nextItem.partOrderEstimateMillis - nextItem.partOrderedMillis) / MILLIS_IN_DAY))
-        : 0;
-      _setWaitDays(days);
-    });
-  }
+  const handleDeleteActiveOrderedItem = useGatedAction(() => {
+    const woID = zOpenWorkorder?.id;
+    if (!woID || !sActiveOrderedItem) return;
+    const current = zOpenWorkorder?.orderedItems || [];
+    const updated = current.filter((o) => o.id !== sActiveOrderedItem.id);
+    useOpenWorkordersStore.getState().setField("orderedItems", updated, woID);
+    if (updated.length === 0) {
+      _sSetActiveOrderedItem(null);
+      _sSetActiveOrderedIndex(-1);
+      hasCommittedRef.current = false;
+      _setWaitDays(0);
+      return;
+    }
+    const nextIndex = Math.min(sActiveOrderedIndex, updated.length - 1);
+    const nextItem = cloneDeep(updated[nextIndex]);
+    _sSetActiveOrderedItem(nextItem);
+    _sSetActiveOrderedIndex(nextIndex);
+    hasCommittedRef.current = true;
+    const days = nextItem.partOrderEstimateMillis && nextItem.partOrderedMillis
+      ? Math.max(0, Math.round((nextItem.partOrderEstimateMillis - nextItem.partOrderedMillis) / MILLIS_IN_DAY))
+      : 0;
+    _setWaitDays(days);
+  });
 
   function handleNavigateRight() {
     const items = zOpenWorkorder?.orderedItems || [];
@@ -372,6 +372,7 @@ export const ActiveWorkorderComponent = ({}) => {
   const brandWrapperRef = useRef(null);
   const brandBackspaced = useRef(false);
   const brandPrevValRef = useRef("");
+  const autoJumpBlock = useAutoJumpBlock();
 
   const brandSuggestions = sBrandFocused && zOpenWorkorder?.brand?.trim().length >= 1
     ? (zSettings.allBrands || []).filter(
@@ -380,13 +381,7 @@ export const ActiveWorkorderComponent = ({}) => {
     : [];
 
   function saveBrandToAllBrands(brand) {
-    if (!brand || !brand.trim()) return;
-    const trimmed = brand.trim();
-    if (trimmed.length < 3) return;
-    const existing = zSettings.allBrands || [];
-    if (existing.some((b) => b.toLowerCase() === trimmed.toLowerCase())) return;
-    const updated = [...existing, trimmed].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-    useSettingsStore.getState().setField("allBrands", updated);
+    confirmAddHint({ kind: "brand", value: brand, settingsKey: "allBrands" });
   }
 
   // Description autocomplete
@@ -403,13 +398,7 @@ export const ActiveWorkorderComponent = ({}) => {
     : [];
 
   function saveDescToAllDescriptions(desc) {
-    if (!desc || !desc.trim()) return;
-    const trimmed = desc.trim();
-    if (trimmed.length < 3) return;
-    const existing = zSettings.allDescriptions || [];
-    if (existing.some((d) => d.toLowerCase() === trimmed.toLowerCase())) return;
-    const updated = [...existing, trimmed].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
-    useSettingsStore.getState().setField("allDescriptions", updated);
+    confirmAddHint({ kind: "description", value: desc, settingsKey: "allDescriptions" });
   }
 
   // Part source autocomplete
@@ -453,6 +442,12 @@ export const ActiveWorkorderComponent = ({}) => {
   const color2SwallowTimerRef = useRef(null);
 
   const allColorLabels = COLORS.map((c) => c.label);
+
+  const isInvalidBikeColor = (label) => {
+    if (!label || !label.trim()) return false;
+    const lc = label.trim().toLowerCase();
+    return !allColorLabels.some((c) => c.toLowerCase() === lc);
+  };
 
   const color1Suggestions = sColor1Focused && zOpenWorkorder?.color1?.label?.trim()
     ? allColorLabels.filter(
@@ -519,18 +514,16 @@ export const ActiveWorkorderComponent = ({}) => {
     useOpenWorkordersStore.getState().setField(fieldName, newColorObj, zOpenWorkorder.id);
   }
 
-  function handleStartStandaloneSalePress() {
-    useLoginStore.getState().requireLogin(async () => {
-      useCurrentCustomerStore.getState().setCustomer(null, false);
-      useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
-      await startNewWorkorder();
-      useTabNamesStore.getState().setItems({
-        infoTabName: TAB_NAMES.infoTab.checkout,
-        itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-        optionsTabName: TAB_NAMES.optionsTab.inventory,
-      });
+  const handleStartStandaloneSalePress = useGatedAction(async () => {
+    useCurrentCustomerStore.getState().setCustomer(null, false);
+    useOpenWorkordersStore.getState().setWorkorderPreviewID(null);
+    await startNewWorkorder();
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.checkout,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+      optionsTabName: TAB_NAMES.optionsTab.inventory,
     });
-  }
+  });
 
   function handleNewWorkorderPress() {
     // If viewing a locked (completed) workorder, remove it from the local store
@@ -549,17 +542,15 @@ export const ActiveWorkorderComponent = ({}) => {
     useCurrentCustomerStore.getState().setCustomer(null);
   }
 
-  function handleCustomerNewWorkorderPress(customer) {
-    useLoginStore.getState().requireLogin(async () => {
-      await startNewWorkorder(customer);
-      useTabNamesStore.getState().setItems({
-        infoTabName: TAB_NAMES.infoTab.workorder,
-        itemsTabName: TAB_NAMES.itemsTab.workorderItems,
-        optionsTabName: TAB_NAMES.optionsTab.inventory,
-      });
-      _setShowCustomerInfoScreen(false);
+  const handleCustomerNewWorkorderPress = useGatedAction(async (customer) => {
+    await startNewWorkorder(customer);
+    useTabNamesStore.getState().setItems({
+      infoTabName: TAB_NAMES.infoTab.workorder,
+      itemsTabName: TAB_NAMES.itemsTab.workorderItems,
+      optionsTabName: TAB_NAMES.optionsTab.inventory,
     });
-  }
+    _setShowCustomerInfoScreen(false);
+  });
 
   function handleWorkorderPrintPress() {
     showToast("Receipt printed");
@@ -810,18 +801,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   placeholder={"Brand"}
                   editable={!isDonePaid}
                   capitalize={true}
-                  style={{
-                    width: "100%",
-                    borderWidth: 1,
-                    borderColor: zOpenWorkorder?.brand ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
-                    color: C.text,
-                    paddingVertical: 2,
-                    paddingHorizontal: 4,
-                    fontSize: 15,
-                    outlineStyle: "none",
-                    borderRadius: Radius.control,
-                    fontWeight: zOpenWorkorder?.brand ? "500" : null,
-                  }}
+                  style={activeInputStyle({ isActive: sBrandFocused, filled: !!zOpenWorkorder?.brand })}
                   value={capitalizeFirstLetterOfString(zOpenWorkorder?.brand)}
                   onKeyPress={(e) => { if (e.nativeEvent.key === "Backspace") brandBackspaced.current = true; }}
                   onChangeText={(val) => {
@@ -834,24 +814,26 @@ export const ActiveWorkorderComponent = ({}) => {
                         (b) => b.toLowerCase().startsWith(q) && b.toLowerCase() !== q
                       );
                       if (matches.length === 1) {
-                        useOpenWorkordersStore.getState().setField("brand", matches[0], zOpenWorkorder.id);
+                        const picked = matches[0];
+                        useOpenWorkordersStore.getState().setField("brand", picked, zOpenWorkorder.id);
                         _setBrandFocused(false);
-                        setTimeout(() => {
+                        const brandEl = brandWrapperRef.current?.querySelector?.("input");
+                        if (brandEl) brandEl.blur();
+                        autoJumpBlock.trigger(`${picked}  →  Description`, () => {
                           const el = descInputRef.current?.querySelector?.("input");
                           if (el) el.focus();
-                          if (descSwallowTimerRef.current) clearTimeout(descSwallowTimerRef.current);
-                          _setDescSwallowing(true);
-                          descSwallowTimerRef.current = setTimeout(() => _setDescSwallowing(false), SWALLOW_DURATION_MS);
-                        }, 50);
+                        });
                       }
                     }
                   }}
-                  onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setBrandFocused(true); brandBackspaced.current = false; brandPrevValRef.current = zOpenWorkorder?.brand || ""; }}
+                  onPointerDown={gate.onPointerDown}
+                  onFocus={(e) => { if (!sessionValid()) { gate.onFocus(e); return; } _setBrandFocused(true); brandBackspaced.current = false; brandPrevValRef.current = zOpenWorkorder?.brand || ""; }}
                   onBlur={() => {
                     setTimeout(() => {
                       _setBrandFocused(false);
                       brandBackspaced.current = false;
-                      saveBrandToAllBrands(zOpenWorkorder?.brand);
+                      const wo = useOpenWorkordersStore.getState().getOpenWorkorder();
+                      saveBrandToAllBrands(wo?.brand);
                     }, 150);
                   }}
                 />
@@ -984,19 +966,11 @@ export const ActiveWorkorderComponent = ({}) => {
                   placeholder={sDescSwallowing ? "" : "Model / description"}
                   editable={!isDonePaid}
                   capitalize={true}
-                  style={{
-                    width: "100%",
-                    borderWidth: 1,
-                    borderColor: zOpenWorkorder?.description ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
-                    color: C.text,
-                    paddingVertical: 2,
-                    paddingHorizontal: 4,
-                    fontSize: 15,
-                    outlineStyle: "none",
-                    borderRadius: Radius.control,
-                    fontWeight: zOpenWorkorder?.description ? "500" : null,
-                    backgroundColor: sDescSwallowing ? C.dangerMuted : undefined,
-                  }}
+                  style={activeInputStyle({
+                    isActive: sDescFocused,
+                    filled: !!zOpenWorkorder?.description,
+                    swallowing: sDescSwallowing,
+                  })}
                   value={capitalizeFirstLetterOfString(zOpenWorkorder?.description)}
                   onKeyPress={(e) => { if (sDescSwallowing) { e.preventDefault?.(); return; } if (e.nativeEvent.key === "Backspace") descBackspaced.current = true; }}
                   onChangeText={(val) => {
@@ -1010,24 +984,26 @@ export const ActiveWorkorderComponent = ({}) => {
                         (d) => d.toLowerCase().startsWith(q) && d.toLowerCase() !== q
                       );
                       if (matches.length === 1) {
-                        useOpenWorkordersStore.getState().setField("description", matches[0], zOpenWorkorder.id);
+                        const picked = matches[0];
+                        useOpenWorkordersStore.getState().setField("description", picked, zOpenWorkorder.id);
                         _setDescFocused(false);
-                        setTimeout(() => {
+                        const descEl = descInputRef.current?.querySelector?.("input");
+                        if (descEl) descEl.blur();
+                        autoJumpBlock.trigger(`${picked}  →  Color 1`, () => {
                           const el = color1InputRef.current?.querySelector?.("input");
                           if (el) el.focus();
-                          if (color1SwallowTimerRef.current) clearTimeout(color1SwallowTimerRef.current);
-                          _setColor1Swallowing(true);
-                          color1SwallowTimerRef.current = setTimeout(() => _setColor1Swallowing(false), SWALLOW_DURATION_MS);
-                        }, 50);
+                        });
                       }
                     }
                   }}
-                  onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setDescFocused(true); descBackspaced.current = false; descPrevValRef.current = zOpenWorkorder?.description || ""; }}
+                  onPointerDown={gate.onPointerDown}
+                  onFocus={(e) => { if (!sessionValid()) { gate.onFocus(e); return; } _setDescFocused(true); descBackspaced.current = false; descPrevValRef.current = zOpenWorkorder?.description || ""; }}
                   onBlur={() => {
                     setTimeout(() => {
                       _setDescFocused(false);
                       descBackspaced.current = false;
-                      saveDescToAllDescriptions(zOpenWorkorder?.description);
+                      const wo = useOpenWorkordersStore.getState().getOpenWorkorder();
+                      saveDescToAllDescriptions(wo?.description);
                     }, 150);
                     if (descSwallowTimerRef.current) clearTimeout(descSwallowTimerRef.current);
                     _setDescSwallowing(false);
@@ -1141,19 +1117,12 @@ export const ActiveWorkorderComponent = ({}) => {
                     editable={!isDonePaid}
                     capitalize={true}
                     value={capitalizeFirstLetterOfString(zOpenWorkorder?.color1.label)}
-                    style={{
-                      width: "100%",
-                      borderWidth: 1,
-                      borderColor: zOpenWorkorder?.color1?.label ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
-                      paddingVertical: 2,
-                      paddingHorizontal: 4,
-                      fontSize: 15,
-                      outlineStyle: "none",
-                      borderRadius: Radius.control,
-                      fontWeight: zOpenWorkorder?.color1.label ? "500" : null,
-                      backgroundColor: sColor1Swallowing ? C.dangerMuted : zOpenWorkorder?.color1.backgroundColor,
+                    style={activeInputStyle({
+                      filled: !!zOpenWorkorder?.color1?.label,
+                      swallowing: sColor1Swallowing,
+                      backgroundColor: isInvalidBikeColor(zOpenWorkorder?.color1?.label) ? C.danger : zOpenWorkorder?.color1.backgroundColor,
                       color: zOpenWorkorder?.color1.textColor,
-                    }}
+                    })}
                     onKeyPress={(e) => { if (sColor1Swallowing) { e.preventDefault?.(); return; } if (e.nativeEvent.key === "Backspace") color1Backspaced.current = true; }}
                     onChangeText={(val) => {
                       if (sColor1Swallowing) return;
@@ -1178,7 +1147,8 @@ export const ActiveWorkorderComponent = ({}) => {
                         }
                       }
                     }}
-                    onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setColor1Focused(true); color1Backspaced.current = false; color1PrevValRef.current = zOpenWorkorder?.color1?.label || ""; }}
+                    onPointerDown={gate.onPointerDown}
+                    onFocus={(e) => { if (!sessionValid()) { gate.onFocus(e); return; } _setColor1Focused(true); color1Backspaced.current = false; color1PrevValRef.current = zOpenWorkorder?.color1?.label || ""; }}
                     onBlur={() => {
                       setTimeout(() => {
                         _setColor1Focused(false);
@@ -1235,19 +1205,12 @@ export const ActiveWorkorderComponent = ({}) => {
                     editable={!isDonePaid}
                     capitalize={true}
                     value={capitalizeFirstLetterOfString(zOpenWorkorder?.color2.label)}
-                    style={{
-                      width: "100%",
-                      borderWidth: 1,
-                      borderColor: zOpenWorkorder?.color2?.label ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
-                      paddingVertical: 2,
-                      paddingHorizontal: 4,
-                      fontSize: 15,
-                      outlineStyle: "none",
-                      borderRadius: Radius.control,
-                      fontWeight: zOpenWorkorder?.color2.label ? "500" : null,
-                      backgroundColor: sColor2Swallowing ? C.dangerMuted : zOpenWorkorder?.color2.backgroundColor,
+                    style={activeInputStyle({
+                      filled: !!zOpenWorkorder?.color2?.label,
+                      swallowing: sColor2Swallowing,
+                      backgroundColor: isInvalidBikeColor(zOpenWorkorder?.color2?.label) ? C.danger : zOpenWorkorder?.color2.backgroundColor,
                       color: zOpenWorkorder?.color2.textColor,
-                    }}
+                    })}
                     onKeyPress={(e) => { if (sColor2Swallowing) { e.preventDefault?.(); return; } if (e.nativeEvent.key === "Backspace") color2Backspaced.current = true; }}
                     onChangeText={(val) => {
                       if (sColor2Swallowing) return;
@@ -1265,7 +1228,8 @@ export const ActiveWorkorderComponent = ({}) => {
                         }
                       }
                     }}
-                    onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setColor2Focused(true); color2Backspaced.current = false; color2PrevValRef.current = zOpenWorkorder?.color2?.label || ""; }}
+                    onPointerDown={gate.onPointerDown}
+                    onFocus={(e) => { if (!sessionValid()) { gate.onFocus(e); return; } _setColor2Focused(true); color2Backspaced.current = false; color2PrevValRef.current = zOpenWorkorder?.color2?.label || ""; }}
                     onBlur={() => {
                       setTimeout(() => {
                         _setColor2Focused(false);
@@ -1391,7 +1355,8 @@ export const ActiveWorkorderComponent = ({}) => {
               const pd = zOpenWorkorder?.pickupDelivery || {};
 
               const handleStatusSelect = (val) => {
-                useLoginStore.getState().requireLogin(() => {
+                useLoginStore.getState().promptLogin().then((ok) => {
+                  if (!ok) return;
                   const store = useOpenWorkordersStore.getState();
                   store.setField("status", val.id, zOpenWorkorder.id);
                   // Auto-populate pickup/delivery defaults when first selected
@@ -1589,21 +1554,14 @@ export const ActiveWorkorderComponent = ({}) => {
                 placeholder={"0"}
                 editable={!isDonePaid}
                 inputMode="numeric"
-                style={{
+                style={activeInputStyle({
+                  filled: !!zOpenWorkorder?.waitTime?.label,
                   width: 50,
-                  borderWidth: 1,
-                  borderColor: zOpenWorkorder?.waitTime?.label ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
-                  color: C.text,
-                  paddingVertical: 2,
-                  paddingHorizontal: 4,
-                  fontSize: 15,
-                  outlineStyle: "none",
-                  borderRadius: Radius.control,
                   textAlign: "center",
                   fontWeight: (zOpenWorkorder?.waitTime?.maxWaitTimeDays != null && zOpenWorkorder?.waitTime?.maxWaitTimeDays !== "") ? "500" : null,
                   backgroundColor: sWaitTimeBlink ? "rgba(255, 255, 0, 0.35)" : "transparent",
                   transition: "background-color 300ms ease",
-                }}
+                })}
                 value={String(zOpenWorkorder?.waitTime?.maxWaitTimeDays ?? "")}
                 onChangeText={(val) => {
                   if (val !== "" && !checkInputForNumbersOnly(val)) return;
@@ -1627,11 +1585,7 @@ export const ActiveWorkorderComponent = ({}) => {
                   boxSizing: "border-box",
                 }}
               >
-                <div
-                  onMouseEnter={(e) => { e.currentTarget.style.opacity = "1"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.opacity = zOpenWorkorder?.waitTime?.label ? String(FILLED_DROPDOWN_OPACITY) : "1"; }}
-                  style={{ display: "flex", width: "100%", opacity: zOpenWorkorder?.waitTime?.label ? FILLED_DROPDOWN_OPACITY : 1 }}
-                >
+                <div style={{ display: "flex", width: "100%" }}>
                   <DropdownMenu
                     modalCoordX={50}
                     dataArr={zSettings.waitTimes}
@@ -1643,37 +1597,14 @@ export const ActiveWorkorderComponent = ({}) => {
                     }}
                     ref={waitTimesRef}
                     matchValue={zOpenWorkorder?.waitTime?.label || ""}
-                    buttonText={zOpenWorkorder?.waitTime?.label || "Wait Times"}
+                    buttonText={zOpenWorkorder?.waitTime?.label || "WAIT ESTIMATES"}
+                    buttonStyle={!zOpenWorkorder?.waitTime?.label ? { backgroundColor: C.red, borderColor: C.red } : undefined}
+                    buttonTextStyle={!zOpenWorkorder?.waitTime?.label ? { color: C.textWhite, fontWeight: "600" } : undefined}
                   />
                 </div>
               </div>
             </div>
-            <div style={{ display: "flex", flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginTop: 4, boxSizing: "border-box" }}>
-              {(() => {
-                let estimateLabel = calculateWaitEstimateLabel(zOpenWorkorder, useSettingsStore.getState().getSettings());
-                let isMissing = estimateLabel === "Missing estimate" || estimateLabel === "No estimate";
-                let estimateColor = C.textMuted;
-                if (isMissing) estimateColor = C.red;
-                else if (/overdue/i.test(estimateLabel) || /today/i.test(estimateLabel)) estimateColor = C.red;
-                else if (/tomorrow/i.test(estimateLabel)) estimateColor = C.green;
-                else if (estimateLabel) estimateColor = C.blue;
-                return estimateLabel ? (
-                  <span
-                    style={{
-                      color: estimateColor,
-                      fontSize: 13,
-                      fontStyle: "italic",
-                      backgroundColor: sWaitTimeBlink && isMissing ? "rgba(255, 255, 0, 0.35)" : "transparent",
-                      transition: "background-color 300ms ease",
-                      borderRadius: Radius.control,
-                      padding: "2px 4px",
-                      opacity: (zOpenWorkorder?.status === "pickup" || zOpenWorkorder?.status === "delivery") ? 0.35 : 1,
-                    }}
-                  >
-                    {estimateLabel}
-                  </span>
-                ) : <div />;
-              })()}
+            <div style={{ display: "flex", flexDirection: "row", justifyContent: "flex-end", alignItems: "center", width: "100%", marginTop: 4, boxSizing: "border-box" }}>
               <CheckBox
                 isChecked={!!zOpenWorkorder?.itemNotHere}
                 text="Customer item not here"
@@ -1733,21 +1664,14 @@ export const ActiveWorkorderComponent = ({}) => {
                       placeholderTextColor={C.textDisabled}
                       editable={!isDonePaid && hasActiveItem}
                       capitalize={true}
-                      style={{
-                        width: "100%",
-                        borderWidth: 1,
-                        borderColor: C.buttonLightGreenOutline,
-                        color: C.text,
-                        paddingVertical: 2,
-                        paddingHorizontal: 4,
-                        fontSize: 15,
-                        outlineStyle: "none",
-                        borderRadius: Radius.control,
-                        fontWeight: sActiveOrderedItem?.partOrdered ? "500" : null,
+                      style={activeInputStyle({
+                        filled: !!sActiveOrderedItem?.partOrdered,
                         backgroundColor: C.backgroundWhite,
-                      }}
+                        borderColor: C.buttonLightGreenOutline,
+                      })}
                       value={capitalizeFirstLetterOfString(sActiveOrderedItem?.partOrdered || "")}
-                      onFocus={() => useLoginStore.getState().requireLogin(() => {})}
+                      onPointerDown={gate.onPointerDown}
+                      onFocus={gate.onFocus}
                       onChangeText={(val) => {
                         updateActiveItemField("partOrdered", val);
                       }}
@@ -1772,20 +1696,12 @@ export const ActiveWorkorderComponent = ({}) => {
                         placeholderTextColor={C.textDisabled}
                         editable={!isDonePaid && hasActiveItem}
                         capitalize={true}
-                        style={{
-                          width: "100%",
-                          borderWidth: 1,
-                          borderColor: sActiveOrderedItem?.partSource ? FILLED_BORDER_COLOR : C.buttonLightGreenOutline,
-                          color: C.text,
-                          paddingVertical: 2,
-                          paddingHorizontal: 4,
-                          fontSize: 15,
-                          outlineStyle: "none",
-                          borderRadius: Radius.control,
-                          fontWeight: sActiveOrderedItem?.partSource ? "500" : null,
+                        style={activeInputStyle({
+                          filled: !!sActiveOrderedItem?.partSource,
                           backgroundColor: C.backgroundWhite,
-                        }}
-                        onFocus={() => { useLoginStore.getState().requireLogin(() => {}); _setPartSourceFocused(true); }}
+                        })}
+                        onPointerDown={gate.onPointerDown}
+                        onFocus={(e) => { if (!sessionValid()) { gate.onFocus(e); return; } _setPartSourceFocused(true); }}
                         onBlur={() => {
                           setTimeout(() => {
                             _setPartSourceFocused(false);
@@ -2342,6 +2258,7 @@ export const ActiveWorkorderComponent = ({}) => {
         position="top-middle"
         onHide={() => _sSetToastVisible(false)}
       />
+      <AutoJumpBlocker show={autoJumpBlock.blocking} message={autoJumpBlock.message} />
     </div>
   );
 };

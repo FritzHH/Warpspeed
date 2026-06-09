@@ -7,10 +7,18 @@ import { useZ } from "../../hooks/useZ";
 import styles from "./AlertBox.module.css";
 
 const OFFSET_PX = 20;
+const GHOST_CLICK_GUARD_MS = 300;
 
 export const AlertBox = ({ showAlert }) => {
   const zAlerts = useAlertScreenStore((state) => state.alerts);
   const z = useZ("alert", showAlert);
+  const topShownAtRef = useRef(0);
+
+  const topId = zAlerts.length > 0 ? zAlerts[zAlerts.length - 1].id : null;
+
+  useEffect(() => {
+    if (topId) topShownAtRef.current = Date.now();
+  }, [topId]);
 
   useEffect(() => {
     if (!showAlert) return;
@@ -47,6 +55,7 @@ export const AlertBox = ({ showAlert }) => {
         data-alert-portal=""
         style={{ zIndex: z }}
         onClick={() => {
+          if (Date.now() - topShownAtRef.current < GHOST_CLICK_GUARD_MS) return;
           if (topAlert.canExitOnOuterClick) {
             useAlertScreenStore.getState().dismissTop();
           }

@@ -50,6 +50,7 @@ export const LoginModal = forwardRef(function LoginModal(
       _setPin("");
       _setError("");
       store.setShowLoginScreen(false);
+      store.resolveLoginPrompt(true);
     }, 500);
     return () => clearInterval(interval);
   }, [modalVisible, sSuccess]);
@@ -59,6 +60,7 @@ export const LoginModal = forwardRef(function LoginModal(
     _setError("");
     _setSuccess(false);
     useLoginStore.getState().setShowLoginScreen(false);
+    useLoginStore.getState().resolveLoginPrompt(false);
   }
 
   async function handlePinChange(input) {
@@ -103,7 +105,7 @@ export const LoginModal = forwardRef(function LoginModal(
     _setPin("");
     _setError("");
     useLoginStore.getState().setShowLoginScreen(false);
-    useLoginStore.getState().runPostLoginFunction();
+    useLoginStore.getState().resolveLoginPrompt(true);
     runPostLoginChain(userObj);
   }
 

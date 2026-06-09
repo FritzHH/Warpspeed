@@ -21,6 +21,7 @@ export { Dialog } from "./Dialog/Dialog";
 export { Tooltip } from "./Tooltip/Tooltip";
 export { AlertBox } from "./AlertBox/AlertBox";
 export { Toast } from "./Toast/Toast";
+export { AutoJumpBlocker } from "./AutoJumpBlocker/AutoJumpBlocker";
 export { ModalFooter, ModalFooterButton } from "./ModalFooter/ModalFooter";
 export { ModalHeader, ModalHeaderButton } from "./ModalHeader/ModalHeader";
 export { LargeModalHeader, LargeModalHeaderButton } from "./LargeModalHeader/LargeModalHeader";

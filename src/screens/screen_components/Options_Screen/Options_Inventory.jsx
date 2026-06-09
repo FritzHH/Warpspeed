@@ -1198,7 +1198,8 @@ export function InventoryComponent({}) {
       _setModalItem({ ...item });
       return;
     }
-    useLoginStore.getState().requireLogin(() => {
+    useLoginStore.getState().promptLogin().then((ok) => {
+      if (!ok) return;
       console.log("  -> adding to workorder:", openWorkorder.id);
       let workorderLines = openWorkorder.workorderLines;
       if (!workorderLines) workorderLines = [];
@@ -1376,10 +1377,10 @@ export function InventoryComponent({}) {
   function handleCustomItemSave(lineItem) {
     const openWorkorder = useOpenWorkordersStore.getState().getOpenWorkorder();
     if (!openWorkorder) return;
-    useLoginStore.getState().requireLogin(() => {
+    useLoginStore.getState().promptLogin().then((ok) => {
+      if (!ok) return;
       let workorderLines = openWorkorder.workorderLines || [];
       workorderLines = [...workorderLines, lineItem];
-      // Track newly added line so intake notes auto-open
       if (!useOpenWorkordersStore._newLineIDs) useOpenWorkordersStore._newLineIDs = new Set();
       useOpenWorkordersStore._newLineIDs.add(lineItem.id);
       useOpenWorkordersStore.getState().setField("workorderLines", workorderLines);

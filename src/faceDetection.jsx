@@ -368,7 +368,7 @@ export function FaceDetectionClientComponent({ __handleEnrollDescriptor }) {
         useLoginStore.getState().setLastActionMillis();
         useLoginStore.getState().setCameraStatus("matched");
         if (isFreshLogin) {
-          useLoginStore.getState().runPostLoginFunction();
+          useLoginStore.getState().resolveLoginPrompt(true);
           useLoginStore.getState().triggerLoginMessagesAutoOpen(matchedUser);
           checkClockIn(matchedUser);
         }
